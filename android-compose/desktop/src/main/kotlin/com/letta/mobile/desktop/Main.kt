@@ -25,11 +25,17 @@ import javax.swing.JOptionPane
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.system.exitProcess
 
+internal const val LETTA_WINDOWS_AUMID = "com.letta.desktop"
+internal const val LETTA_DESKTOP_APP_NAME = "Letta Desktop"
+
 fun main(args: Array<String>) {
     applyLinuxHiDpiScale()
     DesktopCrashReporter.installGlobalHandler()
     initializeDesktopLifecycleMainThread()
-    if (Platform.Current == Platform.Windows) WindowsJumpListManager.setProcessAppId()
+    if (Platform.Current == Platform.Windows) {
+        System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
+        WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)
+    }
     val activationHandler = DesktopWindowActivationHandler()
     runDesktopApplication(args, activationHandler)
 }

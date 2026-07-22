@@ -88,10 +88,10 @@ private fun UpdateSettingsSection(state: DesktopNucleusState, actions: Destinati
 private fun NotificationSettingsSection(state: DesktopNucleusState, actions: DestinationNucleusActions) {
     SettingsSection(
         title = "Notifications",
-        supporting = if (state.notificationsAvailable) {
+        supporting = state.notificationMessage ?: if (state.notificationsAvailable) {
             "Native notifications are available for completed responses and failures."
         } else {
-            "The current desktop session does not expose a native notification service."
+            "The current desktop session could not initialize native notifications."
         },
     ) {
         DesktopOutlinedButton(

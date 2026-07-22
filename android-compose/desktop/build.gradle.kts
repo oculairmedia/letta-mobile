@@ -134,6 +134,7 @@ dependencies {
     implementation("dev.nucleusframework:nucleus.native-http:$nucleusVersion")
     implementation("dev.nucleusframework:nucleus.native-ssl:$nucleusVersion")
     implementation("dev.nucleusframework:nucleus.notification-common:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.notification-windows:$nucleusVersion")
     implementation("dev.nucleusframework:nucleus.system-info:$nucleusVersion")
     implementation("dev.nucleusframework:nucleus.darkmode-detector:$nucleusVersion")
     implementation("dev.nucleusframework:nucleus.system-color:$nucleusVersion")

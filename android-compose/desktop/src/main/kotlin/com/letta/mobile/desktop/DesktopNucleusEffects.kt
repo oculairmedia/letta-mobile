@@ -205,7 +205,7 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
                     ),
                 ),
             )
-            WindowsBadgeManager.initialize()
+            WindowsBadgeManager.initialize(LETTA_WINDOWS_AUMID)
         }
         Platform.MacOS -> {
             MacOsDockMenu.listener = { itemId ->

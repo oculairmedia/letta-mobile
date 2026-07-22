@@ -4,7 +4,11 @@ import dev.nucleusframework.autolaunch.AutoLaunch
 import dev.nucleusframework.autolaunch.AutoLaunchState
 import dev.nucleusframework.nativehttp.NativeHttpClient
 import dev.nucleusframework.notification.common.NotificationManager
+import dev.nucleusframework.notification.common.NotificationResult
 import dev.nucleusframework.notification.common.notification
+import dev.nucleusframework.notification.windows.ShortcutPolicy
+import dev.nucleusframework.notification.windows.WindowsNotificationCenter
+import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.systeminfo.SystemInfo
 import dev.nucleusframework.updater.NucleusUpdater
 import dev.nucleusframework.updater.UpdateInfo
@@ -52,6 +56,7 @@ internal data class DesktopNucleusState(
     val updateMessage: String? = null,
     val autoLaunchState: AutoLaunchState = AutoLaunchState.UNSUPPORTED,
     val notificationsAvailable: Boolean = false,
+    val notificationMessage: String? = null,
     val system: DesktopSystemSnapshot = DesktopSystemSnapshot(),
     val justUpdatedMessage: String? = null,
 )
@@ -78,12 +83,17 @@ internal class DesktopNucleusController(
     init {
         scope.launch(Dispatchers.IO) {
             AutoLaunch.preload()
-            NotificationManager.initialize()
+            val notificationsInitialized = initializeNotifications()
             val updateEvent = updater.consumeUpdateEvent()
             mutableState.update {
                 it.copy(
                     autoLaunchState = AutoLaunch.state(),
-                    notificationsAvailable = NotificationManager.isAvailable(),
+                    notificationsAvailable = notificationsInitialized,
+                    notificationMessage = if (notificationsInitialized) {
+                        null
+                    } else {
+                        "Windows could not initialize the native notification identity."
+                    },
                     justUpdatedMessage = updateEvent?.let { event ->
                         "Updated from ${event.previousVersion} to ${event.newVersion}"
                     },
@@ -208,11 +218,24 @@ internal class DesktopNucleusController(
     }
 
     fun sendTestNotification(onActivated: () -> Unit) {
-        notification(
+        val result = notification(
             title = "Letta Desktop",
             message = "Native notifications are connected.",
             onActivated = onActivated,
+            onFailed = {
+                mutableState.update {
+                    it.copy(notificationMessage = "Windows rejected the test notification.")
+                }
+            },
         ).send()
+        mutableState.update {
+            it.copy(
+                notificationMessage = when (result) {
+                    is NotificationResult.Success -> "Test notification sent to Windows."
+                    is NotificationResult.Failure -> "Notification failed: ${result.reason}"
+                },
+            )
+        }
     }
 
     fun notifyAgentFinished(agentName: String, onActivated: () -> Unit) {
@@ -229,5 +252,21 @@ internal class DesktopNucleusController(
             message = message,
             onActivated = onActivated,
         ).send()
+    }
+
+    private fun initializeNotifications(): Boolean {
+        val initialized = if (Platform.Current == Platform.Windows) {
+            WindowsNotificationCenter.initialize(
+                aumid = LETTA_WINDOWS_AUMID,
+                appName = LETTA_DESKTOP_APP_NAME,
+                shortcutPolicy = ShortcutPolicy.REQUIRE_CREATE,
+            )
+        } else {
+            NotificationManager.isAvailable()
+        }
+        // Marks the common dispatcher initialized after the Windows backend has
+        // established the explicit AUMID and Start Menu shortcut.
+        NotificationManager.initialize()
+        return initialized && NotificationManager.isAvailable()
     }
 }
