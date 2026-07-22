@@ -82,6 +82,7 @@
   <string name="screen_drawer_memory">Memory</string>
   <string name="screen_drawer_reset_icon_description">Reset</string>
   <string name="screen_drawer_schedules">Schedules</string>
+  <string name="screen_drawer_projects">Projects</string>
   <string name="screen_home_search_messages_section">Messages</string>
   <string name="screen_home_search_no_results">No results found</string>
   <string name="screen_project_agents_empty">No linked coding agents are currently visible for this project.</string>

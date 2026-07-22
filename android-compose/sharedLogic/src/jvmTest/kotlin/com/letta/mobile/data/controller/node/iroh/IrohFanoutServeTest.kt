@@ -150,7 +150,7 @@ class IrohFanoutServeTest {
             }),
             raw(buildJsonObject {
                 put("message_type", "assistant_message"); put("otid", otid)
-                put("id", "letta-msg-1"); put("content", "Hello world")
+                put("id", "letta-msg-1"); put("content", "lo world")
             }),
             raw(buildJsonObject {
                 put("message_type", "tool_return_message"); put("tool_call_id", toolCallId)
@@ -445,8 +445,8 @@ class IrohFanoutServeTest {
         val a = viewer("conn-A", sinkA)
         registry.register("conv-C", a)
 
-        // Build a scripted flow with THREE cumulative assistant deltas so we can
-        // join between them and prove convergence.
+        // Build a scripted flow with THREE incremental assistant deltas so we can
+        // join between them and prove the fanout emits cumulative text.
         val seq = AtomicLong(0)
         fun raw(delta: JsonObject) = RuntimeEventPayload.RemoteStreamFrame(
             frameId = "f-${UUID.randomUUID()}", messageId = null, messageType = null,
@@ -472,15 +472,15 @@ class IrohFanoutServeTest {
         )
         val leaverFramesAtDisconnect = leaverSink.frames().size
 
-        fanout.onDraft(assistant("Hello wor"))
+        fanout.onDraft(assistant("lo wor"))
 
         // Joiner registers mid-turn (its own message.list subscribe would do this).
         val joinerSink = CapturingSink()
         val joiner = viewer("conn-joiner", joinerSink)
         registry.register("conv-C", joiner)
 
-        // Final cumulative delta + terminal.
-        fanout.onDraft(assistant("Hello world"))
+        // Final incremental delta is emitted cumulatively, followed by terminal.
+        fanout.onDraft(assistant("ld"))
         fanout.onDraft(RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Completed, reason = "end_turn"))
 
         // JOINER converged to the FINAL text + one terminal.

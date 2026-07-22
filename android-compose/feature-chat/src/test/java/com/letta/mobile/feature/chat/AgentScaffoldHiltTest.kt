@@ -39,12 +39,14 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
+import kotlinx.coroutines.test.runTest
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.screen.AdminChatViewModel
 import com.letta.mobile.feature.chat.screen.AgentScaffoldTestTags
+import com.letta.mobile.feature.chat.screen.closeDrawerThenRun
 
 @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
 @RunWith(RobolectricTestRunner::class)
@@ -85,9 +87,11 @@ class AgentScaffoldHiltTest {
     private fun testNavigation(
         onNavigateBack: () -> Unit = {},
         onNavigateToSettings: (String) -> Unit = {},
+        onNavigateToProjects: (() -> Unit)? = null,
     ) = AgentScaffoldNavigationCallbacks(
         onNavigateBack = onNavigateBack,
         onNavigateToSettings = onNavigateToSettings,
+        onNavigateToProjects = onNavigateToProjects,
     )
 
     @Before
@@ -127,6 +131,20 @@ class AgentScaffoldHiltTest {
 
         composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
         composeRule.onNodeWithText("Context utilization").assertIsDisplayed()
+    }
+
+    @Test
+    fun projectsNavigationClosesDrawerBeforeCallback() = runTest {
+        val calls = mutableListOf<String>()
+
+        closeDrawerThenRun(
+            closeDrawer = { calls += "drawer closed" },
+            action = { calls += "projects navigated" },
+        )
+
+        assert(calls == listOf("drawer closed", "projects navigated")) {
+            "Expected drawer close before Projects navigation, got: $calls"
+        }
     }
 
     @Test
