@@ -18,8 +18,6 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Ktor-backed App Server transport.
@@ -112,26 +110,13 @@ class KtorAppServerWebSocketTransport(
     ) {
         for (frame in incoming) {
             if (frame is Frame.Text) {
-                sink.emit(decodeFrame(frame.readText(), channel))
+                // protocol.decodeFrame is total: malformed frames surface as
+                // AppServerInboundFrame.DecodeFailure rather than throwing, so a
+                // bad frame never tears down this receive loop (letta-mobile-lgns8.4).
+                sink.emit(protocol.decodeFrame(frame.readText(), channel))
             }
         }
     }
-
-    private fun decodeFrame(rawText: String, channel: AppServerChannel): AppServerReceivedFrame =
-        runCatching {
-            protocol.decodeFrame(rawText, channel)
-        }.getOrElse { error ->
-            val raw = buildJsonObject {
-                put("type", "decode_error")
-                put("raw", rawText)
-                put("message", error.message ?: "Failed to decode App Server frame")
-            }
-            AppServerReceivedFrame(
-                channel = channel,
-                frame = AppServerInboundFrame.Unknown(type = "decode_error", raw = raw),
-                raw = raw,
-            )
-        }
 
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
