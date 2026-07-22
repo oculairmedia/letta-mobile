@@ -10,6 +10,9 @@ import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeRunStatus
+import com.letta.mobile.runtime.ToolCallId
+import com.letta.mobile.runtime.ToolExecutionStatus
+import com.letta.mobile.runtime.ToolName
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
 import kotlinx.coroutines.sync.Mutex
@@ -430,6 +433,242 @@ class ConversationTurnFanoutTest {
         assertEquals(5, parked.size, "parking must be initiator-scoped, once per delta")
         // The tracked terminal is the stop_reason delta.
         assertTrue(parked.last().contains("stop_reason"))
+    }
+
+    @Test
+    fun rawAndSemanticToolEventsBroadcastOneLogicalCallAndReturn() = runTest {
+        val registry = ConnectionRegistry()
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+        val seq = AtomicLong(0)
+        fun raw(delta: JsonObject) = RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "dedup-${seq.incrementAndGet()}",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(seq.get(), delta),
+        )
+        val callId = ToolCallId("tc-dedup")
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(callId, ToolName("bash"), "{}"))
+        fanout.onDraft(raw(buildJsonObject {
+            put("message_type", "tool_call_message")
+            put("tool_call", buildJsonObject {
+                put("tool_call_id", callId.value)
+                put("name", "bash")
+                put("arguments", "{}")
+            })
+        }))
+        fanout.onDraft(raw(buildJsonObject {
+            put("message_type", "tool_return_message")
+            put("id", "message-tool-return-rotating")
+            put("tool_call_id", callId.value)
+            put("status", "success")
+            put("tool_return", "ok")
+        }))
+        fanout.onDraft(RuntimeEventPayload.ToolReturnObserved(callId, ToolExecutionStatus.Succeeded, "ok"))
+
+        val deltas = sink.frames().map { json.parseToJsonElement(it).jsonObject["delta"]!!.jsonObject }
+        assertEquals(1, deltas.count { it["message_type"]!!.jsonPrimitive.content == "tool_call_message" })
+        assertEquals(1, deltas.count { it["message_type"]!!.jsonPrimitive.content == "tool_return_message" })
+        fanout.flushOpenToolCalls()
+        assertEquals(2, sink.frames().size, "real return must close the tracker despite duplicate suppression")
+    }
+
+    @Test
+    fun sameIdRawToolUpdatesBroadcastDistinctArgumentSnapshots() = runTest {
+        val registry = ConnectionRegistry()
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+        val seq = AtomicLong(0)
+        fun raw(arguments: String) = RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "update-${seq.incrementAndGet()}",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(seq.get(), buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("tool_call", buildJsonObject {
+                    put("tool_call_id", "tc-progressive")
+                    put("name", "bash")
+                    put("arguments", arguments)
+                })
+            }),
+        )
+
+        fanout.onDraft(raw("{\"command\":\"ec\"}"))
+        fanout.onDraft(raw("{\"command\":\"echo ok\"}"))
+        fanout.onDraft(raw("{\"command\":\"echo ok\"}"))
+
+        val arguments = sink.frames().map {
+            json.parseToJsonElement(it).jsonObject["delta"]!!.jsonObject["tool_call"]!!
+                .jsonObject["arguments"]!!.jsonPrimitive.content
+        }
+        assertEquals(listOf("{\"command\":\"ec\"}", "{\"command\":\"echo ok\"}"), arguments)
+    }
+
+    @Test
+    fun topLevelToolCallShapeDeduplicatesAgainstSemanticEvent() = runTest {
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+        val fanout = fanoutFor(registry, initiator)
+        val callId = ToolCallId("tc-top-level")
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(callId, ToolName("bash"), "{\"command\":\"pwd\"}"))
+        fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "raw-top-level",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(1, buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("tool_call_id", callId.value)
+                put("name", "bash")
+                put("arguments", "{\"command\":\"pwd\"}")
+            }),
+        ))
+
+        assertEquals(1, sink.frames().size)
+    }
+
+    @Test
+    fun toolCallsArrayShapeDeduplicatesAgainstSemanticEvent() = runTest {
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+        val fanout = fanoutFor(registry, initiator)
+        val callId = ToolCallId("tc-array")
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(callId, ToolName("bash"), "{\"command\":\"pwd\"}"))
+        fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "raw-array",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(1, buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("id", "message-id")
+                put("tool_calls", kotlinx.serialization.json.buildJsonArray {
+                    add(buildJsonObject {
+                        put("tool_call_id", callId.value)
+                        put("name", "bash")
+                        put("arguments", "{\"command\":\"pwd\"}")
+                    })
+                })
+            }),
+        ))
+
+        assertEquals(1, sink.frames().size)
+    }
+
+    @Test
+    fun toolCallsArrayBroadcastsOnlyEntriesNotAlreadyObserved() = runTest {
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+        val fanout = fanoutFor(registry, initiator)
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(ToolCallId("tc-seen"), ToolName("bash"), "{}"))
+        fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "raw-array-partial-overlap",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(1, buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("tool_calls", kotlinx.serialization.json.buildJsonArray {
+                    add(buildJsonObject {
+                        put("tool_call_id", "tc-seen")
+                        put("name", "bash")
+                        put("arguments", "{}")
+                    })
+                    add(buildJsonObject {
+                        put("tool_call_id", "tc-new")
+                        put("name", "bash")
+                        put("arguments", "{\"command\":\"pwd\"}")
+                    })
+                })
+            }),
+        ))
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(
+            ToolCallId("tc-new"),
+            ToolName("bash"),
+            "{\"command\":\"pwd\"}",
+        ))
+
+        assertEquals(2, sink.frames().size, "the array must broadcast once for its previously unseen entry")
+    }
+
+    @Test
+    fun returnAliasesAndDefaultStatusDeduplicateAgainstSemanticEvent() = runTest {
+        listOf("output", "message", "content").forEach { bodyAlias ->
+            val sink = CapturingSink()
+            val initiator = viewer("conn-$bodyAlias", sink)
+            val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+            val fanout = fanoutFor(registry, initiator)
+            val callId = ToolCallId("tc-$bodyAlias")
+
+            fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+                frameId = "raw-$bodyAlias",
+                messageId = null,
+                messageType = null,
+                body = rawStreamDeltaBody(1, buildJsonObject {
+                    put("message_type", "tool_return_message")
+                    put("tool_call_id", callId.value)
+                    put(bodyAlias, "ok")
+                }),
+            ))
+            fanout.onDraft(RuntimeEventPayload.ToolReturnObserved(callId, ToolExecutionStatus.Succeeded, "ok"))
+
+            assertEquals(1, sink.frames().size, "alias $bodyAlias should use mapper-equivalent normalization")
+        }
+    }
+
+    @Test
+    fun richerRawReturnIsPreservedAfterSemanticReturn() = runTest {
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+        val fanout = fanoutFor(registry, initiator)
+        val callId = ToolCallId("tc-rich")
+
+        fanout.onDraft(RuntimeEventPayload.ToolReturnObserved(callId, ToolExecutionStatus.Succeeded, "ok"))
+        fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "raw-rich",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(1, buildJsonObject {
+                put("message_type", "tool_return_message")
+                put("tool_call_id", callId.value)
+                put("status", "success")
+                put("tool_return", "ok")
+                put("stdout", kotlinx.serialization.json.buildJsonArray { add(kotlinx.serialization.json.JsonPrimitive("full output")) })
+                put("metadata", buildJsonObject { put("duration_ms", 12) })
+            }),
+        ))
+
+        val deltas = sink.frames().map { json.parseToJsonElement(it).jsonObject["delta"]!!.jsonObject }
+        assertEquals(2, deltas.size)
+        assertTrue(deltas.last().containsKey("stdout"))
+        assertTrue(deltas.last().containsKey("metadata"))
+        fanout.flushOpenToolCalls()
+        assertEquals(2, sink.frames().size, "dedupe state must not interfere with open-tool tracking")
+    }
+
+    @Test
+    fun distinctToolCallIdsAreNotDeduplicated() = runTest {
+        val registry = ConnectionRegistry()
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+
+        listOf("tc-one", "tc-two").forEach { id ->
+            fanout.onDraft(RuntimeEventPayload.ToolCallObserved(ToolCallId(id), ToolName("bash"), "{}"))
+            fanout.onDraft(RuntimeEventPayload.ToolReturnObserved(ToolCallId(id), ToolExecutionStatus.Succeeded, "ok"))
+        }
+
+        assertEquals(4, sink.frames().size)
     }
 
     @Test
