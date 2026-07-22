@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.iroh.canonicalToolCalls
+import com.letta.mobile.data.transport.iroh.canonicalToolReturn
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
@@ -100,6 +102,7 @@ internal class ConversationTurnFanout(
 ) {
     private val openToolCalls = OpenToolCallTracker()
     private val cumulativeText = CumulativeStreamText()
+    private val broadcastToolSignatures = mutableSetOf<String>()
     private var terminalWritten = false
 
     /** Whether a terminal frame has already been broadcast for this turn. */
@@ -143,7 +146,7 @@ internal class ConversationTurnFanout(
                     })
                 }
                 openToolCalls.observe(delta.toString())
-                broadcastDeltaBody(delta)
+                broadcastToolDeltaIfNew(delta)
                 false
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
@@ -154,7 +157,7 @@ internal class ConversationTurnFanout(
                     put("tool_return", payload.body)
                 }
                 openToolCalls.observe(delta.toString())
-                broadcastDeltaBody(delta)
+                broadcastToolDeltaIfNew(delta)
                 false
             }
             is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
@@ -211,8 +214,35 @@ internal class ConversationTurnFanout(
             return false
         }
         val tagged = tagStreamDeltaForOptimisticDedup(delta)
-        broadcastDeltaBody(tagged)
+        broadcastToolDeltaIfNew(tagged)
         return deltaIsTerminal(tagged)
+    }
+
+    private suspend fun broadcastToolDeltaIfNew(delta: JsonObject) {
+        val signatures = toolDeltaSignatures(delta)
+        if (signatures.isEmpty() || signatures.map(broadcastToolSignatures::add).any { it }) broadcastDeltaBody(delta)
+    }
+
+    private fun toolDeltaSignatures(delta: JsonObject): List<String> = when (DanglingToolCallSynthesizer.messageType(delta)) {
+        "tool_call_message", "approval_request_message" -> canonicalToolCallSignatures(delta)
+        "tool_return_message" -> listOfNotNull(canonicalToolReturnSignature(delta))
+        else -> emptyList()
+    }
+
+    private fun canonicalToolCallSignatures(delta: JsonObject): List<String> =
+        canonicalToolCalls(delta).map { "call|${it.toolCallId}|${it.name}|${it.arguments}" }
+
+    private fun canonicalToolReturnSignature(delta: JsonObject): String? {
+        val canonical = canonicalToolReturn(delta)
+        if (canonical.toolCallId.isBlank()) return null
+        return buildString {
+            append("return|").append(canonical.toolCallId)
+            append('|').append(canonical.status)
+            append('|').append(canonical.body)
+            append('|').append(delta["stdout"])
+            append('|').append(delta["stderr"])
+            append('|').append(delta["metadata"])
+        }
     }
 
     /** Flush a synthetic cancelled tool_return for every still-open tool_call (8s45p), fanned out. */
