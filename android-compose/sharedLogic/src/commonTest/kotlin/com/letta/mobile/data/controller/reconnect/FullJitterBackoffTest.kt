@@ -4,65 +4,59 @@ import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FullJitterBackoffTest {
+
     @Test
-    fun delaysAreFullJitterWithinTheExponentialCap() {
-        val backoff = FullJitterBackoff(baseDelayMs = 1_000, maxDelayMs = 30_000, maxAttempts = 10, random = Random(42))
-        repeat(200) {
-            for (attempt in 0 until 10) {
-                val cap = minOf(30_000L, 1_000L shl attempt)
-                val delay = backoff.delayFor(attempt)
-                assertTrue(delay != null && delay in 0..cap, "attempt $attempt produced $delay outside [0, $cap]")
-            }
+    fun ceilingGrowsExponentiallyThenCaps() {
+        val backoff = FullJitterBackoff(baseDelayMs = 100, maxDelayMs = 2_000, multiplier = 2.0)
+        assertEquals(100, backoff.ceilingMs(0))
+        assertEquals(200, backoff.ceilingMs(1))
+        assertEquals(400, backoff.ceilingMs(2))
+        assertEquals(800, backoff.ceilingMs(3))
+        assertEquals(1_600, backoff.ceilingMs(4))
+        assertEquals(2_000, backoff.ceilingMs(5)) // capped
+        assertEquals(2_000, backoff.ceilingMs(50)) // stays capped, no overflow
+    }
+
+    @Test
+    fun delayIsWithinCeiling() {
+        val backoff = FullJitterBackoff(baseDelayMs = 100, maxDelayMs = 5_000, multiplier = 2.0)
+        val rng = Random(42)
+        repeat(1_000) {
+            val attempt = it % 10
+            val delay = backoff.delayMs(attempt, rng)
+            assertTrue(delay in 0..backoff.ceilingMs(attempt), "delay $delay out of [0, ${backoff.ceilingMs(attempt)}] for attempt $attempt")
         }
     }
 
     @Test
-    fun delayCapNeverExceedsMaxDelay() {
-        val backoff = FullJitterBackoff(baseDelayMs = 1_000, maxDelayMs = 5_000, maxAttempts = 40, random = Random(7))
-        for (attempt in 0 until 40) {
-            val delay = backoff.delayFor(attempt)
-            assertTrue(delay != null && delay <= 5_000, "attempt $attempt produced $delay above the cap")
-        }
+    fun delayIsDeterministicForSeededRandom() {
+        val backoff = FullJitterBackoff(baseDelayMs = 250, maxDelayMs = 30_000)
+        val a = FullJitterBackoff(baseDelayMs = 250, maxDelayMs = 30_000)
+        val seedForEach = { Random(7) }
+        val seqA = (0..6).map { backoff.delayMs(it, seedForEach()) }
+        val seqB = (0..6).map { a.delayMs(it, seedForEach()) }
+        assertEquals(seqA, seqB)
     }
 
     @Test
-    fun exhaustedAttemptBudgetReturnsNull() {
-        val backoff = FullJitterBackoff(maxAttempts = 3, random = Random(1))
-        assertTrue(backoff.delayFor(2) != null)
-        assertNull(backoff.delayFor(3))
-        assertNull(backoff.delayFor(100))
+    fun jitterProducesSpread() {
+        // Full jitter must not collapse to a single value: many draws at the
+        // same attempt should span a meaningful fraction of the ceiling.
+        val backoff = FullJitterBackoff(baseDelayMs = 1_000, maxDelayMs = 1_000)
+        val rng = Random(99)
+        val draws = (0 until 200).map { backoff.delayMs(3, rng) }
+        assertTrue(draws.min() < 250, "min ${draws.min()} not low enough — no jitter?")
+        assertTrue(draws.max() > 750, "max ${draws.max()} not high enough — no jitter?")
     }
 
     @Test
-    fun hugeAttemptNumbersDoNotOverflow() {
-        val backoff = FullJitterBackoff(
-            baseDelayMs = 1_000,
-            maxDelayMs = 30_000,
-            maxAttempts = Int.MAX_VALUE,
-            random = Random(3),
-        )
-        val delay = backoff.delayFor(Int.MAX_VALUE - 1)
-        assertTrue(delay != null && delay in 0..30_000)
-    }
-
-    @Test
-    fun invalidConfigurationFailsFast() {
+    fun rejectsInvalidConfig() {
         assertFailsWith<IllegalArgumentException> { FullJitterBackoff(baseDelayMs = 0) }
         assertFailsWith<IllegalArgumentException> { FullJitterBackoff(baseDelayMs = 100, maxDelayMs = 50) }
-        assertFailsWith<IllegalArgumentException> { FullJitterBackoff(maxAttempts = 0) }
-    }
-
-    @Test
-    fun injectedRandomMakesDelaysDeterministic() {
-        val a = FullJitterBackoff(random = Random(99))
-        val b = FullJitterBackoff(random = Random(99))
-        assertEquals(
-            (0 until 10).map { a.delayFor(it) },
-            (0 until 10).map { b.delayFor(it) },
-        )
+        assertFailsWith<IllegalArgumentException> { FullJitterBackoff(multiplier = 0.5) }
+        assertFailsWith<IllegalArgumentException> { FullJitterBackoff().ceilingMs(-1) }
     }
 }

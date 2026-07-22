@@ -100,6 +100,8 @@ class ReconnectingAppServerClient(
     private val connect: suspend () -> AppServerClientGeneration,
     private val listener: ReconnectingClientListener = object : ReconnectingClientListener {},
     private val backoff: FullJitterBackoff = FullJitterBackoff(),
+    private val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
+    private val random: kotlin.random.Random = kotlin.random.Random.Default,
     private val sleep: suspend (Long) -> Unit = { delay(it) },
 ) : AppServerClient {
     private val _state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Stopped)
@@ -132,11 +134,11 @@ class ReconnectingAppServerClient(
                         return@launch
                     }
                 }
-                val delayMs = backoff.delayFor(attempt)
-                if (delayMs == null) {
-                    giveUp("reconnect attempts exhausted after ${backoff.maxAttempts} tries: ${outcome.reason}")
+                if (attempt >= maxAttempts) {
+                    giveUp("reconnect attempts exhausted after $maxAttempts tries: ${outcome.reason}")
                     return@launch
                 }
+                val delayMs = backoff.delayMs(attempt, random)
                 _state.value = ReconnectingClientState.BackingOff(attempt, delayMs, outcome.reason)
                 Telemetry.event(
                     "AppServerReconnect",
@@ -263,5 +265,6 @@ class ReconnectingAppServerClient(
 
     companion object {
         private const val EVENT_BUFFER = 256
+        const val DEFAULT_MAX_ATTEMPTS = 10
     }
 }

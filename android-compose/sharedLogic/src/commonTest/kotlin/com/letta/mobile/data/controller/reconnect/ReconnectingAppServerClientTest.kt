@@ -116,8 +116,7 @@ class ReconnectingAppServerClientTest {
         }
     }
 
-    private fun backoff(maxAttempts: Int = 5) =
-        FullJitterBackoff(baseDelayMs = 100, maxDelayMs = 1_000, maxAttempts = maxAttempts, random = Random(1))
+    private fun backoff() = FullJitterBackoff(baseDelayMs = 100, maxDelayMs = 1_000)
 
     @Test
     fun failsFastBeforeFirstGenerationIsReady() = runTest {
@@ -218,7 +217,9 @@ class ReconnectingAppServerClientTest {
                 error("dial refused")
             },
             listener = listener,
-            backoff = backoff(maxAttempts = 3),
+            backoff = backoff(),
+            maxAttempts = 3,
+            random = Random(1),
             sleep = { sleeps += it },
         )
         client.start(backgroundScope)
