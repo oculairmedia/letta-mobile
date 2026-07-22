@@ -2,6 +2,7 @@ package com.letta.mobile.cli.commands
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
@@ -10,6 +11,8 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
@@ -102,10 +105,37 @@ internal class AppServerServeIrohCommand : CliktCommand(
             "never dial it directly.",
     ).default("http://127.0.0.1:8291")
 
+    private val allowInsecureAnonymousIroh by option(
+        "--allow-insecure-anonymous-iroh",
+        help = "TEST/DEV ONLY: run the Iroh endpoint with NO authentication. Every peer that " +
+            "can dial the ticket gets full runtime and admin access. Prohibited for release " +
+            "or long-running service use; a warning is printed on every start.",
+    ).flag(default = false)
+
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         
         try {
+            // d6e8g.2: fail closed — refuse anonymous startup unless explicitly
+            // opted into via the loudly named test/dev-only flag.
+            val authPolicy = when (
+                val resolution = IrohAuthPolicy.resolve(
+                    authToken = authToken,
+                    allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+                    allowInsecureAnonymous = allowInsecureAnonymousIroh,
+                )
+            ) {
+                is IrohAuthPolicyResolution.Secure -> resolution.policy
+                is IrohAuthPolicyResolution.InsecureAccepted -> {
+                    System.err.println("[iroh-app-server] ${resolution.warning}")
+                    resolution.policy
+                }
+                is IrohAuthPolicyResolution.Refused -> {
+                    System.err.println("[iroh-app-server] ${resolution.error}")
+                    exitProcess(78)
+                }
+            }
+
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             // Create the Iroh endpoint
@@ -113,8 +143,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 scope = scope,
                 bindAddr = "0.0.0.0:${irohPort}",
                 secretKeyPath = irohSecretKeyPath,
-                requiredBearerToken = authToken?.takeIf { it.isNotBlank() },
-                allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+                authPolicy = authPolicy,
             )
             irohEndpoint.create()
             

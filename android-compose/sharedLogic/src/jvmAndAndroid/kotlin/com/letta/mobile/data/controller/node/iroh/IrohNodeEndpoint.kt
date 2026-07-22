@@ -48,8 +48,12 @@ class IrohNodeEndpoint(
      * ephemeral safe key when neither is configured.
      */
     private val secretKeyStore: IrohSecretKeyStore? = null,
-    private val requiredBearerToken: String? = null,
-    private val allowedPeerIds: Set<String> = emptySet(),
+    /**
+     * REQUIRED authentication policy (d6e8g.2). There is no default: anonymous
+     * operation must be selected explicitly via
+     * [IrohAuthPolicy.InsecureAnonymousForTestOnly].
+     */
+    private val authPolicy: IrohAuthPolicy,
 ) {
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
@@ -214,7 +218,7 @@ class IrohNodeEndpoint(
                             val connection = withTimeout(HANDSHAKE_TIMEOUT_MS.milliseconds) { accepting.connect() }
                             val remoteId = IrohDiagnostics.endpointIdHex(connection.remoteId())
                             Telemetry.event("IrohNode", "incoming.connected", "remoteEndpointId" to remoteId)
-                            if (allowedPeerIds.isNotEmpty() && remoteId !in allowedPeerIds) {
+                            if (authPolicy.allowedPeerIds.isNotEmpty() && remoteId !in authPolicy.allowedPeerIds) {
                                 Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteId, "reason" to "peer_not_allowed")
                                 runCatching { connection.close(4403L, "peer_not_allowed".encodeToByteArray()) }
                             } else {
@@ -222,7 +226,7 @@ class IrohNodeEndpoint(
                                     connection = connection,
                                     controller = controller,
                                     adminRpcRouter = adminRpcRouter,
-                                    requiredBearerToken = requiredBearerToken,
+                                    authPolicy = authPolicy,
                                     remoteEndpointId = remoteId,
                                     connectionRegistry = connectionRegistry,
                                 ).serve()
