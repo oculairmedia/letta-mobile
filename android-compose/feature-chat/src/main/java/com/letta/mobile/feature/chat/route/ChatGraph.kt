@@ -20,6 +20,7 @@ fun NavGraphBuilder.chatGraph(
     onNavigateToMemory: (String) -> Unit,
     onNavigateToAdmin: () -> Unit,
     onNavigateToSchedules: (String) -> Unit,
+    onNavigateToProjects: () -> Unit,
     onNavigateToConversationList: () -> Unit,
     onSwitchConversation: (AgentChatRoute) -> Unit,
 ) {
@@ -39,6 +40,7 @@ fun NavGraphBuilder.chatGraph(
             onNavigateToMemory = onNavigateToMemory,
             onNavigateToAdmin = onNavigateToAdmin,
             onNavigateToSchedules = onNavigateToSchedules,
+            onNavigateToProjects = onNavigateToProjects,
             onNavigateToConversationList = onNavigateToConversationList,
             onSwitchConversation = { agentId, conversationId, agentName ->
                 val normalizedConversationId = conversationId?.takeIf { it.isNotBlank() }
