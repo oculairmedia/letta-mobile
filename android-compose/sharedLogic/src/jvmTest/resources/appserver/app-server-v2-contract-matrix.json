@@ -8,7 +8,7 @@
     "protocol_sha256": "68ef0a3683f7e57be02638d5973e7211493658dd0d0038e3e0d5f571da3116f4",
     "captured_at": "2026-07-22",
     "capture_method": "executed the resolved installed package entrypoint with /usr/bin/node; retained stdout fixtures and omitted local wrapper stderr",
-    "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root>"
+    "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",

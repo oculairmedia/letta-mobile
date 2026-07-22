@@ -12,11 +12,12 @@ if (packageRootIndex < 0 || !args[packageRootIndex + 1]) {
   throw new Error("Usage: verify-contract-baseline.mjs --package-root <installed-package-root>");
 }
 
-const packageRoot = resolve(args[packageRootIndex + 1]);
+const packageRootArgument = resolve(args[packageRootIndex + 1]);
 const repositoryRoot = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const fixtureRoot = join(repositoryRoot, "android-compose/sharedLogic/src/jvmTest/resources/appserver");
 const matrix = readJson(join(fixtureRoot, "app-server-v2-contract-matrix.json"));
 const inventory = readJson(join(fixtureRoot, "installed-protocol-v2-inventory.json"));
+const packageRoot = resolveInstalledPackageRoot(packageRootArgument, matrix.baseline.package);
 const packageJson = readJson(join(packageRoot, "package.json"));
 const entrypoint = join(packageRoot, "letta.js");
 const declaration = join(packageRoot, inventory.source.protocol_declaration);
@@ -36,7 +37,27 @@ verifyProbe(probes.get("installed_version"), [entrypoint, "--version"]);
 verifyProbe(probes.get("server_listener"), [entrypoint, "server", "--help"]);
 verifyProbe(probes.get("app_server_v2"), [entrypoint, "app-server", "--help"]);
 
-console.log(`Verified App Server v2 baseline for ${packageJson.name}@${packageJson.version}.`);
+console.log(`Verified App Server v2 baseline for ${packageJson.name}@${packageJson.version} at ${packageRoot}.`);
+
+function resolveInstalledPackageRoot(candidate, expectedName) {
+  const directPackageJson = join(candidate, "package.json");
+  try {
+    if (readJson(directPackageJson).name === expectedName) return candidate;
+  } catch {
+    // The argument may be an npm prefix or node_modules directory.
+  }
+
+  const packagePath = expectedName.split("/");
+  const candidates = [join(candidate, ...packagePath), join(candidate, "node_modules", ...packagePath)];
+  for (const packageCandidate of candidates) {
+    try {
+      if (readJson(join(packageCandidate, "package.json")).name === expectedName) return packageCandidate;
+    } catch {
+      // Continue until a matching installed package is found.
+    }
+  }
+  throw new Error(`Could not resolve installed package ${expectedName} from ${candidate}`);
+}
 
 function verifyProbe(probe, probeArgs, executable = process.execPath) {
   if (!probe) throw new Error("Missing CLI probe classification");

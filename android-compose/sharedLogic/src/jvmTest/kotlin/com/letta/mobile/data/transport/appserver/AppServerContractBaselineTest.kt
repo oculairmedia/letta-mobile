@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.appserver
 import java.nio.charset.StandardCharsets
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
@@ -146,7 +147,7 @@ class AppServerContractBaselineTest {
     }
 
     @Test
-    fun fixturesAreSanitizedAndContainNoCredentialOrPatchLoaderMaterial() {
+    fun fixturesRecursivelyRedactTokensAndCredentialsAndContainNoPatchLoaderMaterial() {
         val fixtureNames = listOf(
             "app-server-v2-contract-matrix.json",
             "installed-protocol-v2-inventory.json",
@@ -168,28 +169,49 @@ class AppServerContractBaselineTest {
             }
         }
         fixtureNames.filter { it.endsWith(".json") }.forEach { name ->
-            assertTokensRedacted(fixtureJson(name), name)
+            assertCredentialsRedacted(fixtureJson(name), name)
         }
         protocolFixtures().forEach { frame ->
-            assertTokensRedacted(frame, "protocol-frames.jsonl:${typeOf(frame)}")
+            assertCredentialsRedacted(frame, "protocol-frames.jsonl:${typeOf(frame)}")
+        }
+        val nestedCredentialExample = AppServerProtocol.json.parseToJsonElement(
+            """{"outer":{"items":[{"access_token":"<redacted>"},{"password":"<redacted>"}]}}""",
+        )
+        assertCredentialsRedacted(nestedCredentialExample, "nested-credential-example")
+        val unredactedNestedCredential = AppServerProtocol.json.parseToJsonElement(
+            """{"outer":[{"credentials":{"refreshToken":"live-fixture-secret"}}]}""",
+        )
+        assertFailsWith<AssertionError> {
+            assertCredentialsRedacted(unredactedNestedCredential, "unredacted-nested-credential")
         }
         assertTrue(fixtureText("protocol-frames.jsonl").contains("\"token\":\"<redacted>\""))
     }
 
-    private fun assertTokensRedacted(element: JsonElement, location: String) {
+    private fun assertCredentialsRedacted(element: JsonElement, location: String) {
         when (element) {
             is JsonObject -> element.forEach { (name, value) ->
-                if (name == "token") {
-                    assertEquals("<redacted>", value.jsonPrimitive.content, "$location contains an unredacted token")
+                val fieldLocation = "$location.$name"
+                if (name.isCredentialField()) {
+                    assertEquals("<redacted>", value.jsonPrimitive.content, "$fieldLocation contains an unredacted credential")
                 } else {
-                    assertTokensRedacted(value, "$location.$name")
+                    assertCredentialsRedacted(value, fieldLocation)
                 }
             }
             is JsonArray -> element.forEachIndexed { index, value ->
-                assertTokensRedacted(value, "$location[$index]")
+                assertCredentialsRedacted(value, "$location[$index]")
             }
             else -> Unit
         }
+    }
+
+    private fun String.isCredentialField(): Boolean {
+        val normalized = lowercase().replace(Regex("[^a-z0-9]"), "")
+        return normalized == "authorization" ||
+            normalized == "password" ||
+            normalized == "privatekey" ||
+            normalized.endsWith("token") ||
+            normalized.endsWith("secret") ||
+            normalized.endsWith("apikey")
     }
 
     private fun assertProbe(probe: JsonObject, expectedUsage: String, forbiddenUsage: String) {
