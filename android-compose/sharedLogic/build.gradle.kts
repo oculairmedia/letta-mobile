@@ -120,6 +120,11 @@ kotlin {
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("io.ktor:ktor-client-cio:3.5.0")
+                // Embedded WebSocket server for deterministic JVM transport tests
+                // (letta-mobile-lgns8.2): connect races, close codes, malformed frames.
+                implementation("io.ktor:ktor-server-core:3.5.0")
+                implementation("io.ktor:ktor-server-cio:3.5.0")
+                implementation("io.ktor:ktor-server-websockets:3.5.0")
             }
         }
 
