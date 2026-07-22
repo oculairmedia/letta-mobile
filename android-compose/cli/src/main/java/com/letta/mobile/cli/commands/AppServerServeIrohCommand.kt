@@ -5,6 +5,11 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
+import com.letta.mobile.data.controller.reconnect.ReconnectCoordinator
+import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
+import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
+import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
@@ -19,7 +24,9 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.websocket.WebSockets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlin.system.exitProcess
@@ -226,16 +233,70 @@ internal class AppServerServeIrohCommand : CliktCommand(
                     this.socketTimeoutMillis = requestTimeoutMs
                 }
             }
-            
-            val transport = KtorAppServerWebSocketTransport(
-                httpClient = httpClient,
-                baseUrl = appServerUrl,
-                scope = scope,
-                bearerToken = null,
+
+            // lgns8.5: the controller holds ONE stable client; underneath, each
+            // socket loss or App Server restart mints a fresh transport
+            // generation with bounded full-jitter backoff. On loss the
+            // controller's runtime caches are invalidated; on recovery every
+            // registered runtime is reattached (runtime_start), external tools
+            // re-registered, and sync issued with approval/device recovery
+            // before the client reports Ready again.
+            val runtimeRegistry = InMemoryRuntimeRegistry()
+            var controllerRef: DefaultAppServerController? = null
+            var coordinatorRef: ReconnectCoordinator? = null
+            val reconnectingClient = ReconnectingAppServerClient(
+                connect = {
+                    val generationJob = Job(scope.coroutineContext.job)
+                    val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
+                    val transport = KtorAppServerWebSocketTransport(
+                        httpClient = httpClient,
+                        baseUrl = appServerUrl,
+                        scope = generationScope,
+                        bearerToken = null,
+                    )
+                    AppServerClientGeneration(
+                        client = DefaultAppServerClient(
+                            transport,
+                            requestTimeoutMs = requestTimeoutMs,
+                            parentScope = generationScope,
+                        ),
+                        connectionState = transport.connectionState,
+                        close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
+                    )
+                },
+                listener = object : ReconnectingClientListener {
+                    override suspend fun onDisconnected(reason: String?) {
+                        println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
+                        controllerRef?.onTransportDisconnected(reason)
+                    }
+
+                    override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+                        val result = coordinatorRef?.reconnect()
+                        if (result != null && result.errors.isNotEmpty()) {
+                            result.errors.forEach {
+                                System.err.println("[iroh-app-server] reattach failed: ${it.message}")
+                            }
+                        }
+                        controllerRef?.markConnected()
+                        println(
+                            "[iroh-app-server] App Server connection recovered " +
+                                "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
+                        )
+                    }
+
+                    override suspend fun onGaveUp(reason: String?) {
+                        System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
+                    }
+                },
             )
-            
-            val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-            DefaultAppServerController(client)
+            val controller = DefaultAppServerController(
+                client = reconnectingClient,
+                runtimeRegistry = runtimeRegistry,
+            )
+            controllerRef = controller
+            coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
+            reconnectingClient.start(scope)
+            controller
         } else {
             // Stub controller - the server side will return errors for now
             // This allows testing the Iroh transport layer without a full app server

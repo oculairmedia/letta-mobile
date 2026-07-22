@@ -1,7 +1,10 @@
 package com.letta.mobile.data.controller
 
+import com.letta.mobile.data.controller.registry.RuntimeRecord
+import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -33,6 +36,15 @@ class DefaultAppServerController(
     private val client: AppServerClient,
     private val clientInfo: AppServerRuntimeStartClientInfo = DEFAULT_CLIENT_INFO,
     private val requestIdFactory: () -> String = ::defaultRequestId,
+    /**
+     * Optional durable registry of desired runtimes (lgns8.5). When provided,
+     * every successful runtime_start upserts a [RuntimeRecord] so the reconnect
+     * flow knows which runtimes to reattach after socket loss or App Server
+     * restart. The in-memory [runtimeCache] alone is NOT recovery state — it is
+     * cleared wholesale on [onTransportDisconnected].
+     */
+    private val runtimeRegistry: RuntimeRegistry? = null,
+    private val clock: Clock = Clock.System,
 ) : AppServerController {
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
     override val state: StateFlow<AppServerControllerState> = _state.asStateFlow()
@@ -118,7 +130,44 @@ class DefaultAppServerController(
         )
 
         runtimeCache[key] = canonical
+        recordStartedRuntime(agentId, conversationId, cwd, canonical)
         canonical
+    }
+
+    private suspend fun recordStartedRuntime(
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        canonical: CanonicalRuntime,
+    ) {
+        val registry = runtimeRegistry ?: return
+        val recordId = "${agentId.value}:${conversationId.value}"
+        registry.save(
+            RuntimeRecord(
+                id = recordId,
+                agentId = agentId,
+                conversationId = conversationId,
+                cwd = cwd,
+                lastStartedAt = clock.now(),
+                canonicalRuntime = canonical,
+            ),
+        )
+    }
+
+    override suspend fun onTransportDisconnected(reason: String?) {
+        runtimeMutex.withLock {
+            // Canonical runtime scopes are generation-local: every cached scope
+            // was minted by the generation that just died and must be re-fetched
+            // via runtime_start on the next one. Desired permission modes and
+            // the durable registry survive — they are intent, not server state.
+            runtimeCache.clear()
+        }
+        turnEngine.invalidateRuntime()
+        _state.value = AppServerControllerState.Disconnected(reason)
+    }
+
+    override fun markConnected() {
+        _state.value = AppServerControllerState.Connected
     }
 
     override suspend fun stopRuntime(agentId: AgentId) {
