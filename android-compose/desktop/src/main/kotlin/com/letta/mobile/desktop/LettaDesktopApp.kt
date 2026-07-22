@@ -160,11 +160,7 @@ fun LettaDesktopApp(
         ),
     )
 
-    val activeTitle = when (selectedDestination) {
-        DesktopDestination.Conversations ->
-            chatState.selectedConversation?.title ?: "Letta Desktop"
-        else -> selectedDestination.label
-    }
+    val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
     // Same-named agents are stacked in the rail, and the sidebar lists the
@@ -274,10 +270,12 @@ fun LettaDesktopApp(
     DesktopNucleusEffects(
         bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
         state = desktopNucleusEffectState(
-            thinkingConversationId = thinkingConversationId,
-            isStreamingReply = replyPresence.isStreaming,
-            agentName = selectedAgentName,
-            errorMessage = chatState.errorMessage,
+            DesktopNucleusRuntimeState(
+                thinkingConversationId = thinkingConversationId,
+                isStreamingReply = replyPresence.isStreaming,
+                agentName = selectedAgentName,
+                errorMessage = chatState.errorMessage,
+            ),
         ),
         actions = DesktopNucleusEffectActions(
             onOpenCommandPalette = { showCommandPalette = true },
@@ -613,6 +611,11 @@ fun LettaDesktopApp(
           }
         }
     }
+}
+
+private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
+    if (destination != DesktopDestination.Conversations) return destination.label
+    return conversationTitle ?: "Letta Desktop"
 }
 
 /**

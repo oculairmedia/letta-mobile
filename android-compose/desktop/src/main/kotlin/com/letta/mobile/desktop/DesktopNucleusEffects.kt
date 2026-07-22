@@ -58,15 +58,19 @@ internal data class DesktopNucleusEffectActions(
     val onOpenSettings: () -> Unit,
 )
 
+internal data class DesktopNucleusRuntimeState(
+    val thinkingConversationId: String?,
+    val isStreamingReply: Boolean,
+    val agentName: String,
+    val errorMessage: String?,
+)
+
 internal fun desktopNucleusEffectState(
-    thinkingConversationId: String?,
-    isStreamingReply: Boolean,
-    agentName: String,
-    errorMessage: String?,
+    runtime: DesktopNucleusRuntimeState,
 ): DesktopNucleusEffectState = DesktopNucleusEffectState(
-    isAgentWorking = hasActiveAgentWork(thinkingConversationId, isStreamingReply),
-    agentName = agentName,
-    errorMessage = errorMessage,
+    isAgentWorking = hasActiveAgentWork(runtime.thinkingConversationId, runtime.isStreamingReply),
+    agentName = runtime.agentName,
+    errorMessage = runtime.errorMessage,
 )
 
 private data class AgentCompletionBindings(
@@ -79,6 +83,12 @@ private data class AgentFailureBindings(
     val window: Window,
     val controller: DesktopNucleusController,
     val onActivate: () -> Unit,
+)
+
+private data class DesktopTrayActions(
+    val onShow: () -> Unit,
+    val onOpenSettings: () -> Unit,
+    val onCheckForUpdates: () -> Unit,
 )
 
 internal fun destinationNucleusActions(
@@ -109,12 +119,14 @@ internal fun DesktopNucleusEffects(
     DesktopTray(
         applicationScope = applicationScope,
         isAgentWorking = state.isAgentWorking,
-        onShow = activate,
-        onOpenSettings = {
-            activate()
-            actions.onOpenSettings()
-        },
-        onCheckForUpdates = bindings.controller::checkForUpdates,
+        actions = DesktopTrayActions(
+            onShow = activate,
+            onOpenSettings = {
+                activate()
+                actions.onOpenSettings()
+            },
+            onCheckForUpdates = bindings.controller::checkForUpdates,
+        ),
     )
 
     DesktopIntegrationLifecycleEffect(
@@ -279,18 +291,16 @@ private fun disposeDesktopIntegrations(window: Window, focusListener: WindowFocu
 private fun DesktopTray(
     applicationScope: NucleusApplicationScope,
     isAgentWorking: Boolean,
-    onShow: () -> Unit,
-    onOpenSettings: () -> Unit,
-    onCheckForUpdates: () -> Unit,
+    actions: DesktopTrayActions,
 ) {
     applicationScope.Tray(
         icon = Icons.Outlined.SmartToy,
         tooltip = if (isAgentWorking) "Letta Desktop — agent working" else "Letta Desktop",
-        primaryAction = onShow,
+        primaryAction = actions.onShow,
     ) {
-        Item(label = "Show Letta Desktop", onClick = onShow)
-        Item(label = "Settings", onClick = onOpenSettings)
-        Item(label = "Check for updates", onClick = onCheckForUpdates)
+        Item(label = "Show Letta Desktop", onClick = actions.onShow)
+        Item(label = "Settings", onClick = actions.onOpenSettings)
+        Item(label = "Check for updates", onClick = actions.onCheckForUpdates)
         Divider()
         Item(label = "Quit", onClick = { exitProcess(0) })
     }
