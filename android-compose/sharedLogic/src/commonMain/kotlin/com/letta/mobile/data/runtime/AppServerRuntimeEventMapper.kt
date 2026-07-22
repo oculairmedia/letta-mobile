@@ -35,6 +35,9 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.ControlRequest -> frame.toApprovalOrExternalDraft(command, received)
             is AppServerInboundFrame.AdminRpcResponse -> emptyList() // handled by IrohAdminRpcClient
             is AppServerInboundFrame.Unknown -> listOf(received.toExternalTransportDraft(command))
+            // Malformed/undecodable frames are surfaced as external transport drafts
+            // (same as Unknown) so they are observable without killing the loop.
+            is AppServerInboundFrame.DecodeFailure -> listOf(received.toExternalTransportDraft(command))
         }
 
     private fun AppServerInboundFrame.AbortMessageResponse.toAbortDraft(command: TurnCommand): List<RuntimeEventDraft> =
