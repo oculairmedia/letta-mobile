@@ -231,23 +231,17 @@ internal object IrohStreamDeltaServerFrameMapper {
         delta: JsonObject,
         meta: Metadata,
     ): ServerFrame.ToolReturnMessage {
-        val returnObject = delta["tool_return"].objectOrNull()
-        val toolCallId = delta.string("tool_call_id")
-            ?: returnObject?.string("tool_call_id")
-            ?: meta.frameId
+        val canonical = canonicalToolReturn(delta, meta.frameId)
         return ServerFrame.ToolReturnMessage(
-            id = delta.string("id") ?: "toolreturn-$toolCallId",
+            id = delta.string("id") ?: "toolreturn-${canonical.toolCallId}",
             ts = meta.timestamp,
             agentId = meta.agentId,
             conversationId = meta.conversationId,
             turnId = meta.turnId,
             runId = meta.runId,
-            toolCallId = toolCallId,
-            status = delta.string("status") ?: returnObject?.string("status") ?: "success",
-            toolReturn = delta["tool_return"]
-                ?: delta["output"]
-                ?: delta["message"]
-                ?: delta["content"],
+            toolCallId = canonical.toolCallId,
+            status = canonical.status,
+            toolReturn = canonical.body,
             stdout = delta["stdout"].stringArrayOrNull(),
             stderr = delta["stderr"].stringArrayOrNull(),
             seq = meta.eventSeq,
@@ -474,3 +468,26 @@ internal object IrohStreamDeltaServerFrameMapper {
             ?: this[key]?.jsonPrimitive?.intOrNull?.toLong()
             ?: this[key]?.jsonPrimitive?.booleanOrNull?.let { if (it) 1L else 0L }
 }
+
+internal data class CanonicalToolReturn(
+    val toolCallId: String,
+    val status: String,
+    val body: JsonElement?,
+)
+
+internal fun canonicalToolReturn(delta: JsonObject, defaultId: String? = null): CanonicalToolReturn {
+    val returnObject = delta["tool_return"] as? JsonObject
+    return CanonicalToolReturn(
+        toolCallId = delta.stringValue("tool_call_id")
+            ?: returnObject?.stringValue("tool_call_id")
+            ?: defaultId.orEmpty(),
+        status = delta.stringValue("status") ?: returnObject?.stringValue("status") ?: "success",
+        body = delta["tool_return"]
+            ?: delta["output"]
+            ?: delta["message"]
+            ?: delta["content"],
+    )
+}
+
+private fun JsonObject.stringValue(key: String): String? =
+    (this[key] as? JsonPrimitive)?.contentOrNull
