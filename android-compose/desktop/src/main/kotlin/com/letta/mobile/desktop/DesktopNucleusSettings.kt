@@ -207,8 +207,11 @@ private fun MetricRow(label: String, value: String) {
     }
 }
 
-private fun formatMemory(used: Long?, total: Long?): String =
-    if (used == null || total == null || total <= 0) "—" else "${formatBytes(used)} / ${formatBytes(total)}"
+private fun formatMemory(used: Long?, total: Long?): String {
+    val usedBytes = used ?: return "—"
+    val totalBytes = total?.takeIf { it > 0 } ?: return "—"
+    return "${formatBytes(usedBytes)} / ${formatBytes(totalBytes)}"
+}
 
 private fun formatBytes(bytes: Long): String {
     val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)

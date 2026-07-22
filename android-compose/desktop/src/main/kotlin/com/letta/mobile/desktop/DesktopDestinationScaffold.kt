@@ -134,6 +134,12 @@ private data class DestinationSettingsActions(
     val nucleus: DestinationNucleusActions,
 )
 
+private data class ScrollableDestinationInputs(
+    val destination: DesktopDestination,
+    val state: DesktopBootstrapState,
+    val nucleus: DesktopNucleusState,
+)
+
 private val DesktopDestination.icon: ImageVector
     get() = when (this) {
         DesktopDestination.Overview -> Icons.Outlined.Dashboard
@@ -181,9 +187,11 @@ internal fun DestinationContent(
             modifier = modifier,
         )
         else -> ScrollableDestinationContent(
-            destination = destination,
-            state = inputs.state,
-            nucleus = inputs.nucleus,
+            inputs = ScrollableDestinationInputs(
+                destination = destination,
+                state = inputs.state,
+                nucleus = inputs.nucleus,
+            ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
@@ -276,9 +284,7 @@ private fun AgentsDestinationContent(
 
 @Composable
 private fun ScrollableDestinationContent(
-    destination: DesktopDestination,
-    state: DesktopBootstrapState,
-    nucleus: DesktopNucleusState,
+    inputs: ScrollableDestinationInputs,
     settings: DestinationSettingsActions,
     modifier: Modifier = Modifier,
 ) {
@@ -289,11 +295,11 @@ private fun ScrollableDestinationContent(
             .padding(horizontal = 32.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { DestinationHeader(destination) }
+        item { DestinationHeader(inputs.destination) }
         scrollableDestinationItems(
-            destination = destination,
-            state = state,
-            nucleus = nucleus,
+            destination = inputs.destination,
+            state = inputs.state,
+            nucleus = inputs.nucleus,
             settings = settings,
         )
     }

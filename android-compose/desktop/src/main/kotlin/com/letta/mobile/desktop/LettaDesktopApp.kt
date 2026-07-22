@@ -199,21 +199,12 @@ fun LettaDesktopApp(
         selectedDestination = DesktopDestination.Conversations
     }
 
-    val pendingDeepLink by deepLinks.collectAsState()
-    LaunchedEffect(pendingDeepLink) {
-        pendingDeepLink?.let { uri ->
-            when (val destination = parseDesktopDeepLink(uri)) {
-                DesktopDeepLinkDestination.Settings -> selectedDestination = DesktopDestination.Settings
-                DesktopDeepLinkDestination.Conversations -> selectedDestination = DesktopDestination.Conversations
-                is DesktopDeepLinkDestination.Conversation -> {
-                    chatController.selectConversation(destination.id)
-                    selectedDestination = DesktopDestination.Conversations
-                }
-                is DesktopDeepLinkDestination.Agent -> openAgent(destination.id)
-                null -> Unit
-            }
-        }
-    }
+    DesktopDeepLinkEffect(
+        deepLinks = deepLinks,
+        onDestinationSelected = { selectedDestination = it },
+        onConversationSelected = chatController::selectConversation,
+        onAgentSelected = ::openAgent,
+    )
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
     // Per-agent avatar-style override chosen in the editor (stored in agent
@@ -281,14 +272,16 @@ fun LettaDesktopApp(
     val isStreamingReplySelected = replyPresence.isStreaming
 
     DesktopNucleusEffects(
-        applicationScope = nucleusApplicationScope,
-        window = window,
-        controller = nucleusController,
-        isAgentWorking = thinkingConversationId != null || replyPresence.isStreaming,
-        agentName = selectedAgentName,
-        errorMessage = chatState.errorMessage,
-        onOpenCommandPalette = { showCommandPalette = true },
-        onOpenSettings = { selectedDestination = DesktopDestination.Settings },
+        bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
+        state = DesktopNucleusEffectState(
+            isAgentWorking = thinkingConversationId != null || replyPresence.isStreaming,
+            agentName = selectedAgentName,
+            errorMessage = chatState.errorMessage,
+        ),
+        actions = DesktopNucleusEffectActions(
+            onOpenCommandPalette = { showCommandPalette = true },
+            onOpenSettings = { selectedDestination = DesktopDestination.Settings },
+        ),
     )
 
     AvatarPresenceEffects(

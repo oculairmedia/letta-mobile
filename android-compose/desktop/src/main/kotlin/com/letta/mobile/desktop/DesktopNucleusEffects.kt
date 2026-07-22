@@ -41,80 +41,85 @@ internal fun activateDesktopWindow(window: Window) {
     }
 }
 
+internal data class DesktopNucleusEffectBindings(
+    val applicationScope: NucleusApplicationScope,
+    val window: Window,
+    val controller: DesktopNucleusController,
+)
+
+internal data class DesktopNucleusEffectState(
+    val isAgentWorking: Boolean,
+    val agentName: String,
+    val errorMessage: String?,
+)
+
+internal data class DesktopNucleusEffectActions(
+    val onOpenCommandPalette: () -> Unit,
+    val onOpenSettings: () -> Unit,
+)
+
 @Composable
 internal fun DesktopNucleusEffects(
-    applicationScope: NucleusApplicationScope,
-    window: Window,
-    controller: DesktopNucleusController,
-    isAgentWorking: Boolean,
-    agentName: String,
-    errorMessage: String?,
-    onOpenCommandPalette: () -> Unit,
-    onOpenSettings: () -> Unit,
+    bindings: DesktopNucleusEffectBindings,
+    state: DesktopNucleusEffectState,
+    actions: DesktopNucleusEffectActions,
 ) {
+    val applicationScope = bindings.applicationScope
+    val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
 
     DesktopTray(
         applicationScope = applicationScope,
-        isAgentWorking = isAgentWorking,
+        isAgentWorking = state.isAgentWorking,
         onShow = activate,
         onOpenSettings = {
             activate()
-            onOpenSettings()
+            actions.onOpenSettings()
         },
-        onCheckForUpdates = controller::checkForUpdates,
+        onCheckForUpdates = bindings.controller::checkForUpdates,
     )
 
+    DesktopIntegrationLifecycleEffect(
+        window = window,
+        agentName = state.agentName,
+        onActivate = activate,
+        actions = actions,
+    )
+    AgentWorkEffect(window, state)
+    AgentCompletionEffect(window, bindings.controller, state, activate)
+    AgentFailureEffect(window, bindings.controller, state.errorMessage, activate)
+}
+
+@Composable
+private fun DesktopIntegrationLifecycleEffect(
+    window: Window,
+    agentName: String,
+    onActivate: () -> Unit,
+    actions: DesktopNucleusEffectActions,
+) {
     DisposableEffect(window) {
         GlobalHotKeyManager.initialize()
-        val hotKey = GlobalHotKeyManager.register(
-            keyCode = KeyEvent.VK_SPACE,
-            modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
-            description = "Open Letta quick switcher",
-        ) { _, _ ->
-            SwingUtilities.invokeLater {
-                activate()
-                onOpenCommandPalette()
-            }
-        }
-
-        configureLauncherMenus(onShow = activate, onOpenSettings = onOpenSettings)
-        configureMediaControls(agentName = agentName, onActivate = activate)
-        val focusListener = object : WindowFocusListener {
-            override fun windowGainedFocus(event: WindowEvent?) {
-                TaskbarProgress.stopAttention(window)
-                if (Platform.Current == Platform.Windows && WindowsBadgeManager.isAvailable) {
-                    WindowsBadgeManager.clear()
-                }
-            }
-
-            override fun windowLostFocus(event: WindowEvent?) = Unit
-        }
+        val hotKey = registerQuickSwitcher(onActivate, actions.onOpenCommandPalette)
+        configureLauncherMenus(onShow = onActivate, onOpenSettings = actions.onOpenSettings)
+        configureMediaControls(agentName = agentName, onActivate = onActivate)
+        val focusListener = desktopFocusListener(window)
         window.addWindowFocusListener(focusListener)
 
         onDispose {
-            window.removeWindowFocusListener(focusListener)
-            if (hotKey >= 0) GlobalHotKeyManager.unregister(hotKey)
-            GlobalHotKeyManager.shutdown()
-            MediaControlService.detach()
-            if (Platform.Current == Platform.MacOS) {
-                MacOsDockMenu.clearDockMenu()
-                MacOsDockMenu.listener = null
-            }
-            if (Platform.Current == Platform.Windows) WindowsBadgeManager.uninitialize()
-            TaskbarProgress.hideProgress(window)
-            EnergyManager.releaseScreenAwake()
-            EnergyManager.disableLightEfficiencyMode()
+            disposeDesktopIntegrations(window, focusListener, hotKey)
         }
     }
+}
 
-    LaunchedEffect(isAgentWorking, agentName) {
-        if (isAgentWorking) {
+@Composable
+private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
+    LaunchedEffect(state.isAgentWorking, state.agentName) {
+        if (state.isAgentWorking) {
             TaskbarProgress.showIndeterminate(window)
             EnergyManager.disableLightEfficiencyMode()
             EnergyManager.keepScreenAwake()
             MediaControlService.setMetadata(
-                MediaMetadata(title = "$agentName is working", artist = "Letta Desktop"),
+                MediaMetadata(title = "${state.agentName} is working", artist = "Letta Desktop"),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PLAYING))
         } else {
@@ -122,34 +127,91 @@ internal fun DesktopNucleusEffects(
             EnergyManager.releaseScreenAwake()
             EnergyManager.enableLightEfficiencyMode()
             MediaControlService.setMetadata(
-                MediaMetadata(title = agentName, artist = "Letta Desktop"),
+                MediaMetadata(title = state.agentName, artist = "Letta Desktop"),
             )
             MediaControlService.setPlaybackState(MediaPlaybackState(MediaPlaybackStatus.PAUSED))
         }
     }
+}
 
+@Composable
+private fun AgentCompletionEffect(
+    window: Window,
+    controller: DesktopNucleusController,
+    state: DesktopNucleusEffectState,
+    onActivate: () -> Unit,
+) {
     var wasWorking by remember { mutableStateOf(false) }
-    LaunchedEffect(isAgentWorking) {
-        if (wasWorking && !isAgentWorking && !window.isFocused) {
-            controller.notifyAgentFinished(agentName, activate)
+    LaunchedEffect(state.isAgentWorking) {
+        if (wasWorking && !state.isAgentWorking && !window.isFocused) {
+            controller.notifyAgentFinished(state.agentName, onActivate)
             TaskbarProgress.requestAttention(window)
             if (Platform.Current == Platform.Windows && WindowsBadgeManager.isAvailable) {
                 WindowsBadgeManager.setCount(1)
             }
         }
-        wasWorking = isAgentWorking
+        wasWorking = state.isAgentWorking
     }
+}
 
+@Composable
+private fun AgentFailureEffect(
+    window: Window,
+    controller: DesktopNucleusController,
+    errorMessage: String?,
+    onActivate: () -> Unit,
+) {
     var previousError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(errorMessage) {
         val current = errorMessage
         if (current != null && current != previousError && !window.isFocused) {
-            controller.notifyFailure(current, activate)
+            controller.notifyFailure(current, onActivate)
             TaskbarProgress.showError(window)
             TaskbarProgress.requestAttention(window, TaskbarProgress.AttentionType.CRITICAL)
         }
         previousError = current
     }
+}
+
+private fun registerQuickSwitcher(onActivate: () -> Unit, onOpenCommandPalette: () -> Unit): Long =
+    GlobalHotKeyManager.register(
+        keyCode = KeyEvent.VK_SPACE,
+        modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
+        description = "Open Letta quick switcher",
+    ) { _, _ ->
+        SwingUtilities.invokeLater {
+            onActivate()
+            onOpenCommandPalette()
+        }
+    }
+
+private fun desktopFocusListener(window: Window): WindowFocusListener = object : WindowFocusListener {
+    override fun windowGainedFocus(event: WindowEvent?) {
+        TaskbarProgress.stopAttention(window)
+        if (Platform.Current == Platform.Windows && WindowsBadgeManager.isAvailable) {
+            WindowsBadgeManager.clear()
+        }
+    }
+
+    override fun windowLostFocus(event: WindowEvent?) = Unit
+}
+
+private fun disposeDesktopIntegrations(window: Window, focusListener: WindowFocusListener, hotKey: Long) {
+    window.removeWindowFocusListener(focusListener)
+    hotKey.takeIf { it >= 0 }?.let(GlobalHotKeyManager::unregister)
+    GlobalHotKeyManager.shutdown()
+    MediaControlService.detach()
+    when (Platform.Current) {
+        Platform.MacOS -> {
+            MacOsDockMenu.clearDockMenu()
+            MacOsDockMenu.listener = null
+        }
+        Platform.Windows -> WindowsBadgeManager.uninitialize()
+        else -> Unit
+    }
+    TaskbarProgress.hideProgress(window)
+    EnergyManager.releaseScreenAwake()
+    EnergyManager.disableLightEfficiencyMode()
 }
 
 @Composable
