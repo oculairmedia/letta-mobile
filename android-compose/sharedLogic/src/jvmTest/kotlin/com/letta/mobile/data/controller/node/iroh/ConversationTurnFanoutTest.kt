@@ -563,6 +563,43 @@ class ConversationTurnFanoutTest {
     }
 
     @Test
+    fun toolCallsArrayBroadcastsOnlyEntriesNotAlreadyObserved() = runTest {
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+        val fanout = fanoutFor(registry, initiator)
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(ToolCallId("tc-seen"), ToolName("bash"), "{}"))
+        fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "raw-array-partial-overlap",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(1, buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("tool_calls", kotlinx.serialization.json.buildJsonArray {
+                    add(buildJsonObject {
+                        put("tool_call_id", "tc-seen")
+                        put("name", "bash")
+                        put("arguments", "{}")
+                    })
+                    add(buildJsonObject {
+                        put("tool_call_id", "tc-new")
+                        put("name", "bash")
+                        put("arguments", "{\"command\":\"pwd\"}")
+                    })
+                })
+            }),
+        ))
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(
+            ToolCallId("tc-new"),
+            ToolName("bash"),
+            "{\"command\":\"pwd\"}",
+        ))
+
+        assertEquals(2, sink.frames().size, "the array must broadcast once for its previously unseen entry")
+    }
+
+    @Test
     fun returnAliasesAndDefaultStatusDeduplicateAgainstSemanticEvent() = runTest {
         listOf("output", "message", "content").forEach { bodyAlias ->
             val sink = CapturingSink()

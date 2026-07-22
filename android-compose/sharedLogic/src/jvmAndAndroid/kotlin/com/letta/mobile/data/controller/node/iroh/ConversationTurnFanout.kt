@@ -219,20 +219,18 @@ internal class ConversationTurnFanout(
     }
 
     private suspend fun broadcastToolDeltaIfNew(delta: JsonObject) {
-        val signature = toolDeltaSignature(delta)
-        if (signature == null || broadcastToolSignatures.add(signature)) broadcastDeltaBody(delta)
+        val signatures = toolDeltaSignatures(delta)
+        if (signatures.isEmpty() || signatures.map(broadcastToolSignatures::add).any { it }) broadcastDeltaBody(delta)
     }
 
-    private fun toolDeltaSignature(delta: JsonObject): String? = when (DanglingToolCallSynthesizer.messageType(delta)) {
-        "tool_call_message", "approval_request_message" -> canonicalToolCallSignature(delta)
-        "tool_return_message" -> canonicalToolReturnSignature(delta)
-        else -> null
+    private fun toolDeltaSignatures(delta: JsonObject): List<String> = when (DanglingToolCallSynthesizer.messageType(delta)) {
+        "tool_call_message", "approval_request_message" -> canonicalToolCallSignatures(delta)
+        "tool_return_message" -> listOfNotNull(canonicalToolReturnSignature(delta))
+        else -> emptyList()
     }
 
-    private fun canonicalToolCallSignature(delta: JsonObject): String? =
-        canonicalToolCalls(delta).takeIf { it.isNotEmpty() }?.joinToString(";") {
-            "call|${it.toolCallId}|${it.name}|${it.arguments}"
-        }
+    private fun canonicalToolCallSignatures(delta: JsonObject): List<String> =
+        canonicalToolCalls(delta).map { "call|${it.toolCallId}|${it.name}|${it.arguments}" }
 
     private fun canonicalToolReturnSignature(delta: JsonObject): String? {
         val canonical = canonicalToolReturn(delta)
