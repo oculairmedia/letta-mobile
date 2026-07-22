@@ -1,15 +1,12 @@
 package com.letta.mobile.data.transport.appserver
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -22,13 +19,17 @@ import kotlinx.serialization.json.JsonObject
 
 class AppServerRequestRegistryTest {
 
-    private val registryScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val controlChannel = Channel<AppServerReceivedFrame>(Channel.UNLIMITED)
     private val controlFlow = controlChannel.receiveAsFlow()
 
-    private fun registry(timeoutMs: Long = 30_000L): AppServerRequestRegistry {
+    // Run the registry collector on backgroundScope, which shares the test's
+    // scheduler/virtual clock, so correlation is deterministic. runCurrent()
+    // after startRouting ensures the collector has subscribed to the channel
+    // before any emit; tests advance the scheduler to drain responses.
+    private fun TestScope.registry(timeoutMs: Long = 30_000L): AppServerRequestRegistry {
         val r = AppServerRequestRegistry(controlFrames = controlFlow, timeoutMs = timeoutMs)
-        r.startRouting(registryScope)
+        r.startRouting(backgroundScope)
+        runCurrent()
         return r
     }
 
@@ -51,25 +52,30 @@ class AppServerRequestRegistryTest {
         var respB: AppServerInboundFrame.SyncResponse? = null
         val barrier = CompletableDeferred<Unit>()
 
-        coroutineScope {
-            launch {
-                respA = registry.request(
-                    requestId = "a",
-                    response = { it as? AppServerInboundFrame.RuntimeStartResponse },
-                    send = { barrier.await() },
-                )
-            }
-            launch {
-                respB = registry.request(
-                    requestId = "b",
-                    response = { it as? AppServerInboundFrame.SyncResponse },
-                    send = { barrier.await() },
-                )
-            }
-            emitResponse("b", syncResponse("b"))
-            emitResponse("a", runtimeStartResponse("a"))
-            barrier.complete(Unit)
+        val jobA = launch {
+            respA = registry.request(
+                requestId = "a",
+                response = { it as? AppServerInboundFrame.RuntimeStartResponse },
+                send = { barrier.await() },
+            )
         }
+        val jobB = launch {
+            respB = registry.request(
+                requestId = "b",
+                response = { it as? AppServerInboundFrame.SyncResponse },
+                send = { barrier.await() },
+            )
+        }
+        runCurrent() // both requests register their pending entries
+
+        // Deliver responses out of order: B before A.
+        controlChannel.send(received(syncResponse("b")))
+        controlChannel.send(received(runtimeStartResponse("a")))
+        barrier.complete(Unit)
+        advanceUntilIdle() // sends complete, collector correlates each by request_id
+        jobA.join()
+        jobB.join()
+
         assertEquals("b", respB?.requestId)
         assertEquals("a", respA?.requestId)
     }
@@ -77,19 +83,18 @@ class AppServerRequestRegistryTest {
     @Test
     fun duplicateRequestIdFailsClosed() = runTest {
         val registry = registry()
-        // Register first request — send blocks until barrier completes.
+        // First request registers, then blocks in its send on the barrier.
         val barrier = CompletableDeferred<Unit>()
-        val deferred = CompletableDeferred<AppServerInboundFrame.RuntimeStartResponse>()
         val job = launch {
-            deferred.complete(
-                registry.request(
-                    requestId = "dup",
-                    response = { it as? AppServerInboundFrame.RuntimeStartResponse },
-                    send = { barrier.await() },
-                ),
+            registry.request(
+                requestId = "dup",
+                response = { it as? AppServerInboundFrame.RuntimeStartResponse },
+                send = { barrier.await() },
             )
         }
         runCurrent() // advance so the launch enters registry.request and registers
+
+        // A second request with the same id must fail closed.
         val ex = assertFailsWith<IllegalStateException> {
             registry.request<AppServerInboundFrame.SyncResponse>(
                 requestId = "dup",
@@ -98,47 +103,65 @@ class AppServerRequestRegistryTest {
             )
         }
         assertTrue(ex.message!!.contains("duplicate"))
+
+        // Unblock and resolve the first request so no coroutine leaks.
         barrier.complete(Unit)
+        controlChannel.send(received(runtimeStartResponse("dup")))
+        advanceUntilIdle()
+        job.join()
     }
 
     @Test
     fun wrongResponseTypeDoesNotResolveCall() = runTest {
         val registry = registry()
         val barrier = CompletableDeferred<Unit>()
-        var gotCorrectType = false
+        var result: AppServerInboundFrame.SyncResponse? = null
         val job = launch {
-            try {
-                registry.request<AppServerInboundFrame.SyncResponse>(
-                    requestId = "wrong-type",
-                    response = { it as? AppServerInboundFrame.SyncResponse },
-                    send = { barrier.await() },
-                )
-                gotCorrectType = true
-            } catch (_: kotlinx.coroutines.CancellationException) {
-                // not expected
-            }
+            result = registry.request(
+                requestId = "wrong-type",
+                response = { it as? AppServerInboundFrame.SyncResponse },
+                send = { barrier.await() },
+            )
         }
-        emitResponse("wrong-type", runtimeStartResponse("wrong-type"))
-        emitResponse("wrong-type", syncResponse("wrong-type"))
+        runCurrent() // request registers its pending entry
+
+        // A matching-id but wrong-type response must NOT resolve the entry.
+        controlChannel.send(received(runtimeStartResponse("wrong-type")))
+        runCurrent()
+        assertTrue(job.isActive, "wrong-type response must leave the request pending")
+
+        // The correct-type response resolves it.
+        controlChannel.send(received(syncResponse("wrong-type")))
         barrier.complete(Unit)
+        advanceUntilIdle()
         job.join()
-        assertTrue(gotCorrectType, "wrong type should not resolve, correct type should")
+        assertEquals("wrong-type", result?.requestId)
     }
 
     @Test
     fun timeoutCleansEntry() = runTest {
         val registry = registry(timeoutMs = 100)
-        assertFailsWith<AppServerRequestTimeoutException> {
-            registry.request<AppServerInboundFrame.SyncResponse>(
-                requestId = "timeout-req",
-                response = { it as? AppServerInboundFrame.SyncResponse },
-                send = { /* never completes */ },
-            )
+        var timedOut = false
+        val job = launch {
+            try {
+                registry.request<AppServerInboundFrame.SyncResponse>(
+                    requestId = "timeout-req",
+                    response = { it as? AppServerInboundFrame.SyncResponse },
+                    send = { /* completes; no response ever arrives */ },
+                )
+            } catch (_: AppServerRequestTimeoutException) {
+                timedOut = true
+            }
         }
+        advanceUntilIdle() // virtual time passes the 100ms timeout
+        job.join()
+        assertTrue(timedOut, "request must time out when no response arrives")
+
+        // The id is freed for reuse after timeout.
         val response = registry.request(
             requestId = "timeout-req",
             response = { it as? AppServerInboundFrame.SyncResponse },
-            send = { emitResponse("timeout-req", syncResponse("timeout-req")) },
+            send = { controlChannel.send(received(syncResponse("timeout-req"))) },
         )
         assertEquals("timeout-req", response.requestId)
     }
@@ -211,9 +234,10 @@ class AppServerRequestRegistryTest {
                 bFailed = true
             }
         }
-        delay(10)
+        runCurrent() // both requests register their pending entries
         registry.failAll(RuntimeException("connection lost"))
         barrier.complete(Unit)
+        advanceUntilIdle()
         jobA.join()
         jobB.join()
         assertTrue(aFailed)
@@ -261,14 +285,15 @@ class AppServerRequestRegistryTest {
         assertEquals("other", response.requestId)
     }
 
-    private suspend fun emitResponse(requestId: String, frame: AppServerInboundFrame) {
-        controlChannel.send(
-            AppServerReceivedFrame(
-                channel = AppServerChannel.Control,
-                frame = frame,
-                raw = JsonObject(emptyMap()),
-            ),
+    private fun received(frame: AppServerInboundFrame) =
+        AppServerReceivedFrame(
+            channel = AppServerChannel.Control,
+            frame = frame,
+            raw = JsonObject(emptyMap()),
         )
+
+    private suspend fun emitResponse(requestId: String, frame: AppServerInboundFrame) {
+        controlChannel.send(received(frame))
     }
 
     private fun runtimeStartResponse(requestId: String) =

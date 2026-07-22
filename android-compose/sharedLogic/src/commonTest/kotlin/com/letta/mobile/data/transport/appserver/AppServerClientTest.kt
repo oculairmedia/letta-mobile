@@ -63,7 +63,7 @@ class AppServerClientTest {
     fun timeoutCancelsPendingCorrelation() = runTest {
         val client = DefaultAppServerClient(FakeAppServerTransport(), requestTimeoutMs = 10)
 
-        assertFailsWith<kotlinx.coroutines.TimeoutCancellationException> {
+        assertFailsWith<AppServerRequestTimeoutException> {
             client.runtimeStart(
                 AppServerCommand.RuntimeStart(
                     requestId = "start-timeout",

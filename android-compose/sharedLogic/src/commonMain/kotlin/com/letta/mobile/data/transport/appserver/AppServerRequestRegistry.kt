@@ -33,17 +33,24 @@ internal class AppServerRequestRegistry(
     private var collectorJob: Job? = null
     private var failed = false
 
-    /** Start routing control responses. Must be called once per generation. */
+    /**
+     * Start a single long-lived collector that routes every control response by
+     * request_id to the registered pending entry. Optional: when not called,
+     * [request] launches a per-call collector for the duration of that request
+     * (still correct — all entries share the ONE registry map).
+     */
     fun startRouting(scope: CoroutineScope) {
         check(collectorJob == null) { "already routing" }
-        collectorJob = scope.launch {
-            controlFrames.collect { received ->
-                val frame = received.frame
-                val requestId = frame.requestId ?: return@collect
-                val entry = synchronized(lock) { pending[requestId] }
-                if (entry != null && entry.complete(frame)) {
-                    synchronized(lock) { pending.remove(requestId) }
-                }
+        collectorJob = scope.launch { routeFrames() }
+    }
+
+    private suspend fun routeFrames() {
+        controlFrames.collect { received ->
+            val frame = received.frame
+            val requestId = frame.requestId ?: return@collect
+            val entry = synchronized(lock) { pending[requestId] }
+            if (entry != null && entry.complete(frame)) {
+                synchronized(lock) { pending.remove(requestId) }
             }
         }
     }
@@ -71,20 +78,29 @@ internal class AppServerRequestRegistry(
             pending[requestId] = entry
         }
 
+        // When no long-lived router is active, route frames for this request's
+        // lifetime only. Cancelled in finally so no collector leaks.
+        val localCollector = if (collectorJob == null) launch { routeFrames() } else null
+
         try {
             send()
             withTimeout(timeoutMs) {
                 deferred.await()
             }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            // Must precede the CancellationException clause below:
+            // TimeoutCancellationException IS a CancellationException, and
+            // callers rely on the typed timeout wrapper.
+            synchronized(lock) { pending.remove(requestId) }
+            throw AppServerRequestTimeoutException(requestId, timeoutMs, e)
         } catch (e: CancellationException) {
             synchronized(lock) { pending.remove(requestId) }
             throw e
         } catch (e: Exception) {
             synchronized(lock) { pending.remove(requestId) }
-            if (e is kotlinx.coroutines.TimeoutCancellationException) {
-                throw AppServerRequestTimeoutException(requestId, timeoutMs, e)
-            }
             throw e
+        } finally {
+            localCollector?.cancel()
         }
     }
 
