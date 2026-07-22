@@ -380,6 +380,10 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 - JDK 26 (Temurin, CI parity + desktop runtime): `/usr/lib/jvm/jdk-26`. JDK 21 also exists at
   `/usr/lib/jvm/java-21-openjdk-amd64` (needed by detekt — see below).
+- JDK 17 (Temurin): `/usr/lib/jvm/jdk-17`. Some modules request a **Java 17 toolchain** via Gradle
+  toolchain resolution; without a discoverable JDK 17 the build fails with "Cannot find a Java
+  installation … matching {languageVersion=17}". CI's GitHub runners ship JDK 17 by default; this VM
+  needs it installed (Gradle auto-detects it under `/usr/lib/jvm`).
 - Android SDK: `$HOME/Android/Sdk` (platform 36, build-tools 36, platform-tools).
 - `JAVA_HOME`, `ANDROID_HOME`, and `PATH` are exported for interactive shells from `~/.bashrc`.
   Non-interactive scripts should set `JAVA_HOME=/usr/lib/jvm/jdk-26` explicitly.
