@@ -29,6 +29,7 @@ import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
@@ -196,42 +197,23 @@ internal fun LettaDesktopApp(
         selectedDestination = DesktopDestination.Conversations
     }
 
-    // Deep-linked conversations/agents can arrive before the conversation list
-    // has loaded (cold-start protocol activation); selectConversation ignores
-    // unknown ids and openAgent would treat the empty list as "no existing
-    // chat", so buffer the target and act once the initial load has settled.
-    var pendingDeepLinkConversationId by remember { mutableStateOf<String?>(null) }
-    var pendingDeepLinkAgentId by remember { mutableStateOf<String?>(null) }
-    DesktopDeepLinkEffect(
+    DesktopDeepLinkRouting(
         deepLinks = deepLinks,
-        // Deep links must win over the full-page agent editor, matching the
-        // sidebar navigation paths that clear edit mode before routing.
-        onDestinationSelected = {
-            editAgentId = null
-            selectedDestination = it
-        },
-        onConversationSelected = {
-            editAgentId = null
-            pendingDeepLinkConversationId = it
-        },
-        onAgentSelected = { pendingDeepLinkAgentId = it },
+        chatState = chatState,
+        actions = DesktopDeepLinkRoutingActions(
+            // Deep links must win over the full-page agent editor, matching
+            // the sidebar navigation paths that clear edit mode before routing.
+            onDestinationSelected = {
+                editAgentId = null
+                selectedDestination = it
+            },
+            onSelectConversation = {
+                editAgentId = null
+                chatController.selectConversation(it)
+            },
+            onOpenAgent = ::openAgent,
+        ),
     )
-    LaunchedEffect(pendingDeepLinkConversationId, chatState.conversations) {
-        val target = pendingDeepLinkConversationId ?: return@LaunchedEffect
-        if (chatState.conversations.any { it.id == target }) {
-            chatController.selectConversation(target)
-            pendingDeepLinkConversationId = null
-        }
-    }
-    LaunchedEffect(pendingDeepLinkAgentId, chatState.isLoading, chatState.connectionState) {
-        val target = pendingDeepLinkAgentId ?: return@LaunchedEffect
-        val initialLoadSettled = !chatState.isLoading &&
-            chatState.connectionState != DesktopChatConnectionState.Loading
-        if (initialLoadSettled) {
-            openAgent(target)
-            pendingDeepLinkAgentId = null
-        }
-    }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
     // Per-agent avatar-style override chosen in the editor (stored in agent
@@ -659,6 +641,53 @@ internal fun LettaDesktopApp(
           }
         }
     }
+}
+
+private data class DesktopDeepLinkRoutingActions(
+    val onDestinationSelected: (DesktopDestination) -> Unit,
+    val onSelectConversation: (String) -> Unit,
+    val onOpenAgent: (String) -> Unit,
+)
+
+/**
+ * Routes deep links into the app, buffering targets that arrive before the
+ * conversation list has loaded (cold-start protocol activation):
+ * selectConversation ignores unknown ids and openAgent would treat the empty
+ * list as "no existing chat", so both wait for the initial load to settle.
+ */
+@Composable
+private fun DesktopDeepLinkRouting(
+    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
+    chatState: DesktopChatSurfaceState,
+    actions: DesktopDeepLinkRoutingActions,
+) {
+    var pendingConversationId by remember { mutableStateOf<String?>(null) }
+    var pendingAgentId by remember { mutableStateOf<String?>(null) }
+    DesktopDeepLinkEffect(
+        deepLinks = deepLinks,
+        onDestinationSelected = actions.onDestinationSelected,
+        onConversationSelected = { pendingConversationId = it },
+        onAgentSelected = { pendingAgentId = it },
+    )
+    LaunchedEffect(pendingConversationId, chatState.conversations) {
+        val target = pendingConversationId ?: return@LaunchedEffect
+        if (chatState.conversations.any { it.id == target }) {
+            actions.onSelectConversation(target)
+            pendingConversationId = null
+        }
+    }
+    LaunchedEffect(pendingAgentId, chatState.isLoading, chatState.connectionState) {
+        val target = pendingAgentId ?: return@LaunchedEffect
+        if (initialConversationLoadSettled(chatState)) {
+            actions.onOpenAgent(target)
+            pendingAgentId = null
+        }
+    }
+}
+
+private fun initialConversationLoadSettled(chatState: DesktopChatSurfaceState): Boolean {
+    if (chatState.isLoading) return false
+    return chatState.connectionState != DesktopChatConnectionState.Loading
 }
 
 private data class WorkingAgentNameParams(

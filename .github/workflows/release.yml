@@ -194,13 +194,17 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           version="${tag#v}"
-          # Any hyphen-suffixed pre-release tag publishes to its own updater
-          # channel file (alpha.yml, beta.yml, rc.yml, ...) so pre-release
-          # metadata never lands on the stable latest.yml manifest.
+          # Any hyphen-suffixed pre-release tag publishes to a non-stable
+          # updater channel so its metadata never lands on latest.yml. Nucleus
+          # only serves latest/beta/alpha channel files, so labels it does not
+          # define (rc, hotfix, ...) map to beta.
           if [[ "$version" == *-* ]]; then
             prerelease="${version#*-}"
             channel="$(printf '%s' "$prerelease" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z].*//')"
-            [ -n "$channel" ] || channel="beta"
+            case "$channel" in
+              alpha|beta) ;;
+              *) channel="beta" ;;
+            esac
           else
             channel="latest"
           fi

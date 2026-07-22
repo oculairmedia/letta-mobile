@@ -22,7 +22,9 @@ internal sealed interface DesktopDeepLinkDestination {
 
 internal fun parseDesktopDeepLink(uri: URI): DesktopDeepLinkDestination? {
     if (!uri.scheme.equals("meridian", ignoreCase = true)) return null
-    val id = uri.path.trim('/').takeIf(String::isNotBlank)
+    // Opaque activations like `meridian:settings` have no host or path;
+    // treat them as unroutable instead of crashing the deep-link effect.
+    val id = uri.path?.trim('/')?.takeIf(String::isNotBlank)
     return when (uri.host?.lowercase()) {
         "conversations" -> DesktopDeepLinkDestination.Conversations
         "settings" -> DesktopDeepLinkDestination.Settings

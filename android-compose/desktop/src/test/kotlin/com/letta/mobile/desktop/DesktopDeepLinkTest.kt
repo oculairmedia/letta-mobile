@@ -31,5 +31,8 @@ class DesktopDeepLinkTest {
         assertNull(parseDesktopDeepLink(URI("https://settings")))
         assertNull(parseDesktopDeepLink(URI("meridian://conversation")))
         assertNull(parseDesktopDeepLink(URI("meridian://unknown/value")))
+        // Opaque form: no host/path, must be ignored rather than crash.
+        assertNull(parseDesktopDeepLink(URI("meridian:settings")))
+        assertNull(parseDesktopDeepLink(URI("meridian:conversation/conversation-42")))
     }
 }

@@ -72,7 +72,7 @@ internal data class DesktopNucleusRuntimeState(
 internal fun desktopNucleusEffectState(
     runtime: DesktopNucleusRuntimeState,
 ): DesktopNucleusEffectState = DesktopNucleusEffectState(
-    isAgentWorking = hasActiveAgentWork(runtime.thinkingConversationId, runtime.isStreamingReply),
+    isAgentWorking = runtime.thinkingConversationId != null || runtime.isStreamingReply,
     agentName = runtime.agentName,
     errorMessage = runtime.errorMessage,
 )
@@ -201,7 +201,7 @@ private fun AgentCompletionEffect(
 ) {
     var wasWorking by remember { mutableStateOf(false) }
     LaunchedEffect(state.isAgentWorking) {
-        if (shouldNotifyCompletion(wasWorking, state.isAgentWorking, bindings.window.isFocused)) {
+        if (shouldNotifyCompletion(wasWorking, state, bindings.window)) {
             bindings.controller.notifyAgentFinished(state.agentName, bindings.onActivate)
             TaskbarProgress.requestAttention(bindings.window)
             setWindowsCompletionBadge()
@@ -210,15 +210,10 @@ private fun AgentCompletionEffect(
     }
 }
 
-private fun hasActiveAgentWork(thinkingConversationId: String?, isStreamingReply: Boolean): Boolean {
-    if (thinkingConversationId != null) return true
-    return isStreamingReply
-}
-
-private fun shouldNotifyCompletion(wasWorking: Boolean, isWorking: Boolean, isWindowFocused: Boolean): Boolean {
+private fun shouldNotifyCompletion(wasWorking: Boolean, state: DesktopNucleusEffectState, window: Window): Boolean {
     if (!wasWorking) return false
-    if (isWorking) return false
-    return !isWindowFocused
+    if (state.isAgentWorking) return false
+    return !window.isFocused
 }
 
 private fun setWindowsCompletionBadge() {
@@ -234,34 +229,38 @@ private fun AgentFailureEffect(
 ) {
     var previousError by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(state.errorMessage) {
-        val current = state.errorMessage
-        if (shouldNotifyFailure(current, previousError, bindings.window.isFocused)) {
-            bindings.controller.notifyFailure(current.orEmpty(), bindings.onActivate)
-            TaskbarProgress.showError(bindings.window)
-            TaskbarProgress.requestAttention(bindings.window, TaskbarProgress.AttentionType.CRITICAL)
+        when (failureProgressAction(state, previousError, bindings.window)) {
+            FailureProgressAction.Notify -> {
+                bindings.controller.notifyFailure(state.errorMessage.orEmpty(), bindings.onActivate)
+                TaskbarProgress.showError(bindings.window)
+                TaskbarProgress.requestAttention(bindings.window, TaskbarProgress.AttentionType.CRITICAL)
+            }
+            FailureProgressAction.ClearProgress -> TaskbarProgress.hideProgress(bindings.window)
+            FailureProgressAction.None -> Unit
         }
-        if (shouldClearFailureProgress(current, previousError, state.isAgentWorking)) {
-            TaskbarProgress.hideProgress(bindings.window)
-        }
-        previousError = current
+        previousError = state.errorMessage
     }
 }
 
-private fun shouldNotifyFailure(current: String?, previous: String?, isWindowFocused: Boolean): Boolean {
-    if (current == null) return false
-    if (current == previous) return false
-    return !isWindowFocused
-}
+private enum class FailureProgressAction { Notify, ClearProgress, None }
 
 /**
- * The focus listener clears attention/badge but not the red error progress;
- * drop it as soon as the error state resolves so the taskbar doesn't stay red
- * until an unrelated agent-work transition. Active work keeps its own progress.
+ * Notify on a fresh background error; clear the red error progress once the
+ * error state resolves (the focus listener only clears attention/badge, and
+ * active agent work owns its own progress indicator).
  */
-private fun shouldClearFailureProgress(current: String?, previous: String?, isAgentWorking: Boolean): Boolean {
-    if (current != null) return false
-    if (previous == null) return false
-    return !isAgentWorking
+private fun failureProgressAction(
+    state: DesktopNucleusEffectState,
+    previousError: String?,
+    window: Window,
+): FailureProgressAction {
+    val current = state.errorMessage
+    if (current != null) {
+        if (current == previousError) return FailureProgressAction.None
+        return if (window.isFocused) FailureProgressAction.None else FailureProgressAction.Notify
+    }
+    if (previousError == null) return FailureProgressAction.None
+    return if (state.isAgentWorking) FailureProgressAction.None else FailureProgressAction.ClearProgress
 }
 
 private fun registerQuickSwitcher(onActivate: () -> Unit, onOpenCommandPalette: () -> Unit): Long =
