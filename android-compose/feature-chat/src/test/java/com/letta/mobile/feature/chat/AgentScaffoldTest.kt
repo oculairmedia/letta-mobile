@@ -11,6 +11,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.feature.chat.screen.DrawerContent
+import com.letta.mobile.feature.chat.screen.DrawerNavigationCallbacks
 import com.letta.mobile.ui.test.setLettaTestContent
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -93,6 +94,37 @@ class AgentScaffoldTest {
 
         composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_EDIT_AGENT).performClick()
         assertTrue("Edit callback should fire", fired)
+    }
+
+    @Test
+    fun drawerProjectsItemRendersAndFiresCallback() {
+        var projectsCalled = false
+        composeRule.setLettaTestContent(useChatTheme = false) {
+            DrawerContent(
+                agentName = "ProjectsBot",
+                agentId = "agent-projects-1",
+                activeBackendLabel = "letta.test",
+                currentModel = null,
+                contextWindow = emptyContextWindow(),
+                chatMode = "interactive",
+                onChatModeSelected = {},
+                onModelTap = {},
+                conversations = emptyList(),
+                currentConversationId = null,
+                onNewConversation = {},
+                onConversationSelected = {},
+                onEditAgent = {},
+                onResetMessages = {},
+                onRefreshContextWindow = {},
+                navigation = DrawerNavigationCallbacks(
+                    onNavigateToProjects = { projectsCalled = true },
+                ),
+                onClose = {},
+            )
+        }
+
+        composeRule.onNodeWithText("Projects").performScrollTo().assertIsDisplayed().performClick()
+        assertTrue("Projects callback should fire", projectsCalled)
     }
 
     @Test
