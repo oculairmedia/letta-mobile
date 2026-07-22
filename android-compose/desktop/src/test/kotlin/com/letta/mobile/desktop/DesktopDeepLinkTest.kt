@@ -9,6 +9,10 @@ class DesktopDeepLinkTest {
     @Test
     fun parsesSupportedMeridianDestinations() {
         assertEquals(
+            DesktopDeepLinkDestination.Conversations,
+            parseDesktopDeepLink(URI("meridian://conversations")),
+        )
+        assertEquals(
             DesktopDeepLinkDestination.Settings,
             parseDesktopDeepLink(URI("meridian://settings")),
         )

@@ -44,14 +44,13 @@ import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import java.awt.Window
-import java.net.URI
 import dev.nucleusframework.application.NucleusApplicationScope
 
 @Composable
-fun LettaDesktopApp(
+internal fun LettaDesktopApp(
     nucleusApplicationScope: NucleusApplicationScope,
     window: Window,
-    deepLinks: StateFlow<URI?>,
+    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
     onActiveTitleChange: (String) -> Unit = {},
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
@@ -195,12 +194,31 @@ fun LettaDesktopApp(
         selectedDestination = DesktopDestination.Conversations
     }
 
+    // Deep-linked conversations can arrive before the conversation list has
+    // loaded (cold-start protocol activation); selectConversation ignores
+    // unknown ids, so buffer the target and select once it exists.
+    var pendingDeepLinkConversationId by remember { mutableStateOf<String?>(null) }
     DesktopDeepLinkEffect(
         deepLinks = deepLinks,
-        onDestinationSelected = { selectedDestination = it },
-        onConversationSelected = chatController::selectConversation,
+        // Deep links must win over the full-page agent editor, matching the
+        // sidebar navigation paths that clear edit mode before routing.
+        onDestinationSelected = {
+            editAgentId = null
+            selectedDestination = it
+        },
+        onConversationSelected = {
+            editAgentId = null
+            pendingDeepLinkConversationId = it
+        },
         onAgentSelected = ::openAgent,
     )
+    LaunchedEffect(pendingDeepLinkConversationId, chatState.conversations) {
+        val target = pendingDeepLinkConversationId ?: return@LaunchedEffect
+        if (chatState.conversations.any { it.id == target }) {
+            chatController.selectConversation(target)
+            pendingDeepLinkConversationId = null
+        }
+    }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
     // Per-agent avatar-style override chosen in the editor (stored in agent
@@ -267,13 +285,23 @@ fun LettaDesktopApp(
     val replyPresence by chatController.replyPresence.collectAsState()
     val isStreamingReplySelected = replyPresence.isStreaming
 
+    // Background work can belong to a conversation the user has switched away
+    // from; label taskbar/media/notification integration with the agent that
+    // is actually working, not the current selection.
+    val workingAgentName = thinkingAgentId?.let { id ->
+        railAgents.firstOrNull { it.first == id }?.second
+    }
+        ?: thinkingConversationId?.let { tid ->
+            chatState.conversations.firstOrNull { it.id == tid }?.agentName
+        }
+        ?: selectedAgentName
     DesktopNucleusEffects(
         bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
         state = desktopNucleusEffectState(
             DesktopNucleusRuntimeState(
                 thinkingConversationId = thinkingConversationId,
                 isStreamingReply = replyPresence.isStreaming,
-                agentName = selectedAgentName,
+                agentName = workingAgentName,
                 errorMessage = chatState.errorMessage,
             ),
         ),

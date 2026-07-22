@@ -217,41 +217,49 @@ internal class DesktopNucleusController(
         }
     }
 
+    // Native notification sends go through OS IPC; keep them off the
+    // Compose/Swing main thread like the other native calls in this class.
     fun sendTestNotification(onActivated: () -> Unit) {
-        val result = notification(
-            title = "Letta Desktop",
-            message = "Native notifications are connected.",
-            onActivated = onActivated,
-            onFailed = {
-                mutableState.update {
-                    it.copy(notificationMessage = "Windows rejected the test notification.")
-                }
-            },
-        ).send()
-        mutableState.update {
-            it.copy(
-                notificationMessage = when (result) {
-                    is NotificationResult.Success -> "Test notification sent to Windows."
-                    is NotificationResult.Failure -> "Notification failed: ${result.reason}"
+        scope.launch(Dispatchers.IO) {
+            val result = notification(
+                title = "Letta Desktop",
+                message = "Native notifications are connected.",
+                onActivated = onActivated,
+                onFailed = {
+                    mutableState.update {
+                        it.copy(notificationMessage = "Windows rejected the test notification.")
+                    }
                 },
-            )
+            ).send()
+            mutableState.update {
+                it.copy(
+                    notificationMessage = when (result) {
+                        is NotificationResult.Success -> "Test notification sent to Windows."
+                        is NotificationResult.Failure -> "Notification failed: ${result.reason}"
+                    },
+                )
+            }
         }
     }
 
     fun notifyAgentFinished(agentName: String, onActivated: () -> Unit) {
-        notification(
-            title = agentName,
-            message = "Your agent finished responding.",
-            onActivated = onActivated,
-        ).send()
+        scope.launch(Dispatchers.IO) {
+            notification(
+                title = agentName,
+                message = "Your agent finished responding.",
+                onActivated = onActivated,
+            ).send()
+        }
     }
 
     fun notifyFailure(message: String, onActivated: () -> Unit) {
-        notification(
-            title = "Letta Desktop needs attention",
-            message = message,
-            onActivated = onActivated,
-        ).send()
+        scope.launch(Dispatchers.IO) {
+            notification(
+                title = "Letta Desktop needs attention",
+                message = message,
+                onActivated = onActivated,
+            ).send()
+        }
     }
 
     private fun initializeNotifications(): Boolean {

@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.dp
 import dev.nucleusframework.autolaunch.AutoLaunchState
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
@@ -218,4 +219,6 @@ private fun formatBytes(bytes: Long): String {
     return if (gib >= 1.0) "%.1f GiB".format(gib) else "${bytes / (1024 * 1024)} MiB"
 }
 
-private fun Color.toHexLabel(): String = "#%06X".format(value.toLong() and 0xFFFFFF)
+// sRGB Color.value keeps ARGB in the upper 32 bits; toArgb() yields the packed
+// 32-bit form whose low 24 bits are the actual RGB channels.
+private fun Color.toHexLabel(): String = "#%06X".format(toArgb() and 0xFFFFFF)

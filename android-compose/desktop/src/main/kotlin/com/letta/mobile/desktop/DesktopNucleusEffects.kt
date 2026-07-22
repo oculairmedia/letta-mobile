@@ -26,6 +26,7 @@ import dev.nucleusframework.media.control.MediaPlaybackState
 import dev.nucleusframework.media.control.MediaPlaybackStatus
 import dev.nucleusframework.taskbarprogress.TaskbarProgress
 import dev.nucleusframework.composenativetray.tray.api.Tray
+import java.awt.Frame
 import java.awt.Window
 import java.awt.event.KeyEvent
 import java.awt.event.WindowEvent
@@ -36,6 +37,9 @@ import kotlin.system.exitProcess
 internal fun activateDesktopWindow(window: Window) {
     SwingUtilities.invokeLater {
         window.isVisible = true
+        if (window is Frame) {
+            window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
+        }
         window.toFront()
         window.requestFocus()
     }
@@ -236,6 +240,12 @@ private fun AgentFailureEffect(
             TaskbarProgress.showError(bindings.window)
             TaskbarProgress.requestAttention(bindings.window, TaskbarProgress.AttentionType.CRITICAL)
         }
+        // The focus listener clears attention/badge but not the red error
+        // progress; drop it as soon as the error state resolves so the taskbar
+        // doesn't stay red until an unrelated agent-work transition.
+        if (current == null && previousError != null && !state.isAgentWorking) {
+            TaskbarProgress.hideProgress(bindings.window)
+        }
         previousError = current
     }
 }
@@ -344,7 +354,12 @@ private fun configureLauncherMenus(onShow: () -> Unit, onOpenSettings: () -> Uni
             MacOsDockMenu.listener = { itemId ->
                 when (itemId) {
                     1 -> onShow()
-                    2 -> onOpenSettings()
+                    2 -> {
+                        // Match the tray Settings action: bring the (possibly
+                        // hidden) window forward before switching destination.
+                        onShow()
+                        onOpenSettings()
+                    }
                 }
             }
             MacOsDockMenu.setDockMenu(

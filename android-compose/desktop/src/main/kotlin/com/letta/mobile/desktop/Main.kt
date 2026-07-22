@@ -15,13 +15,14 @@ import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
 import dev.nucleusframework.application.NucleusBackend
+import dev.nucleusframework.application.SingleInstanceRestoreEffect
 import dev.nucleusframework.application.nucleusApplication
 import dev.nucleusframework.hidpi.applyLinuxHiDpiScale
 import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.launcher.windows.WindowsJumpListManager
 import java.awt.Dimension
-import java.net.URI
 import javax.swing.JOptionPane
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.system.exitProcess
 
@@ -66,7 +67,8 @@ private fun runDesktopApplication(
     args: Array<String>,
     activationHandler: DesktopWindowActivationHandler,
 ) {
-    val deepLinks = MutableStateFlow<URI?>(null)
+    val deepLinkSequence = AtomicLong()
+    val deepLinks = MutableStateFlow<DesktopDeepLinkRequest?>(null)
     nucleusApplication(
         args = args,
         backend = NucleusBackend.Awt,
@@ -74,7 +76,12 @@ private fun runDesktopApplication(
     ) {
             val nucleusScope = this
             onDeepLink { uri ->
-                deepLinks.value = uri
+                deepLinks.value = DesktopDeepLinkRequest(deepLinkSequence.incrementAndGet(), uri)
+                activationHandler.showUserThatAppIsRunning()
+            }
+            // A second launch with no deep link (desktop/Start Menu icon while
+            // the primary is hidden to the tray) must still restore the window.
+            SingleInstanceRestoreEffect {
                 activationHandler.showUserThatAppIsRunning()
             }
             var windowTitle by remember { mutableStateOf("Letta Desktop") }

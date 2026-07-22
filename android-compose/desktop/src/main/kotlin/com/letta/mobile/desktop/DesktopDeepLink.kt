@@ -7,6 +7,12 @@ import androidx.compose.runtime.getValue
 import kotlinx.coroutines.flow.StateFlow
 import java.net.URI
 
+/**
+ * One deep-link delivery. The [sequence] makes repeated activations of the
+ * same URI distinct, so StateFlow's equality conflation cannot swallow them.
+ */
+internal data class DesktopDeepLinkRequest(val sequence: Long, val uri: URI)
+
 internal sealed interface DesktopDeepLinkDestination {
     data object Conversations : DesktopDeepLinkDestination
     data object Settings : DesktopDeepLinkDestination
@@ -28,7 +34,7 @@ internal fun parseDesktopDeepLink(uri: URI): DesktopDeepLinkDestination? {
 
 @Composable
 internal fun DesktopDeepLinkEffect(
-    deepLinks: StateFlow<URI?>,
+    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
     onDestinationSelected: (DesktopDestination) -> Unit,
     onConversationSelected: (String) -> Unit,
     onAgentSelected: (String) -> Unit,
@@ -36,7 +42,7 @@ internal fun DesktopDeepLinkEffect(
     val pendingDeepLink by deepLinks.collectAsState()
     LaunchedEffect(pendingDeepLink) {
         handleDesktopDeepLink(
-            destination = pendingDeepLink?.let(::parseDesktopDeepLink),
+            destination = pendingDeepLink?.uri?.let(::parseDesktopDeepLink),
             onDestinationSelected = onDestinationSelected,
             onConversationSelected = onConversationSelected,
             onAgentSelected = onAgentSelected,
