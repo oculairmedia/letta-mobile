@@ -57,7 +57,7 @@ object AppServerProtocol {
                 frame = AppServerInboundFrame.DecodeFailure(
                     declaredType = null,
                     raw = null,
-                    diagnostic = decodeDiagnostic(declaredType = null, reason = reason),
+                    diagnostic = boundedDiagnostic("decode_failure: $reason"),
                 ),
                 raw = emptyRaw,
             )
@@ -87,31 +87,27 @@ object AppServerProtocol {
         decode: () -> AppServerInboundFrame,
     ): AppServerInboundFrame =
         runCatching { decode() }.getOrElse { error ->
+            val reason = error.message ?: error::class.simpleName ?: "decode failed"
             AppServerInboundFrame.DecodeFailure(
                 declaredType = type,
                 raw = raw,
-                diagnostic = decodeDiagnostic(
-                    declaredType = type,
-                    reason = error.message ?: error::class.simpleName ?: "decode failed",
-                ),
+                diagnostic = boundedDiagnostic("decode_failure type=$type: $reason"),
             )
         }
 
     /**
-     * Build a bounded diagnostic for a decode failure. Intentionally excludes the
-     * raw frame payload (available separately on [AppServerInboundFrame.DecodeFailure.raw])
-     * so nothing that leaves the process — logs, traces, fanout — carries frame
-     * contents, and caps the length so a hostile/oversized frame cannot bloat sinks.
+     * Cap a decode-failure diagnostic to [MAX_DIAGNOSTIC_LENGTH]. Callers compose
+     * the message; it must intentionally exclude the raw frame payload (available
+     * separately on [AppServerInboundFrame.DecodeFailure.raw]) so nothing that
+     * leaves the process — logs, traces, fanout — carries frame contents, and the
+     * cap prevents a hostile/oversized frame from bloating sinks.
      */
-    fun decodeDiagnostic(declaredType: String?, reason: String): String {
-        val prefix = "decode_failure" + (declaredType?.let { " type=$it" }.orEmpty())
-        val message = "$prefix: $reason"
-        return if (message.length > MAX_DIAGNOSTIC_LENGTH) {
+    fun boundedDiagnostic(message: String): String =
+        if (message.length > MAX_DIAGNOSTIC_LENGTH) {
             message.take(MAX_DIAGNOSTIC_LENGTH - 1) + "\u2026"
         } else {
             message
         }
-    }
 
     /**
      * Recursively replace credential-bearing values with [REDACTED_PLACEHOLDER].

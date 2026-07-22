@@ -439,10 +439,9 @@ class AppServerProtocolTest {
     }
 
     @Test
-    fun decodeDiagnosticIsBoundedToMaxLength() {
-        val diagnostic = AppServerProtocol.decodeDiagnostic(
-            declaredType = "stream_delta",
-            reason = "x".repeat(2_000),
+    fun boundedDiagnosticIsCappedToMaxLength() {
+        val diagnostic = AppServerProtocol.boundedDiagnostic(
+            "decode_failure type=stream_delta: " + "x".repeat(2_000),
         )
         assertEquals(AppServerProtocol.MAX_DIAGNOSTIC_LENGTH, diagnostic.length)
         assertTrue(diagnostic.endsWith("\u2026"))
