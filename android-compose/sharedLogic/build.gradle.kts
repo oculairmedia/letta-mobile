@@ -64,7 +64,7 @@ kotlin {
                 // 0.7.1 to match the version the Compose calendar library
                 // (kizitonwose) pulls; 0.7.0 moved Instant to kotlin.time.
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-                api("org.jetbrains.compose.runtime:runtime:1.10.0")
+                api("org.jetbrains.compose.runtime:runtime:1.11.1")
                 api("io.ktor:ktor-http:3.5.0")
                 api("io.ktor:ktor-io:3.5.0")
                 // Multiplatform HTTP client core for shared repository logic
@@ -83,14 +83,13 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 // Compose-Multiplatform UI dependencies for shared chat UI (slice 1).
-                // foundation/ui are kept on the 1.10.x train (matching the
-                // org.jetbrains.compose plugin) so Jewel's expected Compose
-                // foundation API is present on the desktop classpath
+                // foundation/ui match the Compose plugin and Nucleus runtime.
+                // DesktopJewelTheme bridges Jewel 0.37's older text-menu ABI
                 // (letta-mobile-5icsp). material3 stays on 1.9.0 — the latest
-                // STABLE Compose material3 (1.10.x material3 is alpha-only).
-                api("org.jetbrains.compose.foundation:foundation:1.10.0")
+                // stable Compose Material 3 release used by this project.
+                api("org.jetbrains.compose.foundation:foundation:1.11.1")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
-                api("org.jetbrains.compose.ui:ui:1.10.0")
+                api("org.jetbrains.compose.ui:ui:1.11.1")
                 // Shared Android/Desktop Markdown paint layer. Semantic streaming
                 // structure lives alongside it in this source set; platform
                 // modules provide only optional image/clipboard adapters.

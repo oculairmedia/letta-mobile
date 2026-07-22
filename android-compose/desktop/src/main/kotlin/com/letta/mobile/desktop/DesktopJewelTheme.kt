@@ -18,15 +18,26 @@ import org.jetbrains.jewel.intui.standalone.theme.darkThemeDefinition
 import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.ui.ComponentStyling
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
     val themeDefinition = remember { JewelTheme.darkThemeDefinition() }
+    // Jewel 0.37 was compiled against Compose 1.10's text-menu ABI. Capture
+    // Compose 1.11's implementation before entering Jewel and re-provide it to
+    // app content, matching Nucleus's Jewel integration compatibility bridge.
+    @Suppress("DEPRECATION")
+    val composeTextContextMenu = androidx.compose.foundation.text.LocalTextContextMenu.current
 
     IntUiTheme(
         theme = themeDefinition,
         styling = ComponentStyling.decoratedWindow(),
-        content = content,
-    )
+    ) {
+        @Suppress("DEPRECATION")
+        CompositionLocalProvider(
+            androidx.compose.foundation.text.LocalTextContextMenu provides composeTextContextMenu,
+            content = content,
+        )
+    }
 }
 
 /**

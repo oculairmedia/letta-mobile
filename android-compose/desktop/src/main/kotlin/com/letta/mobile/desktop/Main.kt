@@ -11,15 +11,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.WindowExceptionHandler
 import androidx.compose.ui.window.WindowExceptionHandlerFactory
-import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
 import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
+import dev.nucleusframework.application.NucleusBackend
+import dev.nucleusframework.application.nucleusApplication
 import java.awt.Dimension
 import javax.swing.JOptionPane
 import kotlin.system.exitProcess
 
-fun main() {
+fun main(args: Array<String>) {
     DesktopCrashReporter.installGlobalHandler()
     val activationHandler = DesktopWindowActivationHandler()
     when (val singleInstance = DesktopSingleInstance.acquire(onCommand = activationHandler::handleCommand)) {
@@ -29,17 +30,24 @@ fun main() {
             }
             return
         }
-        is DesktopSingleInstance.Primary -> runDesktopApplication(singleInstance, activationHandler)
+        is DesktopSingleInstance.Primary -> runDesktopApplication(args, singleInstance, activationHandler)
     }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 private fun runDesktopApplication(
+    args: Array<String>,
     singleInstance: DesktopSingleInstance.Primary,
     activationHandler: DesktopWindowActivationHandler,
 ) {
     singleInstance.use {
-        application {
+        nucleusApplication(
+            args = args,
+            backend = NucleusBackend.Awt,
+            // Letta's lock also forwards a show-window command to the primary
+            // process, so retain it instead of stacking Nucleus's generic lock.
+            enableSingleInstance = false,
+        ) {
             var windowTitle by remember { mutableStateOf("Letta Desktop") }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
