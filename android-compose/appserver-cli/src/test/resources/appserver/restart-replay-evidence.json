@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "issue": "letta-mobile-lgns8.15",
+  "description": "Observed persistence/identity evidence from executable probes against a real local Letta Code App Server v2. Captured — not hand-authored — by AppServerRestartReplayProbe; regenerate with :appserver-cli:test when OPENROUTER_API_KEY + a local letta-code install are present.",
+  "source": {
+    "package": "@letta-ai/letta-code",
+    "version": "0.28.8",
+    "node": "v24.18.0",
+    "backend": "local",
+    "backend_env": {
+      "LETTA_LOCAL_BACKEND_EXPERIMENTAL": "1",
+      "LETTA_LOCAL_BACKEND_DIR": "<isolated temp dir per run>"
+    },
+    "model": "openrouter/nvidia/nemotron-nano-9b-v2:free",
+    "provider": "openrouter (pi-ai, OPENAI-compatible; OPENROUTER_API_KEY)"
+  },
+  "durability": {
+    "process_restart_same_backend_dir": {
+      "agent": "survives",
+      "conversation": "survives",
+      "committed_transcript": "survives",
+      "reattach_created_flags": { "agent": false, "conversation": false }
+    },
+    "control_reconnect_same_process": {
+      "agent": "survives",
+      "conversation": "survives",
+      "committed_transcript": "survives",
+      "sync_replays_transcript_as_stream_deltas": false
+    },
+    "transcript_store": "conversations/<base64 conversation id>/messages.jsonl (append-only; user/assistant linked by parentId chain)"
+  },
+  "identity_scopes": {
+    "client_message_id": {
+      "committed_as": "otid",
+      "durable_across_process_restart": true,
+      "server_deduplicated": false,
+      "scope": "per-message, client-owned; the only durable client-supplied correlation id on the committed transcript"
+    },
+    "run_id": {
+      "format": "local-run-N",
+      "resets_on_process_restart": true,
+      "globally_unique_across_restart": false,
+      "scope": "per-process monotonic counter (observed local-run-1 reused after restart)"
+    },
+    "event_seq": {
+      "resets_on": "stream_connection",
+      "durable_cursor": false,
+      "scope": "per-connection generation (new stream connection restarts near seq 2)"
+    },
+    "idempotency_key": {
+      "format": "stream_delta:<event_seq>:<uuid>",
+      "stable_across_replay": false,
+      "scope": "per-emission (random uuid component)"
+    }
+  },
+  "mid_turn_kill_before_terminal": {
+    "user_input_committed": true,
+    "assistant_message_committed": false,
+    "note": "the user input commits to the transcript before the assistant turn completes; the assistant response is lost if the process is killed before its terminal stop_reason"
+  },
+  "ambiguity": {
+    "unacknowledged_input_after_disconnect": "ambiguous",
+    "distinguisher": "inspect the committed transcript for a user message whose otid equals the client_message_id",
+    "resend_same_client_message_id_after_restart": "duplicates the user message and re-runs the turn (observed cmid count = 2); the server does NOT deduplicate by client_message_id"
+  },
+  "reconciliation_rules": [
+    { "operation": "runtime_start(reattach)", "class": "safe_read", "retry": "safe" },
+    { "operation": "sync", "class": "safe_read", "retry": "safe" },
+    {
+      "operation": "input/create_message",
+      "class": "ambiguous_write",
+      "retry": "do_not_blind_replay",
+      "reconcile": "before resending, match the committed transcript by otid == client_message_id; only resend if absent"
+    },
+    {
+      "operation": "resume_after_mid_turn_kill",
+      "class": "ambiguous_write",
+      "action": "if a committed user message has no following assistant/terminal message, re-drive the assistant turn; do NOT re-append the user message"
+    }
+  ],
+  "anti_anchors": ["run_id", "event_seq", "idempotency_key"],
+  "durable_correlation_id": "client_message_id"
+}
