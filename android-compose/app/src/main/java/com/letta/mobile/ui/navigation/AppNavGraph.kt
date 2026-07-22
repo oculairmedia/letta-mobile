@@ -49,6 +49,36 @@ const val PROJECT_CREATED_REFRESH_KEY: String = "project_created_refresh"
 @OptIn(ExperimentalSharedTransitionApi::class)
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
+private fun androidx.navigation.NavGraphBuilder.appChatGraph(navController: NavHostController) {
+    chatGraph(
+        enterTransition = { fadeIn(animationSpec = tween(150)) },
+        exitTransition = { fadeOut(animationSpec = tween(150)) },
+        popEnterTransition = { fadeIn(animationSpec = tween(150)) },
+        popExitTransition = { fadeOut(animationSpec = tween(150)) },
+        onNavigateBack = {
+            if (!navController.popBackStack()) {
+                navController.navigate(ConversationsRoute) {
+                    popUpTo(0) { inclusive = true }
+                    launchSingleTop = true
+                }
+            }
+        },
+        onNavigateToSettings = { agentId -> navController.navigate(EditAgentRoute(agentId)) },
+        onNavigateToArchival = { agentId -> navController.navigate(ArchivalRoute(agentId)) },
+        onNavigateToTools = { navController.navigate(AllToolsRoute) },
+        onNavigateToMemory = { agentId -> navController.navigate(MemoryRoute(agentId)) },
+        onNavigateToAdmin = { navController.navigate(AdminRoute) },
+        onNavigateToSchedules = { agentId -> navController.navigate(SchedulesRoute(agentId)) },
+        onNavigateToProjects = { navController.navigate(HomeRoute) },
+        onNavigateToConversationList = { navController.navigate(ConversationsRoute) },
+        onSwitchConversation = { route ->
+            navController.navigate(route) {
+                popUpTo<AgentChatRoute> { inclusive = true }
+            }
+        },
+    )
+}
+
 val LocalAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
 @HiltViewModel
@@ -150,51 +180,7 @@ fun AppNavGraph(
             onNavigateBack = { navController.popBackStack() }
         )
 
-        chatGraph(
-            enterTransition = { fadeIn(animationSpec = tween(150)) },
-            exitTransition = { fadeOut(animationSpec = tween(150)) },
-            popEnterTransition = { fadeIn(animationSpec = tween(150)) },
-            popExitTransition = { fadeOut(animationSpec = tween(150)) },
-            // letta-mobile: when AgentChatRoute is the cold-start landing
-            // (lastChatSelection or fallbackAgentId picked it as the
-            // startDestination), the back stack is empty. Fall back to the
-            // conversations list so back-from-default-chat takes the user
-            // somewhere useful instead.
-            onNavigateBack = {
-                if (!navController.popBackStack()) {
-                    navController.navigate(ConversationsRoute) {
-                        popUpTo(0) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            },
-            onNavigateToSettings = { agentId ->
-                navController.navigate(EditAgentRoute(agentId))
-            },
-            onNavigateToArchival = { agentId ->
-                navController.navigate(ArchivalRoute(agentId))
-            },
-            onNavigateToTools = {
-                navController.navigate(AllToolsRoute)
-            },
-            onNavigateToMemory = { agentId ->
-                navController.navigate(MemoryRoute(agentId))
-            },
-            onNavigateToAdmin = {
-                navController.navigate(AdminRoute)
-            },
-            onNavigateToSchedules = { agentId ->
-                navController.navigate(SchedulesRoute(agentId))
-            },
-            onNavigateToConversationList = {
-                navController.navigate(ConversationsRoute)
-            },
-            onSwitchConversation = { route ->
-                navController.navigate(route) {
-                    popUpTo<AgentChatRoute> { inclusive = true }
-                }
-            },
-        )
+        appChatGraph(navController)
     }
 
     // letta-mobile-cdlk: render the backend-switcher sheet at the top level
