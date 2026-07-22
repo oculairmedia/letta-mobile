@@ -68,17 +68,35 @@ class TurnIdentityLifecycleTest {
     }
 
     @Test
-    fun acceptedSendRejectsIdentifiedTerminalUntilItsTurnStarts() {
+    fun acceptedSendAcceptsImmediateFailureButRejectsDelayedOldTerminal() {
         val lifecycle = lifecycleWithPromotedTurn()
+        lifecycle.clear()
         lifecycle.acceptedSend(CONVERSATION)
 
         assertFalse(lifecycle.acceptsTerminal(TURN))
-        assertFalse(lifecycle.acceptsTerminal(REPLACEMENT_TURN))
-        assertFalse(lifecycle.acceptsTerminal(""))
+        assertTrue(lifecycle.acceptsTerminal(REPLACEMENT_TURN))
+        assertTrue(lifecycle.acceptsTerminal(""))
 
         lifecycle.turnStarted(CONVERSATION, REPLACEMENT_TURN, REPLACEMENT_RUN)
         assertFalse(lifecycle.acceptsTerminal(TURN))
+        assertFalse(lifecycle.acceptsTerminal(""))
         assertTrue(lifecycle.acceptsTerminal(REPLACEMENT_TURN))
+    }
+
+    @Test
+    fun identifiedFailureBeforeAnyTurnStartedOwnsAcceptedSend() {
+        val lifecycle = TurnIdentityLifecycle()
+        lifecycle.acceptedSend(CONVERSATION)
+
+        assertTrue(lifecycle.acceptsTerminal(TURN))
+    }
+
+    @Test
+    fun blankFailureBeforeAnyTurnStartedOwnsAcceptedSend() {
+        val lifecycle = TurnIdentityLifecycle()
+        lifecycle.acceptedSend(CONVERSATION)
+
+        assertTrue(lifecycle.acceptsTerminal(""))
     }
 
     @Test

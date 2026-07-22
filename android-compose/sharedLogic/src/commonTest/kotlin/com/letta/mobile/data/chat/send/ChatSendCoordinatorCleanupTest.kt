@@ -267,6 +267,48 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun `identified failed TurnDone before TurnStarted finalizes accepted send`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.Error("busy", "Send rejected", "conv-1", "turn-failed", "run-failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-failed", "run-failed", "failed"))
+
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", timeline.externalLocals.single().otid)), timeline.failedLocals)
+        assertEquals("Send rejected", ui.currentError())
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+    }
+
+    @Test
+    fun `blank failed TurnDone before TurnStarted finalizes accepted send`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.Error("busy", "", "conv-1", null, null))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("", "", "failed"))
+
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", timeline.externalLocals.single().otid)), timeline.failedLocals)
+        assertEquals("busy", ui.currentError())
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+    }
+
+    @Test
     fun `old TurnDone before newly accepted send starts cannot finalize the new generation`() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val ui = RecordingUiSink()

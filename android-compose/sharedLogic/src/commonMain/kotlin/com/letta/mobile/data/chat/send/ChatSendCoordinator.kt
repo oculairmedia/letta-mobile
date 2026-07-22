@@ -24,6 +24,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -80,6 +82,9 @@ class ChatSendCoordinator(
     // duplicates defensively (drop with telemetry rather than overwriting).
     @Volatile private var activeWsTurnId: String? = null
     @Volatile private var activeWsRunId: String? = null
+    // Send acceptance, transport events, and cleanup all mutate one ownership graph. Serializing
+    // their suspend paths makes the lifecycle decision and the matching UI/OTID mutation atomic.
+    private val turnStateMutex = Mutex()
     private val turnIdentity = TurnIdentityLifecycle()
     private val activeAssistantMessageRunIds = linkedSetOf<String>()
     @Volatile private var stopReasonForTurn: String? = null
@@ -126,6 +131,14 @@ class ChatSendCoordinator(
     }
 
     private suspend fun sendInternal(
+        text: String,
+        attachments: List<MessageContentPart.Image>,
+        targetConversationId: String?,
+    ) = turnStateMutex.withLock {
+        sendInternalLocked(text, attachments, targetConversationId)
+    }
+
+    private suspend fun sendInternalLocked(
         text: String,
         attachments: List<MessageContentPart.Image>,
         targetConversationId: String?,
@@ -250,13 +263,23 @@ class ChatSendCoordinator(
             "otid" to pending.otid,
             "appendOptimisticLocal" to appendOptimisticLocal,
         )
-        val accepted = wsChatBridge.send(
-            agentId = agentId,
+        val accepted = turnIdentity.acceptSend(
             conversationId = pending.conversationId,
-            text = pending.text,
-            otid = pending.otid,
-            attachments = pending.attachments,
-            startNewConversation = pending.startNewConversation,
+            send = {
+                wsChatBridge.send(
+                    agentId = agentId,
+                    conversationId = pending.conversationId,
+                    text = pending.text,
+                    otid = pending.otid,
+                    attachments = pending.attachments,
+                    startNewConversation = pending.startNewConversation,
+                )
+            },
+            onAccepted = {
+                activeWsOtid = pending.otid
+                activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
+                activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
+            },
         )
         Telemetry.event(
             "IrohTrace", "dispatchPendingSend.bridgeSend.done",
@@ -266,10 +289,6 @@ class ChatSendCoordinator(
         )
         if (!accepted) return false
 
-        turnIdentity.acceptedSend(pending.conversationId)
-        activeWsOtid = pending.otid
-        activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
-        activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
         if (appendOptimisticLocal) {
             if (pending.startNewConversation) {
                 pendingConversationBootstrapLocal = pending
@@ -464,7 +483,11 @@ class ChatSendCoordinator(
         } ?: false
     }
 
-    suspend fun handleEvent(event: WsTimelineEvent) {
+    suspend fun handleEvent(event: WsTimelineEvent) = turnStateMutex.withLock {
+        handleEventLocked(event)
+    }
+
+    private suspend fun handleEventLocked(event: WsTimelineEvent) {
         // letta-mobile-sfex6: strict agent scoping. wsChatBridge.events is a
         // GLOBAL flow — every per-(agentId,conversationId) coordinator collects
         // it, so a frame for one agent reaches every coordinator. When two
@@ -571,16 +594,9 @@ class ChatSendCoordinator(
                 }
             }
             is WsTimelineEvent.TurnDone -> {
-                // dir4k (z5vfy PR-1): run/turn generation fence. A late TurnDone
-                // for an OLD turn can arrive after the user has already started a
-                // NEWER turn (activeWsTurnId now points at the newer turn). Without
-                // this fence, finishActiveTurn would finalize + clear the newer
-                // turn's presence (nulls activeWsTurnId/activeWsRunId, fires
-                // ui.onTurnFinished) — wrongly finalizing the new run and stopping
-                // its Thinking indicator. Detect the stale terminal (a non-blank
-                // incoming turnId that does not match the currently-active turnId
-                // while a turn IS active) and do only OLD-run-scoped cleanup, then
-                // return without touching the newer turn's state.
+                // Lifecycle ownership is the terminal fence. It rejects delayed
+                // terminals from older generations without touching the accepted
+                // send or the newer turn that currently owns UI presence.
                 if (isStaleTerminalForOlderTurn(event.turnId)) {
                     if (event.status == "failed" || event.status == "cancelled") {
                         val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
@@ -688,7 +704,11 @@ class ChatSendCoordinator(
         }
     }
 
-    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) {
+    private suspend fun handleRedialWhileTurnActive(event: RedialWhileTurnActive) = turnStateMutex.withLock {
+        handleRedialWhileTurnActiveLocked(event)
+    }
+
+    private suspend fun handleRedialWhileTurnActiveLocked(event: RedialWhileTurnActive) {
         if (event.agentId != agentId) return
         val activeConversation = activeWsConversationId ?: activeConversationId()
         if (activeConversation != event.conversationId) return
@@ -905,16 +925,6 @@ class ChatSendCoordinator(
         }
     }
 
-    /**
-     * dir4k (z5vfy PR-1): true when an incoming TurnDone is for an OLDER turn
-     * than the one currently active, i.e. a late/stale terminal that must not be
-     * allowed to finalize the newer active turn. Requires a non-blank incoming
-     * turnId, a currently-active turn (activeWsTurnId != null), and a mismatch
-     * between them. When no turn is active, or the incoming turn matches the
-     * active turn, or the incoming turnId is blank (identity unknown — treat as
-     * the current turn, matching the SubscribeDone path), this returns false so
-     * the terminal finalizes normally.
-     */
     private fun isStaleTerminalForOlderTurn(incomingTurnId: String): Boolean =
         !turnIdentity.acceptsTerminal(incomingTurnId)
 
