@@ -397,6 +397,35 @@ class ConversationTurnFanoutTest {
     }
 
     @Test
+    fun toolCallsArrayShapeDeduplicatesAgainstSemanticEvent() = runTest {
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        val registry = ConnectionRegistry().apply { register(conversationId, initiator) }
+        val fanout = fanoutFor(registry, initiator)
+        val callId = ToolCallId("tc-array")
+
+        fanout.onDraft(RuntimeEventPayload.ToolCallObserved(callId, ToolName("bash"), "{\"command\":\"pwd\"}"))
+        fanout.onDraft(RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "raw-array",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(1, buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("id", "message-id")
+                put("tool_calls", kotlinx.serialization.json.buildJsonArray {
+                    add(buildJsonObject {
+                        put("tool_call_id", callId.value)
+                        put("name", "bash")
+                        put("arguments", "{\"command\":\"pwd\"}")
+                    })
+                })
+            }),
+        ))
+
+        assertEquals(1, sink.frames().size)
+    }
+
+    @Test
     fun returnAliasesAndDefaultStatusDeduplicateAgainstSemanticEvent() = runTest {
         listOf("output", "message", "content").forEach { bodyAlias ->
             val sink = CapturingSink()

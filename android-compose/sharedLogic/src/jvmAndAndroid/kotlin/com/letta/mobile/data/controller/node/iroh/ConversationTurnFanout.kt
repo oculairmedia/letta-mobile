@@ -2,7 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.transport.iroh.canonicalToolCall
+import com.letta.mobile.data.transport.iroh.canonicalToolCalls
 import com.letta.mobile.data.transport.iroh.canonicalToolReturn
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -221,7 +221,9 @@ internal class ConversationTurnFanout(
     }
 
     private fun canonicalToolCallSignature(delta: JsonObject): String? =
-        canonicalToolCall(delta)?.let { "call|${it.toolCallId}|${it.name}|${it.arguments}" }
+        canonicalToolCalls(delta).takeIf { it.isNotEmpty() }?.joinToString(";") {
+            "call|${it.toolCallId}|${it.name}|${it.arguments}"
+        }
 
     private fun canonicalToolReturnSignature(delta: JsonObject): String? {
         val canonical = canonicalToolReturn(delta)
