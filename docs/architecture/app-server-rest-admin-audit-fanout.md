@@ -2,7 +2,7 @@
 
 Date: 2026-06-24
 
-Beads: `letta-mobile-ph9ws.14`, `letta-mobile-ph9ws.15`
+Beads: `letta-mobile-ph9ws.14`, `letta-mobile-ph9ws.15`, `letta-mobile-lgns8.1`
 
 ## Scope
 
@@ -11,8 +11,9 @@ This note audits the current REST/Admin clients under
 repository/UI surfaces that depend on them. It also records the multi-client
 App Server control-session decision for the `letta-mobile-ph9ws` migration.
 
-No production code should move as part of this audit. The App Server migration
-sequence remains:
+No production code should move as part of this audit. The parent migration epic
+is paused; the phases below are historical planning context, not active or
+committed implementation scope:
 
 1. Phase A: embedded Android loopback App Server for runtime transport.
 2. Phase B: shared `commonMain` App Server client.
@@ -20,9 +21,20 @@ sequence remains:
 
 ## Boundary Decision
 
-App Server is a runtime control plane: start a runtime, send input, receive
-runtime events, interrupt/abort, reconnect, and expose runtime-native tool
-execution. It is not a replacement for the Admin REST product API.
+The fixture-pinned installed `@letta-ai/letta-code` 0.28.8 package exposes a
+`letta app-server` v2 WebSocket command, classified here as `app_server_v2`.
+The captured help and declaration files do not label that command deprecated;
+this is not a claim about other releases or upstream support policy. The pinned
+declaration unions include runtime turns plus agent and conversation operations,
+terminal, filesystem, MemFS, model/provider, skill, cron, channel, secret, and
+related commands. These fixtures establish names and shapes only, not behavioral
+completeness or a decision to adopt those capabilities.
+
+That observed installed contract is separate from downstream ownership policy.
+The presence of an official v2 command does not by itself transfer product or
+durable-state ownership from Admin REST. This audit preserves existing REST
+ownership until a downstream migration explicitly adopts and validates the
+specific native v2 operation.
 
 Keep Admin REST for product screens and durable server state:
 
@@ -34,10 +46,12 @@ Keep Admin REST for product screens and durable server state:
 - project catalog, beads remote provisioning, issue/work dashboards
 - settings validation and backend capability probes
 
-Only runtime-turn behavior is an App Server migration candidate. If App Server
-later exposes native capability commands for a specific operation, treat that
-as a runtime capability path, not as permission to mirror every REST endpoint
-through WebSocket tools. A fanout controller must not become admin-shim v2.
+If the epic resumes, runtime-turn behavior remains the first migration
+candidate. The pinned declaration also contains agent/conversation,
+model/provider, MemFS, skill, cron, channel, and secret operations, but this
+audit does not validate end-to-end behavior or authorize downstream `.7`/`.8`
+work. Any resumed work requires an explicit ownership and security decision per
+capability. A fanout controller must not become admin-shim v2.
 
 ## Wiring Summary
 
@@ -137,15 +151,26 @@ Recommended topology:
 
 Reasoning:
 
-- App Server permits one active control session per process; a new control
-  session replaces the listener runtime. Multiple product clients connecting
-  directly to the same App Server would evict each other.
-- One App Server process per product client avoids eviction but multiplies
-  runtime processes, ports, auth, working directories, replay buffers, and
-  command arbitration. It also cannot represent "several clients observing the
-  same runtime" without duplicating or desynchronizing runtime state.
-- A single control client with fanout preserves App Server's ownership rule and
-  gives mobile/desktop/CLI/Matrix a stable shared runtime view.
+- The pinned App Server accepts one active control session per process. A second
+  control socket is rejected with a policy violation; it does not replace or
+  evict the active session. Disconnect releases the session for reconnect.
+- The deployment invariant is one App Server process and one shared controller
+  per backend root. Starting a process per product client against the same root
+  would create competing owners for runtime, working-directory, replay, and
+  mutation state even if each process used a distinct port.
+- The stream socket is an optional companion attached to the control session,
+  not an independent owner. In installed 0.28.8, stream close clears only the
+  runtime's stream socket/transport; the control session and runtime remain
+  active, and a replacement stream may attach. Events may arrive on either
+  socket, so channel is routing context rather than an event-type guarantee.
+- The official 0.28.8 JavaScript `AppServerClient` nevertheless reports the
+  first close on either socket as a disconnect and rejects pending requests; it
+  neither closes the sibling socket nor reconnects automatically. The proposed
+  Kotlin policy is deliberately stricter: pause sends, rebuild both sockets,
+  and sync affected runtimes before resuming. That is target policy, not a
+  statement of required upstream server behavior.
+- A single control client with fanout preserves these ownership rules and gives
+  mobile/desktop/CLI/Matrix a stable shared runtime view.
 
 The fanout controller may own:
 
@@ -179,5 +204,6 @@ Clients should connect as follows:
 - Matrix/future multi-client integrations: connect as observers/command senders
   through fanout with arbitration, not directly to App Server.
 
-Follow-up implementation work should be filed only when Phase C begins. Phase A
-and Phase B should not block on fanout implementation.
+Do not start follow-up implementation while the parent epic is paused. If the
+epic is explicitly resumed, fanout implementation belongs to Phase C and should
+not block Phase A or Phase B.
