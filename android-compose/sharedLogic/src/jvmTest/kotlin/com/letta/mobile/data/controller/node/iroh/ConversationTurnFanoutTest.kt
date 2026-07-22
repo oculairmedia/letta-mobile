@@ -73,7 +73,11 @@ class ConversationTurnFanoutTest {
     )
 
     /** A full upstream wire frame body, as DefaultAppServerController/ProbeStub emits. */
-    private fun rawStreamDeltaBody(seq: Long, delta: JsonObject): String = buildJsonObject {
+    private fun rawStreamDeltaBody(
+        seq: Long,
+        delta: JsonObject,
+        idempotencyKey: String = "stub-delta-${UUID.randomUUID()}",
+    ): String = buildJsonObject {
         put("type", "stream_delta")
         put("runtime", buildJsonObject {
             put("agent_id", runtime.agentId)
@@ -81,9 +85,40 @@ class ConversationTurnFanoutTest {
         })
         put("event_seq", seq)
         put("emitted_at", Instant.now().toString())
-        put("idempotency_key", "stub-delta-${UUID.randomUUID()}")
+        put("idempotency_key", idempotencyKey)
         put("delta", delta)
     }.toString()
+
+    private data class AssistantTestFrame(
+        val content: String,
+        val idempotencyKey: String,
+        val otid: String,
+    )
+
+    private fun assistantFrame(frame: AssistantTestFrame): String = rawStreamDeltaBody(
+        seq = 1,
+        idempotencyKey = frame.idempotencyKey,
+        delta = buildJsonObject {
+            put("message_type", "assistant_message")
+            put("otid", frame.otid)
+            put("content", frame.content)
+        },
+    )
+
+    private fun assistantContent(frame: String): String = json.parseToJsonElement(frame).jsonObject
+        .getValue("delta").jsonObject.getValue("content").jsonPrimitive.content
+
+    private fun assertAccumulatedText(
+        source: StreamTextFrameSource,
+        frames: List<AssistantTestFrame>,
+        expected: List<String>,
+    ) {
+        val accumulator = CumulativeStreamText()
+        val actual = frames.map { frame ->
+            assistantContent(accumulator.applyToRawFrame(assistantFrame(frame), source))
+        }
+        assertEquals(expected, actual)
+    }
 
     private val command = TurnCommand(
         backendId = BackendId("iroh-node-server"),
@@ -117,7 +152,7 @@ class ConversationTurnFanoutTest {
             }),
             raw(buildJsonObject {
                 put("message_type", "assistant_message"); put("otid", "otid-1")
-                put("id", "letta-msg-1"); put("content", "Hello world")
+                put("id", "letta-msg-1"); put("content", "lo world")
             }),
             raw(buildJsonObject {
                 put("message_type", "tool_return_message"); put("tool_call_id", "tc-1")
@@ -207,6 +242,108 @@ class ConversationTurnFanoutTest {
         val initSeqs = sinkInit.frames().map { json.parseToJsonElement(it).jsonObject["event_seq"]!!.jsonPrimitive.content.toLong() }.toSet()
         val obsSeqs = sinkObs.frames().map { json.parseToJsonElement(it).jsonObject["event_seq"]!!.jsonPrimitive.content.toLong() }.toSet()
         assertTrue(initSeqs.intersect(obsSeqs).isEmpty(), "viewers must not share event_seq")
+    }
+
+    @Test
+    fun repeatedIncrementalTokensArePreservedExactly() = runTest {
+        val registry = ConnectionRegistry()
+        val sinkInit = CapturingSink()
+        val initiator = viewer("conn-init", sinkInit)
+        registry.register(conversationId, initiator)
+        val seq = AtomicLong(0)
+        fun assistant(content: String) = RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "f-${UUID.randomUUID()}",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(seq.incrementAndGet(), buildJsonObject {
+                put("message_type", "assistant_message")
+                put("otid", "otid-repeat")
+                put("id", "letta-msg-repeat")
+                put("content", content)
+            }),
+        )
+
+        pump(
+            fanoutFor(registry, initiator),
+            listOf(
+                assistant("ha"),
+                assistant("ha"),
+                assistant(" "),
+                assistant(" "),
+                assistant("."),
+                assistant("."),
+                assistant("\n"),
+                assistant("\n"),
+            ),
+        )
+
+        val assistantContents = sinkInit.frames().mapNotNull { encoded ->
+            val delta = json.parseToJsonElement(encoded).jsonObject["delta"]?.jsonObject
+                ?: return@mapNotNull null
+            if (delta["message_type"]?.jsonPrimitive?.content == "assistant_message") {
+                delta["content"]?.jsonPrimitive?.content
+            } else {
+                null
+            }
+        }
+        assertEquals(
+            listOf("ha", "haha", "haha ", "haha  ", "haha  .", "haha  ..", "haha  ..\n", "haha  ..\n\n"),
+            assistantContents,
+        )
+    }
+
+    @Test
+    fun overlappingIncrementalFramesPreserveEveryByte() = runTest {
+        assertAccumulatedText(
+            source = StreamTextFrameSource.AppServerDelta,
+            frames = listOf(
+                AssistantTestFrame("a", "overlap-1", "otid-overlap"),
+                AssistantTestFrame("aa", "overlap-2", "otid-overlap"),
+            ),
+            expected = listOf("a", "aaa"),
+        )
+    }
+
+    @Test
+    fun explicitlyCumulativeFramesReplaceThePreviousSnapshot() = runTest {
+        assertAccumulatedText(
+            source = StreamTextFrameSource.CumulativeSnapshot,
+            frames = listOf(
+                AssistantTestFrame("Hel", "cumulative-1", "otid-cumulative"),
+                AssistantTestFrame("Hello", "cumulative-2", "otid-cumulative"),
+            ),
+            expected = listOf("Hel", "Hello"),
+        )
+    }
+
+    @Test
+    fun replayedEnvelopeDoesNotDuplicateIncrementalText() = runTest {
+        val registry = ConnectionRegistry()
+        val sinkInit = CapturingSink()
+        val initiator = viewer("conn-init", sinkInit)
+        registry.register(conversationId, initiator)
+        val delta = buildJsonObject {
+            put("message_type", "assistant_message")
+            put("otid", "otid-replay")
+            put("id", "letta-msg-replay")
+            put("content", "same")
+        }
+        val body = rawStreamDeltaBody(1, delta, idempotencyKey = "replay-key")
+        val replay = RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "frame-replay",
+            messageId = null,
+            messageType = null,
+            body = body,
+        )
+
+        pump(fanoutFor(registry, initiator), listOf(replay, replay))
+
+        val assistantContents = sinkInit.frames().mapNotNull { encoded ->
+            val bodyDelta = json.parseToJsonElement(encoded).jsonObject["delta"]?.jsonObject
+                ?: return@mapNotNull null
+            bodyDelta["content"]?.jsonPrimitive?.content
+        }
+        assertEquals(listOf("same", "same"), assistantContents)
     }
 
     @Test
