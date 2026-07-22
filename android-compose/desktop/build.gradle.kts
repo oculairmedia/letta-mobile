@@ -192,6 +192,8 @@ nucleus.application {
             // Preserve the existing installer identity and discoverability
             // while moving packaging from Compose Desktop to Nucleus.
             menuGroup = "Letta"
+            menu = true
+            shortcut = true
             perUserInstall = true
             upgradeUuid = "44e25263-67d4-443c-b85c-655a41118add"
             nsis {

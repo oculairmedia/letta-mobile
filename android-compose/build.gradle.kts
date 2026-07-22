@@ -10,10 +10,10 @@ plugins {
     id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
     id("org.jetbrains.kotlin.jvm") version "2.4.0" apply false
     id("org.jetbrains.kotlin.multiplatform") version "2.4.0" apply false
-    // Nucleus 2.1.5 is compiled and tested against Compose 1.11.1. Jewel 0.37's
-    // precompiled text-menu API is bridged in DesktopJewelTheme so right-click
-    // menus retain the 1.11 implementation without reintroducing letta-mobile-5icsp.
-    id("org.jetbrains.compose") version "1.11.1" apply false
+    // Keep the project plugin on 1.10.0 for the shared macOS x64 target, which
+    // Compose 1.11 no longer publishes. Nucleus upgrades only the desktop
+    // runtime to 1.11.1; DesktopJewelTheme bridges Jewel's older text-menu ABI.
+    id("org.jetbrains.compose") version "1.10.0" apply false
     id("dev.nucleusframework") version "2.1.5" apply false
     id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
     id("io.github.takahirom.roborazzi") version "1.63.0" apply false
