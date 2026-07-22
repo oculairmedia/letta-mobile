@@ -89,7 +89,8 @@ class AppServerNotConnectedException(message: String) : IllegalStateException(me
  * Loss intolerance: while no generation is Ready, every call fails immediately
  * with [AppServerNotConnectedException] — nothing queues, nothing blind-replays.
  * Whether a failed call may be retried is the caller's decision via
- * [AppServerRetryPolicy]; ambiguous writes must reconcile against the committed
+ * [com.letta.mobile.data.transport.appserver.AppServerCommandRetryClass];
+ * ambiguous writes must reconcile against the committed
  * transcript first (see [AmbiguousTurnReconciler]).
  *
  * Terminal handshake failures (the transport's `Failed(terminal = true)`:
