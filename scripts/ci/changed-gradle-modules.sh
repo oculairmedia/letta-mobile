@@ -37,7 +37,7 @@ resolve_base() {
 }
 
 RESOLVED_BASE="$(resolve_base "$BASE_REF")"
-if ! DIFF_FILES="$(git diff --name-only --diff-filter=ACMR "${RESOLVED_BASE}...HEAD")"; then
+if ! DIFF_FILES="$(git diff --name-only --diff-filter=ACMRD "${RESOLVED_BASE}...HEAD")"; then
   echo "changed-gradle-modules: failed to diff '$RESOLVED_BASE...HEAD'" >&2
   exit 1
 fi
@@ -52,6 +52,7 @@ while IFS= read -r file; do
     android-compose/core/data/*) ;;
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
     android-compose/cli/*) TASKS[":cli:testDebugUnitTest"]=1 ;;
+    android-compose/appserver-cli/*) TASKS[":appserver-cli:test"]=1 ;;
   esac
 done <<<"$DIFF_FILES"
 
@@ -61,6 +62,7 @@ ORDERED=(
   ":designsystem:testDebugUnitTest"
   ":desktop:test"
   ":cli:testDebugUnitTest"
+  ":appserver-cli:test"
 )
 OUT=()
 for task in "${ORDERED[@]}"; do

@@ -52,6 +52,25 @@ if bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base" >/dev/null 2>&1; th
   fail "module resolver accepted a failed three-dot diff"
 fi
 
+# D-filter test: deleting a module file should still schedule that module
+git -C "$repo" checkout "$base" -q
+mkdir -p "$repo/android-compose/appserver-cli/src"
+printf '#!/usr/bin/env bash\necho hello' > "$repo/android-compose/appserver-cli/src/appserver_cli.sh"
+git -C "$repo" add . && git -C "$repo" commit -qm "add appserver-cli"
+base2="$(git -C "$repo" rev-parse HEAD)"
+git -C "$repo" rm "$repo/android-compose/appserver-cli/src/appserver_cli.sh" -q
+git -C "$repo" commit -qm "delete appserver-cli file"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base2")"
+assert_eq "$actual" ":appserver-cli:test"
+
+# Additive appserver-cli test: adding a file should also schedule the module
+git -C "$repo" checkout "$base2" -q
+mkdir -p "$repo/android-compose/appserver-cli/src"
+printf '#!/usr/bin/env bash\necho world' > "$repo/android-compose/appserver-cli/src/appserver_cli.sh"
+git -C "$repo" add . && git -C "$repo" commit -qm "add appserver-cli file"
+actual="$(bash "$repo/scripts/ci/changed-gradle-modules.sh" "$base2")"
+assert_eq "$actual" ":appserver-cli:test"
+
 repo="$TMP/policy"
 new_repo "$repo"
 mkdir -p "$repo/android-compose/app/src" "$repo/android-compose/sharedLogic/src/commonMain/kotlin" \
@@ -75,5 +94,16 @@ assert_eq "$fallback_output" "$output"
 if bash "$repo/scripts/ci/agents-policy-check.sh" --diff-base refs/heads/missing >/dev/null 2>&1; then
   fail "policy scan accepted a missing base"
 fi
+
+# commonTest JVM API scan: adding a JVM-only API in commonTest should be reported
+git -C "$repo" checkout "$base" -q
+mkdir -p "$repo/android-compose/sharedLogic/src/commonTest/kotlin"
+printf '%s\n' 'val safe = "ok"' >"$repo/android-compose/sharedLogic/src/commonTest/kotlin/TestUtil.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "commonTest baseline"
+base3="$(git -C "$repo" rev-parse HEAD)"
+printf '%s\n' 'val leak = String.format("x")' >"$repo/android-compose/sharedLogic/src/commonTest/kotlin/TestUtil.kt"
+git -C "$repo" add . && git -C "$repo" commit -qm "commonTest violation"
+output3="$(bash "$repo/scripts/ci/agents-policy-check.sh" --diff-base "$base3")"
+assert_contains "$output3" 'sharedlogic-jvm-api|android-compose/sharedLogic/src/commonTest/kotlin/TestUtil.kt:1'
 
 echo "ci policy script tests: PASS"

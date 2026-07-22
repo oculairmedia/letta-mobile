@@ -185,11 +185,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java 26
+      - name: Setup Java 21
+        # Paparazzi + KMP native targets need JDK 21; Java 26 breaks them.
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 26
+          java-version: 21
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

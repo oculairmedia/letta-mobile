@@ -58,7 +58,7 @@ search_kotlin() {
   set +e
   if command -v rg >/dev/null 2>&1 && [[ "${AGENTS_POLICY_FORCE_GREP:-0}" != "1" ]]; then
     tool="rg"
-    matches="$(rg -n --glob '*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
+    matches="$(rg -n --with-filename --glob '*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
   else
     tool="grep"
     matches="$(grep -EnH --include='*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
@@ -90,7 +90,7 @@ while IFS=: read -r file line _; do
   [[ -n "$file" ]] || continue
   rel="${file#"$ROOT"/}"
   is_changed "$rel" "$line" || continue
-  case "$rel" in */sharedLogic/*/commonMain/*|*/sharedLogic/src/commonMain/*)
+  case "$rel" in */sharedLogic/*/commonMain/*|*/sharedLogic/src/commonMain/*|*/sharedLogic/*/commonTest/*|*/sharedLogic/src/commonTest/*)
     echo "WARN|sharedlogic-jvm-api|${rel}:${line}|forbidden JVM-only API in commonMain" >>"$OUT" ;;
   esac
 done <<<"$JVM_API_MATCHES"
