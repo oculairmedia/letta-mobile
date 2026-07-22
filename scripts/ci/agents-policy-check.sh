@@ -52,22 +52,27 @@ is_changed() {
   [[ -z "$DIFF_BASE" || -n "${CHANGED_LINES[$1:$2]+x}" ]]
 }
 
-run_rg() {
+search_kotlin() {
   local pattern="$1"
-  shift
-  local matches status
+  local matches status tool
   set +e
-  matches="$(rg -n --glob '*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
+  if command -v rg >/dev/null 2>&1 && [[ "${AGENTS_POLICY_FORCE_GREP:-0}" != "1" ]]; then
+    tool="rg"
+    matches="$(rg -n --glob '*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
+  else
+    tool="grep"
+    matches="$(grep -EnH --include='*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
+  fi
   status=$?
   set -e
   if ((status > 1)); then
-    echo "agents-policy-check: rg failed for pattern '$pattern'" >&2
+    echo "agents-policy-check: ${tool} failed for pattern '$pattern'" >&2
     return "$status"
   fi
   printf '%s' "$matches"
 }
 
-RAW_COLOR_MATCHES="$(run_rg '\bColor\s*\(\s*0x[0-9A-Fa-f]+\s*\)')"
+RAW_COLOR_MATCHES="$(search_kotlin '\bColor\s*\(\s*0x[0-9A-Fa-f]+\s*\)')"
 while IFS=: read -r file line _; do
   [[ -n "$file" ]] || continue
   rel="${file#"$ROOT"/}"
@@ -80,7 +85,7 @@ while IFS=: read -r file line _; do
   esac
 done <<<"$RAW_COLOR_MATCHES"
 
-JVM_API_MATCHES="$(run_rg '\bString\.format\s*\(|\bStringBuilder\.delete\s*\(|\.toByteArray\s*\(')"
+JVM_API_MATCHES="$(search_kotlin '\bString\.format\s*\(|\bStringBuilder\.delete\s*\(|\.toByteArray\s*\(')"
 while IFS=: read -r file line _; do
   [[ -n "$file" ]] || continue
   rel="${file#"$ROOT"/}"
@@ -90,7 +95,7 @@ while IFS=: read -r file line _; do
   esac
 done <<<"$JVM_API_MATCHES"
 
-ALERT_DIALOG_MATCHES="$(run_rg '\bAlertDialog\s*\(')"
+ALERT_DIALOG_MATCHES="$(search_kotlin '\bAlertDialog\s*\(')"
 while IFS=: read -r file line _; do
   [[ -n "$file" ]] || continue
   rel="${file#"$ROOT"/}"

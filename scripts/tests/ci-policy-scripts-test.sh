@@ -69,6 +69,9 @@ assert_contains "$output" 'raw-alertdialog|android-compose/app/src/Screen.kt:2'
 assert_contains "$output" 'sharedlogic-jvm-api|android-compose/sharedLogic/src/commonMain/kotlin/Common.kt:1'
 [[ "$output" != *'no-raw-hex-color'* ]] || fail "diff scan reported an unchanged or exempt raw color"
 
+fallback_output="$(AGENTS_POLICY_FORCE_GREP=1 bash "$repo/scripts/ci/agents-policy-check.sh" --diff-base "$base")"
+assert_eq "$fallback_output" "$output"
+
 if bash "$repo/scripts/ci/agents-policy-check.sh" --diff-base refs/heads/missing >/dev/null 2>&1; then
   fail "policy scan accepted a missing base"
 fi
