@@ -2,6 +2,7 @@ package com.letta.mobile.ui.markdown
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SharedMarkdownParityTest {
@@ -46,5 +47,16 @@ class SharedMarkdownParityTest {
         assertEquals(first.blocks.single().id, second.blocks.single().id)
         assertEquals(StreamingMarkdownBlockKind.BulletList, second.blocks.single().kind)
         assertTrue(second.blocks.single().renderMarkdownSource().endsWith("`"))
+    }
+
+    @Test
+    fun `table separator scan respects slice bounds and accepts slice ending after dashes`() {
+        val text = "prefix| --- | ---:suffix"
+        val start = "prefix".length
+        val end = start + "| --- | ---".length
+
+        assertTrue(lineLooksLikeTableSeparator("| ---", 0, 5))
+        assertTrue(lineLooksLikeTableSeparator(text, start, end))
+        assertFalse(lineLooksLikeTableSeparator(text, start, start + 1))
     }
 }

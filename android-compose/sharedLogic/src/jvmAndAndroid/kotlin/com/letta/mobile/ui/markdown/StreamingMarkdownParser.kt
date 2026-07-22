@@ -79,6 +79,9 @@ internal fun lineHasPipe(text: String, start: Int, end: Int): Boolean {
     return false
 }
 
+private fun consumeOptionalTrailingColon(text: String, start: Int, end: Int): Int =
+    if (start < end && text[start] == ':') start + 1 else start
+
 internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Boolean {
     // Walk the line, skipping whitespace, expecting a sequence of
     // separator cells (each one or more `-` optionally bracketed by `:`),
@@ -104,9 +107,8 @@ internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Bo
             j++
         }
         if (dashes == 0) return false
-        // Optional trailing colon for alignment. A streaming line can end
-        // immediately after its dashes, so guard the cursor before indexing.
-        if (j < end && text[j] == ':') j++
+        // Optional trailing colon for alignment.
+        j = consumeOptionalTrailingColon(text, j, end)
         skipSpaces()
         cellsSeen++
         if (j >= end) break
