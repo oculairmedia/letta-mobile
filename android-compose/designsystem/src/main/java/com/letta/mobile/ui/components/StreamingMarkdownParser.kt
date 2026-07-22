@@ -83,46 +83,19 @@ private fun consumeOptionalTrailingColon(text: String, start: Int, end: Int): In
     if (start < end && text[start] == ':') start + 1 else start
 
 internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Boolean {
-    // Walk the line, skipping whitespace, expecting a sequence of
-    // separator cells (each one or more `-` optionally bracketed by `:`),
-    // delimited by `|`.
-    var j = start
-    fun skipSpaces() {
-        while (j < end && (text[j] == ' ' || text[j] == '\t')) j++
-    }
-    skipSpaces()
-    // Optional leading pipe.
-    if (j < end && text[j] == '|') {
-        j++
-        skipSpaces()
-    }
-    var cellsSeen = 0
-    while (j < end) {
-        // Optional leading colon for alignment.
-        if (text[j] == ':') j++
-        // Must have at least one dash.
-        var dashes = 0
-        while (j < end && text[j] == '-') {
-            dashes++
-            j++
-        }
-        if (dashes == 0) return false
-        // Optional trailing colon for alignment.
-        j = consumeOptionalTrailingColon(text, j, end)
-        skipSpaces()
-        cellsSeen++
-        if (j >= end) break
-        if (text[j] != '|') return false
-        j++
-        skipSpaces()
-        // Trailing pipe with no further cell is fine.
-        if (j >= end) break
-    }
-    // GFM tables require at least one column, but since prose can
-    // contain a single "-----" line we require at least one explicit
-    // cell delimiter to avoid matching "thematic break" lines like
-    // `---` that produce an HR, not a table.
-    return cellsSeen >= 2 || (cellsSeen >= 1 && containsPipe(text, start, end))
+    val line = text.substring(start, end).trim()
+    if (!line.contains('|')) return false
+    val cells = line.removePrefix("|").removeSuffix("|").split('|')
+    return cells.isNotEmpty() && cells.all(::isTableSeparatorCell)
+}
+
+private fun isTableSeparatorCell(cell: String): Boolean {
+    val trimmed = cell.trim()
+    val dashStart = if (trimmed.startsWith(':')) 1 else 0
+    var dashEnd = dashStart
+    while (dashEnd < trimmed.length && trimmed[dashEnd] == '-') dashEnd++
+    val cellEnd = consumeOptionalTrailingColon(trimmed, dashEnd, trimmed.length)
+    return dashEnd > dashStart && cellEnd == trimmed.length
 }
 
 internal fun containsPipe(text: String, start: Int, end: Int): Boolean {

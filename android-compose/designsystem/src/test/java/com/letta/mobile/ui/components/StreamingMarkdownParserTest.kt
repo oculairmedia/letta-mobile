@@ -91,6 +91,7 @@ class StreamingMarkdownParserTest {
         assertTrue(lineLooksLikeTableSeparator("| --- | --- |", 0, 13))
         assertTrue(lineLooksLikeTableSeparator("| :--- | :---: | ---: |", 0, 23))
         assertFalse(lineLooksLikeTableSeparator("---", 0, 3))
+        assertFalse(lineLooksLikeTableSeparator("-", 0, 1))
         assertFalse(lineLooksLikeTableSeparator("| a | b |", 0, 9))
     }
 

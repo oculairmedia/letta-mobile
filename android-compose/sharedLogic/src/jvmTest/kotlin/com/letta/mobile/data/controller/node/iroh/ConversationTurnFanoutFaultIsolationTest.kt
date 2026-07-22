@@ -138,7 +138,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         val fanout = fanoutFor(registry, initiator)
         // Full ordered turn: two assistant deltas + terminal. Must NOT throw.
         fanout.onDraft(assistantDelta("Hel"))
-        fanout.onDraft(assistantDelta("Hello world"))
+        fanout.onDraft(assistantDelta("lo world"))
         fanout.onDraft(terminal())
 
         // Initiator got the full ordered sequence + exactly one terminal.
@@ -170,7 +170,7 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         val start = testScheduler.currentTime
         fanout.onDraft(assistantDelta("Hel"))       // first delta: observer times out -> dropped
-        fanout.onDraft(assistantDelta("Hello world"))
+        fanout.onDraft(assistantDelta("lo world"))
         fanout.onDraft(terminal())
         val elapsed = testScheduler.currentTime - start
 
@@ -198,7 +198,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         val fanout = fanoutFor(registry, initiator)
         // Two deltas broadcast BEFORE the observer joins.
         fanout.onDraft(assistantDelta("Hel"))
-        fanout.onDraft(assistantDelta("Hello wor"))
+        fanout.onDraft(assistantDelta("lo wor"))
 
         // Observer registers mid-turn (as its own message.list subscribe would).
         val sinkObs = FakeSink()
@@ -206,7 +206,7 @@ class ConversationTurnFanoutFaultIsolationTest {
         registry.register(conversationId, observer)
 
         // Remaining cumulative delta + terminal.
-        fanout.onDraft(assistantDelta("Hello world"))
+        fanout.onDraft(assistantDelta("ld"))
         fanout.onDraft(terminal())
 
         // The mid-turn joiner received the REMAINING cumulative delta (which
@@ -240,7 +240,7 @@ class ConversationTurnFanoutFaultIsolationTest {
 
         // Broadcaster stops writing to it: it received only the pre-disconnect delta.
         val before = sinkObs.frames().size
-        fanout.onDraft(assistantDelta("Hello world"))
+        fanout.onDraft(assistantDelta("lo world"))
         fanout.onDraft(terminal())
         assertEquals(before, sinkObs.frames().size, "no writes after disconnect")
 
