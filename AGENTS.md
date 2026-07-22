@@ -437,13 +437,19 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 ### Beads (`bd`) issue tracker on this VM
 
-- `bd` **v1.0.4** is installed at `/usr/local/bin/bd` (provisioned in the snapshot). If missing on a
-  fresh VM, reinstall from the GitHub release
-  (`steveyegge/beads` → `beads_1.0.4_linux_amd64.tar.gz`) into `/usr/local/bin`.
+- `bd` **v1.1.0** is installed at `/usr/local/bin/bd` (provisioned in the snapshot; matches the
+  remote's migrated schema **v53**). If missing on a fresh VM, reinstall from the GitHub release
+  (`steveyegge/beads` → `beads_1.1.0_linux_amd64.tar.gz`) into `/usr/local/bin`.
 - On a fresh clone/VM, sync the embedded Dolt DB once with `bd bootstrap --yes` (pulls from the git
   remote `git+https://github.com/oculairmedia/letta-mobile.git`; no separate `dolt` binary needed).
   Verify with `bd ping`. `bd dolt pull` / `bd dolt push` work against the DoltHub federation remote
   (`doltremoteapi.dolthub.com/oulair/letta_mobile`) using the existing GitHub/Dolt credentials.
+- **Schema migrations**: the designated migrator (Emmanuel) runs `bd migrate`/`bd dolt push`; every
+  other clone (Cursor included) only runs `bd bootstrap` to sync — never migrate here (it forks the
+  shared schema). If `bd ping` warns the schema is behind and `bd bootstrap --yes` errors with
+  "can't create database beads; database exists", move the stale local DB aside
+  (`mv .beads/embeddeddolt /tmp/embeddeddolt.bak`) and re-run `bd bootstrap --yes` to re-clone the
+  migrated schema. This is safe only when the clone has no unpushed tracker changes.
 - Recommended local config (silences warnings): `chmod 700 .beads` and
   `git config beads.role maintainer`. `.beads/issues.jsonl` is gitignored — never edit `.beads`
   files directly; use `bd` commands. Pull before tracker mutations and push afterward.
