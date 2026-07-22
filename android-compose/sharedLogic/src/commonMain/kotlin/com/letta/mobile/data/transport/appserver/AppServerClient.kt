@@ -1,6 +1,12 @@
 package com.letta.mobile.data.transport.appserver
 
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.job
+import kotlinx.coroutines.launch
 
 /**
  * Typed client for one Letta Code App Server process.
@@ -33,9 +39,10 @@ interface AppServerClient {
 
 class DefaultAppServerClient(
     private val transport: AppServerTransport,
-    requestTimeoutMs: Long = AppServerRequestCorrelator.DEFAULT_REQUEST_TIMEOUT_MS,
+    requestTimeoutMs: Long = AppServerRequestRegistry.DEFAULT_REQUEST_TIMEOUT_MS,
+    parentScope: CoroutineScope? = null,
 ) : AppServerClient {
-    private val correlator = AppServerRequestCorrelator(
+    private val registry = AppServerRequestRegistry(
         controlFrames = transport.controlFrames,
         timeoutMs = requestTimeoutMs,
     )
@@ -43,8 +50,23 @@ class DefaultAppServerClient(
     override val events: Flow<AppServerReceivedFrame> = transport.mergedFrames()
     override val isConnected: Flow<Boolean> = transport.isConnected
 
+    init {
+        // Start the registry's inbound router if a scope is provided.
+        // When parentScope is null (e.g. in unit tests using FakeAppServerTransport),
+        // the caller is responsible for starting the registry.
+        parentScope?.let {
+            registry.startRouting(it)
+            it.launch {
+                transport.isConnected.dropWhile { it }.collect {
+                    registry.failAll(CancellationException("transport disconnected"))
+                    return@collect
+                }
+            }
+        }
+    }
+
     override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
-        correlator.request(
+        registry.request(
             requestId = command.requestId,
             response = { it as? AppServerInboundFrame.AuthResponse },
             send = { transport.sendControl(command) },
@@ -53,7 +75,7 @@ class DefaultAppServerClient(
     override suspend fun runtimeStart(
         command: AppServerCommand.RuntimeStart,
     ): AppServerInboundFrame.RuntimeStartResponse =
-        correlator.request(
+        registry.request(
             requestId = command.requestId,
             response = { it as? AppServerInboundFrame.RuntimeStartResponse },
             send = { transport.sendControl(command) },
@@ -67,7 +89,7 @@ class DefaultAppServerClient(
         val requestId = requireNotNull(command.requestId) {
             "sync requires request_id when using response correlation."
         }
-        return correlator.request(
+        return registry.request(
             requestId = requestId,
             response = { it as? AppServerInboundFrame.SyncResponse },
             send = { transport.sendControl(command) },
@@ -78,7 +100,7 @@ class DefaultAppServerClient(
         val requestId = requireNotNull(command.requestId) {
             "abort_message requires request_id when using response correlation."
         }
-        return correlator.request(
+        return registry.request(
             requestId = requestId,
             response = { it as? AppServerInboundFrame.AbortMessageResponse },
             send = { transport.sendControl(command) },
@@ -86,7 +108,7 @@ class DefaultAppServerClient(
     }
 
     override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-        correlator.request(
+        registry.request(
             requestId = command.requestId,
             response = { it as? AppServerInboundFrame.AdminRpcResponse },
             send = { transport.sendControl(command) },
