@@ -469,6 +469,34 @@ internal object IrohStreamDeltaServerFrameMapper {
             ?: this[key]?.jsonPrimitive?.booleanOrNull?.let { if (it) 1L else 0L }
 }
 
+internal data class CanonicalToolCall(
+    val toolCallId: String,
+    val name: String,
+    val arguments: String,
+)
+
+internal fun canonicalToolCall(delta: JsonObject): CanonicalToolCall? {
+    val call = delta["tool_call"] as? JsonObject ?: delta
+    val function = call["function"] as? JsonObject
+    val id = call.stringValue("tool_call_id")
+        ?: call.stringValue("id")
+        ?: delta.stringValue("tool_call_id")
+        ?: return null
+    val name = call.stringValue("name")
+        ?: call.stringValue("tool_name")
+        ?: function?.stringValue("name")
+        ?: delta.stringValue("name")
+        ?: delta.stringValue("tool_name")
+        ?: "tool"
+    val arguments = call["arguments"]
+        ?: call["input"]
+        ?: function?.get("arguments")
+        ?: function?.get("input")
+        ?: delta["arguments"]
+        ?: delta["input"]
+    return CanonicalToolCall(id, name, arguments.argumentValue())
+}
+
 internal data class CanonicalToolReturn(
     val toolCallId: String,
     val status: String,
@@ -491,3 +519,9 @@ internal fun canonicalToolReturn(delta: JsonObject, defaultId: String? = null): 
 
 private fun JsonObject.stringValue(key: String): String? =
     (this[key] as? JsonPrimitive)?.contentOrNull
+
+private fun JsonElement?.argumentValue(): String = when (this) {
+    is JsonPrimitive -> contentOrNull ?: toString()
+    null -> "{}"
+    else -> toString()
+}

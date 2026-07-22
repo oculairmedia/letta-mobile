@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.transport.iroh.canonicalToolCall
 import com.letta.mobile.data.transport.iroh.canonicalToolReturn
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -219,32 +220,8 @@ internal class ConversationTurnFanout(
         else -> null
     }
 
-    private fun canonicalToolCallSignature(delta: JsonObject): String? {
-        val call = delta["tool_call"] as? JsonObject ?: delta
-        val function = call["function"] as? JsonObject
-        val id = stringValue(call, "tool_call_id")
-            ?: stringValue(call, "id")
-            ?: stringValue(delta, "tool_call_id")
-            ?: return null
-        val name = stringValue(call, "name")
-            ?: stringValue(call, "tool_name")
-            ?: stringValue(function, "name")
-            ?: stringValue(delta, "name")
-            ?: stringValue(delta, "tool_name")
-            ?: "tool"
-        val arguments = call["arguments"]
-            ?: call["input"]
-            ?: function?.get("arguments")
-            ?: function?.get("input")
-            ?: delta["arguments"]
-            ?: delta["input"]
-        val canonicalArguments = when (arguments) {
-            is JsonPrimitive -> arguments.contentOrNull ?: arguments.toString()
-            null -> "{}"
-            else -> arguments.toString()
-        }
-        return "call|$id|$name|$canonicalArguments"
-    }
+    private fun canonicalToolCallSignature(delta: JsonObject): String? =
+        canonicalToolCall(delta)?.let { "call|${it.toolCallId}|${it.name}|${it.arguments}" }
 
     private fun canonicalToolReturnSignature(delta: JsonObject): String? {
         val canonical = canonicalToolReturn(delta)
@@ -258,9 +235,6 @@ internal class ConversationTurnFanout(
             append('|').append(delta["metadata"])
         }
     }
-
-    private fun stringValue(obj: JsonObject?, key: String): String? =
-        (obj?.get(key) as? JsonPrimitive)?.contentOrNull
 
     /** Flush a synthetic cancelled tool_return for every still-open tool_call (8s45p), fanned out. */
     suspend fun flushOpenToolCalls() {
