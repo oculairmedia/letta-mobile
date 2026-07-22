@@ -81,6 +81,15 @@ class AppServerTurnEngine(
     private var runtime: AppServerRuntimeScope? = null
 
     /**
+     * Drops the cached runtime scope so the next turn re-issues runtime_start.
+     * Called on transport disconnect/generation rollover (lgns8.5): a scope
+     * minted by a dead generation must never be reused against the next one.
+     */
+    fun invalidateRuntime() {
+        runtime = null
+    }
+
+    /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY owner identity for the currently held
      * [activeTurn] lock. This holder is set STRICTLY adjacent to the existing
      * `activeTurn.lock()`/`activeTurn.unlock()` calls and never participates in
