@@ -537,19 +537,7 @@ fun LettaDesktopApp(
                                 onTokenCleared = {
                                     applyConfig(activeConfig.copy(accessToken = null))
                                 },
-                                nucleus = DestinationNucleusActions(
-                                    onCheckForUpdates = nucleusController::checkForUpdates,
-                                    onDownloadUpdate = nucleusController::downloadUpdate,
-                                    onInstallUpdate = nucleusController::installUpdateAndRestart,
-                                    onRefreshSystemInfo = nucleusController::refreshSystemInfo,
-                                    onAutoLaunchChanged = nucleusController::setAutoLaunch,
-                                    onOpenAutoLaunchSettings = nucleusController::openAutoLaunchSettings,
-                                    onTestNotification = {
-                                        nucleusController.sendTestNotification {
-                                            activateDesktopWindow(window)
-                                        }
-                                    },
-                                ),
+                                nucleus = destinationNucleusActions(nucleusController, window),
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )

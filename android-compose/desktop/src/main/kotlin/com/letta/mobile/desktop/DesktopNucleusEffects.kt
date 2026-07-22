@@ -75,6 +75,27 @@ private data class AgentCompletionBindings(
     val onActivate: () -> Unit,
 )
 
+private data class AgentFailureBindings(
+    val window: Window,
+    val controller: DesktopNucleusController,
+    val onActivate: () -> Unit,
+)
+
+internal fun destinationNucleusActions(
+    controller: DesktopNucleusController,
+    window: Window,
+): DestinationNucleusActions = DestinationNucleusActions(
+    onCheckForUpdates = controller::checkForUpdates,
+    onDownloadUpdate = controller::downloadUpdate,
+    onInstallUpdate = controller::installUpdateAndRestart,
+    onRefreshSystemInfo = controller::refreshSystemInfo,
+    onAutoLaunchChanged = controller::setAutoLaunch,
+    onOpenAutoLaunchSettings = controller::openAutoLaunchSettings,
+    onTestNotification = {
+        controller.sendTestNotification { activateDesktopWindow(window) }
+    },
+)
+
 @Composable
 internal fun DesktopNucleusEffects(
     bindings: DesktopNucleusEffectBindings,
@@ -107,7 +128,10 @@ internal fun DesktopNucleusEffects(
         bindings = AgentCompletionBindings(window, bindings.controller, activate),
         state = state,
     )
-    AgentFailureEffect(window, bindings.controller, state.errorMessage, activate)
+    AgentFailureEffect(
+        bindings = AgentFailureBindings(window, bindings.controller, activate),
+        state = state,
+    )
 }
 
 @Composable
@@ -189,21 +213,25 @@ private fun setWindowsCompletionBadge() {
 
 @Composable
 private fun AgentFailureEffect(
-    window: Window,
-    controller: DesktopNucleusController,
-    errorMessage: String?,
-    onActivate: () -> Unit,
+    bindings: AgentFailureBindings,
+    state: DesktopNucleusEffectState,
 ) {
     var previousError by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(errorMessage) {
-        val current = errorMessage
-        if (current != null && current != previousError && !window.isFocused) {
-            controller.notifyFailure(current, onActivate)
-            TaskbarProgress.showError(window)
-            TaskbarProgress.requestAttention(window, TaskbarProgress.AttentionType.CRITICAL)
+    LaunchedEffect(state.errorMessage) {
+        val current = state.errorMessage
+        if (shouldNotifyFailure(current, previousError, bindings.window.isFocused)) {
+            bindings.controller.notifyFailure(current.orEmpty(), bindings.onActivate)
+            TaskbarProgress.showError(bindings.window)
+            TaskbarProgress.requestAttention(bindings.window, TaskbarProgress.AttentionType.CRITICAL)
         }
         previousError = current
     }
+}
+
+private fun shouldNotifyFailure(current: String?, previous: String?, isWindowFocused: Boolean): Boolean {
+    if (current == null) return false
+    if (current == previous) return false
+    return !isWindowFocused
 }
 
 private fun registerQuickSwitcher(onActivate: () -> Unit, onOpenCommandPalette: () -> Unit): Long =
