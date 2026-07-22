@@ -100,8 +100,7 @@ internal class ConversationTurnFanout(
 ) {
     private val openToolCalls = OpenToolCallTracker()
     private val cumulativeText = CumulativeStreamText()
-    private val broadcastToolCallIds = mutableSetOf<String>()
-    private val broadcastToolReturnIds = mutableSetOf<String>()
+    private val broadcastToolSignatures = mutableSetOf<String>()
     private var terminalWritten = false
 
     /** Whether a terminal frame has already been broadcast for this turn. */
@@ -139,7 +138,7 @@ internal class ConversationTurnFanout(
                     })
                 }
                 openToolCalls.observe(delta.toString())
-                if (broadcastToolCallIds.add(payload.toolCallId.value)) broadcastDeltaBody(delta)
+                broadcastToolDeltaIfNew(delta)
                 false
             }
             is RuntimeEventPayload.ToolReturnObserved -> {
@@ -150,7 +149,7 @@ internal class ConversationTurnFanout(
                     put("tool_return", payload.body)
                 }
                 openToolCalls.observe(delta.toString())
-                if (broadcastToolReturnIds.add(payload.toolCallId.value)) broadcastDeltaBody(delta)
+                broadcastToolDeltaIfNew(delta)
                 false
             }
             is RuntimeEventPayload.RunLifecycleChanged -> when (payload.status) {
@@ -205,22 +204,25 @@ internal class ConversationTurnFanout(
             return false
         }
         val tagged = tagStreamDeltaForOptimisticDedup(delta)
-        if (shouldBroadcastToolDelta(tagged)) broadcastDeltaBody(tagged)
+        broadcastToolDeltaIfNew(tagged)
         return deltaIsTerminal(tagged)
     }
 
-    private fun shouldBroadcastToolDelta(delta: JsonObject): Boolean = when (DanglingToolCallSynthesizer.messageType(delta)) {
-        "tool_call_message", "approval_request_message" ->
-            recordAnyNew(DanglingToolCallSynthesizer.toolCallIds(delta), broadcastToolCallIds)
-        "tool_return_message" ->
-            recordAnyNew(DanglingToolCallSynthesizer.toolReturnCallIds(delta), broadcastToolReturnIds)
-        else -> true
+    private suspend fun broadcastToolDeltaIfNew(delta: JsonObject) {
+        val signature = toolDeltaSignature(delta)
+        if (signature == null || broadcastToolSignatures.add(signature)) broadcastDeltaBody(delta)
     }
 
-    private fun recordAnyNew(ids: List<String>, seen: MutableSet<String>): Boolean {
-        var anyNew = false
-        ids.forEach { if (seen.add(it)) anyNew = true }
-        return anyNew
+    private fun toolDeltaSignature(delta: JsonObject): String? = when (DanglingToolCallSynthesizer.messageType(delta)) {
+        "tool_call_message", "approval_request_message" ->
+            DanglingToolCallSynthesizer.toolCallIds(delta).firstOrNull()?.let { id ->
+                "call|$id|${delta["tool_call"] ?: delta}"
+            }
+        "tool_return_message" ->
+            DanglingToolCallSynthesizer.toolReturnCallIds(delta).firstOrNull()?.let { id ->
+                "return|$id|${delta["status"]}|${delta["tool_return"]}"
+            }
+        else -> null
     }
 
     /** Flush a synthetic cancelled tool_return for every still-open tool_call (8s45p), fanned out. */

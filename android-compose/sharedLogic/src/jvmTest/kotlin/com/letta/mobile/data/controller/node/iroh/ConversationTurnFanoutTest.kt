@@ -340,6 +340,39 @@ class ConversationTurnFanoutTest {
     }
 
     @Test
+    fun sameIdRawToolUpdatesBroadcastDistinctArgumentSnapshots() = runTest {
+        val registry = ConnectionRegistry()
+        val sink = CapturingSink()
+        val initiator = viewer("conn-init", sink)
+        registry.register(conversationId, initiator)
+        val fanout = fanoutFor(registry, initiator)
+        val seq = AtomicLong(0)
+        fun raw(arguments: String) = RuntimeEventPayload.RemoteStreamFrame(
+            frameId = "update-${seq.incrementAndGet()}",
+            messageId = null,
+            messageType = null,
+            body = rawStreamDeltaBody(seq.get(), buildJsonObject {
+                put("message_type", "tool_call_message")
+                put("tool_call", buildJsonObject {
+                    put("tool_call_id", "tc-progressive")
+                    put("name", "bash")
+                    put("arguments", arguments)
+                })
+            }),
+        )
+
+        fanout.onDraft(raw("{\"command\":\"ec\"}"))
+        fanout.onDraft(raw("{\"command\":\"echo ok\"}"))
+        fanout.onDraft(raw("{\"command\":\"echo ok\"}"))
+
+        val arguments = sink.frames().map {
+            json.parseToJsonElement(it).jsonObject["delta"]!!.jsonObject["tool_call"]!!
+                .jsonObject["arguments"]!!.jsonPrimitive.content
+        }
+        assertEquals(listOf("{\"command\":\"ec\"}", "{\"command\":\"echo ok\"}"), arguments)
+    }
+
+    @Test
     fun distinctToolCallIdsAreNotDeduplicated() = runTest {
         val registry = ConnectionRegistry()
         val sink = CapturingSink()
