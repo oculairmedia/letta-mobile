@@ -7,6 +7,8 @@ on:
       - ".github/workflows/android.yml"
       - "android-compose/**"
       - "third_party/overmorrow/**"
+      - "scripts/ci/**"
+      - "scripts/tests/**"
   pull_request:
     branches: [main]
     paths:
@@ -19,6 +21,7 @@ on:
       - ".github/workflows/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
+      - "scripts/ci/**"
       - "scripts/tests/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
@@ -83,6 +86,10 @@ jobs:
           key: ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
+
+      - name: Test CI policy scripts
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/tests/ci-policy-scripts-test.sh
 
       - name: Compile all debug variants
         run: ./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :core:testutil:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin

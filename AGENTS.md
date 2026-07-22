@@ -52,7 +52,7 @@ git push --force-with-lease                 # safe force-push to your branch
 | Desktop shell | `android-compose/desktop/` | — | windowing, installer, Ktor engine, OS lock |
 | CLI / probes | `android-compose/cli/`, `appserver-cli/` | JVM tooling | — |
 
-Local quality: `cd android-compose && ./gradlew detekt` and `bash scripts/ci/agents-policy-check.sh` (full) or `bash scripts/ci/agents-policy-check.sh --diff-base origin/main` (PR-shaped).
+Local quality: run `bash scripts/tests/ci-policy-scripts-test.sh`, then `bash scripts/ci/agents-policy-check.sh` (full) or `bash scripts/ci/agents-policy-check.sh --diff-base origin/main` (PR-shaped). Run detekt from `android-compose/` with Java 21 as documented below. The policy scripts are Bash-only; their regression runner executes in the required `test` CI job.
 
 - **`sharedLogic` commonMain/commonTest must stay platform-neutral.** No JVM-only APIs (`String.format`, `StringBuilder.delete(start, end)`, `String.toByteArray()`, …) — the code must compile for every configured KMP target (Android, JVM/desktop, host-native for Windows). The `shared-multiplatform` required check (`:sharedLogic:allTests` + `:desktop:test`) enforces this; see bead letta-mobile-kx1r3 for the leaks that motivated it.
 - **First-time setup in a fresh clone:** run `./scripts/install-hooks.sh` to activate the local hooks via `core.hooksPath`.
