@@ -1,0 +1,23 @@
+Usage: letta server [--env-name <name>] [--channels <list>] [--debug]
+
+Register this letta-code instance to receive messages from Letta Cloud.
+
+Options:
+  --env-name <name>  Friendly name for this environment (uses hostname if not provided)
+  --channels <list>  Comma-separated channel names to enable (e.g. telegram)
+  --install-channel-runtimes  Install missing runtime deps for the selected channels before startup
+  --debug            Plain-text mode: log all WebSocket events instead of interactive UI
+  -h, --help         Show this help message
+
+Examples:
+  letta channels configure telegram          # Configure Telegram first
+  letta server                              # Uses hostname as default
+  letta server --env-name "work-laptop"
+  letta server --channels telegram           # Enable Telegram channel
+  letta server --channels telegram --install-channel-runtimes
+  letta server --debug                       # Log all WS events
+
+Once connected, this instance will listen for incoming messages from cloud agents.
+Messages will be executed locally using your letta-code environment.
+Telegram flow: configure the bot, start the listener with --channels telegram,
+then message the bot from Telegram and run /channels telegram pair <code> in the target conversation.

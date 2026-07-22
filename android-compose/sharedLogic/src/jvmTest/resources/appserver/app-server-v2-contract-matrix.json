@@ -1,0 +1,97 @@
+{
+  "baseline": {
+    "package": "@letta-ai/letta-code",
+    "version": "0.28.8",
+    "node": "v24.18.0",
+    "package_engine": ">=22.19.0",
+    "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
+    "protocol_sha256": "68ef0a3683f7e57be02638d5973e7211493658dd0d0038e3e0d5f571da3116f4",
+    "captured_at": "2026-07-22",
+    "capture_method": "executed installed CLI directly with /usr/bin/node; omitted local wrapper stderr"
+  },
+  "observed_installed_contract": {
+    "classification": "local_v2_app_server_surface",
+    "source": "installed @letta-ai/letta-code 0.28.8 declarations and bundled runtime",
+    "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
+    "mobile_typed_frame_fixture": "protocol-frames.jsonl",
+    "deprecation_claim": "none; installed upstream help and declarations do not label app-server deprecated"
+  },
+  "downstream_ownership_policy": {
+    "status": "mobile migration policy, not an upstream protocol limitation",
+    "rule": "retain existing Admin REST ownership until a downstream migration explicitly adopts and validates an exposed v2 operation",
+    "runtime_candidate": "native runtime commands and events may migrate to the shared App Server client",
+    "admin_boundary": "v2 exposure does not itself transfer product or durable-state ownership from Admin REST"
+  },
+  "upstream_socket_behavior": {
+    "source": "installed letta.js 0.28.8 startAppServer/attachStreamSocket and dist/app-server-client.js",
+    "second_control": "server closes the new control socket with code 1008 and reason control channel already connected; active control remains",
+    "duplicate_stream": "server closes the new stream socket with code 1008; active stream remains",
+    "stream_disconnect": "server clears only streamSocket and streamTransport; control session and runtime remain active; a replacement stream can attach",
+    "control_disconnect": "listener onDisconnected clears the active control session; runtime shutdown follows listener behavior",
+    "official_client_disconnect": "AppServerClient reports the first control or stream close once and rejects all pending requests, but does not automatically close the sibling or reconnect"
+  },
+  "kotlin_target_policy": {
+    "stream_disconnect": "treat either socket loss as degraded transport, stop new sends, rebuild both sockets, then sync affected runtimes before resuming",
+    "note": "This conservative reconnect-both policy is a Kotlin target decision, not required by the upstream server behavior."
+  },
+  "reconnect_classes": {
+    "session_setup": "retry_with_new_request_id_after_reconnect",
+    "read_sync": "retry_with_new_request_id_after_reconnect",
+    "turn_input": "do_not_blind_retry; reconcile by client_message_id and sync",
+    "approval_response": "do_not_blind_retry; sync pending approvals before deciding",
+    "abort": "safe_to_retry_with_same_run_target_after_sync; aborted=false is a valid settled result",
+    "external_tool_result": "do_not_reexecute_tool; replay only the cached result for the same request_id",
+    "event": "dedupe by runtime plus idempotency_key; event_seq orders replay within a runtime"
+  },
+  "cli_probes": [
+    {
+      "command": "/usr/bin/node --version",
+      "classification": "installed_node_version",
+      "exit": 0,
+      "fixture": "cli-node-version.txt"
+    },
+    {
+      "command": "/usr/bin/node <installed-package>/letta.js --version",
+      "classification": "installed_version",
+      "exit": 0,
+      "fixture": "cli-version.txt"
+    },
+    {
+      "command": "/usr/bin/node <installed-package>/letta.js server --help",
+      "classification": "modern_listener_server",
+      "exit": 0,
+      "capabilities": ["cloud_environment_registration", "channel_listener", "debug_event_log"],
+      "not_capabilities": ["app_server_v2", "control_socket", "stream_socket", "listen_url", "ws_auth"],
+      "fixture": "cli-server-help.txt"
+    },
+    {
+      "command": "/usr/bin/node <installed-package>/letta.js app-server --help",
+      "classification": "local_v2_app_server_surface",
+      "exit": 0,
+      "capabilities": ["app_server_v2", "control_socket", "stream_socket", "listen_url", "capability_token", "signed_bearer_token"],
+      "not_capabilities": ["cloud_environment_registration", "channel_listener"],
+      "fixture": "cli-app-server-help.txt"
+    }
+  ],
+  "frames": [
+    {"type":"auth","direction":"client_to_server","channel":"control","owner":"transport","reconnect":"session_setup","idempotency":"request_id_correlated","capability":"iroh_transport_extension"},
+    {"type":"auth_response","direction":"server_to_client","channel":"control","owner":"transport","reconnect":"session_setup","idempotency":"request_id_correlated","capability":"iroh_transport_extension"},
+    {"type":"runtime_start","direction":"client_to_server","channel":"control","owner":"controller","reconnect":"session_setup","idempotency":"request_id_correlated","capability":"app_server_v2"},
+    {"type":"runtime_start_response","direction":"server_to_client","channel":"control","owner":"controller","reconnect":"session_setup","idempotency":"request_id_correlated","capability":"app_server_v2"},
+    {"type":"input","direction":"client_to_server","channel":"control","owner":"turn_engine","reconnect":"turn_input","idempotency":"client_message_id_reconciliation","capability":"app_server_v2"},
+    {"type":"sync","direction":"client_to_server","channel":"control","owner":"controller","reconnect":"read_sync","idempotency":"request_id_correlated","capability":"app_server_v2"},
+    {"type":"sync_response","direction":"server_to_client","channel":"control","owner":"controller","reconnect":"read_sync","idempotency":"request_id_correlated","capability":"app_server_v2"},
+    {"type":"abort_message","direction":"client_to_server","channel":"control","owner":"turn_engine","reconnect":"abort","idempotency":"run_target_reconciliation","capability":"app_server_v2"},
+    {"type":"abort_message_response","direction":"server_to_client","channel":"control","owner":"turn_engine","reconnect":"abort","idempotency":"request_id_correlated","capability":"app_server_v2"},
+    {"type":"external_tool_call_response","direction":"client_to_server","channel":"control","owner":"external_tool_host","reconnect":"external_tool_result","idempotency":"request_id_cached_result","capability":"external_tools"},
+    {"type":"external_tool_call_request","direction":"server_to_client","channel":"either","owner":"external_tool_host","reconnect":"external_tool_result","idempotency":"request_id_and_tool_call_id","capability":"external_tools"},
+    {"type":"control_request","direction":"server_to_client","channel":"either","owner":"approval_host","reconnect":"approval_response","idempotency":"request_id","capability":"approvals"},
+    {"type":"stream_delta","direction":"server_to_client","channel":"either","owner":"timeline_projection","reconnect":"event","idempotency":"idempotency_key","capability":"app_server_v2"},
+    {"type":"update_loop_status","direction":"server_to_client","channel":"either","owner":"runtime_state","reconnect":"event","idempotency":"idempotency_key","capability":"app_server_v2"},
+    {"type":"update_device_status","direction":"server_to_client","channel":"either","owner":"runtime_state","reconnect":"event","idempotency":"idempotency_key","capability":"app_server_v2"},
+    {"type":"update_queue","direction":"server_to_client","channel":"either","owner":"runtime_state","reconnect":"event","idempotency":"idempotency_key","capability":"app_server_v2"},
+    {"type":"update_subagent_state","direction":"server_to_client","channel":"either","owner":"runtime_state","reconnect":"event","idempotency":"idempotency_key","capability":"app_server_v2"},
+    {"type":"admin_rpc","direction":"client_to_server","channel":"control","owner":"admin_extension","reconnect":"capability_gated","idempotency":"method_specific","capability":"meridian_admin_rpc_extension"},
+    {"type":"admin_rpc_response","direction":"server_to_client","channel":"control","owner":"admin_extension","reconnect":"capability_gated","idempotency":"request_id_correlated","capability":"meridian_admin_rpc_extension"}
+  ]
+}
