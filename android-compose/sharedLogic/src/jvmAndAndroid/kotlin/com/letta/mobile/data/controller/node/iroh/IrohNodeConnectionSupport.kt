@@ -335,19 +335,18 @@ internal object DanglingToolCallSynthesizer {
 
 /**
  * Per-turn, per-connection cumulative accumulation of streamed assistant/reasoning
- * text (h30cy). App Server assistant/reasoning deltas arrive as either cumulative
- * or incremental chunks keyed by otid/id; this collapses them to a single
- * cumulative body per key so the client renders one growing row, not N appended
- * fragments. Replayed envelopes are idempotent by frame ID; all other frames follow
- * their explicit incremental or cumulative mode. Non-assistant/reasoning frames pass
- * through unchanged.
+ * text (h30cy). Typed App Server stream deltas are incremental; legacy external
+ * transport snapshots are cumulative. The caller supplies that source contract,
+ * and this collapses either representation to one cumulative body per otid/id so
+ * the client renders one growing row. Replayed envelopes are idempotent by frame
+ * ID. Non-assistant/reasoning frames pass through unchanged.
  *
  * Extracted from IrohNodeConnection (eaczz.4) so the fanout core can compute the
  * cumulated body ONCE, initiator-side, before publishing to all viewers.
  */
-internal enum class StreamTextFrameMode {
-    Incremental,
-    Cumulative,
+internal enum class StreamTextFrameSource {
+    AppServerDelta,
+    CumulativeSnapshot,
 }
 
 internal class CumulativeStreamText {
@@ -356,11 +355,11 @@ internal class CumulativeStreamText {
 
     fun applyToRawFrame(
         rawFrame: String,
-        frameMode: StreamTextFrameMode = StreamTextFrameMode.Incremental,
+        source: StreamTextFrameSource,
     ): String = runCatching {
         val frame = parseTextFrame(rawFrame) ?: return@runCatching rawFrame
         val existing = byKey[frame.textKey].orEmpty()
-        val cumulative = accumulatedText(frame, existing, frameMode)
+        val cumulative = accumulatedText(frame, existing, source)
         byKey[frame.textKey] = cumulative
         frame.withText(cumulative).toString()
     }.getOrDefault(rawFrame)
@@ -368,27 +367,27 @@ internal class CumulativeStreamText {
     private fun accumulatedText(
         frame: StreamTextFrame,
         existing: String,
-        frameMode: StreamTextFrameMode,
+        source: StreamTextFrameSource,
     ): String {
         if (frame.isReplay) return existing.ifEmpty { frame.chunk }
-        return when (frameMode) {
-            StreamTextFrameMode.Incremental -> existing + frame.chunk
-            StreamTextFrameMode.Cumulative -> frame.chunk
+        return when (source) {
+            StreamTextFrameSource.AppServerDelta -> existing + frame.chunk
+            StreamTextFrameSource.CumulativeSnapshot -> frame.chunk
         }
     }
 
     private fun parseTextFrame(rawFrame: String): StreamTextFrame? {
         val envelope = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
         if (envelope["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return null
-        val delta = envelope["delta"]?.jsonObject ?: return null
-        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return null
-        if (messageType !in STREAM_TEXT_MESSAGE_TYPES) return null
+        return envelope["delta"]?.jsonObject?.let { delta -> parseTextDelta(envelope, delta) }
+    }
+
+    private fun parseTextDelta(envelope: JsonObject, delta: JsonObject): StreamTextFrame? {
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull
+            ?.takeIf { it in STREAM_TEXT_MESSAGE_TYPES }
+            ?: return null
         val field = if (messageType == "assistant_message") "content" else "reasoning"
         val chunk = textFrom(delta[field]) ?: textFrom(delta["content"]) ?: textFrom(delta["text"]) ?: return null
-        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
-            ?: delta["id"]?.jsonPrimitive?.contentOrNull
-            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
-            ?: messageType
         val frameId = envelope["idempotency_key"]?.jsonPrimitive?.contentOrNull
         return StreamTextFrame(
             envelope = envelope,
@@ -396,10 +395,16 @@ internal class CumulativeStreamText {
             messageType = messageType,
             field = field,
             chunk = chunk,
-            textKey = textKey,
+            textKey = textKey(delta, messageType),
             isReplay = frameId != null && !seenFrameIds.add(frameId),
         )
     }
+
+    private fun textKey(delta: JsonObject, messageType: String): String =
+        delta["otid"]?.jsonPrimitive?.contentOrNull
+            ?: delta["id"]?.jsonPrimitive?.contentOrNull
+            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
+            ?: messageType
 
     private fun textFrom(element: JsonElement?): String? {
         if (element == null) return null
