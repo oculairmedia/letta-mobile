@@ -42,9 +42,16 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
+import java.awt.Window
+import java.net.URI
+import dev.nucleusframework.application.NucleusApplicationScope
 
 @Composable
 fun LettaDesktopApp(
+    nucleusApplicationScope: NucleusApplicationScope,
+    window: Window,
+    deepLinks: StateFlow<URI?>,
     onActiveTitleChange: (String) -> Unit = {},
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
@@ -60,6 +67,8 @@ fun LettaDesktopApp(
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
     val chatScope = rememberCoroutineScope()
+    val nucleusController = remember(chatScope) { DesktopNucleusController(chatScope) }
+    val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
     val irohMode = irohTransport != null
     val irohAgentDirectory = remember(irohTransport) {
@@ -189,6 +198,22 @@ fun LettaDesktopApp(
         }
         selectedDestination = DesktopDestination.Conversations
     }
+
+    val pendingDeepLink by deepLinks.collectAsState()
+    LaunchedEffect(pendingDeepLink) {
+        pendingDeepLink?.let { uri ->
+            when (val destination = parseDesktopDeepLink(uri)) {
+                DesktopDeepLinkDestination.Settings -> selectedDestination = DesktopDestination.Settings
+                DesktopDeepLinkDestination.Conversations -> selectedDestination = DesktopDestination.Conversations
+                is DesktopDeepLinkDestination.Conversation -> {
+                    chatController.selectConversation(destination.id)
+                    selectedDestination = DesktopDestination.Conversations
+                }
+                is DesktopDeepLinkDestination.Agent -> openAgent(destination.id)
+                null -> Unit
+            }
+        }
+    }
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
     // Per-agent avatar-style override chosen in the editor (stored in agent
@@ -254,6 +279,17 @@ fun LettaDesktopApp(
     // place across platforms.
     val replyPresence by chatController.replyPresence.collectAsState()
     val isStreamingReplySelected = replyPresence.isStreaming
+
+    DesktopNucleusEffects(
+        applicationScope = nucleusApplicationScope,
+        window = window,
+        controller = nucleusController,
+        isAgentWorking = thinkingConversationId != null || replyPresence.isStreaming,
+        agentName = selectedAgentName,
+        errorMessage = chatState.errorMessage,
+        onOpenCommandPalette = { showCommandPalette = true },
+        onOpenSettings = { selectedDestination = DesktopDestination.Settings },
+    )
 
     AvatarPresenceEffects(
         avatar = avatar,
@@ -432,6 +468,7 @@ fun LettaDesktopApp(
                                     canManageSkills = skillsPanel.available && selectedAgentId != null,
                                     focusedAgentName = selectedAgentName,
                                 ),
+                                nucleus = nucleusState,
                             ),
                             actions = DestinationContentActions(
                                 memory = DestinationMemoryActions(
@@ -506,6 +543,19 @@ fun LettaDesktopApp(
                                 onTokenCleared = {
                                     applyConfig(activeConfig.copy(accessToken = null))
                                 },
+                                nucleus = DestinationNucleusActions(
+                                    onCheckForUpdates = nucleusController::checkForUpdates,
+                                    onDownloadUpdate = nucleusController::downloadUpdate,
+                                    onInstallUpdate = nucleusController::installUpdateAndRestart,
+                                    onRefreshSystemInfo = nucleusController::refreshSystemInfo,
+                                    onAutoLaunchChanged = nucleusController::setAutoLaunch,
+                                    onOpenAutoLaunchSettings = nucleusController::openAutoLaunchSettings,
+                                    onTestNotification = {
+                                        nucleusController.sendTestNotification {
+                                            activateDesktopWindow(window)
+                                        }
+                                    },
+                                ),
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )

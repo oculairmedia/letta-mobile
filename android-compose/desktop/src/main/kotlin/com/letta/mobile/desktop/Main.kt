@@ -16,45 +16,48 @@ import com.letta.mobile.desktop.markdown.DesktopMermaidDiagramRenderer
 import com.letta.mobile.ui.markdown.LocalMermaidDiagramRenderer
 import dev.nucleusframework.application.NucleusBackend
 import dev.nucleusframework.application.nucleusApplication
+import dev.nucleusframework.hidpi.applyLinuxHiDpiScale
+import dev.nucleusframework.core.runtime.Platform
+import dev.nucleusframework.launcher.windows.WindowsJumpListManager
 import java.awt.Dimension
+import java.net.URI
 import javax.swing.JOptionPane
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.system.exitProcess
 
 fun main(args: Array<String>) {
+    applyLinuxHiDpiScale()
     DesktopCrashReporter.installGlobalHandler()
+    if (Platform.Current == Platform.Windows) WindowsJumpListManager.setProcessAppId()
     val activationHandler = DesktopWindowActivationHandler()
-    when (val singleInstance = DesktopSingleInstance.acquire(onCommand = activationHandler::handleCommand)) {
-        is DesktopSingleInstance.Secondary -> {
-            if (!singleInstance.notifyPrimary()) {
-                System.err.println("Letta Desktop is already running, but did not respond to the show command.")
-            }
-            return
-        }
-        is DesktopSingleInstance.Primary -> runDesktopApplication(args, singleInstance, activationHandler)
-    }
+    runDesktopApplication(args, activationHandler)
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
 private fun runDesktopApplication(
     args: Array<String>,
-    singleInstance: DesktopSingleInstance.Primary,
     activationHandler: DesktopWindowActivationHandler,
 ) {
-    singleInstance.use {
-        nucleusApplication(
-            args = args,
-            backend = NucleusBackend.Awt,
-            // Letta's lock also forwards a show-window command to the primary
-            // process, so retain it instead of stacking Nucleus's generic lock.
-            enableSingleInstance = false,
-        ) {
+    val deepLinks = MutableStateFlow<URI?>(null)
+    nucleusApplication(
+        args = args,
+        backend = NucleusBackend.Awt,
+        enableSingleInstance = true,
+    ) {
+            val nucleusScope = this
+            onDeepLink { uri ->
+                deepLinks.value = uri
+                activationHandler.showUserThatAppIsRunning()
+            }
             var windowTitle by remember { mutableStateOf("Letta Desktop") }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
             ) {
                 DesktopJewelWindow(
-                    onCloseRequest = ::exitApplication,
+                    // Keep background agents and schedules alive; Quit remains
+                    // available from the Nucleus native tray menu.
+                    onCloseRequest = { activationHandler.hideWindow() },
                     title = windowTitle,
                     state = rememberWindowState(width = 1280.dp, height = 820.dp),
                 ) {
@@ -63,11 +66,15 @@ private fun runDesktopApplication(
                         window.minimumSize = Dimension(960, 640)
                     }
 
-                    LettaDesktopApp(onActiveTitleChange = { windowTitle = it })
+                    LettaDesktopApp(
+                        nucleusApplicationScope = nucleusScope,
+                        window = window,
+                        deepLinks = deepLinks,
+                        onActiveTitleChange = { windowTitle = it },
+                    )
                 }
             }
         }
-    }
 }
 
 /**
@@ -89,11 +96,5 @@ private val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactor
             JOptionPane.showMessageDialog(window, message, "Letta Desktop", JOptionPane.ERROR_MESSAGE)
         }
         exitProcess(1)
-    }
-}
-
-private fun DesktopWindowActivationHandler.handleCommand(command: DesktopIpcCommand) {
-    when (command) {
-        DesktopIpcCommand.ShowUserThatAppIsRunning -> showUserThatAppIsRunning()
     }
 }

@@ -1,4 +1,7 @@
 import dev.nucleusframework.desktop.application.dsl.TargetFormat
+import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
+import dev.nucleusframework.desktop.application.dsl.ReleaseType
+import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // This repo does not yet use a Gradle version catalog. Keep desktop-only
@@ -21,6 +24,7 @@ val calendarVersion = "2.10.1"
 val jcefMavenVersion = "146.0.10"
 val jnaVersion = "5.17.0"
 val nucleusVersion = "2.1.5"
+val nativeTrayVersion = "2.0.1"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -126,6 +130,23 @@ dependencies {
     implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
     implementation(compose.desktop.currentOs)
     implementation("dev.nucleusframework:nucleus.nucleus-application:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.updater-runtime:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.native-http:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.native-ssl:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.notification-common:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.system-info:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.darkmode-detector:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.system-color:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.taskbar-progress:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.autolaunch:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.launcher-windows:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.launcher-linux:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.launcher-macos:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.global-hotkey:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.energy-manager:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.media-control:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.linux-hidpi:$nucleusVersion")
+    implementation("dev.nucleusframework:composenativetray-jvm:$nativeTrayVersion")
     // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
     // use its portable JNI-backed AWT window backend rather than Tao.
     runtimeOnly("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
@@ -180,13 +201,38 @@ tasks.register<JavaExec>("runPetSpike") {
 nucleus.application {
     mainClass = "com.letta.mobile.desktop.MainKt"
 
+    // Native Image is intentionally opt-in: the JVM distribution remains the
+    // compatibility build for JCEF and Iroh, while release engineers can run
+    // `-PnucleusGraalvm=true` to benchmark the native launcher.
+    graalvm {
+        isEnabled = providers.gradleProperty("nucleusGraalvm").orNull.toBoolean()
+        imageName = "letta-desktop"
+        javaLanguageVersion = 25
+    }
+
     nativeDistributions {
-        targetFormats(TargetFormat.Exe, TargetFormat.Msi)
+        if (providers.gradleProperty("nucleusAllFormats").orNull.toBoolean()) {
+            targetFormats(*TargetFormat.entries.toTypedArray())
+        } else {
+            targetFormats(TargetFormat.Exe, TargetFormat.Msi)
+        }
         packageName = "Letta Desktop"
         packageVersion = computeDesktopPackageVersion().get()
         description = "Desktop client foundation for the Letta AI platform."
         copyright = "Copyright (C) 2026 Letta"
         vendor = "Letta"
+        artifactName = $$"${name}-${version}-${os}-${arch}.${ext}"
+        protocol("Meridian", "meridian")
+
+        publish {
+            github {
+                enabled = true
+                owner = "oculairmedia"
+                repo = "letta-mobile"
+                channel = ReleaseChannel.Latest
+                releaseType = ReleaseType.Release
+            }
+        }
 
         windows {
             // Preserve the existing installer identity and discoverability
@@ -200,6 +246,42 @@ nucleus.application {
                 createDesktopShortcut = true
                 createStartMenuShortcut = true
             }
+            providers.environmentVariable("WINDOWS_SIGNING_CERTIFICATE").orNull?.let { certificate ->
+                signing {
+                    enabled = true
+                    certificateFile.set(file(certificate))
+                    certificatePassword = providers.environmentVariable("WINDOWS_SIGNING_PASSWORD").orNull
+                    algorithm = SigningAlgorithm.Sha256
+                    timestampServer = "http://timestamp.digicert.com"
+                }
+            }
+        }
+
+        macOS {
+            bundleID = "com.letta.desktop"
+            appCategory = "public.app-category.productivity"
+            dockName = "Letta"
+            providers.environmentVariable("APPLE_SIGNING_IDENTITY").orNull?.let { signingIdentity ->
+                signing {
+                    sign.set(true)
+                    identity.set(signingIdentity)
+                }
+            }
+            val appleId = providers.environmentVariable("APPLE_NOTARIZATION_ID").orNull
+            val applePassword = providers.environmentVariable("APPLE_NOTARIZATION_PASSWORD").orNull
+            val appleTeam = providers.environmentVariable("APPLE_TEAM_ID").orNull
+            if (appleId != null && applePassword != null && appleTeam != null) {
+                notarization {
+                    this.appleID.set(appleId)
+                    password.set(applePassword)
+                    teamID.set(appleTeam)
+                }
+            }
+        }
+
+        linux {
+            appCategory = "Utility"
+            startupWMClass = "Letta Desktop"
         }
     }
 }

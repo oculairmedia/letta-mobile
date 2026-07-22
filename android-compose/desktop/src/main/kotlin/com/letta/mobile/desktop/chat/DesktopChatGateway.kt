@@ -9,6 +9,7 @@ import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
+import dev.nucleusframework.nativessl.NativeTrustManager
 
 typealias DesktopChatGateway = ChatGateway
 
@@ -23,6 +24,11 @@ class DesktopLettaHttpChatGateway(
 ) : LettaHttpChatGateway(config = config, httpClient = httpClient)
 
 fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
+    engine {
+        https {
+            trustManager = NativeTrustManager.trustManager
+        }
+    }
     install(ContentNegotiation) {
         json(desktopChatJson)
     }
