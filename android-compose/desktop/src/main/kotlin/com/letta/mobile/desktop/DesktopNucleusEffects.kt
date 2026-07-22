@@ -240,10 +240,7 @@ private fun AgentFailureEffect(
             TaskbarProgress.showError(bindings.window)
             TaskbarProgress.requestAttention(bindings.window, TaskbarProgress.AttentionType.CRITICAL)
         }
-        // The focus listener clears attention/badge but not the red error
-        // progress; drop it as soon as the error state resolves so the taskbar
-        // doesn't stay red until an unrelated agent-work transition.
-        if (current == null && previousError != null && !state.isAgentWorking) {
+        if (shouldClearFailureProgress(current, previousError, state.isAgentWorking)) {
             TaskbarProgress.hideProgress(bindings.window)
         }
         previousError = current
@@ -254,6 +251,17 @@ private fun shouldNotifyFailure(current: String?, previous: String?, isWindowFoc
     if (current == null) return false
     if (current == previous) return false
     return !isWindowFocused
+}
+
+/**
+ * The focus listener clears attention/badge but not the red error progress;
+ * drop it as soon as the error state resolves so the taskbar doesn't stay red
+ * until an unrelated agent-work transition. Active work keeps its own progress.
+ */
+private fun shouldClearFailureProgress(current: String?, previous: String?, isAgentWorking: Boolean): Boolean {
+    if (current != null) return false
+    if (previous == null) return false
+    return !isAgentWorking
 }
 
 private fun registerQuickSwitcher(onActivate: () -> Unit, onOpenCommandPalette: () -> Unit): Long =

@@ -194,13 +194,16 @@ jobs:
           set -euo pipefail
           tag="$RELEASE_TAG"
           version="${tag#v}"
-          # Pre-release tags publish to their own updater channel file so
-          # beta/alpha clients don't read (or pollute) the stable manifest.
-          case "$version" in
-            *-alpha*) channel="alpha" ;;
-            *-beta*) channel="beta" ;;
-            *) channel="latest" ;;
-          esac
+          # Any hyphen-suffixed pre-release tag publishes to its own updater
+          # channel file (alpha.yml, beta.yml, rc.yml, ...) so pre-release
+          # metadata never lands on the stable latest.yml manifest.
+          if [[ "$version" == *-* ]]; then
+            prerelease="${version#*-}"
+            channel="$(printf '%s' "$prerelease" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z].*//')"
+            [ -n "$channel" ] || channel="beta"
+          else
+            channel="latest"
+          fi
           release_date="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
           mapfile -d '' installers < <(find release-assets -type f \( -iname '*.exe' -o -iname '*.msi' \) -print0 | sort -z)
           if [ "${#installers[@]}" -eq 0 ]; then

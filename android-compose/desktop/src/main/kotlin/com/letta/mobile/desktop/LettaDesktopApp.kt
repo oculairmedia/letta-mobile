@@ -28,6 +28,8 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
+import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
@@ -194,10 +196,12 @@ internal fun LettaDesktopApp(
         selectedDestination = DesktopDestination.Conversations
     }
 
-    // Deep-linked conversations can arrive before the conversation list has
-    // loaded (cold-start protocol activation); selectConversation ignores
-    // unknown ids, so buffer the target and select once it exists.
+    // Deep-linked conversations/agents can arrive before the conversation list
+    // has loaded (cold-start protocol activation); selectConversation ignores
+    // unknown ids and openAgent would treat the empty list as "no existing
+    // chat", so buffer the target and act once the initial load has settled.
     var pendingDeepLinkConversationId by remember { mutableStateOf<String?>(null) }
+    var pendingDeepLinkAgentId by remember { mutableStateOf<String?>(null) }
     DesktopDeepLinkEffect(
         deepLinks = deepLinks,
         // Deep links must win over the full-page agent editor, matching the
@@ -210,13 +214,22 @@ internal fun LettaDesktopApp(
             editAgentId = null
             pendingDeepLinkConversationId = it
         },
-        onAgentSelected = ::openAgent,
+        onAgentSelected = { pendingDeepLinkAgentId = it },
     )
     LaunchedEffect(pendingDeepLinkConversationId, chatState.conversations) {
         val target = pendingDeepLinkConversationId ?: return@LaunchedEffect
         if (chatState.conversations.any { it.id == target }) {
             chatController.selectConversation(target)
             pendingDeepLinkConversationId = null
+        }
+    }
+    LaunchedEffect(pendingDeepLinkAgentId, chatState.isLoading, chatState.connectionState) {
+        val target = pendingDeepLinkAgentId ?: return@LaunchedEffect
+        val initialLoadSettled = !chatState.isLoading &&
+            chatState.connectionState != DesktopChatConnectionState.Loading
+        if (initialLoadSettled) {
+            openAgent(target)
+            pendingDeepLinkAgentId = null
         }
     }
     val selectedAgentId = chatState.selectedConversation?.agentId
@@ -288,13 +301,15 @@ internal fun LettaDesktopApp(
     // Background work can belong to a conversation the user has switched away
     // from; label taskbar/media/notification integration with the agent that
     // is actually working, not the current selection.
-    val workingAgentName = thinkingAgentId?.let { id ->
-        railAgents.firstOrNull { it.first == id }?.second
-    }
-        ?: thinkingConversationId?.let { tid ->
-            chatState.conversations.firstOrNull { it.id == tid }?.agentName
-        }
-        ?: selectedAgentName
+    val workingAgentName = workingAgentName(
+        WorkingAgentNameParams(
+            thinkingAgentId = thinkingAgentId,
+            thinkingConversationId = thinkingConversationId,
+            railAgents = railAgents,
+            conversations = chatState.conversations,
+            fallback = selectedAgentName,
+        ),
+    )
     DesktopNucleusEffects(
         bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
         state = desktopNucleusEffectState(
@@ -307,7 +322,12 @@ internal fun LettaDesktopApp(
         ),
         actions = DesktopNucleusEffectActions(
             onOpenCommandPalette = { showCommandPalette = true },
-            onOpenSettings = { selectedDestination = DesktopDestination.Settings },
+            // Clear the full-page agent editor like the sidebar and deep-link
+            // paths do, or the editor branch keeps rendering over Settings.
+            onOpenSettings = {
+                editAgentId = null
+                selectedDestination = DesktopDestination.Settings
+            },
         ),
     )
 
@@ -639,6 +659,25 @@ internal fun LettaDesktopApp(
           }
         }
     }
+}
+
+private data class WorkingAgentNameParams(
+    val thinkingAgentId: String?,
+    val thinkingConversationId: String?,
+    val railAgents: List<Pair<String, String>>,
+    val conversations: List<DesktopConversationSummary>,
+    val fallback: String,
+)
+
+private fun workingAgentName(params: WorkingAgentNameParams): String {
+    val byAgent = params.thinkingAgentId?.let { id ->
+        params.railAgents.firstOrNull { it.first == id }?.second
+    }
+    if (byAgent != null) return byAgent
+    val byConversation = params.thinkingConversationId?.let { tid ->
+        params.conversations.firstOrNull { it.id == tid }?.agentName
+    }
+    return byConversation ?: params.fallback
 }
 
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
