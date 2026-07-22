@@ -338,77 +338,116 @@ internal object DanglingToolCallSynthesizer {
  * text (h30cy). App Server assistant/reasoning deltas arrive as either cumulative
  * or incremental chunks keyed by otid/id; this collapses them to a single
  * cumulative body per key so the client renders one growing row, not N appended
- * fragments. Idempotent: re-applying a body that is already a prefix/suffix of the
- * accumulated text does not double it. Non-assistant/reasoning frames pass through
- * unchanged.
+ * fragments. Replayed envelopes are idempotent by frame ID; all other frames follow
+ * their explicit incremental or cumulative mode. Non-assistant/reasoning frames pass
+ * through unchanged.
  *
  * Extracted from IrohNodeConnection (eaczz.4) so the fanout core can compute the
  * cumulated body ONCE, initiator-side, before publishing to all viewers.
  */
+internal enum class StreamTextFrameMode {
+    Incremental,
+    Cumulative,
+}
+
 internal class CumulativeStreamText {
     private val byKey = LinkedHashMap<String, String>()
     private val seenFrameIds = LinkedHashSet<String>()
+
+    fun applyToRawFrame(
+        rawFrame: String,
+        frameMode: StreamTextFrameMode = StreamTextFrameMode.Incremental,
+    ): String = runCatching {
+        val frame = parseTextFrame(rawFrame) ?: return@runCatching rawFrame
+        val existing = byKey[frame.textKey].orEmpty()
+        val cumulative = accumulatedText(frame, existing, frameMode)
+        byKey[frame.textKey] = cumulative
+        frame.withText(cumulative).toString()
+    }.getOrDefault(rawFrame)
+
+    private fun accumulatedText(
+        frame: StreamTextFrame,
+        existing: String,
+        frameMode: StreamTextFrameMode,
+    ): String {
+        if (frame.isReplay) return existing.ifEmpty { frame.chunk }
+        return when (frameMode) {
+            StreamTextFrameMode.Incremental -> existing + frame.chunk
+            StreamTextFrameMode.Cumulative -> frame.chunk
+        }
+    }
+
+    private fun parseTextFrame(rawFrame: String): StreamTextFrame? {
+        val envelope = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
+        if (envelope["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return null
+        val delta = envelope["delta"]?.jsonObject ?: return null
+        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return null
+        if (messageType !in STREAM_TEXT_MESSAGE_TYPES) return null
+        val field = if (messageType == "assistant_message") "content" else "reasoning"
+        val chunk = textFrom(delta[field]) ?: textFrom(delta["content"]) ?: textFrom(delta["text"]) ?: return null
+        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
+            ?: delta["id"]?.jsonPrimitive?.contentOrNull
+            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
+            ?: messageType
+        val frameId = envelope["idempotency_key"]?.jsonPrimitive?.contentOrNull
+        return StreamTextFrame(
+            envelope = envelope,
+            delta = delta,
+            messageType = messageType,
+            field = field,
+            chunk = chunk,
+            textKey = textKey,
+            isReplay = frameId != null && !seenFrameIds.add(frameId),
+        )
+    }
 
     private fun textFrom(element: JsonElement?): String? {
         if (element == null) return null
         (element as? JsonPrimitive)?.contentOrNull?.let { return it }
         val array = element as? JsonArray ?: return null
-        return array.joinToString("") { part ->
-            runCatching {
-                val obj = part.jsonObject
-                if (obj["type"]?.jsonPrimitive?.contentOrNull == "text") {
-                    obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
-                } else {
-                    ""
-                }
-            }.getOrDefault("")
-        }.takeIf { it.isNotEmpty() }
+        return array.joinToString("") { part -> textPartFrom(part) }.takeIf { it.isNotEmpty() }
     }
 
-    fun applyToRawFrame(rawFrame: String): String = runCatching {
-        val obj = AppServerProtocol.json.parseToJsonElement(rawFrame).jsonObject
-        if (obj["type"]?.jsonPrimitive?.contentOrNull != "stream_delta") return@runCatching rawFrame
-        val frameId = obj["idempotency_key"]?.jsonPrimitive?.contentOrNull
-        val isReplay = frameId != null && !seenFrameIds.add(frameId)
-        val delta = obj["delta"]?.jsonObject ?: return@runCatching rawFrame
-        val messageType = delta["message_type"]?.jsonPrimitive?.contentOrNull ?: return@runCatching rawFrame
-        if (messageType != "assistant_message" && messageType != "reasoning_message" && messageType != "hidden_reasoning_message") {
-            return@runCatching rawFrame
+    private fun textPartFrom(part: JsonElement): String = runCatching {
+        val obj = part.jsonObject
+        if (obj["type"]?.jsonPrimitive?.contentOrNull == "text") {
+            obj["text"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        } else {
+            ""
         }
-        val textKey = delta["otid"]?.jsonPrimitive?.contentOrNull
-            ?: delta["id"]?.jsonPrimitive?.contentOrNull
-            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
-            ?: messageType
-        val field = if (messageType == "assistant_message") "content" else "reasoning"
-        val chunk = textFrom(delta[field])
-            ?: textFrom(delta["content"])
-            ?: textFrom(delta["text"])
-            ?: return@runCatching rawFrame
-        val existing = byKey[textKey].orEmpty()
-        val cumulative = when {
-            isReplay -> existing.ifEmpty { chunk }
-            existing.isEmpty() -> chunk
-            chunk.length > existing.length && chunk.startsWith(existing) -> chunk
-            // App Server assistant frames are incremental unless the incoming
-            // body is an explicit cumulative extension. Byte-equal suffixes can
-            // be legitimate consecutive tokens ("ha" + "ha", repeated spaces,
-            // punctuation, or newlines), so sequence-blind suffix suppression
-            // loses authored text. The upstream idempotency key handles actual
-            // replayed envelopes without conflating them with equal new tokens.
-            else -> existing + chunk
-        }.also { byKey[textKey] = it }
-        val cumulativeDelta = buildJsonObject {
-            delta.forEach { (key, value) -> if (key != field) put(key, value) }
-            put(field, cumulative)
-            if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
-                put("reasoning", cumulative)
+    }.getOrDefault("")
+
+    private data class StreamTextFrame(
+        val envelope: JsonObject,
+        val delta: JsonObject,
+        val messageType: String,
+        val field: String,
+        val chunk: String,
+        val textKey: String,
+        val isReplay: Boolean,
+    ) {
+        fun withText(cumulative: String): JsonObject {
+            val cumulativeDelta = buildJsonObject {
+                delta.forEach { (key, value) -> if (key != field) put(key, value) }
+                put(field, cumulative)
+                if (messageType != "assistant_message" && !delta.containsKey("reasoning")) {
+                    put("reasoning", cumulative)
+                }
+            }
+            return buildJsonObject {
+                envelope.forEach { (key, value) -> if (key != "delta") put(key, value) }
+                put("delta", cumulativeDelta)
             }
         }
-        buildJsonObject {
-            obj.forEach { (key, value) -> if (key != "delta") put(key, value) }
-            put("delta", cumulativeDelta)
-        }.toString()
-    }.getOrDefault(rawFrame)
+    }
+
+    private companion object {
+        val STREAM_TEXT_MESSAGE_TYPES = setOf(
+            "assistant_message",
+            "reasoning_message",
+            "hidden_reasoning_message",
+        )
+    }
 }
 
 /**

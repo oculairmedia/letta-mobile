@@ -121,7 +121,7 @@ class ConversationTurnFanoutTest {
             }),
             raw(buildJsonObject {
                 put("message_type", "assistant_message"); put("otid", "otid-1")
-                put("id", "letta-msg-1"); put("content", "Hello world")
+                put("id", "letta-msg-1"); put("content", "lo world")
             }),
             raw(buildJsonObject {
                 put("message_type", "tool_return_message"); put("tool_call_id", "tc-1")
@@ -258,6 +258,50 @@ class ConversationTurnFanoutTest {
         assertEquals(
             listOf("ha", "haha", "haha ", "haha  ", "haha  .", "haha  ..", "haha  ..\n", "haha  ..\n\n"),
             assistantContents,
+        )
+    }
+
+    @Test
+    fun overlappingIncrementalFramesPreserveEveryByte() = runTest {
+        val accumulator = CumulativeStreamText()
+        fun assistant(content: String, key: String) = rawStreamDeltaBody(
+            seq = 1,
+            idempotencyKey = key,
+            delta = buildJsonObject {
+                put("message_type", "assistant_message")
+                put("otid", "otid-overlap")
+                put("content", content)
+            },
+        )
+        fun content(frame: String) = json.parseToJsonElement(frame).jsonObject
+            .getValue("delta").jsonObject.getValue("content").jsonPrimitive.content
+
+        assertEquals("a", content(accumulator.applyToRawFrame(assistant("a", "overlap-1"))))
+        assertEquals("aaa", content(accumulator.applyToRawFrame(assistant("aa", "overlap-2"))))
+    }
+
+    @Test
+    fun explicitlyCumulativeFramesReplaceThePreviousSnapshot() = runTest {
+        val accumulator = CumulativeStreamText()
+        fun assistant(content: String, key: String) = rawStreamDeltaBody(
+            seq = 1,
+            idempotencyKey = key,
+            delta = buildJsonObject {
+                put("message_type", "assistant_message")
+                put("otid", "otid-cumulative")
+                put("content", content)
+            },
+        )
+        fun content(frame: String) = json.parseToJsonElement(frame).jsonObject
+            .getValue("delta").jsonObject.getValue("content").jsonPrimitive.content
+
+        assertEquals(
+            "Hel",
+            content(accumulator.applyToRawFrame(assistant("Hel", "cumulative-1"), StreamTextFrameMode.Cumulative)),
+        )
+        assertEquals(
+            "Hello",
+            content(accumulator.applyToRawFrame(assistant("Hello", "cumulative-2"), StreamTextFrameMode.Cumulative)),
         )
     }
 
