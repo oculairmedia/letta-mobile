@@ -7,7 +7,8 @@
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
     "protocol_sha256": "68ef0a3683f7e57be02638d5973e7211493658dd0d0038e3e0d5f571da3116f4",
     "source_map_origin": "src/types/protocol_v2.ts",
-    "observation": "installed_package_declaration_unions"
+    "observation": "installed_package_declaration_unions",
+    "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root>"
   },
   "commands": [
     "input", "change_device_state", "abort_message", "sync", "runtime_start", "external_tool_call_response",

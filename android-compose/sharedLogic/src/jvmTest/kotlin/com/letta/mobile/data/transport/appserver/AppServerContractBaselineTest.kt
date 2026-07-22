@@ -7,6 +7,7 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -14,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 
 class AppServerContractBaselineTest {
     @Test
-    fun mobileFrameMatrixCoversEveryCapturedTypedFrame() {
+    fun capturedFrameMatrixCoversEveryTypedFixture() {
         val rows = fixtureJson("app-server-v2-contract-matrix.json")["frames"]!!.jsonArray.map { it.jsonObject }
         val fixtures = protocolFixtures()
 
@@ -96,7 +97,7 @@ class AppServerContractBaselineTest {
         val kotlinPolicy = matrix["kotlin_target_policy"]!!.jsonObject
         val reconnect = matrix["reconnect_classes"]!!.jsonObject
 
-        assertEquals("local_v2_app_server_surface", observed.requiredString("classification"))
+        assertEquals("app_server_v2", observed.requiredString("classification"))
         assertEquals("none; installed upstream help and declarations do not label app-server deprecated", observed.requiredString("deprecation_claim"))
         assertTrue(upstream.requiredString("second_control").contains("1008"))
         assertTrue(upstream.requiredString("stream_disconnect").contains("control session and runtime remain active"))
@@ -120,13 +121,13 @@ class AppServerContractBaselineTest {
         assertEquals("v24.18.0\n", fixtureText(probes.getValue("installed_node_version").requiredString("fixture")))
         assertEquals("0.28.8 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
 
-        val modern = probes.getValue("modern_listener_server")
-        val appServer = probes.getValue("local_v2_app_server_surface")
-        assertProbe(modern, expectedUsage = "Usage: letta server", forbiddenUsage = "Usage: letta app-server")
+        val serverListener = probes.getValue("server_listener")
+        val appServer = probes.getValue("app_server_v2")
+        assertProbe(serverListener, expectedUsage = "Usage: letta server", forbiddenUsage = "Usage: letta app-server")
         assertProbe(appServer, expectedUsage = "Usage: letta app-server", forbiddenUsage = "Usage: letta server")
         assertTrue("app_server_v2" in appServer.stringSet("capabilities"))
-        assertTrue("app_server_v2" in modern.stringSet("not_capabilities"))
-        assertTrue("cloud_environment_registration" in modern.stringSet("capabilities"))
+        assertTrue("app_server_v2" in serverListener.stringSet("not_capabilities"))
+        assertTrue("cloud_environment_registration" in serverListener.stringSet("capabilities"))
         assertTrue("cloud_environment_registration" in appServer.stringSet("not_capabilities"))
     }
 
@@ -166,7 +167,29 @@ class AppServerContractBaselineTest {
                 assertFalse(content.lowercase().contains(marker.lowercase()), "$name contains forbidden marker $marker")
             }
         }
+        fixtureNames.filter { it.endsWith(".json") }.forEach { name ->
+            assertTokensRedacted(fixtureJson(name), name)
+        }
+        protocolFixtures().forEach { frame ->
+            assertTokensRedacted(frame, "protocol-frames.jsonl:${typeOf(frame)}")
+        }
         assertTrue(fixtureText("protocol-frames.jsonl").contains("\"token\":\"<redacted>\""))
+    }
+
+    private fun assertTokensRedacted(element: JsonElement, location: String) {
+        when (element) {
+            is JsonObject -> element.forEach { (name, value) ->
+                if (name == "token") {
+                    assertEquals("<redacted>", value.jsonPrimitive.content, "$location contains an unredacted token")
+                } else {
+                    assertTokensRedacted(value, "$location.$name")
+                }
+            }
+            is JsonArray -> element.forEachIndexed { index, value ->
+                assertTokensRedacted(value, "$location[$index]")
+            }
+            else -> Unit
+        }
     }
 
     private fun assertProbe(probe: JsonObject, expectedUsage: String, forbiddenUsage: String) {

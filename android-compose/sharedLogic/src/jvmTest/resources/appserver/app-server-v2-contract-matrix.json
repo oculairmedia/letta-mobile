@@ -7,10 +7,11 @@
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
     "protocol_sha256": "68ef0a3683f7e57be02638d5973e7211493658dd0d0038e3e0d5f571da3116f4",
     "captured_at": "2026-07-22",
-    "capture_method": "executed installed CLI directly with /usr/bin/node; omitted local wrapper stderr"
+    "capture_method": "executed the resolved installed package entrypoint with /usr/bin/node; retained stdout fixtures and omitted local wrapper stderr",
+    "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root>"
   },
   "observed_installed_contract": {
-    "classification": "local_v2_app_server_surface",
+    "classification": "app_server_v2",
     "source": "installed @letta-ai/letta-code 0.28.8 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
@@ -58,7 +59,7 @@
     },
     {
       "command": "/usr/bin/node <installed-package>/letta.js server --help",
-      "classification": "modern_listener_server",
+      "classification": "server_listener",
       "exit": 0,
       "capabilities": ["cloud_environment_registration", "channel_listener", "debug_event_log"],
       "not_capabilities": ["app_server_v2", "control_socket", "stream_socket", "listen_url", "ws_auth"],
@@ -66,7 +67,7 @@
     },
     {
       "command": "/usr/bin/node <installed-package>/letta.js app-server --help",
-      "classification": "local_v2_app_server_surface",
+      "classification": "app_server_v2",
       "exit": 0,
       "capabilities": ["app_server_v2", "control_socket", "stream_socket", "listen_url", "capability_token", "signed_bearer_token"],
       "not_capabilities": ["cloud_environment_registration", "channel_listener"],

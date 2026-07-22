@@ -2,7 +2,7 @@
 
 Date: 2026-06-24
 
-Beads: `letta-mobile-ph9ws.14`, `letta-mobile-ph9ws.15`
+Beads: `letta-mobile-ph9ws.14`, `letta-mobile-ph9ws.15`, `letta-mobile-lgns8.1`
 
 ## Scope
 
@@ -21,7 +21,7 @@ sequence remains:
 ## Boundary Decision
 
 The installed `@letta-ai/letta-code` 0.28.8 `letta app-server` command exposes a
-v2 WebSocket control plane, classified here as `local_v2_app_server_surface`.
+v2 WebSocket control plane, classified here as `app_server_v2`.
 Upstream's installed help and protocol declarations do not call this command
 deprecated, so this audit does not apply that label. Its protocol includes
 runtime turns plus first-class agent and conversation CRUD/hydration, terminal,
