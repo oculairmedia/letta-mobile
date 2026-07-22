@@ -5,10 +5,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -20,28 +22,120 @@ object AppServerProtocol {
         explicitNulls = false
     }
 
+    /** Placeholder substituted for credential values in redacted diagnostics. */
+    const val REDACTED_PLACEHOLDER: String = "<redacted>"
+
+    /** Upper bound on decode-failure diagnostic length so logs/traces stay bounded. */
+    const val MAX_DIAGNOSTIC_LENGTH: Int = 512
+
+    private val redactedPrimitive = JsonPrimitive(REDACTED_PLACEHOLDER)
+    private val emptyRaw = JsonObject(emptyMap())
+
     fun encodeCommand(command: AppServerCommand): String =
         json.encodeToString(AppServerCommand.serializer(), command)
 
+    /**
+     * Decode one inbound App Server frame. This is **total** — it never throws.
+     *
+     * Forward-compatibility contract (letta-mobile-lgns8.4):
+     * - Unknown top-level `type` values decode to [AppServerInboundFrame.Unknown]
+     *   with the raw envelope preserved, so receive loops survive new server frames.
+     * - Additive object keys on known frames are ignored ([Json.ignoreUnknownKeys]).
+     * - A malformed *known* frame (missing/mistyped required field) or non-object /
+     *   syntactically invalid JSON becomes an explicit
+     *   [AppServerInboundFrame.DecodeFailure] carrying the preserved raw envelope
+     *   (when available) plus a bounded, credential-redacted diagnostic — instead of
+     *   throwing and killing the receive loop.
+     */
     fun decodeFrame(rawJson: String, channel: AppServerChannel): AppServerReceivedFrame {
-        val element = json.parseToJsonElement(rawJson)
-        val raw = element.jsonObject
-        val frame = when (val type = raw["type"]?.jsonPrimitive?.content) {
-            "auth_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(element)
-            "runtime_start_response" -> json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(element)
-            "sync_response" -> json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(element)
-            "abort_message_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AbortMessageResponse>(element)
-            "stream_delta" -> json.decodeFromJsonElement<AppServerInboundFrame.StreamDelta>(element)
-            "update_loop_status" -> json.decodeFromJsonElement<AppServerInboundFrame.UpdateLoopStatus>(element)
-            "update_device_status" -> json.decodeFromJsonElement<AppServerInboundFrame.UpdateDeviceStatus>(element)
-            "update_queue" -> json.decodeFromJsonElement<AppServerInboundFrame.UpdateQueue>(element)
-            "update_subagent_state" -> json.decodeFromJsonElement<AppServerInboundFrame.UpdateSubagentState>(element)
-            "external_tool_call_request" -> json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(element)
-            "control_request" -> json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(element)
-            "admin_rpc_response" -> json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(element)
+        val element = runCatching { json.parseToJsonElement(rawJson) }.getOrNull()
+        val raw = element as? JsonObject
+        if (raw == null) {
+            val reason = if (element == null) "invalid JSON syntax" else "top-level frame is not a JSON object"
+            return AppServerReceivedFrame(
+                channel = channel,
+                frame = AppServerInboundFrame.DecodeFailure(
+                    declaredType = null,
+                    raw = null,
+                    diagnostic = decodeDiagnostic(declaredType = null, reason = reason),
+                ),
+                raw = emptyRaw,
+            )
+        }
+        val type = (raw["type"] as? JsonPrimitive)?.contentOrNull
+        val frame = when (type) {
+            "auth_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(raw) }
+            "runtime_start_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(raw) }
+            "sync_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(raw) }
+            "abort_message_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AbortMessageResponse>(raw) }
+            "stream_delta" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.StreamDelta>(raw) }
+            "update_loop_status" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateLoopStatus>(raw) }
+            "update_device_status" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateDeviceStatus>(raw) }
+            "update_queue" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateQueue>(raw) }
+            "update_subagent_state" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateSubagentState>(raw) }
+            "external_tool_call_request" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(raw) }
+            "control_request" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(raw) }
+            "admin_rpc_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(raw) }
             else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
         }
         return AppServerReceivedFrame(channel = channel, frame = frame, raw = raw)
+    }
+
+    private inline fun decodeKnown(
+        type: String,
+        raw: JsonObject,
+        decode: () -> AppServerInboundFrame,
+    ): AppServerInboundFrame =
+        runCatching { decode() }.getOrElse { error ->
+            AppServerInboundFrame.DecodeFailure(
+                declaredType = type,
+                raw = raw,
+                diagnostic = decodeDiagnostic(
+                    declaredType = type,
+                    reason = error.message ?: error::class.simpleName ?: "decode failed",
+                ),
+            )
+        }
+
+    /**
+     * Build a bounded diagnostic for a decode failure. Intentionally excludes the
+     * raw frame payload (available separately on [AppServerInboundFrame.DecodeFailure.raw])
+     * so nothing that leaves the process — logs, traces, fanout — carries frame
+     * contents, and caps the length so a hostile/oversized frame cannot bloat sinks.
+     */
+    fun decodeDiagnostic(declaredType: String?, reason: String): String {
+        val prefix = "decode_failure" + (declaredType?.let { " type=$it" }.orEmpty())
+        val message = "$prefix: $reason"
+        return if (message.length > MAX_DIAGNOSTIC_LENGTH) {
+            message.take(MAX_DIAGNOSTIC_LENGTH - 1) + "\u2026"
+        } else {
+            message
+        }
+    }
+
+    /**
+     * Recursively replace credential-bearing values with [REDACTED_PLACEHOLDER].
+     * Field matching mirrors the contract-baseline hygiene predicate so runtime
+     * redaction and committed-fixture redaction stay consistent.
+     */
+    fun redactCredentials(element: JsonElement): JsonElement = when (element) {
+        is JsonObject -> JsonObject(
+            element.mapValues { (key, value) ->
+                if (isCredentialField(key)) redactedPrimitive else redactCredentials(value)
+            },
+        )
+        is JsonArray -> JsonArray(element.map(::redactCredentials))
+        else -> element
+    }
+
+    fun isCredentialField(name: String): Boolean {
+        val normalized = name.lowercase().filter(Char::isLetterOrDigit)
+        return normalized == "authorization" ||
+            normalized == "password" ||
+            normalized == "privatekey" ||
+            normalized.endsWith("token") ||
+            normalized.endsWith("secret") ||
+            normalized.endsWith("apikey")
     }
 }
 
@@ -476,5 +570,32 @@ sealed interface AppServerInboundFrame {
 
         override val runtime: AppServerRuntimeScope?
             get() = null
+    }
+
+    /**
+     * A frame that could not be decoded (malformed known frame, non-object frame,
+     * or invalid JSON syntax). Surfacing this instead of throwing keeps receive
+     * loops alive (letta-mobile-lgns8.4). The raw envelope is preserved when it
+     * parsed to an object; [diagnostic] is bounded and credential-redacted and is
+     * the only part safe to log/trace/fan out.
+     */
+    @Serializable
+    data class DecodeFailure(
+        @SerialName("declared_type") val declaredType: String?,
+        val raw: JsonObject? = null,
+        val diagnostic: String,
+    ) : AppServerInboundFrame {
+        @Transient
+        override val type: String = DECODE_FAILURE_TYPE
+
+        override val requestId: String?
+            get() = (raw?.get("request_id") as? JsonPrimitive)?.contentOrNull
+
+        @Transient
+        override val runtime: AppServerRuntimeScope? = null
+
+        companion object {
+            const val DECODE_FAILURE_TYPE: String = "decode_failure"
+        }
     }
 }

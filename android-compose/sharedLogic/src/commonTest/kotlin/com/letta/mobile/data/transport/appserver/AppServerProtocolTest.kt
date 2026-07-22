@@ -2,8 +2,10 @@ package com.letta.mobile.data.transport.appserver
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
@@ -363,6 +365,123 @@ class AppServerProtocolTest {
         assertEquals("approval-1", frame.requestId)
         assertEquals("agent-1", frame.runtime?.agentId)
         assertEquals("can_use_tool", frame.request["subtype"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun malformedKnownFrameBecomesDecodeFailurePreservingRawWithBoundedRedactedDiagnostic() {
+        // runtime_start_response requires request_id + success; omit both and add a
+        // credential-bearing key to prove the diagnostic never leaks it.
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """{"type":"runtime_start_response","token":"super-secret-value","note":"partial"}""",
+            channel = AppServerChannel.Control,
+        )
+
+        val frame = assertIs<AppServerInboundFrame.DecodeFailure>(received.frame)
+        assertEquals("decode_failure", frame.type)
+        assertEquals("runtime_start_response", frame.declaredType)
+        // Raw envelope remains available (unredacted, in-memory) for callers.
+        assertEquals("super-secret-value", frame.raw?.get("token")?.jsonPrimitive?.content)
+        assertEquals("partial", frame.raw?.get("note")?.jsonPrimitive?.content)
+        // The received frame's raw is the same preserved envelope.
+        assertEquals("runtime_start_response", received.raw["type"]?.jsonPrimitive?.content)
+        // Diagnostic is bounded and never carries the credential value.
+        assertTrue(frame.diagnostic.startsWith("decode_failure type=runtime_start_response"))
+        assertTrue(frame.diagnostic.length <= AppServerProtocol.MAX_DIAGNOSTIC_LENGTH)
+        assertFalse(frame.diagnostic.contains("super-secret-value"))
+    }
+
+    @Test
+    fun invalidJsonSyntaxBecomesDecodeFailureWithoutRawInsteadOfThrowing() {
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """{"type":"auth_response", not-valid-json""",
+            channel = AppServerChannel.Control,
+        )
+
+        val frame = assertIs<AppServerInboundFrame.DecodeFailure>(received.frame)
+        assertNull(frame.declaredType)
+        assertNull(frame.raw)
+        assertTrue(frame.diagnostic.contains("invalid JSON syntax"))
+        assertTrue(frame.diagnostic.length <= AppServerProtocol.MAX_DIAGNOSTIC_LENGTH)
+    }
+
+    @Test
+    fun nonObjectTopLevelFrameBecomesDecodeFailure() {
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = "[1,2,3]",
+            channel = AppServerChannel.Stream,
+        )
+
+        val frame = assertIs<AppServerInboundFrame.DecodeFailure>(received.frame)
+        assertNull(frame.raw)
+        assertTrue(frame.diagnostic.contains("not a JSON object"))
+    }
+
+    @Test
+    fun redactCredentialsMasksSensitiveFieldsRecursivelyAndKeepsOthers() {
+        val element = AppServerProtocol.json.parseToJsonElement(
+            """
+            {
+              "token": "abc",
+              "name": "keep-me",
+              "nested": {"access_token": "xyz", "count": 3},
+              "items": [{"password": "p"}, {"api_key": "k"}]
+            }
+            """.trimIndent(),
+        )
+
+        val redacted = AppServerProtocol.redactCredentials(element).jsonObject
+        assertEquals("<redacted>", redacted["token"]?.jsonPrimitive?.content)
+        assertEquals("keep-me", redacted["name"]?.jsonPrimitive?.content)
+        assertEquals("<redacted>", redacted["nested"]?.jsonObject?.get("access_token")?.jsonPrimitive?.content)
+        assertEquals("3", redacted["nested"]?.jsonObject?.get("count")?.jsonPrimitive?.content)
+        assertEquals("<redacted>", redacted["items"]?.jsonArray?.get(0)?.jsonObject?.get("password")?.jsonPrimitive?.content)
+        assertEquals("<redacted>", redacted["items"]?.jsonArray?.get(1)?.jsonObject?.get("api_key")?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun decodeDiagnosticIsBoundedToMaxLength() {
+        val diagnostic = AppServerProtocol.decodeDiagnostic(
+            declaredType = "stream_delta",
+            reason = "x".repeat(2_000),
+        )
+        assertEquals(AppServerProtocol.MAX_DIAGNOSTIC_LENGTH, diagnostic.length)
+        assertTrue(diagnostic.endsWith("\u2026"))
+    }
+
+    @Test
+    fun unknownServerControlledTokenValueDoesNotFailKnownFrameDecoding() {
+        // loop_status.status is a server-controlled evolving token modeled as an
+        // open String, so a value the client has never seen must still decode.
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """
+                {
+                  "type": "update_loop_status",
+                  "runtime": {"agent_id": "agent-1", "conversation_id": "conv-1"},
+                  "event_seq": 7,
+                  "emitted_at": "2026-06-27T00:00:00Z",
+                  "idempotency_key": "evt-7",
+                  "loop_status": {"status": "SOME_FUTURE_STATUS", "active_run_ids": ["run-9"]}
+                }
+            """.trimIndent(),
+            channel = AppServerChannel.Stream,
+        )
+
+        val frame = assertIs<AppServerInboundFrame.UpdateLoopStatus>(received.frame)
+        assertEquals("SOME_FUTURE_STATUS", frame.loopStatus.status)
+        assertEquals(listOf("run-9"), frame.loopStatus.activeRunIds)
+    }
+
+    @Test
+    fun additiveKeysOnKnownFrameAreIgnored() {
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """{"type":"auth_response","request_id":"auth-1","success":true,"future_field":{"x":1}}""",
+            channel = AppServerChannel.Control,
+        )
+
+        val frame = assertIs<AppServerInboundFrame.AuthResponse>(received.frame)
+        assertEquals(true, frame.success)
+        // Additive key is ignored for typed decoding but preserved on the raw envelope.
+        assertEquals("1", received.raw["future_field"]?.jsonObject?.get("x")?.jsonPrimitive?.content)
     }
 
     private companion object {

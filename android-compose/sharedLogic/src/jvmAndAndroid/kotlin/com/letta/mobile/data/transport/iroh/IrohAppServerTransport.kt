@@ -513,21 +513,12 @@ class IrohAppServerTransport(
         return values
     }
 
+    // protocol.decodeFrame is total: malformed frames surface as
+    // AppServerInboundFrame.DecodeFailure (raw preserved, diagnostic bounded +
+    // credential-redacted) instead of throwing, so a bad frame never tears down
+    // the QUIC reader loop (letta-mobile-lgns8.4).
     private fun decodeFrame(rawText: String, channel: AppServerChannel): AppServerReceivedFrame =
-        runCatching {
-            protocol.decodeFrame(rawText, channel)
-        }.getOrElse { error ->
-            val raw = buildJsonObject {
-                put("type", "decode_error")
-                put("raw", rawText)
-                put("message", error.message ?: "Failed to decode App Server frame")
-            }
-            AppServerReceivedFrame(
-                channel = channel,
-                frame = AppServerInboundFrame.Unknown(type = "decode_error", raw = raw),
-                raw = raw,
-            )
-        }
+        protocol.decodeFrame(rawText, channel)
 
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
