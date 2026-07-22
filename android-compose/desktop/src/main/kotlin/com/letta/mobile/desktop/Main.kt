@@ -28,9 +28,31 @@ import kotlin.system.exitProcess
 fun main(args: Array<String>) {
     applyLinuxHiDpiScale()
     DesktopCrashReporter.installGlobalHandler()
+    initializeDesktopLifecycleMainThread()
     if (Platform.Current == Platform.Windows) WindowsJumpListManager.setProcessAppId()
     val activationHandler = DesktopWindowActivationHandler()
     runDesktopApplication(args, activationHandler)
+}
+
+/**
+ * Compose 1.11 can create its first architecture owner before Lifecycle has a
+ * usable Swing Main dispatcher. Lifecycle's discovery then uses
+ * runBlocking(Dispatchers.Main.immediate), which waits forever because no AWT
+ * event queue can service it yet. Use Lifecycle's own "dispatcher unavailable"
+ * fallback during bootstrap; Compose continues to own UI confinement on AWT.
+ *
+ * MainDispatcherChecker is internal Kotlin API, so reflection keeps this
+ * narrowly scoped and lets a future Lifecycle upgrade remove the workaround
+ * without exposing that implementation detail to the rest of the app.
+ */
+private fun initializeDesktopLifecycleMainThread() {
+    runCatching {
+        val checkerClass = Class.forName("androidx.lifecycle.MainDispatcherChecker")
+        checkerClass.getDeclaredField("isMainDispatcherAvailable").apply {
+            isAccessible = true
+            setBoolean(null, false)
+        }
+    }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
