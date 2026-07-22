@@ -115,21 +115,23 @@ private fun AgentScaffoldDrawerSheet(state: AgentScaffoldRuntimeState) {
                 closeDrawerAndRun(state) { params.viewModel.resetMessages() }
             },
             onRefreshContextWindow = state.projectBindings::refreshContextWindow,
-            onNavigateToAdmin = {
-                closeDrawerAndRun(state) { params.navigation.onNavigateToAdmin?.invoke() }
-            },
-            onNavigateToConversations = {
-                closeDrawerAndRun(state) { params.navigation.onNavigateToConversationList?.invoke() }
-            },
-            onNavigateToMemory = {
-                closeDrawerAndRun(state) { params.navigation.onNavigateToMemory?.invoke(state.agentIdValue) }
-            },
-            onNavigateToSchedules = {
-                closeDrawerAndRun(state) { params.navigation.onNavigateToSchedules?.invoke(state.agentIdValue) }
-            },
-            onNavigateToProjects = {
-                closeDrawerAndRun(state) { params.navigation.onNavigateToProjects?.invoke() }
-            },
+            navigation = DrawerNavigationCallbacks(
+                onNavigateToAdmin = {
+                    closeDrawerAndRun(state) { params.navigation.onNavigateToAdmin?.invoke() }
+                },
+                onNavigateToConversations = {
+                    closeDrawerAndRun(state) { params.navigation.onNavigateToConversationList?.invoke() }
+                },
+                onNavigateToMemory = {
+                    closeDrawerAndRun(state) { params.navigation.onNavigateToMemory?.invoke(state.agentIdValue) }
+                },
+                onNavigateToSchedules = {
+                    closeDrawerAndRun(state) { params.navigation.onNavigateToSchedules?.invoke(state.agentIdValue) }
+                },
+                onNavigateToProjects = {
+                    closeDrawerThenRun(state) { params.navigation.onNavigateToProjects?.invoke() }
+                },
+            ),
             onClose = { state.scope.launch { state.drawerState.close() } },
             modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_CONTENT),
         )
@@ -138,6 +140,20 @@ private fun AgentScaffoldDrawerSheet(state: AgentScaffoldRuntimeState) {
 
 private fun closeDrawerAndRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
     state.scope.launch { state.drawerState.close() }
+    action()
+}
+
+private fun closeDrawerThenRun(state: AgentScaffoldRuntimeState, action: () -> Unit) {
+    state.scope.launch {
+        closeDrawerThenRun(closeDrawer = state.drawerState::close, action = action)
+    }
+}
+
+internal suspend fun closeDrawerThenRun(
+    closeDrawer: suspend () -> Unit,
+    action: () -> Unit,
+) {
+    closeDrawer()
     action()
 }
 

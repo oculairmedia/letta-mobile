@@ -943,6 +943,14 @@ private fun buildModelSubtitle(model: LlmModel): String {
     return parts.joinToString(" · ")
 }
 
+internal data class DrawerNavigationCallbacks(
+    val onNavigateToAdmin: () -> Unit = {},
+    val onNavigateToConversations: () -> Unit = {},
+    val onNavigateToMemory: () -> Unit = {},
+    val onNavigateToSchedules: () -> Unit = {},
+    val onNavigateToProjects: () -> Unit = {},
+)
+
 @Composable
 internal fun DrawerContent(
     agentName: String,
@@ -960,11 +968,7 @@ internal fun DrawerContent(
     onEditAgent: () -> Unit,
     onResetMessages: () -> Unit = {},
     onRefreshContextWindow: () -> Unit,
-    onNavigateToAdmin: () -> Unit = {},
-    onNavigateToConversations: () -> Unit = {},
-    onNavigateToMemory: () -> Unit = {},
-    onNavigateToSchedules: () -> Unit = {},
-    onNavigateToProjects: () -> Unit = {},
+    navigation: DrawerNavigationCallbacks = DrawerNavigationCallbacks(),
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1105,55 +1109,9 @@ internal fun DrawerContent(
 
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
-        // Navigation items
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Chat, contentDescription = null) },
-            label = { Text(stringResource(R.string.common_conversations)) },
-            selected = false,
-            onClick = {
-                HapticEffects.segmentTick(haptic, view)
-                onNavigateToConversations()
-            },
-            colors = drawerItemColors,
-        )
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Psychology, contentDescription = null) },
-            label = { Text(stringResource(R.string.screen_drawer_memory)) },
-            selected = false,
-            onClick = {
-                HapticEffects.segmentTick(haptic, view)
-                onNavigateToMemory()
-            },
-            colors = drawerItemColors,
-        )
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.AccessTime, contentDescription = null) },
-            label = { Text(stringResource(R.string.screen_drawer_schedules)) },
-            selected = false,
-            onClick = {
-                HapticEffects.segmentTick(haptic, view)
-                onNavigateToSchedules()
-            },
-            colors = drawerItemColors,
-        )
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Apps, contentDescription = null) },
-            label = { Text(stringResource(R.string.screen_drawer_projects)) },
-            selected = false,
-            onClick = {
-                HapticEffects.segmentTick(haptic, view)
-                onNavigateToProjects()
-            },
-            colors = drawerItemColors,
-        )
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Settings, contentDescription = null) },
-            label = { Text(stringResource(R.string.screen_drawer_admin)) },
-            selected = false,
-            onClick = {
-                HapticEffects.segmentTick(haptic, view)
-                onNavigateToAdmin()
-            },
+        DrawerNavigationItems(
+            navigation = navigation,
+            onHapticClick = { HapticEffects.segmentTick(haptic, view) },
             colors = drawerItemColors,
         )
 
@@ -1240,6 +1198,33 @@ internal fun DrawerContent(
             text = agentId.take(12) + "\u2026",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun DrawerNavigationItems(
+    navigation: DrawerNavigationCallbacks,
+    onHapticClick: () -> Unit,
+    colors: androidx.compose.material3.NavigationDrawerItemColors,
+) {
+    val items = listOf(
+        Triple(LettaIcons.Chat, R.string.common_conversations, navigation.onNavigateToConversations),
+        Triple(LettaIcons.Psychology, R.string.screen_drawer_memory, navigation.onNavigateToMemory),
+        Triple(LettaIcons.AccessTime, R.string.screen_drawer_schedules, navigation.onNavigateToSchedules),
+        Triple(LettaIcons.Apps, R.string.screen_drawer_projects, navigation.onNavigateToProjects),
+        Triple(LettaIcons.Settings, R.string.screen_drawer_admin, navigation.onNavigateToAdmin),
+    )
+    items.forEach { (icon, label, onClick) ->
+        NavigationDrawerItem(
+            icon = { Icon(icon, contentDescription = null) },
+            label = { Text(stringResource(label)) },
+            selected = false,
+            onClick = {
+                onHapticClick()
+                onClick()
+            },
+            colors = colors,
         )
     }
 }
