@@ -1,7 +1,7 @@
 name: Agents Policy Check
 
-# Advisory semantic lint for greppable AGENTS.md rules (raw hex colors,
-# sharedLogic JVM APIs, platform Repository duplication, raw AlertDialog).
+# Advisory semantic lint for implemented greppable AGENTS.md rules: raw hex
+# colors, sharedLogic JVM APIs, and raw AlertDialog usage.
 # Findings never fail the job (continue-on-error); they surface in the
 # GitHub Actions job summary for PR review.
 

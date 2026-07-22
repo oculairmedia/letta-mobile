@@ -108,7 +108,7 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          tasks="$(./scripts/ci/changed-gradle-modules.sh origin/main || true)"
+          tasks="$(./scripts/ci/changed-gradle-modules.sh origin/main)"
           echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
           if [ -n "${tasks}" ]; then
             echo "Additive Gradle tasks: ${tasks}"
@@ -134,11 +134,11 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java 26
+      - name: Setup Java 21 for detekt
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 26
+          java-version: 21
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
