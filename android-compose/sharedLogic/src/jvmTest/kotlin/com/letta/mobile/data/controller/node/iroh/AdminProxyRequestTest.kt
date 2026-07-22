@@ -57,7 +57,7 @@ class AdminProxyRequestTest {
         }
 
         assertEquals(
-            "http://admin.local/v1/agents/agent-1/conversations?limit=25&after=cursor-2&archive_status=active&summary_search=needle&order=desc&order_by=created_at",
+            "http://admin.local/v1/conversations?agent_id=agent-1&limit=25&after=cursor-2&archive_status=active&summary_search=needle&order=desc&order_by=created_at",
             recording.calls.single().url,
         )
     }
