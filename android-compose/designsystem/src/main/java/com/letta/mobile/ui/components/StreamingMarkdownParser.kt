@@ -79,6 +79,9 @@ internal fun lineHasPipe(text: String, start: Int, end: Int): Boolean {
     return false
 }
 
+private fun consumeOptionalTrailingColon(text: String, start: Int, end: Int): Int =
+    if (start < end && text[start] == ':') start + 1 else start
+
 internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Boolean {
     val line = text.substring(start, end).trim()
     if (!line.contains('|')) return false
@@ -88,8 +91,11 @@ internal fun lineLooksLikeTableSeparator(text: String, start: Int, end: Int): Bo
 
 private fun isTableSeparatorCell(cell: String): Boolean {
     val trimmed = cell.trim()
-    val dashes = trimmed.removePrefix(":").removeSuffix(":")
-    return dashes.isNotEmpty() && dashes.all { it == '-' }
+    val dashStart = if (trimmed.startsWith(':')) 1 else 0
+    var dashEnd = dashStart
+    while (dashEnd < trimmed.length && trimmed[dashEnd] == '-') dashEnd++
+    val cellEnd = consumeOptionalTrailingColon(trimmed, dashEnd, trimmed.length)
+    return dashEnd > dashStart && cellEnd == trimmed.length
 }
 
 internal fun containsPipe(text: String, start: Int, end: Int): Boolean {
