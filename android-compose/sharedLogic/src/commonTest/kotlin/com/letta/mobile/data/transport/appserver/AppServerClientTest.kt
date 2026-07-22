@@ -17,7 +17,7 @@ class AppServerClientTest {
     @Test
     fun runtimeStartSendsTypedCommandAndCorrelatesControlResponse() = runTest {
         val transport = FakeAppServerTransport()
-        val client = DefaultAppServerClient(transport, requestTimeoutMs = 1_000)
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
 
         val response = backgroundScope.async {
             client.runtimeStart(
@@ -76,7 +76,7 @@ class AppServerClientTest {
     @Test
     fun duplicateResponseIsIgnoredAfterFirstCompletion() = runTest {
         val transport = FakeAppServerTransport()
-        val client = DefaultAppServerClient(transport, requestTimeoutMs = 1_000)
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
         val response = backgroundScope.async {
             client.sync(
                 AppServerCommand.Sync(
@@ -96,7 +96,7 @@ class AppServerClientTest {
     @Test
     fun clientMethodsSerializeCommandsToControlOnly() = runTest {
         val transport = FakeAppServerTransport()
-        val client = DefaultAppServerClient(transport, requestTimeoutMs = 1_000)
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
 
         client.input(
             AppServerCommand.Input(
@@ -122,7 +122,7 @@ class AppServerClientTest {
     @Test
     fun eventsMergeControlAndStreamFrames() = runTest {
         val transport = FakeAppServerTransport()
-        val client = DefaultAppServerClient(transport, requestTimeoutMs = 1_000)
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
 
         client.events.test {
             transport.emitControl(syncResponse(requestId = "sync-1", runtime = runtime))
