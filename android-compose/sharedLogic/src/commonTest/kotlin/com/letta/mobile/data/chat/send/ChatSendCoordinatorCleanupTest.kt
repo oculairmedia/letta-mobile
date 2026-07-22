@@ -267,6 +267,34 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun `old TurnDone before newly accepted send starts cannot finalize the new generation`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true, true)),
+            activeConversationId = { "conv-1" },
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.SubscribeDone("run-1", lastSeq = 1L, status = "completed"))
+        coordinator.send("second").join()
+
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        assertTrue(ui.isStreaming())
+        assertTrue(ui.isAgentTyping())
+        assertEquals(1, timeline.clearedActiveConversations.size)
+
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", "completed"))
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(2, timeline.clearedActiveConversations.size)
+    }
+
+    @Test
     fun `stale failed TurnDone for older turn cleans only the old run and keeps newer turn active`() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val ui = RecordingUiSink()

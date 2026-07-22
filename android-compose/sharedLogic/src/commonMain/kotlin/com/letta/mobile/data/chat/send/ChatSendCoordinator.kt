@@ -915,11 +915,8 @@ class ChatSendCoordinator(
      * the current turn, matching the SubscribeDone path), this returns false so
      * the terminal finalizes normally.
      */
-    private fun isStaleTerminalForOlderTurn(incomingTurnId: String): Boolean {
-        val active = activeWsTurnId ?: return false
-        if (incomingTurnId.isBlank()) return false
-        return incomingTurnId != active
-    }
+    private fun isStaleTerminalForOlderTurn(incomingTurnId: String): Boolean =
+        !turnIdentity.acceptsTerminal(incomingTurnId)
 
     private suspend fun finishActiveTurn(
         status: String,

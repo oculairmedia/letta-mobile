@@ -2,8 +2,10 @@ package com.letta.mobile.data.chat.send
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class TurnIdentityLifecycleTest {
     @Test
@@ -63,6 +65,20 @@ class TurnIdentityLifecycleTest {
         assertEquals(REPLACEMENT_RUN, replacement.identity.durableRunId)
         assertEquals(false, lifecycle.owns(old))
         assertEquals(true, lifecycle.owns(replacement.identity))
+    }
+
+    @Test
+    fun acceptedSendRejectsIdentifiedTerminalUntilItsTurnStarts() {
+        val lifecycle = lifecycleWithPromotedTurn()
+        lifecycle.acceptedSend(CONVERSATION)
+
+        assertFalse(lifecycle.acceptsTerminal(TURN))
+        assertFalse(lifecycle.acceptsTerminal(REPLACEMENT_TURN))
+        assertFalse(lifecycle.acceptsTerminal(""))
+
+        lifecycle.turnStarted(CONVERSATION, REPLACEMENT_TURN, REPLACEMENT_RUN)
+        assertFalse(lifecycle.acceptsTerminal(TURN))
+        assertTrue(lifecycle.acceptsTerminal(REPLACEMENT_TURN))
     }
 
     @Test

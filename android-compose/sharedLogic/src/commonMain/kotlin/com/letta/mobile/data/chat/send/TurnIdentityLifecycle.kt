@@ -57,6 +57,12 @@ internal class TurnIdentityLifecycle {
 
     fun owns(identity: ActiveTurnIdentity): Boolean = active == identity
 
+    fun acceptsTerminal(turnId: String): Boolean {
+        val current = active ?: return true
+        if (turnId.isBlank()) return current.turnId != null
+        return current.turnId == turnId
+    }
+
     fun clear() {
         active = null
     }
