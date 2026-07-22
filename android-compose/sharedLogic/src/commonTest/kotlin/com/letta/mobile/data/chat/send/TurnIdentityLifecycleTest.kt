@@ -84,6 +84,19 @@ class TurnIdentityLifecycleTest {
     }
 
     @Test
+    fun allSupersededTurnsRemainFencedAcrossAcceptedToStartGap() {
+        val lifecycle = lifecycleWithPromotedTurn()
+        lifecycle.turnStarted(CONVERSATION, REPLACEMENT_TURN, REPLACEMENT_RUN)
+        lifecycle.clear()
+        lifecycle.acceptedSend(CONVERSATION)
+
+        assertFalse(lifecycle.acceptsTerminal(TURN))
+        assertFalse(lifecycle.acceptsTerminal(REPLACEMENT_TURN))
+        assertTrue(lifecycle.acceptsTerminal("turn-3"))
+        assertTrue(lifecycle.acceptsTerminal(""))
+    }
+
+    @Test
     fun identifiedFailureBeforeAnyTurnStartedOwnsAcceptedSend() {
         val lifecycle = TurnIdentityLifecycle()
         lifecycle.acceptedSend(CONVERSATION)

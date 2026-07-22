@@ -337,6 +337,40 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     @Test
+    fun `superseded TurnDone after later completion cannot finalize third accepted send`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val coordinator = coordinator(
+                timeline = timeline,
+                ui = ui,
+                transport = FakeChannelTransport(mutableListOf(true)),
+                activeConversationId = { "conv-1" },
+            )
+
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", "completed"))
+            coordinator.send("third").join()
+            val thirdLocal = timeline.externalLocals.single()
+            val clearsBeforeDelayedTerminal = timeline.clearedActiveConversations.size
+
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+
+            assertTrue(ui.isStreaming())
+            assertTrue(ui.isAgentTyping())
+            assertEquals(clearsBeforeDelayedTerminal, timeline.clearedActiveConversations.size)
+            assertTrue(timeline.sentLocals.none { it.otid == thirdLocal.otid })
+            assertTrue(timeline.failedLocals.none { it.otid == thirdLocal.otid })
+
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-3", AGENT_ID, "conv-1", "run-3"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-3", "run-3", "completed"))
+            assertFalse(ui.isStreaming())
+            assertFalse(ui.isAgentTyping())
+            assertTrue(timeline.sentLocals.any { it.otid == thirdLocal.otid })
+        }
+
+    @Test
     fun `stale failed TurnDone for older turn cleans only the old run and keeps newer turn active`() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
         val ui = RecordingUiSink()

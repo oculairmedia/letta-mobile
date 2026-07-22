@@ -27,15 +27,15 @@ internal sealed interface TurnIdentityTransition {
  * Owns turn identity independently from UI and transport cleanup state.
  *
  * Sends and transport events run on separate coroutines, so every lifecycle read and transition is
- * serialized by [lock]. The last identified turn survives [clear] as a terminal fence: while an
- * accepted send is waiting for `TurnStarted`, its immediate identified or blank failure owns the new
- * generation, but a delayed terminal for the previous turn does not.
+ * serialized by [lock]. Identified turns survive replacement and [clear] as terminal fences: while
+ * an accepted send is waiting for `TurnStarted`, its immediate new identified or blank failure owns
+ * the new generation, but a delayed terminal for any superseded turn does not.
  */
 internal class TurnIdentityLifecycle {
     private val lock = SynchronizedObject()
     private var current: ActiveTurnIdentity? = null
     private var generation: Long = 0L
-    private var terminalFenceTurnId: String? = null
+    private val terminalFenceTurnIds = mutableSetOf<String>()
 
     val active: ActiveTurnIdentity?
         get() = synchronized(lock) { current }
@@ -74,14 +74,15 @@ internal class TurnIdentityLifecycle {
                     !runId.startsWith(SYNTHETIC_RUN_PREFIX)
                 val updated = ActiveTurnIdentity(conversationId, turnId, runId, previous.generation)
                 current = updated
-                terminalFenceTurnId = turnId
+                terminalFenceTurnIds += turnId
                 return@synchronized TurnIdentityTransition.SameTurn(updated, promoted)
             }
 
+            previous?.turnId?.let(terminalFenceTurnIds::add)
             generation += 1L
             val replacement = ActiveTurnIdentity(conversationId, turnId, runId, generation)
             current = replacement
-            terminalFenceTurnId = turnId
+            terminalFenceTurnIds += turnId
             if (previous == null) {
                 TurnIdentityTransition.Accepted(replacement)
             } else {
@@ -97,12 +98,12 @@ internal class TurnIdentityLifecycle {
             current == null -> true
             activeTurnId != null -> turnId.isNotBlank() && turnId == activeTurnId
             turnId.isBlank() -> true
-            else -> turnId != terminalFenceTurnId
+            else -> turnId !in terminalFenceTurnIds
         }
     }
 
     fun clear() = synchronized(lock) {
-        current?.turnId?.let { terminalFenceTurnId = it }
+        current?.turnId?.let(terminalFenceTurnIds::add)
         current = null
     }
 }
