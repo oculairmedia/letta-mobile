@@ -435,6 +435,21 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   emulation-speed artifacts, not app bugs. `adb exec-out screencap -p > out.png` is the most
   reliable way to capture the app's screen.
 
+### Beads (`bd`) issue tracker on this VM
+
+- `bd` **v1.0.4** is installed at `/usr/local/bin/bd` (provisioned in the snapshot). If missing on a
+  fresh VM, reinstall from the GitHub release
+  (`steveyegge/beads` → `beads_1.0.4_linux_amd64.tar.gz`) into `/usr/local/bin`.
+- On a fresh clone/VM, sync the embedded Dolt DB once with `bd bootstrap --yes` (pulls from the git
+  remote `git+https://github.com/oculairmedia/letta-mobile.git`; no separate `dolt` binary needed).
+  Verify with `bd ping`. `bd dolt pull` / `bd dolt push` work against the DoltHub federation remote
+  (`doltremoteapi.dolthub.com/oulair/letta_mobile`) using the existing GitHub/Dolt credentials.
+- Recommended local config (silences warnings): `chmod 700 .beads` and
+  `git config beads.role maintainer`. `.beads/issues.jsonl` is gitignored — never edit `.beads`
+  files directly; use `bd` commands. Pull before tracker mutations and push afterward.
+- The canonical epic is `letta-mobile-lgns8` (paused until explicitly resumed — do not claim/work its
+  children until authorized). Use isolated git worktrees for code changes when it resumes.
+
 ### Persisting the desktop backend config (without committing the URL)
 
 - On **Save**, the desktop client writes its config to `~/.letta-mobile/desktop-settings.properties`
