@@ -78,6 +78,28 @@ class ChatSendCoordinatorCleanupTest {
         }
 
     @Test
+    fun `accepted send adopts new turn when coordinator still holds stale turn id`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+            val recorded = mutableListOf<WsTimelineEvent>()
+            val coordinator = coordinator(timeline, ui, transport, recordRuntimeEvent = { event, _ -> recorded += event })
+
+            coordinator.send("first").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-old", AGENT_ID, "conv-1", "run-old"))
+            coordinator.send("second").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-new", AGENT_ID, "conv-1", "run-new"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-new", "run-new", "completed"))
+            advanceUntilIdle()
+
+            assertTrue(recorded.contains(WsTimelineEvent.TurnStarted("turn-new", AGENT_ID, "conv-1", "run-new")))
+            assertTrue(recorded.contains(WsTimelineEvent.TurnDone("turn-new", "run-new", "completed")))
+            assertFalse(ui.isStreaming())
+            assertFalse(ui.isAgentTyping())
+        }
+
+    @Test
     fun `next send does not clear presence while transport still owns active turn`() =
         runTest(UnconfinedTestDispatcher()) {
             val timeline = RecordingTimelineWriter()
@@ -243,6 +265,110 @@ class ChatSendCoordinatorCleanupTest {
         // clear (finishActiveTurn would have cleared it).
         assertTrue(timeline.clearedActiveConversations.isEmpty())
     }
+
+    @Test
+    fun `identified failed TurnDone before TurnStarted finalizes accepted send`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.Error("busy", "Send rejected", "conv-1", "turn-failed", "run-failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-failed", "run-failed", "failed"))
+
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", timeline.externalLocals.single().otid)), timeline.failedLocals)
+        assertEquals("Send rejected", ui.currentError())
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+    }
+
+    @Test
+    fun `blank failed TurnDone before TurnStarted finalizes accepted send`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true)),
+            activeConversationId = { "conv-1" },
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.Error("busy", "", "conv-1", null, null))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("", "", "failed"))
+
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", timeline.externalLocals.single().otid)), timeline.failedLocals)
+        assertEquals("busy", ui.currentError())
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+    }
+
+    @Test
+    fun `old TurnDone before newly accepted send starts cannot finalize the new generation`() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = FakeChannelTransport(mutableListOf(true, true)),
+            activeConversationId = { "conv-1" },
+        )
+
+        coordinator.send("first").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(WsTimelineEvent.SubscribeDone("run-1", lastSeq = 1L, status = "completed"))
+        coordinator.send("second").join()
+
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        assertTrue(ui.isStreaming())
+        assertTrue(ui.isAgentTyping())
+        assertEquals(1, timeline.clearedActiveConversations.size)
+
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", "completed"))
+        assertFalse(ui.isStreaming())
+        assertFalse(ui.isAgentTyping())
+        assertEquals(2, timeline.clearedActiveConversations.size)
+    }
+
+    @Test
+    fun `superseded TurnDone after later completion cannot finalize third accepted send`() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val coordinator = coordinator(
+                timeline = timeline,
+                ui = ui,
+                transport = FakeChannelTransport(mutableListOf(true)),
+                activeConversationId = { "conv-1" },
+            )
+
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", "completed"))
+            coordinator.send("third").join()
+            val thirdLocal = timeline.externalLocals.single()
+            val clearsBeforeDelayedTerminal = timeline.clearedActiveConversations.size
+
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+
+            assertTrue(ui.isStreaming())
+            assertTrue(ui.isAgentTyping())
+            assertEquals(clearsBeforeDelayedTerminal, timeline.clearedActiveConversations.size)
+            assertTrue(timeline.sentLocals.none { it.otid == thirdLocal.otid })
+            assertTrue(timeline.failedLocals.none { it.otid == thirdLocal.otid })
+
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-3", AGENT_ID, "conv-1", "run-3"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-3", "run-3", "completed"))
+            assertFalse(ui.isStreaming())
+            assertFalse(ui.isAgentTyping())
+            assertTrue(timeline.sentLocals.any { it.otid == thirdLocal.otid })
+        }
 
     @Test
     fun `stale failed TurnDone for older turn cleans only the old run and keeps newer turn active`() = runTest(UnconfinedTestDispatcher()) {

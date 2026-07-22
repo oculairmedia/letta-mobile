@@ -380,11 +380,26 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 
 - JDK 26 (Temurin, CI parity + desktop runtime): `/usr/lib/jvm/jdk-26`. JDK 21 also exists at
   `/usr/lib/jvm/java-21-openjdk-amd64` (needed by detekt — see below).
+- JDK 17 (Temurin): `/usr/lib/jvm/jdk-17`. Some modules request a **Java 17 toolchain** via Gradle
+  toolchain resolution; without a discoverable JDK 17 the build fails with "Cannot find a Java
+  installation … matching {languageVersion=17}". CI's GitHub runners ship JDK 17 by default; this VM
+  needs it installed (Gradle auto-detects it under `/usr/lib/jvm`).
 - Android SDK: `$HOME/Android/Sdk` (platform 36, build-tools 36, platform-tools).
 - `JAVA_HOME`, `ANDROID_HOME`, and `PATH` are exported for interactive shells from `~/.bashrc`.
   Non-interactive scripts should set `JAVA_HOME=/usr/lib/jvm/jdk-26` explicitly.
 - `android-compose/local.properties` (`sdk.dir=…`, gitignored) is auto-created by the startup
   update script; recreate it if missing.
+
+### App Server contract / probe toolchain (epic letta-mobile-lgns8)
+
+- For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
+  `~/.nvm/versions/node/v24.18.0/bin/node`) and **`@letta-ai/letta-code@0.28.8`**
+  (`~/letta-code-install/node_modules/@letta-ai/letta-code`) are provisioned in the snapshot.
+- The contract verifier pins the exact Node + package versions, so run it with Node 24.18.0:
+  `node scripts/appserver/verify-contract-baseline.mjs --package-root ~/letta-code-install/node_modules/@letta-ai/letta-code`.
+- Launch the local App Server for probes with
+  `node <package-root>/letta.js app-server --listen ws://127.0.0.1:4500` (capability-detect the
+  newer `letta server --backend local --listen` syntax where supported).
 
 ### Running the app on this VM
 
@@ -434,6 +449,27 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
   dialogs during startup — tap **Wait** (or `adb shell input tap`) and give it time; these are
   emulation-speed artifacts, not app bugs. `adb exec-out screencap -p > out.png` is the most
   reliable way to capture the app's screen.
+
+### Beads (`bd`) issue tracker on this VM
+
+- `bd` **v1.1.0** is installed at `/usr/local/bin/bd` (provisioned in the snapshot; matches the
+  remote's migrated schema **v53**). If missing on a fresh VM, reinstall from the GitHub release
+  (`steveyegge/beads` → `beads_1.1.0_linux_amd64.tar.gz`) into `/usr/local/bin`.
+- On a fresh clone/VM, sync the embedded Dolt DB once with `bd bootstrap --yes` (pulls from the git
+  remote `git+https://github.com/oculairmedia/letta-mobile.git`; no separate `dolt` binary needed).
+  Verify with `bd ping`. `bd dolt pull` / `bd dolt push` work against the DoltHub federation remote
+  (`doltremoteapi.dolthub.com/oulair/letta_mobile`) using the existing GitHub/Dolt credentials.
+- **Schema migrations**: the designated migrator (Emmanuel) runs `bd migrate`/`bd dolt push`; every
+  other clone (Cursor included) only runs `bd bootstrap` to sync — never migrate here (it forks the
+  shared schema). If `bd ping` warns the schema is behind and `bd bootstrap --yes` errors with
+  "can't create database beads; database exists", move the stale local DB aside
+  (`mv .beads/embeddeddolt /tmp/embeddeddolt.bak`) and re-run `bd bootstrap --yes` to re-clone the
+  migrated schema. This is safe only when the clone has no unpushed tracker changes.
+- Recommended local config (silences warnings): `chmod 700 .beads` and
+  `git config beads.role maintainer`. `.beads/issues.jsonl` is gitignored — never edit `.beads`
+  files directly; use `bd` commands. Pull before tracker mutations and push afterward.
+- The canonical epic is `letta-mobile-lgns8` (paused until explicitly resumed — do not claim/work its
+  children until authorized). Use isolated git worktrees for code changes when it resumes.
 
 ### Persisting the desktop backend config (without committing the URL)
 
