@@ -58,6 +58,23 @@ internal data class DesktopNucleusEffectActions(
     val onOpenSettings: () -> Unit,
 )
 
+internal fun desktopNucleusEffectState(
+    thinkingConversationId: String?,
+    isStreamingReply: Boolean,
+    agentName: String,
+    errorMessage: String?,
+): DesktopNucleusEffectState = DesktopNucleusEffectState(
+    isAgentWorking = hasActiveAgentWork(thinkingConversationId, isStreamingReply),
+    agentName = agentName,
+    errorMessage = errorMessage,
+)
+
+private data class AgentCompletionBindings(
+    val window: Window,
+    val controller: DesktopNucleusController,
+    val onActivate: () -> Unit,
+)
+
 @Composable
 internal fun DesktopNucleusEffects(
     bindings: DesktopNucleusEffectBindings,
@@ -86,7 +103,10 @@ internal fun DesktopNucleusEffects(
         actions = actions,
     )
     AgentWorkEffect(window, state)
-    AgentCompletionEffect(window, bindings.controller, state, activate)
+    AgentCompletionEffect(
+        bindings = AgentCompletionBindings(window, bindings.controller, activate),
+        state = state,
+    )
     AgentFailureEffect(window, bindings.controller, state.errorMessage, activate)
 }
 
@@ -136,22 +156,35 @@ private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
 
 @Composable
 private fun AgentCompletionEffect(
-    window: Window,
-    controller: DesktopNucleusController,
+    bindings: AgentCompletionBindings,
     state: DesktopNucleusEffectState,
-    onActivate: () -> Unit,
 ) {
     var wasWorking by remember { mutableStateOf(false) }
     LaunchedEffect(state.isAgentWorking) {
-        if (wasWorking && !state.isAgentWorking && !window.isFocused) {
-            controller.notifyAgentFinished(state.agentName, onActivate)
-            TaskbarProgress.requestAttention(window)
-            if (Platform.Current == Platform.Windows && WindowsBadgeManager.isAvailable) {
-                WindowsBadgeManager.setCount(1)
-            }
+        if (shouldNotifyCompletion(wasWorking, state.isAgentWorking, bindings.window.isFocused)) {
+            bindings.controller.notifyAgentFinished(state.agentName, bindings.onActivate)
+            TaskbarProgress.requestAttention(bindings.window)
+            setWindowsCompletionBadge()
         }
         wasWorking = state.isAgentWorking
     }
+}
+
+private fun hasActiveAgentWork(thinkingConversationId: String?, isStreamingReply: Boolean): Boolean {
+    if (thinkingConversationId != null) return true
+    return isStreamingReply
+}
+
+private fun shouldNotifyCompletion(wasWorking: Boolean, isWorking: Boolean, isWindowFocused: Boolean): Boolean {
+    if (!wasWorking) return false
+    if (isWorking) return false
+    return !isWindowFocused
+}
+
+private fun setWindowsCompletionBadge() {
+    if (Platform.Current != Platform.Windows) return
+    if (!WindowsBadgeManager.isAvailable) return
+    WindowsBadgeManager.setCount(1)
 }
 
 @Composable

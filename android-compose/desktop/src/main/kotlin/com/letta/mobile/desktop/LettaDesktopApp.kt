@@ -273,8 +273,9 @@ fun LettaDesktopApp(
 
     DesktopNucleusEffects(
         bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
-        state = DesktopNucleusEffectState(
-            isAgentWorking = thinkingConversationId != null || replyPresence.isStreaming,
+        state = desktopNucleusEffectState(
+            thinkingConversationId = thinkingConversationId,
+            isStreamingReply = replyPresence.isStreaming,
             agentName = selectedAgentName,
             errorMessage = chatState.errorMessage,
         ),
