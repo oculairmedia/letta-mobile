@@ -981,7 +981,7 @@ val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAss
               // IP literals need no DNS — resolving them through the bridge adds
               // an HTTP round-trip per request (e.g. every call to a LAN provider
               // like 192.168.50.90). Short-circuit them locally.
-              const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}${'$'}/;
+              const IPV4_RE = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
               function bridgeLookup(hostname, options, callback) {
                 if (typeof options === 'function') { callback = options; options = {}; }
                 const wantsAll = options && options.all === true;
@@ -1537,8 +1537,8 @@ tasks.register<Test>("testScreenshot") {
     testClassesDirs = testTask.testClassesDirs
     classpath = testTask.classpath
     maxHeapSize = testTask.maxHeapSize
-    jvmArgs(testTask.jvmArgs.orEmpty())
-    setForkEvery(1L)
+    jvmArgs(testTask.jvmArgs)
+    forkEvery = 1L
 
     useJUnitPlatform {
         includeEngines("junit-vintage")

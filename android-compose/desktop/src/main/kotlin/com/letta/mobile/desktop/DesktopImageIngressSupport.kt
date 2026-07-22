@@ -127,10 +127,8 @@ internal fun createWindowOpenedDropTargetInstaller(
     target: DropTargetAdapter,
     installed: java.util.WeakHashMap<Component, DropTarget?>,
 ): java.awt.event.AWTEventListener =
-    object : java.awt.event.AWTEventListener {
-        override fun eventDispatched(event: java.awt.AWTEvent) {
-            if (event is WindowEvent && event.id == WindowEvent.WINDOW_OPENED) {
-                (event.window as? Window)?.let { installDropTargetOnComponentTree(it, target, installed) }
-            }
+    java.awt.event.AWTEventListener { event ->
+        if (event is WindowEvent && event.id == WindowEvent.WINDOW_OPENED) {
+            (event.window as? Window)?.let { installDropTargetOnComponentTree(it, target, installed) }
         }
     }

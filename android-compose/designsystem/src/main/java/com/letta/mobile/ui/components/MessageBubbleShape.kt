@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import com.letta.mobile.ui.common.GroupPosition
 
-private val SMALL_RADIUS_RATIO = 0.25f
+private const val SMALL_RADIUS_RATIO = 0.25f
 
 class MessageBubbleShape(
     private val radius: Dp,

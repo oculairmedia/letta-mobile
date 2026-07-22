@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toBackendLabel
 import com.letta.mobile.data.repository.api.IAgentRepository
@@ -61,12 +62,10 @@ import com.letta.mobile.feature.chat.coordination.AdminChatSlashCommandsCoordina
 import com.letta.mobile.feature.chat.coordination.AdminChatTransportCoordinator
 import com.letta.mobile.feature.chat.coordination.AdminChatTruncatedToolReturnCoordinator
 import com.letta.mobile.data.model.AgentRuntimeBinding
-import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.feature.chat.subagent.SelfTodoSource
 import com.letta.mobile.feature.chat.subagent.WsSelfTodoSource
-import android.os.SystemClock
 import com.letta.mobile.feature.chat.coordination.ChatApprovalController
 import com.letta.mobile.feature.chat.coordination.ChatApprovalCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
@@ -89,8 +88,6 @@ import com.letta.mobile.ui.chat.render.toConversationState
 import com.letta.mobile.ui.chat.render.ProjectChatContext
 import com.letta.mobile.data.chat.runtime.ChatSessionState
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
-
-
 
 internal fun resolveLocalRuntimeRouting(
     agent: Agent?,
@@ -135,7 +132,6 @@ internal class AdminChatViewModel @Inject constructor(
 ) : ViewModel() {
     companion object {
         private const val RESUME_CACHE_MAX_AGE_MS = 60_000L
-        private const val TAG = "AdminChatViewModel"
     }
 
     val agentId: AgentId = AgentId(routeArgs.agentId)
@@ -388,11 +384,6 @@ internal class AdminChatViewModel @Inject constructor(
     }
 
     val composerState: StateFlow<ChatComposerState> by lazy { composerCoordinator.state }
-    val inputText: StateFlow<String> by lazy {
-        composerState
-            .map { it.inputText }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, "")
-    }
 
     val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
         .map { ChatBackground.fromKey(it) }
@@ -461,12 +452,6 @@ internal class AdminChatViewModel @Inject constructor(
 
     fun clearChatSearch() = chatSearchCoordinator.clear()
 
-    fun setChatBackground(background: ChatBackground) {
-        viewModelScope.launch {
-            settingsRepository.setChatBackgroundKey(background.key)
-        }
-    }
-
     fun setChatFontScale(scale: Float) {
         viewModelScope.launch {
             settingsRepository.setChatFontScale(scale)
@@ -531,9 +516,7 @@ internal class AdminChatViewModel @Inject constructor(
         updateSessionState = ::updateSessionState,
         pendingClientModeBootstrapMessages = { persistentListOf() },
         setPendingClientModeBootstrapUserMessage = { },
-        clearPendingClientModeBootstrapUserMessage = { },
         currentClientModeConversationId = { null },
-        setClientModeConversationId = { },
         startTimelineObserver = ::startTimelineObserver,
         stopTimelineObserver = ::stopTimelineObserver,
         reconcileRecentMessages = { convId, reason ->
@@ -699,8 +682,6 @@ internal class AdminChatViewModel @Inject constructor(
         }
     }
 
-    fun updateInputText(text: String) = composerCoordinator.updateInputText(text)
-
     val canSendMessages: Boolean
         get() = ChatSessionReducer.canSend(_sessionState.value)
 
@@ -711,17 +692,16 @@ internal class AdminChatViewModel @Inject constructor(
     override fun onCleared() {
         adminChatA2uiCoordinator.release()
         screenLifecycleCoordinator.onCleared()
-        super.onCleared()
     }
 
     // --- Composer coordination delegates ---
     fun handleComposerTextChanged(newText: String): ChatComposerEffect? =
         composerCoordinator.handleComposerTextChanged(newText)
 
-    fun selectSlashCommand(command: com.letta.mobile.data.model.SlashCommand) =
+    fun selectSlashCommand(command: SlashCommand) =
         slashCommandsCoordinator.selectSlashCommand(command)
 
-    fun uninstallSlashCommand(command: com.letta.mobile.data.model.SlashCommand) =
+    fun uninstallSlashCommand(command: SlashCommand) =
         slashCommandsCoordinator.uninstallSlashCommand(command)
 
     fun submitComposer(text: String = composerCoordinator.state.value.inputText): ChatComposerEffect? =
@@ -745,6 +725,4 @@ internal class AdminChatViewModel @Inject constructor(
     fun submitA2uiAction(action: A2uiAction) = adminChatA2uiCoordinator.submitA2uiAction(action)
 
     fun markA2uiActionSnackbarShown(id: Long) = adminChatA2uiCoordinator.markA2uiActionSnackbarShown(id)
-
-    fun markA2uiThinkingDelayMessageShown() = adminChatA2uiCoordinator.markA2uiThinkingDelayMessageShown()
 }

@@ -67,9 +67,6 @@ class NavViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.clearAllData() }
     }
 
-    fun setActiveConfig(configId: String) {
-        viewModelScope.launch { settingsRepository.setActiveConfigId(configId) }
-    }
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)

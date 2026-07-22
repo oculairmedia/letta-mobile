@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.view.View
+import androidx.core.graphics.createBitmap
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -51,7 +52,7 @@ class AndroidScreenCaptureProvider @Inject constructor(
         val scale = minOf(1f, maxDimension.toFloat() / maxOf(width, height).toFloat())
         val outputWidth = (width * scale).toInt().coerceAtLeast(1)
         val outputHeight = (height * scale).toInt().coerceAtLeast(1)
-        val bitmap = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(outputWidth, outputHeight)
         val canvas = Canvas(bitmap)
         canvas.scale(scale, scale)
         root.draw(canvas)

@@ -231,9 +231,9 @@ object IrohProbeAssertions {
                         }
                     }
                     else -> {
-                        turn.assistantFinalTextLengths
-                            .filter { it in 1..2 }
-                            .forEach { add("orphan_fragment:$prefix") }
+                        repeat(turn.assistantFinalTextLengths.count { it in 1..2 }) {
+                            add("orphan_fragment:$prefix")
+                        }
                         if (!turn.dialSucceeded) add("$prefix:dial_failed")
                         if (turn.turn == 2 && !turn.dialSucceeded) add("accept_wedge:turn2_dial_failed")
                         if (turn.timedOut) add("$prefix:timeout_missing_terminal")

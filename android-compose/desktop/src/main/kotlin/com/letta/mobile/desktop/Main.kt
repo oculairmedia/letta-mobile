@@ -38,7 +38,7 @@ private fun runDesktopApplication(
     singleInstance: DesktopSingleInstance.Primary,
     activationHandler: DesktopWindowActivationHandler,
 ) {
-    try {
+    singleInstance.use {
         application {
             var windowTitle by remember { mutableStateOf("Letta Desktop") }
             CompositionLocalProvider(
@@ -59,8 +59,6 @@ private fun runDesktopApplication(
                 }
             }
         }
-    } finally {
-        singleInstance.close()
     }
 }
 

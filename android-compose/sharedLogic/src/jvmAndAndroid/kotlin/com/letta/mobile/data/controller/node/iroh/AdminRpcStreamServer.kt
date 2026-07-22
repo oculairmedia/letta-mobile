@@ -64,7 +64,7 @@ internal class AdminRpcStreamServer(
     private val router: AdminRpcRouter,
     private val authenticated: AtomicBoolean,
     private val remoteEndpointId: String = "",
-    private val maxActiveHandlers: Int = DEFAULT_MAX_ACTIVE_HANDLERS,
+    maxActiveHandlers: Int = DEFAULT_MAX_ACTIVE_HANDLERS,
     private val firstFrameTimeoutMs: Long = DEFAULT_FIRST_FRAME_TIMEOUT_MS,
     private val maxFrameBytes: Int = IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES,
     /**

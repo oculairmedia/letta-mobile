@@ -134,8 +134,7 @@ object OnDeviceToolCallProtocol {
     private fun imageFromContentPart(part: JsonElement): OnDeviceImage? {
         val item = part as? JsonObject ?: return null
         if (item.stringField("type") != "image_url") return null
-        val imageUrl = item["image_url"]
-        val url = when (imageUrl) {
+        val url = when (val imageUrl = item["image_url"]) {
             is JsonPrimitive -> imageUrl.contentOrNull
             is JsonObject -> imageUrl.stringField("url")
             else -> null

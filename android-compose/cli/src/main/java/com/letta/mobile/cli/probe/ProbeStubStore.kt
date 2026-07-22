@@ -100,25 +100,29 @@ class ProbeStubAdminServer(private val store: ProbeStubStore, port: Int = 0) : A
         val query = parseQuery(exchange.requestURI.rawQuery)
         val segments = path.split('/').filter { it.isNotEmpty() }
         try {
-            when {
-                exchange.requestMethod == "GET" && segments == listOf("v1", "conversations") ->
-                    respond(exchange, 200, conversationsJson())
+            when (exchange.requestMethod) {
+                "GET" -> when {
+                    segments == listOf("v1", "conversations") ->
+                        respond(exchange, 200, conversationsJson())
 
-                exchange.requestMethod == "GET" && segments.size == 4 &&
-                    segments[0] == "v1" && segments[1] == "conversations" && segments[3] == "messages" ->
-                    respond(exchange, 200, messagesJson(segments[2], query))
+                    segments.size == 4 &&
+                        segments[0] == "v1" && segments[1] == "conversations" && segments[3] == "messages" ->
+                        respond(exchange, 200, messagesJson(segments[2], query))
 
-                exchange.requestMethod == "GET" && segments.size == 5 &&
-                    segments[0] == "v1" && segments[1] == "conversations" && segments[3] == "messages" ->
-                    respond(exchange, 200, messageJson(segments[2], segments[4]))
+                    segments.size == 5 &&
+                        segments[0] == "v1" && segments[1] == "conversations" && segments[3] == "messages" ->
+                        respond(exchange, 200, messageJson(segments[2], segments[4]))
 
-                exchange.requestMethod == "GET" && segments.size == 3 &&
-                    segments[0] == "v1" && segments[1] == "runs" ->
-                    respond(exchange, 200, runJson(segments[2]))
+                    segments.size == 3 &&
+                        segments[0] == "v1" && segments[1] == "runs" ->
+                        respond(exchange, 200, runJson(segments[2]))
 
-                exchange.requestMethod == "POST" && segments == listOf("probe", "seed") ->
-                    respond(exchange, 200, seedJson(exchange))
-
+                    else -> respond(exchange, 404, """{"error":"not found: ${exchange.requestMethod} $path"}""")
+                }
+                "POST" -> when {
+                    segments == listOf("probe", "seed") -> respond(exchange, 200, seedJson(exchange))
+                    else -> respond(exchange, 404, """{"error":"not found: ${exchange.requestMethod} $path"}""")
+                }
                 else -> respond(exchange, 404, """{"error":"not found: ${exchange.requestMethod} $path"}""")
             }
         } catch (error: Exception) {
@@ -175,7 +179,8 @@ class ProbeStubAdminServer(private val store: ProbeStubStore, port: Int = 0) : A
     private fun parseQuery(rawQuery: String?): Map<String, String> =
         rawQuery.orEmpty().split('&').filter { it.contains('=') }.associate { pair ->
             val (key, value) = pair.split('=', limit = 2)
-            java.net.URLDecoder.decode(key, Charsets.UTF_8) to java.net.URLDecoder.decode(value, Charsets.UTF_8)
+            java.net.URLDecoder.decode(key, Charsets.UTF_8.name()) to
+                java.net.URLDecoder.decode(value, Charsets.UTF_8.name())
         }
 
     private fun respond(exchange: HttpExchange, status: Int, body: String) {
@@ -185,11 +190,4 @@ class ProbeStubAdminServer(private val store: ProbeStubStore, port: Int = 0) : A
         exchange.responseBody.use { it.write(bytes) }
     }
 
-    private inline fun HttpExchange.use(block: (HttpExchange) -> Unit) {
-        try {
-            block(this)
-        } finally {
-            close()
-        }
-    }
 }

@@ -13,8 +13,8 @@ import java.net.URL
 import java.net.URLEncoder
 
 class AdminProxyHttpException(
-    val statusCode: Int,
-    val bodyText: String,
+    statusCode: Int,
+    bodyText: String,
 ) : RuntimeException("HTTP $statusCode: $bodyText")
 
 data class AdminProxyResponse(

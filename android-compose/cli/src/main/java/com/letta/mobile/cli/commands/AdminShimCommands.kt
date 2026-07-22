@@ -31,9 +31,9 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.WsChatBridge
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -241,7 +241,7 @@ internal class CaptureCommand : AdminShimCommand(
             attachments = emptyList(),
             runId = runId,
             cursor = cursor,
-            out = Path.of(out),
+            out = Paths.get(out),
             timeoutMs = timeoutMs,
             deviceId = deviceId,
             clientVersion = clientVersion,
@@ -351,7 +351,7 @@ internal class ReplayCommand : AdminShimCommand(
             validateResumeAssertions(assertionOptions)
             val conversationId = requireConversationId(conversation)
             ReplayInteractiveShell(
-                recording = Path.of(recording),
+                recording = Paths.get(recording),
                 conversationId = conversationId,
                 defaultAssertionOptions = assertionOptions,
             ).run()
@@ -365,7 +365,7 @@ internal class ReplayCommand : AdminShimCommand(
             }
             val result = HeadlessTimelineReplayer().bisectFailingJsonl(
                 conversationId = conversationId,
-                lines = Files.readAllLines(Path.of(recording)),
+                lines = Files.readAllLines(Paths.get(recording)),
                 assertionOptions = assertionOptions,
             )
             if (result.fullReplayPassed) {
@@ -381,7 +381,7 @@ internal class ReplayCommand : AdminShimCommand(
             println("[bisect] failures:")
             result.finalFailures.forEach { println("[bisect] FAIL $it") }
             bisectOut?.let { path ->
-                Files.write(Path.of(path), result.keptLines)
+                Files.write(Paths.get(path), result.keptLines)
                 println("[bisect] wrote minimized fixture to $path")
             }
             return@runBlocking
@@ -391,7 +391,7 @@ internal class ReplayCommand : AdminShimCommand(
             dumpAfterFrame = dumpAfterFrame.validatedNonNegativeOrNull("--dump-after-frame"),
             dumpFrames = dumpFrames.parseFrameSet(),
         )
-        val result = Files.newBufferedReader(Path.of(recording)).use { reader ->
+        val result = Files.newBufferedReader(Paths.get(recording)).use { reader ->
             HeadlessTimelineReplayer().replayJsonl(
                 conversationId = conversationId,
                 lines = reader.lineSequence(),
@@ -471,7 +471,7 @@ internal class RecordCommand : AdminShimCommand(
             attachments = attachments,
             runId = runId,
             cursor = cursor,
-            out = Path.of(out),
+            out = Paths.get(out),
             timeoutMs = timeoutMs,
             deviceId = deviceId,
             clientVersion = clientVersion,
@@ -484,7 +484,7 @@ internal class RecordCursorStateCommand : CliktCommand(name = "record-cursor-sta
     private val recording by option("--recording").required()
 
     override fun run() {
-        val output = buildCursorStateSnapshot(Files.readAllLines(Path.of(recording)))
+        val output = buildCursorStateSnapshot(Files.readAllLines(Paths.get(recording)))
         println(CliJson.encodeToString(JsonObject.serializer(), output))
     }
 }

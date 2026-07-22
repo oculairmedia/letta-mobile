@@ -7,7 +7,7 @@ import androidx.compose.ui.graphics.Color
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 
-internal val LocalStreamingRevealHapticPulse = compositionLocalOf<() -> Unit> { {} }
+internal val LocalStreamingRevealHapticPulse = compositionLocalOf { {} }
 
 internal interface MessageContentRenderer {
     fun canRender(message: UiMessage): Boolean

@@ -183,7 +183,7 @@ class FakeSettingsRepository(
     }
 
     override suspend fun removePinnedShortcut(name: String) {
-        pinnedShortcutOrder.value = pinnedShortcutOrder.value - name
+        pinnedShortcutOrder.value -= name
     }
 
     val pinnedItemsOrder: MutableStateFlow<List<String>> =
@@ -205,7 +205,7 @@ class FakeSettingsRepository(
     }
 
     override suspend fun removePinnedAgentName(id: String) {
-        pinnedAgentNames.value = pinnedAgentNames.value - id
+        pinnedAgentNames.value -= id
     }
 
     override fun getChatBackgroundKey(): Flow<String> = chatBackgroundKeyState

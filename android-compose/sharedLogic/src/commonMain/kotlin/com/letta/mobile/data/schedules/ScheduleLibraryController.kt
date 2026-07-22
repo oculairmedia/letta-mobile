@@ -45,9 +45,6 @@ data class ScheduleLibraryState(
      */
     val cronMode: Boolean = false,
 ) {
-    val selectedAgent: AgentSummary?
-        get() = agents.firstOrNull { it.id.value == selectedAgentId }
-
     /** Crons scoped to the selected agent (cron tasks may carry no agent id). */
     val cronsForSelectedAgent: List<CronTask>
         get() = selectedAgentId?.let { agentId ->
@@ -320,15 +317,6 @@ class ScheduleLibraryController(
                     )
                 }
             }
-        }
-    }
-
-    fun showError(message: String) {
-        stateFlow.update {
-            it.copy(
-                isLoading = false,
-                errorMessage = message,
-            )
         }
     }
 

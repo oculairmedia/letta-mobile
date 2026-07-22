@@ -196,8 +196,7 @@ internal class ConversationTurnFanout(
     private suspend fun emitRawFrameBody(body: String): Boolean {
         openToolCalls.observe(body)
         val cumulated = cumulativeText.applyToRawFrame(body)
-        val delta = innerDeltaOf(cumulated)
-        if (delta == null) {
+        val delta = innerDeltaOf(cumulated) ?: run {
             // Not a stream_delta we can re-frame (e.g. usage_statistics-only or a
             // malformed body) — nothing to fan out; not a terminal.
             return false

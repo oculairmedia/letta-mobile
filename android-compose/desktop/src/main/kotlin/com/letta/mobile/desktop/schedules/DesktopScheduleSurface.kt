@@ -98,7 +98,6 @@ fun DesktopScheduleSurface(
     }
     val today = remember(now, zone) { now.toLocalDateTime(zone).date }
 
-    val filterAgentId = focusedAgentId
     // Native schedule-admin schedules are loaded per-agent by the controller
     // (only for state.selectedAgentId). When the surface is focused on a
     // specific agent, drive that selection so we load and show that agent's
@@ -109,8 +108,8 @@ fun DesktopScheduleSurface(
             onAgentSelected(focusedAgentId)
         }
     }
-    val filteredCrons = remember(crons, filterAgentId) {
-        if (filterAgentId == null) crons else crons.filter { it.agentId == null || it.agentId == filterAgentId }
+    val filteredCrons = remember(crons, focusedAgentId) {
+        if (focusedAgentId == null) crons else crons.filter { it.agentId == null || it.agentId == focusedAgentId }
     }
     // Native schedule-admin schedules (state.schedules) are a parallel source to
     // /v1/crons. Projecting from crons alone hid real schedules on backends that
@@ -119,7 +118,7 @@ fun DesktopScheduleSurface(
     // native-sourced ids are tracked so the rail can route Delete correctly
     // (native schedules aren't deletable through the cron API).
     val nativeSchedules = state.schedules
-    val defs = remember(filteredCrons, nativeSchedules, filterAgentId, zone) {
+    val defs = remember(filteredCrons, nativeSchedules, focusedAgentId, zone) {
         // `now` is read but intentionally NOT a key: one-shot crons resolve to a
         // single instant at build time and must stay fixed (re-resolving each
         // tick would jump a just-fired one-shot to next year).
@@ -247,7 +246,7 @@ fun DesktopScheduleSurface(
                     canCreate = canCreate,
                     onDismiss = { showCreate = false },
                     onCreate = { name, prompt, cron ->
-                        onCreateCron(filterAgentId, name, prompt, cron, true, zone.id)
+                        onCreateCron(focusedAgentId, name, prompt, cron, true, zone.id)
                         showCreate = false
                     },
                 ),

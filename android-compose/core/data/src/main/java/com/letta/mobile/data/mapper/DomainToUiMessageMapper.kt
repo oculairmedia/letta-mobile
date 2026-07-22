@@ -120,8 +120,7 @@ private fun findQuotedMessageValueStart(arguments: String): Int? {
 private fun unescapeJsonStringLiteral(source: String, startIndex: Int): String = buildString {
     var index = startIndex
     while (index < source.length) {
-        val char = source[index]
-        when (char) {
+        when (val char = source[index]) {
             '\\' if index + 1 < source.length -> {
                 appendEscapedJsonChar(source[index + 1])
                 index += 2

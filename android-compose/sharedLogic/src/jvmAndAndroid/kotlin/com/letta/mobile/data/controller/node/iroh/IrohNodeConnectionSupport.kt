@@ -237,9 +237,6 @@ internal class ConnectionEventSeq(base: Long) {
 
     /** Strictly-monotonic next value for this connection. */
     fun next(): Long = counter.getAndIncrement()
-
-    /** The next value that [next] would return, without consuming it. */
-    val peek: Long get() = counter.value
 }
 
 internal object IrohEventSeqAllocator {
@@ -266,7 +263,7 @@ internal class OpenToolCallTracker {
         when (DanglingToolCallSynthesizer.messageType(delta)) {
             "tool_call_message",
             "approval_request_message" -> open += DanglingToolCallSynthesizer.toolCallIds(delta)
-            "tool_return_message" -> open -= DanglingToolCallSynthesizer.toolReturnCallIds(delta)
+            "tool_return_message" -> open -= DanglingToolCallSynthesizer.toolReturnCallIds(delta).toSet()
             else -> Unit
         }
     }

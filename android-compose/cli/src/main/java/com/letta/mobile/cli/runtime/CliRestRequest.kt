@@ -3,7 +3,7 @@ package com.letta.mobile.cli.runtime
 import com.github.ajalt.clikt.core.UsageError
 import java.io.IOException
 import java.nio.file.Files
-import java.nio.file.Path
+import java.nio.file.Paths
 
 internal data class CliQueryParam(
     val name: String,
@@ -68,7 +68,7 @@ internal fun resolveRequestBody(
     return when {
         inlineBody != null -> inlineBody
         bodyFile != null -> try {
-            String(Files.readAllBytes(Path.of(bodyFile)), Charsets.UTF_8)
+            String(Files.readAllBytes(Paths.get(bodyFile)), Charsets.UTF_8)
         } catch (error: IOException) {
             throw UsageError("Unable to read --body-file '$bodyFile': ${error.message}")
         } catch (error: RuntimeException) {
@@ -79,4 +79,4 @@ internal fun resolveRequestBody(
 }
 
 internal fun encodeUrlComponent(value: String): String =
-    java.net.URLEncoder.encode(value, Charsets.UTF_8).replace("+", "%20")
+    java.net.URLEncoder.encode(value, Charsets.UTF_8.name()).replace("+", "%20")

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
 internal fun ChatMessageListScrollToMessageEffect(params: ChatMessageListEffectsParams) {
@@ -18,7 +19,7 @@ internal fun ChatMessageListScrollToMessageEffect(params: ChatMessageListEffects
         )
         params.onHighlightedMessageIdChange(target.first)
         params.onHasScrolledToTargetChange(true)
-        delay(2000)
+        delay(2000.milliseconds)
         params.onHighlightedMessageIdChange(null)
     }
 }

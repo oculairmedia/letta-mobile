@@ -170,7 +170,7 @@ internal fun JsonObject.probeTextContent(key: String): String? = this[key]?.extr
 private fun JsonObject.textContent(key: String): String? = probeTextContent(key)
 private fun JsonElement.extractProbeTextContent(): String = when (this) {
     is JsonPrimitive -> contentOrNull.orEmpty()
-    is JsonArray -> map { it.extractProbeTextContent() }.joinToString("")
+    is JsonArray -> joinToString("") { it.extractProbeTextContent() }
     is JsonObject -> listOf("text", "content", "value")
         .firstNotNullOfOrNull { field -> this[field]?.extractProbeTextContent() }
         .orEmpty()

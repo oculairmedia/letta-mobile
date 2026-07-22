@@ -130,6 +130,6 @@ class IrohAdminRpcTimelineTransport(
     }
 
     private companion object {
-        val gatedTelemetryPaths = ConcurrentHashMap.newKeySet<String>()
+        val gatedTelemetryPaths: MutableSet<String> = ConcurrentHashMap.newKeySet()
     }
 }

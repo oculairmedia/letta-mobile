@@ -43,25 +43,19 @@ internal class VoiceInputViewModel @Inject constructor(@ApplicationContext priva
     private val _uiState = MutableStateFlow(VoiceInputUiState())
     val uiState = _uiState.asStateFlow()
 
-    private val speechRecognizer: SpeechRecognizer
-    private val recognizerIntent: Intent
-    private var onRecognitionDone: ((String) -> Unit)? = null
-
-    init {
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-            setRecognitionListener(this@VoiceInputViewModel)
-        }
-
-        recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            // letta-mobile-71sh: respect device locale rather than hard-
-            // coding en-US. The Edge Gallery original was a US-English
-            // sample; ours is shipping internationally.
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-        }
+    private val speechRecognizer: SpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+        setRecognitionListener(this@VoiceInputViewModel)
     }
+    private val recognizerIntent: Intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+        // letta-mobile-71sh: respect device locale rather than hard-
+        // coding en-US. The Edge Gallery original was a US-English
+        // sample; ours is shipping internationally.
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+        putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+    }
+    private var onRecognitionDone: ((String) -> Unit)? = null
 
     fun startSpeechRecognition(onDone: (String) -> Unit) {
         onRecognitionDone = onDone

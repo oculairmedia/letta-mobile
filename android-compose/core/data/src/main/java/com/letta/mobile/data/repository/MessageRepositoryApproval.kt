@@ -6,7 +6,6 @@ import com.letta.mobile.data.model.ApprovalCreate
 import com.letta.mobile.data.model.ApprovalSubmission
 import com.letta.mobile.data.model.MessageCreateRequest
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.encodeToJsonElement
 
 internal data class ApprovalSubmitParams(
     val messageApi: MessageApi,

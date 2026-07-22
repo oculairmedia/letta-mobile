@@ -5,7 +5,6 @@ import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -54,7 +53,6 @@ class ReconnectCoordinator(
             ),
 ) {
     private val reconnectMutex = Mutex()
-    private var lastReconnectState: AppServerControllerState? = null
 
     /**
      * Executes the reconnect/replay flow.

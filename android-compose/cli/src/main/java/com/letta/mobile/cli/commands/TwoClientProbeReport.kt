@@ -186,7 +186,7 @@ internal object TwoClientObservation {
         val userIdx = frames.indexOf(echo)
         val asstIdx = frames.indexOf(assistantRows.last())
         val termIdx = frames.indexOf(terminals.first())
-        if (userIdx <= asstIdx && asstIdx <= termIdx) return emptyList()
+        if (asstIdx in userIdx..termIdx) return emptyList()
         return listOf("out_of_order:user=$userIdx asst=$asstIdx term=$termIdx")
     }
 }

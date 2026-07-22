@@ -148,10 +148,10 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 method == "POST" && path == "/fetch" -> handleFetch(socket.outputStream, body)
                 method == "POST" && path == "/device/sensors/read" -> handleReadSensors(socket.outputStream, body)
                 method == "POST" && path == "/device/actions/command" -> handleDeviceActionCommand(socket.outputStream, body)
-                method == "GET" && path == "/device/mobile-actions/capabilities" -> handleMobileActionCapabilities(socket.outputStream)
                 method == "POST" && path == "/device/mobile-actions/execute" -> handleMobileActionExecute(socket.outputStream, body)
                 method == "POST" && path == "/device/mobile-actions/intent" -> handleMobileIntentAction(socket.outputStream, body)
                 method == "POST" && path.startsWith("/device/hardware/") -> handleHardwareControl(socket.outputStream, path, body)
+                method == "GET" && path == "/device/mobile-actions/capabilities" -> handleMobileActionCapabilities(socket.outputStream)
                 else -> socket.outputStream.writeJsonResponse(404, errorBody("not_found", "Unknown route: $path"))
             }
         }

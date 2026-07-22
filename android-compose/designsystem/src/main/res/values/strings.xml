@@ -4,7 +4,6 @@
     <string name="action_dismiss">Dismiss</string>
     <string name="common_error">Error</string>
     <string name="action_copy">Copy</string>
-    <string name="action_regenerate">Regenerate</string>
     <string name="action_delete">Delete</string>
     <string name="screen_models_no_models">No models available</string>
     <string name="tool_affordance_row_label">Available agent capabilities</string>
