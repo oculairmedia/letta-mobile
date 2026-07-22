@@ -89,22 +89,36 @@ class ConversationTurnFanoutTest {
         put("delta", delta)
     }.toString()
 
-    private fun assistantFrame(
-        content: String,
-        idempotencyKey: String,
-        otid: String,
-    ): String = rawStreamDeltaBody(
+    private data class AssistantTestFrame(
+        val content: String,
+        val idempotencyKey: String,
+        val otid: String,
+    )
+
+    private fun assistantFrame(frame: AssistantTestFrame): String = rawStreamDeltaBody(
         seq = 1,
-        idempotencyKey = idempotencyKey,
+        idempotencyKey = frame.idempotencyKey,
         delta = buildJsonObject {
             put("message_type", "assistant_message")
-            put("otid", otid)
-            put("content", content)
+            put("otid", frame.otid)
+            put("content", frame.content)
         },
     )
 
     private fun assistantContent(frame: String): String = json.parseToJsonElement(frame).jsonObject
         .getValue("delta").jsonObject.getValue("content").jsonPrimitive.content
+
+    private fun assertAccumulatedText(
+        source: StreamTextFrameSource,
+        frames: List<AssistantTestFrame>,
+        expected: List<String>,
+    ) {
+        val accumulator = CumulativeStreamText()
+        val actual = frames.map { frame ->
+            assistantContent(accumulator.applyToRawFrame(assistantFrame(frame), source))
+        }
+        assertEquals(expected, actual)
+    }
 
     private val command = TurnCommand(
         backendId = BackendId("iroh-node-server"),
@@ -280,41 +294,25 @@ class ConversationTurnFanoutTest {
 
     @Test
     fun overlappingIncrementalFramesPreserveEveryByte() = runTest {
-        val accumulator = CumulativeStreamText()
-
-        assertEquals(
-            "a",
-            assistantContent(accumulator.applyToRawFrame(
-                assistantFrame("a", "overlap-1", "otid-overlap"),
-                StreamTextFrameSource.AppServerDelta,
-            )),
-        )
-        assertEquals(
-            "aaa",
-            assistantContent(accumulator.applyToRawFrame(
-                assistantFrame("aa", "overlap-2", "otid-overlap"),
-                StreamTextFrameSource.AppServerDelta,
-            )),
+        assertAccumulatedText(
+            source = StreamTextFrameSource.AppServerDelta,
+            frames = listOf(
+                AssistantTestFrame("a", "overlap-1", "otid-overlap"),
+                AssistantTestFrame("aa", "overlap-2", "otid-overlap"),
+            ),
+            expected = listOf("a", "aaa"),
         )
     }
 
     @Test
     fun explicitlyCumulativeFramesReplaceThePreviousSnapshot() = runTest {
-        val accumulator = CumulativeStreamText()
-
-        assertEquals(
-            "Hel",
-            assistantContent(accumulator.applyToRawFrame(
-                assistantFrame("Hel", "cumulative-1", "otid-cumulative"),
-                StreamTextFrameSource.CumulativeSnapshot,
-            )),
-        )
-        assertEquals(
-            "Hello",
-            assistantContent(accumulator.applyToRawFrame(
-                assistantFrame("Hello", "cumulative-2", "otid-cumulative"),
-                StreamTextFrameSource.CumulativeSnapshot,
-            )),
+        assertAccumulatedText(
+            source = StreamTextFrameSource.CumulativeSnapshot,
+            frames = listOf(
+                AssistantTestFrame("Hel", "cumulative-1", "otid-cumulative"),
+                AssistantTestFrame("Hello", "cumulative-2", "otid-cumulative"),
+            ),
+            expected = listOf("Hel", "Hello"),
         )
     }
 
