@@ -390,6 +390,17 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 - `android-compose/local.properties` (`sdk.dir=…`, gitignored) is auto-created by the startup
   update script; recreate it if missing.
 
+### App Server contract / probe toolchain (epic letta-mobile-lgns8)
+
+- For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
+  `~/.nvm/versions/node/v24.18.0/bin/node`) and **`@letta-ai/letta-code@0.28.8`**
+  (`~/letta-code-install/node_modules/@letta-ai/letta-code`) are provisioned in the snapshot.
+- The contract verifier pins the exact Node + package versions, so run it with Node 24.18.0:
+  `node scripts/appserver/verify-contract-baseline.mjs --package-root ~/letta-code-install/node_modules/@letta-ai/letta-code`.
+- Launch the local App Server for probes with
+  `node <package-root>/letta.js app-server --listen ws://127.0.0.1:4500` (capability-detect the
+  newer `letta server --backend local --listen` syntax where supported).
+
 ### Running the app on this VM
 
 - Both clients are runnable here: the **Compose Desktop** app (`:desktop:run`) and the **Android**
