@@ -125,8 +125,14 @@ internal class ConversationTurnFanout(
      */
     suspend fun onDraft(payload: RuntimeEventPayload): Boolean {
         return when (payload) {
-            is RuntimeEventPayload.RemoteStreamFrame -> emitRawFrameBody(payload.body)
-            is RuntimeEventPayload.ExternalTransportFrame -> emitRawFrameBody(payload.body)
+            is RuntimeEventPayload.RemoteStreamFrame -> emitRawFrameBody(
+                payload.body,
+                StreamTextFrameSource.AppServerDelta,
+            )
+            is RuntimeEventPayload.ExternalTransportFrame -> emitRawFrameBody(
+                payload.body,
+                StreamTextFrameSource.CumulativeSnapshot,
+            )
             is RuntimeEventPayload.ToolCallObserved -> {
                 val delta = buildJsonObject {
                     put("message_type", "tool_call_message")
@@ -186,16 +192,19 @@ internal class ConversationTurnFanout(
     /**
      * RemoteStreamFrame / ExternalTransportFrame path: the [body] is the FULL
      * upstream wire frame ({type,runtime,event_seq,...,delta}). Preserve the
-     * exact single-connection shaping — observe open tool_calls, apply cumulative
-     * assistant-text accumulation, cm-stream optimistic-dedup tag the inner delta
+     * exact single-connection shaping — observe open tool_calls, normalize text
+     * using the payload type's source contract, cm-stream tag the inner delta
      * — then extract that inner delta body and fan IT out. Each viewer re-wraps
      * the delta with its own event_seq + idempotency_key (uniform with the
      * synthesized paths), so the initiator's per-connection monotonic event_seq
      * semantics match what the synthesized `writeStreamDelta` produced.
      */
-    private suspend fun emitRawFrameBody(body: String): Boolean {
+    private suspend fun emitRawFrameBody(
+        body: String,
+        source: StreamTextFrameSource,
+    ): Boolean {
         openToolCalls.observe(body)
-        val cumulated = cumulativeText.applyToRawFrame(body)
+        val cumulated = cumulativeText.applyToRawFrame(body, source)
         val delta = innerDeltaOf(cumulated) ?: run {
             // Not a stream_delta we can re-frame (e.g. usage_statistics-only or a
             // malformed body) — nothing to fan out; not a terminal.
