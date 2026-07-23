@@ -54,8 +54,17 @@ object AdminRpcRegistry {
          * compatibility in tests; production injects VibeSync directly.
          */
         vibesyncBaseUrl: String? = adminBaseUrl,
+        /**
+         * lgns8.9: base URL for the bounded admin_rest_service adapters (runs,
+         * archives, identities, models, schedules, tools, blocks, mcp, goals,
+         * slash-commands). When null those methods return capability-unavailable
+         * instead of dialing lettashim. Defaults to [adminBaseUrl] for backward
+         * compatibility; a shim-less deployment passes null.
+         */
+        adminRestBaseUrl: String? = adminBaseUrl,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
+        val adminRestBase = adminRestBaseUrl?.trimEnd('/')
         val router = AdminRpcRouter()
 
         HealthAdminHandlers.register(router, rpcBase, controller)
@@ -63,15 +72,15 @@ object AdminRpcRegistry {
         SubagentAdminHandlers.register(router, subagentRegistrySource)
         ConversationAdminHandlers.register(router, rpcBase, nativeClient, shimRetired)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
-        RunAdminHandlers.register(router, rpcBase)
-        ArchiveAdminHandlers.register(router, rpcBase)
-        IdentityAdminHandlers.register(router, rpcBase)
-        ModelAdminHandlers.register(router, rpcBase, nativeClient)
-        ScheduleAdminHandlers.register(router, rpcBase)
-        ToolAdminHandlers.register(router, rpcBase)
-        McpAdminHandlers.register(router, rpcBase)
-        GoalAdminHandlers.register(router, rpcBase)
-        SlashCommandAdminHandlers.register(router, rpcBase)
+        RunAdminHandlers.register(router, adminRestBase)
+        ArchiveAdminHandlers.register(router, adminRestBase)
+        IdentityAdminHandlers.register(router, adminRestBase)
+        ModelAdminHandlers.register(router, adminRestBase, nativeClient)
+        ScheduleAdminHandlers.register(router, adminRestBase)
+        ToolAdminHandlers.register(router, adminRestBase)
+        McpAdminHandlers.register(router, adminRestBase)
+        GoalAdminHandlers.register(router, adminRestBase)
+        SlashCommandAdminHandlers.register(router, adminRestBase)
         SkillAdminHandlers.register(router, rpcBase, nativeClient)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
         PairingAdminHandlers.register(router, pairingService)

@@ -1,7 +1,13 @@
 package com.letta.mobile.data.controller.node.iroh
 
 object ArchiveAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
+        // lgns8.9: no admin-rest service injected -> capability-unavailable
+        // (never a shim dial). Bounded admin adapter degrades gracefully.
+        if (adminBaseUrl == null) {
+            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
+            return
+        }
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("archive.list") { api.get(AdminPath.v1("archives")) }
         router.register("folder.list") { params ->
@@ -19,4 +25,11 @@ object ArchiveAdminHandlers {
         }
         router.register("group.list") { api.get(AdminPath.v1("groups")) }
     }
+    val METHODS: Set<String> = setOf(
+        "archive.list",
+        "folder.list",
+        "passage.create",
+        "passage.delete",
+        "group.list",
+    )
 }
