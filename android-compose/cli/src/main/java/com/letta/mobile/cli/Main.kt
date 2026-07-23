@@ -35,6 +35,13 @@ import com.letta.mobile.cli.commands.AppServerIrohDeviceGateCommand
 import com.letta.mobile.cli.commands.AppServerIrohProbeCommand
 import com.letta.mobile.cli.commands.AppServerIrohTwoClientProbeCommand
 import com.letta.mobile.cli.commands.AppServerSmokeCommand
+import com.letta.mobile.cli.commands.PeerCommand
+import com.letta.mobile.cli.commands.PeerGetCommand
+import com.letta.mobile.cli.commands.PeerInviteCommand
+import com.letta.mobile.cli.commands.PeerListCommand
+import com.letta.mobile.cli.commands.PeerRenameCommand
+import com.letta.mobile.cli.commands.PeerRevokeCommand
+import com.letta.mobile.cli.commands.PeerSetCapabilitiesCommand
 import com.letta.mobile.cli.commands.SetupApplyCommand
 import com.letta.mobile.cli.commands.SetupCommand
 import com.letta.mobile.cli.commands.SetupExportCommand
@@ -87,6 +94,14 @@ object Main {
                 AppServerServeCommand(),
                 AppServerServeIrohCommand(),
                 AgentMessageCommand().subcommands(AgentMessageSendCommand()),
+                PeerCommand().subcommands(
+                    PeerInviteCommand(),
+                    PeerListCommand(),
+                    PeerGetCommand(),
+                    PeerRenameCommand(),
+                    PeerSetCapabilitiesCommand(),
+                    PeerRevokeCommand(),
+                ),
                 AppServerServeIrohStubCommand(),
                 AppServerIrohProbeCommand(),
                 AppServerIrohTwoClientProbeCommand(),
