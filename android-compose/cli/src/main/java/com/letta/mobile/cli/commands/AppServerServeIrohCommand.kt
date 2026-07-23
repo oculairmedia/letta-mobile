@@ -59,7 +59,8 @@ internal fun buildProductionAdminRouter(
     subagentRegistrySource: SubagentRegistrySource?,
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
-): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient)
+    vibesyncBaseUrl: String? = null,
+): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient, vibesyncBaseUrl = vibesyncBaseUrl)
 
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
@@ -100,6 +101,14 @@ internal class AppServerServeIrohCommand : CliktCommand(
         envvar = "LETTA_IROH_ALLOWED_PEER_IDS",
         help = "Optional comma-separated allowlist of remote EndpointIds (64 hex chars).",
     ).default("")
+
+    private val vibesyncBaseUrl by option(
+        "--vibesync-base-url",
+        envvar = "LETTA_IROH_VIBESYNC_BASE_URL",
+        help = "Base URL of the VibeSync product service that project.* methods call " +
+            "DIRECTLY (lgns8.9), bypassing the lettashim /api reverse-proxy splice. " +
+            "Server-side localhost only.",
+    ).default("http://127.0.0.1:3099")
 
     private val adminBaseUrl by option(
         "--admin-base-url",
@@ -201,7 +210,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val rpcBase = adminBaseUrl.trimEnd('/')
             val subagentRegistrySource =
                 com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
-            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService, nativeAdminClient)
+            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService, nativeAdminClient, vibesyncBaseUrl)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
