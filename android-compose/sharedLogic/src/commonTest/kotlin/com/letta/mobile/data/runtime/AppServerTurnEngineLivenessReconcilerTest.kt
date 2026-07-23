@@ -88,6 +88,61 @@ class AppServerTurnEngineLivenessReconcilerTest {
         assertFalse(secondAccepted, "the second send stays busy-rejected while the owner run is alive")
     }
 
+    @Test
+    fun busyRejectedSendReconcilesViaRunListWhenOwnerHasNoRunIdAndConversationIsIdle() =
+        runTest(UnconfinedTestDispatcher()) {
+            // The completed terminal was never fanned to this initiator, and the
+            // deltas carried NO run_id, so owner.runId stays null. Previously the
+            // reconciler hard-returned → stuck "turn engine busy" until the 70s
+            // external cancel. Now it falls back to a conversation-scoped run.list.
+            val client = LivenessClient(
+                runStatus = "ignored",
+                runListRuns = kotlinx.serialization.json.JsonArray(listOf(runObj("conv-1", "completed"))),
+            )
+            val engine = AppServerTurnEngine(client = client)
+            backgroundScope.launch { runCatching { engine.runTurn(command).collect() } }
+            runCurrent()
+            client.emit(streamDeltaNoRunId("assistant_message")) // no run_id promoted
+            runCurrent()
+            assertTrue(engine.isBusy)
+
+            var secondAccepted = false
+            backgroundScope.launch {
+                runCatching { engine.runTurn(secondCommand).collect { secondAccepted = true } }
+            }
+            runCurrent()
+            client.emit(streamDeltaNoRunId("assistant_message"))
+            runCurrent()
+
+            assertTrue(client.runListQueried, "no-run_id owner must fall back to a run.list liveness probe")
+            assertTrue(secondAccepted, "an idle conversation (no active run) must release the stale lock")
+        }
+
+    @Test
+    fun busyRejectedSendKeepsLockViaRunListWhenConversationHasAnActiveRun() =
+        runTest(UnconfinedTestDispatcher()) {
+            val client = LivenessClient(
+                runStatus = "ignored",
+                runListRuns = kotlinx.serialization.json.JsonArray(listOf(runObj("conv-1", "in_progress"))),
+            )
+            val engine = AppServerTurnEngine(client = client)
+            backgroundScope.launch { runCatching { engine.runTurn(command).collect() } }
+            runCurrent()
+            client.emit(streamDeltaNoRunId("assistant_message"))
+            runCurrent()
+            assertTrue(engine.isBusy)
+
+            var secondAccepted = false
+            backgroundScope.launch {
+                runCatching { engine.runTurn(secondCommand).collect { secondAccepted = true } }
+            }
+            runCurrent()
+
+            assertTrue(client.runListQueried)
+            assertTrue(engine.isBusy, "an active run for the conversation must NOT be interrupted")
+            assertFalse(secondAccepted)
+        }
+
     private companion object {
         val runtime = AppServerRuntimeScope("agent-1", "conv-1")
         val command = TurnCommand(
@@ -105,11 +160,28 @@ class AppServerTurnEngineLivenessReconcilerTest {
                 idempotencyKey = "evt-$messageType-$runId",
                 delta = buildJsonObject { put("message_type", messageType); put("run_id", runId) },
             )
+
+        // A delta with NO run_id — the owner never gets a run id promoted.
+        fun streamDeltaNoRunId(messageType: String): AppServerInboundFrame.StreamDelta =
+            AppServerInboundFrame.StreamDelta(
+                runtime = runtime, eventSeq = 1, emittedAt = "2026-07-16T00:00:00Z",
+                idempotencyKey = "evt-$messageType-norun",
+                delta = buildJsonObject { put("message_type", messageType) },
+            )
+
+        fun runObj(conversationId: String, status: String): kotlinx.serialization.json.JsonObject =
+            buildJsonObject { put("conversation_id", conversationId); put("status", status) }
     }
 
-    private class LivenessClient(private val runStatus: String) : AppServerClient {
+    private class LivenessClient(
+        private val runStatus: String,
+        // For the no-run_id path: the run.list body returned to the conversation-
+        // scoped liveness probe (a JSON array of run objects).
+        private val runListRuns: kotlinx.serialization.json.JsonArray? = null,
+    ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow(extraBufferCapacity = 64)
         var runGetQueried = false
+        var runListQueried = false
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
             AppServerInboundFrame.RuntimeStartResponse(
@@ -127,6 +199,13 @@ class AppServerTurnEngineLivenessReconcilerTest {
                 return AppServerInboundFrame.AdminRpcResponse(
                     requestId = command.requestId, success = true,
                     result = buildJsonObject { put("status", runStatus) },
+                )
+            }
+            if (command.method == "run.list") {
+                runListQueried = true
+                return AppServerInboundFrame.AdminRpcResponse(
+                    requestId = command.requestId, success = true,
+                    result = runListRuns ?: kotlinx.serialization.json.JsonArray(emptyList()),
                 )
             }
             return AppServerInboundFrame.AdminRpcResponse(requestId = command.requestId, success = false, error = "unexpected")
