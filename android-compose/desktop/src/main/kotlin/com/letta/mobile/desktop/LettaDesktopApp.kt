@@ -28,6 +28,9 @@ import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
+import com.letta.mobile.desktop.chat.DesktopChatConnectionState
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
@@ -42,9 +45,15 @@ import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.StateFlow
+import java.awt.Window
+import dev.nucleusframework.application.NucleusApplicationScope
 
 @Composable
-fun LettaDesktopApp(
+internal fun LettaDesktopApp(
+    nucleusApplicationScope: NucleusApplicationScope,
+    window: Window,
+    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
     onActiveTitleChange: (String) -> Unit = {},
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
@@ -60,6 +69,8 @@ fun LettaDesktopApp(
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
     val chatScope = rememberCoroutineScope()
+    val nucleusController = remember(chatScope) { DesktopNucleusController(chatScope) }
+    val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
     val irohMode = irohTransport != null
     val irohAgentDirectory = remember(irohTransport) {
@@ -151,11 +162,7 @@ fun LettaDesktopApp(
         ),
     )
 
-    val activeTitle = when (selectedDestination) {
-        DesktopDestination.Conversations ->
-            chatState.selectedConversation?.title ?: "Letta Desktop"
-        else -> selectedDestination.label
-    }
+    val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
     // Same-named agents are stacked in the rail, and the sidebar lists the
@@ -189,6 +196,24 @@ fun LettaDesktopApp(
         }
         selectedDestination = DesktopDestination.Conversations
     }
+
+    DesktopDeepLinkRouting(
+        deepLinks = deepLinks,
+        chatState = chatState,
+        actions = DesktopDeepLinkRoutingActions(
+            // Deep links must win over the full-page agent editor, matching
+            // the sidebar navigation paths that clear edit mode before routing.
+            onDestinationSelected = {
+                editAgentId = null
+                selectedDestination = it
+            },
+            onSelectConversation = {
+                editAgentId = null
+                chatController.selectConversation(it)
+            },
+            onOpenAgent = ::openAgent,
+        ),
+    )
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
     // Per-agent avatar-style override chosen in the editor (stored in agent
@@ -254,6 +279,39 @@ fun LettaDesktopApp(
     // place across platforms.
     val replyPresence by chatController.replyPresence.collectAsState()
     val isStreamingReplySelected = replyPresence.isStreaming
+
+    // Background work can belong to a conversation the user has switched away
+    // from; label taskbar/media/notification integration with the agent that
+    // is actually working, not the current selection.
+    val workingAgentName = workingAgentName(
+        WorkingAgentNameParams(
+            thinkingAgentId = thinkingAgentId,
+            thinkingConversationId = thinkingConversationId,
+            railAgents = railAgents,
+            conversations = chatState.conversations,
+            fallback = selectedAgentName,
+        ),
+    )
+    DesktopNucleusEffects(
+        bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
+        state = desktopNucleusEffectState(
+            DesktopNucleusRuntimeState(
+                thinkingConversationId = thinkingConversationId,
+                isStreamingReply = replyPresence.isStreaming,
+                agentName = workingAgentName,
+                errorMessage = chatState.errorMessage,
+            ),
+        ),
+        actions = DesktopNucleusEffectActions(
+            onOpenCommandPalette = { showCommandPalette = true },
+            // Clear the full-page agent editor like the sidebar and deep-link
+            // paths do, or the editor branch keeps rendering over Settings.
+            onOpenSettings = {
+                editAgentId = null
+                selectedDestination = DesktopDestination.Settings
+            },
+        ),
+    )
 
     AvatarPresenceEffects(
         avatar = avatar,
@@ -432,6 +490,7 @@ fun LettaDesktopApp(
                                     canManageSkills = skillsPanel.available && selectedAgentId != null,
                                     focusedAgentName = selectedAgentName,
                                 ),
+                                nucleus = nucleusState,
                             ),
                             actions = DestinationContentActions(
                                 memory = DestinationMemoryActions(
@@ -506,6 +565,7 @@ fun LettaDesktopApp(
                                 onTokenCleared = {
                                     applyConfig(activeConfig.copy(accessToken = null))
                                 },
+                                nucleus = destinationNucleusActions(nucleusController, window),
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )
@@ -581,6 +641,77 @@ fun LettaDesktopApp(
           }
         }
     }
+}
+
+private data class DesktopDeepLinkRoutingActions(
+    val onDestinationSelected: (DesktopDestination) -> Unit,
+    val onSelectConversation: (String) -> Unit,
+    val onOpenAgent: (String) -> Unit,
+)
+
+/**
+ * Routes deep links into the app, buffering targets that arrive before the
+ * conversation list has loaded (cold-start protocol activation):
+ * selectConversation ignores unknown ids and openAgent would treat the empty
+ * list as "no existing chat", so both wait for the initial load to settle.
+ */
+@Composable
+private fun DesktopDeepLinkRouting(
+    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
+    chatState: DesktopChatSurfaceState,
+    actions: DesktopDeepLinkRoutingActions,
+) {
+    var pendingConversationId by remember { mutableStateOf<String?>(null) }
+    var pendingAgentId by remember { mutableStateOf<String?>(null) }
+    DesktopDeepLinkEffect(
+        deepLinks = deepLinks,
+        onDestinationSelected = actions.onDestinationSelected,
+        onConversationSelected = { pendingConversationId = it },
+        onAgentSelected = { pendingAgentId = it },
+    )
+    LaunchedEffect(pendingConversationId, chatState.conversations) {
+        val target = pendingConversationId ?: return@LaunchedEffect
+        if (chatState.conversations.any { it.id == target }) {
+            actions.onSelectConversation(target)
+            pendingConversationId = null
+        }
+    }
+    LaunchedEffect(pendingAgentId, chatState.isLoading, chatState.connectionState) {
+        val target = pendingAgentId ?: return@LaunchedEffect
+        if (initialConversationLoadSettled(chatState)) {
+            actions.onOpenAgent(target)
+            pendingAgentId = null
+        }
+    }
+}
+
+private fun initialConversationLoadSettled(chatState: DesktopChatSurfaceState): Boolean {
+    if (chatState.isLoading) return false
+    return chatState.connectionState != DesktopChatConnectionState.Loading
+}
+
+private data class WorkingAgentNameParams(
+    val thinkingAgentId: String?,
+    val thinkingConversationId: String?,
+    val railAgents: List<Pair<String, String>>,
+    val conversations: List<DesktopConversationSummary>,
+    val fallback: String,
+)
+
+private fun workingAgentName(params: WorkingAgentNameParams): String {
+    val byAgent = params.thinkingAgentId?.let { id ->
+        params.railAgents.firstOrNull { it.first == id }?.second
+    }
+    if (byAgent != null) return byAgent
+    val byConversation = params.thinkingConversationId?.let { tid ->
+        params.conversations.firstOrNull { it.id == tid }?.agentName
+    }
+    return byConversation ?: params.fallback
+}
+
+private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
+    if (destination != DesktopDestination.Conversations) return destination.label
+    return conversationTitle ?: "Letta Desktop"
 }
 
 /**
