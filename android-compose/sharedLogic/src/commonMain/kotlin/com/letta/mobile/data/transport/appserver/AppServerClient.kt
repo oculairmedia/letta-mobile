@@ -103,6 +103,12 @@ interface AppServerClient {
 
     suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll): AppServerInboundFrame.CronDeleteAllResponse =
         throw UnsupportedOperationException("CronDeleteAll is not supported by this client")
+
+    suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings): AppServerInboundFrame.GetReflectionSettingsResponse =
+        throw UnsupportedOperationException("GetReflectionSettings is not supported by this client")
+
+    suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
+        throw UnsupportedOperationException("SetReflectionSettings is not supported by this client")
 }
 
 class DefaultAppServerClient(
@@ -250,4 +256,10 @@ class DefaultAppServerClient(
 
     override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll): AppServerInboundFrame.CronDeleteAllResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.CronDeleteAllResponse }) { transport.sendControl(command) }
+
+    override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings): AppServerInboundFrame.GetReflectionSettingsResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.GetReflectionSettingsResponse }) { transport.sendControl(command) }
+
+    override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.SetReflectionSettingsResponse }) { transport.sendControl(command) }
 }
