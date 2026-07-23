@@ -4,7 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.dropWhile
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
@@ -131,10 +131,16 @@ class DefaultAppServerClient(
         parentScope?.let {
             registry.startRouting(it)
             it.launch {
-                transport.isConnected.dropWhile { it }.collect {
-                    registry.failAll(CancellationException("transport disconnected"))
-                    return@collect
-                }
+                // Fail pending requests only on a genuine connected -> disconnected
+                // transition. The transport StateFlow starts Disconnected(false),
+                // so the previous `dropWhile { it }` dropped nothing and fired
+                // failAll() at CONSTRUCTION — poisoning this generation's registry
+                // before the socket ever connected, so every subsequent request
+                // threw "generation already failed" and runtime turns never
+                // started (admin reads silently fell back to the shim).
+                transport.isConnected.first { connected -> connected }
+                transport.isConnected.first { connected -> !connected }
+                registry.failAll(CancellationException("transport disconnected"))
             }
         }
     }

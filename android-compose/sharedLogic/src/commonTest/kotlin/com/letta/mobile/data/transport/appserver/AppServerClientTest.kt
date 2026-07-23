@@ -48,6 +48,29 @@ class AppServerClientTest {
     }
 
     @Test
+    fun generationIsNotPoisonedWhenTransportStartsDisconnected() = runTest {
+        // Regression: the init disconnect-watcher used `dropWhile { it }`, but the
+        // real transport's isConnected StateFlow starts `false`, so the watcher
+        // fired failAll() at construction and every request threw "generation
+        // already failed" — turns never started after the reconnect layer landed.
+        val transport = FakeAppServerTransport(initiallyConnected = false)
+        val client = DefaultAppServerClient(transport, parentScope = backgroundScope, requestTimeoutMs = 1_000)
+
+        // The socket comes up after construction.
+        transport.connectedState.value = true
+        val response = backgroundScope.async {
+            client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-1", agentId = "agent-1"))
+        }
+        runCurrent()
+
+        assertIs<AppServerCommand.RuntimeStart>(transport.sentControlCommands.first())
+        transport.emitControl(runtimeStartResponse(requestId = "start-1", runtime = runtime))
+
+        // With the bug this threw IllegalStateException("generation already failed").
+        assertEquals(runtime, response.await().runtime)
+    }
+
+    @Test
     fun syncAndAbortRequireRequestIdsForCorrelation() = runTest {
         val client = DefaultAppServerClient(FakeAppServerTransport(), requestTimeoutMs = 10)
 
@@ -139,9 +162,13 @@ class AppServerClientTest {
     }
 }
 
-private class FakeAppServerTransport : AppServerTransport {
+private class FakeAppServerTransport(initiallyConnected: Boolean = true) : AppServerTransport {
     override val controlFrames = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 16)
     override val streamFrames = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 16)
+    // Real transports start Disconnected(false) and flip to true once the socket
+    // opens; the interface default flowOf(true) hid the init-watcher poison bug.
+    val connectedState = kotlinx.coroutines.flow.MutableStateFlow(initiallyConnected)
+    override val isConnected = connectedState
     val sentControlCommands = mutableListOf<AppServerCommand>()
 
     override suspend fun sendControl(command: AppServerCommand) {
