@@ -57,6 +57,8 @@ class IrohPairingService(
 
     fun isPaired(nodeId: String): Boolean = store.isPaired(nodeId)
 
+    fun peer(nodeId: String): PairedPeer? = store.get(nodeId)
+
     fun redeem(secret: String, nodeId: String, name: String? = null): RedeemResult {
         // Consume atomically: exactly one caller wins a given invite.
         val invite = synchronized(lock) {
