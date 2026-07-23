@@ -55,6 +55,10 @@ class IrohNodeEndpoint(
      */
     private val authPolicy: IrohAuthPolicy,
 ) {
+    // d6e8g.3: ONE verifier across every connection this endpoint accepts, so
+    // per-NodeId auth-failure rate limiting survives redials.
+    private val authVerifier = IrohBearerAuthVerifier(authPolicy)
+
     private var endpoint: Endpoint? = null
     private var acceptJob: Job? = null
     private var _adminRpcRouter: AdminRpcRouter? = null
@@ -227,6 +231,7 @@ class IrohNodeEndpoint(
                                     controller = controller,
                                     adminRpcRouter = adminRpcRouter,
                                     authPolicy = authPolicy,
+                                    authVerifier = authVerifier,
                                     remoteEndpointId = remoteId,
                                     connectionRegistry = connectionRegistry,
                                 ).serve()
