@@ -119,6 +119,24 @@ class IrohPairingServiceTest {
     }
 
     @Test
+    fun aPairedPeerStaysPairedEvenWhenItReplaysItsConsumedInvite() {
+        // Invariant the handleAuth stale-invite fall-through relies on (d6e8g.7):
+        // a device that paired but still carries the now-consumed invite in its
+        // token field re-presents it on reconnect. Redemption is Rejected, but
+        // isPaired stays true — so auth can fall through to NodeId instead of
+        // locking the device out.
+        val (pairing, _) = service()
+        val nodeId = "8".repeat(64)
+        val invite = pairing.createInvite("pixel")
+        assertIs<IrohPairingService.RedeemResult.Paired>(pairing.redeem(invite.secret, nodeId))
+        assertTrue(pairing.isPaired(nodeId))
+
+        val replay = assertIs<IrohPairingService.RedeemResult.Rejected>(pairing.redeem(invite.secret, nodeId))
+        assertEquals("invalid", replay.reason)
+        assertTrue(pairing.isPaired(nodeId), "a consumed-invite replay must not un-pair the device")
+    }
+
+    @Test
     fun filePairedPeerStoreSurvivesRestartAndHoldsNoSecrets() {
         val path = Files.createTempDirectory("pairing-test").resolve("paired-peers.json")
         val store = FilePairedPeerStore(path)
