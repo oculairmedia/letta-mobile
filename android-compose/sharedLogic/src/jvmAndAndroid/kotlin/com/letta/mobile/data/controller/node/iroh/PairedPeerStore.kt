@@ -18,6 +18,12 @@ data class PairedPeer(
     val nodeId: String,
     val name: String,
     val pairedAtMs: Long,
+    /**
+     * Explicit capability grants (d6e8g.6). Defaults to the least-privilege
+     * desktop role; admin.full is never implicit and must be granted
+     * deliberately.
+     */
+    val capabilities: Set<String> = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE,
 )
 
 interface PairedPeerStore {
