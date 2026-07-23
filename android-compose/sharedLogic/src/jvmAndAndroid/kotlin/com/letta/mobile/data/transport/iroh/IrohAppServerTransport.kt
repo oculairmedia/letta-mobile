@@ -81,6 +81,17 @@ class IrohAppServerTransport(
      */
     private val connected = MutableStateFlow(true)
 
+    /**
+     * Synchronous liveness read of the underlying QUIC connection. Flips false
+     * only on a real reader-exit / [close] (lines that set `connected.value =
+     * false`). Used by [IrohChannelTransport.adminRpc] to keep a single request's
+     * failure from tearing down a connection that is actually still alive
+     * (request isolation) — a per-request error (unimplemented method, this
+     * request's own timeout) must never cancel every other in-flight read on the
+     * shared connection.
+     */
+    val isConnectionAlive: Boolean get() = connected.value
+
     // Connection and streams, initialized in background jobs
     private lateinit var connection: Connection
     private lateinit var controlBiStream: BiStream

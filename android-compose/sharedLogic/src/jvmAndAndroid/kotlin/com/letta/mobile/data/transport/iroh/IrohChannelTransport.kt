@@ -1145,6 +1145,30 @@ class IrohChannelTransport(
         if (!firstError.isConnectionLostClass()) throw firstError
         if (!method.isReadOnlyAdminRpcMethod()) throw firstError
 
+        // Request isolation: if the shared connection is STILL ALIVE, this read's
+        // failure is isolated to THIS request (e.g. a method the node doesn't
+        // implement, or this request's own 15s timeout), NOT a transport fault.
+        // `isConnectionLostClass()` only inspects the error text — which for
+        // per-request errors ("admin_rpc stream closed before response", "admin_rpc
+        // timed out") matches "closed"/"stream"/"timeout" and looks connection-ish
+        // even though the QUIC connection is fine. Escalating here would call
+        // supervisor.onConnectionLost → close the shared connection → cancel every
+        // OTHER in-flight admin_rpc read on it (e.g. a large concurrent agent.list),
+        // which is exactly the desktop connect-burst teardown loop. A genuine drop
+        // instead flips `connected` false (reader-exit/close, which reconnect
+        // independently), so only fall through to retry/escalate when the
+        // connection is actually dead.
+        if (first.isConnectionAlive) {
+            com.letta.mobile.util.Telemetry.event(
+                "IrohTransport", "admin_rpc.request_isolated",
+                "method" to method,
+                "path" to path,
+                "error" to (firstError.message ?: firstError.toString()),
+                "class" to firstError::class.simpleName,
+            )
+            throw firstError
+        }
+
         // letta-mobile-34xoj: an admin_rpc read timed out or failed with a
         // connection-like error. NEVER invalidate the live connection while
         // a turn is actively streaming — retry on the SAME connection.
