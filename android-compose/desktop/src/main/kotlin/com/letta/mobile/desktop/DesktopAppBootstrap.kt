@@ -10,6 +10,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.commands.SlashCommandsApi
+import com.letta.mobile.desktop.data.defaultDesktopStateDirectory
+import com.letta.mobile.desktop.security.DesktopSecretVaults
+import com.letta.mobile.desktop.security.EncryptingSecureSettingsStore
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.schedules.CronApi
@@ -35,7 +38,7 @@ import kotlinx.coroutines.launch
  * the iroh transport-derived directory is available.
  */
 internal data class DesktopConfigBootstrap(
-    val secureSettingsStore: DesktopFileSecureSettingsStore,
+    val secureSettingsStore: com.letta.mobile.data.storage.SecureSettingsStore,
     val dataBindings: DesktopDataBindings,
     val activeConfig: LettaConfig,
     val bootstrapState: DesktopBootstrapState,
@@ -45,7 +48,15 @@ internal data class DesktopConfigBootstrap(
 
 @Composable
 internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
-    val secureSettingsStore = remember { DesktopFileSecureSettingsStore() }
+    // d6e8g.4: sensitive settings (access token) are vault-encrypted at rest —
+    // DPAPI on Windows, keyfile-AES-GCM elsewhere. Legacy plaintext tokens
+    // migrate transparently on first read.
+    val secureSettingsStore = remember {
+        EncryptingSecureSettingsStore(
+            delegate = DesktopFileSecureSettingsStore(),
+            vault = DesktopSecretVaults.forCurrentOs(defaultDesktopStateDirectory()),
+        )
+    }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }
     val irohAgentDirectorySlot = remember { mutableStateOf<IrohAdminRpcAgentDirectory?>(null) }

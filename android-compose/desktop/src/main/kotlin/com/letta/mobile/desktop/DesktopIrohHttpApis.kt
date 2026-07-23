@@ -61,7 +61,7 @@ private fun createDesktopHttpApis(
     )
 }
 
-internal fun loadArchivedConversationIds(store: DesktopFileSecureSettingsStore): Set<String> =
+internal fun loadArchivedConversationIds(store: com.letta.mobile.data.storage.SecureSettingsStore): Set<String> =
     store.getString(ARCHIVED_CONVERSATION_IDS_KEY)
         ?.split(',')
         ?.map { it.trim() }
@@ -70,7 +70,7 @@ internal fun loadArchivedConversationIds(store: DesktopFileSecureSettingsStore):
         ?: emptySet()
 
 internal fun persistArchivedConversationIds(
-    store: DesktopFileSecureSettingsStore,
+    store: com.letta.mobile.data.storage.SecureSettingsStore,
     ids: Set<String>,
 ) {
     store.putString(ARCHIVED_CONVERSATION_IDS_KEY, ids.joinToString(","))
