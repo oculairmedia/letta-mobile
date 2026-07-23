@@ -133,6 +133,113 @@ class IrohObserverRunIdReconcileDedupTest {
         )
     }
 
+    /**
+     * THE desktop→mobile passive-observer duplicate. The observer stamps the
+     * fanned-out reply with a synthetic run id and a TRANSIENT streamed server id;
+     * the post-send reconcile refetches the SAME reply under its CANONICAL server
+     * id and a REAL run id, with the streamed row's text a non-prefix subset of the
+     * fuller final (first-word-lag). server-id match, exact-content, and prefix all
+     * miss, so it falls through to [findRecentSameRealRunAssistantIndex] — which
+     * used to SKIP the synthetic observer row, stranding a second (duplicate) row
+     * that lands after the just-sent message. FAILS on main (2 rows); PASSES once
+     * the synthetic-live→real-run promotion is honored on the different-server-id
+     * reconcile too.
+     */
+    @Test
+    fun `observer row is promoted by a real-run reconcile final under a different canonical server id`() {
+        val conversationId = "conv-j98r5"
+
+        val timeline = Timeline(
+            conversationId = conversationId,
+            events = persistentListOf(
+                TimelineEvent.Confirmed(
+                    position = 1.0,
+                    otid = "iroh-observer-turn-$conversationId",
+                    serverId = "letta-msg-transient", // transient streamed id
+                    content = "kicking around here", // streamed row (first word lagged off)
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = timelineNow(),
+                    runId = "iroh-observer-run-$conversationId", // synthetic observer run
+                    stepId = null,
+                ),
+            ),
+        )
+
+        val serverMessages = listOf(
+            AssistantMessage(
+                id = "letta-msg-canonical", // DIFFERENT canonical server id
+                contentRaw = JsonPrimitive("Still kicking around here"), // fuller; NOT a prefix of the streamed row
+                date = "2026-07-09T00:00:00Z",
+                runId = "run-real-server-777", // REAL run id
+            ),
+        )
+
+        val (merged, _) = timeline.mergeServerMessages(serverMessages)
+
+        val assistantRows = merged.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+
+        assertEquals(
+            1,
+            assistantRows.size,
+            "A real-run reconcile final under a canonical server id must PROMOTE the synthetic " +
+                "observer row, not append a duplicate. Rows: " +
+                assistantRows.joinToString(" || ") { "[${it.serverId}/${it.runId}] ${it.content}" },
+        )
+        assertEquals("run-real-server-777", assistantRows.single().runId)
+    }
+
+    /**
+     * Latent variant of the same bug on the HTTP/admin `message.list` shape: the
+     * reconcile final carries a NULL run id and a non-prefix superset text. It
+     * falls through to [findRecentAssistantContentSupersetIndex], whose candidate
+     * guard used to require a REAL run id and so skipped the synthetic observer
+     * row → duplicate. PASSES once synthetic (streamed) candidates are eligible.
+     */
+    @Test
+    fun `observer row collapses into a null-run non-prefix superset reconcile final`() {
+        val conversationId = "conv-j98r5"
+
+        val timeline = Timeline(
+            conversationId = conversationId,
+            events = persistentListOf(
+                TimelineEvent.Confirmed(
+                    position = 1.0,
+                    otid = "iroh-observer-turn-$conversationId",
+                    serverId = "letta-msg-transient",
+                    content = "kicking around here",
+                    messageType = TimelineMessageType.ASSISTANT,
+                    date = timelineNow(),
+                    runId = "iroh-observer-run-$conversationId",
+                    stepId = null,
+                ),
+            ),
+        )
+
+        val serverMessages = listOf(
+            AssistantMessage(
+                id = "ui-msg-final", // DIFFERENT server id
+                contentRaw = JsonPrimitive("Still kicking around here"), // NOT a prefix of the streamed row
+                date = "2026-07-09T00:00:00Z",
+                runId = null, // admin message.list omits run_id
+            ),
+        )
+
+        val (merged, _) = timeline.mergeServerMessages(serverMessages)
+
+        val assistantRows = merged.events
+            .filterIsInstance<TimelineEvent.Confirmed>()
+            .filter { it.messageType == TimelineMessageType.ASSISTANT }
+
+        assertEquals(
+            1,
+            assistantRows.size,
+            "A null-run non-prefix superset final must collapse the synthetic observer row, not append. " +
+                "Rows: " + assistantRows.joinToString(" || ") { "[${it.serverId}] ${it.content}" },
+        )
+    }
+
     // ---------------------------------------------------------------------
     // NEGATIVE CONTROLS (letta-mobile-j98r5.1, PR #874 review — Meridian P1).
     //
