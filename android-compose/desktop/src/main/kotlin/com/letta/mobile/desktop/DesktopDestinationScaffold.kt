@@ -104,6 +104,17 @@ internal data class DestinationContentInputs(
     val toolLibraryState: DesktopToolLibraryState,
     val blockApi: DesktopBlockApi?,
     val skills: DestinationSkillsInputs,
+    val nucleus: DesktopNucleusState,
+)
+
+internal data class DestinationNucleusActions(
+    val onCheckForUpdates: () -> Unit,
+    val onDownloadUpdate: () -> Unit,
+    val onInstallUpdate: () -> Unit,
+    val onRefreshSystemInfo: () -> Unit,
+    val onAutoLaunchChanged: (Boolean) -> Unit,
+    val onOpenAutoLaunchSettings: () -> Unit,
+    val onTestNotification: () -> Unit,
 )
 
 internal data class DestinationContentActions(
@@ -115,12 +126,20 @@ internal data class DestinationContentActions(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
+    val nucleus: DestinationNucleusActions,
 )
 
 private data class DestinationSettingsActions(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
+    val nucleus: DestinationNucleusActions,
+)
+
+private data class ScrollableDestinationInputs(
+    val destination: DesktopDestination,
+    val state: DesktopBootstrapState,
+    val nucleus: DesktopNucleusState,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -170,12 +189,16 @@ internal fun DestinationContent(
             modifier = modifier,
         )
         else -> ScrollableDestinationContent(
-            destination = destination,
-            state = inputs.state,
+            inputs = ScrollableDestinationInputs(
+                destination = destination,
+                state = inputs.state,
+                nucleus = inputs.nucleus,
+            ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
                 onIrohIdentityReset = actions.onIrohIdentityReset,
+                nucleus = actions.nucleus,
             ),
             modifier = modifier,
         )
@@ -264,8 +287,7 @@ private fun AgentsDestinationContent(
 
 @Composable
 private fun ScrollableDestinationContent(
-    destination: DesktopDestination,
-    state: DesktopBootstrapState,
+    inputs: ScrollableDestinationInputs,
     settings: DestinationSettingsActions,
     modifier: Modifier = Modifier,
 ) {
@@ -276,10 +298,11 @@ private fun ScrollableDestinationContent(
             .padding(horizontal = 32.dp, vertical = 20.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { DestinationHeader(destination) }
+        item { DestinationHeader(inputs.destination) }
         scrollableDestinationItems(
-            destination = destination,
-            state = state,
+            destination = inputs.destination,
+            state = inputs.state,
+            nucleus = inputs.nucleus,
             settings = settings,
         )
     }
@@ -304,6 +327,7 @@ private fun DestinationHeader(destination: DesktopDestination) {
 private fun LazyListScope.scrollableDestinationItems(
     destination: DesktopDestination,
     state: DesktopBootstrapState,
+    nucleus: DesktopNucleusState,
     settings: DestinationSettingsActions,
 ) {
     when (destination) {
@@ -318,6 +342,12 @@ private fun LazyListScope.scrollableDestinationItems(
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
                     onIrohIdentityReset = settings.onIrohIdentityReset,
+                )
+            }
+            item {
+                DesktopNucleusSettingsCard(
+                    state = nucleus,
+                    actions = settings.nucleus,
                 )
             }
         }

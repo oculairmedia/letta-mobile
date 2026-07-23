@@ -11,8 +11,10 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
+import com.letta.mobile.data.controller.node.iroh.IrohPairingService
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
@@ -55,7 +57,8 @@ internal fun buildProductionAdminRouter(
     adminBaseUrl: String,
     controller: DefaultAppServerController,
     subagentRegistrySource: SubagentRegistrySource?,
-): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource)
+    pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
+): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource, pairingService)
 
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
@@ -105,6 +108,14 @@ internal class AppServerServeIrohCommand : CliktCommand(
             "never dial it directly.",
     ).default("http://127.0.0.1:8291")
 
+    private val pairingStoreFile by option(
+        "--pairing-store-file",
+        envvar = "LETTA_IROH_PAIRING_STORE",
+        help = "Path to the paired-peer JSON store (d6e8g.5). When set, paired NodeIds " +
+            "authenticate without a token and one-time invites can be minted via " +
+            "pair.invite.create; redeem with an 'invite:<secret>' auth token.",
+    )
+
     private val allowInsecureAnonymousIroh by option(
         "--allow-insecure-anonymous-iroh",
         help = "TEST/DEV ONLY: run the Iroh endpoint with NO authentication. Every peer that " +
@@ -136,6 +147,11 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 }
             }
 
+            val pairingService = pairingStoreFile?.let { storePath ->
+                println("[iroh-app-server] Pairing enabled (store: $storePath)")
+                IrohPairingService(FilePairedPeerStore(java.nio.file.Path.of(storePath)))
+            }
+
             println("[iroh-app-server] Starting Iroh endpoint...")
             
             // Create the Iroh endpoint
@@ -144,6 +160,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 bindAddr = "0.0.0.0:${irohPort}",
                 secretKeyPath = irohSecretKeyPath,
                 authPolicy = authPolicy,
+                pairingService = pairingService,
             )
             irohEndpoint.create()
             
@@ -183,7 +200,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val rpcBase = adminBaseUrl.trimEnd('/')
             val subagentRegistrySource =
                 com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
-            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource)
+            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +

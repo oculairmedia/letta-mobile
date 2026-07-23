@@ -186,6 +186,52 @@ jobs:
       - name: List collected assets
         run: ls -la release-assets
 
+      - name: Generate Nucleus Windows update metadata
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ needs.android-apk.outputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="$RELEASE_TAG"
+          version="${tag#v}"
+          # Any hyphen-suffixed pre-release tag publishes to a non-stable
+          # updater channel so its metadata never lands on latest.yml. Nucleus
+          # only serves latest/beta/alpha channel files, so labels it does not
+          # define (rc, hotfix, ...) map to beta.
+          if [[ "$version" == *-* ]]; then
+            prerelease="${version#*-}"
+            channel="$(printf '%s' "$prerelease" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z].*//')"
+            case "$channel" in
+              alpha|beta) ;;
+              *) channel="beta" ;;
+            esac
+          else
+            channel="latest"
+          fi
+          release_date="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
+          mapfile -d '' installers < <(find release-assets -type f \( -iname '*.exe' -o -iname '*.msi' \) -print0 | sort -z)
+          if [ "${#installers[@]}" -eq 0 ]; then
+            echo "No Windows installers found for updater metadata" >&2
+            exit 1
+          fi
+          first_name="$(basename "${installers[0]}")"
+          first_hash="$(openssl dgst -sha512 -binary "${installers[0]}" | openssl base64 -A)"
+          {
+            echo "version: ${version}"
+            echo "files:"
+            for installer in "${installers[@]}"; do
+              name="$(basename "$installer")"
+              hash="$(openssl dgst -sha512 -binary "$installer" | openssl base64 -A)"
+              size="$(stat --printf='%s' "$installer")"
+              echo "  - url: ${name}"
+              echo "    sha512: ${hash}"
+              echo "    size: ${size}"
+            done
+            echo "path: ${first_name}"
+            echo "sha512: ${first_hash}"
+            echo "releaseDate: '${release_date}'"
+          } > "release-assets/${channel}.yml"
+
       - name: Create release with auto-generated notes
         uses: softprops/action-gh-release@v2
         with:
@@ -198,3 +244,4 @@ jobs:
             release-assets/*.apk
             release-assets/exe/*.exe
             release-assets/msi/*.msi
+            release-assets/*.yml

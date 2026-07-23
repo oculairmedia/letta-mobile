@@ -43,6 +43,7 @@ object AdminRpcRegistry {
         adminBaseUrl: String,
         controller: AppServerController? = null,
         subagentRegistrySource: SubagentRegistrySource? = null,
+        pairingService: IrohPairingService? = null,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val router = AdminRpcRouter()
@@ -63,6 +64,7 @@ object AdminRpcRegistry {
         SlashCommandAdminHandlers.register(router, rpcBase)
         SkillAdminHandlers.register(router, rpcBase)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
+        PairingAdminHandlers.register(router, pairingService)
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

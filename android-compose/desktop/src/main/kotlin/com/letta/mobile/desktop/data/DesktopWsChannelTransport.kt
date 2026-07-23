@@ -38,6 +38,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import java.time.Instant
 import java.util.UUID
+import dev.nucleusframework.nativessl.NativeTrustManager
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -266,7 +267,14 @@ class DesktopWsChannelTransport(
     companion object {
         const val DEFAULT_TIMEOUT_MS: Long = ChannelTransportDefaults.DEFAULT_CRON_TIMEOUT_MS
 
-        fun defaultWsClient(): HttpClient = HttpClient(CIO) { install(WebSockets) }
+        fun defaultWsClient(): HttpClient = HttpClient(CIO) {
+            engine {
+                https {
+                    trustManager = NativeTrustManager.trustManager
+                }
+            }
+            install(WebSockets)
+        }
     }
 }
 

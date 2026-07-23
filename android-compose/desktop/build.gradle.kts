@@ -1,4 +1,7 @@
-import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+import dev.nucleusframework.desktop.application.dsl.TargetFormat
+import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
+import dev.nucleusframework.desktop.application.dsl.ReleaseType
+import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // This repo does not yet use a Gradle version catalog. Keep desktop-only
@@ -20,12 +23,15 @@ val calendarVersion = "2.10.1"
 // off-screen renderer + Win32 window styles (no-activate / click-through).
 val jcefMavenVersion = "146.0.10"
 val jnaVersion = "5.17.0"
+val nucleusVersion = "2.1.5"
+val nativeTrayVersion = "2.0.1"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.compose")
+    id("dev.nucleusframework")
 }
 
 java {
@@ -123,6 +129,32 @@ dependencies {
     implementation("io.github.vinceglb:filekit-core-jvm:0.14.1")
     implementation("io.github.vinceglb:filekit-dialogs-compose-jvm:0.14.1")
     implementation(compose.desktop.currentOs)
+    implementation("dev.nucleusframework:nucleus.nucleus-application:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.updater-runtime:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.native-http:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.native-ssl:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.notification-common:$nucleusVersion")
+    // The common NotificationManager delegates to the matching per-OS bridge,
+    // so every desktop OS backend must be on the runtime classpath.
+    implementation("dev.nucleusframework:nucleus.notification-windows:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.notification-macos:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.notification-linux:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.system-info:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.darkmode-detector:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.system-color:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.taskbar-progress:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.autolaunch:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.launcher-windows:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.launcher-linux:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.launcher-macos:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.global-hotkey:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.energy-manager:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.media-control:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.linux-hidpi:$nucleusVersion")
+    implementation("dev.nucleusframework:composenativetray-jvm:$nativeTrayVersion")
+    // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
+    // use its portable JNI-backed AWT window backend rather than Tao.
+    runtimeOnly("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
     implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
@@ -140,7 +172,7 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.compose.ui:ui-test:1.10.0")
+    testImplementation("org.jetbrains.compose.ui:ui-test:1.11.1")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
     testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
 }
@@ -171,31 +203,90 @@ tasks.register<JavaExec>("runPetSpike") {
 // (`:desktop:run` or a packaged distribution) requires a JDK 25+ at runtime — an
 // older JRE fails at startup with UnsupportedClassVersionError loading
 // org.jetbrains.jewel.*. Compilation and unit tests run on JDK 21+.
-compose.desktop {
-    application {
-        mainClass = "com.letta.mobile.desktop.MainKt"
+nucleus.application {
+    mainClass = "com.letta.mobile.desktop.MainKt"
 
-        nativeDistributions {
+    // Native Image is intentionally opt-in: the JVM distribution remains the
+    // compatibility build for JCEF and Iroh, while release engineers can run
+    // `-PnucleusGraalvm=true` to benchmark the native launcher.
+    graalvm {
+        isEnabled = providers.gradleProperty("nucleusGraalvm").orNull.toBoolean()
+        imageName = "letta-desktop"
+        javaLanguageVersion = 25
+    }
+
+    nativeDistributions {
+        if (providers.gradleProperty("nucleusAllFormats").orNull.toBoolean()) {
+            targetFormats(*TargetFormat.entries.toTypedArray())
+        } else {
             targetFormats(TargetFormat.Exe, TargetFormat.Msi)
-            packageName = "Letta Desktop"
-            packageVersion = computeDesktopPackageVersion().get()
-            description = "Desktop client foundation for the Letta AI platform."
-            copyright = "Copyright (C) 2026 Letta"
-            vendor = "Letta"
+        }
+        packageName = "Letta Desktop"
+        packageVersion = computeDesktopPackageVersion().get()
+        description = "Desktop client foundation for the Letta AI platform."
+        copyright = "Copyright (C) 2026 Letta"
+        vendor = "Letta"
+        artifactName = $$"${name}-${version}-${os}-${arch}.${ext}"
+        protocol("Meridian", "meridian")
 
-            windows {
-                // Create a Start Menu entry ("Letta" group) and a desktop
-                // shortcut so the app is discoverable after install instead of
-                // only living under AppData/Program Files.
-                menuGroup = "Letta"
-                menu = true
-                shortcut = true
-                // Per-user install: no admin/UAC prompt required.
-                perUserInstall = true
-                // Stable GUID so MSI installs UPGRADE in place across versions
-                // instead of stacking side-by-side. Must never change.
-                upgradeUuid = "44e25263-67d4-443c-b85c-655a41118add"
+        publish {
+            github {
+                enabled = true
+                owner = "oculairmedia"
+                repo = "letta-mobile"
+                channel = ReleaseChannel.Latest
+                releaseType = ReleaseType.Release
             }
+        }
+
+        windows {
+            // Preserve the existing installer identity and discoverability
+            // while moving packaging from Compose Desktop to Nucleus.
+            menuGroup = "Letta"
+            menu = true
+            shortcut = true
+            perUserInstall = true
+            upgradeUuid = "44e25263-67d4-443c-b85c-655a41118add"
+            nsis {
+                createDesktopShortcut = true
+                createStartMenuShortcut = true
+            }
+            providers.environmentVariable("WINDOWS_SIGNING_CERTIFICATE").orNull?.let { certificate ->
+                signing {
+                    enabled = true
+                    certificateFile.set(file(certificate))
+                    certificatePassword = providers.environmentVariable("WINDOWS_SIGNING_PASSWORD").orNull
+                    algorithm = SigningAlgorithm.Sha256
+                    timestampServer = "http://timestamp.digicert.com"
+                }
+            }
+        }
+
+        macOS {
+            bundleID = "com.letta.desktop"
+            appCategory = "public.app-category.productivity"
+            dockName = "Letta"
+            providers.environmentVariable("APPLE_SIGNING_IDENTITY").orNull?.let { signingIdentity ->
+                signing {
+                    sign.set(true)
+                    identity.set(signingIdentity)
+                }
+            }
+            val appleId = providers.environmentVariable("APPLE_NOTARIZATION_ID").orNull
+            val applePassword = providers.environmentVariable("APPLE_NOTARIZATION_PASSWORD").orNull
+            val appleTeam = providers.environmentVariable("APPLE_TEAM_ID").orNull
+            if (appleId != null && applePassword != null && appleTeam != null) {
+                notarization {
+                    this.appleID.set(appleId)
+                    password.set(applePassword)
+                    teamID.set(appleTeam)
+                }
+            }
+        }
+
+        linux {
+            appCategory = "Utility"
+            startupWMClass = "Letta Desktop"
         }
     }
 }
