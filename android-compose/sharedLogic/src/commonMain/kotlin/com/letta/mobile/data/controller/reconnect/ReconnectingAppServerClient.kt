@@ -309,6 +309,10 @@ class ReconnectingAppServerClient(
 
     override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = ready().cronDeleteAll(command)
 
+    override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) = ready().getReflectionSettings(command)
+
+    override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) = ready().setReflectionSettings(command)
+
 
     companion object {
         private const val EVENT_BUFFER = 256

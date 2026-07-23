@@ -88,6 +88,9 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.CronUpdate -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.CronDelete -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.CronDeleteAll -> AmbiguousMutation(dedupKey = null)
+
+            is AppServerCommand.GetReflectionSettings -> SafeRead
+            is AppServerCommand.SetReflectionSettings -> AmbiguousMutation(dedupKey = null)
         }
 
         /** True if this command may be re-sent verbatim after a reconnect. */
