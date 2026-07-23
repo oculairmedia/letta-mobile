@@ -288,6 +288,12 @@ class ReconnectingAppServerClient(
     override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
         ready().conversationMessagesList(command)
 
+    override suspend fun listModels(command: AppServerCommand.ListModels) = ready().listModels(command)
+
+    override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)
+
+    override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
+
     companion object {
         private const val EVENT_BUFFER = 256
         const val DEFAULT_MAX_ATTEMPTS = 10

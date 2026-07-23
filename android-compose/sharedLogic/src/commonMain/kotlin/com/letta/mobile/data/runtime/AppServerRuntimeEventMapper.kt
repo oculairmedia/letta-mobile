@@ -36,6 +36,9 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.ConversationCreateResponse,
             is AppServerInboundFrame.ConversationUpdateResponse,
             is AppServerInboundFrame.ConversationMessagesListResponse,
+            is AppServerInboundFrame.ListModelsResponse,
+            is AppServerInboundFrame.SkillEnableResponse,
+            is AppServerInboundFrame.SkillDisableResponse,
             -> emptyList()
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)

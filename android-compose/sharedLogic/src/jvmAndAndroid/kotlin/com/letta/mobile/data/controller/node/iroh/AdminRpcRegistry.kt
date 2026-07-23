@@ -45,25 +45,27 @@ object AdminRpcRegistry {
         subagentRegistrySource: SubagentRegistrySource? = null,
         pairingService: IrohPairingService? = null,
         nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
+        /** lgns8.8/.11 cutover lever: capability-gated ops deny instead of using the shim. */
+        shimRetired: Boolean = false,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val router = AdminRpcRouter()
 
-        HealthAdminHandlers.register(router, rpcBase)
+        HealthAdminHandlers.register(router, rpcBase, controller)
         AgentAdminHandlers.register(router, rpcBase, controller, nativeClient)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase, nativeClient)
+        ConversationAdminHandlers.register(router, rpcBase, nativeClient, shimRetired)
         ProjectAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
         ArchiveAdminHandlers.register(router, rpcBase)
         IdentityAdminHandlers.register(router, rpcBase)
-        ModelAdminHandlers.register(router, rpcBase)
+        ModelAdminHandlers.register(router, rpcBase, nativeClient)
         ScheduleAdminHandlers.register(router, rpcBase)
         ToolAdminHandlers.register(router, rpcBase)
         McpAdminHandlers.register(router, rpcBase)
         GoalAdminHandlers.register(router, rpcBase)
         SlashCommandAdminHandlers.register(router, rpcBase)
-        SkillAdminHandlers.register(router, rpcBase)
+        SkillAdminHandlers.register(router, rpcBase, nativeClient)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
         PairingAdminHandlers.register(router, pairingService)
 

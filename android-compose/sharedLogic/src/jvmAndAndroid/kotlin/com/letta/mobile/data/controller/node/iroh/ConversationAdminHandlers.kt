@@ -5,10 +5,15 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
 
 object ConversationAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String, nativeClient: AppServerClient? = null) {
+    fun register(
+        router: AdminRpcRouter,
+        adminBaseUrl: String,
+        nativeClient: AppServerClient? = null,
+        shimRetired: Boolean = false,
+    ) {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         registerConversationReadRoutes(router, api, nativeClient)
-        registerConversationWriteRoutes(router, api, nativeClient)
+        registerConversationWriteRoutes(router, api, nativeClient, shimRetired)
         registerMessageRoutes(router, api, nativeClient)
     }
 
@@ -66,6 +71,7 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
+        shimRetired: Boolean,
     ) {
         router.register("conversation.create") { params ->
             // Current App Server exposes the canonical create route at
@@ -81,6 +87,15 @@ object ConversationAdminHandlers {
             } ?: api.post(AdminPath.v1("conversations"), body = params.toString())
         }
         router.register("conversation.delete") { params ->
+            params.requireParam(AdminParamKey("conversation_id"))
+            // lgns8.8 (matrix: capability_gated_unsupported, deny_fail_closed):
+            // conversation_delete is absent from the pinned v2 inventory. Once
+            // the shim is retired there is no backend for it — return a typed
+            // capability denial instead of pretending. Until cutover the shim
+            // DELETE keeps product behavior.
+            if (shimRetired) {
+                adminError("capability_unavailable: conversation_delete is not in the pinned App Server v2 contract; archive instead")
+            }
             val id = params.requireParam(AdminParamKey("conversation_id"))
             api.delete(AdminPath.v1("conversations", id))
         }

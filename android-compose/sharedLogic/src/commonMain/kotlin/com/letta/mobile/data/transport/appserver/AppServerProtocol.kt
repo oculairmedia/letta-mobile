@@ -354,6 +354,29 @@ sealed interface AppServerCommand {
         @SerialName("conversation_id") val conversationId: String,
         val query: JsonObject? = null,
     ) : AppServerCommand
+
+    // Policy-gated control capabilities (lgns8.8).
+
+    @Serializable
+    @SerialName("list_models")
+    data class ListModels(
+        @SerialName("request_id") val requestId: String,
+        val force: Boolean? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("skill_enable")
+    data class SkillEnable(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("skill_path") val skillPath: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("skill_disable")
+    data class SkillDisable(
+        @SerialName("request_id") val requestId: String,
+        val name: String,
+    ) : AppServerCommand
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -631,6 +654,44 @@ sealed interface AppServerInboundFrame {
 
         @Transient
         override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("list_models_response")
+    data class ListModelsResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val entries: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "list_models_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("skill_enable_response")
+    data class SkillEnableResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("skill_name") val skillName: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "skill_enable_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("skill_disable_response")
+    data class SkillDisableResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "skill_disable_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
     // Runtime-native admin responses (lgns8.7); entity payloads stay raw

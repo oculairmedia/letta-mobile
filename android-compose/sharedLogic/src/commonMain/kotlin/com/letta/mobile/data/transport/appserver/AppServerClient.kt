@@ -70,6 +70,15 @@ interface AppServerClient {
         command: AppServerCommand.ConversationMessagesList,
     ): AppServerInboundFrame.ConversationMessagesListResponse =
         throw UnsupportedOperationException("conversation_messages_list is not supported by this client")
+
+    suspend fun listModels(command: AppServerCommand.ListModels): AppServerInboundFrame.ListModelsResponse =
+        throw UnsupportedOperationException("list_models is not supported by this client")
+
+    suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse =
+        throw UnsupportedOperationException("skill_enable is not supported by this client")
+
+    suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
+        throw UnsupportedOperationException("skill_disable is not supported by this client")
 }
 
 class DefaultAppServerClient(
@@ -184,4 +193,13 @@ class DefaultAppServerClient(
         command: AppServerCommand.ConversationMessagesList,
     ): AppServerInboundFrame.ConversationMessagesListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationMessagesListResponse }) { transport.sendControl(command) }
+
+    override suspend fun listModels(command: AppServerCommand.ListModels): AppServerInboundFrame.ListModelsResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ListModelsResponse }) { transport.sendControl(command) }
+
+    override suspend fun skillEnable(command: AppServerCommand.SkillEnable): AppServerInboundFrame.SkillEnableResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.SkillEnableResponse }) { transport.sendControl(command) }
+
+    override suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.SkillDisableResponse }) { transport.sendControl(command) }
 }
