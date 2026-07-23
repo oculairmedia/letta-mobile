@@ -110,6 +110,77 @@ class ChatSendCoordinatorConversationSwitchTest {
         assertEquals(listOf("conv-old"), timeline.ingestedConversationIds)
     }
 
+    @Test
+    fun `iroh backend with a blank token is not gated on a token`() = runTest {
+        val transport = RecordingChannelTransport()
+        val failures = mutableListOf<String>()
+        val coordinator = ChatSendCoordinator(
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler)),
+            agentId = AGENT_ID,
+            activeConfig = { LettaConfig("iroh", LettaConfig.Mode.SELF_HOSTED, "iroh://node@host:4501", accessToken = null) },
+            wsChatBridge = WsChatBridge(transport),
+            timelineRepository = RecordingTimelineWriter(),
+            conversationRepository = FakeConversationRepository(),
+            ui = CapturingUiSink(failures),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-a" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersion = { "test" },
+            otidGenerator = { "otid-iroh" },
+        )
+
+        coordinator.send("hello")
+        advanceUntilIdle()
+
+        assertEquals(emptyList(), failures.filter { it.contains("API token") }, "iroh send must not be token-gated")
+        assertEquals(listOf("conv-a"), transport.sentConversationIds, "the send proceeds over the transport")
+    }
+
+    @Test
+    fun `admin-shim backend with a blank token is still rejected for a token`() = runTest {
+        val transport = RecordingChannelTransport()
+        val failures = mutableListOf<String>()
+        val coordinator = ChatSendCoordinator(
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler)),
+            agentId = AGENT_ID,
+            activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", accessToken = null) },
+            wsChatBridge = WsChatBridge(transport),
+            timelineRepository = RecordingTimelineWriter(),
+            conversationRepository = FakeConversationRepository(),
+            ui = CapturingUiSink(failures),
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-a" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersion = { "test" },
+            otidGenerator = { "otid-shim" },
+        )
+
+        coordinator.send("hello")
+        advanceUntilIdle()
+
+        assertEquals(1, failures.count { it.contains("API token") }, "shim send with no token is rejected")
+        assertEquals(emptyList(), transport.sentConversationIds, "nothing is sent")
+    }
+
+    private class CapturingUiSink(private val failures: MutableList<String>) : ChatSendUiSink {
+        override fun currentError(): String? = null
+        override fun isStreaming(): Boolean = false
+        override fun isAgentTyping(): Boolean = false
+        override fun onSendDispatched(conversationId: String?) = Unit
+        override fun onSendQueued(conversationId: String) = Unit
+        override fun onSendFailed(message: String) { failures += message }
+        override fun onError(message: String?) = Unit
+        override fun onTurnStarted(conversationId: String) = Unit
+        override fun onMessageDelta(conversationId: String) = Unit
+        override fun onUsage(promptTokens: Int, completionTokens: Int, totalTokens: Int) = Unit
+        override fun onTurnFinished(error: String?) = Unit
+        override fun onTurnVisuallyComplete() = Unit
+        override fun onTransientDisconnect(hasActiveSend: Boolean) = Unit
+        override fun onDisconnectFailure(error: String) = Unit
+    }
+
     private class NoopUiSink : ChatSendUiSink {
         override fun currentError(): String? = null
         override fun isStreaming(): Boolean = false
