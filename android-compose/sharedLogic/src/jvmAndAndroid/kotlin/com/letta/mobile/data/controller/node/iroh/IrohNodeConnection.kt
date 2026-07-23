@@ -284,9 +284,13 @@ class IrohNodeConnection(
     private fun currentAdminRpcRequestContext(): AdminRpcRequestContext =
         AdminRpcRequestContext(
             authenticated = authenticated.get(),
-            authorizedConversationIds = viewerSubscription?.currentConversation
-                ?.let(::setOf)
-                ?: emptySet(),
+            // lgns8.12: conversation-content scope follows peer capabilities —
+            // manage/admin peers are unrestricted (null); lesser peers are
+            // bounded to the conversation they are viewing.
+            authorizedConversationIds = IrohPeerCapabilities.conversationScope(
+                capabilities = effectiveCapabilities(),
+                viewedConversationId = viewerSubscription?.currentConversation,
+            ),
         )
 
     /** Control-channel admin_rpc: parse + dispatch with scoped auth context. */

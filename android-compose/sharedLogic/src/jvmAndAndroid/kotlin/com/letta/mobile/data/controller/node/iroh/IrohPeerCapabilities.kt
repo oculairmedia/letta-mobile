@@ -67,6 +67,20 @@ object IrohPeerCapabilities {
     fun isAllowed(capabilities: Set<String>, required: String): Boolean =
         ADMIN_FULL in capabilities || required in capabilities
 
+    /**
+     * Conversation-content scope for admin_rpc reads (lgns8.12): peers that
+     * may manage conversations read any conversation (null = unrestricted);
+     * lesser peers are bounded to the conversation they are actively viewing
+     * (empty set when none) — cross-conversation content access is rejected
+     * at the handler with no proxy side effects.
+     */
+    fun conversationScope(capabilities: Set<String>, viewedConversationId: String?): Set<String>? =
+        if (ADMIN_FULL in capabilities || CONVERSATION_MANAGE in capabilities) {
+            null
+        } else {
+            viewedConversationId?.let(::setOf) ?: emptySet()
+        }
+
     private fun String.isReadMethod(): Boolean =
         endsWith(".list") || endsWith(".get") || endsWith(".list_agent")
 

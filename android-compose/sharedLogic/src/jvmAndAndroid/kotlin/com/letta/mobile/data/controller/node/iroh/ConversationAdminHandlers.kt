@@ -69,8 +69,9 @@ object ConversationAdminHandlers {
     }
 
     private fun registerMessageRoutes(router: AdminRpcRouter, api: AdminHandlerSupport) {
-        router.register("message.list") { params ->
+        router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
+            requireConversationAccess(context, convId)
             // letta-mobile-c4igq.9: enforce a bounded newest-window even when the
             // client sends no limit. An unbounded message.list on a ~60MB transcript
             // built one giant admin_rpc response the frame layer rejects
@@ -103,19 +104,32 @@ object ConversationAdminHandlers {
                 MessageListWireProjection.projectMessageList(response, convId),
             )
         }
-        router.register("message.get") { params ->
+        router.registerScoped("message.get") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
+            requireConversationAccess(context, convId)
             val msgId = params.requireParam(AdminParamKey("message_id"))
             api.get(AdminPath.v1("conversations", convId, "messages", msgId))
         }
-        router.register("tool_return.get") { params ->
+        router.registerScoped("tool_return.get") { params, context ->
             /**
              * letta-mobile-fe51r: on-demand full-body fetch for a projected
              * tool-return message. Returns the complete, unprojected message.
              */
             val convId = params.requireParam(AdminParamKey("conversation_id"))
+            requireConversationAccess(context, convId)
             val msgId = params.requireParam(AdminParamKey("message_id"))
             api.get(AdminPath.v1("conversations", convId, "messages", msgId))
+        }
+    }
+
+    /**
+     * lgns8.12: conversation-content reads reject cross-scope access BEFORE
+     * any proxy call. Uniform denial without leaking whether the target
+     * conversation exists.
+     */
+    private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
+        if (!context.canAccessConversation(conversationId)) {
+            adminError("forbidden: conversation out of authorized scope")
         }
     }
 
