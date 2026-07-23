@@ -321,6 +321,36 @@ class IrohAdminRpcChatGatewayTest {
         assertEquals("agent-1", schedule.agentId)
     }
 
+    @Test
+    fun listAgentsPagesInSmallChunksAndStopsOnAShortPage() = runTest(UnconfinedTestDispatcher()) {
+        // Regression: a single limit=200 agent.list read returns FULL agent
+        // objects (multi-MB) and timed out on a slow link ("admin_rpc timed out"
+        // → agents never load). listAgents must page in small chunks and stop at
+        // the first short page — never issuing a needless extra round trip.
+        val pageSize = IrohAdminRpcAgentDirectory.AGENT_LIST_PAGE_SIZE
+        val offsetOf = { body: String? ->
+            Regex("\"offset\":\"(\\d+)\"").find(body.orEmpty())!!.groupValues[1].toInt()
+        }
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("agent.list", call.method)
+            assertTrue("limit=$pageSize" in call.path, "page limit in path: ${call.path}")
+            val ids = when (offsetOf(call.body)) {
+                0 -> (0 until pageSize).map { "agent-$it" }                 // full page → keep going
+                pageSize -> (pageSize until pageSize + 3).map { "agent-$it" } // short page → stop
+                else -> emptyList()
+            }
+            ok(ids.joinToString(prefix = "[", postfix = "]") { """{"id":"$it","name":"A"}""" })
+        }
+        val directory = IrohAdminRpcAgentDirectory(transport)
+
+        val agents = directory.listAgents()
+
+        assertEquals(pageSize + 3, agents.size, "all pages accumulated")
+        assertEquals(2, transport.rpcCalls.size, "stops on the short page — no wasted 3rd call")
+        assertEquals(listOf(0, pageSize), transport.rpcCalls.map { offsetOf(it.body) }, "offsets advance by page")
+    }
+
     // ------------------------------------------------------------------
     // Fixtures
     // ------------------------------------------------------------------

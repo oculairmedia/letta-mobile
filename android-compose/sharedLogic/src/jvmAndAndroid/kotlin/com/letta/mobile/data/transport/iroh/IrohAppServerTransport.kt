@@ -540,7 +540,13 @@ class IrohAppServerTransport(
         // user messages.
         const val KEEPALIVE_INTERVAL_MS = 15_000L
         const val CONNECT_TIMEOUT_MS = 120_000L
-        const val ADMIN_RPC_TIMEOUT_MS = 15_000L
+        // 30s (was 15s): headroom for legitimately large admin_rpc reads on a
+        // slow/relayed link — notably block.list, whose backend ignores
+        // limit/offset so it can't be paged and returns the full set (~2 MB /
+        // 1400+ blocks) in one response. agent.list is paged (see
+        // IrohAdminRpcChatGateway.AGENT_LIST_PAGE_SIZE) so it no longer relies on
+        // this. Kept bounded so a genuinely dead request still fails, not hangs.
+        const val ADMIN_RPC_TIMEOUT_MS = 30_000L
         val KEEPALIVE_PAYLOAD = byteArrayOf(0)
     }
 }
