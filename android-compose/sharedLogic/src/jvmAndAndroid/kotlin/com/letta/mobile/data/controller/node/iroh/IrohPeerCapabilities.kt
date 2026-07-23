@@ -61,6 +61,11 @@ object IrohPeerCapabilities {
         method.startsWith("skill.") -> SKILLS_MANAGE
         method.startsWith("tool.") || method == "mcp.list" -> TOOLS_MANAGE
         method.startsWith("project.") -> PROJECTS_MANAGE
+        // Pairing management (invite/list/get/rename/set_capabilities/revoke) is
+        // privileged: only an admin.full peer may enroll, re-scope, or revoke
+        // devices (d6e8g.7). Explicit so it never silently downgrades if a
+        // future prefix rule is added above.
+        method.startsWith("pair.") -> ADMIN_FULL
         else -> ADMIN_FULL
     }
 
