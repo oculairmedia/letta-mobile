@@ -11,6 +11,8 @@ import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
+import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
+import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -80,6 +82,12 @@ class IrohChannelTransport(
     // Lets the on-host harness dial a live in-process node without rebuilding the constant.
     private val forcedIrohUrl: String = "",
     private val activeConfigProvider: () -> IrohConnectConfig? = { null },
+    // d6e8g.9: persistent client identity. The default is ephemeral (a fresh
+    // NodeId per dial, preserving prior behavior + tests); production apps pass
+    // a persisted store so the device keeps ONE stable NodeId across reconnects
+    // — a prerequisite for server-side pairing (a churning NodeId can never
+    // bind to a paired peer).
+    private val secretKeyStore: IrohSecretKeyStore = EphemeralIrohSecretKeyStore(),
     private val testDialer: (suspend (IrohConnectConfig) -> IrohConnectionHandle)? = null,
     // Bounded window (ms) to await the server's own terminal after an abort
     // before synthesizing a cancelled terminal. Overridable so tests need not
@@ -657,9 +665,10 @@ class IrohChannelTransport(
             ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
         _state.value = ChannelTransportState.Connecting()
         onConnect()
+        val secretKey = secretKeyStore.loadOrCreate()
         val localEndpoint = runCatching {
             Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.defaultMode())
+                EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey)
             )
         }.onFailure { t ->
             Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)

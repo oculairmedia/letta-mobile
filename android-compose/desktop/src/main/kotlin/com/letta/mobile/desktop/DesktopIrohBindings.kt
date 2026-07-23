@@ -40,7 +40,12 @@ private fun desktopIrohConnectConfig(config: LettaConfig): IrohConnectConfig =
  * backends. Connects on entering composition and disconnects on dispose.
  */
 private fun createIrohTransport(config: LettaConfig): IrohChannelTransport =
-    IrohChannelTransport(activeConfigProvider = { desktopIrohConnectConfig(config) })
+    IrohChannelTransport(
+        activeConfigProvider = { desktopIrohConnectConfig(config) },
+        // d6e8g.9: reuse the persisted, vault-encrypted desktop identity so this
+        // machine keeps one stable NodeId across reconnects (enables pairing).
+        secretKeyStore = { com.letta.mobile.desktop.security.DesktopIrohIdentity.loadOrCreate() },
+    )
 
 internal data class DesktopConnectParams(
     val baseShimUrl: String,

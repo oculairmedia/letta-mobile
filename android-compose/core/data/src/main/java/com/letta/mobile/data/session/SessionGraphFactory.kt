@@ -202,6 +202,12 @@ class SessionGraphFactory internal constructor(
                 IrohChannelTransport(
                     scope = scope,
                     onConnect = { com.letta.mobile.runtime.iroh.IrohAndroidInit.install(appContext) },
+                    // d6e8g.9: persist a stable device NodeId (0600 key file in
+                    // the app-private filesDir) so reconnects reuse one identity
+                    // — required for server-side pairing to bind this device.
+                    secretKeyStore = com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore(
+                        java.io.File(appContext.filesDir, "iroh-client-identity.key").path,
+                    ),
                     activeConfigProvider = {
                         settingsRepository?.activeConfig?.value?.let { config ->
                             IrohConnectConfig(
