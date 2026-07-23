@@ -424,11 +424,33 @@ class IrohAdminRpcAgentDirectory(
     }
 
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
-        val body = buildJsonObject {
-            put("limit", limit.toString())
-            put("offset", "0")
-        }.toString()
-        return adminRpcDecodedList("agent.list", "/v1/agents?limit=$limit&offset=0", body)
+        // agent.list returns FULL agent objects (each carries its whole system
+        // prompt + core-memory), so the complete set is multiple MB. A single
+        // limit=200 read blew past ADMIN_RPC_TIMEOUT on a slow/relayed link
+        // ("admin_rpc timed out" → agents never load). Page through in small
+        // chunks so every request stays small and fast, and accumulate up to
+        // `limit` — mirrors the REST cache-refresh paging (AgentRepository
+        // CACHE_REFRESH_PAGE_SIZE) and the message.list frame-cap paging.
+        val out = ArrayList<Agent>(minOf(limit, 64))
+        var offset = 0
+        while (out.size < limit) {
+            val pageLimit = minOf(AGENT_LIST_PAGE_SIZE, limit - out.size)
+            val body = buildJsonObject {
+                put("limit", pageLimit.toString())
+                put("offset", offset.toString())
+            }.toString()
+            val page: List<Agent> =
+                adminRpcDecodedList("agent.list", "/v1/agents?limit=$pageLimit&offset=$offset", body)
+            if (page.isEmpty()) break
+            out += page
+            // A short page means we've reached the end. (If the server ever
+            // ignored `limit` and returned everything at once, page.size >=
+            // pageLimit keeps us looping; the next offset then returns empty and
+            // we stop — so this is safe either way.)
+            if (page.size < pageLimit) break
+            offset += page.size
+        }
+        return out
     }
 
     suspend fun getAgent(agentId: String): Agent? {
@@ -611,5 +633,10 @@ class IrohAdminRpcAgentDirectory(
         // Single page sized for the desktop roster; Android's source paginates
         // 50-at-a-time up to 2500 — revisit if a deployment outgrows this.
         const val AGENT_LIST_LIMIT = 200
+        // Per-page size for the paged agent.list read. Kept small because each
+        // agent object is heavy (full system prompt + core memory): ~10 agents
+        // is a few hundred KB, well under the admin_rpc timeout on a slow link,
+        // whereas the full set is multiple MB and times out in one shot.
+        const val AGENT_LIST_PAGE_SIZE = 10
     }
 }
