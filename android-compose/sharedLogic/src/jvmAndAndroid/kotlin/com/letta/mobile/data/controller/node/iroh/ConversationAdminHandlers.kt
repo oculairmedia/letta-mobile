@@ -41,12 +41,11 @@ object ConversationAdminHandlers {
                 )
                 if (response.success) response.conversations ?: JsonArray(emptyList()) else null
             } ?: run {
-                val path = if (agentId != null) {
-                    AdminPath.v1("agents", agentId, "conversations")
-                } else {
-                    AdminPath.v1("conversations")
-                }
-                api.get(path) {
+                // #962: the App Server only serves the flat GET /v1/conversations
+                // route, filtering by an agent_id query param; the agent-scoped
+                // /v1/agents/{id}/conversations route is not registered and 404s.
+                api.get(AdminPath.v1("conversations")) {
+                    query("agent_id", agentId)
                     query("limit", param(params, AdminParamKey("limit")))
                     query("after", param(params, AdminParamKey("after")))
                     query("archive_status", param(params, AdminParamKey("archive_status")))
