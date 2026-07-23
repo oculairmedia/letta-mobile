@@ -58,7 +58,9 @@ class IrohPeerCapabilitiesTest {
         // Denied: server administration requires explicit admin.full.
         listOf(
             "agent.create", "agent.delete", "identity.list", "run.list", "provider.list",
-            "health.check", "goal.command", "pair.invite.create", "pair.peer.revoke",
+            "health.check", "goal.command",
+            "pair.invite.create", "pair.peer.list", "pair.peer.get",
+            "pair.peer.rename", "pair.peer.set_capabilities", "pair.peer.revoke",
             "archive.list", "folder.list", "group.list",
         ).forEach { method ->
             assertFalse(
