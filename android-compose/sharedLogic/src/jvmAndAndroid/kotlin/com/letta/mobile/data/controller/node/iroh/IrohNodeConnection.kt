@@ -532,20 +532,7 @@ class IrohNodeConnection(
             )
         }
         if (pairingService?.isPaired(remoteEndpointId) == true) {
-            authenticated.set(true)
-            val advertised = (obj["capabilities"] as? JsonArray)
-                ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
-                ?.toSet()
-                .orEmpty()
-            peerCapabilities.set(advertised)
-            Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId, "method" to "paired_node_id")
-            val capabilities = advertisedCapabilities(adminRpcRouter)
-            return buildJsonObject {
-                put("type", "auth_response")
-                put("request_id", requestId)
-                put("success", true)
-                put("capabilities", Json.encodeToJsonElement(capabilities))
-            }.toString()
+            return authenticatePairedPeer(requestId, obj)
         }
         val outcome = authVerifier.verify(remoteEndpointId, provided)
         if (outcome is IrohBearerAuthVerifier.Outcome.RateLimited) {
@@ -652,6 +639,19 @@ class IrohNodeConnection(
                 }.toString()
             }
             is IrohPairingService.RedeemResult.Rejected -> {
+                // d6e8g.7: a device that already paired but still carries the
+                // now-consumed invite in its token field must NOT be locked out.
+                // Fall through to NodeId auth instead of hard-failing on the
+                // stale invite (the invite is enrollment-only; the binding is
+                // what authenticates future sessions).
+                if (pairing.isPaired(remoteEndpointId)) {
+                    Telemetry.event(
+                        "IrohNode", "auth.invite_superseded_by_pairing",
+                        "remoteEndpointId" to remoteEndpointId,
+                        "reason" to "invite_${result.reason}",
+                    )
+                    return authenticatePairedPeer(requestId, obj)
+                }
                 authenticated.set(false)
                 Telemetry.event(
                     "IrohNode", "auth.failed",
@@ -661,6 +661,29 @@ class IrohNodeConnection(
                 """{"type":"auth_response","request_id":"$requestId","success":false,"error":"invite_${result.reason}"}"""
             }
         }
+    }
+
+    /**
+     * Authenticate an already-paired peer by its NodeId alone (d6e8g.5). Shared
+     * by the direct paired-auth path and the stale-invite fall-through (d6e8g.7).
+     * The advertised capabilities are the client's transport capabilities, not
+     * authorization grants (those come from the persisted PairedPeer).
+     */
+    private fun authenticatePairedPeer(requestId: String, obj: JsonObject): String {
+        authenticated.set(true)
+        val advertised = (obj["capabilities"] as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+            ?.toSet()
+            .orEmpty()
+        peerCapabilities.set(advertised)
+        Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId, "method" to "paired_node_id")
+        val capabilities = advertisedCapabilities(adminRpcRouter)
+        return buildJsonObject {
+            put("type", "auth_response")
+            put("request_id", requestId)
+            put("success", true)
+            put("capabilities", Json.encodeToJsonElement(capabilities))
+        }.toString()
     }
 
     private inline fun ifAuthorized(requestId: String?, block: () -> String?): String? =
