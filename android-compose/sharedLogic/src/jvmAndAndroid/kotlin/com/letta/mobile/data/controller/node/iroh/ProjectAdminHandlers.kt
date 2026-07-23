@@ -1,15 +1,23 @@
 package com.letta.mobile.data.controller.node.iroh
 
 /**
- * Project API parity over Iroh admin_rpc.
+ * Project API parity over Iroh admin_rpc (lgns8.9).
  *
- * Proxies the existing HTTP project endpoints; this handler owns no separate
- * project store. It exists so iroh:// clients do not trip the raw-HTTP purity
- * choke-point and mark Projects as unsupported.
+ * These 9 methods are owned by the VibeSync product service, not lettashim.
+ * The handler talks to VibeSync DIRECTLY through an injected base URL rather
+ * than routing through lettashim's `/api` reverse-proxy splice — removing
+ * the shim dependency for the project surface (matrix owner: vibesync_service).
+ * When no VibeSync service is configured ([vibesyncBaseUrl] == null) the
+ * methods return a typed capability-unavailable rather than dialing the shim,
+ * so Projects degrade gracefully without failing chat.
  */
 object ProjectAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
+    fun register(router: AdminRpcRouter, vibesyncBaseUrl: String?) {
+        if (vibesyncBaseUrl == null) {
+            CapabilityUnavailable.register(router, PROJECT_METHODS, service = "vibesync")
+            return
+        }
+        val api = AdminHandlerSupport(AdminProxyClient(vibesyncBaseUrl))
 
         router.register("project.list") { params ->
             api.get(AdminPath.api("projects")) {
@@ -64,4 +72,9 @@ object ProjectAdminHandlers {
             api.delete(AdminPath.api("registry", "projects", identifier))
         }
     }
+
+    val PROJECT_METHODS: Set<String> = setOf(
+        "project.list", "project.get", "project.beadsRemoteStatus", "project.provisionBeadsRemote",
+        "project.triggerSync", "project.create", "project.update", "project.archive", "project.delete",
+    )
 }

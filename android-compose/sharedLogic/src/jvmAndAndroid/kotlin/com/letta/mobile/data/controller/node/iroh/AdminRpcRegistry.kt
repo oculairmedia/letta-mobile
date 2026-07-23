@@ -47,6 +47,13 @@ object AdminRpcRegistry {
         nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
         /** lgns8.8/.11 cutover lever: capability-gated ops deny instead of using the shim. */
         shimRetired: Boolean = false,
+        /**
+         * lgns8.9: VibeSync product service base URL for project.* methods. When
+         * null the project methods return capability-unavailable instead of
+         * dialing lettashim. Defaults to [adminBaseUrl] only for backward
+         * compatibility in tests; production injects VibeSync directly.
+         */
+        vibesyncBaseUrl: String? = adminBaseUrl,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val router = AdminRpcRouter()
@@ -55,7 +62,7 @@ object AdminRpcRegistry {
         AgentAdminHandlers.register(router, rpcBase, controller, nativeClient)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
         ConversationAdminHandlers.register(router, rpcBase, nativeClient, shimRetired)
-        ProjectAdminHandlers.register(router, rpcBase)
+        ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, rpcBase)
         ArchiveAdminHandlers.register(router, rpcBase)
         IdentityAdminHandlers.register(router, rpcBase)
