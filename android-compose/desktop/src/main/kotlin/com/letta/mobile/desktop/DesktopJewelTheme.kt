@@ -4,6 +4,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -15,24 +16,42 @@ import com.letta.mobile.ui.theme.LocalCustomColors
 import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.intui.standalone.theme.IntUiTheme
 import org.jetbrains.jewel.intui.standalone.theme.darkThemeDefinition
+import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
 import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.ui.ComponentStyling
+import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
+import dev.nucleusframework.systemcolor.systemAccentColor
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
-    val themeDefinition = remember { JewelTheme.darkThemeDefinition() }
+    val dark = isSystemInDarkMode()
+    val themeDefinition = remember(dark) {
+        if (dark) JewelTheme.darkThemeDefinition() else JewelTheme.lightThemeDefinition()
+    }
+    // Jewel 0.37 was compiled against Compose 1.10's text-menu ABI. Capture
+    // Compose 1.11's implementation before entering Jewel and re-provide it to
+    // app content, matching Nucleus's Jewel integration compatibility bridge.
+    @Suppress("DEPRECATION")
+    val composeTextContextMenu = androidx.compose.foundation.text.LocalTextContextMenu.current
 
     IntUiTheme(
         theme = themeDefinition,
         styling = ComponentStyling.decoratedWindow(),
-        content = content,
-    )
+    ) {
+        @Suppress("DEPRECATION")
+        CompositionLocalProvider(
+            androidx.compose.foundation.text.LocalTextContextMenu provides composeTextContextMenu,
+            content = content,
+        )
+    }
 }
 
 /**
  * Desktop Material theme — re-based onto the Letta palette (teal primary,
  * #0A0A0A background, #1E1E1E surfaces) instead of Jewel-derived hues, so the
- * desktop app matches the mobile design template. Desktop is dark-only today.
+ * desktop app matches the mobile design template while following live OS
+ * appearance and accent changes through Nucleus.
  *
  * `LocalCustomColors` is provided with the same fixed brand agent-status values
  * the Android `deriveCustomColors()` uses. Desktop only depends on
@@ -41,10 +60,12 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  */
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
+    val dark = isSystemInDarkMode()
+    val systemAccent = systemAccentColor()
     // Cool-slate palette (2026-06-23 retune) — sourced from the shared
     // LettaColorTokens so desktop and Android stay in lockstep (no duplication).
-    val scheme = darkColorScheme(
-        primary = Color(LettaColorTokens.DARK_PRIMARY),
+    val scheme = if (dark) darkColorScheme(
+        primary = systemAccent ?: Color(LettaColorTokens.DARK_PRIMARY),
         onPrimary = Color(0xFF06302B),
         primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
         onPrimaryContainer = Color(0xFFE6F4F1),
@@ -73,22 +94,52 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
         errorContainer = Color(0xFF93000A),
         onError = Color(0xFF000000),
         onErrorContainer = Color(0xFFFFDAD6),
+    ) else lightColorScheme(
+        primary = systemAccent ?: Color(LettaColorTokens.LIGHT_PRIMARY),
+        onPrimary = Color.White,
+        primaryContainer = (systemAccent ?: Color(LettaColorTokens.LIGHT_PRIMARY)).copy(alpha = 0.16f),
+        onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
+        secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
+        onSecondary = Color.White,
+        secondaryContainer = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
+        onSecondaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
+        tertiary = Color(0xFF007D8A),
+        onTertiary = Color.White,
+        tertiaryContainer = Color(0xFFC7F1F5),
+        onTertiaryContainer = Color(0xFF002F34),
+        background = Color(LettaColorTokens.LIGHT_BACKGROUND),
+        onBackground = Color(LettaColorTokens.LIGHT_ON_SURFACE),
+        surface = Color(LettaColorTokens.LIGHT_SURFACE),
+        onSurface = Color(LettaColorTokens.LIGHT_ON_SURFACE),
+        surfaceVariant = Color(LettaColorTokens.LIGHT_SURFACE_VARIANT),
+        onSurfaceVariant = Color(LettaColorTokens.LIGHT_ON_SURFACE_VARIANT),
+        surfaceContainerLowest = Color.White,
+        surfaceContainerLow = Color(LettaColorTokens.LIGHT_SURFACE),
+        surfaceContainer = Color(LettaColorTokens.LIGHT_SURFACE_VARIANT),
+        surfaceContainerHigh = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
+        surfaceContainerHighest = Color(0xFFD2D9E2),
+        outline = Color(LettaColorTokens.LIGHT_OUTLINE),
+        outlineVariant = Color(LettaColorTokens.LIGHT_SURFACE_CONTAINER),
+        error = Color(LettaColorTokens.LIGHT_ERROR),
+        onError = Color(LettaColorTokens.LIGHT_ON_ERROR),
+        errorContainer = Color(0xFFFFDAD6),
+        onErrorContainer = Color(0xFF410002),
     )
 
-    val customColors = remember {
+    val customColors = remember(scheme, dark) {
         CustomColors(
-            userBubbleBgColor = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
-            agentBubbleBgColor = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_LOW),
-            reasoningBubbleBgColor = Color(0xFF143C42),
-            toolBubbleBgColor = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_DEFAULT),
-            systemMessageColor = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_HIGH),
-            dateSeparatorColor = Color(LettaColorTokens.DARK_ON_SURFACE_VARIANT),
-            textPrimary = Color(LettaColorTokens.DARK_ON_SURFACE),
-            textSecondary = Color(LettaColorTokens.DARK_ON_SURFACE_VARIANT),
-            textDisabled = Color(0x80AEB6C2),
-            textLink = Color(0xFF00BFA5),
-            textOnPrimary = Color(0xFF06302B),
-            errorTextColor = Color(0xFFFFDAD6),
+            userBubbleBgColor = scheme.primaryContainer,
+            agentBubbleBgColor = scheme.surfaceContainerLow,
+            reasoningBubbleBgColor = scheme.tertiaryContainer.copy(alpha = 0.72f),
+            toolBubbleBgColor = scheme.surfaceContainer,
+            systemMessageColor = scheme.surfaceContainerHigh,
+            dateSeparatorColor = scheme.onSurfaceVariant,
+            textPrimary = scheme.onSurface,
+            textSecondary = scheme.onSurfaceVariant,
+            textDisabled = scheme.onSurface.copy(alpha = 0.5f),
+            textLink = scheme.primary,
+            textOnPrimary = scheme.onPrimary,
+            errorTextColor = scheme.error,
             successColor = Color(0xFF46C08F),
             onSuccessColor = Color(0xFF06302B),
             runningColor = Color(0xFFE0A458),
@@ -96,7 +147,7 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
             agentAColor = Color(0xFF8B7CF0),
             agentBColor = Color(0xFF4C9AFF),
             agentCColor = Color(0xFFE36FB3),
-            onSurfaceMutedColor = Color(LettaColorTokens.DARK_ON_SURFACE_MUTED),
+            onSurfaceMutedColor = scheme.onSurfaceVariant.copy(alpha = 0.72f),
             categoryPersonaColor = Color(LettaColorTokens.DARK_CATEGORY_PERSONA),
             categoryHumanColor = Color(LettaColorTokens.DARK_CATEGORY_HUMAN),
             categoryOnboardingColor = Color(LettaColorTokens.DARK_CATEGORY_ONBOARDING),
@@ -105,13 +156,13 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
             onlineColor = Color(0xFF46C08F),
             offlineColor = Color(0xFFCF6679),
             reconnectingColor = Color(0xFFE0A458),
-            iconPrimary = Color(LettaColorTokens.DARK_ON_SURFACE),
-            iconSecondary = Color(LettaColorTokens.DARK_ON_SURFACE_VARIANT),
-            iconAccent = Color(0xFF00BFA5),
-            listItemContainerColor = Color(LettaColorTokens.DARK_SURFACE_CONTAINER_DEFAULT),
-            borderDefault = Color(LettaColorTokens.DARK_OUTLINE_VARIANT),
-            borderFocused = Color(0xFF00BFA5),
-            borderCritical = Color(0xFFCF6679),
+            iconPrimary = scheme.onSurface,
+            iconSecondary = scheme.onSurfaceVariant,
+            iconAccent = scheme.primary,
+            listItemContainerColor = scheme.surfaceContainer,
+            borderDefault = scheme.outlineVariant,
+            borderFocused = scheme.primary,
+            borderCritical = scheme.error,
         )
     }
 

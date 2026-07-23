@@ -277,6 +277,184 @@ sealed interface AppServerCommand {
         val method: String,
         val params: JsonObject? = null,
     ) : AppServerCommand
+
+    // Runtime-native admin commands (lgns8.7), shapes pinned against the
+    // installed @letta-ai/letta-code 0.28.8 protocol declaration. query/body
+    // stay raw JSON so unknown upstream fields pass through untouched.
+
+    @Serializable
+    @SerialName("agent_list")
+    data class AgentList(
+        @SerialName("request_id") val requestId: String,
+        val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_retrieve")
+    data class AgentRetrieve(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_create")
+    data class AgentCreate(
+        @SerialName("request_id") val requestId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_update")
+    data class AgentUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_delete")
+    data class AgentDelete(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_list")
+    data class ConversationList(
+        @SerialName("request_id") val requestId: String,
+        val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_retrieve")
+    data class ConversationRetrieve(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_create")
+    data class ConversationCreate(
+        @SerialName("request_id") val requestId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_update")
+    data class ConversationUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_messages_list")
+    data class ConversationMessagesList(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    // Policy-gated control capabilities (lgns8.8).
+
+    @Serializable
+    @SerialName("list_models")
+    data class ListModels(
+        @SerialName("request_id") val requestId: String,
+        val force: Boolean? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("skill_enable")
+    data class SkillEnable(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("skill_path") val skillPath: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("skill_disable")
+    data class SkillDisable(
+        @SerialName("request_id") val requestId: String,
+        val name: String,
+    ) : AppServerCommand
+
+    // Native cron scheduling (lgns8.8): replaces the legacy mobile-WS cron
+    // path, which retires with the shim in lgns8.11.
+
+    @Serializable
+    @SerialName("cron_list")
+    data class CronList(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_add")
+    data class CronAdd(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+        @SerialName("conversation_id") val conversationId: String? = null,
+        val name: String,
+        val description: String,
+        val cron: String,
+        val timezone: String? = null,
+        val recurring: Boolean,
+        val prompt: String,
+        @SerialName("scheduled_for") val scheduledFor: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_get")
+    data class CronGet(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_runs")
+    data class CronRuns(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+        val limit: Int? = null,
+        val offset: Int? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_trigger")
+    data class CronTrigger(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_update")
+    data class CronUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+        val name: String? = null,
+        val description: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
+        val cron: String? = null,
+        val timezone: String? = null,
+        val recurring: Boolean? = null,
+        val prompt: String? = null,
+        @SerialName("scheduled_for") val scheduledFor: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_delete")
+    data class CronDelete(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_delete_all")
+    data class CronDeleteAll(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+    ) : AppServerCommand
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -554,6 +732,276 @@ sealed interface AppServerInboundFrame {
 
         @Transient
         override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("list_models_response")
+    data class ListModelsResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val entries: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "list_models_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("skill_enable_response")
+    data class SkillEnableResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("skill_name") val skillName: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "skill_enable_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("skill_disable_response")
+    data class SkillDisableResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "skill_disable_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("cron_list_response")
+    data class CronListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val tasks: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_add_response")
+    data class CronAddResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val task: JsonObject? = null,
+        val warning: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_add_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_get_response")
+    data class CronGetResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val found: Boolean = false,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_get_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_runs_response")
+    data class CronRunsResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val page: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_runs_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_trigger_response")
+    data class CronTriggerResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val found: Boolean = false,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_trigger_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_update_response")
+    data class CronUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_update_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_delete_response")
+    data class CronDeleteResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val found: Boolean = false,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_delete_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_delete_all_response")
+    data class CronDeleteAllResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("agent_id") val agentId: String? = null,
+        val deleted: Int = 0,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_delete_all_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    // Runtime-native admin responses (lgns8.7); entity payloads stay raw
+    // JSON (JsonElement/JsonArray) per the lgns8.4 tolerant-model convention.
+
+    @Serializable
+    @SerialName("agent_list_response")
+    data class AgentListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agents: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_retrieve_response")
+    data class AgentRetrieveResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agent: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_retrieve_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_create_response")
+    data class AgentCreateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agent: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_create_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_update_response")
+    data class AgentUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agent: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_update_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_delete_response")
+    data class AgentDeleteResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_delete_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_list_response")
+    data class ConversationListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversations: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_retrieve_response")
+    data class ConversationRetrieveResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversation: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_retrieve_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_create_response")
+    data class ConversationCreateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversation: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_create_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_update_response")
+    data class ConversationUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversation: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_update_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_messages_list_response")
+    data class ConversationMessagesListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val messages: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_messages_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
     @Serializable
