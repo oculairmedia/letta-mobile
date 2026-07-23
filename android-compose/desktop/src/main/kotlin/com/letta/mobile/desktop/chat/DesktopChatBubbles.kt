@@ -363,6 +363,10 @@ internal fun AgentText(params: AgentTextParams) {
             com.letta.mobile.ui.markdown.SharedMarkdownText(
                 text = displayText,
                 modifier = Modifier.padding(end = 32.dp),
+                // Retaining the previous markdown AST while parsing an update
+                // can pair stale annotation offsets with a newly reshaped block.
+                // Selectable Compose Desktop text then crashes in ParagraphBuilder.
+                retainState = false,
                 textColor = if (params.isError) {
                     MaterialTheme.colorScheme.error
                 } else {
