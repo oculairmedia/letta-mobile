@@ -64,7 +64,19 @@ class IrohNodeConnection(
      * before connections arrive (e.g. in IrohNodeEndpoint.start).
      */
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
-    private val requiredBearerToken: String? = null,
+    /**
+     * REQUIRED authentication policy (d6e8g.2). Connections only start
+     * pre-authenticated when the policy explicitly says so (anonymous
+     * test-only mode or an already-vetted peer allowlist) — never because a
+     * parameter was omitted.
+     */
+    private val authPolicy: IrohAuthPolicy,
+    /**
+     * Bearer verifier (d6e8g.3): constant-time comparison + per-NodeId rate
+     * limiting. Endpoints pass ONE shared instance to every connection so
+     * redialing cannot reset a peer's failure budget.
+     */
+    private val authVerifier: IrohBearerAuthVerifier = IrohBearerAuthVerifier(authPolicy),
     private val remoteEndpointId: String = "",
     // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
     // so a turn on one connection fans out to every connection viewing the same
@@ -87,7 +99,10 @@ class IrohNodeConnection(
     // connections/threads (P3).
     private val eventSeq = IrohEventSeqAllocator.newConnectionSeq()
     private val streamWriteMutex = Mutex()
-    private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
+    // Pre-authenticated only when the explicit policy requires no token:
+    // InsecureAnonymousForTestOnly, or PeerAllowlist (the endpoint's accept
+    // loop has already vetted the peer identity before constructing this).
+    private val authenticated = AtomicBoolean(authPolicy.requiredBearerToken.isNullOrBlank())
     
     /**
      * Mid-turn redial fix: thread-local storage for tracking the active turn's
@@ -462,9 +477,15 @@ class IrohNodeConnection(
         requestId: String?,
     ): String {
         if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
-        val expected = requiredBearerToken
         val provided = obj["token"]?.jsonPrimitive?.contentOrNull
-        val isAuthenticated = expected.isNullOrBlank() || provided == expected
+        val outcome = authVerifier.verify(remoteEndpointId, provided)
+        if (outcome is IrohBearerAuthVerifier.Outcome.RateLimited) {
+            authenticated.set(false)
+            Telemetry.event("IrohNode", "auth.rate_limited", "remoteEndpointId" to remoteEndpointId)
+            runCatching { connection.close(4429L, "auth_rate_limited".encodeToByteArray()) }
+            return """{"type":"auth_response","request_id":"$requestId","success":false,"error":"rate_limited"}"""
+        }
+        val isAuthenticated = outcome is IrohBearerAuthVerifier.Outcome.Authenticated
         authenticated.set(isAuthenticated)
         return if (isAuthenticated) {
             val advertised = (obj["capabilities"] as? JsonArray)
@@ -485,11 +506,23 @@ class IrohNodeConnection(
                 put("capabilities", Json.encodeToJsonElement(capabilities))
             }.toString()
         } else {
-            val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
-            Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)
+            val reason = (outcome as IrohBearerAuthVerifier.Outcome.Denied).reason
+            val failures = authFailuresOnThisConnection.incrementAndGet()
+            Telemetry.event(
+                "IrohNode", "auth.failed",
+                "remoteEndpointId" to remoteEndpointId,
+                "reason" to reason,
+                "connectionFailures" to failures,
+            )
+            if (failures >= IrohBearerAuthVerifier.MAX_FAILURES_BEFORE_CLOSE) {
+                Telemetry.event("IrohNode", "auth.connection_closed", "remoteEndpointId" to remoteEndpointId)
+                runCatching { connection.close(4401L, "auth_failures".encodeToByteArray()) }
+            }
             """{"type":"auth_response","request_id":"$requestId","success":false,"error":"$reason"}"""
         }
     }
+
+    private val authFailuresOnThisConnection = java.util.concurrent.atomic.AtomicInteger(0)
 
     private inline fun ifAuthorized(requestId: String?, block: () -> String?): String? =
         if (authenticated.get()) {

@@ -11,6 +11,8 @@ import com.letta.mobile.cli.probe.ProbeStubBehavior
 import com.letta.mobile.cli.probe.ProbeStubController
 import com.letta.mobile.cli.probe.ProbeStubStore
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
+import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import kotlin.system.exitProcess
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +56,11 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
         envvar = "LETTA_IROH_AUTH_TOKEN",
         help = "Bearer token clients must present.",
     )
+
+    private val allowInsecureAnonymousIroh by option(
+        "--allow-insecure-anonymous-iroh",
+        help = "TEST/DEV ONLY: run the stub with NO authentication (see app-server-serve-iroh).",
+    ).flag(default = false)
 
     private val adminPort by option(
         "--admin-port",
@@ -107,11 +114,31 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
             println("[iroh-stub-server] Admin base: ${adminServer.baseUrl}")
 
             println("[iroh-stub-server] Starting Iroh endpoint...")
+            // d6e8g.2: same fail-closed resolution as the production wrapper —
+            // hermetic scripts always pass a token; anonymous stub runs need
+            // the explicit test/dev flag.
+            val authPolicy = when (
+                val resolution = IrohAuthPolicy.resolve(
+                    authToken = authToken,
+                    allowedPeerIds = emptySet(),
+                    allowInsecureAnonymous = allowInsecureAnonymousIroh,
+                )
+            ) {
+                is IrohAuthPolicyResolution.Secure -> resolution.policy
+                is IrohAuthPolicyResolution.InsecureAccepted -> {
+                    System.err.println("[iroh-stub-server] ${resolution.warning}")
+                    resolution.policy
+                }
+                is IrohAuthPolicyResolution.Refused -> {
+                    System.err.println("[iroh-stub-server] ${resolution.error}")
+                    exitProcess(78)
+                }
+            }
             val irohEndpoint = IrohNodeEndpoint(
                 scope = scope,
                 bindAddr = "0.0.0.0:$irohPort",
                 secretKeyPath = irohSecretKeyPath,
-                requiredBearerToken = authToken?.takeIf { it.isNotBlank() },
+                authPolicy = authPolicy,
             )
             irohEndpoint.create()
 
