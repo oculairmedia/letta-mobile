@@ -79,6 +79,30 @@ interface AppServerClient {
 
     suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         throw UnsupportedOperationException("skill_disable is not supported by this client")
+
+    suspend fun cronList(command: AppServerCommand.CronList): AppServerInboundFrame.CronListResponse =
+        throw UnsupportedOperationException("CronList is not supported by this client")
+
+    suspend fun cronAdd(command: AppServerCommand.CronAdd): AppServerInboundFrame.CronAddResponse =
+        throw UnsupportedOperationException("CronAdd is not supported by this client")
+
+    suspend fun cronGet(command: AppServerCommand.CronGet): AppServerInboundFrame.CronGetResponse =
+        throw UnsupportedOperationException("CronGet is not supported by this client")
+
+    suspend fun cronRuns(command: AppServerCommand.CronRuns): AppServerInboundFrame.CronRunsResponse =
+        throw UnsupportedOperationException("CronRuns is not supported by this client")
+
+    suspend fun cronTrigger(command: AppServerCommand.CronTrigger): AppServerInboundFrame.CronTriggerResponse =
+        throw UnsupportedOperationException("CronTrigger is not supported by this client")
+
+    suspend fun cronUpdate(command: AppServerCommand.CronUpdate): AppServerInboundFrame.CronUpdateResponse =
+        throw UnsupportedOperationException("CronUpdate is not supported by this client")
+
+    suspend fun cronDelete(command: AppServerCommand.CronDelete): AppServerInboundFrame.CronDeleteResponse =
+        throw UnsupportedOperationException("CronDelete is not supported by this client")
+
+    suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll): AppServerInboundFrame.CronDeleteAllResponse =
+        throw UnsupportedOperationException("CronDeleteAll is not supported by this client")
 }
 
 class DefaultAppServerClient(
@@ -202,4 +226,28 @@ class DefaultAppServerClient(
 
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SkillDisableResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronList(command: AppServerCommand.CronList): AppServerInboundFrame.CronListResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronListResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronAdd(command: AppServerCommand.CronAdd): AppServerInboundFrame.CronAddResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronAddResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronGet(command: AppServerCommand.CronGet): AppServerInboundFrame.CronGetResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronGetResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronRuns(command: AppServerCommand.CronRuns): AppServerInboundFrame.CronRunsResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronRunsResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronTrigger(command: AppServerCommand.CronTrigger): AppServerInboundFrame.CronTriggerResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronTriggerResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronUpdate(command: AppServerCommand.CronUpdate): AppServerInboundFrame.CronUpdateResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronUpdateResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronDelete(command: AppServerCommand.CronDelete): AppServerInboundFrame.CronDeleteResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronDeleteResponse }) { transport.sendControl(command) }
+
+    override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll): AppServerInboundFrame.CronDeleteAllResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.CronDeleteAllResponse }) { transport.sendControl(command) }
 }

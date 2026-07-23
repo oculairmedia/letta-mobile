@@ -377,6 +377,84 @@ sealed interface AppServerCommand {
         @SerialName("request_id") val requestId: String,
         val name: String,
     ) : AppServerCommand
+
+    // Native cron scheduling (lgns8.8): replaces the legacy mobile-WS cron
+    // path, which retires with the shim in lgns8.11.
+
+    @Serializable
+    @SerialName("cron_list")
+    data class CronList(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_add")
+    data class CronAdd(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+        @SerialName("conversation_id") val conversationId: String? = null,
+        val name: String,
+        val description: String,
+        val cron: String,
+        val timezone: String? = null,
+        val recurring: Boolean,
+        val prompt: String,
+        @SerialName("scheduled_for") val scheduledFor: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_get")
+    data class CronGet(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_runs")
+    data class CronRuns(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+        val limit: Int? = null,
+        val offset: Int? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_trigger")
+    data class CronTrigger(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_update")
+    data class CronUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+        val name: String? = null,
+        val description: String? = null,
+        @SerialName("conversation_id") val conversationId: String? = null,
+        val cron: String? = null,
+        val timezone: String? = null,
+        val recurring: Boolean? = null,
+        val prompt: String? = null,
+        @SerialName("scheduled_for") val scheduledFor: String? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_delete")
+    data class CronDelete(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("task_id") val taskId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("cron_delete_all")
+    data class CronDeleteAll(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+    ) : AppServerCommand
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -694,6 +772,106 @@ sealed interface AppServerInboundFrame {
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
+    @Serializable
+    @SerialName("cron_list_response")
+    data class CronListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val tasks: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_add_response")
+    data class CronAddResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val task: JsonObject? = null,
+        val warning: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_add_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_get_response")
+    data class CronGetResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val found: Boolean = false,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_get_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_runs_response")
+    data class CronRunsResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val page: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_runs_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_trigger_response")
+    data class CronTriggerResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val found: Boolean = false,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_trigger_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_update_response")
+    data class CronUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val task: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_update_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_delete_response")
+    data class CronDeleteResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val found: Boolean = false,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_delete_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("cron_delete_all_response")
+    data class CronDeleteAllResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("agent_id") val agentId: String? = null,
+        val deleted: Int = 0,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "cron_delete_all_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
     // Runtime-native admin responses (lgns8.7); entity payloads stay raw
     // JSON (JsonElement/JsonArray) per the lgns8.4 tolerant-model convention.
 

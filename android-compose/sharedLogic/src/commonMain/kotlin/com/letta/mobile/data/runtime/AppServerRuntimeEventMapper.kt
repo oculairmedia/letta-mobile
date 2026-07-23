@@ -39,6 +39,14 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.ListModelsResponse,
             is AppServerInboundFrame.SkillEnableResponse,
             is AppServerInboundFrame.SkillDisableResponse,
+            is AppServerInboundFrame.CronListResponse,
+            is AppServerInboundFrame.CronAddResponse,
+            is AppServerInboundFrame.CronGetResponse,
+            is AppServerInboundFrame.CronRunsResponse,
+            is AppServerInboundFrame.CronTriggerResponse,
+            is AppServerInboundFrame.CronUpdateResponse,
+            is AppServerInboundFrame.CronDeleteResponse,
+            is AppServerInboundFrame.CronDeleteAllResponse,
             -> emptyList()
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)

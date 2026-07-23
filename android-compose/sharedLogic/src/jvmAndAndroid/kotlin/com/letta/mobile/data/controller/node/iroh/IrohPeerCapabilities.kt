@@ -57,7 +57,7 @@ object IrohPeerCapabilities {
         method in CONVERSATION_MANAGE_METHODS -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
             if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
-        method.startsWith("schedule.") || method.startsWith("job.") -> SCHEDULE_MANAGE
+        method.startsWith("schedule.") || method.startsWith("job.") || method.startsWith("cron.") -> SCHEDULE_MANAGE
         method.startsWith("skill.") -> SKILLS_MANAGE
         method.startsWith("tool.") || method == "mcp.list" -> TOOLS_MANAGE
         method.startsWith("project.") -> PROJECTS_MANAGE

@@ -77,6 +77,17 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.ListModels -> SafeRead
             is AppServerCommand.SkillEnable -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.SkillDisable -> AmbiguousMutation(dedupKey = null)
+
+            // Cron scheduling (lgns8.8): reads replay safely; schedule
+            // mutations and manual triggers are ambiguous after disconnect.
+            is AppServerCommand.CronList -> SafeRead
+            is AppServerCommand.CronGet -> SafeRead
+            is AppServerCommand.CronRuns -> SafeRead
+            is AppServerCommand.CronAdd -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronTrigger -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronUpdate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronDelete -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronDeleteAll -> AmbiguousMutation(dedupKey = null)
         }
 
         /** True if this command may be re-sent verbatim after a reconnect. */

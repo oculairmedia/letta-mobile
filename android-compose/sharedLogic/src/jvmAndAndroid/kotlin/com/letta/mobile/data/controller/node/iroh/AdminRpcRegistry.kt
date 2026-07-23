@@ -68,6 +68,7 @@ object AdminRpcRegistry {
         SkillAdminHandlers.register(router, rpcBase, nativeClient)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
         PairingAdminHandlers.register(router, pairingService)
+        CronAdminHandlers.register(router, nativeClient)
 
         router.requireNonEmpty()
         val enabledMethods = if (subagentRegistrySource == null) {

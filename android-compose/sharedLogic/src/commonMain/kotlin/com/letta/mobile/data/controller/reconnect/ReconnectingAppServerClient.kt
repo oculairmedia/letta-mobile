@@ -293,6 +293,22 @@ class ReconnectingAppServerClient(
     override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)
 
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
+    override suspend fun cronList(command: AppServerCommand.CronList) = ready().cronList(command)
+
+    override suspend fun cronAdd(command: AppServerCommand.CronAdd) = ready().cronAdd(command)
+
+    override suspend fun cronGet(command: AppServerCommand.CronGet) = ready().cronGet(command)
+
+    override suspend fun cronRuns(command: AppServerCommand.CronRuns) = ready().cronRuns(command)
+
+    override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) = ready().cronTrigger(command)
+
+    override suspend fun cronUpdate(command: AppServerCommand.CronUpdate) = ready().cronUpdate(command)
+
+    override suspend fun cronDelete(command: AppServerCommand.CronDelete) = ready().cronDelete(command)
+
+    override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = ready().cronDeleteAll(command)
+
 
     companion object {
         private const val EVENT_BUFFER = 256
