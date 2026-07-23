@@ -24,6 +24,30 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.AuthResponse -> emptyList()
             is AppServerInboundFrame.RuntimeStartResponse -> emptyList()
             is AppServerInboundFrame.SyncResponse -> emptyList()
+            // Native admin request/response frames (lgns8.7) are correlated by
+            // the request registry; they are not runtime turn events.
+            is AppServerInboundFrame.AgentListResponse,
+            is AppServerInboundFrame.AgentRetrieveResponse,
+            is AppServerInboundFrame.AgentCreateResponse,
+            is AppServerInboundFrame.AgentUpdateResponse,
+            is AppServerInboundFrame.AgentDeleteResponse,
+            is AppServerInboundFrame.ConversationListResponse,
+            is AppServerInboundFrame.ConversationRetrieveResponse,
+            is AppServerInboundFrame.ConversationCreateResponse,
+            is AppServerInboundFrame.ConversationUpdateResponse,
+            is AppServerInboundFrame.ConversationMessagesListResponse,
+            is AppServerInboundFrame.ListModelsResponse,
+            is AppServerInboundFrame.SkillEnableResponse,
+            is AppServerInboundFrame.SkillDisableResponse,
+            is AppServerInboundFrame.CronListResponse,
+            is AppServerInboundFrame.CronAddResponse,
+            is AppServerInboundFrame.CronGetResponse,
+            is AppServerInboundFrame.CronRunsResponse,
+            is AppServerInboundFrame.CronTriggerResponse,
+            is AppServerInboundFrame.CronUpdateResponse,
+            is AppServerInboundFrame.CronDeleteResponse,
+            is AppServerInboundFrame.CronDeleteAllResponse,
+            -> emptyList()
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)
             is AppServerInboundFrame.UpdateLoopStatus -> frame.toLoopStatusDraft(command)

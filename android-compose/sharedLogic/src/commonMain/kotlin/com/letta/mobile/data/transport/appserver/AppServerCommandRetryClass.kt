@@ -58,6 +58,36 @@ sealed interface AppServerCommandRetryClass {
             // Aborting / approval / tool-result are effectful and non-idempotent.
             is AppServerCommand.AbortMessage -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ExternalToolCallResponse -> AmbiguousMutation(dedupKey = null)
+
+            // Native admin operations (lgns8.7): reads replay safely; entity
+            // mutations may have committed before an ambiguous disconnect.
+            is AppServerCommand.AgentList -> SafeRead
+            is AppServerCommand.AgentRetrieve -> SafeRead
+            is AppServerCommand.ConversationList -> SafeRead
+            is AppServerCommand.ConversationRetrieve -> SafeRead
+            is AppServerCommand.ConversationMessagesList -> SafeRead
+            is AppServerCommand.AgentCreate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.AgentUpdate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.AgentDelete -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.ConversationCreate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.ConversationUpdate -> AmbiguousMutation(dedupKey = null)
+
+            // Control capabilities (lgns8.8): model listing is a read; skill
+            // enable/disable are idempotent-by-target but treated as ambiguous.
+            is AppServerCommand.ListModels -> SafeRead
+            is AppServerCommand.SkillEnable -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.SkillDisable -> AmbiguousMutation(dedupKey = null)
+
+            // Cron scheduling (lgns8.8): reads replay safely; schedule
+            // mutations and manual triggers are ambiguous after disconnect.
+            is AppServerCommand.CronList -> SafeRead
+            is AppServerCommand.CronGet -> SafeRead
+            is AppServerCommand.CronRuns -> SafeRead
+            is AppServerCommand.CronAdd -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronTrigger -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronUpdate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronDelete -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.CronDeleteAll -> AmbiguousMutation(dedupKey = null)
         }
 
         /** True if this command may be re-sent verbatim after a reconnect. */
