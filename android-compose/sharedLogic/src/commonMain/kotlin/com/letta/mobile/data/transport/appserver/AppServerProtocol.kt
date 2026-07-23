@@ -76,6 +76,33 @@ object AppServerProtocol {
             "external_tool_call_request" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(raw) }
             "control_request" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(raw) }
             "admin_rpc_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(raw) }
+            // lgns8.7/.8 native typed responses: defined + correlated on by
+            // client methods but absent from this decode dispatch, so real App
+            // Server replies fell through to Unknown and every native op hung
+            // (e.g. conversation.create timed out at 15s). Decode them here.
+            "list_models_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(raw) }
+            "skill_enable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(raw) }
+            "skill_disable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(raw) }
+            "cron_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(raw) }
+            "cron_add_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(raw) }
+            "cron_get_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(raw) }
+            "cron_runs_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronRunsResponse>(raw) }
+            "cron_trigger_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronTriggerResponse>(raw) }
+            "cron_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronUpdateResponse>(raw) }
+            "cron_delete_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteResponse>(raw) }
+            "cron_delete_all_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteAllResponse>(raw) }
+            "get_reflection_settings_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.GetReflectionSettingsResponse>(raw) }
+            "set_reflection_settings_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SetReflectionSettingsResponse>(raw) }
+            "agent_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentListResponse>(raw) }
+            "agent_retrieve_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentRetrieveResponse>(raw) }
+            "agent_create_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentCreateResponse>(raw) }
+            "agent_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentUpdateResponse>(raw) }
+            "agent_delete_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentDeleteResponse>(raw) }
+            "conversation_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationListResponse>(raw) }
+            "conversation_retrieve_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationRetrieveResponse>(raw) }
+            "conversation_create_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCreateResponse>(raw) }
+            "conversation_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationUpdateResponse>(raw) }
+            "conversation_messages_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationMessagesListResponse>(raw) }
             else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
         }
         return AppServerReceivedFrame(channel = channel, frame = frame, raw = raw)
