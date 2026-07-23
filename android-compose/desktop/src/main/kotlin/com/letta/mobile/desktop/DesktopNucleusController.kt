@@ -62,6 +62,18 @@ internal data class DesktopNucleusState(
 )
 
 /**
+ * Mirrors the release workflow's updater-channel derivation: alpha/beta keep
+ * their own channel files, labels Nucleus doesn't serve (rc, dev, ...) map to
+ * beta, and stable versions poll latest.
+ */
+internal fun updateChannelFor(version: String): String {
+    val prerelease = version.substringAfter('-', missingDelimiterValue = "")
+    if (prerelease.isEmpty()) return "latest"
+    val label = prerelease.lowercase().takeWhile { it in 'a'..'z' }
+    return if (label == "alpha") "alpha" else "beta"
+}
+
+/**
  * Owns Nucleus runtime state outside composition. The UI renders [state] and
  * forwards actions; native calls and update/network work stay in this class.
  */
@@ -72,6 +84,12 @@ internal class DesktopNucleusController(
         NucleusUpdater {
             provider = GitHubProvider(owner = "oculairmedia", repo = "letta-mobile")
             httpClient = NativeHttpClient.create()
+            // Nucleus defaults to the "latest" channel, but the release
+            // workflow publishes pre-release metadata to beta.yml/alpha.yml —
+            // a pre-release install must poll its own channel file or it never
+            // sees follow-up pre-releases. currentVersion is auto-detected
+            // from the packaged app before this block runs.
+            channel = updateChannelFor(currentVersion)
         }
     }
     private val mutableState = MutableStateFlow(DesktopNucleusState())
