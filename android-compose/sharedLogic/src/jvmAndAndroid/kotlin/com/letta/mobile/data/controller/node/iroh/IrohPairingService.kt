@@ -85,6 +85,33 @@ class IrohPairingService(
 
     fun listPeers(): List<PairedPeer> = store.list()
 
+    /**
+     * Rename an already-paired peer (d6e8g.7 inventory UX). Returns the updated
+     * record, or null when the NodeId is not paired. The NodeId binding and
+     * capabilities are untouched.
+     */
+    fun rename(nodeId: String, name: String): PairedPeer? {
+        val existing = store.get(nodeId) ?: return null
+        val updated = existing.copy(name = name)
+        store.save(updated)
+        Telemetry.event("IrohPairing", "peer.renamed", "nodeId" to nodeId, "name" to name)
+        return updated
+    }
+
+    /**
+     * Replace an already-paired peer's capability grants (d6e8g.7). Returns the
+     * updated record, or null when the NodeId is not paired. Capability names
+     * are validated by the caller (handler) against [IrohPeerCapabilities.ALL];
+     * this preserves the NodeId binding and paired-at time.
+     */
+    fun setCapabilities(nodeId: String, capabilities: Set<String>): PairedPeer? {
+        val existing = store.get(nodeId) ?: return null
+        val updated = existing.copy(capabilities = capabilities)
+        store.save(updated)
+        Telemetry.event("IrohPairing", "peer.capabilities_set", "nodeId" to nodeId)
+        return updated
+    }
+
     fun revoke(nodeId: String): Boolean {
         val removed = store.remove(nodeId)
         if (removed) Telemetry.event("IrohPairing", "peer.revoked", "nodeId" to nodeId)

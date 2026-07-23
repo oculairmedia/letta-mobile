@@ -95,6 +95,30 @@ class IrohPairingServiceTest {
     }
 
     @Test
+    fun renameAndSetCapabilitiesUpdatePairedPeerInPlace() {
+        val (pairing, _) = service()
+        val nodeId = "7".repeat(64)
+        pairing.redeem(pairing.createInvite("laptop").secret, nodeId)
+
+        val renamed = pairing.rename(nodeId, "emmanuel-laptop")
+        assertEquals("emmanuel-laptop", renamed?.name)
+        assertEquals("emmanuel-laptop", pairing.peer(nodeId)?.name)
+        // NodeId binding + default capabilities preserved by a rename.
+        assertEquals(IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE, pairing.peer(nodeId)?.capabilities)
+
+        val recapped = pairing.setCapabilities(nodeId, setOf(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.ADMIN_FULL))
+        assertEquals(setOf(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.ADMIN_FULL), recapped?.capabilities)
+        assertEquals("emmanuel-laptop", pairing.peer(nodeId)?.name, "re-scoping capabilities must not lose the name")
+    }
+
+    @Test
+    fun renameAndSetCapabilitiesReturnNullForUnknownPeer() {
+        val (pairing, _) = service()
+        assertEquals(null, pairing.rename("z".repeat(64), "ghost"))
+        assertEquals(null, pairing.setCapabilities("z".repeat(64), setOf(IrohPeerCapabilities.CHAT_READ)))
+    }
+
+    @Test
     fun filePairedPeerStoreSurvivesRestartAndHoldsNoSecrets() {
         val path = Files.createTempDirectory("pairing-test").resolve("paired-peers.json")
         val store = FilePairedPeerStore(path)
