@@ -18,6 +18,9 @@ import computer.iroh.RelayMode
 import java.util.UUID
 import kotlin.system.exitProcess
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -81,12 +84,22 @@ internal class IrohAdminDialer(
     private val token: String?,
     private val timeoutMs: Long,
 ) {
-    suspend fun <T> use(scope: CoroutineScope, block: suspend (AppServerClient) -> T): T {
+    suspend fun <T> use(block: suspend (AppServerClient) -> T): T {
+        // The transport's reader coroutines live in their OWN scope, not the
+        // caller's: on teardown the connection tears down with ConnectionLost,
+        // and if those readers shared the runBlocking scope that benign error
+        // would clobber an already-delivered result. We cancel this scope in
+        // finally so teardown never propagates past the returned value.
+        val transportScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         val endpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
         try {
+            // Bring the endpoint online so its native driver/reactor stays alive
+            // for the lifetime of the call (matches AgentMessageSendCommand);
+            // without this the driver future is dropped mid-request.
+            endpoint.online()
             val transport = IrohAppServerTransportAdapter(endpoint).createTransport(
                 endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
-                scope = scope,
+                scope = transportScope,
             ) as IrohAppServerTransport
             transport.awaitConnectionReady()
             val client = DefaultAppServerClient(transport, requestTimeoutMs = timeoutMs)
@@ -100,6 +113,7 @@ internal class IrohAdminDialer(
             if (!auth.success) error("Iroh auth failed: ${auth.error ?: "denied"}")
             return block(client)
         } finally {
+            runCatching { transportScope.cancel() }
             runCatching { endpoint.close() }
         }
     }
@@ -126,7 +140,7 @@ abstract class PeerAdminSubcommand(name: String, private val helpText: String) :
     protected open fun params(): JsonObject? = null
 
     override fun run() = runBlocking {
-        val response = IrohAdminDialer(ticket, authToken, timeoutMs.toLongOrNull() ?: 30000L).use(this) { client ->
+        val response = IrohAdminDialer(ticket, authToken, timeoutMs.toLongOrNull() ?: 30000L).use { client ->
             client.adminRpc(
                 AppServerCommand.AdminRpc(
                     requestId = "peer-${UUID.randomUUID()}",
