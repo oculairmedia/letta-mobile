@@ -168,7 +168,15 @@ class ChatSendCoordinator(
             ui.onSendFailed("No active backend is configured")
             return
         }
-        if (config.accessToken.isNullOrBlank()) {
+        // Only the legacy admin-shim WS actually needs a bearer token. The Iroh
+        // transport authenticates the paired peer by NodeID and ignores the
+        // token entirely (IrohChannelTransport sends its auth frame even with a
+        // blank token and only fails on an explicit auth rejection). Gating Iroh
+        // sends on a token was the sole reason paired devices had to carry one —
+        // relaxing it here is the client half of retiring the bearer token
+        // (d6e8g.9). Token-carrying devices are unaffected; this only stops the
+        // client from self-rejecting a BLANK token on an iroh:// backend.
+        if (config.accessToken.isNullOrBlank() && !config.isIrohBackend()) {
             ui.onSendFailed("Admin-shim WebSocket requires an API token")
             return
         }
@@ -1129,3 +1137,16 @@ class ChatSendCoordinator(
         val startNewConversation: Boolean = false,
     )
 }
+
+/**
+ * True when the active backend is an `iroh://` node (bare, or a corrupted
+ * `https://iroh://` saved config). Mirrors `IrohChannelTransport.isIrohUrl` /
+ * the ShimBackendDetector check, kept commonMain-local so the send path can tell
+ * an Iroh backend (authenticates by paired NodeID, no bearer token needed) from
+ * the legacy admin-shim WS (which does require a token).
+ */
+internal fun LettaConfig.isIrohBackend(): Boolean =
+    serverUrl.trimStart()
+        .removePrefix("https://")
+        .removePrefix("http://")
+        .startsWith("iroh://")
