@@ -35,6 +35,43 @@ class AppServerProtocolTest {
     }
 
     @Test
+    fun decodesNativeTypedResponsesInsteadOfDroppingThemAsUnknown() {
+        // Regression: these lgns8.7/.8 native responses were defined and correlated
+        // on by client methods, but were missing from decodeFrame's dispatch — so a
+        // real App Server reply fell through to Unknown, the pending request never
+        // completed, and every native op (e.g. conversation.create) hung until the
+        // client's 15s timeout. Unit tests missed it by emitting pre-decoded frames.
+        val create = AppServerProtocol.decodeFrame(
+            rawJson = """{"type":"conversation_create_response","request_id":"c-1","success":true,"conversation":{"id":"conv-x"}}""",
+            channel = AppServerChannel.Control,
+        )
+        val frame = assertIs<AppServerInboundFrame.ConversationCreateResponse>(create.frame)
+        assertEquals("c-1", frame.requestId)
+        assertEquals(true, frame.success)
+        assertEquals("conv-x", frame.conversation?.get("id")?.jsonPrimitive?.content)
+
+        // Spot-check other previously-undecoded native responses.
+        assertIs<AppServerInboundFrame.ConversationListResponse>(
+            AppServerProtocol.decodeFrame(
+                """{"type":"conversation_list_response","request_id":"l-1","success":true}""",
+                AppServerChannel.Control,
+            ).frame,
+        )
+        assertIs<AppServerInboundFrame.AgentListResponse>(
+            AppServerProtocol.decodeFrame(
+                """{"type":"agent_list_response","request_id":"a-1","success":true}""",
+                AppServerChannel.Control,
+            ).frame,
+        )
+        assertIs<AppServerInboundFrame.ListModelsResponse>(
+            AppServerProtocol.decodeFrame(
+                """{"type":"list_models_response","request_id":"m-1","success":true}""",
+                AppServerChannel.Control,
+            ).frame,
+        )
+    }
+
+    @Test
     fun authCapabilitiesRoundTripAndStayAbsentByDefault() {
         val withCaps = AppServerProtocol.json.parseToJsonElement(
             AppServerProtocol.encodeCommand(
