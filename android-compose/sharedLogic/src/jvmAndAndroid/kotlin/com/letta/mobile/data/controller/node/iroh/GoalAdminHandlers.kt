@@ -4,7 +4,13 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 object GoalAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
+        // lgns8.9: no admin-rest service injected -> capability-unavailable
+        // (never a shim dial). Bounded admin adapter degrades gracefully.
+        if (adminBaseUrl == null) {
+            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
+            return
+        }
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("goal.get") { params ->
             val agentId = params.requireParam(AdminParamKey("agent_id"))
@@ -17,4 +23,8 @@ object GoalAdminHandlers {
             api.post(AdminPath.v1("agents", agentId, "goal", "command"), body = body)
         }
     }
+    val METHODS: Set<String> = setOf(
+        "goal.get",
+        "goal.command",
+    )
 }

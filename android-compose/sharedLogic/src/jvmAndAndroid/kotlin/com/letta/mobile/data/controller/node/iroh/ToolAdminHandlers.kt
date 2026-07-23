@@ -1,7 +1,13 @@
 package com.letta.mobile.data.controller.node.iroh
 
 object ToolAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
+        // lgns8.9: no admin-rest service injected -> capability-unavailable
+        // (never a shim dial). Bounded admin adapter degrades gracefully.
+        if (adminBaseUrl == null) {
+            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
+            return
+        }
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("tool.list") { p ->
             api.get(AdminPath.v1("tools")) {
@@ -65,4 +71,21 @@ object ToolAdminHandlers {
             )
         }
     }
+    val METHODS: Set<String> = setOf(
+        "tool.list",
+        "tool.get",
+        "tool.create",
+        "tool.update",
+        "tool.delete",
+        "tool.attach",
+        "tool.detach",
+        "block.list",
+        "block.get",
+        "block.create",
+        "block.update",
+        "block.delete",
+        "block.attach",
+        "block.detach",
+        "block.update_agent",
+    )
 }

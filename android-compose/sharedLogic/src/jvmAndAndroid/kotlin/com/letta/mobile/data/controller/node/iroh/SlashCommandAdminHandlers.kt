@@ -1,7 +1,13 @@
 package com.letta.mobile.data.controller.node.iroh
 
 object SlashCommandAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
+        // lgns8.9: no admin-rest service injected -> capability-unavailable
+        // (never a shim dial). Bounded admin adapter degrades gracefully.
+        if (adminBaseUrl == null) {
+            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
+            return
+        }
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         // Global builtins (e.g. /goal). GET /v1/slash-commands.
         router.register("slash_command.list") {
@@ -15,4 +21,8 @@ object SlashCommandAdminHandlers {
             api.get(AdminPath.v1("agents", agentId, "slash-commands"))
         }
     }
+    val METHODS: Set<String> = setOf(
+        "slash_command.list",
+        "slash_command.list_agent",
+    )
 }

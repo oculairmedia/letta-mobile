@@ -1,7 +1,13 @@
 package com.letta.mobile.data.controller.node.iroh
 
 object ScheduleAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String) {
+    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
+        // lgns8.9: no admin-rest service injected -> capability-unavailable
+        // (never a shim dial). Bounded admin adapter degrades gracefully.
+        if (adminBaseUrl == null) {
+            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
+            return
+        }
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("schedule.list") { p ->
             val agentId = param(p, AdminParamKey("agent_id"))
@@ -27,4 +33,12 @@ object ScheduleAdminHandlers {
             api.get(AdminPath.v1("jobs", jobId))
         }
     }
+    val METHODS: Set<String> = setOf(
+        "schedule.list",
+        "schedule.get",
+        "schedule.create",
+        "schedule.delete",
+        "job.list",
+        "job.get",
+    )
 }
