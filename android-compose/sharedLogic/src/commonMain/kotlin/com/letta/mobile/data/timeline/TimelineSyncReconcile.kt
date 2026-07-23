@@ -315,8 +315,24 @@ private fun Timeline.findRecentSameRealRunAssistantIndex(incoming: TimelineEvent
         val event = events[index] as? TimelineEvent.Confirmed ?: continue
         if (event.messageType != TimelineMessageType.ASSISTANT) continue
         if (event.serverId == incoming.serverId) continue
-        val existingRunId = event.runId?.takeIf { it.isNotBlank() && !it.isReconcileSyntheticRunId() } ?: continue
-        if (existingRunId != incomingRunId) continue
+        val existingRunRaw = event.runId?.takeIf { it.isNotBlank() } ?: continue
+        // Qualify the candidate's run id. Either (a) it shares the SAME REAL run
+        // id as [incoming] — two live-stream fragments of one reply — or (b) it is
+        // a SYNTHETIC iroh live/observer placeholder (iroh-run-* / iroh-observer-run-*)
+        // that this REAL-run reconciled copy PROMOTES. Case (b) is the same rule
+        // canReplaceIrohSyntheticLiveRow already applies on the server-id-match
+        // branch, extended here to the different-server-id reconcile: the passive
+        // observer stamps a throwaway synthetic run on the fanned-out reply, then
+        // the post-send reconcile refetches that same reply under its CANONICAL
+        // server id + real run id. serverId/exact-content/prefix all miss, and this
+        // guard used to skip the synthetic row (`!isReconcileSyntheticRunId`), so
+        // the reconciled copy appended as a DUPLICATE. The content-overlap check
+        // below still discriminates, so an unrelated message never collapses.
+        val qualifies = when {
+            existingRunRaw.isReconcileSyntheticRunId() -> true
+            else -> existingRunRaw == incomingRunId
+        }
+        if (!qualifies) continue
         val existingText = event.content.trim()
         if (existingText.isBlank()) continue
         if (existingText == incomingText ||
@@ -383,10 +399,16 @@ private fun Timeline.findRecentAssistantContentSupersetIndex(incoming: TimelineE
         if (event.serverId == incoming.serverId) continue
         val existingText = event.content.trim()
         if (existingText.length < 3) continue
-        // Guard (1): candidate must be a live-streamed row (real run id). Skip
-        // reconciled/null-run rows entirely — they are not streamed replies.
+        // Guard (1): candidate must be a live-STREAMED row, never a reconciled one.
+        // A null run id marks a reconciled/replayed row — not a streamed reply
+        // awaiting its final — so it is never a collapse target. A SYNTHETIC run id
+        // (iroh-run-* / iroh-observer-run-*) IS a streamed row: the send/observer
+        // path stamps a throwaway placeholder the real run later supersedes, so it
+        // MUST stay eligible. Excluding synthetic here stranded the passive-observer
+        // duplicate whenever its reconcile final arrived with a null run id (the
+        // admin/HTTP message.list shape).
         val candidateRun = event.runId?.takeIf { it.isNotBlank() }
-        if (candidateRun == null || candidateRun.isReconcileSyntheticRunId()) continue
+        if (candidateRun == null) continue
         // Guard (2): first (most recent) streamed row strictly contained by the
         // incoming final IS the reply being finalized. Return it immediately.
         // If not contained, continue scanning backwards — there may be an older
