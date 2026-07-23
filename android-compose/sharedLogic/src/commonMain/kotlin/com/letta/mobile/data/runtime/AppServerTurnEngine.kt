@@ -37,8 +37,10 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -142,31 +144,41 @@ class AppServerTurnEngine(
      */
     private suspend fun reconcileOwnerLivenessAndMaybeRelease(): Boolean {
         val owner = activeTurnOwnerRef.value ?: return false
-        val runId = owner.runId?.takeIf { it.isNotBlank() } ?: return false
+        val runId = owner.runId?.takeIf { it.isNotBlank() }
         val dead = try {
-            val resp = client.adminRpc(
-                AppServerCommand.AdminRpc(
-                    requestId = requestIdFactory(),
-                    method = "run.get",
-                    params = buildJsonObject { put("run_id", runId) },
-                ),
-            )
-            when {
-                // The server reports success with a run body: dead iff terminal.
-                resp.success -> runResultIsDead(resp.result)
-                // A failed run.get whose error indicates the run is gone/not-found
-                // is also proof of death.
-                resp.error?.let { it.contains("not found", ignoreCase = true) || it.contains("no such run", ignoreCase = true) } == true -> true
-                else -> false
+            if (runId != null) {
+                val resp = client.adminRpc(
+                    AppServerCommand.AdminRpc(
+                        requestId = requestIdFactory(),
+                        method = "run.get",
+                        params = buildJsonObject { put("run_id", runId) },
+                    ),
+                )
+                when {
+                    // The server reports success with a run body: dead iff terminal.
+                    resp.success -> runResultIsDead(resp.result)
+                    // A failed run.get whose error indicates the run is gone/not-found
+                    // is also proof of death.
+                    resp.error?.let { it.contains("not found", ignoreCase = true) || it.contains("no such run", ignoreCase = true) } == true -> true
+                    else -> false
+                }
+            } else {
+                // turn-engine-busy heal: the owner never had a run_id promoted (the
+                // completed_settle terminal was never fanned to THIS initiator's
+                // stream, so isBusy stuck until the external watchdog). Fall back to
+                // a conversation-scoped run.list liveness probe — dead ONLY when the
+                // server reports no non-terminal run for this agent+conversation, so
+                // a genuinely live turn is still never interrupted.
+                conversationHasNoActiveRun(owner.agentId, owner.conversationId)
             }
         } catch (t: Throwable) {
             // Never clear the lock on an inconclusive/errored liveness check — that
             // could interrupt a live run. Only server-CONFIRMED death releases.
-            Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to runId)
+            Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to (runId ?: "<none>"))
             return false
         }
         if (!dead) {
-            Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to runId)
+            Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to (runId ?: "<none>"))
             return false
         }
         // Confirmed dead: release the stale lock so the pending send can proceed.
@@ -179,22 +191,65 @@ class AppServerTurnEngine(
         }
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.reconciledDead",
-            "runId" to runId,
+            "runId" to (runId ?: "<none>"),
             "agentId" to (released?.agentId ?: ""),
             "conversationId" to (released?.conversationId ?: ""),
-            "reason" to "run_provably_dead",
+            "reason" to if (runId != null) "run_provably_dead" else "conversation_has_no_active_run",
         )
         return true
     }
 
     /** True iff a run.get result body proves the run is terminal/dead. */
-    private fun runResultIsDead(result: JsonElement?): Boolean {
-        val obj = (result as? JsonObject) ?: return false
+    private fun runResultIsDead(result: JsonElement?): Boolean = runObjIsTerminal(result as? JsonObject)
+
+    /** True iff a single run JSON object shows a terminal/dead run. */
+    private fun runObjIsTerminal(obj: JsonObject?): Boolean {
+        if (obj == null) return false
         val status = obj["status"]?.jsonPrimitive?.contentOrNull?.lowercase()
         if (status != null && (status == "completed" || status == "failed" || status == "cancelled" || status == "error" || status == "expired")) return true
         // completed_at set is also terminal.
         if (obj["completed_at"]?.jsonPrimitive?.contentOrNull?.isNotBlank() == true) return true
         return false
+    }
+
+    /**
+     * Conversation-scoped liveness probe used when the stuck-lock owner has no
+     * run_id. Queries run.list (server returns the run set) and returns true ONLY
+     * when it can prove there is no NON-terminal run for this agent+conversation.
+     * Any inconclusive result (unsuccessful call, unparseable body) returns false
+     * so a genuinely live run is never interrupted.
+     */
+    private suspend fun conversationHasNoActiveRun(agentId: String?, conversationId: String?): Boolean {
+        if (agentId.isNullOrBlank() && conversationId.isNullOrBlank()) return false
+        val resp = client.adminRpc(
+            AppServerCommand.AdminRpc(requestId = requestIdFactory(), method = "run.list"),
+        )
+        if (!resp.success) return false
+        val runs = runListArray(resp.result) ?: return false
+        // Match this owner's runs: prefer conversation id (always present in
+        // /v1/runs); a run is "active" if it exists for this conversation and is
+        // not terminal.
+        val hasActive = runs.any { element ->
+            val obj = element as? JsonObject ?: return@any false
+            val runConv = obj["conversation_id"]?.jsonPrimitive?.contentOrNull
+                ?: obj["conversationId"]?.jsonPrimitive?.contentOrNull
+            val runAgent = obj["agent_id"]?.jsonPrimitive?.contentOrNull
+                ?: obj["agentId"]?.jsonPrimitive?.contentOrNull
+            val matchesOwner = when {
+                !conversationId.isNullOrBlank() && runConv != null -> runConv == conversationId
+                !agentId.isNullOrBlank() && runAgent != null -> runAgent == agentId
+                else -> false
+            }
+            matchesOwner && !runObjIsTerminal(obj)
+        }
+        return !hasActive
+    }
+
+    /** Extract the runs array from a run.list result (bare array or {runs|data:[…]}). */
+    private fun runListArray(result: JsonElement?): JsonArray? = when (result) {
+        is JsonArray -> result
+        is JsonObject -> (result["runs"] ?: result["data"])?.let { it as? JsonArray }
+        else -> null
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = channelFlow {
