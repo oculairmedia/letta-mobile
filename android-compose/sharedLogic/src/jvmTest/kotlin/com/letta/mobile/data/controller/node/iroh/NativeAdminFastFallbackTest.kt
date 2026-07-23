@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -25,8 +26,14 @@ import kotlin.test.assertTrue
  */
 class NativeAdminFastFallbackTest {
 
+    // Reset the process-wide circuit breaker both BEFORE (clean start) and AFTER
+    // (these tests deliberately TRIP it — leave no state for other classes sharing
+    // the JVM test process).
     @BeforeTest
     fun clearBreaker() = NativeAdmin.resetCircuitForTest()
+
+    @AfterTest
+    fun clearBreakerAfter() = NativeAdmin.resetCircuitForTest()
 
     @Test
     fun aHangingNativeAttemptFallsBackFastInsteadOfBlockingForTheFullRequestTimeout() = runTest {

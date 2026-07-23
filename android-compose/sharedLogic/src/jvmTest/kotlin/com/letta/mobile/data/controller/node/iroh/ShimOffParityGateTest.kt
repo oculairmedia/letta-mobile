@@ -38,6 +38,10 @@ class ShimOffParityGateTest {
 
     @BeforeTest
     fun shimOff() {
+        // Clear NativeAdmin's process-wide circuit breaker so a prior class's
+        // native-timeout test can't leave native short-circuited for the
+        // runtime-owned ops this gate asserts serve natively.
+        NativeAdmin.resetCircuitForTest()
         // lettashim is unreachable: every proxy dial fails fast (not a hang).
         savedFactory = AdminProxyClient.defaultTransportFactory
         AdminProxyClient.defaultTransportFactory = {
