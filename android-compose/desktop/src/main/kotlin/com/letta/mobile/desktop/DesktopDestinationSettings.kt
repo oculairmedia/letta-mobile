@@ -106,6 +106,7 @@ private data class BackendSettingsFormState(
 private data class BackendSettingsCallbacks(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
+    val onIrohIdentityReset: () -> Unit,
 )
 
 @Composable
@@ -113,11 +114,16 @@ internal fun BackendSettingsCard(
     config: LettaConfig,
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit,
+    onIrohIdentityReset: () -> Unit,
 ) {
     var serverUrl by remember(config.id, config.serverUrl) { mutableStateOf(TextFieldValue(config.serverUrl)) }
     var tokenInput by remember(config.id) { mutableStateOf(TextFieldValue("")) }
     var mode by remember(config.id) { mutableStateOf(config.mode) }
-    val callbacks = BackendSettingsCallbacks(onConfigSaved = onConfigSaved, onTokenCleared = onTokenCleared)
+    val callbacks = BackendSettingsCallbacks(
+        onConfigSaved = onConfigSaved,
+        onTokenCleared = onTokenCleared,
+        onIrohIdentityReset = onIrohIdentityReset,
+    )
 
     Card(
         colors = CardDefaults.cardColors(
@@ -240,6 +246,14 @@ private fun BackendSettingsActions(params: BackendSettingsActionsParams) {
             ) {
                 DesktopButtonContent("Clear token")
             }
+        }
+        // d6e8g.4: deliberate identity reset — discards the persistent Iroh
+        // client key so the next connection dials with a fresh NodeId (any
+        // server-side pairing must be redone).
+        DesktopOutlinedButton(
+            onClick = { params.callbacks.onIrohIdentityReset() },
+        ) {
+            DesktopButtonContent("Reset Iroh identity")
         }
     }
 }

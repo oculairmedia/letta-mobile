@@ -139,7 +139,7 @@ internal data class DesktopChatControllerBindings(
     val runtime: DesktopChatRuntime,
     val irohTransport: IrohChannelTransport?,
     val irohAgentDirectory: IrohAdminRpcAgentDirectory?,
-    val secureSettingsStore: DesktopFileSecureSettingsStore,
+    val secureSettingsStore: com.letta.mobile.data.storage.SecureSettingsStore,
 )
 
 /** [DesktopChatController] wired for either backend (iroh admin_rpc or HTTP). */

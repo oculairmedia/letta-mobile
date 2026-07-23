@@ -114,11 +114,13 @@ internal data class DestinationContentActions(
     val skills: DestinationSkillsActions,
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
+    val onIrohIdentityReset: () -> Unit,
 )
 
 private data class DestinationSettingsActions(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
+    val onIrohIdentityReset: () -> Unit,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -173,6 +175,7 @@ internal fun DestinationContent(
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
+                onIrohIdentityReset = actions.onIrohIdentityReset,
             ),
             modifier = modifier,
         )
@@ -314,6 +317,7 @@ private fun LazyListScope.scrollableDestinationItems(
                     config = state.config,
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
+                    onIrohIdentityReset = settings.onIrohIdentityReset,
                 )
             }
         }

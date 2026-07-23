@@ -506,6 +506,12 @@ fun LettaDesktopApp(
                                 onTokenCleared = {
                                     applyConfig(activeConfig.copy(accessToken = null))
                                 },
+                                onIrohIdentityReset = {
+                                    com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
+                                    // Rebuild the session graph so the next dial
+                                    // mints and uses the new identity.
+                                    applyConfig(activeConfig)
+                                },
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )
