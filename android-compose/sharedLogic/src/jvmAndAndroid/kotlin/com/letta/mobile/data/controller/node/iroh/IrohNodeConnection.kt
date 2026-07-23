@@ -296,6 +296,18 @@ class IrohNodeConnection(
         if (method == null || requestId == null) {
             return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
         }
+        // d6e8g.6: per-method capability gate BEFORE dispatch — a denial must
+        // have no proxy side effects. Unknown methods require admin.full.
+        val requiredCapability = IrohPeerCapabilities.forAdminMethod(method)
+        if (!IrohPeerCapabilities.isAllowed(effectiveCapabilities(), requiredCapability)) {
+            Telemetry.event(
+                "IrohNode", "authz.denied",
+                "remoteEndpointId" to remoteEndpointId,
+                "method" to method,
+                "capability" to requiredCapability,
+            )
+            return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"forbidden","capability":"$requiredCapability"}"""
+        }
         return adminRpcRouter.dispatch(
             AdminRpcInvocation(
                 requestId = requestId,
@@ -404,8 +416,13 @@ class IrohNodeConnection(
             Telemetry.event("IrohNode", "control.frame", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
-                "runtime_start" -> ifAuthorized(requestId) { handleRuntimeStart(obj, requestId) }
+                "runtime_start" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("runtime_start")) {
+                        handleRuntimeStart(obj, requestId)
+                    }
+                }
                 "input" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("input")) {
                     launchInputJob(
                         frameJson = frameJson,
                         streamSend = streamSend,
@@ -413,10 +430,17 @@ class IrohNodeConnection(
                         activeTurnJobsMutex = activeTurnJobsMutex,
                     )
                     null
+                    }
                 }
                 "admin_rpc" -> ifAuthorized(requestId) { handleControlAdminRpc(obj) }
-                "sync" -> ifAuthorized(requestId) { handleControlSync(obj) }
-                "abort_message" -> ifAuthorized(requestId) { handleAbort(frameJson, requestId) }
+                "sync" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("sync")) { handleControlSync(obj) }
+                }
+                "abort_message" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("abort_message")) {
+                        handleAbort(frameJson, requestId)
+                    }
+                }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
             }
         } catch (e: CancellationException) {
@@ -564,6 +588,35 @@ class IrohNodeConnection(
     }
 
     private val authFailuresOnThisConnection = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
+     * Effective capabilities for this connection (d6e8g.6). Paired peers carry
+     * their persisted explicit grants; bearer-token and explicitly-insecure
+     * (test-only) authentications keep full access as the legacy bootstrap
+     * path until pairing is universal — that path retires with the shim.
+     */
+    private fun effectiveCapabilities(): Set<String> {
+        val paired = pairingService?.peer(remoteEndpointId)?.capabilities
+        return paired ?: setOf(IrohPeerCapabilities.ADMIN_FULL)
+    }
+
+    private fun capabilityDenied(requestId: String?, required: String): String {
+        val id = requestId ?: ""
+        Telemetry.event(
+            "IrohNode", "authz.denied",
+            "remoteEndpointId" to remoteEndpointId,
+            "requestId" to id,
+            "capability" to required,
+        )
+        return """{"type":"error","request_id":"$id","message":"forbidden","capability":"$required"}"""
+    }
+
+    private inline fun ifCapable(requestId: String?, required: String?, block: () -> String?): String? {
+        if (required != null && !IrohPeerCapabilities.isAllowed(effectiveCapabilities(), required)) {
+            return capabilityDenied(requestId, required)
+        }
+        return block()
+    }
 
     private fun handleInviteRedemption(
         requestId: String,
