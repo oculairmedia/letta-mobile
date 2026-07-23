@@ -10,6 +10,8 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -23,6 +25,25 @@ import kotlinx.serialization.json.put
 
 /** lgns8.8: policy-gated control capabilities. Shim base is unreachable. */
 class ControlCapabilityHandlersTest {
+    private var savedFactory: (() -> AdminProxyTransport)? = null
+
+    @BeforeTest
+    fun pinUnreachableShim() {
+        // The shim base points at a discard port, but AdminProxyClient's shared
+        // defaultTransportFactory is mutable process-wide and other tests in the
+        // suite leave a fake installed. Pin a deterministic always-failing
+        // transport so "shim unavailable" holds regardless of test order.
+        savedFactory = AdminProxyClient.defaultTransportFactory
+        AdminProxyClient.defaultTransportFactory = {
+            AdminProxyTransport { _, _, _ -> error("shim unavailable (d6e8g test harness)") }
+        }
+    }
+
+    @AfterTest
+    fun restoreShimFactory() {
+        savedFactory?.let { AdminProxyClient.defaultTransportFactory = it }
+    }
+
     private class FakeControlClient : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
         val calls = mutableListOf<String>()

@@ -4,6 +4,8 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -22,6 +24,25 @@ import kotlinx.serialization.json.put
  * below points at an unreachable port, so any shim fallback fails loudly.
  */
 class NativeAdminHandlersTest {
+    private var savedFactory: (() -> AdminProxyTransport)? = null
+
+    @BeforeTest
+    fun pinUnreachableShim() {
+        // The shim base points at a discard port, but AdminProxyClient's shared
+        // defaultTransportFactory is mutable process-wide and other tests in the
+        // suite leave a fake installed. Pin a deterministic always-failing
+        // transport so "shim unavailable" holds regardless of test order.
+        savedFactory = AdminProxyClient.defaultTransportFactory
+        AdminProxyClient.defaultTransportFactory = {
+            AdminProxyTransport { _, _, _ -> error("shim unavailable (d6e8g test harness)") }
+        }
+    }
+
+    @AfterTest
+    fun restoreShimFactory() {
+        savedFactory?.let { AdminProxyClient.defaultTransportFactory = it }
+    }
+
     private class FakeNativeClient(
         var failNative: Boolean = false,
     ) : AppServerClient {
