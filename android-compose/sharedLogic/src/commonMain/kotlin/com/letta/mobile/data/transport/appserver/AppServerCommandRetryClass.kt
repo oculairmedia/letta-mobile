@@ -58,6 +58,19 @@ sealed interface AppServerCommandRetryClass {
             // Aborting / approval / tool-result are effectful and non-idempotent.
             is AppServerCommand.AbortMessage -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ExternalToolCallResponse -> AmbiguousMutation(dedupKey = null)
+
+            // Native admin operations (lgns8.7): reads replay safely; entity
+            // mutations may have committed before an ambiguous disconnect.
+            is AppServerCommand.AgentList -> SafeRead
+            is AppServerCommand.AgentRetrieve -> SafeRead
+            is AppServerCommand.ConversationList -> SafeRead
+            is AppServerCommand.ConversationRetrieve -> SafeRead
+            is AppServerCommand.ConversationMessagesList -> SafeRead
+            is AppServerCommand.AgentCreate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.AgentUpdate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.AgentDelete -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.ConversationCreate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.ConversationUpdate -> AmbiguousMutation(dedupKey = null)
         }
 
         /** True if this command may be re-sent verbatim after a reconnect. */

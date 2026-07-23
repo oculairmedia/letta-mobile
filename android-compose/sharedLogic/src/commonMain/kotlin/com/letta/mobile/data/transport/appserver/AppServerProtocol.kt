@@ -277,6 +277,83 @@ sealed interface AppServerCommand {
         val method: String,
         val params: JsonObject? = null,
     ) : AppServerCommand
+
+    // Runtime-native admin commands (lgns8.7), shapes pinned against the
+    // installed @letta-ai/letta-code 0.28.8 protocol declaration. query/body
+    // stay raw JSON so unknown upstream fields pass through untouched.
+
+    @Serializable
+    @SerialName("agent_list")
+    data class AgentList(
+        @SerialName("request_id") val requestId: String,
+        val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_retrieve")
+    data class AgentRetrieve(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_create")
+    data class AgentCreate(
+        @SerialName("request_id") val requestId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_update")
+    data class AgentUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("agent_delete")
+    data class AgentDelete(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_list")
+    data class ConversationList(
+        @SerialName("request_id") val requestId: String,
+        val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_retrieve")
+    data class ConversationRetrieve(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_create")
+    data class ConversationCreate(
+        @SerialName("request_id") val requestId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_update")
+    data class ConversationUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val body: JsonObject,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_messages_list")
+    data class ConversationMessagesList(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val query: JsonObject? = null,
+    ) : AppServerCommand
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -554,6 +631,138 @@ sealed interface AppServerInboundFrame {
 
         @Transient
         override val runtime: AppServerRuntimeScope? = null
+    }
+
+    // Runtime-native admin responses (lgns8.7); entity payloads stay raw
+    // JSON (JsonElement/JsonArray) per the lgns8.4 tolerant-model convention.
+
+    @Serializable
+    @SerialName("agent_list_response")
+    data class AgentListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agents: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_retrieve_response")
+    data class AgentRetrieveResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agent: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_retrieve_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_create_response")
+    data class AgentCreateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agent: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_create_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_update_response")
+    data class AgentUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val agent: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_update_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("agent_delete_response")
+    data class AgentDeleteResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "agent_delete_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_list_response")
+    data class ConversationListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversations: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_retrieve_response")
+    data class ConversationRetrieveResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversation: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_retrieve_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_create_response")
+    data class ConversationCreateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversation: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_create_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_update_response")
+    data class ConversationUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val conversation: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_update_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_messages_list_response")
+    data class ConversationMessagesListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val messages: JsonArray? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_messages_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
     @Serializable

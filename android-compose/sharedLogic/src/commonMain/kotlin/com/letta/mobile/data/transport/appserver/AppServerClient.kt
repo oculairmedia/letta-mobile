@@ -35,6 +35,41 @@ interface AppServerClient {
     suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse
 
     suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse)
+
+    // Runtime-native admin operations (lgns8.7). Defaults throw so existing
+    // fakes keep compiling; real transports override via the request registry.
+
+    suspend fun agentList(command: AppServerCommand.AgentList): AppServerInboundFrame.AgentListResponse =
+        throw UnsupportedOperationException("agent_list is not supported by this client")
+
+    suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve): AppServerInboundFrame.AgentRetrieveResponse =
+        throw UnsupportedOperationException("agent_retrieve is not supported by this client")
+
+    suspend fun agentCreate(command: AppServerCommand.AgentCreate): AppServerInboundFrame.AgentCreateResponse =
+        throw UnsupportedOperationException("agent_create is not supported by this client")
+
+    suspend fun agentUpdate(command: AppServerCommand.AgentUpdate): AppServerInboundFrame.AgentUpdateResponse =
+        throw UnsupportedOperationException("agent_update is not supported by this client")
+
+    suspend fun agentDelete(command: AppServerCommand.AgentDelete): AppServerInboundFrame.AgentDeleteResponse =
+        throw UnsupportedOperationException("agent_delete is not supported by this client")
+
+    suspend fun conversationList(command: AppServerCommand.ConversationList): AppServerInboundFrame.ConversationListResponse =
+        throw UnsupportedOperationException("conversation_list is not supported by this client")
+
+    suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve): AppServerInboundFrame.ConversationRetrieveResponse =
+        throw UnsupportedOperationException("conversation_retrieve is not supported by this client")
+
+    suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): AppServerInboundFrame.ConversationCreateResponse =
+        throw UnsupportedOperationException("conversation_create is not supported by this client")
+
+    suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate): AppServerInboundFrame.ConversationUpdateResponse =
+        throw UnsupportedOperationException("conversation_update is not supported by this client")
+
+    suspend fun conversationMessagesList(
+        command: AppServerCommand.ConversationMessagesList,
+    ): AppServerInboundFrame.ConversationMessagesListResponse =
+        throw UnsupportedOperationException("conversation_messages_list is not supported by this client")
 }
 
 class DefaultAppServerClient(
@@ -117,4 +152,36 @@ class DefaultAppServerClient(
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) {
         transport.sendControl(command)
     }
+
+    override suspend fun agentList(command: AppServerCommand.AgentList): AppServerInboundFrame.AgentListResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.AgentListResponse }) { transport.sendControl(command) }
+
+    override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve): AppServerInboundFrame.AgentRetrieveResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.AgentRetrieveResponse }) { transport.sendControl(command) }
+
+    override suspend fun agentCreate(command: AppServerCommand.AgentCreate): AppServerInboundFrame.AgentCreateResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.AgentCreateResponse }) { transport.sendControl(command) }
+
+    override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate): AppServerInboundFrame.AgentUpdateResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.AgentUpdateResponse }) { transport.sendControl(command) }
+
+    override suspend fun agentDelete(command: AppServerCommand.AgentDelete): AppServerInboundFrame.AgentDeleteResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.AgentDeleteResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationList(command: AppServerCommand.ConversationList): AppServerInboundFrame.ConversationListResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationListResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve): AppServerInboundFrame.ConversationRetrieveResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationRetrieveResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): AppServerInboundFrame.ConversationCreateResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationCreateResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate): AppServerInboundFrame.ConversationUpdateResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationUpdateResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationMessagesList(
+        command: AppServerCommand.ConversationMessagesList,
+    ): AppServerInboundFrame.ConversationMessagesListResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationMessagesListResponse }) { transport.sendControl(command) }
 }

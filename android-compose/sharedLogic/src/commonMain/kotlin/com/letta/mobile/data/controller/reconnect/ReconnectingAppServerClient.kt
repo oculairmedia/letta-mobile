@@ -264,6 +264,30 @@ class ReconnectingAppServerClient(
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
         ready().sendExternalToolResponse(command)
 
+    override suspend fun agentList(command: AppServerCommand.AgentList) = ready().agentList(command)
+
+    override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve) = ready().agentRetrieve(command)
+
+    override suspend fun agentCreate(command: AppServerCommand.AgentCreate) = ready().agentCreate(command)
+
+    override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate) = ready().agentUpdate(command)
+
+    override suspend fun agentDelete(command: AppServerCommand.AgentDelete) = ready().agentDelete(command)
+
+    override suspend fun conversationList(command: AppServerCommand.ConversationList) = ready().conversationList(command)
+
+    override suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve) =
+        ready().conversationRetrieve(command)
+
+    override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate) =
+        ready().conversationCreate(command)
+
+    override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
+        ready().conversationUpdate(command)
+
+    override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
+        ready().conversationMessagesList(command)
+
     companion object {
         private const val EVENT_BUFFER = 256
         const val DEFAULT_MAX_ATTEMPTS = 10
