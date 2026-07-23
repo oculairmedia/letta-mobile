@@ -57,7 +57,17 @@ class LettaCodeLocalTimelineTransport @Inject constructor(
     }
 
     companion object {
-        fun isLocalConversationId(conversationId: String): Boolean = conversationId.startsWith("local-conv-")
+        // An on-device conversation id is local-conv-<localAgentId> where the
+        // agent id is itself local (local-agent-*). The `local-conv-` prefix
+        // ALONE is NOT sufficient: the REMOTE letta-code-local backend (e.g.
+        // Meridian over Iroh) also names its conversations `local-conv-<n>`
+        // (local-conv-101, …). Matching the bare prefix misrouted follow-up
+        // sends on those remote conversations to the (unavailable) on-device
+        // runtime — "local runtime not available". Require the suffix to be a
+        // local agent id so remote local-conv-* stay on the remote transport.
+        fun isLocalConversationId(conversationId: String): Boolean =
+            conversationId.startsWith("local-conv-") &&
+                isLocalAgentId(agentIdFromLocalConversationId(conversationId))
 
         fun isLocalAgentId(agentId: String): Boolean = agentId.startsWith("local-agent-")
 
