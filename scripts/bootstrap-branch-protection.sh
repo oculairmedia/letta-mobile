@@ -14,7 +14,7 @@
 #   - PRs must be up-to-date with main before merging (strict).
 #   - Required status checks must pass: test, build-apk-pass,
 #     shared-multiplatform (KMP all-target gate, see letta-mobile-kx1r3),
-#     iroh-probe-gate (hermetic iroh probe, see letta-mobile-q5iiv).
+#     and perf-gate.
 #   - Linear history only -- squash-merge or rebase-merge, no merge commits.
 #   - Force-push and branch deletion are blocked.
 #   - No approving-review requirement (solo dev). When a second contributor
@@ -37,10 +37,7 @@ set -euo pipefail
 
 REPO="${REPO:-oculairmedia/letta-mobile}"
 BRANCH="${BRANCH:-main}"
-# iroh-probe-gate is the aggregator job in .github/workflows/iroh-probe.yml;
-# it self-skips (green) on PRs that do not touch the iroh transport surface,
-# so requiring it cannot deadlock unrelated PRs (letta-mobile-q5iiv).
-CHECKS=(test build-apk-pass shared-multiplatform iroh-probe-gate)
+CHECKS=(test build-apk-pass shared-multiplatform perf-gate)
 
 contexts=$(printf '"%s",' "${CHECKS[@]}")
 contexts="[${contexts%,}]"

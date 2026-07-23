@@ -264,6 +264,52 @@ class ReconnectingAppServerClient(
     override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
         ready().sendExternalToolResponse(command)
 
+    override suspend fun agentList(command: AppServerCommand.AgentList) = ready().agentList(command)
+
+    override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve) = ready().agentRetrieve(command)
+
+    override suspend fun agentCreate(command: AppServerCommand.AgentCreate) = ready().agentCreate(command)
+
+    override suspend fun agentUpdate(command: AppServerCommand.AgentUpdate) = ready().agentUpdate(command)
+
+    override suspend fun agentDelete(command: AppServerCommand.AgentDelete) = ready().agentDelete(command)
+
+    override suspend fun conversationList(command: AppServerCommand.ConversationList) = ready().conversationList(command)
+
+    override suspend fun conversationRetrieve(command: AppServerCommand.ConversationRetrieve) =
+        ready().conversationRetrieve(command)
+
+    override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate) =
+        ready().conversationCreate(command)
+
+    override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
+        ready().conversationUpdate(command)
+
+    override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
+        ready().conversationMessagesList(command)
+
+    override suspend fun listModels(command: AppServerCommand.ListModels) = ready().listModels(command)
+
+    override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)
+
+    override suspend fun skillDisable(command: AppServerCommand.SkillDisable) = ready().skillDisable(command)
+    override suspend fun cronList(command: AppServerCommand.CronList) = ready().cronList(command)
+
+    override suspend fun cronAdd(command: AppServerCommand.CronAdd) = ready().cronAdd(command)
+
+    override suspend fun cronGet(command: AppServerCommand.CronGet) = ready().cronGet(command)
+
+    override suspend fun cronRuns(command: AppServerCommand.CronRuns) = ready().cronRuns(command)
+
+    override suspend fun cronTrigger(command: AppServerCommand.CronTrigger) = ready().cronTrigger(command)
+
+    override suspend fun cronUpdate(command: AppServerCommand.CronUpdate) = ready().cronUpdate(command)
+
+    override suspend fun cronDelete(command: AppServerCommand.CronDelete) = ready().cronDelete(command)
+
+    override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) = ready().cronDeleteAll(command)
+
+
     companion object {
         private const val EVENT_BUFFER = 256
         const val DEFAULT_MAX_ATTEMPTS = 10

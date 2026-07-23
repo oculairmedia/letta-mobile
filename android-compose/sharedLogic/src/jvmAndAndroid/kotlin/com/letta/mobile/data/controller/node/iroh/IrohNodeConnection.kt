@@ -71,6 +71,19 @@ class IrohNodeConnection(
      * parameter was omitted.
      */
     private val authPolicy: IrohAuthPolicy,
+    /**
+     * Bearer verifier (d6e8g.3): constant-time comparison + per-NodeId rate
+     * limiting. Endpoints pass ONE shared instance to every connection so
+     * redialing cannot reset a peer's failure budget.
+     */
+    private val authVerifier: IrohBearerAuthVerifier = IrohBearerAuthVerifier(authPolicy),
+    /**
+     * Pairing service (d6e8g.5): peers whose NodeId is already paired
+     * authenticate by transport identity alone; unpaired peers may redeem a
+     * one-time invite via an `invite:<secret>` auth token. Null disables
+     * pairing entirely.
+     */
+    private val pairingService: IrohPairingService? = null,
     private val remoteEndpointId: String = "",
     // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
     // so a turn on one connection fans out to every connection viewing the same
@@ -96,7 +109,12 @@ class IrohNodeConnection(
     // Pre-authenticated only when the explicit policy requires no token:
     // InsecureAnonymousForTestOnly, or PeerAllowlist (the endpoint's accept
     // loop has already vetted the peer identity before constructing this).
-    private val authenticated = AtomicBoolean(authPolicy.requiredBearerToken.isNullOrBlank())
+    // Paired peers (d6e8g.5) are pre-authenticated by NodeId: the QUIC
+    // handshake already proved possession of the paired private key.
+    private val authenticated = AtomicBoolean(
+        authPolicy.requiredBearerToken.isNullOrBlank() ||
+            (pairingService?.isPaired(remoteEndpointId) == true),
+    )
     
     /**
      * Mid-turn redial fix: thread-local storage for tracking the active turn's
@@ -266,9 +284,13 @@ class IrohNodeConnection(
     private fun currentAdminRpcRequestContext(): AdminRpcRequestContext =
         AdminRpcRequestContext(
             authenticated = authenticated.get(),
-            authorizedConversationIds = viewerSubscription?.currentConversation
-                ?.let(::setOf)
-                ?: emptySet(),
+            // lgns8.12: conversation-content scope follows peer capabilities —
+            // manage/admin peers are unrestricted (null); lesser peers are
+            // bounded to the conversation they are viewing.
+            authorizedConversationIds = IrohPeerCapabilities.conversationScope(
+                capabilities = effectiveCapabilities(),
+                viewedConversationId = viewerSubscription?.currentConversation,
+            ),
         )
 
     /** Control-channel admin_rpc: parse + dispatch with scoped auth context. */
@@ -277,6 +299,18 @@ class IrohNodeConnection(
         val method = obj["method"]?.jsonPrimitive?.content
         if (method == null || requestId == null) {
             return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"method and request_id are required"}"""
+        }
+        // d6e8g.6: per-method capability gate BEFORE dispatch — a denial must
+        // have no proxy side effects. Unknown methods require admin.full.
+        val requiredCapability = IrohPeerCapabilities.forAdminMethod(method)
+        if (!IrohPeerCapabilities.isAllowed(effectiveCapabilities(), requiredCapability)) {
+            Telemetry.event(
+                "IrohNode", "authz.denied",
+                "remoteEndpointId" to remoteEndpointId,
+                "method" to method,
+                "capability" to requiredCapability,
+            )
+            return """{"type":"admin_rpc_response","request_id":"$requestId","success":false,"error":"forbidden","capability":"$requiredCapability"}"""
         }
         return adminRpcRouter.dispatch(
             AdminRpcInvocation(
@@ -386,8 +420,13 @@ class IrohNodeConnection(
             Telemetry.event("IrohNode", "control.frame", "remoteEndpointId" to remoteEndpointId, "type" to type, "requestId" to requestId, "agentId" to obj["agent_id"]?.jsonPrimitive?.content)
             when (type) {
                 "auth" -> handleAuth(obj, requestId)
-                "runtime_start" -> ifAuthorized(requestId) { handleRuntimeStart(obj, requestId) }
+                "runtime_start" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("runtime_start")) {
+                        handleRuntimeStart(obj, requestId)
+                    }
+                }
                 "input" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("input")) {
                     launchInputJob(
                         frameJson = frameJson,
                         streamSend = streamSend,
@@ -395,10 +434,17 @@ class IrohNodeConnection(
                         activeTurnJobsMutex = activeTurnJobsMutex,
                     )
                     null
+                    }
                 }
                 "admin_rpc" -> ifAuthorized(requestId) { handleControlAdminRpc(obj) }
-                "sync" -> ifAuthorized(requestId) { handleControlSync(obj) }
-                "abort_message" -> ifAuthorized(requestId) { handleAbort(frameJson, requestId) }
+                "sync" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("sync")) { handleControlSync(obj) }
+                }
+                "abort_message" -> ifAuthorized(requestId) {
+                    ifCapable(requestId, IrohPeerCapabilities.forProtocolCommand("abort_message")) {
+                        handleAbort(frameJson, requestId)
+                    }
+                }
                 else -> """{"type":"error","message":"Unknown command type: $type"}"""
             }
         } catch (e: CancellationException) {
@@ -471,9 +517,44 @@ class IrohNodeConnection(
         requestId: String?,
     ): String {
         if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
-        val expected = authPolicy.requiredBearerToken
         val provided = obj["token"]?.jsonPrimitive?.contentOrNull
-        val isAuthenticated = expected.isNullOrBlank() || provided == expected
+        // d6e8g.5: one-time invite redemption rides the auth frame. The invite
+        // is enrollment-only — on success the NodeId binding (not the invite)
+        // is what authenticates this and every future session.
+        if (pairingService != null && provided != null &&
+            provided.startsWith(IrohPairingService.INVITE_TOKEN_PREFIX)
+        ) {
+            return handleInviteRedemption(
+                requestId = requestId,
+                secret = provided.removePrefix(IrohPairingService.INVITE_TOKEN_PREFIX),
+                obj = obj,
+                pairing = pairingService,
+            )
+        }
+        if (pairingService?.isPaired(remoteEndpointId) == true) {
+            authenticated.set(true)
+            val advertised = (obj["capabilities"] as? JsonArray)
+                ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                ?.toSet()
+                .orEmpty()
+            peerCapabilities.set(advertised)
+            Telemetry.event("IrohNode", "auth.ok", "remoteEndpointId" to remoteEndpointId, "method" to "paired_node_id")
+            val capabilities = advertisedCapabilities(adminRpcRouter)
+            return buildJsonObject {
+                put("type", "auth_response")
+                put("request_id", requestId)
+                put("success", true)
+                put("capabilities", Json.encodeToJsonElement(capabilities))
+            }.toString()
+        }
+        val outcome = authVerifier.verify(remoteEndpointId, provided)
+        if (outcome is IrohBearerAuthVerifier.Outcome.RateLimited) {
+            authenticated.set(false)
+            Telemetry.event("IrohNode", "auth.rate_limited", "remoteEndpointId" to remoteEndpointId)
+            runCatching { connection.close(4429L, "auth_rate_limited".encodeToByteArray()) }
+            return """{"type":"auth_response","request_id":"$requestId","success":false,"error":"rate_limited"}"""
+        }
+        val isAuthenticated = outcome is IrohBearerAuthVerifier.Outcome.Authenticated
         authenticated.set(isAuthenticated)
         return if (isAuthenticated) {
             val advertised = (obj["capabilities"] as? JsonArray)
@@ -494,9 +575,91 @@ class IrohNodeConnection(
                 put("capabilities", Json.encodeToJsonElement(capabilities))
             }.toString()
         } else {
-            val reason = if (provided.isNullOrBlank()) "missing_token" else "invalid_token"
-            Telemetry.event("IrohNode", "auth.failed", "remoteEndpointId" to remoteEndpointId, "reason" to reason)
+            val reason = (outcome as IrohBearerAuthVerifier.Outcome.Denied).reason
+            val failures = authFailuresOnThisConnection.incrementAndGet()
+            Telemetry.event(
+                "IrohNode", "auth.failed",
+                "remoteEndpointId" to remoteEndpointId,
+                "reason" to reason,
+                "connectionFailures" to failures,
+            )
+            if (failures >= IrohBearerAuthVerifier.MAX_FAILURES_BEFORE_CLOSE) {
+                Telemetry.event("IrohNode", "auth.connection_closed", "remoteEndpointId" to remoteEndpointId)
+                runCatching { connection.close(4401L, "auth_failures".encodeToByteArray()) }
+            }
             """{"type":"auth_response","request_id":"$requestId","success":false,"error":"$reason"}"""
+        }
+    }
+
+    private val authFailuresOnThisConnection = java.util.concurrent.atomic.AtomicInteger(0)
+
+    /**
+     * Effective capabilities for this connection (d6e8g.6). Paired peers carry
+     * their persisted explicit grants; bearer-token and explicitly-insecure
+     * (test-only) authentications keep full access as the legacy bootstrap
+     * path until pairing is universal — that path retires with the shim.
+     */
+    private fun effectiveCapabilities(): Set<String> {
+        val paired = pairingService?.peer(remoteEndpointId)?.capabilities
+        return paired ?: setOf(IrohPeerCapabilities.ADMIN_FULL)
+    }
+
+    private fun capabilityDenied(requestId: String?, required: String): String {
+        val id = requestId ?: ""
+        Telemetry.event(
+            "IrohNode", "authz.denied",
+            "remoteEndpointId" to remoteEndpointId,
+            "requestId" to id,
+            "capability" to required,
+        )
+        return """{"type":"error","request_id":"$id","message":"forbidden","capability":"$required"}"""
+    }
+
+    private inline fun ifCapable(requestId: String?, required: String?, block: () -> String?): String? {
+        if (required != null && !IrohPeerCapabilities.isAllowed(effectiveCapabilities(), required)) {
+            return capabilityDenied(requestId, required)
+        }
+        return block()
+    }
+
+    private fun handleInviteRedemption(
+        requestId: String,
+        secret: String,
+        obj: JsonObject,
+        pairing: IrohPairingService,
+    ): String {
+        return when (val result = pairing.redeem(secret, remoteEndpointId, obj["peer_name"]?.jsonPrimitive?.contentOrNull)) {
+            is IrohPairingService.RedeemResult.Paired -> {
+                authenticated.set(true)
+                val advertised = (obj["capabilities"] as? JsonArray)
+                    ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                    ?.toSet()
+                    .orEmpty()
+                peerCapabilities.set(advertised)
+                Telemetry.event(
+                    "IrohNode", "auth.ok",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "method" to "invite_redeemed",
+                    "peerName" to result.peer.name,
+                )
+                val capabilities = advertisedCapabilities(adminRpcRouter)
+                buildJsonObject {
+                    put("type", "auth_response")
+                    put("request_id", requestId)
+                    put("success", true)
+                    put("paired", true)
+                    put("capabilities", Json.encodeToJsonElement(capabilities))
+                }.toString()
+            }
+            is IrohPairingService.RedeemResult.Rejected -> {
+                authenticated.set(false)
+                Telemetry.event(
+                    "IrohNode", "auth.failed",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "reason" to "invite_${result.reason}",
+                )
+                """{"type":"auth_response","request_id":"$requestId","success":false,"error":"invite_${result.reason}"}"""
+            }
         }
     }
 

@@ -7,6 +7,8 @@ on:
       - ".github/workflows/android.yml"
       - "android-compose/**"
       - "third_party/overmorrow/**"
+      - "scripts/ci/**"
+      - "scripts/tests/**"
   pull_request:
     branches: [main]
     paths:
@@ -19,6 +21,7 @@ on:
       - ".github/workflows/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
+      - "scripts/ci/**"
       - "scripts/tests/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
@@ -84,6 +87,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
+      - name: Test CI policy scripts
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/tests/ci-policy-scripts-test.sh
+
       - name: Compile all debug variants
         run: ./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :core:testutil:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
 
@@ -91,6 +98,74 @@ jobs:
         run: |
           ./gradlew :core:data:testDebugUnitTest :app:testRootDebugUnitTest
           ./gradlew :app:testScreenshot
+
+      # Additive module tests: when a PR only (or also) touches feature/designsystem/
+      # desktop/cli trees, run those unit tests in addition to the base set.
+      # Never used to skip :sharedLogic:allTests — that stays in shared-multiplatform.
+      - name: Ensure origin/main for module-diff
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        run: |
+          git fetch --no-tags origin main:refs/remotes/origin/main 2>/dev/null \
+            || git fetch --no-tags origin main
+
+      - name: Resolve additive module tests
+        id: additive_modules
+        if: github.event_name == 'pull_request'
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          tasks="$(./scripts/ci/changed-gradle-modules.sh origin/main)"
+          echo "tasks=${tasks}" >> "$GITHUB_OUTPUT"
+          if [ -n "${tasks}" ]; then
+            echo "Additive Gradle tasks: ${tasks}"
+          else
+            echo "No additive module tests for this diff"
+          fi
+
+      - name: Run additive module unit tests
+        if: github.event_name == 'pull_request' && steps.additive_modules.outputs.tasks != ''
+        run: ./gradlew ${{ steps.additive_modules.outputs.tasks }}
+
+  detekt:
+    # Advisory static analysis. Wired with continue-on-error so existing debt
+    # does not block merges; findings still show on the PR checks list.
+    name: detekt (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: android-compose
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 21 for detekt
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+
+      - name: Run detekt
+        run: ./gradlew detekt --continue
+
+      - name: Publish detekt summary
+        if: always()
+        working-directory: ${{ github.workspace }}
+        run: |
+          {
+            echo "## detekt (advisory)"
+            echo
+            echo "Ran \`./gradlew detekt --continue\`. This check is non-blocking."
+            echo
+            echo "Config: \`android-compose/detekt.yml\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   shared-multiplatform:
     # Gates the KMP common code that Android, desktop (Windows), and future
@@ -110,11 +185,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java 26
+      - name: Setup Java 21
+        # Paparazzi + KMP native targets need JDK 21; Java 26 breaks them.
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 26
+          java-version: 21
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4

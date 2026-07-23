@@ -35,6 +35,7 @@ class IrohAdminOwnershipMatrixTest {
             adminBaseUrl = "http://127.0.0.1:0",
             controller = null,
             subagentRegistrySource = EmptySubagentSource,
+            pairingService = IrohPairingService(InMemoryPairedPeerStore()),
         )
         val registered = router.registeredMethods
         val declared = operations.map { it.requiredString("method") }.toSet()

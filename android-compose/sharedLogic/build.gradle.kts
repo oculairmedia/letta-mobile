@@ -83,11 +83,10 @@ kotlin {
             dependsOn(commonMain.get())
             dependencies {
                 // Compose-Multiplatform UI dependencies for shared chat UI (slice 1).
-                // foundation/ui are kept on the 1.10.x train (matching the
-                // org.jetbrains.compose plugin) so Jewel's expected Compose
-                // foundation API is present on the desktop classpath
-                // (letta-mobile-5icsp). material3 stays on 1.9.0 — the latest
-                // STABLE Compose material3 (1.10.x material3 is alpha-only).
+                // foundation/ui stay aligned with the shared Compose plugin so
+                // all configured KMP targets, including macOS x64, resolve.
+                // Nucleus upgrades the desktop runtime separately; its Jewel
+                // text-menu ABI bridge lives in DesktopJewelTheme.
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")

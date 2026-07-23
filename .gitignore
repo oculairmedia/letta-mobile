@@ -18,6 +18,13 @@ keystore.properties
 .vscode
 .opencode/
 
+# Claude Code worktrees (accidentally committed as gitlinks; submodule init fails)
+.claude/worktrees/
+
+# Stale submodule references (committed as gitlinks without .gitmodules entries)
+.compose-performance-skills-source
+.skills
+
 # Beads / Dolt
 .dolt/
 *.db
