@@ -64,7 +64,13 @@ class IrohNodeConnection(
      * before connections arrive (e.g. in IrohNodeEndpoint.start).
      */
     private val adminRpcRouter: AdminRpcRouter = AdminRpcRouter(),
-    private val requiredBearerToken: String? = null,
+    /**
+     * REQUIRED authentication policy (d6e8g.2). Connections only start
+     * pre-authenticated when the policy explicitly says so (anonymous
+     * test-only mode or an already-vetted peer allowlist) — never because a
+     * parameter was omitted.
+     */
+    private val authPolicy: IrohAuthPolicy,
     private val remoteEndpointId: String = "",
     // eaczz.1: shared per-endpoint registry mapping conversationId -> viewers,
     // so a turn on one connection fans out to every connection viewing the same
@@ -87,7 +93,10 @@ class IrohNodeConnection(
     // connections/threads (P3).
     private val eventSeq = IrohEventSeqAllocator.newConnectionSeq()
     private val streamWriteMutex = Mutex()
-    private val authenticated = AtomicBoolean(requiredBearerToken.isNullOrBlank())
+    // Pre-authenticated only when the explicit policy requires no token:
+    // InsecureAnonymousForTestOnly, or PeerAllowlist (the endpoint's accept
+    // loop has already vetted the peer identity before constructing this).
+    private val authenticated = AtomicBoolean(authPolicy.requiredBearerToken.isNullOrBlank())
     
     /**
      * Mid-turn redial fix: thread-local storage for tracking the active turn's
@@ -462,7 +471,7 @@ class IrohNodeConnection(
         requestId: String?,
     ): String {
         if (requestId == null) return """{"type":"auth_response","success":false,"error":"request_id is required"}"""
-        val expected = requiredBearerToken
+        val expected = authPolicy.requiredBearerToken
         val provided = obj["token"]?.jsonPrimitive?.contentOrNull
         val isAuthenticated = expected.isNullOrBlank() || provided == expected
         authenticated.set(isAuthenticated)
