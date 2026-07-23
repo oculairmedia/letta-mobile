@@ -12,6 +12,7 @@ import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
+import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import computer.iroh.Endpoint
@@ -34,6 +35,11 @@ import kotlinx.coroutines.withContext
 class DesktopAppServerControllerGatewayFactory(
     /** Coroutine scope for the controller and transport. */
     private val controllerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    /**
+     * Stable client identity source (d6e8g.4): the desktop dials with the same
+     * vault-protected NodeId across restarts instead of an ephemeral keypair.
+     */
+    private val irohIdentity: () -> ByteArray = { DesktopIrohIdentity.loadOrCreate() },
 ) : DesktopAppServerChatGatewayFactory {
 
     override suspend fun create(
@@ -80,7 +86,9 @@ class DesktopAppServerControllerGatewayFactory(
         lettaConfig: LettaConfig,
     ): Pair<IrohAppServerTransport, DesktopTransportResources> {
         val normalizedAddress = IrohChannelTransport.normalizeIrohAddress(serverUrl)
-        val irohEndpoint = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
+        val irohEndpoint = Endpoint.bind(
+            EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = irohIdentity()),
+        )
         var resources: DesktopTransportResources? = null
         try {
             val irohTransport = IrohAppServerTransportAdapter(irohEndpoint).createTransport(

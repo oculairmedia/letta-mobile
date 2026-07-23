@@ -53,7 +53,7 @@ internal class DesktopAvatarCompanionHandle(
 @Composable
 internal fun rememberAvatarCompanion(
     chatScope: CoroutineScope,
-    secureSettingsStore: DesktopFileSecureSettingsStore,
+    secureSettingsStore: com.letta.mobile.data.storage.SecureSettingsStore,
 ): DesktopAvatarCompanionHandle {
     val avatarCompanion = remember(chatScope) { DesktopAvatarCompanion(chatScope) }
     val avatarCompanionState by avatarCompanion.state.collectAsState()

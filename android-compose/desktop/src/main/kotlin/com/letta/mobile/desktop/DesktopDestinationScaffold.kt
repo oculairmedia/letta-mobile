@@ -125,12 +125,14 @@ internal data class DestinationContentActions(
     val skills: DestinationSkillsActions,
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
+    val onIrohIdentityReset: () -> Unit,
     val nucleus: DestinationNucleusActions,
 )
 
 private data class DestinationSettingsActions(
     val onConfigSaved: (LettaConfig) -> Unit,
     val onTokenCleared: () -> Unit,
+    val onIrohIdentityReset: () -> Unit,
     val nucleus: DestinationNucleusActions,
 )
 
@@ -195,6 +197,7 @@ internal fun DestinationContent(
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
+                onIrohIdentityReset = actions.onIrohIdentityReset,
                 nucleus = actions.nucleus,
             ),
             modifier = modifier,
@@ -338,6 +341,7 @@ private fun LazyListScope.scrollableDestinationItems(
                     config = state.config,
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
+                    onIrohIdentityReset = settings.onIrohIdentityReset,
                 )
             }
             item {
