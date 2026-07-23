@@ -212,10 +212,18 @@ internal class ConversationViewerSubscription(
     suspend fun subscribe(conversationId: String) {
         mutex.withLock {
             val previous = viewed
-            if (previous == conversationId) return@withLock
-            if (previous != null) {
+            // De-scope only a DIFFERENT prior conversation (Option A) — unchanged.
+            if (previous != null && previous != conversationId) {
                 runCatching { registry.unregister(previous, viewer) }
             }
+            // ALWAYS (re-)register. register() is an idempotent Set.add, so a
+            // repeat signal for the SAME conversation is a no-op when we're still
+            // present, but re-adds this viewer when it was evicted from the
+            // registry by a fan-out dead-viewer drop or a redial teardown
+            // unregisterAll (both key on NodeId and can drop a live viewer). Fixes
+            // the desync where `viewed` still names the conversation but the
+            // registry no longer holds us — the cause of passive viewers silently
+            // dropping out of realtime fan-out.
             runCatching { registry.register(conversationId, viewer) }
             viewed = conversationId
         }

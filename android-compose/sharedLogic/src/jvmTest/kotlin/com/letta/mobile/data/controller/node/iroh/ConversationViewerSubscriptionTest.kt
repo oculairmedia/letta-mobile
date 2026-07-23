@@ -85,6 +85,34 @@ class ConversationViewerSubscriptionTest {
     }
 
     @Test
+    fun reSubscribeReAddsViewerAfterAnExternalUnregister() = runTest {
+        // Regression: a passive viewer (mobile) that was evicted from the registry
+        // by a fan-out dead-viewer drop or a redial teardown unregisterAll (both
+        // key on NodeId) must be RE-ADDED by its next same-conversation signal
+        // (message.list poll). Previously `subscribe` short-circuited on the
+        // `viewed` cache and never re-registered, so the viewer stayed absent from
+        // realtime fan-out forever ("desktop -> mobile not realtime").
+        val registry = ConnectionRegistry()
+        val v = viewer("conn-A")
+        val subscription = ConversationViewerSubscription(registry, v)
+
+        subscription.subscribe("convA")
+        assertEquals(setOf<ViewerHandle>(v), registry.viewersFor("convA"))
+
+        // Simulate the external eviction (fan-out drop / redial unregisterAll).
+        registry.unregister("convA", v)
+        assertTrue(registry.viewersFor("convA").isEmpty())
+
+        // A repeat message.list signal for the SAME conversation must re-register.
+        subscription.subscribe("convA")
+        assertEquals(
+            setOf<ViewerHandle>(v),
+            registry.viewersFor("convA"),
+            "a same-conversation signal must heal a dropped registration",
+        )
+    }
+
+    @Test
     fun unrelatedConnectionIsNotRegistered() = runTest {
         val registry = ConnectionRegistry()
         val a = viewer("conn-A")
