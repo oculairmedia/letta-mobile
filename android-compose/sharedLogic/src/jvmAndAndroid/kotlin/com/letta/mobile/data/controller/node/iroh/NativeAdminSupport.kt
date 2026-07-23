@@ -18,6 +18,19 @@ import kotlinx.serialization.json.buildJsonObject
 internal object NativeAdmin {
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
 
+    /**
+     * Upper bound on a single native attempt. The native path is an OPTIMIZATION
+     * over the always-available shim proxy: a localhost App-Server-v2 command that
+     * succeeds does so in milliseconds. If the wrapped App Server does not answer
+     * the command (e.g. letta.js hasn't implemented it), the call would otherwise
+     * block for the client's full request timeout (120s) before the proxy
+     * fallback runs — and the remote admin_rpc client gives up at 30s first, so
+     * the read appears to "time out" even though the proxy is fast. Bounding the
+     * attempt makes an unanswered native command fall back to the proxy almost
+     * immediately, well inside the client's window.
+     */
+    private const val NATIVE_ATTEMPT_TIMEOUT_MS = 3_000L
+
     fun requestId(): String = "native-admin-${counter.incrementAndGet()}"
 
     suspend fun <T : Any> attempt(
@@ -27,11 +40,19 @@ internal object NativeAdmin {
     ): T? {
         if (client == null) return null
         return try {
-            val result = block(client)
+            val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
             if (result == null) {
                 Telemetry.event("IrohAdminNative", "fallback", "op" to op, "reason" to "native_unsuccessful")
             }
             result
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            // A native attempt that outran its own bound is treated as a fast
+            // fallback to the proxy — NOT a propagated cancellation of the whole
+            // admin_rpc request. (TimeoutCancellationException is a subtype of
+            // CancellationException, so it must be caught BEFORE the generic
+            // CancellationException rethrow below.)
+            Telemetry.event("IrohAdminNative", "fallback", "op" to op, "reason" to "native_timeout")
+            null
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
