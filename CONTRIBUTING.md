@@ -29,7 +29,7 @@ git push --force-with-lease                 # safe force-push of your branch
 |-------|--------------|--------|
 | `.githooks/pre-commit` | Refuses commits on `main`/`master` | `git commit --no-verify` |
 | `.githooks/pre-push`   | Refuses pushes targeting `refs/heads/main` or `refs/heads/master` on any remote, runs `compileRootDebugKotlin` | `git push --no-verify` |
-| GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk` + `shared-multiplatform` to pass, linear history only | Admin override in the UI |
+| GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk-pass` + `shared-multiplatform` + `perf-gate` to pass, linear history only | Admin override in the UI |
 
 The local hooks are nudges — they save a round-trip to CI. The branch-protection rule is the wall.
 

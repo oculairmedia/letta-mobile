@@ -4,12 +4,19 @@ This directory contains the production Letta Mobile Android app.
 
 ## Modules
 
-| Module         | Purpose                                                   |
-| -------------- | --------------------------------------------------------- |
-| `app`          | Screens, navigation, Hilt wiring, Android entrypoints     |
-| `core`         | Data models, Ktor API client, Room, repositories, mappers |
-| `designsystem` | Shared Compose components, theme, dialogs, `LettaIcons`   |
-| `chat`         | Streaming chat client and chat-domain support             |
+| Module | Purpose | Required / additive tests |
+| --- | --- | --- |
+| `app` | Screens, navigation, Hilt wiring, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
+| `core/data` | Android data bindings, Ktor wiring, Room, mappers | `:core:data:testDebugUnitTest` (required `test` job) |
+| `core/domain` | JVM domain models | compiled in `test` job |
+| `sharedLogic` | Platform-neutral repositories, timeline, transport, admin RPC | `:sharedLogic:allTests` (required `shared-multiplatform`) |
+| `designsystem` | Shared Compose components, theme, dialogs, A2UI renderer | `:designsystem:testDebugUnitTest` (additive on path change) |
+| `feature-chat` | Chat UI + ViewModels (admin chat stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
+| `feature-editagent` | Agent editor feature module | `:feature-editagent:testDebugUnitTest` (additive on path change) |
+| `desktop` | Compose Desktop host (Windows) | `:desktop:test` (required `shared-multiplatform`) |
+| `cli` / `appserver-cli` | JVM tooling / probe CLIs | covered in `shared-multiplatform` / additive `cli` tests |
+
+**Ownership rule:** feature *logic* lives in `sharedLogic/commonMain`. `app/` and `desktop/` add host binding only (see root `AGENTS.md`).
 
 ## Chat architecture boundary
 
