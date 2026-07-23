@@ -58,7 +58,8 @@ internal fun buildProductionAdminRouter(
     controller: DefaultAppServerController,
     subagentRegistrySource: SubagentRegistrySource?,
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
-): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource, pairingService)
+    nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
+): AdminRpcRouter = AdminRpcRegistry.buildRouter(adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient)
 
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
@@ -191,7 +192,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             
             // Create the controller (using a stub implementation for now)
             // In a full implementation, this would connect to a real Letta App Server
-            val controller = createController(appServerUrl, requestTimeout.toLong(), scope)
+            val (controller, nativeAdminClient) = createController(appServerUrl, requestTimeout.toLong(), scope)
 
             // Register admin_rpc handlers so clients on an iroh:// backend can
             // read conversations/messages/agents WITHOUT any direct HTTP route
@@ -200,7 +201,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val rpcBase = adminBaseUrl.trimEnd('/')
             val subagentRegistrySource =
                 com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
-            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService)
+            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService, nativeAdminClient)
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
@@ -238,7 +239,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
         appServerUrl: String?,
         requestTimeoutMs: Long,
         scope: CoroutineScope,
-    ): DefaultAppServerController {
+    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
         // If an app server URL is provided, create a client that wraps it
         // Otherwise, create a stub controller for testing
         return if (appServerUrl != null) {
@@ -313,7 +314,9 @@ internal class AppServerServeIrohCommand : CliktCommand(
             controllerRef = controller
             coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
             reconnectingClient.start(scope)
-            controller
+            // lgns8.7: the reconnecting client doubles as the native admin
+            // command channel for runtime-native admin_rpc handlers.
+            controller to reconnectingClient
         } else {
             // Stub controller - the server side will return errors for now
             // This allows testing the Iroh transport layer without a full app server
@@ -331,7 +334,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             )
             
             val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-            DefaultAppServerController(client)
+            DefaultAppServerController(client) to null
         }
     }
 }

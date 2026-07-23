@@ -44,14 +44,15 @@ object AdminRpcRegistry {
         controller: AppServerController? = null,
         subagentRegistrySource: SubagentRegistrySource? = null,
         pairingService: IrohPairingService? = null,
+        nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val router = AdminRpcRouter()
 
         HealthAdminHandlers.register(router, rpcBase)
-        AgentAdminHandlers.register(router, rpcBase, controller)
+        AgentAdminHandlers.register(router, rpcBase, controller, nativeClient)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase)
+        ConversationAdminHandlers.register(router, rpcBase, nativeClient)
         ProjectAdminHandlers.register(router, rpcBase)
         RunAdminHandlers.register(router, rpcBase)
         ArchiveAdminHandlers.register(router, rpcBase)
