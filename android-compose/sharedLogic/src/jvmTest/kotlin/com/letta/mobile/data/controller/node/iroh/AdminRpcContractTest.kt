@@ -91,6 +91,8 @@ class AdminRpcContractTest {
             "passage.delete",
             "passage.list",
             "provider.list",
+            "reflection.get",
+            "reflection.set",
             "run.get",
             "run.list",
             "cron.add",
