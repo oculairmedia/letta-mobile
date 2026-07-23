@@ -42,11 +42,28 @@ data class IrohConnectionHandle(
      * without dialing a real QUIC endpoint.
      */
     val observerStreamFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>? = null,
+    /**
+     * Synchronous liveness of the underlying QUIC connection, read by
+     * [IrohChannelTransport.adminRpc] for request isolation: a per-request
+     * failure on a still-alive connection must fail only that request, never tear
+     * down the shared connection. Defaults to the live transport's
+     * `isConnectionAlive`; overridable so tests can drive the isolation path
+     * without dialing a real QUIC endpoint.
+     */
+    val connectionAlive: (() -> Boolean)? = null,
     val close: suspend (String) -> Unit,
 ) {
     /** The flow the observer ingests: the test override if present, else the live transport's stream. */
     val effectiveObserverStreamFrames: kotlinx.coroutines.flow.Flow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>?
         get() = observerStreamFrames ?: transport?.streamFrames
+
+    /**
+     * Liveness the adminRpc isolation guard reads: the test override if present,
+     * else the live transport. Defaults to `false` when neither is set so a
+     * transport-less test handle keeps the legacy retry/escalate behavior.
+     */
+    val isConnectionAlive: Boolean
+        get() = connectionAlive?.invoke() ?: transport?.isConnectionAlive ?: false
 
     suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
         adminRpcCall?.invoke(method, path, body)

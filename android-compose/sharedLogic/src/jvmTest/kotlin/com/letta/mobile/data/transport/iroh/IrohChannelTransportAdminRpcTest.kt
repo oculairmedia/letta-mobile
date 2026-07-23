@@ -171,6 +171,67 @@ class IrohChannelTransportAdminRpcTest {
     }
 
     @Test
+    fun connectionLikeErrorOnLiveConnectionFailsOnlyTheRequestWithoutRedialOrClose() = runTest {
+        // Request isolation: a read that fails with a connection-LOOKING error
+        // ("stream closed before response", per-request timeout) while the shared
+        // QUIC connection is STILL ALIVE must fail only THIS request — no retry
+        // that tears down, no supervisor invalidation, no close. Otherwise one
+        // sibling read in a concurrent connect-burst kills the whole connection
+        // and cancels a large in-flight agent.list (the desktop teardown loop).
+        var dials = 0
+        var calls = 0
+        val closed = mutableListOf<String>()
+        val perRequestError = IllegalStateException("admin_rpc stream closed before response for method=agent.list")
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, alive = { true }, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                calls += 1
+                throw perRequestError
+            }
+        }
+
+        val thrown = assertFailsWith<IllegalStateException> {
+            transport.adminRpc("conversation.list", "/conversations", null)
+        }
+        advanceUntilIdle()
+
+        assertSame(perRequestError, thrown)
+        assertEquals(1, dials, "a live connection must not be redialed for a single request's error")
+        assertEquals(1, calls, "no same-connection retry that could escalate to teardown")
+        assertTrue(closed.isEmpty(), "the shared connection must stay open")
+    }
+
+    @Test
+    fun connectionLikeErrorOnDeadConnectionStillEscalatesAndReconnects() = runTest {
+        // Contrast: when the connection is genuinely dead (isConnectionAlive =
+        // false), the legacy retry -> escalate -> redial path must still run so a
+        // real QUIC drop recovers.
+        val sessions = mutableListOf<String>()
+        val closed = mutableListOf<String>()
+        var dials = 0
+        val transport = transportWithHandles {
+            dials += 1
+            val sessionId = "dial-$dials"
+            fakeHandle(sessionId, alive = { false }, close = { reason -> closed += "$sessionId:$reason" }) { _, _, _ ->
+                sessions += sessionId
+                if (sessionId == "dial-1") throw IllegalStateException("connection reset by peer")
+                response(sessionId, success = true, result = JsonPrimitive(sessionId))
+            }
+        }
+
+        val pending = async { transport.adminRpc("message.list", "/messages", null) }
+        runCurrent()
+        advanceTimeBy(1_000)
+        advanceUntilIdle()
+        val result = pending.await()
+
+        assertEquals(JsonPrimitive("dial-2"), result.result)
+        assertEquals(listOf("dial-1", "dial-1", "dial-2"), sessions)
+        assertTrue(closed.any { it.startsWith("dial-1:admin_rpc_failed_after_retry") })
+    }
+
+    @Test
     fun unknownMethodReturnsFailureEnvelopeWithoutThrowing() = runTest {
         val transport = transportWithHandles {
             fakeHandle("dial-1") { method, _, _ ->
@@ -370,12 +431,14 @@ class IrohChannelTransportAdminRpcTest {
     private fun fakeHandle(
         sessionId: String,
         close: suspend (String) -> Unit = {},
+        alive: (() -> Boolean)? = null,
         adminRpc: suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse,
     ): IrohConnectionHandle = IrohConnectionHandle(
         config = config,
         ticket = "ticket",
         sessionId = sessionId,
         adminRpcCall = adminRpc,
+        connectionAlive = alive,
         close = close,
     )
 
