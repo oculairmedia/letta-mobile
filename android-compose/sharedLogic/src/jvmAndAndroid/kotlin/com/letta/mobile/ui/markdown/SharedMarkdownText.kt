@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.markdown
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -12,12 +11,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import com.mikepenz.markdown.compose.Markdown
 import com.mikepenz.markdown.compose.components.markdownComponents
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeBlock
-import com.mikepenz.markdown.compose.elements.MarkdownHighlightedCodeFence
+import com.mikepenz.markdown.compose.elements.MarkdownCodeBlock
+import com.mikepenz.markdown.compose.elements.MarkdownCodeFence
 import com.mikepenz.markdown.m3.markdownColor
 import com.mikepenz.markdown.m3.markdownTypography
-import dev.snipme.highlights.Highlights
-import dev.snipme.highlights.model.SyntaxThemes
 import org.intellij.markdown.ast.ASTNode
 
 fun interface MermaidDiagramRenderer {
@@ -29,7 +26,7 @@ val LocalMermaidDiagramRenderer = staticCompositionLocalOf<MermaidDiagramRendere
 
 internal enum class CodeFenceRenderer {
     MermaidDiagram,
-    HighlightedCode,
+    Code,
 }
 
 internal fun selectCodeFenceRenderer(
@@ -40,7 +37,7 @@ internal fun selectCodeFenceRenderer(
     if (shouldRenderMermaidDiagram(language, source, deferIncompleteMermaid)) {
         CodeFenceRenderer.MermaidDiagram
     } else {
-        CodeFenceRenderer.HighlightedCode
+        CodeFenceRenderer.Code
     }
 
 private fun shouldRenderMermaidDiagram(
@@ -66,24 +63,20 @@ fun SharedMarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
+    retainState: Boolean = true,
 ) {
     if (text.isBlank()) return
     val repaired = remember(text) { repairIncompleteMarkdownForStreaming(text) }
     val retentionTracker = remember { MarkdownRetentionTracker() }
     val retentionKey = retentionTracker.update(text)
     val deferIncompleteMermaid = remember(text) { hasOpenMarkdownCodeFence(text) }
-    val isDark = isSystemInDarkTheme()
-    val highlights = remember(isDark) {
-        Highlights.Builder().theme(SyntaxThemes.atom(darkMode = isDark))
-    }
     val mermaidRenderer = LocalMermaidDiagramRenderer.current
-    val components = remember(highlights, mermaidRenderer, deferIncompleteMermaid) {
+    val components = remember(mermaidRenderer, deferIncompleteMermaid) {
         markdownComponents(
             codeBlock = {
-                MarkdownHighlightedCodeBlock(
+                MarkdownCodeBlock(
                     content = it.content,
                     node = it.node,
-                    highlightsBuilder = highlights,
                 )
             },
             codeFence = {
@@ -92,15 +85,13 @@ fun SharedMarkdownText(
                     CodeFenceRenderer.MermaidDiagram -> mermaidRenderer?.Render(
                         source = source,
                         modifier = Modifier.fillMaxWidth(),
-                    ) ?: MarkdownHighlightedCodeFence(
+                    ) ?: MarkdownCodeFence(
                         content = it.content,
                         node = it.node,
-                        highlightsBuilder = highlights,
                     )
-                    CodeFenceRenderer.HighlightedCode -> MarkdownHighlightedCodeFence(
+                    CodeFenceRenderer.Code -> MarkdownCodeFence(
                         content = it.content,
                         node = it.node,
-                        highlightsBuilder = highlights,
                     )
                 }
             },
@@ -117,7 +108,7 @@ fun SharedMarkdownText(
             content = repaired,
             modifier = modifier.fillMaxWidth(),
             components = components,
-            retainState = true,
+            retainState = retainState,
             colors = markdownColor(
                 text = textColor,
                 codeBackground = MaterialTheme.colorScheme.surfaceVariant,
