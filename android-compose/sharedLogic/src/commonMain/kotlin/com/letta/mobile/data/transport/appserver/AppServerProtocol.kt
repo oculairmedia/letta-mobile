@@ -455,6 +455,25 @@ sealed interface AppServerCommand {
         @SerialName("request_id") val requestId: String,
         @SerialName("agent_id") val agentId: String,
     ) : AppServerCommand
+
+    // Reflection settings (lgns8.16): runtime-scoped get/set of the agent's
+    // reflection trigger + step_count, carried through the native path.
+
+    @Serializable
+    @SerialName("get_reflection_settings")
+    data class GetReflectionSettings(
+        @SerialName("request_id") val requestId: String,
+        val runtime: AppServerRuntimeScope,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("set_reflection_settings")
+    data class SetReflectionSettings(
+        @SerialName("request_id") val requestId: String,
+        val runtime: AppServerRuntimeScope,
+        val settings: JsonObject,
+        val scope: String? = null,
+    ) : AppServerCommand
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -872,6 +891,33 @@ sealed interface AppServerInboundFrame {
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
+    @Serializable
+    @SerialName("get_reflection_settings_response")
+    data class GetReflectionSettingsResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("reflection_settings") val reflectionSettings: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "get_reflection_settings_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("set_reflection_settings_response")
+    data class SetReflectionSettingsResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("reflection_settings") val reflectionSettings: JsonObject? = null,
+        val scope: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "set_reflection_settings_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
     // Runtime-native admin responses (lgns8.7); entity payloads stay raw
     // JSON (JsonElement/JsonArray) per the lgns8.4 tolerant-model convention.
 
