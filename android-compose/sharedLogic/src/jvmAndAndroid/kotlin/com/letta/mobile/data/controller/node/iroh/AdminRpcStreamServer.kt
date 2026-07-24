@@ -96,6 +96,17 @@ internal class AdminRpcStreamServer(
     private val requestContextProvider: () -> AdminRpcRequestContext = {
         AdminRpcRequestContext(authenticated = authenticated.get())
     },
+    /**
+     * P0.4 (audit): per-method capability gate for the stream-per-request path.
+     * Returns the required-but-missing capability name to DENY the method, or
+     * null to ALLOW. Default allows everything — behaviour-preserving for callers
+     * and tests that don't wire authz. [IrohNodeConnection] supplies the real gate
+     * (forAdminMethod + isAllowed over the peer's effective capabilities) so the
+     * BiStream path enforces the SAME matrix as the control-channel admin_rpc path,
+     * which previously it did not — any authenticated peer could invoke
+     * agent.delete / tool.delete / pair.peer.revoke etc. over a per-request stream.
+     */
+    private val capabilityGate: (method: String) -> String? = { null },
     private val json: Json = Json { ignoreUnknownKeys = true },
 ) {
     private val permits = Semaphore(maxActiveHandlers)
@@ -268,16 +279,29 @@ internal class AdminRpcStreamServer(
             } else if (method == null || requestId == null) {
                 errorEnvelope(requestId ?: "", "method and request_id are required")
             } else {
-                val params = obj["params"]?.jsonObject
-                notifyMethodObserved(method, params)
-                router.dispatch(
-                    AdminRpcInvocation(
-                        requestId = requestId,
-                        method = method,
-                        params = params,
-                        context = requestContextProvider(),
-                    ),
-                )
+                // P0.4: per-method capability gate BEFORE dispatch — a denial must
+                // have no proxy side effects (no notifyMethodObserved, no dispatch).
+                val deniedCapability = capabilityGate(method)
+                if (deniedCapability != null) {
+                    Telemetry.event(
+                        "IrohNode", "authz.denied",
+                        "remoteEndpointId" to remoteEndpointId,
+                        "method" to method,
+                        "capability" to deniedCapability,
+                    )
+                    forbiddenEnvelope(requestId, deniedCapability)
+                } else {
+                    val params = obj["params"]?.jsonObject
+                    notifyMethodObserved(method, params)
+                    router.dispatch(
+                        AdminRpcInvocation(
+                            requestId = requestId,
+                            method = method,
+                            params = params,
+                            context = requestContextProvider(),
+                        ),
+                    )
+                }
             }
         } catch (ce: CancellationException) {
             throw ce
@@ -316,6 +340,19 @@ internal class AdminRpcStreamServer(
                 put("request_id", requestId)
                 put("success", false)
                 put("error", message)
+            },
+        )
+
+    /** P0.4: forbidden response mirroring the control-channel authz denial shape. */
+    private fun forbiddenEnvelope(requestId: String, capability: String): String =
+        json.encodeToString(
+            kotlinx.serialization.serializer(),
+            buildJsonObject {
+                put("type", "admin_rpc_response")
+                put("request_id", requestId)
+                put("success", false)
+                put("error", "forbidden")
+                put("capability", capability)
             },
         )
 

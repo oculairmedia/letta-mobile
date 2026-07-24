@@ -52,6 +52,55 @@ class AdminRpcStreamServerTest {
     }
 
     @Test
+    fun capabilityGateDeniesUnauthorizedMethodBeforeDispatch() = runTest {
+        // P0.4: the stream-per-request path must enforce the same per-method
+        // capability matrix as the control channel. A denied method returns
+        // forbidden + the required capability and NEVER reaches the router.
+        val dispatched = AtomicBoolean(false)
+        val gatedRouter = AdminRpcRouter().apply {
+            register("agent.delete") {
+                dispatched.set(true)
+                JsonPrimitive("deleted")
+            }
+        }
+        val server = AdminRpcStreamServer(
+            router = gatedRouter,
+            authenticated = AtomicBoolean(true),
+            firstFrameTimeoutMs = 1_000,
+            capabilityGate = { method -> if (method == "agent.delete") "admin.full" else null },
+        )
+        val stream = FakeBiStream()
+
+        val job = launchTracked(server, stream)
+        stream.sendFrame(adminRpc("r1", "agent.delete"))
+        stream.closeRecv()
+        val response = stream.awaitFrame()
+        job.join()
+
+        assertEquals("forbidden", response["error"]?.jsonPrimitive?.content)
+        assertEquals("admin.full", response["capability"]?.jsonPrimitive?.content)
+        assertFalse(response["success"]?.jsonPrimitive?.boolean == true)
+        assertFalse(dispatched.get(), "a denied method must not reach the router (no proxy side effects)")
+    }
+
+    @Test
+    fun capabilityGateAllowsAuthorizedMethod() = runTest {
+        val server = AdminRpcStreamServer(
+            router = router(),
+            authenticated = AtomicBoolean(true),
+            firstFrameTimeoutMs = 1_000,
+            capabilityGate = { null }, // allow
+        )
+        val stream = FakeBiStream()
+        val job = launchTracked(server, stream)
+        stream.sendFrame(adminRpc("r2", "health.check"))
+        stream.closeRecv()
+        val response = stream.awaitFrame()
+        job.join()
+        assertTrue(response["success"]?.jsonPrimitive?.boolean == true)
+    }
+
+    @Test
     fun idleAdminStreamWithoutFirstFrameTimesOutAndReleasesHandlerResources() = runTest {
         val server = AdminRpcStreamServer(router = router(), authenticated = AtomicBoolean(true), firstFrameTimeoutMs = 10)
         val idle = FakeBiStream()
