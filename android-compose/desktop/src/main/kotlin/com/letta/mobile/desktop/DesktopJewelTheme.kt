@@ -20,7 +20,6 @@ import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
 import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.ui.ComponentStyling
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
-import dev.nucleusframework.systemcolor.systemAccentColor
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -51,7 +50,13 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  * Desktop Material theme — re-based onto the Letta palette (teal primary,
  * #0A0A0A background, #1E1E1E surfaces) instead of Jewel-derived hues, so the
  * desktop app matches the mobile design template while following live OS
- * appearance and accent changes through Nucleus.
+ * light/dark appearance changes through Nucleus.
+ *
+ * The OS accent color deliberately does NOT repaint `primary`: the rest of the
+ * pairing (onPrimary, containers, the fixed orb gradients) is brand-derived,
+ * so a non-teal accent (e.g. Windows red) turned the thinking ring and
+ * selection markers into what read as error states. The live accent remains
+ * visible as a read-only row in Settings.
  *
  * `LocalCustomColors` is provided with the same fixed brand agent-status values
  * the Android `deriveCustomColors()` uses. Desktop only depends on
@@ -61,11 +66,10 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkMode()
-    val systemAccent = systemAccentColor()
     // Cool-slate palette (2026-06-23 retune) — sourced from the shared
     // LettaColorTokens so desktop and Android stay in lockstep (no duplication).
     val scheme = if (dark) darkColorScheme(
-        primary = systemAccent ?: Color(LettaColorTokens.DARK_PRIMARY),
+        primary = Color(LettaColorTokens.DARK_PRIMARY),
         onPrimary = Color(0xFF06302B),
         primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
         onPrimaryContainer = Color(0xFFE6F4F1),
@@ -95,9 +99,9 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
         onError = Color(0xFF000000),
         onErrorContainer = Color(0xFFFFDAD6),
     ) else lightColorScheme(
-        primary = systemAccent ?: Color(LettaColorTokens.LIGHT_PRIMARY),
+        primary = Color(LettaColorTokens.LIGHT_PRIMARY),
         onPrimary = Color.White,
-        primaryContainer = (systemAccent ?: Color(LettaColorTokens.LIGHT_PRIMARY)).copy(alpha = 0.16f),
+        primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = 0.16f),
         onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
         secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
         onSecondary = Color.White,
