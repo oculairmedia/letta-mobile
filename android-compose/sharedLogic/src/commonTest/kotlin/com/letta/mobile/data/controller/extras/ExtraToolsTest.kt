@@ -8,6 +8,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertTrue
 
 class ExtraToolsTest {
     @Test
@@ -21,7 +22,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun imageHydrationToolInvokeReturnsSuccess() = runTest {
+    fun imageHydrationToolInvokeReturnsUnimplementedError() = runTest {
         val tool = ImageHydrationTool()
         val input = buildJsonObject {
             put("image_id", "test-image")
@@ -29,7 +30,9 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
@@ -43,7 +46,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun goalsToolInvokeReturnsSuccess() = runTest {
+    fun goalsToolInvokeReturnsUnimplementedError() = runTest {
         val tool = GoalsTool()
         val input = buildJsonObject {
             put("action", "list")
@@ -51,7 +54,9 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
@@ -65,7 +70,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun schedulesToolInvokeReturnsSuccess() = runTest {
+    fun schedulesToolInvokeReturnsUnimplementedError() = runTest {
         val tool = SchedulesTool()
         val input = buildJsonObject {
             put("action", "list")
@@ -73,7 +78,9 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
@@ -87,7 +94,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun slashCommandsToolInvokeReturnsSuccess() = runTest {
+    fun slashCommandsToolInvokeReturnsUnimplementedError() = runTest {
         val tool = SlashCommandsTool()
         val input = buildJsonObject {
             put("command", "/help")
@@ -95,7 +102,9 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
@@ -109,7 +118,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun subagentChipsToolInvokeReturnsSuccess() = runTest {
+    fun subagentChipsToolInvokeReturnsUnimplementedError() = runTest {
         val tool = SubagentChipsTool()
         val input = buildJsonObject {
             put("subagent_id", "test-subagent")
@@ -117,7 +126,9 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
@@ -131,7 +142,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun reflectionToolInvokeReturnsSuccess() = runTest {
+    fun reflectionToolInvokeReturnsUnimplementedError() = runTest {
         val tool = ReflectionTool()
         val input = buildJsonObject {
             put("query", "What is my current context?")
@@ -139,7 +150,9 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
@@ -153,7 +166,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun slimAgentsToolInvokeReturnsSuccess() = runTest {
+    fun slimAgentsToolInvokeReturnsUnimplementedError() = runTest {
         val tool = SlimAgentsTool()
         val input = buildJsonObject {
             put("agent_ids", buildJsonObject { })
@@ -162,6 +175,8 @@ class ExtraToolsTest {
 
         val result = tool.invoke(input)
 
-        assertIs<ExternalToolResult.Success>(result)
+        // Advertised-but-stub tools must report a structured error, not a fake success.
+        assertIs<ExternalToolResult.Error>(result)
+        assertTrue(result.error.contains("not yet implemented"))
     }
 }

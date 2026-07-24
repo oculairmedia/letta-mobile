@@ -3,6 +3,10 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 object ConversationAdminHandlers {
     fun register(
@@ -27,9 +31,9 @@ object ConversationAdminHandlers {
         nativeClient: AppServerClient?,
         localStore: LocalBackendAdminStore?,
     ) {
-        router.register("conversation.list") { params ->
+        router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
+            val conversations = NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
                 val response = c.conversationList(
                     AppServerCommand.ConversationList(
                         requestId = NativeAdmin.requestId(),
@@ -81,9 +85,21 @@ object ConversationAdminHandlers {
                     query("order_by", param(params, AdminParamKey("order_by")))
                 }
             }
+            // P3.4 (gn7kr.23): conversation.list previously trusted the capability
+            // tier alone, letting a lesser (non-conversation-manage) peer enumerate
+            // cross-conversation metadata (id, agent_id, last_message_at, summary,
+            // archived) for a whole agent. Mirror the message.list scope mechanism:
+            // conversation.manage/admin.full peers (authorizedConversationIds == null)
+            // stay unrestricted; a scoped peer sees only the conversation(s) it is
+            // authorized for (its viewed conversation, or nothing).
+            scopeConversationList(conversations, context)
         }
-        router.register("conversation.get") { params ->
+        router.registerScoped("conversation.get") { params, context ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
+            // P3.4 (gn7kr.23): scope-check before any read/proxy side effect, exactly
+            // as message.get does — a lesser peer can only read the conversation it is
+            // actively viewing; conversation.manage/admin.full read any.
+            requireConversationAccess(context, id)
             NativeAdmin.attempt(nativeClient, "conversation.get") { c ->
                 val response = c.conversationRetrieve(
                     AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = id),
@@ -91,6 +107,24 @@ object ConversationAdminHandlers {
                 if (response.success) response.conversation else null
             } ?: api.get(AdminPath.v1("conversations", id))
         }
+    }
+
+    /**
+     * P3.4 (gn7kr.23): restricts a conversation-list result to the peer's authorized
+     * conversation scope. Unrestricted peers (conversation.manage / admin.full, i.e.
+     * [AdminRpcRequestContext.authorizedConversationIds] == null) get the list
+     * unchanged; scoped peers get only the entries whose `id` is in their authorized
+     * set (empty when they are viewing no conversation). Non-array results (e.g. a
+     * proxy error object) pass through untouched — filtering only ever narrows.
+     */
+    private fun scopeConversationList(result: JsonElement, context: AdminRpcRequestContext): JsonElement {
+        val authorized = context.authorizedConversationIds ?: return result
+        if (result !is JsonArray) return result
+        val filtered = result.filter { element ->
+            val id = (element as? JsonObject)?.get("id")?.let { it as? JsonPrimitive }?.contentOrNull
+            id != null && id in authorized
+        }
+        return JsonArray(filtered)
     }
 
     private fun registerConversationWriteRoutes(

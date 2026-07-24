@@ -62,3 +62,4 @@ android-compose/app/libs/embedded-bash/
 
 android-compose/app/libs/embedded-curl/
 android-compose/app/libs/embedded-node-cli/
+android-compose/local.properties
