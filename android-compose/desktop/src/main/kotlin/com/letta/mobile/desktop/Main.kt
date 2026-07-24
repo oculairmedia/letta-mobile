@@ -124,7 +124,7 @@ private fun runDesktopApplication(
  * a readable, actionable dialog before exiting.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-private val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactory { window ->
+internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactory { window ->
     WindowExceptionHandler { throwable ->
         DesktopCrashReporter.logCrash(throwable, context = "window composition")
         val message = buildString {

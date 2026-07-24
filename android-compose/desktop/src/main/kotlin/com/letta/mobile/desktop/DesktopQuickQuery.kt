@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +45,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.window.LocalWindowExceptionHandlerFactory
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
@@ -163,13 +166,20 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
             window.requestFocus()
             onDispose { window.removeWindowFocusListener(listener) }
         }
-        // Each Compose window is its own composition root: Jewel/Material
-        // theme locals from the main window do NOT propagate here, so the
-        // quick-query window applies the full theme stack itself (Jewel's
-        // TextField throws "No TextFieldStyle provided" otherwise).
-        DesktopJewelTheme {
-            DesktopMaterialTheme {
-                QuickQueryContent(coordinator)
+        // Each Compose window is its own composition root: NO composition
+        // locals from the main window propagate here. That means the theme
+        // stack (Jewel's TextField throws "No TextFieldStyle provided"
+        // otherwise) AND the crash-reporting exception handler must both be
+        // re-provided, or an exception in this window kills the app with no
+        // dialog and no crash-log entry.
+        @OptIn(ExperimentalComposeUiApi::class)
+        CompositionLocalProvider(
+            LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
+        ) {
+            DesktopJewelTheme {
+                DesktopMaterialTheme {
+                    QuickQueryContent(coordinator)
+                }
             }
         }
     }
