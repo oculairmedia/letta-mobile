@@ -50,19 +50,22 @@ class IrohPeerCapabilitiesTest {
             "conversation.list", "message.list", "conversation.create", "approval.submit",
             "block.list", "block.update", "passage.create",
             "schedule.create", "skill.install", "tool.list", "project.list", "subagent.list",
+            // P0.5 (audit): read-only server metadata is now a benign CHAT_READ,
+            // accessible to a standard paired desktop (not admin-gated).
+            "provider.list", "goal.get", "group.list", "folder.list", "archive.list",
+            "step.list", "identity.list", "identity.get", "run.list", "run.get",
         ).forEach { method ->
             assertTrue(
                 IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod(method)),
                 "desktop role should allow $method",
             )
         }
-        // Denied: server administration requires explicit admin.full.
+        // Denied: server administration + MUTATIONS still require explicit admin.full.
         listOf(
-            "agent.create", "agent.delete", "identity.list", "run.list", "provider.list",
+            "agent.create", "agent.delete",
             "health.check", "goal.command",
             "pair.invite.create", "pair.peer.list", "pair.peer.get",
             "pair.peer.rename", "pair.peer.set_capabilities", "pair.peer.revoke",
-            "archive.list", "folder.list", "group.list",
         ).forEach { method ->
             assertFalse(
                 IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod(method)),
