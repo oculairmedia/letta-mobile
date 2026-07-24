@@ -6,6 +6,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.long
+import com.letta.mobile.appserver.AppServerSmokeSpec
 import com.letta.mobile.appserver.runAppServerSmokeTurn
 import io.ktor.client.engine.okhttp.OkHttp
 import java.util.UUID
@@ -54,12 +55,14 @@ internal class AppServerSmokeCommand : CliktCommand(
         runAppServerSmokeTurn(
             engineFactory = OkHttp,
             identityPrefix = "cli",
-            url = url,
-            token = token,
-            agentId = agentId,
-            conversationId = conversationId,
-            message = message,
-            timeoutMs = timeoutMs,
+            spec = AppServerSmokeSpec(
+                url = url,
+                token = token,
+                agentId = agentId,
+                conversationId = conversationId,
+                message = message,
+                timeoutMs = timeoutMs,
+            ),
             newToken = { UUID.randomUUID().toString() },
             emit = ::println,
         )

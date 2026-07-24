@@ -182,7 +182,7 @@ internal class LocalBackendMessageReader(
                 // transcript never trips (cumulative stays <= cap) and its output
                 // is unchanged.
                 scannedBytes += line.length.toLong() + 1L
-                if (scannedBytes > maxTranscriptBytes || out.size >= maxTranscriptMessages) {
+                if (atLineBudget(out.size, scannedBytes)) {
                     capTripped = true
                     break
                 }
@@ -193,19 +193,31 @@ internal class LocalBackendMessageReader(
                 if (isLocalMessage(norm)) out += norm
             }
         }
-        if (capTripped) {
-            Telemetry.event(
-                "LocalBackendMessageReader",
-                "message.list.transcript_truncated",
-                "path" to file.path,
-                "keptMessages" to out.size,
-                "scannedBytes" to scannedBytes,
-                "maxBytes" to maxTranscriptBytes,
-                "maxMessages" to maxTranscriptMessages,
-                level = Telemetry.Level.WARN,
-            )
-        }
+        if (capTripped) logTruncation(file, out.size, scannedBytes)
         return out
+    }
+
+    /**
+     * True once the transcript scanned so far has reached either cap. Checked
+     * before parsing each line, so an in-budget file (both caps sit far above any
+     * real transcript) never trips and reads to completion — byte-parity with the
+     * admin-shim projection is preserved.
+     */
+    private fun atLineBudget(keptMessages: Int, scannedBytes: Long): Boolean =
+        scannedBytes > maxTranscriptBytes || keptMessages >= maxTranscriptMessages
+
+    /** Emit the single WARN describing a truncated (pathological) transcript. */
+    private fun logTruncation(file: File, keptMessages: Int, scannedBytes: Long) {
+        Telemetry.event(
+            "LocalBackendMessageReader",
+            "message.list.transcript_truncated",
+            "path" to file.path,
+            "keptMessages" to keptMessages,
+            "scannedBytes" to scannedBytes,
+            "maxBytes" to maxTranscriptBytes,
+            "maxMessages" to maxTranscriptMessages,
+            level = Telemetry.Level.WARN,
+        )
     }
 
     /** Port of store.ts unwrapSessionEnvelope + normalizeMessage (content->parts). */

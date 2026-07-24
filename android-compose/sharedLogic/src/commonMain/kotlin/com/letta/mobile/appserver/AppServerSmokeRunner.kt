@@ -19,6 +19,22 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
 
 /**
+ * The single turn a smoke run sends through a Letta App Server: which host to
+ * reach ([url]/[token]), the target ([agentId]/[conversationId]), the [message]
+ * text, and the [timeoutMs] budget. These cohesive request parameters travel as
+ * one value so the runner and its two CLI call sites thread an identical turn
+ * shape (audit P1.6 / gn7kr.12 — CodeScene #1012 arg-count cleanup).
+ */
+data class AppServerSmokeSpec(
+    val url: String,
+    val token: String?,
+    val agentId: String,
+    val conversationId: String,
+    val message: String,
+    val timeoutMs: Long,
+)
+
+/**
  * Send exactly one turn through a running Letta App Server and stream each
  * observed runtime event back as a printable CLI line.
  *
@@ -26,27 +42,25 @@ import kotlinx.coroutines.withTimeout
  * (`app-server-smoke`) entry points (audit P1.6 / gn7kr.12). The two binaries
  * differ only in their Ktor HTTP engine (OkHttp on `:cli`, CIO on
  * `:appserver-cli`) and their identity prefix (`cli` vs `host-cli`); both of
- * those genuine differences are now explicit parameters rather than duplicated,
- * silently-drifting source.
+ * those genuine differences are explicit parameters rather than duplicated,
+ * silently-drifting source. The turn's request parameters travel together in
+ * [spec].
  *
  * @param engineFactory platform Ktor engine (e.g. `OkHttp`, `CIO`).
  * @param identityPrefix short marker embedded in backend/runtime/request ids so
  *   server-side logs can tell the two binaries apart ("cli" or "host-cli").
+ * @param spec the host, target, message, and timeout for this one turn.
  * @param newToken supplies a fresh unique token per request id (e.g. a UUID).
  * @param emit receives one formatted line per runtime event.
  */
 suspend fun runAppServerSmokeTurn(
     engineFactory: HttpClientEngineFactory<*>,
     identityPrefix: String,
-    url: String,
-    token: String?,
-    agentId: String,
-    conversationId: String,
-    message: String,
-    timeoutMs: Long,
+    spec: AppServerSmokeSpec,
     newToken: () -> String,
     emit: (String) -> Unit,
 ) {
+    val timeoutMs = spec.timeoutMs
     val httpClient = HttpClient(engineFactory) {
         install(WebSockets)
         install(HttpTimeout) {
@@ -61,9 +75,9 @@ suspend fun runAppServerSmokeTurn(
             coroutineScope {
                 val transport = KtorAppServerWebSocketTransport(
                     httpClient = httpClient,
-                    baseUrl = url,
+                    baseUrl = spec.url,
                     scope = this,
-                    bearerToken = token,
+                    bearerToken = spec.token,
                 )
                 val engine = AppServerTurnEngine(
                     client = DefaultAppServerClient(transport, requestTimeoutMs = timeoutMs),
@@ -71,16 +85,16 @@ suspend fun runAppServerSmokeTurn(
                 )
 
                 try {
-                    emit("[app-server] connect $url")
+                    emit("[app-server] connect ${spec.url}")
                     engine.runTurn(
                         TurnCommand(
                             backendId = BackendId("app-server-$identityPrefix"),
                             runtimeId = RuntimeId("app-server-$identityPrefix"),
-                            agentId = AgentId(agentId),
-                            conversationId = ConversationId(conversationId),
+                            agentId = AgentId(spec.agentId),
+                            conversationId = ConversationId(spec.conversationId),
                             input = TurnInput.UserMessage(
                                 localMessageId = "$identityPrefix-${newToken()}",
-                                text = message,
+                                text = spec.message,
                             ),
                         ),
                     ).collect { event ->
