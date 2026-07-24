@@ -102,15 +102,9 @@ private fun DesktopWindowTitleBar(
                         .background(MaterialTheme.colorScheme.surfaceContainerLow),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Left third: app menu.
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        Text(
-                            text = "File     Edit     View     Window",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp),
-                        )
-                    }
+                    // Left third: plain drag area — no faux menu bar
+                    // (Spotify-style chromeless top).
+                    Box(modifier = Modifier.weight(1f))
                     // Center: conversation title.
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),

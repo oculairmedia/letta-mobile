@@ -100,6 +100,9 @@ private fun runDesktopApplication(
                     LaunchedEffect(Unit) {
                         activationHandler.attach(window)
                         window.minimumSize = Dimension(960, 640)
+                        // Windows 11 standard rounded corners + outline on the
+                        // undecorated frame.
+                        DesktopWindowsChrome.applyStandardChrome(window)
                     }
 
                     LettaDesktopApp(
