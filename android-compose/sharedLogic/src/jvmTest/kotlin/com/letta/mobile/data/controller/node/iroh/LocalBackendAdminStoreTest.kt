@@ -180,6 +180,144 @@ class LocalBackendAdminStoreTest {
         assertEquals(setOf("c-active", "c-arch"), all) // agent-2's conv excluded by scope
     }
 
+    private fun writeMessages(base: File, key: String, jsonl: String) {
+        val dir = File(base, "conversations/${b64u(key)}").apply { mkdirs() }
+        File(dir, "messages.jsonl").writeText(jsonl)
+    }
+
+    private fun writeSidecar(base: File, key: String, name: String, body: String) {
+        val dir = File(base, "conversations/${b64u(key)}").apply { mkdirs() }
+        File(dir, name).writeText(body)
+    }
+
+    @Test
+    fun `message list fans out user assistant tool with otid echo, sidecar times, and reminder stripping`() {
+        val base = tempStore()
+        val key = "default:agent-1"
+        // Session header (skipped) + v3 envelope rows with `content` (mapped to parts).
+        // Sentinel metadata.created_at dates are overridden by _real-times.jsonl.
+        writeMessages(
+            base, key,
+            """{"type":"session","version":3,"id":"default"}
+{"type":"message","id":"env-1","message":{"id":"ui-1","role":"user","metadata":{"created_at":"2026-01-01T00:00:01.000Z"},"content":[{"type":"text","text":"<system-reminder>ctx</system-reminder>\n\nHello"}]}}
+{"type":"message","id":"env-2","message":{"id":"ui-2","role":"assistant","metadata":{"created_at":"2026-01-01T00:00:02.000Z"},"content":[{"type":"text","text":"working"},{"type":"toolCall","id":"call-1","name":"Bash","arguments":{"command":"ls"}}]}}
+{"type":"message","id":"env-3","message":{"id":"ui-3","role":"toolResult","toolCallId":"call-1","toolName":"Bash","isError":false,"metadata":{"created_at":"2026-01-01T00:00:03.000Z"},"content":[{"type":"text","text":"output-here"}]}}""",
+        )
+        writeSidecar(
+            base, key, "_real-times.jsonl",
+            """{"id":"ui-1","iso":"2025-06-01T12:00:00.000Z"}
+{"id":"ui-2","iso":"2025-06-01T12:00:00.000Z"}
+{"id":"ui-3","iso":"2025-06-01T12:00:00.000Z"}""",
+        )
+        writeSidecar(base, key, "_otid-map.json", """{"ui-1":"cm-otid-1"}""")
+
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val msgs = store.listMessagesProjected(
+            conversationId = "conv-default-agent-1",
+            agentId = null,
+            limit = null,
+            before = null,
+            after = null,
+            order = null,
+        )!!
+        assertEquals(4, msgs.size)
+
+        // [0] user_message: reminder stripped, otid echoed from sidecar, offset 0.
+        val u = msgs[0].jsonObject
+        assertEquals("user_message", u["message_type"]!!.jsonPrimitive.content)
+        assertEquals("Hello", u["content"]!!.jsonPrimitive.content)
+        assertEquals("cm-otid-1", u["otid"]!!.jsonPrimitive.content)
+        assertEquals("ui-1", u["id"]!!.jsonPrimitive.content)
+        assertEquals("2025-06-01T12:00:00.000Z", u["date"]!!.jsonPrimitive.content)
+
+        // [1] assistant_message: otid = source id, assistant offset +40ms.
+        val a = msgs[1].jsonObject
+        assertEquals("assistant_message", a["message_type"]!!.jsonPrimitive.content)
+        assertEquals("working", a["content"]!!.jsonPrimitive.content)
+        assertEquals("ui-2", a["otid"]!!.jsonPrimitive.content)
+        assertEquals("ui-2", a["id"]!!.jsonPrimitive.content)
+        assertEquals("2025-06-01T12:00:00.040Z", a["date"]!!.jsonPrimitive.content)
+
+        // [2] tool_call_message: toolcall-<id>, tool_call offset +20ms.
+        val tc = msgs[2].jsonObject
+        assertEquals("tool_call_message", tc["message_type"]!!.jsonPrimitive.content)
+        assertEquals("toolcall-call-1", tc["id"]!!.jsonPrimitive.content)
+        assertEquals("Bash", tc["name"]!!.jsonPrimitive.content)
+        assertEquals("ui-2", tc["otid"]!!.jsonPrimitive.content)
+        assertEquals("2025-06-01T12:00:00.020Z", tc["date"]!!.jsonPrimitive.content)
+        val call = tc["tool_call"]!!.jsonObject
+        assertEquals("Bash", call["name"]!!.jsonPrimitive.content)
+        assertEquals("call-1", call["tool_call_id"]!!.jsonPrimitive.content)
+        assertEquals("""{"command":"ls"}""", call["arguments"]!!.jsonPrimitive.content)
+
+        // [3] tool_return_message from the top-level toolResult row.
+        val tr = msgs[3].jsonObject
+        assertEquals("tool_return_message", tr["message_type"]!!.jsonPrimitive.content)
+        assertEquals("toolreturn-call-1", tr["id"]!!.jsonPrimitive.content)
+        assertEquals("success", tr["status"]!!.jsonPrimitive.content)
+        assertEquals("output-here", tr["tool_return"]!!.jsonPrimitive.content)
+        assertEquals("call-1", tr["tool_call_id"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, tr["stdout"])
+        assertEquals("2025-06-01T12:00:00.030Z", tr["date"]!!.jsonPrimitive.content)
+        assertEquals("Bash", tr["name"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `message list applies limit before and desc order like the shim route`() {
+        val base = tempStore()
+        val key = "conversation:conv-xyz"
+        writeMessages(
+            base, key,
+            """{"type":"message","id":"e1","message":{"id":"ui-1","role":"user","content":[{"type":"text","text":"one"}]}}
+{"type":"message","id":"e2","message":{"id":"ui-2","role":"user","content":[{"type":"text","text":"two"}]}}
+{"type":"message","id":"e3","message":{"id":"ui-3","role":"user","content":[{"type":"text","text":"three"}]}}""",
+        )
+        // Real conv: agent_id recovered from conversation.json.
+        writeConversation(base, key, """{"id":"conv-xyz","agent_id":"agent-9"}""")
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+
+        // limit=2 keeps the NEWEST two (tail), preserving asc order.
+        val limited = store.listMessagesProjected("conv-xyz", null, 2, null, null, "asc")!!
+        assertEquals(listOf("two", "three"), limited.map { it.jsonObject["content"]!!.jsonPrimitive.content })
+
+        // before=ui-3 drops ui-3 and everything after it.
+        val before = store.listMessagesProjected("conv-xyz", null, null, "ui-3", null, "asc")!!
+        assertEquals(listOf("one", "two"), before.map { it.jsonObject["content"]!!.jsonPrimitive.content })
+
+        // order=desc reverses AFTER slicing.
+        val desc = store.listMessagesProjected("conv-xyz", null, null, null, null, "desc")!!
+        assertEquals(listOf("three", "two", "one"), desc.map { it.jsonObject["content"]!!.jsonPrimitive.content })
+    }
+
+    @Test
+    fun `message list refuses bare default and empties an unknown conversation`() {
+        val base = tempStore()
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        // Bare "default" is ambiguous across agents -> empty (not the wrong agent).
+        assertEquals(0, store.listMessagesProjected("default", null, null, null, null, null)!!.size)
+        // Unknown conv id -> empty list, mirroring the shim's 200 [] for stale ids.
+        assertEquals(0, store.listMessagesProjected("conv-missing", null, null, null, null, null)!!.size)
+    }
+
+    @Test
+    fun `message list attributes run_id from the runs store`() {
+        val base = tempStore()
+        val key = "conversation:conv-run"
+        writeMessages(
+            base, key,
+            """{"type":"message","id":"e1","message":{"id":"ui-a","role":"user","content":[{"type":"text","text":"hi"}]}}""",
+        )
+        writeConversation(base, key, """{"id":"conv-run","agent_id":"agent-r"}""")
+        // Oldest run wins; _archive is ignored.
+        val runsDir = File(base, "runs/run-1").apply { mkdirs() }
+        File(runsDir, "run.json").writeText(
+            """{"id":"run-1","agent_id":"agent-r","conversation_id":"conv-run","created_at":"2025-01-01T00:00:00.000Z","message_ids":["ui-a"]}""",
+        )
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val msgs = store.listMessagesProjected("conv-run", null, null, null, null, null)!!
+        assertEquals("run-1", msgs[0].jsonObject["run_id"]!!.jsonPrimitive.content)
+    }
+
     @Test
     fun `skips malformed agent json without failing the whole list`() {
         val base = tempStore()

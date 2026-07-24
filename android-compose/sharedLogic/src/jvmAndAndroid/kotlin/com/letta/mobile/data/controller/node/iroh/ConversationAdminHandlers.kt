@@ -17,7 +17,7 @@ object ConversationAdminHandlers {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         registerConversationReadRoutes(router, api, nativeClient, localStore)
         registerConversationWriteRoutes(router, api, nativeClient, shimRetired)
-        registerMessageRoutes(router, api, nativeClient)
+        registerMessageRoutes(router, api, nativeClient, localStore)
     }
 
     private fun registerConversationReadRoutes(
@@ -168,6 +168,9 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
+        // lgns8.9 slice 3: on-disk backend store; when set, message.list serves
+        // already-projected wire messages from disk ahead of the shim proxy.
+        localStore: LocalBackendAdminStore? = null,
     ) {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
@@ -193,7 +196,21 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (native.success) native.messages else null
-            } ?: api.get(
+            }
+            // lgns8.9 slice 3 native-store tier: serve already-projected wire
+            // messages from disk (null on any error → fall through to the shim
+            // proxy). Mirrors the shim /messages route (limit/before/order;
+            // `after` and in-flight filtering intentionally omitted — see
+            // LocalBackendAdminStore.listMessagesProjected).
+                ?: localStore?.listMessagesProjected(
+                    conversationId = convId,
+                    agentId = param(params, AdminParamKey("agent_id")),
+                    limit = effectiveLimit.toIntOrNull(),
+                    before = param(params, AdminParamKey("before")),
+                    after = param(params, AdminParamKey("after")),
+                    order = param(params, AdminParamKey("order")),
+                )
+                ?: api.get(
                 AdminPath.v1("conversations", convId, "messages").builder()
                     .query("limit", effectiveLimit)
                     .query("after", param(params, AdminParamKey("after")))

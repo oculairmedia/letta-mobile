@@ -386,6 +386,558 @@ class LocalBackendAdminStore(
         put("model_settings", JsonNull)
     }
 
+    // ──────────────────────────────────────────────────────────────────
+    // message.list (lgns8.9 slice 3)
+    //
+    // Faithful port of admin-shim `handleConversationMessagesList`
+    // (server.ts) + `store.ts:listMessages`/`normalizeMessage` +
+    // `translate.ts:localMessageToConversationMessages` (the 1:N fan-out).
+    // Emits already-projected wire messages so the caller passes the output
+    // straight through MessageListPageGuard.bound (the pointer-diet /
+    // page-size layer runs on wire messages regardless of source, exactly
+    // as it does on the shim proxy response).
+    //
+    // Deliberate divergences from the live shim, each safe for a cold
+    // on-disk reader:
+    //   - `after` is accepted but NOT applied: the shim's /messages route
+    //     reads only limit/before/order (parsePagination + before + order);
+    //     `after` never reaches store.listMessages. We mirror that exactly.
+    //   - in-flight run filtering (inFlightMessageIds) is skipped: it drops
+    //     messages owned by an ACTIVE run in the shim's process. A client
+    //     reading the disk store has no active runs, so the set is always
+    //     empty — omitting it cannot change output for a settled transcript.
+    // ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Port of `GET /v1/conversations/{id}/messages`. Resolves the external
+     * conv id, reads + normalizes messages.jsonl, applies before/limit/order
+     * exactly as the shim route does, then fans each LocalMessage out via
+     * [localMessageToConversationMessages] with the realTimes/otid/attachment/
+     * runId sidecar scope. Returns null on ANY error so the caller falls back
+     * to the shim proxy.
+     */
+    fun listMessagesProjected(
+        conversationId: String,
+        agentId: String?,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+    ): JsonArray? = runCatching {
+        val resolved = resolveConversation(conversationId, agentId) ?: return@runCatching JsonArray(emptyList())
+        val (internalConvId, resolvedAgentId) = resolved
+        val dir = File(File(baseDir, "conversations"), b64UrlEncode(conversationKey(internalConvId, resolvedAgentId)))
+        val all = readLocalMessages(File(dir, "messages.jsonl"))
+
+        var scoped = all
+        if (!before.isNullOrEmpty()) {
+            val idx = scoped.indexOfFirst { it["id"]?.stringOrNull() == before }
+            if (idx >= 0) scoped = scoped.subList(0, idx)
+        }
+        if (limit != null && limit > 0 && scoped.size > limit) {
+            scoped = scoped.subList(scoped.size - limit, scoped.size)
+        }
+        val ordered = if ((order ?: "asc").lowercase() == "desc") scoped.asReversed() else scoped
+
+        val realTimes = readRealTimesMap(dir)
+        val otidMap = readStringMap(File(dir, "_otid-map.json"))
+        val attachments = readAttachmentMap(File(dir, "_attachments.json"))
+        val runIds = readRunIdsByMessageId(resolvedAgentId, internalConvId)
+
+        buildJsonArray {
+            ordered.forEach { m ->
+                localMessageToConversationMessages(m, realTimes, otidMap, runIds, attachments)
+                    .forEach { add(it) }
+            }
+        }
+    }.getOrNull()
+
+    /**
+     * Port of `resolveConversationId` + fast-path `getConversation`. Refuses
+     * the bare `"default"` literal (ambiguous across agents). For the
+     * external `conv-default-<agentId>` form, splits out the agent id. For a
+     * real `conv-...` id, the on-disk dir key is `conversation:<id>` so we
+     * read conversation.json directly to recover the agent id (no scan). An
+     * explicit [agentIdHint] short-circuits the disk read.
+     */
+    private fun resolveConversation(externalId: String, agentIdHint: String?): Pair<String, String>? {
+        if (externalId.isEmpty() || externalId == "default") return null
+        val defaultMatch = Regex("^conv-default-(agent-.+)$").find(externalId)
+        if (defaultMatch != null) return "default" to defaultMatch.groupValues[1]
+        if (agentIdHint != null) return externalId to agentIdHint
+        val dir = File(File(baseDir, "conversations"), b64UrlEncode("conversation:$externalId"))
+        val obj = runCatching {
+            File(dir, "conversation.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+        }.getOrNull() ?: return null
+        val agentId = obj["agent_id"]?.jsonPrimitive?.contentOrNullSafe() ?: return null
+        return externalId to agentId
+    }
+
+    /**
+     * Port of store.ts loadFilteredMessages pipeline (no cache): read the
+     * JSONL, unwrap session-log v3 envelopes, map `content`->`parts`, and
+     * keep only records that satisfy `isLocalMessage`. Non-message lines
+     * (the `{"type":"session",...}` header) are rejected by the filter.
+     */
+    private fun readLocalMessages(file: File): List<JsonObject> {
+        if (!file.isFile) return emptyList()
+        val out = ArrayList<JsonObject>()
+        file.forEachLine { line ->
+            val t = line.trim()
+            if (t.isEmpty()) return@forEachLine
+            val el = runCatching { json.parseToJsonElement(t) }.getOrNull() as? JsonObject ?: return@forEachLine
+            val norm = normalizeMessage(el) ?: return@forEachLine
+            if (isLocalMessage(norm)) out += norm
+        }
+        return out
+    }
+
+    /** Port of store.ts unwrapSessionEnvelope + normalizeMessage (content->parts). */
+    private fun normalizeMessage(value: JsonObject): JsonObject? {
+        val unwrapped =
+            if (value["type"]?.stringOrNull() == "message" && value["message"] is JsonObject) {
+                value["message"] as JsonObject
+            } else {
+                value
+            }
+        val parts = unwrapped["parts"]
+        val content = unwrapped["content"]
+        return if (parts !is JsonArray && content is JsonArray) {
+            JsonObject(unwrapped.toMutableMap().apply { this["parts"] = content })
+        } else {
+            unwrapped
+        }
+    }
+
+    /** Port of store.ts isLocalMessage: id string, role string, parts OR content array. */
+    private fun isLocalMessage(m: JsonObject): Boolean {
+        if (m["id"]?.stringOrNull() == null) return false
+        if (m["role"]?.stringOrNull() == null) return false
+        return m["parts"] is JsonArray || m["content"] is JsonArray
+    }
+
+    /**
+     * Port of store.ts readMessageTimestamps: legacy `_real-times.json` map
+     * first, then overlay `_real-times.jsonl` (later lines win). Returns the
+     * full id->iso map (the projection joins it per message; conversation.list
+     * only needs the max, which [maxRealMessageTime] keeps separate).
+     */
+    private fun readRealTimesMap(dir: File): Map<String, String> {
+        val map = HashMap<String, String>()
+        runCatching {
+            File(dir, "_real-times.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+                ?.forEach { (k, v) -> (v as? JsonPrimitive)?.takeIf { it.isString }?.let { map[k] = it.content } }
+        }
+        runCatching {
+            File(dir, "_real-times.jsonl").takeIf { it.isFile }?.forEachLine { line ->
+                val t = line.trim()
+                if (t.isEmpty()) return@forEachLine
+                runCatching {
+                    val o = json.parseToJsonElement(t).jsonObject
+                    val id = o["id"]?.jsonPrimitive?.contentOrNullSafe()
+                    val iso = o["iso"]?.jsonPrimitive?.contentOrNullSafe()
+                    if (id != null && iso != null) map[id] = iso
+                }
+            }
+        }
+        return map
+    }
+
+    /** Read a flat string->string JSON map (e.g. `_otid-map.json`); {} on any fault. */
+    private fun readStringMap(file: File): Map<String, String> {
+        val obj = runCatching {
+            file.takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+        }.getOrNull() ?: return emptyMap()
+        val map = HashMap<String, String>()
+        obj.forEach { (k, v) -> (v as? JsonPrimitive)?.takeIf { it.isString }?.let { map[k] = it.content } }
+        return map
+    }
+
+    /** Read `_attachments.json`: id -> JsonArray of attachment refs; {} on any fault. */
+    private fun readAttachmentMap(file: File): Map<String, JsonArray> {
+        val obj = runCatching {
+            file.takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+        }.getOrNull() ?: return emptyMap()
+        val map = HashMap<String, JsonArray>()
+        obj.forEach { (k, v) -> (v as? JsonArray)?.let { map[k] = it } }
+        return map
+    }
+
+    /**
+     * Port of runs.ts buildMessageRunMap: walk `<baseDir>/runs/<runId>/run.json`
+     * (skipping the `_archive` subdir, matching the live-only walk in
+     * listRuns), keep runs matching BOTH agentId and the INTERNAL conversation
+     * id, sort by created_at ascending, and map each message id -> run id with
+     * the OLDEST run winning (`if (!map[id]) map[id] = run.id`).
+     */
+    private fun readRunIdsByMessageId(agentId: String, internalConvId: String): Map<String, String> {
+        val root = File(baseDir, "runs")
+        val dirs = root.listFiles { f -> f.isDirectory && f.name != "_archive" } ?: return emptyMap()
+        data class RunRec(val id: String, val createdAt: String, val messageIds: List<String>)
+        val runs = ArrayList<RunRec>()
+        for (d in dirs) {
+            val obj = runCatching {
+                File(d, "run.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+            }.getOrNull() ?: continue
+            if (obj["agent_id"]?.stringOrNull() != agentId) continue
+            if (obj["conversation_id"]?.stringOrNull() != internalConvId) continue
+            val id = obj["id"]?.stringOrNull() ?: continue
+            val mids = (obj["message_ids"] as? JsonArray)?.mapNotNull { it.stringOrNull() } ?: emptyList()
+            runs += RunRec(id, obj["created_at"]?.stringOrNull() ?: "", mids)
+        }
+        runs.sortBy { it.createdAt }
+        val map = HashMap<String, String>()
+        for (r in runs) for (mid in r.messageIds) if (!map.containsKey(mid)) map[mid] = r.id
+        return map
+    }
+
+    // ── translate.ts:localMessageToConversationMessages (1:N fan-out) ──────
+
+    private val typeOffsetMs = mapOf(
+        "user_message" to 0L,
+        "system_message" to 0L,
+        "reasoning_message" to 10L,
+        "tool_call_message" to 20L,
+        "tool_return_message" to 30L,
+        "assistant_message" to 40L,
+    )
+
+    /** Port of translate.ts withTypeOffset: add the per-type ms offset to the ISO date. */
+    private fun withTypeOffset(createdIso: String, messageType: String): String {
+        val off = typeOffsetMs[messageType] ?: 0L
+        if (off == 0L) return createdIso
+        val t = runCatching { Instant.parse(createdIso).toEpochMilli() }.getOrNull() ?: return createdIso
+        return isoMillis(t + off)
+    }
+
+    /** Port of translate.ts partsToText: concatenate all `text` parts. */
+    private fun partsToText(parts: JsonArray): String {
+        val sb = StringBuilder()
+        for (p in parts) {
+            val o = p as? JsonObject ?: continue
+            if (o["type"]?.stringOrNull() == "text") sb.append(o["text"]?.stringOrNull() ?: "")
+        }
+        return sb.toString()
+    }
+
+    /** Port of translate.ts stripSystemReminders (user-role only). */
+    private fun stripSystemReminders(text: String): String =
+        text
+            .replace(Regex("<system-reminder>[\\s\\S]*?</system-reminder>"), "")
+            .replace(Regex("\\n{3,}"), "\n\n")
+            .trim()
+
+    /** Port of translate.ts flattenToolOutput. */
+    private fun flattenToolOutput(value: JsonElement?): String = when (value) {
+        null, is JsonNull -> ""
+        is JsonPrimitive -> if (value.isString) value.content else value.toString()
+        is JsonArray -> value.joinToString("") { p ->
+            when {
+                p is JsonPrimitive && p.isString -> p.content
+                p is JsonObject && p["type"]?.stringOrNull() == "text" && p["text"]?.stringOrNull() != null ->
+                    p["text"]!!.stringOrNull()!!
+                else -> p.toString()
+            }
+        }
+        is JsonObject -> value.toString()
+    }
+
+    /** JS `JSON.stringify(value ?? {})` — compact; string args pass through verbatim. */
+    private fun jsonStringifyArgs(value: JsonElement?): String = when (value) {
+        null, is JsonNull -> "{}"
+        is JsonPrimitive -> if (value.isString) value.content else value.toString()
+        else -> value.toString()
+    }
+
+    private fun toStringArrayOrNull(value: JsonElement?): JsonElement = when (value) {
+        null, is JsonNull -> JsonNull
+        is JsonArray -> JsonArray(value.filterIsInstance<JsonPrimitive>().filter { it.isString }.map { JsonPrimitive(it.content) })
+        is JsonPrimitive -> if (value.isString) JsonArray(listOf(JsonPrimitive(value.content))) else JsonNull
+        else -> JsonNull
+    }
+
+    /**
+     * Faithful port of translate.ts `localMessageToConversationMessages`.
+     * One LocalMessage projects to one or more wire messages. Wire field sets
+     * and key order match the TS object literals byte-for-byte.
+     */
+    private fun localMessageToConversationMessages(
+        localMsg: JsonObject,
+        realTimes: Map<String, String>,
+        otidMap: Map<String, String>,
+        runIds: Map<String, String>,
+        attachments: Map<String, JsonArray>,
+    ): List<JsonObject> {
+        val id = localMsg["id"]?.stringOrNull()
+        val sentinel = (localMsg["metadata"] as? JsonObject)?.get("created_at")?.stringOrNull()
+        val real = id?.let { realTimes[it] }
+        val created = real ?: sentinel ?: isoMillis(System.currentTimeMillis())
+        val role = localMsg["role"]?.stringOrNull() ?: "system"
+        val parts = localMsg["parts"] as? JsonArray ?: JsonArray(emptyList())
+        val projectedOtid = (id?.let { otidMap[it] }) ?: id
+        val projectedRunId: JsonElement = (id?.let { runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull
+        val attachmentRefs = id?.let { attachments[it] }
+
+        // User / system: collapse text parts into one wire message.
+        if (role == "user" || role == "system") {
+            var text = partsToText(parts)
+            if (role == "user") text = stripSystemReminders(text)
+            if (text.isEmpty()) return emptyList()
+            val wireType = if (role == "user") "user_message" else "system_message"
+            val wire = buildJsonObject {
+                put("id", id ?: "")
+                put("date", withTypeOffset(created, wireType))
+                put("name", JsonNull)
+                put("message_type", wireType)
+                put("otid", projectedOtid?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("sender_id", JsonNull)
+                put("step_id", JsonNull)
+                put("is_err", JsonNull)
+                put("seq_id", JsonNull)
+                put("run_id", projectedRunId)
+                put("content", text)
+                // attachRefsToWireMessage: only user_message, only when refs present.
+                if (wireType == "user_message" && attachmentRefs != null && attachmentRefs.isNotEmpty()) {
+                    put("attachments", attachmentRefs)
+                }
+            }
+            return listOf(wire)
+        }
+
+        // toolResult top-level row (letta-code 0.25.x).
+        if (role == "toolResult") {
+            val callId = localMsg["toolCallId"]?.stringOrNull() ?: ""
+            val toolName = localMsg["toolName"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+            val isError = (localMsg["isError"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+            val returnText = partsToText(parts)
+            val status = if (isError) "error" else "success"
+            val tr = buildJsonObject {
+                put("tool_call_id", callId)
+                put("status", status)
+                put("stdout", JsonNull)
+                put("stderr", JsonNull)
+                put("func_response", returnText)
+                put("type", "tool")
+            }
+            val trMsg = buildJsonObject {
+                put("id", if (callId.isNotEmpty()) "toolreturn-$callId" else (id ?: ""))
+                put("date", withTypeOffset(created, "tool_return_message"))
+                put("name", toolName?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("message_type", "tool_return_message")
+                put("otid", projectedOtid?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("sender_id", JsonNull)
+                put("step_id", JsonNull)
+                put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
+                put("seq_id", JsonNull)
+                put("run_id", projectedRunId)
+                put("tool_call_id", callId)
+                put("status", status)
+                put("tool_return", returnText)
+                put("stdout", JsonNull)
+                put("stderr", JsonNull)
+                put("tool_returns", JsonArray(listOf(tr)))
+            }
+            return listOf(trMsg)
+        }
+
+        // Assistant / tool: walk parts, grouping consecutive text.
+        val out = ArrayList<JsonObject>()
+        val pendingText = StringBuilder()
+        var pendingTextStartIndex = -1
+        fun flushText() {
+            if (pendingText.isEmpty()) return
+            val isFirst = out.isEmpty()
+            out += buildJsonObject {
+                put("id", if (isFirst) (id ?: "") else "$id:assistant:$pendingTextStartIndex")
+                put("date", withTypeOffset(created, "assistant_message"))
+                put("name", JsonNull)
+                put("message_type", "assistant_message")
+                put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("sender_id", JsonNull)
+                put("step_id", JsonNull)
+                put("is_err", JsonNull)
+                put("seq_id", JsonNull)
+                put("run_id", projectedRunId)
+                put("content", pendingText.toString())
+            }
+            pendingText.setLength(0)
+            pendingTextStartIndex = -1
+        }
+
+        for (i in 0 until parts.size) {
+            val part = parts[i] as? JsonObject ?: continue
+            val type = part["type"]?.stringOrNull() ?: continue
+
+            if (type == "text" && part["text"]?.stringOrNull() != null) {
+                if (pendingTextStartIndex == -1) pendingTextStartIndex = i
+                pendingText.append(part["text"]!!.stringOrNull())
+                continue
+            }
+
+            if (type == "reasoning" && part["text"]?.stringOrNull() != null) {
+                flushText()
+                val signature = (part["providerMetadata"] as? JsonObject)?.get("signature")?.stringOrNull()
+                out += buildJsonObject {
+                    put("id", "$id:reasoning:$i")
+                    put("date", withTypeOffset(created, "reasoning_message"))
+                    put("name", JsonNull)
+                    put("message_type", "reasoning_message")
+                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
+                    put("sender_id", JsonNull)
+                    put("step_id", JsonNull)
+                    put("is_err", JsonNull)
+                    put("seq_id", JsonNull)
+                    put("run_id", projectedRunId)
+                    put("source", "reasoner_model")
+                    put("reasoning", part["text"]!!.stringOrNull()!!)
+                    put("signature", signature?.let { JsonPrimitive(it) } ?: JsonNull)
+                }
+                continue
+            }
+
+            // Legacy `tool-call` + new camelCase `toolCall`.
+            if (type == "tool-call" || type == "toolCall") {
+                flushText()
+                val argsStr = jsonStringifyArgs(part["arguments"])
+                val callId = part["toolCallId"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+                    ?: part["id"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+                    ?: ""
+                val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() } ?: "tool"
+                val tc = buildJsonObject {
+                    put("name", name)
+                    put("arguments", argsStr)
+                    put("tool_call_id", callId)
+                }
+                out += buildJsonObject {
+                    put("id", if (callId.isNotEmpty()) "toolcall-$callId" else "$id:tool:$i:call")
+                    put("date", withTypeOffset(created, "tool_call_message"))
+                    put("name", name)
+                    put("message_type", "tool_call_message")
+                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
+                    put("sender_id", JsonNull)
+                    put("step_id", JsonNull)
+                    put("is_err", JsonNull)
+                    put("seq_id", JsonNull)
+                    put("run_id", projectedRunId)
+                    put("tool_call", tc)
+                    put("tool_calls", JsonArray(listOf(tc)))
+                }
+                continue
+            }
+
+            // Native LocalBackend tool part: `tool-<name>` with toolCallId.
+            if (type.startsWith("tool-") && type != "tool-call" && type != "tool-return" &&
+                part["toolCallId"]?.stringOrNull() != null
+            ) {
+                flushText()
+                val toolCallId = part["toolCallId"]!!.stringOrNull()!!
+                val toolName = type.substring("tool-".length)
+                val argsStr = jsonStringifyArgs(part["input"])
+                val tc = buildJsonObject {
+                    put("name", toolName)
+                    put("arguments", argsStr)
+                    put("tool_call_id", toolCallId)
+                }
+                out += buildJsonObject {
+                    put("id", "toolcall-$toolCallId")
+                    put("date", withTypeOffset(created, "tool_call_message"))
+                    put("name", toolName)
+                    put("message_type", "tool_call_message")
+                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
+                    put("sender_id", JsonNull)
+                    put("step_id", JsonNull)
+                    put("is_err", JsonNull)
+                    put("seq_id", JsonNull)
+                    put("run_id", projectedRunId)
+                    put("tool_call", tc)
+                    put("tool_calls", JsonArray(listOf(tc)))
+                }
+                val state = part["state"]?.stringOrNull()
+                if (state == "output-available" || state == "output-error" || state == "output-denied") {
+                    val isError = state != "output-available"
+                    val returnText = if (isError) {
+                        part["errorText"]?.stringOrNull() ?: flattenToolOutput(part["output"])
+                    } else {
+                        flattenToolOutput(part["output"])
+                    }
+                    val status = if (isError) "error" else "success"
+                    val tr = buildJsonObject {
+                        put("tool_call_id", toolCallId)
+                        put("status", status)
+                        put("stdout", JsonNull)
+                        put("stderr", JsonNull)
+                        put("func_response", returnText)
+                        put("type", "tool")
+                    }
+                    out += buildJsonObject {
+                        put("id", "toolreturn-$toolCallId")
+                        put("date", withTypeOffset(created, "tool_return_message"))
+                        put("name", toolName)
+                        put("message_type", "tool_return_message")
+                        put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
+                        put("sender_id", JsonNull)
+                        put("step_id", JsonNull)
+                        put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
+                        put("seq_id", JsonNull)
+                        put("run_id", projectedRunId)
+                        put("tool_call_id", toolCallId)
+                        put("status", status)
+                        put("tool_return", returnText)
+                        put("stdout", JsonNull)
+                        put("stderr", JsonNull)
+                        put("tool_returns", JsonArray(listOf(tr)))
+                    }
+                }
+                continue
+            }
+
+            if (type == "tool-return") {
+                flushText()
+                val callId = part["toolCallId"]?.stringOrNull() ?: ""
+                val status = if (part["status"]?.stringOrNull() == "error") "error" else "success"
+                val returnRaw = part["tool_return"]
+                val returnText = when {
+                    returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
+                    returnRaw == null || returnRaw is JsonNull -> "\"\""
+                    else -> returnRaw.toString()
+                }
+                val stdout = toStringArrayOrNull(part["stdout"])
+                val stderr = toStringArrayOrNull(part["stderr"])
+                val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+                val tr = buildJsonObject {
+                    put("tool_call_id", callId)
+                    put("status", status)
+                    put("stdout", stdout)
+                    put("stderr", stderr)
+                    put("func_response", returnText)
+                    put("type", "tool")
+                }
+                out += buildJsonObject {
+                    put("id", if (callId.isNotEmpty()) "toolreturn-$callId" else "$id:tool:$i:return")
+                    put("date", withTypeOffset(created, "tool_return_message"))
+                    put("name", name?.let { JsonPrimitive(it) } ?: JsonNull)
+                    put("message_type", "tool_return_message")
+                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
+                    put("sender_id", JsonNull)
+                    put("step_id", JsonNull)
+                    put("is_err", if (part["status"]?.stringOrNull() == "error") JsonPrimitive(true) else JsonNull)
+                    put("seq_id", JsonNull)
+                    put("run_id", projectedRunId)
+                    put("tool_call_id", callId)
+                    put("status", status)
+                    put("tool_return", returnText)
+                    put("stdout", stdout)
+                    put("stderr", stderr)
+                    put("tool_returns", JsonArray(listOf(tr)))
+                }
+                continue
+            }
+            // Unknown tool-shaped part: skip (shim logs + skips).
+        }
+        flushText()
+        return out
+    }
+
     private fun conversationKey(conversationId: String, agentId: String): String =
         if (conversationId == "default") "default:$agentId" else "conversation:$conversationId"
 
