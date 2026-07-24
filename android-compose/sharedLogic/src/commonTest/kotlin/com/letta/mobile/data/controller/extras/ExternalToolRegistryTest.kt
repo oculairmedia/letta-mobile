@@ -66,7 +66,9 @@ class ExternalToolRegistryTest {
     }
 
     @Test
-    fun invokeSucceedsForAdvertisedTool() = runTest {
+    fun invokeReturnsUnimplementedErrorForAdvertisedStubTool() = runTest {
+        // An advertised tool whose handler is still a stub must NOT report a fake
+        // success — it returns a structured error clearly marking it unimplemented.
         val capabilities = RemoteCapabilities(imageHydration = true)
         val registry = ExternalToolRegistry.standard(capabilities)
 
@@ -76,7 +78,11 @@ class ExternalToolRegistryTest {
 
         val result = registry.invoke("image_hydration", input)
 
-        assertIs<ExternalToolResult.Success>(result, "Should return success for advertised tool")
+        assertIs<ExternalToolResult.Error>(result, "Advertised-but-stub tool should return an error, not a fake success")
+        assertTrue(
+            result.error.contains("not yet implemented"),
+            "Error should clearly mark the tool as not yet implemented"
+        )
     }
 
     @Test

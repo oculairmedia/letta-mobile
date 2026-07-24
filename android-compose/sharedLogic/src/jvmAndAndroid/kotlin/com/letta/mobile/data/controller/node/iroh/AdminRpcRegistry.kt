@@ -15,6 +15,10 @@ data class NativeReadTiers(
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
         "conversation.list",
+        // P2.6 (audit): conversation.get is registered by ConversationAdminHandlers
+        // but was missing here, so the canonical/registered assertion passed only
+        // by accident (it compares against the full router set).
+        "conversation.get",
         "message.list",
         "message.get",
         "tool_return.get",

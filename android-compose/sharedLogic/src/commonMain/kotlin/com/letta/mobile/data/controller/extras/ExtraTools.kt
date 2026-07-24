@@ -29,8 +29,9 @@ class ImageHydrationTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Image hydration not yet implemented")
+        // Not yet implemented. The capability may be advertised (server negotiated it),
+        // but the handler is a stub, so return a structured error rather than a fake success.
+        return ExternalToolResult.Error("image_hydration is not yet implemented")
     }
 }
 
@@ -69,8 +70,8 @@ class GoalsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Goals management not yet implemented")
+        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
+        return ExternalToolResult.Error("goals is not yet implemented")
     }
 }
 
@@ -110,8 +111,8 @@ class SchedulesTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Schedules management not yet implemented")
+        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
+        return ExternalToolResult.Error("schedules is not yet implemented")
     }
 }
 
@@ -146,8 +147,8 @@ class SlashCommandsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Slash commands execution not yet implemented")
+        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
+        return ExternalToolResult.Error("slash_commands is not yet implemented")
     }
 }
 
@@ -183,8 +184,8 @@ class SubagentChipsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Subagent chips not yet implemented")
+        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
+        return ExternalToolResult.Error("subagent_chips is not yet implemented")
     }
 }
 
@@ -216,8 +217,8 @@ class ReflectionTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Reflection not yet implemented")
+        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
+        return ExternalToolResult.Error("reflection is not yet implemented")
     }
 }
 
@@ -252,7 +253,7 @@ class SlimAgentsTool : ExternalTool {
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Stub implementation: return a placeholder response
-        return ExternalToolResult.Success("Slim agents projection not yet implemented")
+        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
+        return ExternalToolResult.Error("slim_agents is not yet implemented")
     }
 }
