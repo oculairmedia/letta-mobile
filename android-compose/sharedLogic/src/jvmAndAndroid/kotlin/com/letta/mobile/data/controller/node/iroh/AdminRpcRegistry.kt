@@ -2,6 +2,16 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 
+/**
+ * The native read tiers admin handlers try before falling back to the shim proxy:
+ * the App Server client (native v2 command), and (lgns8.9) the on-disk backend store
+ * for ported reads. Bundled so handler register(...) signatures stay small.
+ */
+data class NativeReadTiers(
+    val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
+    val localStore: LocalBackendAdminStore? = null,
+)
+
 object AdminRpcRegistry {
     val canonicalMethods: Set<String> = setOf(
         "conversation.list",
@@ -62,15 +72,31 @@ object AdminRpcRegistry {
          * compatibility; a shim-less deployment passes null.
          */
         adminRestBaseUrl: String? = adminBaseUrl,
+        /**
+         * lgns8.9: absolute path to the letta-code on-disk backend store
+         * (`.../lc-local-backend`). When set, admin reads that have been ported
+         * (currently agent.list) serve directly from disk, retiring the shim
+         * proxy for them; on any read error they fall back to the proxy. Null =
+         * disabled = pre-lgns8.9 proxy behavior, so production is unaffected
+         * until a deployment opts in (LETTA_LOCAL_BACKEND_DIR).
+         */
+        localBackendDir: String? = null,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val adminRestBase = adminRestBaseUrl?.trimEnd('/')
         val router = AdminRpcRouter()
 
+        val localStore = localBackendDir
+            ?.takeIf { it.isNotBlank() }
+            ?.let { java.io.File(it) }
+            ?.takeIf { it.isDirectory }
+            ?.let { LocalBackendAdminStore(it) }
+        val tiers = NativeReadTiers(nativeClient, localStore)
+
         HealthAdminHandlers.register(router, rpcBase, controller)
-        AgentAdminHandlers.register(router, rpcBase, controller, nativeClient)
+        AgentAdminHandlers.register(router, rpcBase, controller, tiers)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase, nativeClient, shimRetired)
+        ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, adminRestBase)
         ArchiveAdminHandlers.register(router, adminRestBase)
