@@ -151,8 +151,14 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
             window.addWindowFocusListener(listener)
             onDispose { window.removeWindowFocusListener(listener) }
         }
-        DesktopMaterialTheme {
-            QuickQueryContent(coordinator)
+        // Each Compose window is its own composition root: Jewel/Material
+        // theme locals from the main window do NOT propagate here, so the
+        // quick-query window applies the full theme stack itself (Jewel's
+        // TextField throws "No TextFieldStyle provided" otherwise).
+        DesktopJewelTheme {
+            DesktopMaterialTheme {
+                QuickQueryContent(coordinator)
+            }
         }
     }
 }
