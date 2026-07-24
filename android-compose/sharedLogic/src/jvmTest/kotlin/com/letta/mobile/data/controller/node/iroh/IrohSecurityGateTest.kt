@@ -140,8 +140,10 @@ class IrohSecurityGateTest {
         val spy = SideEffectSpy()
         val desktop = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE
 
-        // Server administration and unknown methods require admin.full.
-        listOf("agent.create", "identity.list", "pair.peer.revoke", "brand.new.method", "health.check").forEach { method ->
+        // Server administration, MUTATIONS, and unknown methods require admin.full.
+        // (P0.5: read-only server metadata like identity.list is now a benign
+        // CHAT_READ, so goal.command — a mutation — exercises the denial instead.)
+        listOf("agent.create", "goal.command", "pair.peer.revoke", "brand.new.method", "health.check").forEach { method ->
             val required = IrohPeerCapabilities.forAdminMethod(method)
             val allowed = IrohPeerCapabilities.isAllowed(desktop, required)
             if (allowed) spy.adminDispatched = true
