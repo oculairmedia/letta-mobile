@@ -31,7 +31,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.system.exitProcess
 
 import kotlin.time.Duration.Companion.seconds
@@ -141,29 +143,28 @@ internal class AppServerServeIrohCommand : CliktCommand(
             "or long-running service use; a warning is printed on every start.",
     ).flag(default = false)
 
+    private val ownAppServer by option(
+        "--own-app-server",
+        envvar = "LETTA_OWN_APP_SERVER",
+        help = "lgns8.18 (desktop/bundled): spawn 'letta app-server' as an OWNED child " +
+            "process on an ephemeral loopback port and wrap it, instead of connecting to an " +
+            "external --app-server-url. Gives deterministic lifecycle (child death = process " +
+            "exit) with no external supervisor. NOT for the systemd server (keep external-ws " +
+            "there). Overrides --app-server-url when set.",
+    ).flag(default = false)
+
+    private val lettaCommand by option(
+        "--letta-command",
+        envvar = "LETTA_COMMAND",
+        help = "Executable used to spawn the owned App Server child (default 'letta'). " +
+            "Only used with --own-app-server.",
+    ).default("letta")
+
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         
         try {
-            // d6e8g.2: fail closed — refuse anonymous startup unless explicitly
-            // opted into via the loudly named test/dev-only flag.
-            val authPolicy = when (
-                val resolution = IrohAuthPolicy.resolve(
-                    authToken = authToken,
-                    allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
-                    allowInsecureAnonymous = allowInsecureAnonymousIroh,
-                )
-            ) {
-                is IrohAuthPolicyResolution.Secure -> resolution.policy
-                is IrohAuthPolicyResolution.InsecureAccepted -> {
-                    System.err.println("[iroh-app-server] ${resolution.warning}")
-                    resolution.policy
-                }
-                is IrohAuthPolicyResolution.Refused -> {
-                    System.err.println("[iroh-app-server] ${resolution.error}")
-                    exitProcess(78)
-                }
-            }
+            val authPolicy = resolveAuthPolicy()
 
             val pairingService = pairingStoreFile?.let { storePath ->
                 println("[iroh-app-server] Pairing enabled (store: $storePath)")
@@ -207,9 +208,15 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 }
             }
             
-            // Create the controller (using a stub implementation for now)
-            // In a full implementation, this would connect to a real Letta App Server
-            val (controller, nativeAdminClient) = createController(appServerUrl, requestTimeout.toLong(), scope)
+            // lgns8.18 (Path A, desktop): optionally spawn + OWN the App Server child
+            // on an ephemeral loopback port, instead of connecting to an external URL.
+            val ownedServer = maybeSpawnOwnedAppServer(scope)
+            val effectiveAppServerUrl = ownedServer?.wsBaseUrl ?: appServerUrl
+
+            // Create the controller. With --own-app-server this connects the WS
+            // transport to the owned loopback child; otherwise to the external URL
+            // (null = Iroh-only/stub mode).
+            val (controller, nativeAdminClient) = createController(effectiveAppServerUrl, requestTimeout.toLong(), scope)
 
             // Register admin_rpc handlers so clients on an iroh:// backend can
             // read conversations/messages/agents WITHOUT any direct HTTP route
@@ -250,6 +257,54 @@ internal class AppServerServeIrohCommand : CliktCommand(
             scope.cancel()
             exitProcess(1)
         }
+    }
+
+    /**
+     * d6e8g.2: fail closed — refuse anonymous startup unless explicitly opted into
+     * via the loudly named test/dev-only flag. Extracted from [run] to keep it
+     * within complexity bounds.
+     */
+    private fun resolveAuthPolicy() = when (
+        val resolution = IrohAuthPolicy.resolve(
+            authToken = authToken,
+            allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+            allowInsecureAnonymous = allowInsecureAnonymousIroh,
+        )
+    ) {
+        is IrohAuthPolicyResolution.Secure -> resolution.policy
+        is IrohAuthPolicyResolution.InsecureAccepted -> {
+            System.err.println("[iroh-app-server] ${resolution.warning}")
+            resolution.policy
+        }
+        is IrohAuthPolicyResolution.Refused -> {
+            System.err.println("[iroh-app-server] ${resolution.error}")
+            exitProcess(78)
+        }
+    }
+
+    /**
+     * lgns8.18 (Path A): with --own-app-server, spawn `letta app-server` as an owned
+     * child on an ephemeral loopback port and return it; else null. Registers a
+     * shutdown hook and takes the wrapper down if the child dies (no orphaned
+     * half-stack). Kept out of [run] so it stays within complexity bounds.
+     */
+    private fun maybeSpawnOwnedAppServer(scope: CoroutineScope): com.letta.mobile.cli.appserver.OwnedAppServerProcess? {
+        if (!ownAppServer) return null
+        println("[iroh-app-server] Spawning owned App Server child ($lettaCommand app-server)...")
+        val owned = com.letta.mobile.cli.appserver.OwnedAppServerProcess.spawn(
+            command = com.letta.mobile.cli.appserver.OwnedAppServerProcess.buildCommand(lettaCommand),
+            log = { System.err.println(it) },
+        )
+        Runtime.getRuntime().addShutdownHook(Thread { owned.close() })
+        println("[iroh-app-server] Owned App Server ready at ${owned.wsBaseUrl}")
+        // Deterministic lifecycle: if the owned child dies, take the wrapper down
+        // with it so the pair restarts together — no orphaned half-stack.
+        scope.launch {
+            val code = withContext(Dispatchers.IO) { owned.process.waitFor() }
+            System.err.println("[iroh-app-server] Owned App Server child exited (code $code); shutting down wrapper.")
+            exitProcess(if (code == 0) 0 else 70)
+        }
+        return owned
     }
 
     private fun createController(
