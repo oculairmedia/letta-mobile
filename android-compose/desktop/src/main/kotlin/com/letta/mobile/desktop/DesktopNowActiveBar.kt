@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -67,6 +68,8 @@ internal data class NowActiveBarActions(
     val onJumpToBackgroundWork: () -> Unit,
     /** Toggle the desktop avatar companion (bar trailing control). */
     val onAvatarCompanion: () -> Unit = {},
+    /** Interrupt the pinned conversation's in-flight run (stop button). */
+    val onStopRun: () -> Unit = {},
 )
 
 private val NowActiveStatus.label: String
@@ -89,6 +92,8 @@ internal data class NowActiveBarHostActions(
     /** Select + reveal the given conversation (bar body and work chip). */
     val onOpenConversation: (String) -> Unit,
     val onAvatarCompanion: () -> Unit,
+    /** Interrupt the pinned conversation's in-flight run. */
+    val onStopRun: () -> Unit,
 )
 
 /**
@@ -137,6 +142,7 @@ internal fun DesktopNowActiveBarHost(
                 host.thinkingConversationId?.let(actions.onOpenConversation)
             },
             onAvatarCompanion = actions.onAvatarCompanion,
+            onStopRun = actions.onStopRun,
         ),
     )
 }
@@ -207,12 +213,33 @@ internal fun DesktopNowActiveBar(
                 state.backgroundWorkAgentName?.let { name ->
                     BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
                 }
+                if (state.status == NowActiveStatus.Thinking || state.status == NowActiveStatus.Streaming) {
+                    StopRunButton(onClick = actions.onStopRun)
+                }
                 AvatarCompanionButton(
                     active = state.avatarCompanionActive,
                     onClick = actions.onAvatarCompanion,
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun StopRunButton(onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.StopCircle,
+            contentDescription = "Stop run",
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(19.dp),
+        )
     }
 }
 

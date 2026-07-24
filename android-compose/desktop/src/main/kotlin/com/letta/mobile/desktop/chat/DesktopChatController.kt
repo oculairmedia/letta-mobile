@@ -549,6 +549,19 @@ class DesktopChatController(
         }
     }
 
+    /**
+     * User-facing interrupt (bottom-bar stop): cancels the in-flight
+     * send/stream consumption. The send pipeline's finally clears the
+     * streaming flag on cancellation; thinking is cleared here because the
+     * cancellation path deliberately rethrows before failure-path cleanup.
+     * Client-side only — the server turn may still run to completion.
+     */
+    fun stopActiveRun() {
+        if (closed) return
+        sendJob?.cancel()
+        _thinkingConversationId.value = null
+    }
+
     fun send() {
         if (closed) return
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
