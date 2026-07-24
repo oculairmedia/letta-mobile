@@ -5,6 +5,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -309,4 +311,27 @@ class AppServerRequestRegistryTest {
             runtime = AppServerRuntimeScope(agentId = "agent-test", conversationId = "conv-test"),
             success = true,
         )
+
+    @Test
+    fun parentCancellationPropagatesInsteadOfMislabelingAsThisRequestTimeout() = runTest {
+        // This request's OWN timeout is long; an OUTER withTimeout fires first
+        // (as the native-admin breaker's short bound does). Without the
+        // ensureActive() guard, request() catches the outer's
+        // TimeoutCancellationException and rethrows AppServerRequestTimeoutException
+        // — mislabeled with THIS request's 120s timeoutMs and converting a
+        // cancellation into a plain Exception. The outer cancellation must instead
+        // propagate as a TimeoutCancellationException.
+        val registry = registry(timeoutMs = 120_000L)
+        assertFailsWith<TimeoutCancellationException> {
+            withTimeout(1_000L) {
+                registry.request(
+                    requestId = "parent-cancel",
+                    response = { it as? AppServerInboundFrame.RuntimeStartResponse },
+                    // Never emit a response — force the OUTER 1s timeout to fire
+                    // before this request's own 120s bound.
+                    send = { },
+                )
+            }
+        }
+    }
 }

@@ -8,6 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
@@ -92,6 +93,14 @@ internal class AppServerRequestRegistry(
             // TimeoutCancellationException IS a CancellationException, and
             // callers rely on the typed timeout wrapper.
             synchronized(lock) { pending.remove(requestId) }
+            // Only wrap when THIS request's own withTimeout(timeoutMs) fired. A
+            // PARENT cancellation (e.g. the native-admin breaker's short
+            // withTimeout, or the caller's scope being cancelled) also surfaces
+            // here as a TimeoutCancellationException; ensureActive() rethrows that
+            // parent cancellation so it propagates as cancellation instead of being
+            // mislabeled as this request's `timeoutMs` timeout (and silently
+            // converting a CancellationException into a plain Exception).
+            ensureActive()
             throw AppServerRequestTimeoutException(requestId, timeoutMs, e)
         } catch (e: CancellationException) {
             synchronized(lock) { pending.remove(requestId) }
