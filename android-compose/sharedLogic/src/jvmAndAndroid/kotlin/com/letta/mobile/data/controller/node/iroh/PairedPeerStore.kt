@@ -1,8 +1,10 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -94,11 +96,34 @@ class FilePairedPeerStore(private val path: Path) : PairedPeerStore {
     private fun persist(peers: Map<String, PairedPeer>) {
         path.parent?.let(Files::createDirectories)
         val temp = path.resolveSibling(".${path.fileName}.tmp-${java.util.UUID.randomUUID()}")
-        Files.write(temp, json.encodeToString(peers.values.sortedBy { it.pairedAtMs }).toByteArray(Charsets.UTF_8))
+        val bytes = json.encodeToString(peers.values.sortedBy { it.pairedAtMs }).toByteArray(Charsets.UTF_8)
+
+        // Write the temp file and fsync its contents+metadata to disk BEFORE the
+        // rename, so a power loss can never expose a partially written or
+        // zero-byte peer registry through the durable name. Without force(true)
+        // the ATOMIC_MOVE only orders the directory entry, not the data blocks.
+        FileChannel.open(temp, StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING).use { channel ->
+            val buffer = java.nio.ByteBuffer.wrap(bytes)
+            while (buffer.hasRemaining()) channel.write(buffer)
+            channel.force(true)
+        }
+
         try {
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         } catch (_: Exception) {
             Files.move(temp, path, StandardCopyOption.REPLACE_EXISTING)
+        }
+
+        // Best-effort fsync of the parent directory so the rename itself is
+        // durable. Directory fsync is unsupported on some platforms (e.g.
+        // Windows throws when opening a directory channel) — swallow those.
+        path.parent?.let { parent ->
+            try {
+                FileChannel.open(parent, StandardOpenOption.READ).use { it.force(true) }
+            } catch (_: Exception) {
+                // Directory fsync not supported here; the file fsync + atomic
+                // rename above are still the best durability we can offer.
+            }
         }
     }
 }
