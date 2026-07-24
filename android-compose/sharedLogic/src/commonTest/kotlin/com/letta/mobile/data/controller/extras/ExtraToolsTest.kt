@@ -15,7 +15,7 @@ import kotlin.test.assertTrue
 class ExtraToolsTest {
 
     @Test
-    fun `P0-6 every tool schema declares required (and enum) as JSON arrays`() {
+    fun p06EveryToolSchemaDeclaresRequiredAndEnumAsJsonArrays() {
         val tools = listOf(
             ImageHydrationTool(), GoalsTool(), SchedulesTool(), SlashCommandsTool(),
             SubagentChipsTool(), ReflectionTool(), SlimAgentsTool(),
@@ -35,7 +35,7 @@ class ExtraToolsTest {
     }
 
     @Test
-    fun `P0-6 required arrays name the mandatory fields`() {
+    fun p06RequiredArraysNameTheMandatoryFields() {
         fun req(tool: ExternalTool) =
             (assertNotNull(tool.inputSchema)["required"] as JsonArray).map { it.toString().trim('"') }
         assertTrue(req(GoalsTool()).contains("action"))
