@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlin.test.Test
@@ -11,172 +12,96 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ExtraToolsTest {
-    @Test
-    fun imageHydrationToolHasCorrectMetadata() {
-        val tool = ImageHydrationTool()
+    /**
+     * One row per advertised-but-stub extra tool. Table-driven so the metadata and
+     * invoke-error assertions stay identical across every tool (was 7 near-identical
+     * `xHasCorrectMetadata` + 7 `xInvokeReturnsUnimplementedError` cases).
+     */
+    private data class ToolCase(
+        val label: String,
+        val factory: () -> ExternalTool,
+        val expectedName: String,
+        val expectedCapability: Capability,
+        val sampleInput: JsonObject,
+    )
 
-        assertEquals("image_hydration", tool.name)
-        assertEquals(Capability.ImageHydration, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
+    private val cases = listOf(
+        ToolCase(
+            label = "image_hydration",
+            factory = { ImageHydrationTool() },
+            expectedName = "image_hydration",
+            expectedCapability = Capability.ImageHydration,
+            sampleInput = buildJsonObject { put("image_id", "test-image") },
+        ),
+        ToolCase(
+            label = "goals",
+            factory = { GoalsTool() },
+            expectedName = "goals",
+            expectedCapability = Capability.Goals,
+            sampleInput = buildJsonObject { put("action", "list") },
+        ),
+        ToolCase(
+            label = "schedules",
+            factory = { SchedulesTool() },
+            expectedName = "schedules",
+            expectedCapability = Capability.Schedules,
+            sampleInput = buildJsonObject { put("action", "list") },
+        ),
+        ToolCase(
+            label = "slash_commands",
+            factory = { SlashCommandsTool() },
+            expectedName = "slash_commands",
+            expectedCapability = Capability.SlashCommands,
+            sampleInput = buildJsonObject { put("command", "/help") },
+        ),
+        ToolCase(
+            label = "subagent_chips",
+            factory = { SubagentChipsTool() },
+            expectedName = "subagent_chips",
+            expectedCapability = Capability.SubagentChips,
+            sampleInput = buildJsonObject { put("subagent_id", "test-subagent") },
+        ),
+        ToolCase(
+            label = "reflection",
+            factory = { ReflectionTool() },
+            expectedName = "reflection",
+            expectedCapability = Capability.Reflection,
+            sampleInput = buildJsonObject { put("query", "What is my current context?") },
+        ),
+        ToolCase(
+            label = "slim_agents",
+            factory = { SlimAgentsTool() },
+            expectedName = "slim_agents",
+            expectedCapability = Capability.SlimAgents,
+            sampleInput = buildJsonObject {
+                put("agent_ids", buildJsonObject { })
+                put("projection_type", "summary")
+            },
+        ),
+    )
 
     @Test
-    fun imageHydrationToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = ImageHydrationTool()
-        val input = buildJsonObject {
-            put("image_id", "test-image")
+    fun everyToolReportsCorrectMetadata() {
+        for (case in cases) {
+            val tool = case.factory()
+            assertEquals(case.expectedName, tool.name, "name for ${case.label}")
+            assertEquals(case.expectedCapability, tool.capability, "capability for ${case.label}")
+            assertNotNull(tool.description, "description for ${case.label}")
+            assertNotNull(tool.inputSchema, "inputSchema for ${case.label}")
         }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
     }
 
     @Test
-    fun goalsToolHasCorrectMetadata() {
-        val tool = GoalsTool()
+    fun everyToolInvokeReturnsUnimplementedError() = runTest {
+        for (case in cases) {
+            val result = case.factory().invoke(case.sampleInput)
 
-        assertEquals("goals", tool.name)
-        assertEquals(Capability.Goals, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
-
-    @Test
-    fun goalsToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = GoalsTool()
-        val input = buildJsonObject {
-            put("action", "list")
+            // Advertised-but-stub tools must report a structured error, not a fake success.
+            assertIs<ExternalToolResult.Error>(result, "result type for ${case.label}")
+            assertTrue(
+                result.error.contains("not yet implemented"),
+                "error message for ${case.label}",
+            )
         }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
-    }
-
-    @Test
-    fun schedulesToolHasCorrectMetadata() {
-        val tool = SchedulesTool()
-
-        assertEquals("schedules", tool.name)
-        assertEquals(Capability.Schedules, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
-
-    @Test
-    fun schedulesToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = SchedulesTool()
-        val input = buildJsonObject {
-            put("action", "list")
-        }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
-    }
-
-    @Test
-    fun slashCommandsToolHasCorrectMetadata() {
-        val tool = SlashCommandsTool()
-
-        assertEquals("slash_commands", tool.name)
-        assertEquals(Capability.SlashCommands, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
-
-    @Test
-    fun slashCommandsToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = SlashCommandsTool()
-        val input = buildJsonObject {
-            put("command", "/help")
-        }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
-    }
-
-    @Test
-    fun subagentChipsToolHasCorrectMetadata() {
-        val tool = SubagentChipsTool()
-
-        assertEquals("subagent_chips", tool.name)
-        assertEquals(Capability.SubagentChips, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
-
-    @Test
-    fun subagentChipsToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = SubagentChipsTool()
-        val input = buildJsonObject {
-            put("subagent_id", "test-subagent")
-        }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
-    }
-
-    @Test
-    fun reflectionToolHasCorrectMetadata() {
-        val tool = ReflectionTool()
-
-        assertEquals("reflection", tool.name)
-        assertEquals(Capability.Reflection, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
-
-    @Test
-    fun reflectionToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = ReflectionTool()
-        val input = buildJsonObject {
-            put("query", "What is my current context?")
-        }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
-    }
-
-    @Test
-    fun slimAgentsToolHasCorrectMetadata() {
-        val tool = SlimAgentsTool()
-
-        assertEquals("slim_agents", tool.name)
-        assertEquals(Capability.SlimAgents, tool.capability)
-        assertNotNull(tool.description)
-        assertNotNull(tool.inputSchema)
-    }
-
-    @Test
-    fun slimAgentsToolInvokeReturnsUnimplementedError() = runTest {
-        val tool = SlimAgentsTool()
-        val input = buildJsonObject {
-            put("agent_ids", buildJsonObject { })
-            put("projection_type", "summary")
-        }
-
-        val result = tool.invoke(input)
-
-        // Advertised-but-stub tools must report a structured error, not a fake success.
-        assertIs<ExternalToolResult.Error>(result)
-        assertTrue(result.error.contains("not yet implemented"))
     }
 }

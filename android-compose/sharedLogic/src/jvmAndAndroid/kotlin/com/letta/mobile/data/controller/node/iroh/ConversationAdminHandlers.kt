@@ -33,58 +33,10 @@ object ConversationAdminHandlers {
     ) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            val conversations = NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
-                val response = c.conversationList(
-                    AppServerCommand.ConversationList(
-                        requestId = NativeAdmin.requestId(),
-                        query = NativeAdmin.queryOf(
-                            "agent_id" to agentId,
-                            "limit" to param(params, AdminParamKey("limit")),
-                            "after" to param(params, AdminParamKey("after")),
-                            "archive_status" to param(params, AdminParamKey("archive_status")),
-                            "summary_search" to param(params, AdminParamKey("summary_search")),
-                            "order" to param(params, AdminParamKey("order")),
-                            "order_by" to param(params, AdminParamKey("order_by")),
-                        ),
-                    ),
-                )
-                if (response.success) response.conversations ?: JsonArray(emptyList()) else null
-            }
-                // lgns8.9 native-store tier: serve from disk (null on any error),
-                // else fall through to the shim proxy. Verified to match the shim's
-                // withRealTimes ordering byte-for-byte on the live store.
-                //
-                // The local store only implements the shim's default shape (agent
-                // scope + archive_status filter, last_message_at desc, offset/limit).
-                // If the caller supplies a query shape it cannot honor — a cursor
-                // (`after`), text search (`summary_search`), or a custom
-                // `order`/`order_by` — DON'T serve a wrong-ordered/wrong-page result
-                // from disk; bypass the local tier so the native/proxy path (which
-                // forwards those params) handles it. (CodeRabbit #998.)
-                ?: (if (conversationListLocallyServable(params)) {
-                    localStore?.listConversationsProjected(
-                        agentId = agentId,
-                        archiveStatus = param(params, AdminParamKey("archive_status")),
-                        limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
-                        offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
-                    )
-                } else {
-                    null
-                })
-                ?: run {
-                // #962: the App Server only serves the flat GET /v1/conversations
-                // route, filtering by an agent_id query param; the agent-scoped
-                // /v1/agents/{id}/conversations route is not registered and 404s.
-                api.get(AdminPath.v1("conversations")) {
-                    query("agent_id", agentId)
-                    query("limit", param(params, AdminParamKey("limit")))
-                    query("after", param(params, AdminParamKey("after")))
-                    query("archive_status", param(params, AdminParamKey("archive_status")))
-                    query("summary_search", param(params, AdminParamKey("summary_search")))
-                    query("order", param(params, AdminParamKey("order")))
-                    query("order_by", param(params, AdminParamKey("order_by")))
-                }
-            }
+            val conversations =
+                conversationListNative(nativeClient, agentId, params)
+                    ?: conversationListLocal(localStore, agentId, params)
+                    ?: conversationListProxy(api, agentId, params)
             // P3.4 (gn7kr.23): conversation.list previously trusted the capability
             // tier alone, letting a lesser (non-conversation-manage) peer enumerate
             // cross-conversation metadata (id, agent_id, last_message_at, summary,
@@ -108,6 +60,79 @@ object ConversationAdminHandlers {
             } ?: api.get(AdminPath.v1("conversations", id))
         }
     }
+
+    /**
+     * lgns8.9 native tier: fetch the conversation list from the App Server client.
+     * Returns null on any error so the caller falls through to the local/proxy tiers.
+     */
+    private suspend fun conversationListNative(
+        nativeClient: AppServerClient?,
+        agentId: String?,
+        params: JsonObject?,
+    ): JsonElement? =
+        NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
+            val response = c.conversationList(
+                AppServerCommand.ConversationList(
+                    requestId = NativeAdmin.requestId(),
+                    query = NativeAdmin.queryOf(
+                        "agent_id" to agentId,
+                        "limit" to param(params, AdminParamKey("limit")),
+                        "after" to param(params, AdminParamKey("after")),
+                        "archive_status" to param(params, AdminParamKey("archive_status")),
+                        "summary_search" to param(params, AdminParamKey("summary_search")),
+                        "order" to param(params, AdminParamKey("order")),
+                        "order_by" to param(params, AdminParamKey("order_by")),
+                    ),
+                ),
+            )
+            if (response.success) response.conversations ?: JsonArray(emptyList()) else null
+        }
+
+    /**
+     * lgns8.9 native-store tier: serve from disk (null on any error), else fall
+     * through to the shim proxy. Verified to match the shim's withRealTimes ordering
+     * byte-for-byte on the live store.
+     *
+     * The local store only implements the shim's default shape (agent scope +
+     * archive_status filter, last_message_at desc, offset/limit). If the caller
+     * supplies a query shape it cannot honor — a cursor (`after`), text search
+     * (`summary_search`), or a custom `order`/`order_by` — DON'T serve a
+     * wrong-ordered/wrong-page result from disk; bypass the local tier so the
+     * native/proxy path (which forwards those params) handles it. (CodeRabbit #998.)
+     */
+    private suspend fun conversationListLocal(
+        localStore: LocalBackendAdminStore?,
+        agentId: String?,
+        params: JsonObject?,
+    ): JsonElement? {
+        if (!conversationListLocallyServable(params)) return null
+        return localStore?.listConversationsProjected(
+            agentId = agentId,
+            archiveStatus = param(params, AdminParamKey("archive_status")),
+            limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
+            offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
+        )
+    }
+
+    /**
+     * Shim proxy tier for conversation.list. #962: the App Server only serves the flat
+     * GET /v1/conversations route, filtering by an agent_id query param; the
+     * agent-scoped /v1/agents/{id}/conversations route is not registered and 404s.
+     */
+    private suspend fun conversationListProxy(
+        api: AdminHandlerSupport,
+        agentId: String?,
+        params: JsonObject?,
+    ): JsonElement =
+        api.get(AdminPath.v1("conversations")) {
+            query("agent_id", agentId)
+            query("limit", param(params, AdminParamKey("limit")))
+            query("after", param(params, AdminParamKey("after")))
+            query("archive_status", param(params, AdminParamKey("archive_status")))
+            query("summary_search", param(params, AdminParamKey("summary_search")))
+            query("order", param(params, AdminParamKey("order")))
+            query("order_by", param(params, AdminParamKey("order_by")))
+        }
 
     /**
      * P3.4 (gn7kr.23): restricts a conversation-list result to the peer's authorized
