@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
@@ -32,7 +33,16 @@ data class MessagePage(val limit: Int?, val before: String?, val after: String?,
  *     store has no active runs, so the set is always empty — omitting it cannot
  *     change output for a settled transcript.
  */
-internal class LocalBackendMessageReader(private val support: LocalBackendStoreSupport) {
+internal class LocalBackendMessageReader(
+    private val support: LocalBackendStoreSupport,
+    // Bounded-input guard (audit P3.3 / gn7kr.22): a pathological transcript must
+    // degrade gracefully instead of OOMing the whole reader. The caps sit far above
+    // any real transcript (the largest known on-disk conversation is ~87 MB), so an
+    // in-budget transcript parses to a byte-identical projection — parity with the
+    // admin-shim is preserved. Injectable only so tests can trip the cap cheaply.
+    private val maxTranscriptBytes: Long = MAX_TRANSCRIPT_BYTES,
+    private val maxTranscriptMessages: Int = MAX_TRANSCRIPT_MESSAGES,
+) {
 
     private val projection = LocalBackendMessageProjection(support)
 
@@ -152,16 +162,48 @@ internal class LocalBackendMessageReader(private val support: LocalBackendStoreS
      * JSONL, unwrap session-log v3 envelopes, map `content`->`parts`, and
      * keep only records that satisfy `isLocalMessage`. Non-message lines
      * (the `{"type":"session",...}` header) are rejected by the filter.
+     *
+     * Bounded (audit P3.3): reading stops once the scanned input exceeds
+     * [maxTranscriptBytes] or the kept-message count reaches
+     * [maxTranscriptMessages], emitting a single WARN. Both caps sit far above
+     * any real transcript, so an in-budget file is read to completion exactly as
+     * before — the projection stays byte-identical to the shim. A pathological
+     * transcript is truncated (a bounded prefix) instead of exhausting the heap.
      */
-    private fun readLocalMessages(file: File): List<JsonObject> {
+    internal fun readLocalMessages(file: File): List<JsonObject> {
         if (!file.isFile) return emptyList()
         val out = ArrayList<JsonObject>()
-        file.forEachLine { line ->
-            val t = line.trim()
-            if (t.isEmpty()) return@forEachLine
-            val el = runCatching { support.json.parseToJsonElement(t) }.getOrNull() as? JsonObject ?: return@forEachLine
-            val norm = normalizeMessage(el) ?: return@forEachLine
-            if (isLocalMessage(norm)) out += norm
+        var scannedBytes = 0L
+        var capTripped = false
+        file.bufferedReader().use { reader ->
+            for (line in reader.lineSequence()) {
+                // +1 approximates the stripped line terminator; this bounds the
+                // *input* we agree to parse before the check, so an in-budget
+                // transcript never trips (cumulative stays <= cap) and its output
+                // is unchanged.
+                scannedBytes += line.length.toLong() + 1L
+                if (scannedBytes > maxTranscriptBytes || out.size >= maxTranscriptMessages) {
+                    capTripped = true
+                    break
+                }
+                val t = line.trim()
+                if (t.isEmpty()) continue
+                val el = runCatching { support.json.parseToJsonElement(t) }.getOrNull() as? JsonObject ?: continue
+                val norm = normalizeMessage(el) ?: continue
+                if (isLocalMessage(norm)) out += norm
+            }
+        }
+        if (capTripped) {
+            Telemetry.event(
+                "LocalBackendMessageReader",
+                "message.list.transcript_truncated",
+                "path" to file.path,
+                "keptMessages" to out.size,
+                "scannedBytes" to scannedBytes,
+                "maxBytes" to maxTranscriptBytes,
+                "maxMessages" to maxTranscriptMessages,
+                level = Telemetry.Level.WARN,
+            )
         }
         return out
     }
@@ -223,5 +265,11 @@ internal class LocalBackendMessageReader(private val support: LocalBackendStoreS
 
     companion object {
         private const val MESSAGE_CACHE_MAX = 16
+
+        // Bounded-input guard defaults (audit P3.3). ~3x the largest known
+        // on-disk transcript (~87 MB) so real conversations are never clipped;
+        // a runaway file is truncated well before it can OOM the reader.
+        const val MAX_TRANSCRIPT_BYTES: Long = 256L * 1024 * 1024
+        const val MAX_TRANSCRIPT_MESSAGES: Int = 1_000_000
     }
 }
