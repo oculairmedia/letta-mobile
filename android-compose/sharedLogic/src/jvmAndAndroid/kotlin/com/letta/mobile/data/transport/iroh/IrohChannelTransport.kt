@@ -60,6 +60,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -1281,24 +1282,122 @@ class IrohChannelTransport(
         return listOf("closed", "timeout", "timed out", "reset", "broken pipe", "connection", "stream").any { it in text }
     }
 
-    override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse =
-        ServerFrame.CronListResponse(id = frameId("cron_list"), ts = nowIso(), requestId = "iroh-cron-list", success = false, error = "cron over iroh not implemented")
-    override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronAddResponse =
-        ServerFrame.CronAddResponse(id = frameId("cron_add"), ts = nowIso(), requestId = "iroh-cron-add", success = false, error = "cron over iroh not implemented")
-    override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse =
-        ServerFrame.CronGetResponse(id = frameId("cron_get"), ts = nowIso(), requestId = "iroh-cron-get", success = false, error = "cron over iroh not implemented")
-    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
-        ServerFrame.CronDeleteResponse(id = frameId("cron_delete"), ts = nowIso(), requestId = "iroh-cron-delete", success = false, error = "cron over iroh not implemented")
-    override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
-        ServerFrame.CronDeleteAllResponse(id = frameId("cron_delete_all"), ts = nowIso(), requestId = "iroh-cron-delete-all", success = false, error = "cron over iroh not implemented")
+    // lgns8: cron scheduling over admin_rpc. The native CronAdminHandlers already
+    // serve cron.list/add/get/delete/delete_all against the live App Server; the
+    // Iroh transport just bridges the IChannelTransport surface onto those methods
+    // (dispatch is by method name — CRON_ADMIN_PATH is a stable cosmetic hint,
+    // cron is native-only with no proxy fallback). Field mapping mirrors the native
+    // AppServerCommand.CronAdd contract: a one-off `at` maps to `scheduled_for`;
+    // there is no native interval (`every`) field, so an every-only add reaches the
+    // handler without a `cron` and is rejected there with a clear error rather than
+    // silently dropped.
+    override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse {
+        val requestId = "iroh-cron-list-${UUID.randomUUID()}"
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = ScopedRpcLabels(unsupported = CRON_RPC_UNSUPPORTED, timedOut = "cron.list timed out", failed = "cron.list failed"),
+            call = {
+                adminRpc(
+                    method = "cron.list",
+                    path = CRON_ADMIN_PATH,
+                    body = buildJsonObject {
+                        agentId?.let { put("agent_id", it) }
+                        conversationId?.let { put("conversation_id", it) }
+                    }.toString(),
+                )
+            },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<CronListRpcResult>(result)
+                ServerFrame.CronListResponse(id = frameId("cron_list"), ts = nowIso(), requestId = requestId, success = true, tasks = decoded.tasks)
+            },
+            onFailure = ::cronListFailure,
+        )
+    }
+
+    override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronAddResponse {
+        val requestId = "iroh-cron-add-${UUID.randomUUID()}"
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = ScopedRpcLabels(unsupported = CRON_RPC_UNSUPPORTED, timedOut = "cron.add timed out", failed = "cron.add failed"),
+            call = {
+                adminRpc(
+                    method = "cron.add",
+                    path = CRON_ADMIN_PATH,
+                    body = buildJsonObject {
+                        put("agent_id", agentId)
+                        put("name", name)
+                        put("description", description)
+                        put("prompt", prompt)
+                        put("recurring", recurring)
+                        cron?.let { put("cron", it) }
+                        timezone?.let { put("timezone", it) }
+                        conversationId?.let { put("conversation_id", it) }
+                        // Native contract has no `every`; a one-off time is `scheduled_for`.
+                        at?.let { put("scheduled_for", it) }
+                    }.toString(),
+                )
+            },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
+                ServerFrame.CronAddResponse(id = frameId("cron_add"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task, warning = decoded.warning)
+            },
+            onFailure = ::cronAddFailure,
+        )
+    }
+
+    override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse {
+        val requestId = "iroh-cron-get-${UUID.randomUUID()}"
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = ScopedRpcLabels(unsupported = CRON_RPC_UNSUPPORTED, timedOut = "cron.get timed out", failed = "cron.get failed"),
+            call = { adminRpc(method = "cron.get", path = CRON_ADMIN_PATH, body = buildJsonObject { put("task_id", taskId) }.toString()) },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
+                ServerFrame.CronGetResponse(id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task)
+            },
+            onFailure = ::cronGetFailure,
+        )
+    }
+
+    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse {
+        val requestId = "iroh-cron-delete-${UUID.randomUUID()}"
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = ScopedRpcLabels(unsupported = CRON_RPC_UNSUPPORTED, timedOut = "cron.delete timed out", failed = "cron.delete failed"),
+            call = { adminRpc(method = "cron.delete", path = CRON_ADMIN_PATH, body = buildJsonObject { put("task_id", taskId) }.toString()) },
+            mapSuccess = { _ ->
+                ServerFrame.CronDeleteResponse(id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = true)
+            },
+            onFailure = ::cronDeleteFailure,
+        )
+    }
+
+    override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse {
+        val requestId = "iroh-cron-delete-all-${UUID.randomUUID()}"
+        return invokeScopedRpc(
+            requestId = requestId,
+            timeoutMs = timeoutMs,
+            labels = ScopedRpcLabels(unsupported = CRON_RPC_UNSUPPORTED, timedOut = "cron.delete_all timed out", failed = "cron.delete_all failed"),
+            call = { adminRpc(method = "cron.delete_all", path = CRON_ADMIN_PATH, body = buildJsonObject { put("agent_id", agentId) }.toString()) },
+            mapSuccess = { result ->
+                val decoded = subagentJson.decodeFromJsonElement<CronDeleteAllRpcResult>(result)
+                ServerFrame.CronDeleteAllResponse(id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = true, count = decoded.deleted)
+            },
+            onFailure = ::cronDeleteAllFailure,
+        )
+    }
     override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
         val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
             ?: return subagentListFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
-        return invokeScopedSubagent(
+        return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = SubagentRpcLabels(
+            labels = ScopedRpcLabels(
                 unsupported = SUBAGENT_RPC_UNSUPPORTED,
                 timedOut = "subagent.list timed out",
                 failed = "subagent.list failed",
@@ -1328,10 +1427,10 @@ class IrohChannelTransport(
         val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
         val scope = currentSubagentScope()
             ?: return subagentTodosFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
-        return invokeScopedSubagent(
+        return invokeScopedRpc(
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = SubagentRpcLabels(
+            labels = ScopedRpcLabels(
                 unsupported = SUBAGENT_RPC_UNSUPPORTED,
                 timedOut = "subagent.todos timed out",
                 failed = "subagent.todos failed",
@@ -1360,16 +1459,16 @@ class IrohChannelTransport(
         )
     }
 
-    private data class SubagentRpcLabels(
+    private data class ScopedRpcLabels(
         val unsupported: String,
         val timedOut: String,
         val failed: String,
     )
 
-    private suspend fun <T> invokeScopedSubagent(
+    private suspend fun <T> invokeScopedRpc(
         requestId: String,
         timeoutMs: Long,
-        labels: SubagentRpcLabels,
+        labels: ScopedRpcLabels,
         call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
         mapSuccess: (JsonElement) -> T,
         onFailure: (String, String) -> T,
@@ -1419,6 +1518,26 @@ class IrohChannelTransport(
         id = frameId("subagent_todos"), ts = nowIso(), requestId = requestId, success = false, error = error,
     )
 
+    private fun cronListFailure(requestId: String, error: String) = ServerFrame.CronListResponse(
+        id = frameId("cron_list"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
+
+    private fun cronAddFailure(requestId: String, error: String) = ServerFrame.CronAddResponse(
+        id = frameId("cron_add"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
+
+    private fun cronGetFailure(requestId: String, error: String) = ServerFrame.CronGetResponse(
+        id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
+
+    private fun cronDeleteFailure(requestId: String, error: String) = ServerFrame.CronDeleteResponse(
+        id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
+
+    private fun cronDeleteAllFailure(requestId: String, error: String) = ServerFrame.CronDeleteAllResponse(
+        id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = false, error = error,
+    )
+
     private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
     private fun nowIso(): String = Instant.now().toString()
 
@@ -1435,6 +1554,19 @@ class IrohChannelTransport(
 
     private data class SubagentRpcScope(val conversationId: String, val agentId: String?)
 
+    @Serializable
+    private data class CronListRpcResult(val tasks: List<CronTask> = emptyList())
+
+    @Serializable
+    private data class CronMutationRpcResult(
+        val found: Boolean = false,
+        val task: CronTask? = null,
+        val warning: String? = null,
+    )
+
+    @Serializable
+    private data class CronDeleteAllRpcResult(val deleted: Long = 0L)
+
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
         // letta-mobile-m6oa1.3: informational `reason` vocabulary on the
@@ -1448,6 +1580,10 @@ class IrohChannelTransport(
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
         private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
+        private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
+        // Cron dispatch is by admin_rpc method name; this path is a stable cosmetic
+        // hint (cron is native-only, no proxy fallback consumes it).
+        private const val CRON_ADMIN_PATH = "/v1/cron"
         private val subagentJson = Json { ignoreUnknownKeys = true }
         // letta-mobile-34xoj: admin_rpc retry thresholds
         private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
