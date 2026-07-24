@@ -28,6 +28,11 @@ class NativeAdminHandlersTest {
 
     @BeforeTest
     fun pinUnreachableShim() {
+        // NativeAdmin's circuit breaker is process-wide static; another class's
+        // native-timeout test may have tripped it. Clear it so native ops here
+        // are actually attempted (not short-circuited to the proxy) — same
+        // process-wide-static hygiene as the defaultTransportFactory below.
+        NativeAdmin.resetCircuitForTest()
         // The shim base points at a discard port, but AdminProxyClient's shared
         // defaultTransportFactory is mutable process-wide and other tests in the
         // suite leave a fake installed. Pin a deterministic always-failing
