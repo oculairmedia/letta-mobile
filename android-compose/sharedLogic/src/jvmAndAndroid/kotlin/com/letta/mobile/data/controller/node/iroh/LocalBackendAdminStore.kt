@@ -427,9 +427,11 @@ class LocalBackendAdminStore(
         val resolved = resolveConversation(conversationId, agentId) ?: return@runCatching JsonArray(emptyList())
         val (internalConvId, resolvedAgentId) = resolved
         val dir = File(File(baseDir, "conversations"), b64UrlEncode(conversationKey(internalConvId, resolvedAgentId)))
-        val all = readLocalMessages(File(dir, "messages.jsonl"))
+        // Cached parse of the whole transcript + sidecars; pagination/projection
+        // below stay per-call on the cached (read-only) list.
+        val data = loadMessageData(dir, resolvedAgentId, internalConvId)
 
-        var scoped = all
+        var scoped = data.messages
         if (!before.isNullOrEmpty()) {
             val idx = scoped.indexOfFirst { it["id"]?.stringOrNull() == before }
             if (idx >= 0) scoped = scoped.subList(0, idx)
@@ -439,18 +441,64 @@ class LocalBackendAdminStore(
         }
         val ordered = if ((order ?: "asc").lowercase() == "desc") scoped.asReversed() else scoped
 
-        val realTimes = readRealTimesMap(dir)
-        val otidMap = readStringMap(File(dir, "_otid-map.json"))
-        val attachments = readAttachmentMap(File(dir, "_attachments.json"))
-        val runIds = readRunIdsByMessageId(resolvedAgentId, internalConvId)
-
         buildJsonArray {
             ordered.forEach { m ->
-                localMessageToConversationMessages(m, realTimes, otidMap, runIds, attachments)
+                localMessageToConversationMessages(m, data.realTimes, data.otid, data.runIds, data.attachments)
                     .forEach { add(it) }
             }
         }
     }.getOrNull()
+
+    private data class MessageData(
+        val messages: List<JsonObject>,
+        val realTimes: Map<String, String>,
+        val otid: Map<String, String>,
+        val attachments: Map<String, JsonArray>,
+        val runIds: Map<String, String>,
+    )
+
+    private data class CachedMessageData(val signature: String, val data: MessageData)
+
+    private val messageCache = java.util.concurrent.ConcurrentHashMap<String, CachedMessageData>()
+
+    /**
+     * lgns8.9: cache the parsed transcript + sidecar maps per conversation, keyed
+     * on a composite file signature (messages.jsonl + sidecars + runs dir mtime),
+     * so repeated polls on a large transcript (the ~87MB main conversation) don't
+     * re-parse the whole file every call — mirrors the shim's messagesCache. An
+     * append (new message) bumps messages.jsonl mtime/size → the signature changes
+     * → the entry is recomputed. Cross-process: this reader isn't the writer, so
+     * a plain file-signature check (not writer-invalidation) is the correct
+     * staleness gate. Bounded so a many-conversation host can't grow it without limit.
+     */
+    private fun loadMessageData(dir: File, agentId: String, internalConvId: String): MessageData {
+        val sig = messageCacheSignature(dir)
+        val key = dir.path
+        messageCache[key]?.let { if (it.signature == sig) return it.data }
+        val data = MessageData(
+            messages = readLocalMessages(File(dir, "messages.jsonl")),
+            realTimes = readRealTimesMap(dir),
+            otid = readStringMap(File(dir, "_otid-map.json")),
+            attachments = readAttachmentMap(File(dir, "_attachments.json")),
+            runIds = readRunIdsByMessageId(agentId, internalConvId),
+        )
+        if (messageCache.size > MESSAGE_CACHE_MAX) messageCache.clear()
+        messageCache[key] = CachedMessageData(sig, data)
+        return data
+    }
+
+    private fun messageCacheSignature(dir: File): String {
+        fun stamp(f: File): String = if (f.isFile) "${f.lastModified()}:${f.length()}" else "-"
+        val runs = File(baseDir, "runs").let { if (it.isDirectory) it.lastModified().toString() else "-" }
+        return listOf(
+            stamp(File(dir, "messages.jsonl")),
+            stamp(File(dir, "_real-times.json")),
+            stamp(File(dir, "_real-times.jsonl")),
+            stamp(File(dir, "_otid-map.json")),
+            stamp(File(dir, "_attachments.json")),
+            runs,
+        ).joinToString("|")
+    }
 
     /**
      * Port of `resolveConversationId` + fast-path `getConversation`. Refuses
@@ -979,6 +1027,7 @@ class LocalBackendAdminStore(
     companion object {
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"
         const val DEFAULT_MODEL_HANDLE = "lmstudio/opus-4-7"
+        private const val MESSAGE_CACHE_MAX = 16
         private val ARCHIVE_STATUSES = setOf("active", "archived", "all")
         // admin-shim translate.ts: canned user uuid for created_by/last_updated_by.
         private val CANNED_USER_ID = JsonPrimitive("user-00000000-0000-4000-8000-000000000000")
