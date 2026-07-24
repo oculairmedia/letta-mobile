@@ -43,7 +43,11 @@ class OwnedAppServerProcess private constructor(
         if (!process.isAlive) return
         process.destroy()
         if (!process.waitFor(graceMillis, TimeUnit.MILLISECONDS)) {
+            // destroyForcibly() is ALSO asynchronous ("the process may not terminate
+            // immediately", per the Process javadoc), so wait for it too rather than
+            // returning while the kill is still in flight (CodeRabbit #999).
             process.destroyForcibly()
+            process.waitFor(graceMillis, TimeUnit.MILLISECONDS)
         }
     }
 
