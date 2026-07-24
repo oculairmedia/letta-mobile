@@ -83,11 +83,16 @@ internal class AppServerServeCommand : CliktCommand(
         }
 
         println("[app-server] $rendered")
+        runSupervised(command)
+    }
 
-        // P0.1 (letta-mobile-gn7kr.1): fence backend ownership BEFORE spawning so a
-        // second invocation — or a crash-orphaned prior owner — cannot race the
-        // on-disk backend, and run the child through the crash-recovery supervisor
-        // (readiness-gated startup, bounded graceful shutdown, whole-tree kill).
+    /**
+     * Fence backend ownership (P0.1) then run [command] through the crash-recovery
+     * supervisor: readiness-gated startup, bounded graceful shutdown, whole-tree kill.
+     * A JVM shutdown (SIGTERM, Ctrl-C) stops the child tree and releases the fence so
+     * the next start sees a clean root; a hard SIGKILL cannot run that hook.
+     */
+    private fun runSupervised(command: List<String>) {
         val fence = acquireBackendFence(backendDir, unit, BackendOwnershipPreflight())
         val controller = ProcessHandleController(command)
         val supervisor = AppServerSupervisor(
@@ -96,8 +101,6 @@ internal class AppServerServeCommand : CliktCommand(
             onEvent = ::logSupervisorEvent,
         )
 
-        // On any JVM shutdown (SIGTERM, Ctrl-C) stop the child tree and release the
-        // fence so the next start sees a clean root. A hard SIGKILL cannot run this.
         val shutdownHook = Thread({
             supervisor.stop()
             fence?.close()
@@ -105,27 +108,39 @@ internal class AppServerServeCommand : CliktCommand(
         Runtime.getRuntime().addShutdownHook(shutdownHook)
 
         try {
-            when (val outcome = supervisor.start()) {
-                is AppServerSupervisor.StartupOutcome.Ready -> {
-                    // Child is up and healthy; block on it and propagate its exit code.
-                    val exitCode = controller.awaitExit()
-                    if (exitCode != 0) throw ProgramResult(exitCode)
-                }
-                is AppServerSupervisor.StartupOutcome.ExitedBeforeReady -> {
-                    System.err.println(
-                        "[app-server] child exited before becoming ready (code ${outcome.exitCode})",
-                    )
-                    throw ProgramResult(if (outcome.exitCode != 0) outcome.exitCode else 1)
-                }
-                is AppServerSupervisor.StartupOutcome.StartupTimedOut -> {
-                    System.err.println("[app-server] child did not become ready before the startup timeout")
-                    throw ProgramResult(1)
-                }
-            }
+            handleStartupOutcome(supervisor.start(), controller)
         } finally {
             runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) }
             supervisor.stop()
             fence?.close()
+        }
+    }
+
+    /**
+     * Map the supervisor [outcome] to the serve command's exit semantics: block on a
+     * ready child and propagate its exit code; surface a non-zero [ProgramResult] when
+     * the child exits before ready or the startup times out.
+     */
+    private fun handleStartupOutcome(
+        outcome: AppServerSupervisor.StartupOutcome,
+        controller: ProcessHandleController,
+    ) {
+        when (outcome) {
+            is AppServerSupervisor.StartupOutcome.Ready -> {
+                // Child is up and healthy; block on it and propagate its exit code.
+                val exitCode = controller.awaitExit()
+                if (exitCode != 0) throw ProgramResult(exitCode)
+            }
+            is AppServerSupervisor.StartupOutcome.ExitedBeforeReady -> {
+                System.err.println(
+                    "[app-server] child exited before becoming ready (code ${outcome.exitCode})",
+                )
+                throw ProgramResult(if (outcome.exitCode != 0) outcome.exitCode else 1)
+            }
+            is AppServerSupervisor.StartupOutcome.StartupTimedOut -> {
+                System.err.println("[app-server] child did not become ready before the startup timeout")
+                throw ProgramResult(1)
+            }
         }
     }
 
