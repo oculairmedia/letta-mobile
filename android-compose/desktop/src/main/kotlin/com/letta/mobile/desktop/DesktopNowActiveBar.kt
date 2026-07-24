@@ -17,6 +17,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,6 +54,7 @@ internal data class NowActiveBarState(
     val status: NowActiveStatus,
     /** Agent working in a conversation OTHER than the active one, if any. */
     val backgroundWorkAgentName: String?,
+    val avatarCompanionActive: Boolean = false,
 )
 
 internal data class NowActiveBarActions(
@@ -57,6 +62,8 @@ internal data class NowActiveBarActions(
     val onOpenConversation: () -> Unit,
     /** Jump to the conversation doing background work (chip click). */
     val onJumpToBackgroundWork: () -> Unit,
+    /** Toggle the desktop avatar companion (bar trailing control). */
+    val onAvatarCompanion: () -> Unit = {},
 )
 
 private val NowActiveStatus.label: String
@@ -133,8 +140,30 @@ internal fun DesktopNowActiveBar(
                 state.backgroundWorkAgentName?.let { name ->
                     BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
                 }
+                AvatarCompanionButton(
+                    active = state.avatarCompanionActive,
+                    onClick = actions.onAvatarCompanion,
+                )
             }
         }
+    }
+}
+
+@Composable
+private fun AvatarCompanionButton(active: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(32.dp)
+            .clip(CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Face,
+            contentDescription = if (active) "Stop avatar companion" else "Avatar companion",
+            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(17.dp),
+        )
     }
 }
 

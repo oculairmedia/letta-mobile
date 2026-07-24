@@ -413,7 +413,6 @@ internal fun LettaDesktopApp(
                             thinkingAgentId = thinkingAgentId,
                             avatarStyleByAgentId = avatarStyleByAgentId,
                         ),
-                        avatarCompanionActive = avatar.isActive,
                         expanded = railExpanded,
                     ),
                     actions = DesktopAgentRailActions(
@@ -421,8 +420,6 @@ internal fun LettaDesktopApp(
                         // Contacts-style picker over the persistent-agent
                         // roster; agent creation lives inside it.
                         onNewSession = { showNewConversation = true },
-                        onSearch = { showCommandPalette = true },
-                        onAvatarCompanion = avatar.toggle,
                         onToggleExpanded = { railExpanded = !railExpanded },
                     ),
                 )
@@ -761,8 +758,10 @@ internal fun LettaDesktopApp(
                           backgroundWorkAgentName = thinkingConversationId
                               ?.takeIf { it != barConversation.id }
                               ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
+                          avatarCompanionActive = avatar.isActive,
                       ),
                       actions = NowActiveBarActions(
+                          onAvatarCompanion = avatar.toggle,
                           onOpenConversation = {
                               editAgentId = null
                               chatController.selectConversation(barConversation.id)
