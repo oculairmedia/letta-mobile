@@ -101,6 +101,21 @@ class BackendOwnershipPreflightTest {
     }
 
     @Test
+    fun `acquire writes sidecar atomically leaving no temp remnant`(@TempDir dir: Path) {
+        val live = FakeLiveness(mutableMapOf(100L to 7_000L))
+        val pf = BackendOwnershipPreflight(live, selfPid = 100)
+        pf.acquire(dir.toString()).use {
+            val sidecar = dir.resolve(BackendOwnershipPreflight.OWNER_FILENAME)
+            val tmp = dir.resolve("${BackendOwnershipPreflight.OWNER_FILENAME}.tmp")
+            assertTrue(Files.exists(sidecar), "sidecar must exist after acquire")
+            assertFalse(Files.exists(tmp), "no .tmp remnant may be left behind")
+            // The record is complete and parseable — never a partial/zero-byte file.
+            val onDisk = BackendOwnerInfo.fromJson(Files.readString(sidecar))
+            assertEquals(100L, onDisk!!.pid)
+        }
+    }
+
+    @Test
     fun `acquire on clear root then second acquire fences via lock`(@TempDir dir: Path) {
         val live = FakeLiveness(mutableMapOf(100L to 7_000L))
         val pf = BackendOwnershipPreflight(live, selfPid = 100)
