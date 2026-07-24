@@ -58,6 +58,7 @@ internal fun LettaDesktopApp(
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     var showNewAgentDialog by remember { mutableStateOf(false) }
+    var showNewConversation by remember { mutableStateOf(false) }
     // Avatar styles chosen via the editor this session, applied immediately to the
     // orbs regardless of whether the backend round-trips agent metadata.
     var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
@@ -355,7 +356,9 @@ internal fun LettaDesktopApp(
                     ),
                     actions = DesktopAgentRailActions(
                         onAgentSelected = { agentId -> openAgent(agentId) },
-                        onNewSession = { showNewAgentDialog = true },
+                        // Contacts-style picker over the persistent-agent
+                        // roster; agent creation lives inside it.
+                        onNewSession = { showNewConversation = true },
                         onSearch = { showCommandPalette = true },
                         onAvatarCompanion = avatar.toggle,
                     ),
@@ -606,6 +609,26 @@ internal fun LettaDesktopApp(
                     onDismiss = { showModelPicker = false },
                 )
             }
+            if (showNewConversation) {
+                val directoryRows = remember(railAgents, rosterAgents, avatarStyleByAgentId) {
+                    buildNewConversationRows(railAgents, rosterAgents, avatarStyleByAgentId)
+                }
+                DesktopNewConversationSurface(
+                    recents = directoryRows.take(NEW_CONVERSATION_RECENTS_LIMIT),
+                    directory = directoryRows,
+                    actions = DesktopNewConversationActions(
+                        onAgentSelected = {
+                            showNewConversation = false
+                            openAgent(it)
+                        },
+                        onCreateNewAgent = {
+                            showNewConversation = false
+                            showNewAgentDialog = true
+                        },
+                        onDismiss = { showNewConversation = false },
+                    ),
+                )
+            }
             if (showCommandPalette) {
                 DesktopCommandPalette(
                     items = paletteItems,
@@ -714,6 +737,9 @@ private fun workingAgentName(params: WorkingAgentNameParams): String {
     }
     return byConversation ?: params.fallback
 }
+
+/** Avatar chips shown in the New Conversation "Recent" row. */
+private const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 
 private fun desktopActiveTitle(destination: DesktopDestination, conversationTitle: String?): String {
     if (destination != DesktopDestination.Conversations) return destination.label
