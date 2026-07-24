@@ -226,6 +226,9 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                         placeholder = { Text("Search agents, or ask anything…") },
                         modifier = Modifier
                             .fillMaxWidth()
+                            // Without a real min height the field hugs the text
+                            // and clips descenders in the placeholder.
+                            .heightIn(min = 40.dp)
                             .focusRequester(focusRequester)
                             .onPreviewKeyEvent { event ->
                                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
