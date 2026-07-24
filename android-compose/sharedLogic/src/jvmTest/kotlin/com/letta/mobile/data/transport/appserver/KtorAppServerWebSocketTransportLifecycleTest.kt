@@ -107,9 +107,17 @@ class KtorAppServerWebSocketTransportLifecycleTest {
         }
         val transport = transport(port)
 
+        // Deflake: AWAIT Ready before observing the frame. The stream socket can
+        // deliver its (malformed) frame before the control channel finishes its
+        // handshake, so snapshotting connectionState.value right after the first
+        // frame raced against the generation actually reaching Ready. Await it
+        // first (both channels up), exactly as the sibling tests await their
+        // terminal states — then the "still Ready" assertion below is deterministic.
+        withTimeout(TIMEOUT) { transport.connectionState.first { it == AppServerConnectionState.Ready } }
+
         val frame = withTimeout(TIMEOUT) { transport.streamFrames.first() }
         assertIs<AppServerInboundFrame.DecodeFailure>(frame.frame)
-        // A malformed frame must not fail the generation.
+        // A malformed frame must not fail a Ready generation — it stays Ready.
         assertEquals(AppServerConnectionState.Ready, transport.connectionState.value)
 
         transport.close()
