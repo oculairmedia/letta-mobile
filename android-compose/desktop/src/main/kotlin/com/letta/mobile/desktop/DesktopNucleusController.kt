@@ -260,13 +260,26 @@ internal class DesktopNucleusController(
         }
     }
 
-    fun notifyAgentFinished(agentName: String, onActivated: () -> Unit) {
+    /**
+     * Completion toast carrying the agent's actual reply (truncated) instead
+     * of a generic line, plus a Reply action that jumps into the finished
+     * conversation. Nucleus toasts support buttons but not inline text input,
+     * so Reply opens the composer rather than replying from the toast.
+     */
+    fun notifyAgentFinished(
+        agentName: String,
+        replyPreview: String?,
+        onActivated: () -> Unit,
+        onReply: () -> Unit,
+    ) {
         scope.launch(Dispatchers.IO) {
             notification(
                 title = agentName,
-                message = "Your agent finished responding.",
+                message = replyPreview?.takeIf { it.isNotBlank() } ?: "Your agent finished responding.",
                 onActivated = onActivated,
-            ).send()
+            ) {
+                button("Reply", onReply)
+            }.send()
         }
     }
 

@@ -294,11 +294,28 @@ internal fun LettaDesktopApp(
         ),
     )
     DesktopNucleusEffects(
-        bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
+        bindings = DesktopNucleusEffectBindings(
+            applicationScope = nucleusApplicationScope,
+            window = window,
+            controller = nucleusController,
+            // Read through the controller's live state: the toast fires from a
+            // coroutine after composition-captured chatState may be stale.
+            replyPreviewFor = { conversationId ->
+                notificationReplyPreview(
+                    chatController.state.value.messagesByConversationId[conversationId],
+                )
+            },
+            onOpenConversation = { conversationId ->
+                editAgentId = null
+                chatController.selectConversation(conversationId)
+                selectedDestination = DesktopDestination.Conversations
+            },
+        ),
         state = desktopNucleusEffectState(
             DesktopNucleusRuntimeState(
                 thinkingConversationId = thinkingConversationId,
                 isStreamingReply = replyPresence.isStreaming,
+                selectedConversationId = chatState.selectedConversationId,
                 agentName = workingAgentName,
                 errorMessage = chatState.errorMessage,
             ),
