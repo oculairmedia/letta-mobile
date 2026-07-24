@@ -57,6 +57,14 @@ object IrohPeerCapabilities {
         method in CONVERSATION_MANAGE_METHODS -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
             if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
+        // lgns8.16: reflection/sleeptime settings control WHEN the agent
+        // consolidates memory (dreaming) — a memory-management operation, not an
+        // admin one. Classify it in the memory tier (read vs write) like blocks
+        // and passages, so a standard paired device can read/adjust dreaming.
+        // Without this, reflection.* fell into the `else -> ADMIN_FULL` deny-by-
+        // default bucket and was silently unusable for every non-admin peer.
+        method.startsWith("reflection.") ->
+            if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
         method.startsWith("schedule.") || method.startsWith("job.") || method.startsWith("cron.") -> SCHEDULE_MANAGE
         method.startsWith("skill.") -> SKILLS_MANAGE
         method.startsWith("tool.") || method == "mcp.list" -> TOOLS_MANAGE

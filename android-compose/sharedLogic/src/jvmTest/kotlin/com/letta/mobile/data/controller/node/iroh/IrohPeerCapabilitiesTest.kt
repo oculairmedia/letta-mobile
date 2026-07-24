@@ -3,6 +3,7 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.model.SubagentEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -69,6 +70,31 @@ class IrohPeerCapabilitiesTest {
             )
         }
         assertFalse(IrohPeerCapabilities.ADMIN_FULL in desktopRole, "admin.full is never implicit")
+    }
+
+    @Test
+    fun reflectionSettingsAreMemoryTierNotAdminOnly() {
+        // lgns8.16: reflection/sleeptime (dreaming) settings control WHEN the agent
+        // consolidates memory — a memory-management operation, not server admin.
+        // reflection.get is a memory READ, reflection.set a memory WRITE, so a
+        // standard paired device can use dreaming without admin.full. Before this
+        // they fell into the `else -> ADMIN_FULL` deny-by-default bucket and were
+        // silently unusable for every non-admin peer.
+        assertEquals(IrohPeerCapabilities.MEMORY_READ, IrohPeerCapabilities.forAdminMethod("reflection.get"))
+        assertEquals(IrohPeerCapabilities.MEMORY_WRITE, IrohPeerCapabilities.forAdminMethod("reflection.set"))
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("reflection.get")),
+            "a standard device must be able to READ reflection settings (dreaming not silently denied)",
+        )
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("reflection.set")),
+            "a standard device must be able to SET reflection settings (dreaming not admin-gated)",
+        )
+        assertNotEquals(
+            IrohPeerCapabilities.ADMIN_FULL,
+            IrohPeerCapabilities.forAdminMethod("reflection.set"),
+            "reflection is an intentional memory classification, not the deny-by-default admin bucket",
+        )
     }
 
     @Test
