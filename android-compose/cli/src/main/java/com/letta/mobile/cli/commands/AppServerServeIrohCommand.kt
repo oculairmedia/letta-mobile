@@ -157,25 +157,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
         val scope = CoroutineScope(Dispatchers.IO)
         
         try {
-            // d6e8g.2: fail closed — refuse anonymous startup unless explicitly
-            // opted into via the loudly named test/dev-only flag.
-            val authPolicy = when (
-                val resolution = IrohAuthPolicy.resolve(
-                    authToken = authToken,
-                    allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
-                    allowInsecureAnonymous = allowInsecureAnonymousIroh,
-                )
-            ) {
-                is IrohAuthPolicyResolution.Secure -> resolution.policy
-                is IrohAuthPolicyResolution.InsecureAccepted -> {
-                    System.err.println("[iroh-app-server] ${resolution.warning}")
-                    resolution.policy
-                }
-                is IrohAuthPolicyResolution.Refused -> {
-                    System.err.println("[iroh-app-server] ${resolution.error}")
-                    exitProcess(78)
-                }
-            }
+            val authPolicy = resolveAuthPolicy()
 
             val pairingService = pairingStoreFile?.let { storePath ->
                 println("[iroh-app-server] Pairing enabled (store: $storePath)")
@@ -267,6 +249,29 @@ internal class AppServerServeIrohCommand : CliktCommand(
             e.printStackTrace()
             scope.cancel()
             exitProcess(1)
+        }
+    }
+
+    /**
+     * d6e8g.2: fail closed — refuse anonymous startup unless explicitly opted into
+     * via the loudly named test/dev-only flag. Extracted from [run] to keep it
+     * within complexity bounds.
+     */
+    private fun resolveAuthPolicy() = when (
+        val resolution = IrohAuthPolicy.resolve(
+            authToken = authToken,
+            allowedPeerIds = allowedPeerIds.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
+            allowInsecureAnonymous = allowInsecureAnonymousIroh,
+        )
+    ) {
+        is IrohAuthPolicyResolution.Secure -> resolution.policy
+        is IrohAuthPolicyResolution.InsecureAccepted -> {
+            System.err.println("[iroh-app-server] ${resolution.warning}")
+            resolution.policy
+        }
+        is IrohAuthPolicyResolution.Refused -> {
+            System.err.println("[iroh-app-server] ${resolution.error}")
+            exitProcess(78)
         }
     }
 
