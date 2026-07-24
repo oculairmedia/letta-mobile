@@ -94,9 +94,25 @@ internal fun handleClipboardImageFilePaste(
     return true
 }
 
-internal fun createImageFileDropTarget(sink: DesktopImageIngressSink): DropTargetAdapter =
+internal fun createImageFileDropTarget(
+    sink: DesktopImageIngressSink,
+    onDragActive: (Boolean) -> Unit = {},
+): DropTargetAdapter =
     object : DropTargetAdapter() {
+        override fun dragEnter(event: java.awt.dnd.DropTargetDragEvent) {
+            onDragActive(true)
+        }
+
+        override fun dragOver(event: java.awt.dnd.DropTargetDragEvent) {
+            onDragActive(true)
+        }
+
+        override fun dragExit(event: java.awt.dnd.DropTargetEvent) {
+            onDragActive(false)
+        }
+
         override fun drop(event: DropTargetDropEvent) {
+            onDragActive(false)
             // acceptDrop MUST precede transferable access: on Windows, reading
             // the file list from an unaccepted drop throws
             // InvalidDnDOperationException, which made drops look dead.

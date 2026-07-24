@@ -160,7 +160,7 @@ internal fun LettaDesktopApp(
             }
         }
     }
-    DesktopImageIngressEffect(
+    val isDragActive by DesktopImageIngressEffect(
         DesktopImageIngressConfig(
             enabled = selectedDestination == DesktopDestination.Conversations,
             scope = chatScope,
@@ -720,6 +720,9 @@ internal fun LettaDesktopApp(
                     },
                     onDismiss = { showCommandPalette = false },
                 )
+            }
+            if (isDragActive) {
+                DesktopImageDropOverlay()
             }
             if (showIrohResetConfirm) {
                 DesktopConfirmDialog(
