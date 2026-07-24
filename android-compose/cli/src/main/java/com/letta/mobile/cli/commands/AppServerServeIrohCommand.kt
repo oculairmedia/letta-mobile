@@ -5,6 +5,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.ReconnectCoordinator
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
@@ -319,6 +320,12 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val controller = DefaultAppServerController(
                 client = reconnectingClient,
                 runtimeRegistry = runtimeRegistry,
+                // lgns8.17: give the turn engine a registry so it can execute
+                // controller-owned tools; independently, the engine GUARANTEES a
+                // matched external_tool_call_response for every request (a
+                // synthesized is_error when a tool isn't handled here) so a
+                // tool-call turn over the App Server WS route never hangs.
+                externalToolRegistry = ExternalToolRegistry.factoryDefault(),
             )
             controllerRef = controller
             coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
