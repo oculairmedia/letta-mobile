@@ -8,12 +8,13 @@ object ConversationAdminHandlers {
     fun register(
         router: AdminRpcRouter,
         adminBaseUrl: String,
-        nativeClient: AppServerClient? = null,
+        // The native read tiers reads try before the shim proxy: the App Server
+        // client, and (lgns8.9) the on-disk backend store for ported reads.
+        tiers: NativeReadTiers = NativeReadTiers(),
         shimRetired: Boolean = false,
-        // lgns8.9: on-disk backend store; when set, conversation.list serves from
-        // disk (native tier) ahead of the shim proxy. Null = disabled = proxy only.
-        localStore: LocalBackendAdminStore? = null,
     ) {
+        val nativeClient = tiers.nativeClient
+        val localStore = tiers.localStore
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         registerConversationReadRoutes(router, api, nativeClient, localStore)
         registerConversationWriteRoutes(router, api, nativeClient, shimRetired)

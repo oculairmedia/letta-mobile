@@ -104,45 +104,9 @@ class LocalBackendAdminStore(
         val created = isoMillis(rec.ctimeMs)
         val updated = isoMillis(rec.mtimeMs)
 
-        val providerType = settings["provider_type"]?.stringOrNull()
-        val contextWindow = settings["context_window_limit"]?.longOrNull() ?: 200_000L
-        val temperature = settings["temperature"]?.doubleOrNull() ?: 1.0
-        val maxTokens = settings["max_tokens"]?.longOrNull() ?: 16_384L
-
-        val llmConfig = buildJsonObject {
-            put("model", model)
-            put("display_name", model)
-            put("model_endpoint_type", if (providerType == "lmstudio") "openai" else (providerType ?: "openai"))
-            put("model_endpoint", lmstudioBaseUrl)
-            put("provider_name", provider)
-            put("provider_category", "base")
-            put("model_wrapper", JsonNull)
-            put("context_window", contextWindow)
-            put("put_inner_thoughts_in_kwargs", false)
-            put("handle", handle)
-            put("temperature", temperature)
-            put("max_tokens", maxTokens)
-            put("enable_reasoner", false)
-            put("reasoning_effort", JsonNull)
-        }
-
-        val embeddingConfig = buildJsonObject {
-            put("embedding_endpoint_type", "openai")
-            put("embedding_endpoint", lmstudioBaseUrl)
-            put("embedding_model", "text-embedding-3-small")
-            put("embedding_dim", 1536)
-            put("embedding_chunk_size", 300)
-            put("handle", "openai/text-embedding-3-small")
-            put("batch_size", 32)
-        }
-
-        val memory = buildJsonObject {
-            put("agent_type", "memgpt_agent")
-            put("git_enabled", true)
-            put("blocks", blocks)
-            put("file_blocks", JsonArray(emptyList()))
-            put("prompt_template", JsonNull)
-        }
+        val llmConfig = buildLlmConfig(settings, provider, model, handle)
+        val embeddingConfig = buildEmbeddingConfig()
+        val memory = buildAgentMemory(blocks)
 
         return buildJsonObject {
             put("id", record["id"] ?: JsonPrimitive(rec.id))
@@ -196,6 +160,55 @@ class LocalBackendAdminStore(
             put("webhook_events", JsonArray(emptyList()))
             put("webhook_enabled", false)
         }
+    }
+
+    /** llm_config sub-object of [agentToLettaState]. */
+    private fun buildLlmConfig(
+        settings: JsonObject,
+        provider: String,
+        model: String,
+        handle: String,
+    ): JsonObject {
+        val providerType = settings["provider_type"]?.stringOrNull()
+        val contextWindow = settings["context_window_limit"]?.longOrNull() ?: 200_000L
+        val temperature = settings["temperature"]?.doubleOrNull() ?: 1.0
+        val maxTokens = settings["max_tokens"]?.longOrNull() ?: 16_384L
+        return buildJsonObject {
+            put("model", model)
+            put("display_name", model)
+            put("model_endpoint_type", if (providerType == "lmstudio") "openai" else (providerType ?: "openai"))
+            put("model_endpoint", lmstudioBaseUrl)
+            put("provider_name", provider)
+            put("provider_category", "base")
+            put("model_wrapper", JsonNull)
+            put("context_window", contextWindow)
+            put("put_inner_thoughts_in_kwargs", false)
+            put("handle", handle)
+            put("temperature", temperature)
+            put("max_tokens", maxTokens)
+            put("enable_reasoner", false)
+            put("reasoning_effort", JsonNull)
+        }
+    }
+
+    /** embedding_config sub-object of [agentToLettaState]. */
+    private fun buildEmbeddingConfig(): JsonObject = buildJsonObject {
+        put("embedding_endpoint_type", "openai")
+        put("embedding_endpoint", lmstudioBaseUrl)
+        put("embedding_model", "text-embedding-3-small")
+        put("embedding_dim", 1536)
+        put("embedding_chunk_size", 300)
+        put("handle", "openai/text-embedding-3-small")
+        put("batch_size", 32)
+    }
+
+    /** memory sub-object of [agentToLettaState]. */
+    private fun buildAgentMemory(blocks: JsonArray): JsonObject = buildJsonObject {
+        put("agent_type", "memgpt_agent")
+        put("git_enabled", true)
+        put("blocks", blocks)
+        put("file_blocks", JsonArray(emptyList()))
+        put("prompt_template", JsonNull)
     }
 
     /**
@@ -300,30 +313,39 @@ class LocalBackendAdminStore(
     private fun readConversations(agentId: String?): List<ConvRecord> {
         val root = File(baseDir, "conversations")
         val dirs = root.listFiles { f -> f.isDirectory } ?: return emptyList()
-        val out = ArrayList<ConvRecord>()
-        for (d in dirs) {
-            val key = runCatching { b64UrlDecode(d.name) }.getOrNull() ?: continue
-            if (agentId != null && key != "default:$agentId" && !key.startsWith("conversation:")) continue
-            val obj = runCatching {
-                File(d, "conversation.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
-            }.getOrNull() ?: continue
-            val convId = obj["id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
-            val convAgent = obj["agent_id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
-            if (agentId != null && convAgent != agentId) continue
-            out += ConvRecord(
-                id = convId,
-                agentId = convAgent,
-                createdAt = obj["created_at"]?.stringOrNull(),
-                updatedAt = obj["updated_at"]?.stringOrNull(),
-                lastMessageAt = obj["last_message_at"]?.stringOrNull(),
-                summary = obj["summary"]?.stringOrNull(),
-                archived = (obj["archived"] as? JsonPrimitive)?.let { if (it.isString) null else it.content.toBooleanStrictOrNull() },
-                archivedAt = obj["archived_at"]?.stringOrNull(),
-                inContextMessageIds = obj["in_context_message_ids"] as? JsonArray ?: JsonArray(emptyList()),
-                raw = obj,
-            )
-        }
-        return out
+        return dirs.mapNotNull { parseConversationRecord(it, agentId) }
+    }
+
+    /**
+     * True when the decoded dir key cannot belong to [agentId]: the shim keeps
+     * `default:<agentId>` or any `conversation:` key (agent match verified later
+     * from conversation.json), so anything else is pruned before the file read.
+     */
+    private fun keyExcludedForAgent(key: String, agentId: String): Boolean =
+        key != "default:$agentId" && !key.startsWith("conversation:")
+
+    /** Parse one conversations/<b64url(key)>/ dir into a ConvRecord, or null to skip it. */
+    private fun parseConversationRecord(d: File, agentId: String?): ConvRecord? {
+        val key = runCatching { b64UrlDecode(d.name) }.getOrNull() ?: return null
+        if (agentId != null && keyExcludedForAgent(key, agentId)) return null
+        val obj = runCatching {
+            File(d, "conversation.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+        }.getOrNull() ?: return null
+        val convId = obj["id"]?.jsonPrimitive?.contentOrNullSafe() ?: return null
+        val convAgent = obj["agent_id"]?.jsonPrimitive?.contentOrNullSafe() ?: return null
+        if (agentId != null && convAgent != agentId) return null
+        return ConvRecord(
+            id = convId,
+            agentId = convAgent,
+            createdAt = obj["created_at"]?.stringOrNull(),
+            updatedAt = obj["updated_at"]?.stringOrNull(),
+            lastMessageAt = obj["last_message_at"]?.stringOrNull(),
+            summary = obj["summary"]?.stringOrNull(),
+            archived = (obj["archived"] as? JsonPrimitive)?.let { if (it.isString) null else it.content.toBooleanStrictOrNull() },
+            archivedAt = obj["archived_at"]?.stringOrNull(),
+            inContextMessageIds = obj["in_context_message_ids"] as? JsonArray ?: JsonArray(emptyList()),
+            raw = obj,
+        )
     }
 
     /**
@@ -334,14 +356,21 @@ class LocalBackendAdminStore(
      */
     private fun withRealTimes(c: ConvRecord): ConvRecord {
         val max = maxRealMessageTime(c.id, c.agentId)
-        var last = c.lastMessageAt ?: ""
-        var updated = c.updatedAt ?: ""
         val created = c.createdAt ?: ""
-        if (isSentinelDate(last)) last = max.ifEmpty { created }
-        if (isSentinelDate(updated)) updated = max.ifEmpty { created }
-        if (max.isNotEmpty() && max > last) last = max
-        if (max.isNotEmpty() && max > updated) updated = max
+        val last = resolveRealTime(c.lastMessageAt ?: "", max, created)
+        val updated = resolveRealTime(c.updatedAt ?: "", max, created)
         return c.copy(lastMessageAt = last.ifEmpty { c.lastMessageAt }, updatedAt = updated.ifEmpty { c.updatedAt })
+    }
+
+    /**
+     * Resolve one CLI timestamp against the sidecar max: substitute a sentinel
+     * date with (max, else created); then bump to max when max is greater.
+     */
+    private fun resolveRealTime(current: String, sidecarMax: String, created: String): String {
+        var v = current
+        if (isSentinelDate(v)) v = sidecarMax.ifEmpty { created }
+        if (sidecarMax.isNotEmpty() && sidecarMax > v) v = sidecarMax
+        return v
     }
 
     /** Port of maxRealMessageTime: legacy _real-times.json map, then overlay _real-times.jsonl (later wins), max iso. */
@@ -722,92 +751,115 @@ class LocalBackendAdminStore(
         val created = real ?: sentinel ?: isoMillis(System.currentTimeMillis())
         val role = localMsg["role"]?.stringOrNull() ?: "system"
         val parts = localMsg["parts"] as? JsonArray ?: JsonArray(emptyList())
-        val projectedOtid = (id?.let { otidMap[it] }) ?: id
-        val projectedRunId: JsonElement = (id?.let { runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull
-        val attachmentRefs = id?.let { attachments[it] }
-
-        // User / system: collapse text parts into one wire message.
-        if (role == "user" || role == "system") {
-            var text = partsToText(parts)
-            if (role == "user") text = stripSystemReminders(text)
-            if (text.isEmpty()) return emptyList()
-            val wireType = if (role == "user") "user_message" else "system_message"
-            val wire = buildJsonObject {
-                put("id", id ?: "")
-                put("date", withTypeOffset(created, wireType))
-                put("name", JsonNull)
-                put("message_type", wireType)
-                put("otid", projectedOtid?.let { JsonPrimitive(it) } ?: JsonNull)
-                put("sender_id", JsonNull)
-                put("step_id", JsonNull)
-                put("is_err", JsonNull)
-                put("seq_id", JsonNull)
-                put("run_id", projectedRunId)
-                put("content", text)
-                // attachRefsToWireMessage: only user_message, only when refs present.
-                if (wireType == "user_message" && attachmentRefs != null && attachmentRefs.isNotEmpty()) {
-                    put("attachments", attachmentRefs)
-                }
-            }
-            return listOf(wire)
+        val ctx = ProjCtx(
+            id = id,
+            created = created,
+            projectedOtid = (id?.let { otidMap[it] }) ?: id,
+            projectedRunId = (id?.let { runIds[it] })?.let { JsonPrimitive(it) } ?: JsonNull,
+            attachmentRefs = id?.let { attachments[it] },
+        )
+        return when {
+            role == "user" || role == "system" -> projectUserOrSystem(ctx, role, parts)
+            role == "toolResult" -> projectToolResultRow(ctx, localMsg, parts)
+            else -> projectAssistantParts(ctx, parts)
         }
+    }
 
-        // toolResult top-level row (letta-code 0.25.x).
-        if (role == "toolResult") {
-            val callId = localMsg["toolCallId"]?.stringOrNull() ?: ""
-            val toolName = localMsg["toolName"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
-            val isError = (localMsg["isError"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
-            val returnText = partsToText(parts)
-            val status = if (isError) "error" else "success"
-            val tr = buildJsonObject {
-                put("tool_call_id", callId)
-                put("status", status)
-                put("stdout", JsonNull)
-                put("stderr", JsonNull)
-                put("func_response", returnText)
-                put("type", "tool")
+    /** Shared per-message projection context computed once in [localMessageToConversationMessages]. */
+    private class ProjCtx(
+        val id: String?,
+        val created: String,
+        val projectedOtid: String?,
+        val projectedRunId: JsonElement,
+        val attachmentRefs: JsonArray?,
+    )
+
+    /** tool_call sub-object shared by the tool-call projections. */
+    private fun toolCallInner(name: String, argsStr: String, callId: String): JsonObject = buildJsonObject {
+        put("name", name)
+        put("arguments", argsStr)
+        put("tool_call_id", callId)
+    }
+
+    /** tool_returns[] entry shared by the tool-return projections. */
+    private fun toolReturnInner(
+        callId: String,
+        status: String,
+        stdout: JsonElement,
+        stderr: JsonElement,
+        returnText: String,
+    ): JsonObject = buildJsonObject {
+        put("tool_call_id", callId)
+        put("status", status)
+        put("stdout", stdout)
+        put("stderr", stderr)
+        put("func_response", returnText)
+        put("type", "tool")
+    }
+
+    /** User / system: collapse text parts into one wire message. */
+    private fun projectUserOrSystem(ctx: ProjCtx, role: String, parts: JsonArray): List<JsonObject> {
+        var text = partsToText(parts)
+        if (role == "user") text = stripSystemReminders(text)
+        if (text.isEmpty()) return emptyList()
+        val wireType = if (role == "user") "user_message" else "system_message"
+        val wire = buildJsonObject {
+            put("id", ctx.id ?: "")
+            put("date", withTypeOffset(ctx.created, wireType))
+            put("name", JsonNull)
+            put("message_type", wireType)
+            put("otid", ctx.projectedOtid?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("content", text)
+            // attachRefsToWireMessage: only user_message, only when refs present.
+            if (wireType == "user_message" && ctx.attachmentRefs != null && ctx.attachmentRefs.isNotEmpty()) {
+                put("attachments", ctx.attachmentRefs)
             }
-            val trMsg = buildJsonObject {
-                put("id", if (callId.isNotEmpty()) "toolreturn-$callId" else (id ?: ""))
-                put("date", withTypeOffset(created, "tool_return_message"))
-                put("name", toolName?.let { JsonPrimitive(it) } ?: JsonNull)
-                put("message_type", "tool_return_message")
-                put("otid", projectedOtid?.let { JsonPrimitive(it) } ?: JsonNull)
-                put("sender_id", JsonNull)
-                put("step_id", JsonNull)
-                put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
-                put("seq_id", JsonNull)
-                put("run_id", projectedRunId)
-                put("tool_call_id", callId)
-                put("status", status)
-                put("tool_return", returnText)
-                put("stdout", JsonNull)
-                put("stderr", JsonNull)
-                put("tool_returns", JsonArray(listOf(tr)))
-            }
-            return listOf(trMsg)
         }
+        return listOf(wire)
+    }
 
-        // Assistant / tool: walk parts, grouping consecutive text.
+    /** toolResult top-level row (letta-code 0.25.x). */
+    private fun projectToolResultRow(ctx: ProjCtx, localMsg: JsonObject, parts: JsonArray): List<JsonObject> {
+        val callId = localMsg["toolCallId"]?.stringOrNull() ?: ""
+        val toolName = localMsg["toolName"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+        val isError = (localMsg["isError"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+        val returnText = partsToText(parts)
+        val status = if (isError) "error" else "success"
+        val tr = toolReturnInner(callId, status, JsonNull, JsonNull, returnText)
+        val trMsg = buildJsonObject {
+            put("id", if (callId.isNotEmpty()) "toolreturn-$callId" else (ctx.id ?: ""))
+            put("date", withTypeOffset(ctx.created, "tool_return_message"))
+            put("name", toolName?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("message_type", "tool_return_message")
+            put("otid", ctx.projectedOtid?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("tool_call_id", callId)
+            put("status", status)
+            put("tool_return", returnText)
+            put("stdout", JsonNull)
+            put("stderr", JsonNull)
+            put("tool_returns", JsonArray(listOf(tr)))
+        }
+        return listOf(trMsg)
+    }
+
+    /** Assistant / tool: walk parts, grouping consecutive text, dispatching each tool-shaped part. */
+    private fun projectAssistantParts(ctx: ProjCtx, parts: JsonArray): List<JsonObject> {
         val out = ArrayList<JsonObject>()
         val pendingText = StringBuilder()
         var pendingTextStartIndex = -1
         fun flushText() {
             if (pendingText.isEmpty()) return
-            val isFirst = out.isEmpty()
-            out += buildJsonObject {
-                put("id", if (isFirst) (id ?: "") else "$id:assistant:$pendingTextStartIndex")
-                put("date", withTypeOffset(created, "assistant_message"))
-                put("name", JsonNull)
-                put("message_type", "assistant_message")
-                put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
-                put("sender_id", JsonNull)
-                put("step_id", JsonNull)
-                put("is_err", JsonNull)
-                put("seq_id", JsonNull)
-                put("run_id", projectedRunId)
-                put("content", pendingText.toString())
-            }
+            out += buildAssistantText(ctx, out.isEmpty(), pendingTextStartIndex, pendingText.toString())
             pendingText.setLength(0)
             pendingTextStartIndex = -1
         }
@@ -824,52 +876,14 @@ class LocalBackendAdminStore(
 
             if (type == "reasoning" && part["text"]?.stringOrNull() != null) {
                 flushText()
-                val signature = (part["providerMetadata"] as? JsonObject)?.get("signature")?.stringOrNull()
-                out += buildJsonObject {
-                    put("id", "$id:reasoning:$i")
-                    put("date", withTypeOffset(created, "reasoning_message"))
-                    put("name", JsonNull)
-                    put("message_type", "reasoning_message")
-                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
-                    put("sender_id", JsonNull)
-                    put("step_id", JsonNull)
-                    put("is_err", JsonNull)
-                    put("seq_id", JsonNull)
-                    put("run_id", projectedRunId)
-                    put("source", "reasoner_model")
-                    put("reasoning", part["text"]!!.stringOrNull()!!)
-                    put("signature", signature?.let { JsonPrimitive(it) } ?: JsonNull)
-                }
+                out += buildReasoning(ctx, i, part)
                 continue
             }
 
             // Legacy `tool-call` + new camelCase `toolCall`.
             if (type == "tool-call" || type == "toolCall") {
                 flushText()
-                val argsStr = jsonStringifyArgs(part["arguments"])
-                val callId = part["toolCallId"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
-                    ?: part["id"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
-                    ?: ""
-                val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() } ?: "tool"
-                val tc = buildJsonObject {
-                    put("name", name)
-                    put("arguments", argsStr)
-                    put("tool_call_id", callId)
-                }
-                out += buildJsonObject {
-                    put("id", if (callId.isNotEmpty()) "toolcall-$callId" else "$id:tool:$i:call")
-                    put("date", withTypeOffset(created, "tool_call_message"))
-                    put("name", name)
-                    put("message_type", "tool_call_message")
-                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
-                    put("sender_id", JsonNull)
-                    put("step_id", JsonNull)
-                    put("is_err", JsonNull)
-                    put("seq_id", JsonNull)
-                    put("run_id", projectedRunId)
-                    put("tool_call", tc)
-                    put("tool_calls", JsonArray(listOf(tc)))
-                }
+                out += buildToolCall(ctx, i, part)
                 continue
             }
 
@@ -878,112 +892,166 @@ class LocalBackendAdminStore(
                 part["toolCallId"]?.stringOrNull() != null
             ) {
                 flushText()
-                val toolCallId = part["toolCallId"]!!.stringOrNull()!!
-                val toolName = type.substring("tool-".length)
-                val argsStr = jsonStringifyArgs(part["input"])
-                val tc = buildJsonObject {
-                    put("name", toolName)
-                    put("arguments", argsStr)
-                    put("tool_call_id", toolCallId)
-                }
-                out += buildJsonObject {
-                    put("id", "toolcall-$toolCallId")
-                    put("date", withTypeOffset(created, "tool_call_message"))
-                    put("name", toolName)
-                    put("message_type", "tool_call_message")
-                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
-                    put("sender_id", JsonNull)
-                    put("step_id", JsonNull)
-                    put("is_err", JsonNull)
-                    put("seq_id", JsonNull)
-                    put("run_id", projectedRunId)
-                    put("tool_call", tc)
-                    put("tool_calls", JsonArray(listOf(tc)))
-                }
-                val state = part["state"]?.stringOrNull()
-                if (state == "output-available" || state == "output-error" || state == "output-denied") {
-                    val isError = state != "output-available"
-                    val returnText = if (isError) {
-                        part["errorText"]?.stringOrNull() ?: flattenToolOutput(part["output"])
-                    } else {
-                        flattenToolOutput(part["output"])
-                    }
-                    val status = if (isError) "error" else "success"
-                    val tr = buildJsonObject {
-                        put("tool_call_id", toolCallId)
-                        put("status", status)
-                        put("stdout", JsonNull)
-                        put("stderr", JsonNull)
-                        put("func_response", returnText)
-                        put("type", "tool")
-                    }
-                    out += buildJsonObject {
-                        put("id", "toolreturn-$toolCallId")
-                        put("date", withTypeOffset(created, "tool_return_message"))
-                        put("name", toolName)
-                        put("message_type", "tool_return_message")
-                        put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
-                        put("sender_id", JsonNull)
-                        put("step_id", JsonNull)
-                        put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
-                        put("seq_id", JsonNull)
-                        put("run_id", projectedRunId)
-                        put("tool_call_id", toolCallId)
-                        put("status", status)
-                        put("tool_return", returnText)
-                        put("stdout", JsonNull)
-                        put("stderr", JsonNull)
-                        put("tool_returns", JsonArray(listOf(tr)))
-                    }
-                }
+                out += projectNativeToolPart(ctx, type, part)
                 continue
             }
 
             if (type == "tool-return") {
                 flushText()
-                val callId = part["toolCallId"]?.stringOrNull() ?: ""
-                val status = if (part["status"]?.stringOrNull() == "error") "error" else "success"
-                val returnRaw = part["tool_return"]
-                val returnText = when {
-                    returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
-                    returnRaw == null || returnRaw is JsonNull -> "\"\""
-                    else -> returnRaw.toString()
-                }
-                val stdout = toStringArrayOrNull(part["stdout"])
-                val stderr = toStringArrayOrNull(part["stderr"])
-                val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
-                val tr = buildJsonObject {
-                    put("tool_call_id", callId)
-                    put("status", status)
-                    put("stdout", stdout)
-                    put("stderr", stderr)
-                    put("func_response", returnText)
-                    put("type", "tool")
-                }
-                out += buildJsonObject {
-                    put("id", if (callId.isNotEmpty()) "toolreturn-$callId" else "$id:tool:$i:return")
-                    put("date", withTypeOffset(created, "tool_return_message"))
-                    put("name", name?.let { JsonPrimitive(it) } ?: JsonNull)
-                    put("message_type", "tool_return_message")
-                    put("otid", id?.let { JsonPrimitive(it) } ?: JsonNull)
-                    put("sender_id", JsonNull)
-                    put("step_id", JsonNull)
-                    put("is_err", if (part["status"]?.stringOrNull() == "error") JsonPrimitive(true) else JsonNull)
-                    put("seq_id", JsonNull)
-                    put("run_id", projectedRunId)
-                    put("tool_call_id", callId)
-                    put("status", status)
-                    put("tool_return", returnText)
-                    put("stdout", stdout)
-                    put("stderr", stderr)
-                    put("tool_returns", JsonArray(listOf(tr)))
-                }
+                out += buildToolReturnPart(ctx, i, part)
                 continue
             }
             // Unknown tool-shaped part: skip (shim logs + skips).
         }
         flushText()
         return out
+    }
+
+    /** assistant_message wire object for a run of grouped text parts. */
+    private fun buildAssistantText(ctx: ProjCtx, isFirst: Boolean, startIndex: Int, text: String): JsonObject =
+        buildJsonObject {
+            put("id", if (isFirst) (ctx.id ?: "") else "${ctx.id}:assistant:$startIndex")
+            put("date", withTypeOffset(ctx.created, "assistant_message"))
+            put("name", JsonNull)
+            put("message_type", "assistant_message")
+            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("content", text)
+        }
+
+    /** reasoning_message wire object for a `reasoning` part. */
+    private fun buildReasoning(ctx: ProjCtx, i: Int, part: JsonObject): JsonObject {
+        val signature = (part["providerMetadata"] as? JsonObject)?.get("signature")?.stringOrNull()
+        return buildJsonObject {
+            put("id", "${ctx.id}:reasoning:$i")
+            put("date", withTypeOffset(ctx.created, "reasoning_message"))
+            put("name", JsonNull)
+            put("message_type", "reasoning_message")
+            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("source", "reasoner_model")
+            put("reasoning", part["text"]!!.stringOrNull()!!)
+            put("signature", signature?.let { JsonPrimitive(it) } ?: JsonNull)
+        }
+    }
+
+    /** tool_call_message wire object for a legacy `tool-call` / camelCase `toolCall` part. */
+    private fun buildToolCall(ctx: ProjCtx, i: Int, part: JsonObject): JsonObject {
+        val argsStr = jsonStringifyArgs(part["arguments"])
+        val callId = part["toolCallId"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+            ?: part["id"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+            ?: ""
+        val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() } ?: "tool"
+        val tc = toolCallInner(name, argsStr, callId)
+        return buildJsonObject {
+            put("id", if (callId.isNotEmpty()) "toolcall-$callId" else "${ctx.id}:tool:$i:call")
+            put("date", withTypeOffset(ctx.created, "tool_call_message"))
+            put("name", name)
+            put("message_type", "tool_call_message")
+            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("tool_call", tc)
+            put("tool_calls", JsonArray(listOf(tc)))
+        }
+    }
+
+    /** Native `tool-<name>` part: a tool_call_message plus an optional tool_return_message. */
+    private fun projectNativeToolPart(ctx: ProjCtx, type: String, part: JsonObject): List<JsonObject> {
+        val out = ArrayList<JsonObject>()
+        val toolCallId = part["toolCallId"]!!.stringOrNull()!!
+        val toolName = type.substring("tool-".length)
+        val argsStr = jsonStringifyArgs(part["input"])
+        val tc = toolCallInner(toolName, argsStr, toolCallId)
+        out += buildJsonObject {
+            put("id", "toolcall-$toolCallId")
+            put("date", withTypeOffset(ctx.created, "tool_call_message"))
+            put("name", toolName)
+            put("message_type", "tool_call_message")
+            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("tool_call", tc)
+            put("tool_calls", JsonArray(listOf(tc)))
+        }
+        val state = part["state"]?.stringOrNull()
+        if (state == "output-available" || state == "output-error" || state == "output-denied") {
+            val isError = state != "output-available"
+            val returnText = if (isError) {
+                part["errorText"]?.stringOrNull() ?: flattenToolOutput(part["output"])
+            } else {
+                flattenToolOutput(part["output"])
+            }
+            val status = if (isError) "error" else "success"
+            val tr = toolReturnInner(toolCallId, status, JsonNull, JsonNull, returnText)
+            out += buildJsonObject {
+                put("id", "toolreturn-$toolCallId")
+                put("date", withTypeOffset(ctx.created, "tool_return_message"))
+                put("name", toolName)
+                put("message_type", "tool_return_message")
+                put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+                put("sender_id", JsonNull)
+                put("step_id", JsonNull)
+                put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
+                put("seq_id", JsonNull)
+                put("run_id", ctx.projectedRunId)
+                put("tool_call_id", toolCallId)
+                put("status", status)
+                put("tool_return", returnText)
+                put("stdout", JsonNull)
+                put("stderr", JsonNull)
+                put("tool_returns", JsonArray(listOf(tr)))
+            }
+        }
+        return out
+    }
+
+    /** tool_return_message wire object for an explicit `tool-return` part. */
+    private fun buildToolReturnPart(ctx: ProjCtx, i: Int, part: JsonObject): JsonObject {
+        val callId = part["toolCallId"]?.stringOrNull() ?: ""
+        val status = if (part["status"]?.stringOrNull() == "error") "error" else "success"
+        val returnRaw = part["tool_return"]
+        val returnText = when {
+            returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
+            returnRaw == null || returnRaw is JsonNull -> "\"\""
+            else -> returnRaw.toString()
+        }
+        val stdout = toStringArrayOrNull(part["stdout"])
+        val stderr = toStringArrayOrNull(part["stderr"])
+        val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
+        val tr = toolReturnInner(callId, status, stdout, stderr, returnText)
+        return buildJsonObject {
+            put("id", if (callId.isNotEmpty()) "toolreturn-$callId" else "${ctx.id}:tool:$i:return")
+            put("date", withTypeOffset(ctx.created, "tool_return_message"))
+            put("name", name?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("message_type", "tool_return_message")
+            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", if (part["status"]?.stringOrNull() == "error") JsonPrimitive(true) else JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("tool_call_id", callId)
+            put("status", status)
+            put("tool_return", returnText)
+            put("stdout", stdout)
+            put("stderr", stderr)
+            put("tool_returns", JsonArray(listOf(tr)))
+        }
     }
 
     private fun conversationKey(conversationId: String, agentId: String): String =

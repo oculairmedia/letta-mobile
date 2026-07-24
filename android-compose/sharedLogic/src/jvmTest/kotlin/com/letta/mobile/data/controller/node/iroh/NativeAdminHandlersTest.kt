@@ -162,8 +162,8 @@ class NativeAdminHandlersTest {
     private fun router(client: AppServerClient?): AdminRpcRouter {
         val r = AdminRpcRouter()
         // 127.0.0.1:9 (discard) — the shim is UNAVAILABLE in these tests.
-        AgentAdminHandlers.register(r, "http://127.0.0.1:9", controller = null, nativeClient = client)
-        ConversationAdminHandlers.register(r, "http://127.0.0.1:9", nativeClient = client)
+        AgentAdminHandlers.register(r, "http://127.0.0.1:9", controller = null, tiers = NativeReadTiers(nativeClient = client))
+        ConversationAdminHandlers.register(r, "http://127.0.0.1:9", tiers = NativeReadTiers(nativeClient = client))
         return r
     }
 

@@ -19,12 +19,12 @@ object AgentAdminHandlers {
         router: AdminRpcRouter,
         adminBaseUrl: String,
         controller: AppServerController? = null,
-        nativeClient: AppServerClient? = null,
-        // lgns8.9: when configured, read agent.list from the on-disk backend store
-        // directly (retiring the shim proxy for that read). Null = disabled = the
-        // pre-lgns8.9 proxy behavior, so production is unaffected until enabled.
-        localStore: LocalBackendAdminStore? = null,
+        // The native read tiers reads try before the shim proxy: the App Server
+        // client, and (lgns8.9) the on-disk backend store for ported reads.
+        tiers: NativeReadTiers = NativeReadTiers(),
     ) {
+        val nativeClient = tiers.nativeClient
+        val localStore = tiers.localStore
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("agent.list") { params ->
             // letta-mobile-71orq: forward pagination params so the client can page
