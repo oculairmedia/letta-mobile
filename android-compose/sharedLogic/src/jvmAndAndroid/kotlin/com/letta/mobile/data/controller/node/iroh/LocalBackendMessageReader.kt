@@ -83,7 +83,16 @@ internal class LocalBackendMessageReader(private val support: LocalBackendStoreS
 
     private data class CachedMessageData(val signature: String, val data: MessageData)
 
-    private val messageCache = java.util.concurrent.ConcurrentHashMap<String, CachedMessageData>()
+    // P3.2: access-ordered LRU (evict the single least-recently-used entry on
+    // overflow) instead of clearing the whole map, which caused a thundering-herd
+    // re-parse of every hot conversation on the (MAX+1)th distinct conversation.
+    private val messageCache: MutableMap<String, CachedMessageData> =
+        java.util.Collections.synchronizedMap(
+            object : LinkedHashMap<String, CachedMessageData>(16, 0.75f, true) {
+                override fun removeEldestEntry(eldest: Map.Entry<String, CachedMessageData>): Boolean =
+                    size > MESSAGE_CACHE_MAX
+            },
+        )
 
     /**
      * lgns8.9: cache the parsed transcript + sidecar maps per conversation, keyed
@@ -108,7 +117,7 @@ internal class LocalBackendMessageReader(private val support: LocalBackendStoreS
                 runIds = readRunIdsByMessageId(agentId, internalConvId),
             ),
         )
-        if (messageCache.size > MESSAGE_CACHE_MAX) messageCache.clear()
+        // LRU eviction is handled by removeEldestEntry on insert.
         messageCache[key] = CachedMessageData(sig, data)
         return data
     }
