@@ -356,58 +356,84 @@ class LocalAndroidNetworkBridge @Inject constructor(
             var currentBody = bodyText
             var hop = 0
             while (true) {
-                val connection = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = currentMethod
-                    connectTimeout = FETCH_CONNECT_TIMEOUT_MS
-                    readTimeout = FETCH_READ_IDLE_TIMEOUT_MS
-                    instanceFollowRedirects = false
-                    headers.forEach { (key, value) ->
-                        if (key.lowercase(Locale.US) !in BLOCKED_REQUEST_HEADERS) {
-                            setRequestProperty(key, value)
-                        }
-                    }
-                    if (currentBody != null && currentMethod in METHODS_WITH_BODY) {
-                        doOutput = true
-                        val bytes = currentBody!!.toByteArray(Charsets.UTF_8)
-                        if (bytes.size > MAX_REQUEST_BODY_BYTES) {
-                            throw IllegalArgumentException("Request body too large.")
-                        }
-                        outputStream.use { it.write(bytes) }
-                    }
-                }
+                val connection = openFetchConnection(currentUrl, currentMethod, headers, currentBody)
                 val status = connection.responseCode
-                if (status in 300..399 && status != 304) {
-                    val location = connection.getHeaderField("Location")
-                    connection.disconnect()
-                    if (location.isNullOrBlank()) {
-                        throw IllegalStateException("Redirect response missing Location header.")
-                    }
-                    hop += 1
-                    if (hop > MAX_REDIRECT_HOPS) {
-                        throw IllegalStateException("Too many redirects.")
-                    }
-                    val nextUri = runCatching { URI(currentUrl).resolve(location) }.getOrNull()
-                    if (nextUri == null || nextUri.scheme?.lowercase(Locale.US) !in setOf("http", "https") || nextUri.host.isNullOrBlank()) {
-                        throw IllegalStateException("Redirect to unsupported target: $location")
-                    }
-                    if (BridgeEgressGuard.isBlockedHost(nextUri.host)) {
-                        output.writeJsonResponse(403, errorBody("blocked_host", "Redirect to ${nextUri.host} is not allowed."))
-                        throw BridgeResponseStartedException(IllegalStateException("blocked redirect target"))
-                    }
-                    // 303, and 301/302 for non-HEAD, downgrade to a bodyless GET per
-                    // the HTTP redirect semantics browsers follow; 307/308 preserve
-                    // the original method and body.
-                    if (status == 303 || ((status == 301 || status == 302) && currentMethod != "HEAD")) {
-                        currentMethod = "GET"
-                        currentBody = null
-                    }
-                    currentUrl = nextUri.toString()
-                    continue
+                if (!isRedirectStatus(status)) {
+                    streamFetchResponse(output, connection)
+                    return
                 }
-                streamFetchResponse(output, connection)
-                return
+                val location = connection.getHeaderField("Location")
+                connection.disconnect()
+                if (location.isNullOrBlank()) {
+                    throw IllegalStateException("Redirect response missing Location header.")
+                }
+                hop += 1
+                if (hop > MAX_REDIRECT_HOPS) {
+                    throw IllegalStateException("Too many redirects.")
+                }
+                val nextUri = resolveRedirectTarget(currentUrl, location)
+                    ?: throw IllegalStateException("Redirect to unsupported target: $location")
+                if (BridgeEgressGuard.isBlockedHost(nextUri.host)) {
+                    output.writeJsonResponse(403, errorBody("blocked_host", "Redirect to ${nextUri.host} is not allowed."))
+                    throw BridgeResponseStartedException(IllegalStateException("blocked redirect target"))
+                }
+                if (shouldDowngradeToGet(status, currentMethod)) {
+                    currentMethod = "GET"
+                    currentBody = null
+                }
+                currentUrl = nextUri.toString()
             }
         }
+
+        /** Opens a redirect-disabled connection with the bridge's timeouts, header allow-list, and bounded body. */
+        private fun openFetchConnection(
+            url: String,
+            method: String,
+            headers: List<Pair<String, String>>,
+            bodyText: String?,
+        ): HttpURLConnection =
+            (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = FETCH_CONNECT_TIMEOUT_MS
+                readTimeout = FETCH_READ_IDLE_TIMEOUT_MS
+                instanceFollowRedirects = false
+                headers.forEach { (key, value) ->
+                    if (key.lowercase(Locale.US) !in BLOCKED_REQUEST_HEADERS) {
+                        setRequestProperty(key, value)
+                    }
+                }
+                if (bodyText != null && method in METHODS_WITH_BODY) {
+                    doOutput = true
+                    val bytes = bodyText.toByteArray(Charsets.UTF_8)
+                    if (bytes.size > MAX_REQUEST_BODY_BYTES) {
+                        throw IllegalArgumentException("Request body too large.")
+                    }
+                    outputStream.use { it.write(bytes) }
+                }
+            }
+
+        /** A redirect we must follow (and re-validate): any 3xx except 304 Not Modified. */
+        private fun isRedirectStatus(status: Int): Boolean = status in 300..399 && status != 304
+
+        /**
+         * Resolves a Location header against the current URL and enforces the http(s)+host
+         * shape. Returns null when the target is unusable so the caller rejects it; note the
+         * egress block-list check is applied by the caller on the returned host.
+         */
+        private fun resolveRedirectTarget(currentUrl: String, location: String): URI? {
+            val nextUri = runCatching { URI(currentUrl).resolve(location) }.getOrNull() ?: return null
+            if (nextUri.scheme?.lowercase(Locale.US) !in setOf("http", "https") || nextUri.host.isNullOrBlank()) {
+                return null
+            }
+            return nextUri
+        }
+
+        /**
+         * 303, and 301/302 for non-HEAD, downgrade to a bodyless GET per the HTTP redirect
+         * semantics browsers follow; 307/308 preserve the original method and body.
+         */
+        private fun shouldDowngradeToGet(status: Int, method: String): Boolean =
+            status == 303 || ((status == 301 || status == 302) && method != "HEAD")
 
         private fun streamFetchResponse(output: OutputStream, connection: HttpURLConnection) {
             connection.useResponse { input ->
