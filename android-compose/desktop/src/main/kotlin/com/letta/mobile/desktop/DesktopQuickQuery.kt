@@ -142,13 +142,25 @@ internal fun DesktopQuickQueryWindow(coordinator: DesktopQuickQueryCoordinator) 
         title = "Letta Quick Query",
     ) {
         DisposableEffect(window) {
+            // Close on click-away — but only once the window has actually held
+            // focus. Windows' foreground-lock can deny focus to a window opened
+            // from a background process; a naive lost-focus close then fires
+            // before the bar even paints and it appears to never open.
+            var hadFocus = false
             val listener = object : WindowFocusListener {
-                override fun windowGainedFocus(event: WindowEvent?) = Unit
+                override fun windowGainedFocus(event: WindowEvent?) {
+                    hadFocus = true
+                }
+
                 override fun windowLostFocus(event: WindowEvent?) {
-                    coordinator.close()
+                    if (hadFocus) coordinator.close()
                 }
             }
             window.addWindowFocusListener(listener)
+            // Best-effort focus grab; if the OS denies it the bar stays
+            // visible (always-on-top) awaiting a click.
+            window.toFront()
+            window.requestFocus()
             onDispose { window.removeWindowFocusListener(listener) }
         }
         // Each Compose window is its own composition root: Jewel/Material
