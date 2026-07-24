@@ -10,9 +10,12 @@ object ConversationAdminHandlers {
         adminBaseUrl: String,
         nativeClient: AppServerClient? = null,
         shimRetired: Boolean = false,
+        // lgns8.9: on-disk backend store; when set, conversation.list serves from
+        // disk (native tier) ahead of the shim proxy. Null = disabled = proxy only.
+        localStore: LocalBackendAdminStore? = null,
     ) {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        registerConversationReadRoutes(router, api, nativeClient)
+        registerConversationReadRoutes(router, api, nativeClient, localStore)
         registerConversationWriteRoutes(router, api, nativeClient, shimRetired)
         registerMessageRoutes(router, api, nativeClient)
     }
@@ -21,6 +24,7 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
+        localStore: LocalBackendAdminStore?,
     ) {
         router.register("conversation.list") { params ->
             val agentId = param(params, AdminParamKey("agent_id"))
@@ -40,7 +44,17 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (response.success) response.conversations ?: JsonArray(emptyList()) else null
-            } ?: run {
+            }
+                // lgns8.9 native-store tier: serve from disk (null on any error),
+                // else fall through to the shim proxy. Verified to match the shim's
+                // withRealTimes ordering byte-for-byte on the live store.
+                ?: localStore?.listConversationsProjected(
+                    agentId = agentId,
+                    archiveStatus = param(params, AdminParamKey("archive_status")),
+                    limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
+                    offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
+                )
+                ?: run {
                 // #962: the App Server only serves the flat GET /v1/conversations
                 // route, filtering by an agent_id query param; the agent-scoped
                 // /v1/agents/{id}/conversations route is not registered and 404s.

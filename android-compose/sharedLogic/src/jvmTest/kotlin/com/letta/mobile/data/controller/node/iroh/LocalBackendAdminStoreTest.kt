@@ -125,6 +125,61 @@ class LocalBackendAdminStoreTest {
         assertEquals(0, store.listAgentsProjected(null, null)!!.size)
     }
 
+    private fun b64u(s: String): String =
+        java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(s.toByteArray())
+
+    private fun writeConversation(base: File, key: String, json: String, realTimesJsonl: String? = null) {
+        val dir = File(base, "conversations/${b64u(key)}").apply { mkdirs() }
+        File(dir, "conversation.json").writeText(json)
+        if (realTimesJsonl != null) File(dir, "_real-times.jsonl").writeText(realTimesJsonl)
+    }
+
+    @Test
+    fun `conversation list projects wire shape, applies sidecar times, and orders by recency`() {
+        val base = tempStore()
+        // Default conv with a SENTINEL last_message_at, but a real sidecar time -> should sort newest.
+        writeConversation(
+            base, "default:agent-1",
+            """{"id":"default","agent_id":"agent-1","created_at":"2025-01-01T00:00:00.000Z","last_message_at":"2026-01-01T00:00:05.000Z","summary":"s"}""",
+            realTimesJsonl = """{"id":"m1","iso":"2025-06-01T12:00:00.000Z"}
+{"id":"m2","iso":"2025-09-09T09:00:00.000Z"}""",
+        )
+        // A real conversation with an older explicit last_message_at.
+        writeConversation(
+            base, "conversation:conv-abc",
+            """{"id":"conv-abc","agent_id":"agent-1","last_message_at":"2025-03-03T03:00:00.000Z"}""",
+        )
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val convs = store.listConversationsProjected(agentId = "agent-1", archiveStatus = "active", limit = null, offset = null)!!
+        assertEquals(2, convs.size)
+        // Order: default (sidecar max 2025-09-09) before conv-abc (2025-03-03).
+        assertEquals("conv-default-agent-1", convs[0].jsonObject["id"]!!.jsonPrimitive.content)
+        assertEquals("2025-09-09T09:00:00.000Z", convs[0].jsonObject["last_message_at"]!!.jsonPrimitive.content)
+        assertEquals("conv-abc", convs[1].jsonObject["id"]!!.jsonPrimitive.content)
+        // Locked translate invariants.
+        assertEquals("user-00000000-0000-4000-8000-000000000000", convs[0].jsonObject["created_by_id"]!!.jsonPrimitive.content)
+        assertEquals(JsonNull, convs[0].jsonObject["model"])
+        assertEquals(0, (convs[0].jsonObject["isolated_block_ids"] as JsonArray).size)
+    }
+
+    @Test
+    fun `conversation list filters archived and scopes to the agent`() {
+        val base = tempStore()
+        writeConversation(base, "conversation:c-active", """{"id":"c-active","agent_id":"agent-1","last_message_at":"2025-02-02T00:00:00.000Z"}""")
+        writeConversation(base, "conversation:c-arch", """{"id":"c-arch","agent_id":"agent-1","archived":true,"last_message_at":"2025-02-02T00:00:00.000Z"}""")
+        writeConversation(base, "conversation:c-other", """{"id":"c-other","agent_id":"agent-2","last_message_at":"2025-02-02T00:00:00.000Z"}""")
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+
+        val active = store.listConversationsProjected("agent-1", "active", null, null)!!
+        assertEquals(listOf("c-active"), active.map { it.jsonObject["id"]!!.jsonPrimitive.content })
+
+        val archived = store.listConversationsProjected("agent-1", "archived", null, null)!!
+        assertEquals(listOf("c-arch"), archived.map { it.jsonObject["id"]!!.jsonPrimitive.content })
+
+        val all = store.listConversationsProjected("agent-1", "all", null, null)!!.map { it.jsonObject["id"]!!.jsonPrimitive.content }.toSet()
+        assertEquals(setOf("c-active", "c-arch"), all) // agent-2's conv excluded by scope
+    }
+
     @Test
     fun `skips malformed agent json without failing the whole list`() {
         val base = tempStore()

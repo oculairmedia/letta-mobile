@@ -85,7 +85,7 @@ object AdminRpcRegistry {
         HealthAdminHandlers.register(router, rpcBase, controller)
         AgentAdminHandlers.register(router, rpcBase, controller, nativeClient, localStore)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase, nativeClient, shimRetired)
+        ConversationAdminHandlers.register(router, rpcBase, nativeClient, shimRetired, localStore)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, adminRestBase)
         ArchiveAdminHandlers.register(router, adminRestBase)

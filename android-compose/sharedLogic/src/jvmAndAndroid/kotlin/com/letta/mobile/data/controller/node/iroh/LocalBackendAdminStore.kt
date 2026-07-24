@@ -13,6 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
 import java.security.MessageDigest
+import java.util.Base64
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
@@ -238,6 +239,164 @@ class LocalBackendAdminStore(
         }
     }
 
+    /**
+     * Port of admin-shim `GET /v1/conversations` (handleConversationsList):
+     * read the conversation records (agent-scoped or all), apply the withRealTimes
+     * ordering overlay, filter by archive status, sort by last_message_at desc, page,
+     * and project each via conversationToLetta. Returns null on any error so the
+     * caller falls back to the shim proxy.
+     *
+     * NOTE: no cache here — correctness first. Callers must gate live use on the
+     * measured latency over the real store (~1.4k conversations); a bounded TTL
+     * cache is the follow-up if the uncached scan is too slow to serve on poll.
+     */
+    fun listConversationsProjected(
+        agentId: String?,
+        archiveStatus: String?,
+        limit: Int?,
+        offset: Int?,
+    ): JsonArray? = runCatching {
+        val status = archiveStatus?.takeIf { it in ARCHIVE_STATUSES } ?: "active"
+        val convs = readConversations(agentId)
+            .map { withRealTimes(it) }
+            .filter { c ->
+                val archived = c.archived == true
+                when (status) {
+                    "archived" -> archived
+                    "all" -> true
+                    else -> !archived
+                }
+            }
+            .sortedWith(compareByDescending { it.lastMessageAt ?: "" })
+        val from = (offset ?: 0).coerceAtLeast(0)
+        val windowed = if (from >= convs.size) {
+            emptyList()
+        } else {
+            val end = if (limit != null) (from + limit.coerceAtLeast(0)).coerceAtMost(convs.size) else convs.size
+            convs.subList(from, end)
+        }
+        buildJsonArray { windowed.forEach { add(conversationToLetta(it)) } }
+    }.getOrNull()
+
+    private data class ConvRecord(
+        val id: String,
+        val agentId: String,
+        val createdAt: String?,
+        val updatedAt: String?,
+        val lastMessageAt: String?,
+        val summary: String?,
+        val archived: Boolean?,
+        val archivedAt: String?,
+        val inContextMessageIds: JsonArray,
+        val raw: JsonObject,
+    )
+
+    /**
+     * Port of store.ts listConversationsForAgent / listAllConversations. Scans
+     * conversations/<b64url(key)>/conversation.json; when agentId is given, keep
+     * only that agent's records (key `default:<agentId>` or any `conversation:`
+     * whose agent_id matches).
+     */
+    private fun readConversations(agentId: String?): List<ConvRecord> {
+        val root = File(baseDir, "conversations")
+        val dirs = root.listFiles { f -> f.isDirectory } ?: return emptyList()
+        val out = ArrayList<ConvRecord>()
+        for (d in dirs) {
+            val key = runCatching { b64UrlDecode(d.name) }.getOrNull() ?: continue
+            if (agentId != null && key != "default:$agentId" && !key.startsWith("conversation:")) continue
+            val obj = runCatching {
+                File(d, "conversation.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+            }.getOrNull() ?: continue
+            val convId = obj["id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
+            val convAgent = obj["agent_id"]?.jsonPrimitive?.contentOrNullSafe() ?: continue
+            if (agentId != null && convAgent != agentId) continue
+            out += ConvRecord(
+                id = convId,
+                agentId = convAgent,
+                createdAt = obj["created_at"]?.stringOrNull(),
+                updatedAt = obj["updated_at"]?.stringOrNull(),
+                lastMessageAt = obj["last_message_at"]?.stringOrNull(),
+                summary = obj["summary"]?.stringOrNull(),
+                archived = (obj["archived"] as? JsonPrimitive)?.let { if (it.isString) null else it.content.toBooleanStrictOrNull() },
+                archivedAt = obj["archived_at"]?.stringOrNull(),
+                inContextMessageIds = obj["in_context_message_ids"] as? JsonArray ?: JsonArray(emptyList()),
+                raw = obj,
+            )
+        }
+        return out
+    }
+
+    /**
+     * Port of store.ts withRealTimes: overlay the sidecar max message time. If the
+     * on-disk last/updated are CLI sentinels (2026-01-01T...), substitute
+     * max -> created_at -> (skipped: current time, unavailable deterministically);
+     * bump last/updated to the sidecar max when it is greater.
+     */
+    private fun withRealTimes(c: ConvRecord): ConvRecord {
+        val max = maxRealMessageTime(c.id, c.agentId)
+        var last = c.lastMessageAt ?: ""
+        var updated = c.updatedAt ?: ""
+        val created = c.createdAt ?: ""
+        if (isSentinelDate(last)) last = max.ifEmpty { created }
+        if (isSentinelDate(updated)) updated = max.ifEmpty { created }
+        if (max.isNotEmpty() && max > last) last = max
+        if (max.isNotEmpty() && max > updated) updated = max
+        return c.copy(lastMessageAt = last.ifEmpty { c.lastMessageAt }, updatedAt = updated.ifEmpty { c.updatedAt })
+    }
+
+    /** Port of maxRealMessageTime: legacy _real-times.json map, then overlay _real-times.jsonl (later wins), max iso. */
+    private fun maxRealMessageTime(conversationId: String, agentId: String): String {
+        val dir = File(File(baseDir, "conversations"), b64UrlEncode(conversationKey(conversationId, agentId)))
+        val map = HashMap<String, String>()
+        runCatching {
+            File(dir, "_real-times.json").takeIf { it.isFile }?.readText()?.let { json.parseToJsonElement(it).jsonObject }
+                ?.forEach { (k, v) -> (v as? JsonPrimitive)?.takeIf { it.isString }?.let { map[k] = it.content } }
+        }
+        runCatching {
+            File(dir, "_real-times.jsonl").takeIf { it.isFile }?.forEachLine { line ->
+                val t = line.trim()
+                if (t.isEmpty()) return@forEachLine
+                runCatching {
+                    val o = json.parseToJsonElement(t).jsonObject
+                    val id = o["id"]?.jsonPrimitive?.contentOrNullSafe()
+                    val iso = o["iso"]?.jsonPrimitive?.contentOrNullSafe()
+                    if (id != null && iso != null) map[id] = iso
+                }
+            }
+        }
+        var max = ""
+        for (iso in map.values) if (iso > max) max = iso
+        return max
+    }
+
+    private fun conversationToLetta(c: ConvRecord): JsonObject = buildJsonObject {
+        put("id", if (c.id == "default") "conv-default-${c.agentId}" else c.id)
+        put("agent_id", c.agentId)
+        put("created_at", c.createdAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("updated_at", c.updatedAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("last_message_at", c.lastMessageAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("created_by_id", CANNED_USER_ID)
+        put("last_updated_by_id", CANNED_USER_ID)
+        put("summary", c.summary?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("archived", c.archived?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("archived_at", c.archivedAt?.let { JsonPrimitive(it) } ?: JsonNull)
+        put("in_context_message_ids", c.inContextMessageIds)
+        put("isolated_block_ids", JsonArray(emptyList()))
+        put("model", JsonNull)
+        put("model_settings", JsonNull)
+    }
+
+    private fun conversationKey(conversationId: String, agentId: String): String =
+        if (conversationId == "default") "default:$agentId" else "conversation:$conversationId"
+
+    private fun b64UrlEncode(value: String): String =
+        Base64.getUrlEncoder().withoutPadding().encodeToString(value.toByteArray(Charsets.UTF_8))
+
+    private fun b64UrlDecode(value: String): String =
+        String(Base64.getUrlDecoder().decode(value), Charsets.UTF_8)
+
+    private fun isSentinelDate(iso: String): Boolean = iso.startsWith("2026-01-01T")
+
     private fun parseModelHandle(handle: String): Pair<String, String> {
         val idx = handle.indexOf('/')
         return if (idx < 0) "unknown" to handle else handle.substring(0, idx) to handle.substring(idx + 1)
@@ -268,6 +427,9 @@ class LocalBackendAdminStore(
     companion object {
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"
         const val DEFAULT_MODEL_HANDLE = "lmstudio/opus-4-7"
+        private val ARCHIVE_STATUSES = setOf("active", "archived", "all")
+        // admin-shim translate.ts: canned user uuid for created_by/last_updated_by.
+        private val CANNED_USER_ID = JsonPrimitive("user-00000000-0000-4000-8000-000000000000")
         private val ISO_MILLIS: DateTimeFormatter =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     }
