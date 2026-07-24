@@ -2,7 +2,11 @@ package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolResultContent
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -78,6 +82,18 @@ class AppServerTurnEngine(
      */
     private val turnIdleTimeoutMs: Long = DEFAULT_TURN_IDLE_TIMEOUT_MS,
     private val terminalSettleQuietMs: Long = DEFAULT_TERMINAL_SETTLE_QUIET_MS,
+    /**
+     * lgns8.17: controller-owned external tools. letta-code's App-Server (WS)
+     * route does NOT self-execute tool calls — it emits external_tool_call_request
+     * and BLOCKS the turn until it receives a matched external_tool_call_response
+     * (matched by request_id; content irrelevant). If a request goes unanswered
+     * the turn hangs until the idle watchdog force-fails it. This registry (when
+     * wired) executes controller-owned tools; either way the engine GUARANTEES a
+     * matched response for every request (a synthesized is_error response when no
+     * handler exists), which is the machinery lettashim used to provide. Null =
+     * no controller tools, so every request still gets a benign error response.
+     */
+    private val externalToolRegistry: ExternalToolRegistry? = null,
 ) : TurnEngine {
     private val activeTurn = Mutex()
     private var runtime: AppServerRuntimeScope? = null
@@ -90,6 +106,55 @@ class AppServerTurnEngine(
     fun invalidateRuntime() {
         runtime = null
     }
+
+    /**
+     * lgns8.17: answer an external_tool_call_request so the App Server unblocks
+     * the turn. Executes the tool via the wired [externalToolRegistry] when it
+     * advertises it; otherwise (no registry, unknown tool, or a thrown handler)
+     * synthesizes a matched is_error response. Matching is by request_id — the
+     * ONLY correlation key the App Server uses (the response carries request_id,
+     * not tool_call_id). Fire-and-forget one-way send: any send failure is logged,
+     * never rethrown, so it can't break the turn's event collector. If the
+     * connection has since dropped the send is lost, but the App Server re-emits
+     * the still-blocking request on reconnect/sync, so the next collect re-answers.
+     */
+    private suspend fun guaranteeExternalToolResponse(request: AppServerInboundFrame.ExternalToolCallRequest) {
+        val result: AppServerExternalToolResult = try {
+            when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
+                is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
+                is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
+                null -> toolResult(
+                    "external tool '${request.toolName}' is not handled by this controller",
+                    isError = true,
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            toolResult(
+                "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
+                isError = true,
+            )
+        }
+        Telemetry.event(
+            "AppServerTurnEngine", "externalTool.responded",
+            "requestId" to request.requestId,
+            "toolCallId" to request.toolCallId,
+            "toolName" to request.toolName,
+            "isError" to (result.isError == true).toString(),
+            "handled" to (externalToolRegistry != null).toString(),
+        )
+        runCatching {
+            client.sendExternalToolResponse(
+                AppServerCommand.ExternalToolCallResponse(requestId = request.requestId, result = result),
+            )
+        }.onFailure { Telemetry.error("AppServerTurnEngine", "externalTool.responseSendFailed", it) }
+    }
+
+    private fun toolResult(text: String, isError: Boolean) = AppServerExternalToolResult(
+        content = listOf(AppServerExternalToolResultContent(type = "text", text = text)),
+        isError = isError,
+    )
 
     /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY owner identity for the currently held
@@ -558,6 +623,16 @@ class AppServerTurnEngine(
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
+                // lgns8.17: GUARANTEE a matched external_tool_call_response. The
+                // App Server blocks the turn until every external_tool_call_request
+                // is answered by request_id; the mapper below only turns it into a
+                // UI ToolCallObserved draft and never replies, so an unanswered
+                // request hangs the turn (0 deltas until the idle watchdog fails
+                // it). Reply here — this is the one place the raw frame still
+                // carries request_id (toToolCallDraft discards it) and the client
+                // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
+                (received.frame as? AppServerInboundFrame.ExternalToolCallRequest)
+                    ?.let { guaranteeExternalToolResponse(it) }
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the

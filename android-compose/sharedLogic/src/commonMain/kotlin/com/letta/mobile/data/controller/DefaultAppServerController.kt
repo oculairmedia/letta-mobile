@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller
 
+import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
@@ -44,6 +45,13 @@ class DefaultAppServerController(
      * cleared wholesale on [onTransportDisconnected].
      */
     private val runtimeRegistry: RuntimeRegistry? = null,
+    /**
+     * lgns8.17: controller-owned external tools, forwarded to the turn engine so
+     * every external_tool_call_request the App Server emits gets a matched
+     * response (executed when advertised here, otherwise a synthesized is_error)
+     * and tool-call turns never hang. Null = no controller tools.
+     */
+    private val externalToolRegistry: ExternalToolRegistry? = null,
     private val clock: Clock = Clock.System,
 ) : AppServerController {
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
@@ -70,6 +78,7 @@ class DefaultAppServerController(
                     ?: AppServerPermissionMode.Standard
             },
             requestIdFactory = requestIdFactory,
+            externalToolRegistry = externalToolRegistry,
         )
     }
 
