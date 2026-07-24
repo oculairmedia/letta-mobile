@@ -8,19 +8,24 @@ object ConversationAdminHandlers {
     fun register(
         router: AdminRpcRouter,
         adminBaseUrl: String,
-        nativeClient: AppServerClient? = null,
+        // The native read tiers reads try before the shim proxy: the App Server
+        // client, and (lgns8.9) the on-disk backend store for ported reads.
+        tiers: NativeReadTiers = NativeReadTiers(),
         shimRetired: Boolean = false,
     ) {
+        val nativeClient = tiers.nativeClient
+        val localStore = tiers.localStore
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        registerConversationReadRoutes(router, api, nativeClient)
+        registerConversationReadRoutes(router, api, nativeClient, localStore)
         registerConversationWriteRoutes(router, api, nativeClient, shimRetired)
-        registerMessageRoutes(router, api, nativeClient)
+        registerMessageRoutes(router, api, nativeClient, localStore)
     }
 
     private fun registerConversationReadRoutes(
         router: AdminRpcRouter,
         api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
+        localStore: LocalBackendAdminStore?,
     ) {
         router.register("conversation.list") { params ->
             val agentId = param(params, AdminParamKey("agent_id"))
@@ -40,7 +45,29 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (response.success) response.conversations ?: JsonArray(emptyList()) else null
-            } ?: run {
+            }
+                // lgns8.9 native-store tier: serve from disk (null on any error),
+                // else fall through to the shim proxy. Verified to match the shim's
+                // withRealTimes ordering byte-for-byte on the live store.
+                //
+                // The local store only implements the shim's default shape (agent
+                // scope + archive_status filter, last_message_at desc, offset/limit).
+                // If the caller supplies a query shape it cannot honor — a cursor
+                // (`after`), text search (`summary_search`), or a custom
+                // `order`/`order_by` — DON'T serve a wrong-ordered/wrong-page result
+                // from disk; bypass the local tier so the native/proxy path (which
+                // forwards those params) handles it. (CodeRabbit #998.)
+                ?: (if (conversationListLocallyServable(params)) {
+                    localStore?.listConversationsProjected(
+                        agentId = agentId,
+                        archiveStatus = param(params, AdminParamKey("archive_status")),
+                        limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
+                        offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
+                    )
+                } else {
+                    null
+                })
+                ?: run {
                 // #962: the App Server only serves the flat GET /v1/conversations
                 // route, filtering by an agent_id query param; the agent-scoped
                 // /v1/agents/{id}/conversations route is not registered and 404s.
@@ -154,6 +181,9 @@ object ConversationAdminHandlers {
         router: AdminRpcRouter,
         api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
+        // lgns8.9 slice 3: on-disk backend store; when set, message.list serves
+        // already-projected wire messages from disk ahead of the shim proxy.
+        localStore: LocalBackendAdminStore? = null,
     ) {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
@@ -179,7 +209,23 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (native.success) native.messages else null
-            } ?: api.get(
+            }
+            // lgns8.9 slice 3 native-store tier: serve already-projected wire
+            // messages from disk (null on any error → fall through to the shim
+            // proxy). Mirrors the shim /messages route (limit/before/order;
+            // `after` and in-flight filtering intentionally omitted — see
+            // LocalBackendAdminStore.listMessagesProjected).
+                ?: localStore?.listMessagesProjected(
+                    convId,
+                    param(params, AdminParamKey("agent_id")),
+                    MessagePage(
+                        limit = effectiveLimit.toIntOrNull(),
+                        before = param(params, AdminParamKey("before")),
+                        after = param(params, AdminParamKey("after")),
+                        order = param(params, AdminParamKey("order")),
+                    ),
+                )
+                ?: api.get(
                 AdminPath.v1("conversations", convId, "messages").builder()
                     .query("limit", effectiveLimit)
                     .query("after", param(params, AdminParamKey("after")))
@@ -232,6 +278,20 @@ object ConversationAdminHandlers {
             adminError("forbidden: conversation out of authorized scope")
         }
     }
+
+    /**
+     * lgns8.9 (CodeRabbit #998): the on-disk conversation.list tier only implements
+     * the shim's default shape — agent scope + archive_status filter, last_message_at
+     * DESC, offset/limit. It cannot honor a cursor (`after`), text search
+     * (`summary_search`), or a caller-chosen `order`/`order_by`. When any of those is
+     * supplied, decline the local tier so the native/proxy path (which forwards them)
+     * serves the request, rather than returning a wrong-ordered/wrong-page result.
+     */
+    private fun conversationListLocallyServable(params: kotlinx.serialization.json.JsonObject?): Boolean =
+        param(params, AdminParamKey("after")).isNullOrBlank() &&
+            param(params, AdminParamKey("summary_search")).isNullOrBlank() &&
+            param(params, AdminParamKey("order")).isNullOrBlank() &&
+            param(params, AdminParamKey("order_by")).isNullOrBlank()
 
     /**
      * letta-mobile-8vplf: handler-level parameter errors previously returned a

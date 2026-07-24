@@ -112,7 +112,7 @@ class ControlCapabilityHandlersTest {
         HealthAdminHandlers.register(r, "http://127.0.0.1:9", controller)
         ModelAdminHandlers.register(r, "http://127.0.0.1:9", client)
         SkillAdminHandlers.register(r, "http://127.0.0.1:9", client)
-        ConversationAdminHandlers.register(r, "http://127.0.0.1:9", client, shimRetired)
+        ConversationAdminHandlers.register(r, "http://127.0.0.1:9", NativeReadTiers(nativeClient = client), shimRetired)
         return r
     }
 
