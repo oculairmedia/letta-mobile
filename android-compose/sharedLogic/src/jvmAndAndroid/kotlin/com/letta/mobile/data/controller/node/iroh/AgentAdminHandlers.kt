@@ -100,10 +100,20 @@ object AgentAdminHandlers {
             // memory strings), but a memory-heavy agent can carry large system_prompt/
             // core_memory blocks that push a full response over the frame cap. Bound
             // oversized string fields so context always hydrates.
+            //
+            // Additionally, /context inlines the ENTIRE in-context `messages` array
+            // (e.g. 27,868 messages / ~96MB on a large conversation), which the
+            // client's ContextWindowOverview never reads (it consumes only the
+            // counts; the transcript loads via message.list) and which alone blows
+            // the 1MiB admin_rpc frame (response_too_large — observed live on the
+            // 87MB conversation). Drop it before bounding the remaining strings.
             MessageListPageGuard.boundObjectStringFields(
-                api.get(AdminPath.v1("agents", id, "context")) {
-                    query("conversation_id", param(params, AdminParamKey("conversation_id")))
-                }
+                MessageListPageGuard.dropField(
+                    api.get(AdminPath.v1("agents", id, "context")) {
+                        query("conversation_id", param(params, AdminParamKey("conversation_id")))
+                    },
+                    "messages",
+                )
             )
         }
     }
