@@ -3,6 +3,8 @@ package com.letta.mobile.desktop
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -233,11 +236,18 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                     JewelTextField(
                         value = query,
                         onValueChange = { query = it },
-                        placeholder = { Text("Search agents, or ask anything…") },
+                        placeholder = {
+                            // Explicit compact style: the M3 default leaks a
+                            // larger size into Jewel's text slot and clips
+                            // the placeholder's descenders.
+                            Text(
+                                text = "Search agents, or ask anything…",
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            // Without a real min height the field hugs the text
-                            // and clips descenders in the placeholder.
                             .heightIn(min = 40.dp)
                             .focusRequester(focusRequester)
                             .onPreviewKeyEvent { event ->
@@ -266,6 +276,21 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                 }
                 QuickQueryDivider()
                 LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+                    // Element-style "recently viewed" strip: the most recent
+                    // agents as avatar chips, pinned above the result groups.
+                    val recentAgents = items.filter { it.kind == PaletteItemKind.Agent }
+                        .take(QUICK_QUERY_RECENT_AGENTS_LIMIT)
+                    if (query.text.isBlank() && recentAgents.isNotEmpty()) {
+                        item(key = "qq-recent-agents") {
+                            RecentAgentsStrip(
+                                agents = recentAgents,
+                                onSelect = { item ->
+                                    actions?.onSelectItem(item)
+                                    coordinator.close()
+                                },
+                            )
+                        }
+                    }
                     groups.forEach { (kind, results) ->
                         item(key = "qq-h-$kind") {
                             Text(
@@ -291,6 +316,51 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
+            }
+        }
+    }
+}
+
+private const val QUICK_QUERY_RECENT_AGENTS_LIMIT = 9
+
+@Composable
+private fun RecentAgentsStrip(
+    agents: List<PaletteItem>,
+    onSelect: (PaletteItem) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = "RECENTLY VIEWED",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            agents.forEach { item ->
+                Column(
+                    modifier = Modifier
+                        .clickable(onClick = { onSelect(item) })
+                        .padding(horizontal = 6.dp, vertical = 6.dp)
+                        .width(64.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AgentOrb(index = item.orbIndex ?: 0, size = 44.dp, cornerRadius = 12.dp)
+                    Text(
+                        text = item.label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    )
+                }
             }
         }
     }
