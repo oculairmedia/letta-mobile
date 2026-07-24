@@ -53,6 +53,15 @@ object IrohPeerCapabilities {
      */
     fun forAdminMethod(method: String): String = when {
         method in CHAT_READ_METHODS -> CHAT_READ
+        // P0.5 (audit): read-only server metadata (providers, goals, groups,
+        // folders, archives, run/step history, identities) reclassified from the
+        // deny-by-default admin.full bucket into the CHAT_READ tier — the same
+        // class of benign read as agent.list/model.list — so standard paired
+        // desktops can list them. Reusing an existing broadly-held read capability
+        // (not a new one) means already-persisted paired peers get these with no
+        // capability migration. Mutations in the same namespaces (e.g. goal.command)
+        // are NOT listed here and stay admin.full via the else branch.
+        method in ADMIN_READ_METHODS -> CHAT_READ
         method in CHAT_SEND_METHODS -> CHAT_SEND
         method in CONVERSATION_MANAGE_METHODS -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
@@ -104,6 +113,22 @@ object IrohPeerCapabilities {
         "model.list", "model.list.embedding",
         "subagent.list", "subagent.todos",
         "slash_command.list", "slash_command.list_agent",
+    )
+
+    /**
+     * P0.5: read-only server-metadata methods classified as benign reads
+     * (CHAT_READ tier). Explicit method names — only these exact reads are
+     * folded in; any mutation in the same namespace stays admin.full.
+     */
+    private val ADMIN_READ_METHODS = setOf(
+        "provider.list",
+        "goal.get",
+        "group.list",
+        "folder.list",
+        "archive.list",
+        "step.list",
+        "identity.list", "identity.get",
+        "run.list", "run.get",
     )
 
     private val CHAT_SEND_METHODS = setOf("approval.submit")
