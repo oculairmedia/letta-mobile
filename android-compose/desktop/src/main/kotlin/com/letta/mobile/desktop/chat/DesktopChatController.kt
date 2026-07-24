@@ -111,6 +111,11 @@ class DesktopChatController(
     private val _streamingConversationId = MutableStateFlow<String?>(null)
     val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
 
+    // The conversation the user last SENT a prompt into ("now playing" for the
+    // bottom bar): sticky across selection changes so jumping back is one click.
+    private val _lastPromptedConversationId = MutableStateFlow<String?>(null)
+    val lastPromptedConversationId: StateFlow<String?> = _lastPromptedConversationId.asStateFlow()
+
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
 
@@ -543,6 +548,7 @@ class DesktopChatController(
     fun send() {
         if (closed) return
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
+        _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {

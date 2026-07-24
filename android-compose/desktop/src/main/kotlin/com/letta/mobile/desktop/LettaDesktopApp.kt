@@ -731,38 +731,53 @@ internal fun LettaDesktopApp(
                 )
             }
           }
-          // Spotify-style persistent bottom bar: tracks the ACTIVE
-          // conversation across every destination.
-          chatState.selectedConversation?.let { activeConversation ->
-              DesktopNowActiveBar(
-                  state = NowActiveBarState(
-                      conversationTitle = activeConversation.title,
-                      agentName = activeConversation.agentName,
-                      orbIndex = activeConversation.agentId?.let { avatarStyleByAgentId[it] }
-                          ?: selectedAgentOrbIndex,
-                      status = nowActiveStatus(
-                          isThinking = isThinkingSelected,
-                          isStreaming = isStreamingReplySelected,
-                          hasError = chatState.errorMessage != null,
+          // Spotify-style persistent bottom bar, pinned to the conversation
+          // the user LAST PROMPTED (sticky across browsing, like now-playing)
+          // so jumping back is one click; falls back to the selection until
+          // the first send.
+          run {
+              val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
+              val streamingId by chatController.streamingConversationId.collectAsState()
+              val barConversation = lastPromptedId
+                  ?.let { id -> chatState.conversations.firstOrNull { it.id == id } }
+                  ?: chatState.selectedConversation
+              if (barConversation != null) {
+                  val barIsSelected = barConversation.id == chatState.selectedConversationId
+                  DesktopNowActiveBar(
+                      state = NowActiveBarState(
+                          conversationTitle = barConversation.title,
+                          agentName = barConversation.agentName,
+                          orbIndex = barConversation.agentId?.let { avatarStyleByAgentId[it] }
+                              ?: selectedAgentOrbIndex,
+                          status = nowActiveStatus(
+                              isThinking = thinkingConversationId == barConversation.id,
+                              isStreaming = if (barIsSelected) {
+                                  isStreamingReplySelected
+                              } else {
+                                  streamingId == barConversation.id
+                              },
+                              hasError = barIsSelected && chatState.errorMessage != null,
+                          ),
+                          backgroundWorkAgentName = thinkingConversationId
+                              ?.takeIf { it != barConversation.id }
+                              ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
                       ),
-                      backgroundWorkAgentName = thinkingConversationId
-                          ?.takeIf { it != chatState.selectedConversationId }
-                          ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
-                  ),
-                  actions = NowActiveBarActions(
-                      onOpenConversation = {
-                          editAgentId = null
-                          selectedDestination = DesktopDestination.Conversations
-                      },
-                      onJumpToBackgroundWork = {
-                          thinkingConversationId?.let {
+                      actions = NowActiveBarActions(
+                          onOpenConversation = {
                               editAgentId = null
-                              chatController.selectConversation(it)
+                              chatController.selectConversation(barConversation.id)
                               selectedDestination = DesktopDestination.Conversations
-                          }
-                      },
-                  ),
-              )
+                          },
+                          onJumpToBackgroundWork = {
+                              thinkingConversationId?.let {
+                                  editAgentId = null
+                                  chatController.selectConversation(it)
+                                  selectedDestination = DesktopDestination.Conversations
+                              }
+                          },
+                      ),
+                  )
+              }
           }
           }
         }
