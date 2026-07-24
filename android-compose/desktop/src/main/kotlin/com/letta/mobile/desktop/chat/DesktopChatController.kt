@@ -28,9 +28,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
@@ -518,6 +520,26 @@ class DesktopChatController(
         _state.update { it.copy(errorMessage = message) }
     }
 
+    /**
+     * Inline reply from a notification toast: select the target conversation,
+     * wait briefly for the selection's remote load to settle (so the active
+     * loop targets the right timeline), then send the typed text. Best-effort
+     * after the timeout — the selection state itself is already correct.
+     */
+    fun replyFromNotification(conversationId: String, text: String) {
+        if (closed) return
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        scope.launch {
+            selectConversation(conversationId)
+            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) {
+                state.first { it.selectedConversationId == conversationId && !it.isLoading }
+            }
+            updateComposerText(trimmed)
+            send()
+        }
+    }
+
     fun send() {
         if (closed) return
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
@@ -865,6 +887,9 @@ class DesktopChatController(
         }
     }
 }
+
+/** How long a notification reply waits for the conversation switch to settle. */
+private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
 
 /** Conversation-list scope filter, mapped to the `archive_status` query param. */
 enum class ConversationArchiveFilter(val apiValue: String, val label: String) {

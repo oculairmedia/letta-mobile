@@ -310,6 +310,7 @@ internal fun LettaDesktopApp(
                 chatController.selectConversation(conversationId)
                 selectedDestination = DesktopDestination.Conversations
             },
+            onReplyToConversation = chatController::replyFromNotification,
         ),
         state = desktopNucleusEffectState(
             DesktopNucleusRuntimeState(

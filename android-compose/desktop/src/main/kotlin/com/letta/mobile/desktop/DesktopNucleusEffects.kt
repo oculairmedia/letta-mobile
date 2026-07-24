@@ -52,8 +52,10 @@ internal data class DesktopNucleusEffectBindings(
     val controller: DesktopNucleusController,
     /** Latest assistant reply preview for a conversation, for the toast body. */
     val replyPreviewFor: (String) -> String?,
-    /** Bring the given conversation on screen (toast Reply action). */
+    /** Bring the given conversation on screen (toast body click / Reply button). */
     val onOpenConversation: (String) -> Unit,
+    /** Send inline-typed toast text into the conversation without activating. */
+    val onReplyToConversation: (String, String) -> Unit,
 )
 
 internal data class DesktopNucleusEffectState(
@@ -95,6 +97,7 @@ private data class AgentCompletionBindings(
     val onActivate: () -> Unit,
     val replyPreviewFor: (String) -> String?,
     val onOpenConversation: (String) -> Unit,
+    val onReplyToConversation: (String, String) -> Unit,
 )
 
 private data class AgentFailureBindings(
@@ -161,6 +164,7 @@ internal fun DesktopNucleusEffects(
             onActivate = activate,
             replyPreviewFor = bindings.replyPreviewFor,
             onOpenConversation = bindings.onOpenConversation,
+            onReplyToConversation = bindings.onReplyToConversation,
         ),
         state = state,
     )
@@ -230,10 +234,15 @@ private fun AgentCompletionEffect(
             bindings.controller.notifyAgentFinished(
                 agentName = state.agentName,
                 replyPreview = conversationId?.let(bindings.replyPreviewFor),
-                onActivated = bindings.onActivate,
-                onReply = {
-                    bindings.onActivate()
-                    conversationId?.let(bindings.onOpenConversation)
+                onReply = { typedText ->
+                    if (typedText != null && conversationId != null) {
+                        // Inline toast reply: send in the background without
+                        // stealing focus, like Google Messages.
+                        bindings.onReplyToConversation(conversationId, typedText)
+                    } else {
+                        bindings.onActivate()
+                        conversationId?.let(bindings.onOpenConversation)
+                    }
                 },
             )
             TaskbarProgress.requestAttention(bindings.window)
