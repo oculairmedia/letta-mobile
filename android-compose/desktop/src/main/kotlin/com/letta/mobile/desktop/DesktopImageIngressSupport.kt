@@ -56,11 +56,15 @@ private inline fun <T : java.awt.Graphics> T.use(block: (T) -> Unit) {
 }
 
 @Suppress("UNCHECKED_CAST")
-internal fun Transferable.imageFiles(): List<File> =
+internal fun Transferable.allFiles(): List<File> =
     runCatching { getTransferData(DataFlavor.javaFileListFlavor) as? List<File> }
         .getOrNull()
         .orEmpty()
-        .filter { it.isFile && it.extension.lowercase() in IMAGE_EXTENSIONS }
+        .filter { it.isFile }
+
+internal fun File.isImageFile(): Boolean = extension.lowercase() in IMAGE_EXTENSIONS
+
+internal fun Transferable.imageFiles(): List<File> = allFiles().filter { it.isImageFile() }
 
 internal fun handleClipboardImagePaste(
     transferable: Transferable,
@@ -93,13 +97,20 @@ internal fun handleClipboardImageFilePaste(
 internal fun createImageFileDropTarget(sink: DesktopImageIngressSink): DropTargetAdapter =
     object : DropTargetAdapter() {
         override fun drop(event: DropTargetDropEvent) {
-            val paths = event.transferable.imageFiles().take(MAX_INGRESS_FILES).map { it.toPath() }
-            if (paths.isEmpty()) {
-                event.rejectDrop()
-                return
-            }
+            // acceptDrop MUST precede transferable access: on Windows, reading
+            // the file list from an unaccepted drop throws
+            // InvalidDnDOperationException, which made drops look dead.
             event.acceptDrop(DnDConstants.ACTION_COPY)
-            paths.forEach { path -> sink.launchLoad { load(path) } }
+            val files = event.transferable.allFiles()
+            val paths = files.filter { it.isImageFile() }.take(MAX_INGRESS_FILES).map { it.toPath() }
+            when {
+                paths.isNotEmpty() -> paths.forEach { path -> sink.launchLoad { load(path) } }
+                // Give feedback instead of a silent dead drop.
+                files.isNotEmpty() -> sink.onError(
+                    "Only images can be attached for now (png, jpg, jpeg, webp, gif, bmp).",
+                )
+                else -> sink.onError("Nothing attachable in that drop — try image files.")
+            }
             event.dropComplete(true)
         }
     }
