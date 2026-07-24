@@ -119,4 +119,21 @@ object MessageListPageGuard {
         }
         return out
     }
+
+    /**
+     * Drop [field] from a JSON object response. Used by agent.context: the
+     * /context endpoint inlines the FULL in-context `messages` array (e.g. 27,868
+     * messages / ~96MB on a large conversation) that NO client reads
+     * (ContextWindowOverview consumes only the counts + memory strings; the
+     * transcript comes via message.list) yet which blows the 1MiB admin_rpc frame
+     * (response_too_large). [boundObjectStringFields] only trims oversized STRING
+     * fields, so the heavy array must be removed explicitly. Returns the input
+     * unchanged if it is not a JSON object or lacks [field].
+     */
+    fun dropField(response: JsonElement, field: String): JsonElement {
+        if (response !is JsonObject || field !in response) return response
+        return buildJsonObject {
+            for ((key, value) in response) if (key != field) put(key, value)
+        }
+    }
 }

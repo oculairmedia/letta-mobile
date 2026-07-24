@@ -82,4 +82,33 @@ class MessageListPageGuardTest {
         val context = buildJsonObject { put("num_messages", JsonPrimitive(1)); put("system_prompt", JsonPrimitive("short")) }
         assertEquals(context, MessageListPageGuard.boundObjectStringFields(context))
     }
+
+    @Test
+    fun `dropField removes the heavy agent-context messages array but keeps the counts`() {
+        // Mirror the live /context shape: a giant inline `messages` array (the 96MB
+        // killer) alongside the counts the client actually reads.
+        val context = buildJsonObject {
+            put("messages", buildJsonArray { repeat(5000) { add(buildJsonObject { put("id", JsonPrimitive("m-$it")) }) } })
+            put("num_messages", JsonPrimitive(5000))
+            put("context_window_size_current", JsonPrimitive(395000))
+            put("system_prompt", JsonPrimitive("you are meridian"))
+        }
+        val before = context.toString().encodeToByteArray().size
+
+        val stripped = MessageListPageGuard.dropField(context, "messages").jsonObject
+        assertTrue("messages" !in stripped, "messages array must be dropped")
+        assertEquals(5000, stripped["num_messages"]!!.jsonPrimitive.content.toInt(), "count preserved")
+        assertEquals(395000, stripped["context_window_size_current"]!!.jsonPrimitive.content.toInt())
+        assertEquals("you are meridian", stripped["system_prompt"]!!.jsonPrimitive.content)
+        val after = stripped.toString().encodeToByteArray().size
+        assertTrue(after < before / 100, "dropping messages must massively shrink the response ($before -> $after)")
+    }
+
+    @Test
+    fun `dropField is a no-op when the field is absent or the response is not an object`() {
+        val obj = buildJsonObject { put("num_messages", JsonPrimitive(3)) }
+        assertEquals(obj, MessageListPageGuard.dropField(obj, "messages"))
+        val arr = buildJsonArray { add(JsonPrimitive(1)) }
+        assertEquals(arr, MessageListPageGuard.dropField(arr, "messages"))
+    }
 }
