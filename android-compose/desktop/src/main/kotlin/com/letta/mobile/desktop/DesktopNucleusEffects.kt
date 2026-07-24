@@ -26,6 +26,7 @@ import dev.nucleusframework.media.control.MediaPlaybackState
 import dev.nucleusframework.media.control.MediaPlaybackStatus
 import dev.nucleusframework.taskbarprogress.TaskbarProgress
 import dev.nucleusframework.composenativetray.tray.api.Tray
+import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.UiMessage
 import java.awt.Frame
 import java.awt.Window
@@ -64,7 +65,23 @@ internal data class DesktopNucleusEffectState(
     val errorMessage: String?,
     /** Conversation the in-flight agent work belongs to, when known. */
     val workingConversationId: String?,
+    /** Determinate work progress (0..1) when subagent steps are countable. */
+    val workProgress: Double? = null,
 )
+
+/**
+ * Deterministic taskbar progress from subagent steps: once at least one
+ * subagent of the active batch has finished, expose completed/total; while
+ * everything is still running (or there are no subagents) return null so the
+ * taskbar shows the indeterminate pulse instead. Statuses are the wire
+ * strings from [SubagentStatus].
+ */
+internal fun subagentWorkProgress(statuses: List<String>): Double? {
+    if (statuses.isEmpty()) return null
+    val done = statuses.count { it != SubagentStatus.RUNNING }
+    if (done == 0) return null
+    return done.toDouble() / statuses.size
+}
 
 internal data class DesktopNucleusEffectActions(
     val onOpenCommandPalette: () -> Unit,
@@ -79,6 +96,7 @@ internal data class DesktopNucleusRuntimeState(
     val selectedConversationId: String?,
     val agentName: String,
     val errorMessage: String?,
+    val workProgress: Double? = null,
 )
 
 internal fun desktopNucleusEffectState(
@@ -91,6 +109,7 @@ internal fun desktopNucleusEffectState(
     // conversation (streaming presence is selected-conversation scoped).
     workingConversationId = runtime.thinkingConversationId
         ?: runtime.selectedConversationId.takeIf { runtime.isStreamingReply },
+    workProgress = runtime.workProgress,
 )
 
 private data class AgentCompletionBindings(
@@ -199,9 +218,16 @@ private fun DesktopIntegrationLifecycleEffect(
 
 @Composable
 private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
-    LaunchedEffect(state.isAgentWorking, state.agentName) {
+    LaunchedEffect(state.isAgentWorking, state.agentName, state.workProgress) {
         if (state.isAgentWorking) {
-            TaskbarProgress.showIndeterminate(window)
+            // Countable subagent steps → precise taskbar progress; otherwise
+            // the indeterminate pulse.
+            val progress = state.workProgress
+            if (progress != null) {
+                TaskbarProgress.showProgress(window, progress)
+            } else {
+                TaskbarProgress.showIndeterminate(window)
+            }
             EnergyManager.disableLightEfficiencyMode()
             EnergyManager.keepScreenAwake()
             MediaControlService.setMetadata(

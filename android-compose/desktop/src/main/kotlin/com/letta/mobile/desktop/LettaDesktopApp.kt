@@ -72,6 +72,7 @@ internal fun LettaDesktopApp(
     // Spotify-style library toggle: icon rail ↔ expanded names-and-spaces list.
     var railExpanded by rememberSaveable { mutableStateOf(false) }
     var showNewAgentDialog by remember { mutableStateOf(false) }
+    var showIrohResetConfirm by remember { mutableStateOf(false) }
     var showNewConversation by remember { mutableStateOf(false) }
     // Avatar styles chosen via the editor this session, applied immediately to the
     // orbs regardless of whether the backend round-trips agent metadata.
@@ -136,10 +137,10 @@ internal fun LettaDesktopApp(
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
-        mode = FileKitMode.Single,
-        dialogSettings = FileKitDialogSettings(title = "Attach image"),
-    ) { file ->
-        if (file != null) {
+        mode = FileKitMode.Multiple(maxItems = MAX_INGRESS_FILES),
+        dialogSettings = FileKitDialogSettings(title = "Attach images"),
+    ) { files ->
+        files.orEmpty().forEach { file ->
             chatScope.launch {
                 runCatching {
                     val path = file.file.toPath()
@@ -333,6 +334,7 @@ internal fun LettaDesktopApp(
                 selectedConversationId = chatState.selectedConversationId,
                 agentName = workingAgentName,
                 errorMessage = chatState.errorMessage,
+                workProgress = subagentWorkProgress(activeSubagents.map { it.status }),
             ),
         ),
         actions = DesktopNucleusEffectActions(
@@ -637,12 +639,9 @@ internal fun LettaDesktopApp(
                                 onTokenCleared = {
                                     applyConfig(activeConfig.copy(accessToken = null))
                                 },
-                                onIrohIdentityReset = {
-                                    com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
-                                    // Rebuild the session graph so the next dial
-                                    // mints and uses the new identity.
-                                    applyConfig(activeConfig)
-                                },
+                                // Destructive (breaks device pairings) — route
+                                // through the confirmation dialog first.
+                                onIrohIdentityReset = { showIrohResetConfirm = true },
                                 nucleus = destinationNucleusActions(nucleusController, window),
                             ),
                             modifier = Modifier.fillMaxSize(),
@@ -714,6 +713,23 @@ internal fun LettaDesktopApp(
                         }
                     },
                     onDismiss = { showCommandPalette = false },
+                )
+            }
+            if (showIrohResetConfirm) {
+                DesktopConfirmDialog(
+                    request = ConfirmDialogRequest(
+                        title = "Reset Iroh identity?",
+                        message = "This mints a new NodeId and breaks existing device pairings until you re-pair.",
+                        confirmLabel = "Reset identity",
+                    ),
+                    onConfirm = {
+                        showIrohResetConfirm = false
+                        com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
+                        // Rebuild the session graph so the next dial mints and
+                        // uses the new identity.
+                        applyConfig(activeConfig)
+                    },
+                    onDismiss = { showIrohResetConfirm = false },
                 )
             }
             // Edit agent is now a full-page surface in the main content pane

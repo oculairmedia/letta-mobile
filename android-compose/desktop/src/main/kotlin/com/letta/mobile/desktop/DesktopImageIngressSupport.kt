@@ -74,25 +74,32 @@ internal fun handleClipboardImagePaste(
     return true
 }
 
+/**
+ * Ingest cap per drop/paste, matching the composer's attachment grid; files
+ * beyond it are ignored rather than erroring one by one.
+ */
+internal const val MAX_INGRESS_FILES = 4
+
 internal fun handleClipboardImageFilePaste(
     transferable: Transferable,
     sink: DesktopImageIngressSink,
 ): Boolean {
-    val path = transferable.imageFiles().firstOrNull()?.toPath() ?: return false
-    sink.launchLoad { load(path) }
+    val paths = transferable.imageFiles().take(MAX_INGRESS_FILES).map { it.toPath() }
+    if (paths.isEmpty()) return false
+    paths.forEach { path -> sink.launchLoad { load(path) } }
     return true
 }
 
 internal fun createImageFileDropTarget(sink: DesktopImageIngressSink): DropTargetAdapter =
     object : DropTargetAdapter() {
         override fun drop(event: DropTargetDropEvent) {
-            val path = event.transferable.imageFiles().firstOrNull()?.toPath()
-            if (path == null) {
+            val paths = event.transferable.imageFiles().take(MAX_INGRESS_FILES).map { it.toPath() }
+            if (paths.isEmpty()) {
                 event.rejectDrop()
                 return
             }
             event.acceptDrop(DnDConstants.ACTION_COPY)
-            sink.launchLoad { load(path) }
+            paths.forEach { path -> sink.launchLoad { load(path) } }
             event.dropComplete(true)
         }
     }

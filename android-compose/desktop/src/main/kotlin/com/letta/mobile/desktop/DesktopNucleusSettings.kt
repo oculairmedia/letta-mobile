@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -156,6 +158,14 @@ private fun AppearanceSettingsSection() {
 
 @Composable
 private fun SystemInfoSettingsSection(system: DesktopSystemSnapshot, onRefresh: () -> Unit) {
+    // Live telemetry while this pane is on screen; the effect cancels when
+    // the user leaves Settings, so no background sampling cost.
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(SYSTEM_INFO_REFRESH_INTERVAL_MS)
+            onRefresh()
+        }
+    }
     SettingsSection(
         title = "Runtime introspection",
         supporting = if (system.available) "Native host telemetry" else "Native system information unavailable",
@@ -222,3 +232,6 @@ private fun formatBytes(bytes: Long): String {
 // sRGB Color.value keeps ARGB in the upper 32 bits; toArgb() yields the packed
 // 32-bit form whose low 24 bits are the actual RGB channels.
 private fun Color.toHexLabel(): String = "#%06X".format(toArgb() and 0xFFFFFF)
+
+/** Telemetry sampling cadence while the System section is visible. */
+private const val SYSTEM_INFO_REFRESH_INTERVAL_MS = 3_000L
