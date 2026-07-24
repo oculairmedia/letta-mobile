@@ -46,6 +46,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -236,6 +237,9 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                     JewelTextField(
                         value = query,
                         onValueChange = { query = it },
+                        // Borderless: the bar's Surface is the visual frame;
+                        // Jewel's own focus ring reads as a stray outline here.
+                        undecorated = true,
                         placeholder = {
                             // Explicit compact style: the M3 default leaks a
                             // larger size into Jewel's text slot and clips
@@ -358,6 +362,7 @@ private fun RecentAgentsStrip(
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                     )
                 }
