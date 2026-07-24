@@ -245,8 +245,14 @@ class DesktopChatController(
         gateway = null
     }
 
-    fun selectConversation(conversationId: String) {
-        if (closed) return
+    /**
+     * Selects [conversationId]. Returns the remote-selection [Job] when a
+     * remote load (and timeline-loop rebinding) was kicked off, so callers
+     * that must not race the loop swap — e.g. notification replies — can
+     * await it; null when the selection was a no-op or local-only.
+     */
+    fun selectConversation(conversationId: String): Job? {
+        if (closed) return null
         cleanupUnsentConversation(except = conversationId)
         var generation: Long? = null
         var shouldLoadRemote = false
@@ -261,12 +267,11 @@ class DesktopChatController(
             generation = if (shouldLoadRemote) next.selectionGeneration else null
             current.withRuntimeState(next)
         }
-        if (shouldLoadRemote) {
-            selectJob?.cancel()
-            selectJob = scope.launch {
-                selectRemoteConversation(conversationId, generation ?: return@launch)
-            }
-        }
+        if (!shouldLoadRemote) return null
+        selectJob?.cancel()
+        return scope.launch {
+            selectRemoteConversation(conversationId, generation ?: return@launch)
+        }.also { selectJob = it }
     }
 
     fun deleteConversation(conversationId: String) {
@@ -526,20 +531,19 @@ class DesktopChatController(
     }
 
     /**
-     * Inline reply from a notification toast: select the target conversation,
-     * wait briefly for the selection's remote load to settle (so the active
-     * loop targets the right timeline), then send the typed text. Best-effort
-     * after the timeout — the selection state itself is already correct.
+     * Inline reply from a notification toast: select the target conversation
+     * and await the selection's remote load — the job that rebinds the active
+     * timeline loop — before sending, so the send can never race onto the
+     * previous conversation's loop. Bounded so a wedged load still sends
+     * best-effort into the (already-updated) selection state.
      */
     fun replyFromNotification(conversationId: String, text: String) {
         if (closed) return
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return
         scope.launch {
-            selectConversation(conversationId)
-            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) {
-                state.first { it.selectedConversationId == conversationId && !it.isLoading }
-            }
+            val selection = selectConversation(conversationId)
+            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) { selection?.join() }
             updateComposerText(trimmed)
             send()
         }

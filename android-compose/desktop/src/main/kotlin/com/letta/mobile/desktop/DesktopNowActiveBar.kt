@@ -24,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +33,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.desktop.chat.AgentOrb
+import com.letta.mobile.desktop.chat.DesktopChatController
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 
 /** Coarse status of the active conversation for the bottom bar. */
 internal enum class NowActiveStatus { Idle, Thinking, Streaming, Error }
@@ -73,6 +76,70 @@ private val NowActiveStatus.label: String
         NowActiveStatus.Streaming -> "responding…"
         NowActiveStatus.Error -> "needs attention"
     }
+
+internal data class NowActiveBarHostState(
+    val thinkingConversationId: String?,
+    val isStreamingReplySelected: Boolean,
+    val avatarStyleByAgentId: Map<String, Int>,
+    val fallbackOrbIndex: Int,
+    val avatarCompanionActive: Boolean,
+)
+
+internal data class NowActiveBarHostActions(
+    /** Select + reveal the given conversation (bar body and work chip). */
+    val onOpenConversation: (String) -> Unit,
+    val onAvatarCompanion: () -> Unit,
+)
+
+/**
+ * Derives the bar's pinned conversation and live status from controller
+ * state: pinned to the conversation the user LAST PROMPTED (sticky across
+ * browsing, like now-playing), falling back to the selection until the first
+ * send. Renders nothing when there is no conversation at all.
+ */
+@Composable
+internal fun DesktopNowActiveBarHost(
+    chatController: DesktopChatController,
+    chatState: DesktopChatSurfaceState,
+    host: NowActiveBarHostState,
+    actions: NowActiveBarHostActions,
+) {
+    val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
+    val streamingId by chatController.streamingConversationId.collectAsState()
+    val barConversation = lastPromptedId
+        ?.let { id -> chatState.conversations.firstOrNull { it.id == id } }
+        ?: chatState.selectedConversation
+        ?: return
+    val barIsSelected = barConversation.id == chatState.selectedConversationId
+    DesktopNowActiveBar(
+        state = NowActiveBarState(
+            conversationTitle = barConversation.title,
+            agentName = barConversation.agentName,
+            orbIndex = barConversation.agentId?.let { host.avatarStyleByAgentId[it] }
+                ?: host.fallbackOrbIndex,
+            status = nowActiveStatus(
+                isThinking = host.thinkingConversationId == barConversation.id,
+                isStreaming = if (barIsSelected) {
+                    host.isStreamingReplySelected
+                } else {
+                    streamingId == barConversation.id
+                },
+                hasError = barIsSelected && chatState.errorMessage != null,
+            ),
+            backgroundWorkAgentName = host.thinkingConversationId
+                ?.takeIf { it != barConversation.id }
+                ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
+            avatarCompanionActive = host.avatarCompanionActive,
+        ),
+        actions = NowActiveBarActions(
+            onOpenConversation = { actions.onOpenConversation(barConversation.id) },
+            onJumpToBackgroundWork = {
+                host.thinkingConversationId?.let(actions.onOpenConversation)
+            },
+            onAvatarCompanion = actions.onAvatarCompanion,
+        ),
+    )
+}
 
 /**
  * Spotify-style persistent bottom bar: always shows the ACTIVE conversation

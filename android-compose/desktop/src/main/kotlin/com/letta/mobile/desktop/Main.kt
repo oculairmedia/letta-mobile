@@ -106,10 +106,12 @@ private fun runDesktopApplication(
                     }
 
                     LettaDesktopApp(
-                        nucleusApplicationScope = nucleusScope,
-                        window = window,
-                        deepLinks = deepLinks,
-                        quickQuery = quickQuery,
+                        shell = DesktopAppShellBindings(
+                            nucleusApplicationScope = nucleusScope,
+                            window = window,
+                            deepLinks = deepLinks,
+                            quickQuery = quickQuery,
+                        ),
                         onActiveTitleChange = { windowTitle = it },
                     )
                 }

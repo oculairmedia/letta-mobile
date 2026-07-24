@@ -7,20 +7,11 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DesktopNotificationPreviewTest {
-    private fun message(
-        role: String,
-        content: String,
-        isReasoning: Boolean = false,
-        isError: Boolean = false,
-        isPending: Boolean = false,
-    ) = UiMessage(
+    private fun message(role: String, content: String) = UiMessage(
         id = "m-${'$'}content",
         role = role,
         content = content,
         timestamp = "2026-07-24T11:35:00Z",
-        isReasoning = isReasoning,
-        isError = isError,
-        isPending = isPending,
     )
 
     @Test
@@ -28,7 +19,7 @@ class DesktopNotificationPreviewTest {
         val messages = listOf(
             message("assistant", "First answer"),
             message("user", "good"),
-            message("assistant", "Thinking...", isReasoning = true),
+            message("assistant", "Thinking...").copy(isReasoning = true),
             message("assistant", "Here whenever you need me."),
         )
         assertEquals("Here whenever you need me.", notificationReplyPreview(messages))
@@ -38,8 +29,8 @@ class DesktopNotificationPreviewTest {
     fun skipsErrorPendingAndBlankMessages() {
         val messages = listOf(
             message("assistant", "Real reply"),
-            message("assistant", "boom", isError = true),
-            message("assistant", "", isPending = true),
+            message("assistant", "boom").copy(isError = true),
+            message("assistant", "").copy(isPending = true),
         )
         assertEquals("Real reply", notificationReplyPreview(messages))
         assertNull(notificationReplyPreview(listOf(message("user", "hi"))))

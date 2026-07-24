@@ -51,14 +51,23 @@ import kotlinx.coroutines.flow.StateFlow
 import java.awt.Window
 import dev.nucleusframework.application.NucleusApplicationScope
 
+/** Application-scoped inputs the desktop shell composes over. */
+internal data class DesktopAppShellBindings(
+    val nucleusApplicationScope: NucleusApplicationScope,
+    val window: Window,
+    val deepLinks: StateFlow<DesktopDeepLinkRequest?>,
+    val quickQuery: DesktopQuickQueryCoordinator,
+)
+
 @Composable
 internal fun LettaDesktopApp(
-    nucleusApplicationScope: NucleusApplicationScope,
-    window: Window,
-    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
-    quickQuery: DesktopQuickQueryCoordinator,
+    shell: DesktopAppShellBindings,
     onActiveTitleChange: (String) -> Unit = {},
 ) {
+    val nucleusApplicationScope = shell.nucleusApplicationScope
+    val window = shell.window
+    val deepLinks = shell.deepLinks
+    val quickQuery = shell.quickQuery
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
     // Spotify-style library toggle: icon rail ↔ expanded names-and-spaces list.
     var railExpanded by rememberSaveable { mutableStateOf(false) }
@@ -728,56 +737,25 @@ internal fun LettaDesktopApp(
                 )
             }
           }
-          // Spotify-style persistent bottom bar, pinned to the conversation
-          // the user LAST PROMPTED (sticky across browsing, like now-playing)
-          // so jumping back is one click; falls back to the selection until
-          // the first send.
-          run {
-              val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
-              val streamingId by chatController.streamingConversationId.collectAsState()
-              val barConversation = lastPromptedId
-                  ?.let { id -> chatState.conversations.firstOrNull { it.id == id } }
-                  ?: chatState.selectedConversation
-              if (barConversation != null) {
-                  val barIsSelected = barConversation.id == chatState.selectedConversationId
-                  DesktopNowActiveBar(
-                      state = NowActiveBarState(
-                          conversationTitle = barConversation.title,
-                          agentName = barConversation.agentName,
-                          orbIndex = barConversation.agentId?.let { avatarStyleByAgentId[it] }
-                              ?: selectedAgentOrbIndex,
-                          status = nowActiveStatus(
-                              isThinking = thinkingConversationId == barConversation.id,
-                              isStreaming = if (barIsSelected) {
-                                  isStreamingReplySelected
-                              } else {
-                                  streamingId == barConversation.id
-                              },
-                              hasError = barIsSelected && chatState.errorMessage != null,
-                          ),
-                          backgroundWorkAgentName = thinkingConversationId
-                              ?.takeIf { it != barConversation.id }
-                              ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
-                          avatarCompanionActive = avatar.isActive,
-                      ),
-                      actions = NowActiveBarActions(
-                          onAvatarCompanion = avatar.toggle,
-                          onOpenConversation = {
-                              editAgentId = null
-                              chatController.selectConversation(barConversation.id)
-                              selectedDestination = DesktopDestination.Conversations
-                          },
-                          onJumpToBackgroundWork = {
-                              thinkingConversationId?.let {
-                                  editAgentId = null
-                                  chatController.selectConversation(it)
-                                  selectedDestination = DesktopDestination.Conversations
-                              }
-                          },
-                      ),
-                  )
-              }
-          }
+          DesktopNowActiveBarHost(
+              chatController = chatController,
+              chatState = chatState,
+              host = NowActiveBarHostState(
+                  thinkingConversationId = thinkingConversationId,
+                  isStreamingReplySelected = isStreamingReplySelected,
+                  avatarStyleByAgentId = avatarStyleByAgentId,
+                  fallbackOrbIndex = selectedAgentOrbIndex,
+                  avatarCompanionActive = avatar.isActive,
+              ),
+              actions = NowActiveBarHostActions(
+                  onOpenConversation = { conversationId ->
+                      editAgentId = null
+                      chatController.selectConversation(conversationId)
+                      selectedDestination = DesktopDestination.Conversations
+                  },
+                  onAvatarCompanion = avatar.toggle,
+              ),
+          )
           }
         }
     }

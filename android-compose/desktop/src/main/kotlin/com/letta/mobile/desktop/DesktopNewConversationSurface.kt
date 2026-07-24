@@ -153,7 +153,23 @@ internal fun DesktopNewConversationSurface(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
                     onClick = {},
-                ),
+                )
+                // Hoisted here (not on the field) so Escape/Enter still work
+                // after a click moves focus off the To: field.
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (event.key) {
+                        Key.Escape -> {
+                            actions.onDismiss()
+                            true
+                        }
+                        Key.Enter -> {
+                            filtered.firstOrNull()?.let { actions.onAgentSelected(it.id) }
+                            filtered.isNotEmpty()
+                        }
+                        else -> false
+                    }
+                },
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -183,21 +199,7 @@ internal fun DesktopNewConversationSurface(
                         placeholder = { Text("Type an agent name") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(focusRequester)
-                            .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                                when (event.key) {
-                                    Key.Escape -> {
-                                        actions.onDismiss()
-                                        true
-                                    }
-                                    Key.Enter -> {
-                                        filtered.firstOrNull()?.let { actions.onAgentSelected(it.id) }
-                                        filtered.isNotEmpty()
-                                    }
-                                    else -> false
-                                }
-                            },
+                            .focusRequester(focusRequester),
                     )
                 }
                 DirectoryDivider()

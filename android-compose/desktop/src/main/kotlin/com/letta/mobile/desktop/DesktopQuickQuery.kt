@@ -279,40 +279,15 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                     AmbientContextChip(title = ambientTitle, onDismiss = { includeContext = false })
                 }
                 QuickQueryDivider()
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
-                    // Element-style "recently viewed" strip: the most recent
-                    // agents as avatar chips, pinned above the result groups.
-                    val recentAgents = items.filter { it.kind == PaletteItemKind.Agent }
-                        .take(QUICK_QUERY_RECENT_AGENTS_LIMIT)
-                    if (query.text.isBlank() && recentAgents.isNotEmpty()) {
-                        item(key = "qq-recent-agents") {
-                            RecentAgentsStrip(
-                                agents = recentAgents,
-                                onSelect = { item ->
-                                    actions?.onSelectItem(item)
-                                    coordinator.close()
-                                },
-                            )
-                        }
-                    }
-                    groups.forEach { (kind, results) ->
-                        item(key = "qq-h-$kind") {
-                            Text(
-                                text = CommandPalette.sectionTitle(kind).uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp),
-                            )
-                        }
-                        items(results, key = { "qq-$kind-${it.id}" }) { item ->
-                            QuickQueryRow(item = item, onClick = {
-                                actions?.onSelectItem(item)
-                                coordinator.close()
-                            })
-                        }
-                    }
-                }
+                QuickQueryResults(
+                    query = query.text,
+                    items = items,
+                    groups = groups,
+                    onSelect = { item ->
+                        actions?.onSelectItem(item)
+                        coordinator.close()
+                    },
+                )
                 QuickQueryDivider()
                 Text(
                     text = "⏎ open top result · Ctrl+⏎ ask current agent · Esc close",
@@ -326,6 +301,40 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
 }
 
 private const val QUICK_QUERY_RECENT_AGENTS_LIMIT = 9
+
+@Composable
+private fun QuickQueryResults(
+    query: String,
+    items: List<PaletteItem>,
+    groups: List<Pair<PaletteItemKind, List<PaletteItem>>>,
+    onSelect: (PaletteItem) -> Unit,
+) {
+    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp)) {
+        // Element-style "recently viewed" strip: the most recent agents as
+        // avatar chips, pinned above the result groups.
+        val recentAgents = items.filter { it.kind == PaletteItemKind.Agent }
+            .take(QUICK_QUERY_RECENT_AGENTS_LIMIT)
+        if (query.isBlank() && recentAgents.isNotEmpty()) {
+            item(key = "qq-recent-agents") {
+                RecentAgentsStrip(agents = recentAgents, onSelect = onSelect)
+            }
+        }
+        groups.forEach { (kind, results) ->
+            item(key = "qq-h-$kind") {
+                Text(
+                    text = CommandPalette.sectionTitle(kind).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp),
+                )
+            }
+            items(results, key = { "qq-$kind-${it.id}" }) { item ->
+                QuickQueryRow(item = item, onClick = { onSelect(item) })
+            }
+        }
+    }
+}
 
 @Composable
 private fun RecentAgentsStrip(
