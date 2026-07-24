@@ -221,25 +221,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
             
             // lgns8.18 (Path A, desktop): optionally spawn + OWN the App Server child
             // on an ephemeral loopback port, instead of connecting to an external URL.
-            val ownedServer = if (ownAppServer) {
-                println("[iroh-app-server] Spawning owned App Server child ($lettaCommand app-server)...")
-                val owned = com.letta.mobile.cli.appserver.OwnedAppServerProcess.spawn(
-                    command = com.letta.mobile.cli.appserver.OwnedAppServerProcess.buildCommand(lettaCommand),
-                    log = { System.err.println(it) },
-                )
-                Runtime.getRuntime().addShutdownHook(Thread { owned.close() })
-                println("[iroh-app-server] Owned App Server ready at ${owned.wsBaseUrl}")
-                // Deterministic lifecycle: if the owned child dies, take the wrapper
-                // down with it so the pair restarts together — no orphaned half-stack.
-                scope.launch {
-                    val code = withContext(Dispatchers.IO) { owned.process.waitFor() }
-                    System.err.println("[iroh-app-server] Owned App Server child exited (code $code); shutting down wrapper.")
-                    exitProcess(if (code == 0) 0 else 70)
-                }
-                owned
-            } else {
-                null
-            }
+            val ownedServer = maybeSpawnOwnedAppServer(scope)
             val effectiveAppServerUrl = ownedServer?.wsBaseUrl ?: appServerUrl
 
             // Create the controller. With --own-app-server this connects the WS
@@ -286,6 +268,31 @@ internal class AppServerServeIrohCommand : CliktCommand(
             scope.cancel()
             exitProcess(1)
         }
+    }
+
+    /**
+     * lgns8.18 (Path A): with --own-app-server, spawn `letta app-server` as an owned
+     * child on an ephemeral loopback port and return it; else null. Registers a
+     * shutdown hook and takes the wrapper down if the child dies (no orphaned
+     * half-stack). Kept out of [run] so it stays within complexity bounds.
+     */
+    private fun maybeSpawnOwnedAppServer(scope: CoroutineScope): com.letta.mobile.cli.appserver.OwnedAppServerProcess? {
+        if (!ownAppServer) return null
+        println("[iroh-app-server] Spawning owned App Server child ($lettaCommand app-server)...")
+        val owned = com.letta.mobile.cli.appserver.OwnedAppServerProcess.spawn(
+            command = com.letta.mobile.cli.appserver.OwnedAppServerProcess.buildCommand(lettaCommand),
+            log = { System.err.println(it) },
+        )
+        Runtime.getRuntime().addShutdownHook(Thread { owned.close() })
+        println("[iroh-app-server] Owned App Server ready at ${owned.wsBaseUrl}")
+        // Deterministic lifecycle: if the owned child dies, take the wrapper down
+        // with it so the pair restarts together — no orphaned half-stack.
+        scope.launch {
+            val code = withContext(Dispatchers.IO) { owned.process.waitFor() }
+            System.err.println("[iroh-app-server] Owned App Server child exited (code $code); shutting down wrapper.")
+            exitProcess(if (code == 0) 0 else 70)
+        }
+        return owned
     }
 
     private fun createController(

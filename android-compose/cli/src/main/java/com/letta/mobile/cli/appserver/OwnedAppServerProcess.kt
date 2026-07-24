@@ -1,7 +1,7 @@
 package com.letta.mobile.cli.appserver
 
 import java.io.BufferedReader
-import java.io.File
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 /**
@@ -78,25 +78,20 @@ class OwnedAppServerProcess private constructor(
          */
         fun spawn(
             command: List<String>,
-            workingDir: File? = null,
-            environment: Map<String, String> = emptyMap(),
             readyTimeoutMillis: Long = DEFAULT_READY_TIMEOUT_MILLIS,
             log: (String) -> Unit = {},
         ): OwnedAppServerProcess {
-            val pb = ProcessBuilder(command)
-            workingDir?.let { pb.directory(it) }
-            if (environment.isNotEmpty()) pb.environment().putAll(environment)
             // Keep stdout (protocol announce + any protocol output) SEPARATE from
             // stderr (human logs) — never redirectErrorStream, or logs corrupt the
             // announce parse (and, in a true-stdio future, the frame stream).
-            val process = pb.start()
+            val process = ProcessBuilder(command).start()
             startDrain("app-server:err", process.errorStream.bufferedReader(), log)
 
             // Read stdout on a daemon thread that pushes each line onto a queue and
-            // drains for the child's whole life. The readiness scan then POLLS the
-            // queue against a deadline — so a silent-but-alive child (blocking read)
-            // can't defeat the readiness timeout, and stdout never fills/blocks.
-            val queue = java.util.concurrent.LinkedBlockingQueue<Any>()
+            // drains for the child's whole life; the readiness scan then POLLS the
+            // queue against a deadline, so a silent-but-alive child can't defeat the
+            // timeout and stdout never fills/blocks. EOF is signaled via a sentinel.
+            val queue = LinkedBlockingQueue<Any>()
             val eof = Any()
             Thread {
                 runCatching {
@@ -108,36 +103,43 @@ class OwnedAppServerProcess private constructor(
                 queue.put(eof)
             }.apply { isDaemon = true; name = "owned-app-server-stdout"; start() }
 
+            return OwnedAppServerProcess(process, awaitListenUrl(process, queue, eof, readyTimeoutMillis))
+        }
+
+        /** Poll the stdout [queue] until the child announces its listen URL; throw on EOF/timeout. */
+        private fun awaitListenUrl(
+            process: Process,
+            queue: LinkedBlockingQueue<Any>,
+            eof: Any,
+            readyTimeoutMillis: Long,
+        ): String {
             val deadlineNanos = System.nanoTime() + readyTimeoutMillis * 1_000_000L
-            var url: String? = null
             var sawEof = false
             while (true) {
                 val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000L
                 if (remainingMs <= 0) break
                 val item = queue.poll(remainingMs, TimeUnit.MILLISECONDS) ?: break // deadline
-                if (item === eof) {
-                    sawEof = true // stdout closed => the child is exiting/gone
+                if (item === eof) { // stdout closed => the child is exiting/gone
+                    sawEof = true
                     break
                 }
-                val match = LISTENING.find(item as String)
-                if (match != null) {
-                    url = match.groupValues[1]
-                    break
-                }
+                LISTENING.find(item as String)?.let { return it.groupValues[1] }
             }
-            if (url == null) {
-                if (sawEof) {
-                    // Let the exit be reaped so we can report the code (EOF slightly
-                    // precedes isAlive flipping false — don't race it).
-                    process.waitFor(2, TimeUnit.SECONDS)
-                    val code = runCatching { process.exitValue() }.getOrNull()
-                    process.destroyForcibly()
-                    throw IllegalStateException("app-server child exited (code $code) before announcing a listen URL")
-                }
+            failNoListenUrl(process, sawEof, readyTimeoutMillis)
+        }
+
+        /** Reap the child and throw a message distinguishing an early exit from a readiness timeout. */
+        private fun failNoListenUrl(process: Process, exited: Boolean, readyTimeoutMillis: Long): Nothing {
+            if (exited) {
+                // Let the exit be reaped so we can report the code (EOF slightly
+                // precedes isAlive flipping false — don't race it).
+                process.waitFor(2, TimeUnit.SECONDS)
+                val code = runCatching { process.exitValue() }.getOrNull()
                 process.destroyForcibly()
-                throw IllegalStateException("app-server child did not announce a listen URL within ${readyTimeoutMillis}ms")
+                throw IllegalStateException("app-server child exited (code $code) before announcing a listen URL")
             }
-            return OwnedAppServerProcess(process, url)
+            process.destroyForcibly()
+            throw IllegalStateException("app-server child did not announce a listen URL within ${readyTimeoutMillis}ms")
         }
 
         private fun startDrain(name: String, reader: BufferedReader, log: (String) -> Unit) {
