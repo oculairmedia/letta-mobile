@@ -215,10 +215,7 @@ class LocalBackendAdminStoreTest {
         val msgs = store.listMessagesProjected(
             conversationId = "conv-default-agent-1",
             agentId = null,
-            limit = null,
-            before = null,
-            after = null,
-            order = null,
+            page = MessagePage(limit = null, before = null, after = null, order = null),
         )!!
         assertEquals(4, msgs.size)
 
@@ -277,15 +274,15 @@ class LocalBackendAdminStoreTest {
         val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
 
         // limit=2 keeps the NEWEST two (tail), preserving asc order.
-        val limited = store.listMessagesProjected("conv-xyz", null, 2, null, null, "asc")!!
+        val limited = store.listMessagesProjected("conv-xyz", null, MessagePage(2, null, null, "asc"))!!
         assertEquals(listOf("two", "three"), limited.map { it.jsonObject["content"]!!.jsonPrimitive.content })
 
         // before=ui-3 drops ui-3 and everything after it.
-        val before = store.listMessagesProjected("conv-xyz", null, null, "ui-3", null, "asc")!!
+        val before = store.listMessagesProjected("conv-xyz", null, MessagePage(null, "ui-3", null, "asc"))!!
         assertEquals(listOf("one", "two"), before.map { it.jsonObject["content"]!!.jsonPrimitive.content })
 
         // order=desc reverses AFTER slicing.
-        val desc = store.listMessagesProjected("conv-xyz", null, null, null, null, "desc")!!
+        val desc = store.listMessagesProjected("conv-xyz", null, MessagePage(null, null, null, "desc"))!!
         assertEquals(listOf("three", "two", "one"), desc.map { it.jsonObject["content"]!!.jsonPrimitive.content })
     }
 
@@ -294,9 +291,9 @@ class LocalBackendAdminStoreTest {
         val base = tempStore()
         val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
         // Bare "default" is ambiguous across agents -> empty (not the wrong agent).
-        assertEquals(0, store.listMessagesProjected("default", null, null, null, null, null)!!.size)
+        assertEquals(0, store.listMessagesProjected("default", null, MessagePage(null, null, null, null))!!.size)
         // Unknown conv id -> empty list, mirroring the shim's 200 [] for stale ids.
-        assertEquals(0, store.listMessagesProjected("conv-missing", null, null, null, null, null)!!.size)
+        assertEquals(0, store.listMessagesProjected("conv-missing", null, MessagePage(null, null, null, null))!!.size)
     }
 
     @Test
@@ -314,7 +311,7 @@ class LocalBackendAdminStoreTest {
             """{"id":"run-1","agent_id":"agent-r","conversation_id":"conv-run","created_at":"2025-01-01T00:00:00.000Z","message_ids":["ui-a"]}""",
         )
         val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
-        val msgs = store.listMessagesProjected("conv-run", null, null, null, null, null)!!
+        val msgs = store.listMessagesProjected("conv-run", null, MessagePage(null, null, null, null))!!
         assertEquals("run-1", msgs[0].jsonObject["run_id"]!!.jsonPrimitive.content)
     }
 

@@ -216,12 +216,14 @@ object ConversationAdminHandlers {
             // `after` and in-flight filtering intentionally omitted — see
             // LocalBackendAdminStore.listMessagesProjected).
                 ?: localStore?.listMessagesProjected(
-                    conversationId = convId,
-                    agentId = param(params, AdminParamKey("agent_id")),
-                    limit = effectiveLimit.toIntOrNull(),
-                    before = param(params, AdminParamKey("before")),
-                    after = param(params, AdminParamKey("after")),
-                    order = param(params, AdminParamKey("order")),
+                    convId,
+                    param(params, AdminParamKey("agent_id")),
+                    MessagePage(
+                        limit = effectiveLimit.toIntOrNull(),
+                        before = param(params, AdminParamKey("before")),
+                        after = param(params, AdminParamKey("after")),
+                        order = param(params, AdminParamKey("order")),
+                    ),
                 )
                 ?: api.get(
                 AdminPath.v1("conversations", convId, "messages").builder()

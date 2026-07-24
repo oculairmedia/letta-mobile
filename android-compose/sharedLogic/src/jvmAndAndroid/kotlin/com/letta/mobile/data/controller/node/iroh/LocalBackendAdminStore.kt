@@ -52,11 +52,8 @@ class LocalBackendAdminStore(
     fun listMessagesProjected(
         conversationId: String,
         agentId: String?,
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
-    ): JsonArray? = messageReader.listMessagesProjected(conversationId, agentId, limit, before, after, order)
+        page: MessagePage,
+    ): JsonArray? = messageReader.listMessagesProjected(conversationId, agentId, page)
 
     companion object {
         const val DEFAULT_MODEL_ENDPOINT = "https://api.openai.com/v1"

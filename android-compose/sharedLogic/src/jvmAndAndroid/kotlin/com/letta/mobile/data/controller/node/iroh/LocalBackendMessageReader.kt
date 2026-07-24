@@ -7,6 +7,9 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 
+/** Pagination shape for [LocalBackendMessageReader.listMessagesProjected] (mirrors the shim's message.list query). */
+data class MessagePage(val limit: Int?, val before: String?, val after: String?, val order: String?)
+
 /**
  * lgns8.9 slice 3: on-disk `message.list` reader.
  *
@@ -44,34 +47,34 @@ internal class LocalBackendMessageReader(private val support: LocalBackendStoreS
     fun listMessagesProjected(
         conversationId: String,
         agentId: String?,
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
+        page: MessagePage,
     ): JsonArray? = runCatching {
         val resolved = resolveConversation(conversationId, agentId) ?: return@runCatching JsonArray(emptyList())
         val (internalConvId, resolvedAgentId) = resolved
         val dir = File(File(support.baseDir, "conversations"), support.b64UrlEncode(support.conversationKey(internalConvId, resolvedAgentId)))
         // Cached parse of the whole transcript + sidecars; pagination/projection
-        // below stay per-call on the cached (read-only) list.
+        // stay per-call on the cached (read-only) list.
         val data = loadMessageData(dir, resolvedAgentId, internalConvId)
-
-        var scoped = data.messages
-        if (!before.isNullOrEmpty()) {
-            val idx = scoped.indexOfFirst { it["id"]?.stringOrNull() == before }
-            if (idx >= 0) scoped = scoped.subList(0, idx)
-        }
-        if (limit != null && limit > 0 && scoped.size > limit) {
-            scoped = scoped.subList(scoped.size - limit, scoped.size)
-        }
-        val ordered = if ((order ?: "asc").lowercase() == "desc") scoped.asReversed() else scoped
-
         buildJsonArray {
-            ordered.forEach { m ->
+            paginate(data.messages, page).forEach { m ->
                 projection.localMessageToConversationMessages(m, data.sidecars).forEach { add(it) }
             }
         }
     }.getOrNull()
+
+    /** Apply `before` cursor, newest-`limit` window, then `order` — the shim's message.list paging. */
+    private fun paginate(messages: List<JsonObject>, page: MessagePage): List<JsonObject> {
+        var scoped = messages
+        if (!page.before.isNullOrEmpty()) {
+            val idx = scoped.indexOfFirst { it["id"]?.stringOrNull() == page.before }
+            if (idx >= 0) scoped = scoped.subList(0, idx)
+        }
+        val limit = page.limit
+        if (limit != null && limit > 0 && scoped.size > limit) {
+            scoped = scoped.subList(scoped.size - limit, scoped.size)
+        }
+        return if ((page.order ?: "asc").lowercase() == "desc") scoped.asReversed() else scoped
+    }
 
     private data class MessageData(
         val messages: List<JsonObject>,
@@ -194,25 +197,28 @@ internal class LocalBackendMessageReader(private val support: LocalBackendStoreS
      * id, sort by created_at ascending, and map each message id -> run id with
      * the OLDEST run winning (`if (!map[id]) map[id] = run.id`).
      */
+    private data class RunRec(val id: String, val createdAt: String, val messageIds: List<String>)
+
     private fun readRunIdsByMessageId(agentId: String, internalConvId: String): Map<String, String> {
         val root = File(support.baseDir, "runs")
         val dirs = root.listFiles { f -> f.isDirectory && f.name != "_archive" } ?: return emptyMap()
-        data class RunRec(val id: String, val createdAt: String, val messageIds: List<String>)
-        val runs = ArrayList<RunRec>()
-        for (d in dirs) {
-            val obj = runCatching {
-                File(d, "run.json").takeIf { it.isFile }?.readText()?.let { support.json.parseToJsonElement(it).jsonObject }
-            }.getOrNull() ?: continue
-            if (obj["agent_id"]?.stringOrNull() != agentId) continue
-            if (obj["conversation_id"]?.stringOrNull() != internalConvId) continue
-            val id = obj["id"]?.stringOrNull() ?: continue
-            val mids = (obj["message_ids"] as? JsonArray)?.mapNotNull { it.stringOrNull() } ?: emptyList()
-            runs += RunRec(id, obj["created_at"]?.stringOrNull() ?: "", mids)
-        }
-        runs.sortBy { it.createdAt }
+        val runs = dirs.mapNotNull { parseRunRec(it, agentId, internalConvId) }.sortedBy { it.createdAt }
         val map = HashMap<String, String>()
+        // Oldest run owning a message id wins (first-write); mirrors the shim.
         for (r in runs) for (mid in r.messageIds) if (!map.containsKey(mid)) map[mid] = r.id
         return map
+    }
+
+    /** Read one runs/<id>/run.json, keeping it only if it belongs to this agent+conversation. */
+    private fun parseRunRec(dir: File, agentId: String, internalConvId: String): RunRec? {
+        val obj = runCatching {
+            File(dir, "run.json").takeIf { it.isFile }?.readText()?.let { support.json.parseToJsonElement(it).jsonObject }
+        }.getOrNull() ?: return null
+        if (obj["agent_id"]?.stringOrNull() != agentId) return null
+        if (obj["conversation_id"]?.stringOrNull() != internalConvId) return null
+        val id = obj["id"]?.stringOrNull() ?: return null
+        val mids = (obj["message_ids"] as? JsonArray)?.mapNotNull { it.stringOrNull() } ?: emptyList()
+        return RunRec(id, obj["created_at"]?.stringOrNull() ?: "", mids)
     }
 
     companion object {
