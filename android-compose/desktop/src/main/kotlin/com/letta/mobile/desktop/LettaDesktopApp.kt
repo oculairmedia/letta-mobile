@@ -54,6 +54,7 @@ internal fun LettaDesktopApp(
     nucleusApplicationScope: NucleusApplicationScope,
     window: Window,
     deepLinks: StateFlow<DesktopDeepLinkRequest?>,
+    quickQuery: DesktopQuickQueryCoordinator,
     onActiveTitleChange: (String) -> Unit = {},
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
@@ -329,8 +330,45 @@ internal fun LettaDesktopApp(
                 editAgentId = null
                 selectedDestination = DesktopDestination.Settings
             },
+            onQuickQuery = quickQuery::open,
         ),
     )
+
+    // Publish palette data + routing into the application-scoped quick-query
+    // window. Selecting an item mirrors the in-app command palette; free text
+    // goes to the selected conversation and raises the main window to show
+    // the streaming response.
+    LaunchedEffect(paletteItems) { quickQuery.items.value = paletteItems }
+    SideEffect {
+        quickQuery.actions.value = DesktopQuickQueryActions(
+            onSelectItem = { item ->
+                activateDesktopWindow(window)
+                when (item.kind) {
+                    PaletteItemKind.Conversation -> {
+                        editAgentId = null
+                        chatController.selectConversation(item.id)
+                        selectedDestination = DesktopDestination.Conversations
+                    }
+                    PaletteItemKind.Agent -> openAgent(item.id)
+                    PaletteItemKind.Destination ->
+                        DesktopDestination.entries.firstOrNull { it.name == item.id }
+                            ?.let {
+                                editAgentId = null
+                                selectedDestination = it
+                            }
+                }
+            },
+            onSubmitPrompt = { text, ambientContext ->
+                val target = chatState.selectedConversationId
+                if (target != null) {
+                    chatController.replyFromNotification(target, quickQueryPrompt(text, ambientContext))
+                }
+                activateDesktopWindow(window)
+                editAgentId = null
+                selectedDestination = DesktopDestination.Conversations
+            },
+        )
+    }
 
     AvatarPresenceEffects(
         avatar = avatar,

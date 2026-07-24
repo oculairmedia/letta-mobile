@@ -69,6 +69,7 @@ private fun runDesktopApplication(
 ) {
     val deepLinkSequence = AtomicLong()
     val deepLinks = MutableStateFlow<DesktopDeepLinkRequest?>(null)
+    val quickQuery = DesktopQuickQueryCoordinator()
     nucleusApplication(
         args = args,
         backend = NucleusBackend.Awt,
@@ -105,9 +106,13 @@ private fun runDesktopApplication(
                         nucleusApplicationScope = nucleusScope,
                         window = window,
                         deepLinks = deepLinks,
+                        quickQuery = quickQuery,
                         onActiveTitleChange = { windowTitle = it },
                     )
                 }
+                // Spotlight-style floating query bar, summoned by the global
+                // hotkey without raising the main window.
+                DesktopQuickQueryWindow(quickQuery)
             }
         }
 }

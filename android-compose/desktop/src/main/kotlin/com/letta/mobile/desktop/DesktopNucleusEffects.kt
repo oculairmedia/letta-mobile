@@ -69,6 +69,8 @@ internal data class DesktopNucleusEffectState(
 internal data class DesktopNucleusEffectActions(
     val onOpenCommandPalette: () -> Unit,
     val onOpenSettings: () -> Unit,
+    /** Summon the floating quick-query bar (global hotkey), without raising the main window. */
+    val onQuickQuery: () -> Unit,
 )
 
 internal data class DesktopNucleusRuntimeState(
@@ -183,7 +185,7 @@ private fun DesktopIntegrationLifecycleEffect(
 ) {
     DisposableEffect(window) {
         GlobalHotKeyManager.initialize()
-        val hotKey = registerQuickSwitcher(onActivate, actions.onOpenCommandPalette)
+        val hotKey = registerQuickSwitcher(actions.onQuickQuery)
         configureLauncherMenus(onShow = onActivate, onOpenSettings = actions.onOpenSettings)
         configureMediaControls(agentName = agentName, onActivate = onActivate)
         val focusListener = desktopFocusListener(window)
@@ -319,16 +321,16 @@ private fun failureProgressAction(
     return if (state.isAgentWorking) FailureProgressAction.None else FailureProgressAction.ClearProgress
 }
 
-private fun registerQuickSwitcher(onActivate: () -> Unit, onOpenCommandPalette: () -> Unit): Long =
+private fun registerQuickSwitcher(onQuickQuery: () -> Unit): Long =
     GlobalHotKeyManager.register(
         keyCode = KeyEvent.VK_SPACE,
         modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
-        description = "Open Letta quick switcher",
+        description = "Open Letta quick query",
     ) { _, _ ->
-        SwingUtilities.invokeLater {
-            onActivate()
-            onOpenCommandPalette()
-        }
+        // Deliberately does NOT activate the main window: the quick-query bar
+        // floats over the user's current context (which it also captures —
+        // the foreground app must still be frontmost at this point).
+        SwingUtilities.invokeLater(onQuickQuery)
     }
 
 private fun desktopFocusListener(window: Window): WindowFocusListener = object : WindowFocusListener {
