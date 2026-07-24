@@ -1293,19 +1293,13 @@ class IrohChannelTransport(
     // silently dropped.
     override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse {
         val requestId = "iroh-cron-list-${UUID.randomUUID()}"
-        return invokeScopedRpc(
+        return cronInvoke(
+            op = "cron.list",
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = cronLabels("cron.list"),
-            call = {
-                adminRpc(
-                    method = "cron.list",
-                    path = CRON_ADMIN_PATH,
-                    body = buildJsonObject {
-                        agentId?.let { put("agent_id", it) }
-                        conversationId?.let { put("conversation_id", it) }
-                    }.toString(),
-                )
+            body = buildJsonObject {
+                agentId?.let { put("agent_id", it) }
+                conversationId?.let { put("conversation_id", it) }
             },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronListRpcResult>(result)
@@ -1317,27 +1311,21 @@ class IrohChannelTransport(
 
     override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronAddResponse {
         val requestId = "iroh-cron-add-${UUID.randomUUID()}"
-        return invokeScopedRpc(
+        return cronInvoke(
+            op = "cron.add",
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = cronLabels("cron.add"),
-            call = {
-                adminRpc(
-                    method = "cron.add",
-                    path = CRON_ADMIN_PATH,
-                    body = buildJsonObject {
-                        put("agent_id", agentId)
-                        put("name", name)
-                        put("description", description)
-                        put("prompt", prompt)
-                        put("recurring", recurring)
-                        cron?.let { put("cron", it) }
-                        timezone?.let { put("timezone", it) }
-                        conversationId?.let { put("conversation_id", it) }
-                        // Native contract has no `every`; a one-off time is `scheduled_for`.
-                        at?.let { put("scheduled_for", it) }
-                    }.toString(),
-                )
+            body = buildJsonObject {
+                put("agent_id", agentId)
+                put("name", name)
+                put("description", description)
+                put("prompt", prompt)
+                put("recurring", recurring)
+                cron?.let { put("cron", it) }
+                timezone?.let { put("timezone", it) }
+                conversationId?.let { put("conversation_id", it) }
+                // Native contract has no `every`; a one-off time is `scheduled_for`.
+                at?.let { put("scheduled_for", it) }
             },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
@@ -1349,11 +1337,11 @@ class IrohChannelTransport(
 
     override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse {
         val requestId = "iroh-cron-get-${UUID.randomUUID()}"
-        return invokeScopedRpc(
+        return cronInvoke(
+            op = "cron.get",
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = cronLabels("cron.get"),
-            call = { adminRpc(method = "cron.get", path = CRON_ADMIN_PATH, body = buildJsonObject { put("task_id", taskId) }.toString()) },
+            body = buildJsonObject { put("task_id", taskId) },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
                 ServerFrame.CronGetResponse(id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task)
@@ -1364,11 +1352,11 @@ class IrohChannelTransport(
 
     override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse {
         val requestId = "iroh-cron-delete-${UUID.randomUUID()}"
-        return invokeScopedRpc(
+        return cronInvoke(
+            op = "cron.delete",
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = cronLabels("cron.delete"),
-            call = { adminRpc(method = "cron.delete", path = CRON_ADMIN_PATH, body = buildJsonObject { put("task_id", taskId) }.toString()) },
+            body = buildJsonObject { put("task_id", taskId) },
             mapSuccess = { _ ->
                 ServerFrame.CronDeleteResponse(id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = true)
             },
@@ -1378,11 +1366,11 @@ class IrohChannelTransport(
 
     override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse {
         val requestId = "iroh-cron-delete-all-${UUID.randomUUID()}"
-        return invokeScopedRpc(
+        return cronInvoke(
+            op = "cron.delete_all",
             requestId = requestId,
             timeoutMs = timeoutMs,
-            labels = cronLabels("cron.delete_all"),
-            call = { adminRpc(method = "cron.delete_all", path = CRON_ADMIN_PATH, body = buildJsonObject { put("agent_id", agentId) }.toString()) },
+            body = buildJsonObject { put("agent_id", agentId) },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronDeleteAllRpcResult>(result)
                 ServerFrame.CronDeleteAllResponse(id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = true, count = decoded.deleted)
@@ -1523,6 +1511,27 @@ class IrohChannelTransport(
         unsupported = CRON_RPC_UNSUPPORTED,
         timedOut = "$op timed out",
         failed = "$op failed",
+    )
+
+    /**
+     * Shared cron.* bridge invocation: run [op] over admin_rpc with [body] and map
+     * the result / typed failure. Collapses the per-method invokeScopedRpc + labels
+     * + adminRpc boilerplate so each sendCron* is just its body + result mapping.
+     */
+    private suspend fun <T> cronInvoke(
+        op: String,
+        requestId: String,
+        timeoutMs: Long,
+        body: JsonObject,
+        mapSuccess: (JsonElement) -> T,
+        onFailure: (String, String) -> T,
+    ): T = invokeScopedRpc(
+        requestId = requestId,
+        timeoutMs = timeoutMs,
+        labels = cronLabels(op),
+        call = { adminRpc(method = op, path = CRON_ADMIN_PATH, body = body.toString()) },
+        mapSuccess = mapSuccess,
+        onFailure = onFailure,
     )
 
     private fun cronListFailure(requestId: String, error: String) = ServerFrame.CronListResponse(
