@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -27,6 +29,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -105,6 +109,8 @@ internal data class DesktopAgentRailState(
     val agents: List<Pair<String, String>>,
     val focus: DesktopAgentRailFocus,
     val avatarCompanionActive: Boolean = false,
+    /** Spotify-style expanded library mode: names + spaces, not just orbs. */
+    val expanded: Boolean = false,
 )
 
 internal data class DesktopAgentRailActions(
@@ -112,6 +118,7 @@ internal data class DesktopAgentRailActions(
     val onNewSession: () -> Unit,
     val onSearch: () -> Unit,
     val onAvatarCompanion: () -> Unit = {},
+    val onToggleExpanded: () -> Unit = {},
 )
 
 /**
@@ -132,23 +139,158 @@ internal fun DesktopAgentRail(
         state.agents.groupBy { it.second }
             .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
     }
+    val width by animateDpAsState(if (state.expanded) 248.dp else 56.dp, label = "railWidth")
     Column(
         modifier = Modifier
-            .width(56.dp)
+            .width(width)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 15.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        RailExpandToggle(expanded = state.expanded, onToggle = actions.onToggleExpanded)
         NewSessionButton(onNewSession = actions.onNewSession)
         Spacer(Modifier.height(8.dp))
-        AgentRailOrbList(
-            groups = groups,
-            focus = state.focus,
-            onAgentSelected = actions.onAgentSelected,
-        )
+        if (state.expanded) {
+            ExpandedAgentLibrary(
+                groups = groups,
+                focus = state.focus,
+                onAgentSelected = actions.onAgentSelected,
+            )
+        } else {
+            AgentRailOrbList(
+                groups = groups,
+                focus = state.focus,
+                onAgentSelected = actions.onAgentSelected,
+            )
+        }
         AgentRailBottomActions(state = state, actions = actions)
+    }
+}
+
+@Composable
+private fun RailExpandToggle(expanded: Boolean, onToggle: () -> Unit) {
+    RailActionIcon(
+        RailActionIconModel(
+            icon = Icons.Outlined.Menu,
+            description = if (expanded) "Collapse agent library" else "Expand agent library",
+            onClick = onToggle,
+        ),
+    )
+}
+
+/**
+ * Spotify "Your Library"-style expanded rail: agents grouped into
+ * Element-style spaces (derived from naming conventions), each section
+ * headed by its aggregate impact — member count and a live working
+ * indicator — rather than one anonymous orb per agent.
+ */
+@Composable
+private fun ColumnScope.ExpandedAgentLibrary(
+    groups: List<AgentRailGroup>,
+    focus: DesktopAgentRailFocus,
+    onAgentSelected: (String) -> Unit,
+) {
+    val spaces = remember(groups) { deriveAgentSpaces(groups) }
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        spaces.forEach { space ->
+            SpaceHeader(space = space, focus = focus)
+            space.groups.forEach { group ->
+                val index = groups.indexOf(group)
+                ExpandedAgentRow(
+                    params = AgentRailOrbParams(
+                        group = group,
+                        index = index,
+                        focus = focus,
+                        onAgentSelected = onAgentSelected,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpaceHeader(space: AgentRailSpace, focus: DesktopAgentRailFocus) {
+    val working = focus.thinkingAgentId != null &&
+        space.groups.any { focus.thinkingAgentId in it.agentIds }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = space.name.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (working) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+            )
+        }
+        Text(
+            text = space.agentCount.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ExpandedAgentRow(params: AgentRailOrbParams) {
+    val flags = params.toFlags()
+    val target = params.toTarget(flags)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = { params.onAgentSelected(target.agentId) })
+            .background(
+                if (flags.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (flags.thinking) {
+                ThinkingRing(diameter = 32.dp, cornerRadius = 9.dp)
+            }
+            AgentOrb(index = target.orbStyle, size = 28.dp, cornerRadius = 8.dp) {
+                Text(
+                    text = params.group.name.firstOrNull()?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+            }
+        }
+        Text(
+            text = params.group.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (flags.selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (flags.count > 1) {
+            Text(
+                text = if (flags.count > 99) "99+" else flags.count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -353,10 +495,39 @@ private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
 }
 
 /** A rail entry: one or more agents that share a display name, stacked together. */
-private data class AgentRailGroup(
+internal data class AgentRailGroup(
     val name: String,
     val agentIds: List<String>,
 )
+
+/** An Element-style space: a named cluster of rail groups with aggregate impact. */
+internal data class AgentRailSpace(
+    val name: String,
+    val groups: List<AgentRailGroup>,
+) {
+    val agentCount: Int get() = groups.sumOf { it.agentIds.size }
+}
+
+/**
+ * Derives spaces from naming conventions ("PM - social-hause" → space "PM"):
+ * a prefix before " - " shared by at least two groups becomes a space;
+ * everything else lands in the catch-all "Agents" space. Order follows first
+ * appearance so recency is preserved within and across spaces.
+ */
+internal fun deriveAgentSpaces(groups: List<AgentRailGroup>): List<AgentRailSpace> {
+    val prefixOf = { group: AgentRailGroup ->
+        group.name.substringBefore(" - ", missingDelimiterValue = "").takeIf { it.isNotBlank() }
+    }
+    val prefixCounts = groups.mapNotNull(prefixOf).groupingBy { it }.eachCount()
+    val spaced = LinkedHashMap<String, MutableList<AgentRailGroup>>()
+    groups.forEach { group ->
+        val prefix = prefixOf(group)?.takeIf { (prefixCounts[it] ?: 0) >= 2 }
+        spaced.getOrPut(prefix ?: RAIL_CATCH_ALL_SPACE) { mutableListOf() }.add(group)
+    }
+    return spaced.map { (name, members) -> AgentRailSpace(name = name, groups = members) }
+}
+
+internal const val RAIL_CATCH_ALL_SPACE = "Agents"
 
 private data class RailActionIconModel(
     val icon: ImageVector,

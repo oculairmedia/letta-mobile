@@ -1,9 +1,11 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -58,6 +60,8 @@ internal fun LettaDesktopApp(
     onActiveTitleChange: (String) -> Unit = {},
 ) {
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
+    // Spotify-style library toggle: icon rail ↔ expanded names-and-spaces list.
+    var railExpanded by rememberSaveable { mutableStateOf(false) }
     var showNewAgentDialog by remember { mutableStateOf(false) }
     var showNewConversation by remember { mutableStateOf(false) }
     // Avatar styles chosen via the editor this session, applied immediately to the
@@ -397,7 +401,8 @@ internal fun LettaDesktopApp(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-          Box(Modifier.fillMaxSize()) {
+          Column(Modifier.fillMaxSize()) {
+          Box(Modifier.weight(1f).fillMaxWidth()) {
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -409,6 +414,7 @@ internal fun LettaDesktopApp(
                             avatarStyleByAgentId = avatarStyleByAgentId,
                         ),
                         avatarCompanionActive = avatar.isActive,
+                        expanded = railExpanded,
                     ),
                     actions = DesktopAgentRailActions(
                         onAgentSelected = { agentId -> openAgent(agentId) },
@@ -417,6 +423,7 @@ internal fun LettaDesktopApp(
                         onNewSession = { showNewConversation = true },
                         onSearch = { showCommandPalette = true },
                         onAvatarCompanion = avatar.toggle,
+                        onToggleExpanded = { railExpanded = !railExpanded },
                     ),
                 )
                 RailDivider()
@@ -723,6 +730,40 @@ internal fun LettaDesktopApp(
                     ),
                 )
             }
+          }
+          // Spotify-style persistent bottom bar: tracks the ACTIVE
+          // conversation across every destination.
+          chatState.selectedConversation?.let { activeConversation ->
+              DesktopNowActiveBar(
+                  state = NowActiveBarState(
+                      conversationTitle = activeConversation.title,
+                      agentName = activeConversation.agentName,
+                      orbIndex = activeConversation.agentId?.let { avatarStyleByAgentId[it] }
+                          ?: selectedAgentOrbIndex,
+                      status = nowActiveStatus(
+                          isThinking = isThinkingSelected,
+                          isStreaming = isStreamingReplySelected,
+                          hasError = chatState.errorMessage != null,
+                      ),
+                      backgroundWorkAgentName = thinkingConversationId
+                          ?.takeIf { it != chatState.selectedConversationId }
+                          ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
+                  ),
+                  actions = NowActiveBarActions(
+                      onOpenConversation = {
+                          editAgentId = null
+                          selectedDestination = DesktopDestination.Conversations
+                      },
+                      onJumpToBackgroundWork = {
+                          thinkingConversationId?.let {
+                              editAgentId = null
+                              chatController.selectConversation(it)
+                              selectedDestination = DesktopDestination.Conversations
+                          }
+                      },
+                  ),
+              )
+          }
           }
         }
     }
