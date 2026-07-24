@@ -20,6 +20,10 @@ object AgentAdminHandlers {
         adminBaseUrl: String,
         controller: AppServerController? = null,
         nativeClient: AppServerClient? = null,
+        // lgns8.9: when configured, read agent.list from the on-disk backend store
+        // directly (retiring the shim proxy for that read). Null = disabled = the
+        // pre-lgns8.9 proxy behavior, so production is unaffected until enabled.
+        localStore: LocalBackendAdminStore? = null,
     ) {
         val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("agent.list") { params ->
@@ -27,6 +31,8 @@ object AgentAdminHandlers {
             // through ALL agents. Without a limit the server returns only its default
             // first page (~50), so agents beyond it never resolve a name in the
             // conversation list (fall back to agentId.take(8)).
+            val limit = param(params, AdminParamKey("limit"))?.toIntOrNull()
+            val offset = param(params, AdminParamKey("offset"))?.toIntOrNull()
             NativeAdmin.attempt(nativeClient, "agent.list") { c ->
                 val response = c.agentList(
                     AppServerCommand.AgentList(
@@ -38,10 +44,14 @@ object AgentAdminHandlers {
                     ),
                 )
                 if (response.success) response.agents ?: JsonArray(emptyList()) else null
-            } ?: api.get(AdminPath.v1("agents")) {
-                query("limit", param(params, AdminParamKey("limit")))
-                query("offset", param(params, AdminParamKey("offset")))
             }
+                // lgns8.9 native-store tier: try the on-disk store (returns null on
+                // any error), else fall through to the shim proxy exactly as before.
+                ?: localStore?.listAgentsProjected(limit, offset)
+                ?: api.get(AdminPath.v1("agents")) {
+                    query("limit", param(params, AdminParamKey("limit")))
+                    query("offset", param(params, AdminParamKey("offset")))
+                }
         }
         router.register("agent.get") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
