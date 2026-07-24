@@ -176,11 +176,15 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         return listOf(wire)
     }
 
+    /** True only for a non-string primitive whose content is exactly `true` (JS `=== true` on a bool). */
+    private fun parseBooleanFlag(value: JsonElement?): Boolean =
+        (value as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+
     /** toolResult top-level row (letta-code 0.25.x). */
     private fun projectToolResultRow(ctx: ProjCtx, localMsg: JsonObject, parts: JsonArray): List<JsonObject> {
         val callId = localMsg["toolCallId"]?.stringOrNull() ?: ""
         val toolName = localMsg["toolName"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
-        val isError = (localMsg["isError"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
+        val isError = parseBooleanFlag(localMsg["isError"])
         val returnText = partsToText(parts)
         val status = if (isError) "error" else "success"
         val tr = toolReturnInner(callId, status, JsonNull, JsonNull, returnText)
@@ -205,58 +209,63 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         return listOf(trMsg)
     }
 
+    /** Groups consecutive `text` parts into a single assistant run, flushed on demand. */
+    private class TextAccumulator {
+        private val sb = StringBuilder()
+        private var startIndex = -1
+        fun append(index: Int, text: String) {
+            if (startIndex == -1) startIndex = index
+            sb.append(text)
+        }
+        /** Returns (startIndex, text) and resets, or null when nothing is pending. */
+        fun take(): Pair<Int, String>? {
+            if (sb.isEmpty()) return null
+            val run = startIndex to sb.toString()
+            sb.setLength(0)
+            startIndex = -1
+            return run
+        }
+    }
+
+    /** Emit the pending grouped-text run (if any) as an assistant_message before a tool part. */
+    private fun flushPendingText(out: MutableList<JsonObject>, ctx: ProjCtx, acc: TextAccumulator) {
+        val run = acc.take() ?: return
+        out += buildAssistantText(ctx, out.isEmpty(), run.first, run.second)
+    }
+
+    /**
+     * Dispatch a single non-text part to its wire projection, or null when the part is
+     * not a recognized tool-shaped part (shim logs + skips). Check order matches the
+     * original if-chain byte-for-byte.
+     */
+    private fun projectAssistantPart(ctx: ProjCtx, i: Int, part: JsonObject, type: String): List<JsonObject>? = when {
+        type == "reasoning" && part["text"]?.stringOrNull() != null -> listOf(buildReasoning(ctx, i, part))
+        // Legacy `tool-call` + new camelCase `toolCall`.
+        type == "tool-call" || type == "toolCall" -> listOf(buildToolCall(ctx, i, part))
+        // Native LocalBackend tool part: `tool-<name>` with toolCallId.
+        type.startsWith("tool-") && type != "tool-call" && type != "tool-return" &&
+            part["toolCallId"]?.stringOrNull() != null -> projectNativeToolPart(ctx, type, part)
+        type == "tool-return" -> listOf(buildToolReturnPart(ctx, i, part))
+        else -> null
+    }
+
     /** Assistant / tool: walk parts, grouping consecutive text, dispatching each tool-shaped part. */
     private fun projectAssistantParts(ctx: ProjCtx, parts: JsonArray): List<JsonObject> {
         val out = ArrayList<JsonObject>()
-        val pendingText = StringBuilder()
-        var pendingTextStartIndex = -1
-        fun flushText() {
-            if (pendingText.isEmpty()) return
-            out += buildAssistantText(ctx, out.isEmpty(), pendingTextStartIndex, pendingText.toString())
-            pendingText.setLength(0)
-            pendingTextStartIndex = -1
-        }
-
+        val acc = TextAccumulator()
         for (i in 0 until parts.size) {
             val part = parts[i] as? JsonObject ?: continue
             val type = part["type"]?.stringOrNull() ?: continue
-
-            if (type == "text" && part["text"]?.stringOrNull() != null) {
-                if (pendingTextStartIndex == -1) pendingTextStartIndex = i
-                pendingText.append(part["text"]!!.stringOrNull())
+            val text = if (type == "text") part["text"]?.stringOrNull() else null
+            if (text != null) {
+                acc.append(i, text)
                 continue
             }
-
-            if (type == "reasoning" && part["text"]?.stringOrNull() != null) {
-                flushText()
-                out += buildReasoning(ctx, i, part)
-                continue
-            }
-
-            // Legacy `tool-call` + new camelCase `toolCall`.
-            if (type == "tool-call" || type == "toolCall") {
-                flushText()
-                out += buildToolCall(ctx, i, part)
-                continue
-            }
-
-            // Native LocalBackend tool part: `tool-<name>` with toolCallId.
-            if (type.startsWith("tool-") && type != "tool-call" && type != "tool-return" &&
-                part["toolCallId"]?.stringOrNull() != null
-            ) {
-                flushText()
-                out += projectNativeToolPart(ctx, type, part)
-                continue
-            }
-
-            if (type == "tool-return") {
-                flushText()
-                out += buildToolReturnPart(ctx, i, part)
-                continue
-            }
-            // Unknown tool-shaped part: skip (shim logs + skips).
+            val projected = projectAssistantPart(ctx, i, part, type) ?: continue
+            flushPendingText(out, ctx, acc)
+            out += projected
         }
-        flushText()
+        flushPendingText(out, ctx, acc)
         return out
     }
 
@@ -326,8 +335,23 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         val toolCallId = part["toolCallId"]!!.stringOrNull()!!
         val toolName = type.substring("tool-".length)
         val argsStr = jsonStringifyArgs(part["input"])
+        out += buildNativeToolCallMessage(ctx, toolName, toolCallId, argsStr)
+        val state = part["state"]?.stringOrNull()
+        if (state == "output-available" || state == "output-error" || state == "output-denied") {
+            out += buildNativeToolReturnMessage(ctx, toolName, toolCallId, state, part)
+        }
+        return out
+    }
+
+    /** tool_call_message wire object for a native `tool-<name>` part. */
+    private fun buildNativeToolCallMessage(
+        ctx: ProjCtx,
+        toolName: String,
+        toolCallId: String,
+        argsStr: String,
+    ): JsonObject {
         val tc = toolCallInner(toolName, argsStr, toolCallId)
-        out += buildJsonObject {
+        return buildJsonObject {
             put("id", "toolcall-$toolCallId")
             put("date", withTypeOffset(ctx.created, "tool_call_message"))
             put("name", toolName)
@@ -341,48 +365,57 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("tool_call", tc)
             put("tool_calls", JsonArray(listOf(tc)))
         }
-        val state = part["state"]?.stringOrNull()
-        if (state == "output-available" || state == "output-error" || state == "output-denied") {
-            val isError = state != "output-available"
-            val returnText = if (isError) {
-                part["errorText"]?.stringOrNull() ?: flattenToolOutput(part["output"])
-            } else {
-                flattenToolOutput(part["output"])
-            }
-            val status = if (isError) "error" else "success"
-            val tr = toolReturnInner(toolCallId, status, JsonNull, JsonNull, returnText)
-            out += buildJsonObject {
-                put("id", "toolreturn-$toolCallId")
-                put("date", withTypeOffset(ctx.created, "tool_return_message"))
-                put("name", toolName)
-                put("message_type", "tool_return_message")
-                put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
-                put("sender_id", JsonNull)
-                put("step_id", JsonNull)
-                put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
-                put("seq_id", JsonNull)
-                put("run_id", ctx.projectedRunId)
-                put("tool_call_id", toolCallId)
-                put("status", status)
-                put("tool_return", returnText)
-                put("stdout", JsonNull)
-                put("stderr", JsonNull)
-                put("tool_returns", JsonArray(listOf(tr)))
-            }
+    }
+
+    /** tool_return_message wire object for a completed native `tool-<name>` part. */
+    private fun buildNativeToolReturnMessage(
+        ctx: ProjCtx,
+        toolName: String,
+        toolCallId: String,
+        state: String,
+        part: JsonObject,
+    ): JsonObject {
+        val isError = state != "output-available"
+        val returnText = if (isError) {
+            part["errorText"]?.stringOrNull() ?: flattenToolOutput(part["output"])
+        } else {
+            flattenToolOutput(part["output"])
         }
-        return out
+        val status = if (isError) "error" else "success"
+        val tr = toolReturnInner(toolCallId, status, JsonNull, JsonNull, returnText)
+        return buildJsonObject {
+            put("id", "toolreturn-$toolCallId")
+            put("date", withTypeOffset(ctx.created, "tool_return_message"))
+            put("name", toolName)
+            put("message_type", "tool_return_message")
+            put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
+            put("sender_id", JsonNull)
+            put("step_id", JsonNull)
+            put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
+            put("seq_id", JsonNull)
+            put("run_id", ctx.projectedRunId)
+            put("tool_call_id", toolCallId)
+            put("status", status)
+            put("tool_return", returnText)
+            put("stdout", JsonNull)
+            put("stderr", JsonNull)
+            put("tool_returns", JsonArray(listOf(tr)))
+        }
+    }
+
+    /** Resolve the `tool_return` raw value to its wire text: verbatim string, `"\"\""` for null, else JSON. */
+    private fun resolveToolReturnText(returnRaw: JsonElement?): String = when {
+        returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
+        returnRaw == null || returnRaw is JsonNull -> "\"\""
+        else -> returnRaw.toString()
     }
 
     /** tool_return_message wire object for an explicit `tool-return` part. */
     private fun buildToolReturnPart(ctx: ProjCtx, i: Int, part: JsonObject): JsonObject {
         val callId = part["toolCallId"]?.stringOrNull() ?: ""
-        val status = if (part["status"]?.stringOrNull() == "error") "error" else "success"
-        val returnRaw = part["tool_return"]
-        val returnText = when {
-            returnRaw is JsonPrimitive && returnRaw.isString -> returnRaw.content
-            returnRaw == null || returnRaw is JsonNull -> "\"\""
-            else -> returnRaw.toString()
-        }
+        val isError = part["status"]?.stringOrNull() == "error"
+        val status = if (isError) "error" else "success"
+        val returnText = resolveToolReturnText(part["tool_return"])
         val stdout = toStringArrayOrNull(part["stdout"])
         val stderr = toStringArrayOrNull(part["stderr"])
         val name = part["name"]?.stringOrNull()?.takeIf { it.isNotEmpty() }
@@ -395,7 +428,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("otid", ctx.id?.let { JsonPrimitive(it) } ?: JsonNull)
             put("sender_id", JsonNull)
             put("step_id", JsonNull)
-            put("is_err", if (part["status"]?.stringOrNull() == "error") JsonPrimitive(true) else JsonNull)
+            put("is_err", if (isError) JsonPrimitive(true) else JsonNull)
             put("seq_id", JsonNull)
             put("run_id", ctx.projectedRunId)
             put("tool_call_id", callId)

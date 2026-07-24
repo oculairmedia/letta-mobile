@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -91,29 +92,48 @@ internal class LocalBackendConversationReader(private val support: LocalBackendS
     private fun keyExcludedForAgent(key: String, agentId: String): Boolean =
         key != "default:$agentId" && !key.startsWith("conversation:")
 
+    /** The `id` / `agent_id` identity pair resolved (and agent-filtered) from conversation.json. */
+    private data class ConvIds(val id: String, val agentId: String)
+
     /** Parse one conversations/<b64url(key)>/ dir into a ConvRecord, or null to skip it. */
     private fun parseConversationRecord(d: File, agentId: String?): ConvRecord? {
         val key = runCatching { support.b64UrlDecode(d.name) }.getOrNull() ?: return null
         if (agentId != null && keyExcludedForAgent(key, agentId)) return null
-        val obj = runCatching {
-            File(d, "conversation.json").takeIf { it.isFile }?.readText()?.let { support.json.parseToJsonElement(it).jsonObject }
-        }.getOrNull() ?: return null
+        val obj = readConversationJson(d) ?: return null
+        val ids = resolveConvIds(obj, agentId) ?: return null
+        return buildConvRecord(ids, obj)
+    }
+
+    /** Read + parse conversation.json for a dir, or null on any error / missing file. */
+    private fun readConversationJson(d: File): JsonObject? = runCatching {
+        File(d, "conversation.json").takeIf { it.isFile }?.readText()?.let { support.json.parseToJsonElement(it).jsonObject }
+    }.getOrNull()
+
+    /** Resolve the conversation id + agent_id, applying the agent filter; null skips the record. */
+    private fun resolveConvIds(obj: JsonObject, agentId: String?): ConvIds? {
         val convId = obj["id"]?.jsonPrimitive?.contentOrNullSafe() ?: return null
         val convAgent = obj["agent_id"]?.jsonPrimitive?.contentOrNullSafe() ?: return null
         if (agentId != null && convAgent != agentId) return null
-        return ConvRecord(
-            id = convId,
-            agentId = convAgent,
-            createdAt = obj["created_at"]?.stringOrNull(),
-            updatedAt = obj["updated_at"]?.stringOrNull(),
-            lastMessageAt = obj["last_message_at"]?.stringOrNull(),
-            summary = obj["summary"]?.stringOrNull(),
-            archived = (obj["archived"] as? JsonPrimitive)?.let { if (it.isString) null else it.content.toBooleanStrictOrNull() },
-            archivedAt = obj["archived_at"]?.stringOrNull(),
-            inContextMessageIds = obj["in_context_message_ids"] as? JsonArray ?: JsonArray(emptyList()),
-            raw = obj,
-        )
+        return ConvIds(convId, convAgent)
     }
+
+    /** Parse the raw `archived` value: null for a missing/string value, else the strict boolean. */
+    private fun parseArchivedFlag(value: JsonElement?): Boolean? =
+        (value as? JsonPrimitive)?.let { if (it.isString) null else it.content.toBooleanStrictOrNull() }
+
+    /** Build the ConvRecord from resolved identity + the raw conversation.json object. */
+    private fun buildConvRecord(ids: ConvIds, obj: JsonObject): ConvRecord = ConvRecord(
+        id = ids.id,
+        agentId = ids.agentId,
+        createdAt = obj["created_at"]?.stringOrNull(),
+        updatedAt = obj["updated_at"]?.stringOrNull(),
+        lastMessageAt = obj["last_message_at"]?.stringOrNull(),
+        summary = obj["summary"]?.stringOrNull(),
+        archived = parseArchivedFlag(obj["archived"]),
+        archivedAt = obj["archived_at"]?.stringOrNull(),
+        inContextMessageIds = obj["in_context_message_ids"] as? JsonArray ?: JsonArray(emptyList()),
+        raw = obj,
+    )
 
     /**
      * Port of store.ts withRealTimes: overlay the sidecar max message time. If the
