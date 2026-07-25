@@ -183,6 +183,48 @@ class LettaCodeLocalBackendStoreTest {
         assertTrue("second message should be UserMessage", messages[1] is UserMessage)
     }
 
+    // ── bounded hydration of pathologically oversized rows (letta-mobile-lgns8.20) ──
+
+    @Test
+    fun `readTranscript collapses oversized image row to placeholder without large allocation`() = runTest {
+        val agentId = "agent-oversized-image"
+        val key = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("default:$agentId".toByteArray(Charsets.UTF_8))
+        val conversationDir = File(temp.root, "embedded-lettacode/local-backend/conversations/$key")
+        conversationDir.mkdirs()
+        val transcript = File(conversationDir, "messages.jsonl")
+
+        // A "tens of MB" base64 payload — well above BoundedTranscriptReader's
+        // 8MB cap — that File.readLines()/useLines() would materialize as one
+        // giant String. Built without ever holding the full line as one
+        // in-memory String literal ourselves: write it straight to disk in
+        // chunks.
+        transcript.bufferedWriter().use { writer ->
+            writer.write("""{"id":"u0","role":"user","content":[{"type":"text","text":"before"}]}""")
+            writer.write("\n")
+            writer.write("""{"id":"u1","role":"user","content":[{"type":"text","text":"huge one"},{"type":"image","mimeType":"image/png","data":"""")
+            val chunk = "A".repeat(1024 * 1024)
+            repeat(20) { writer.write(chunk) } // 20MB of base64 'A's, > 8MB cap
+            writer.write(""""}]}""")
+            writer.write("\n")
+            writer.write("""{"id":"u2","role":"user","content":[{"type":"text","text":"after"}]}""")
+            writer.write("\n")
+        }
+
+        val messages = store().readTranscript(agentId)
+
+        // All three rows survive hydration — the oversized row is NOT dropped.
+        assertEquals(3, messages.size)
+        assertEquals("before", (messages[0] as UserMessage).content)
+        assertEquals("after", (messages[2] as UserMessage).content)
+
+        val huge = messages[1] as UserMessage
+        val text = huge.content
+        assertTrue("oversized row should carry its own text plus an omitted-image placeholder", text.contains("huge one"))
+        assertTrue("oversized image should be represented as a placeholder, not raw base64", text.contains("image omitted"))
+        assertFalse("collapsed placeholder must not carry the raw base64 payload", text.contains("AAAA"))
+    }
+
     @Test
     fun `stripPersistedImageData uses blob store correctly`() = runTest {
         val agentId = "agent-strip-with-blobs"
