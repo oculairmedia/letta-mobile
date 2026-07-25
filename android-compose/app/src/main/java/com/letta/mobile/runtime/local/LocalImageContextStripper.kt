@@ -61,18 +61,35 @@ class LocalImageContextStripper(
 
         // Pre-parse to locate the most-recent image-bearing user message —
         // that row is preserved so follow-up turns can still reason about the
-        // just-posted image (re-port of PR #481 behaviour). A row whose image
-        // data was ITSELF bounded/collapsed above (pathologically oversized)
-        // is never eligible for this preservation carve-out — it is stripped
-        // like any other image row below, since its "preserved" data would
-        // just be our own placeholder marker, not a resendable image.
+        // just-posted image (re-port of PR #481 behaviour).
         val rows: List<JsonObject?> = lines.map { line ->
             runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
         }
+        // If that row's image data was ITSELF bounded/collapsed above (a normal
+        // phone photo's base64 easily exceeds the ~8MB per-value cap), do NOT
+        // simply skip preservation — that would silently drop the just-shared
+        // image from what the model sees (letta-mobile vision regression from
+        // PR #1017). Instead, re-read ONLY that one line in full (uncapped);
+        // this bounds the extra memory cost to exactly the one image that
+        // must survive, while every other row stays subject to the normal
+        // collapsing/stripping behavior below.
+        var latestImageFullLine: String? = null
         val latestImageUserIndex = rows.indexOfLast { row -> row?.isUserImageMessage() == true }
             .let { candidate ->
                 if (candidate >= 0 && boundedLines[candidate].collapsedValueChars > 0L) {
-                    rows.subList(0, candidate).indexOfLast { row -> row?.isUserImageMessage() == true }
+                    val fullLine = BoundedTranscriptReader.readSingleLineFull(transcript, candidate)
+                    val fullRow = fullLine?.let {
+                        runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull()
+                    }
+                    if (fullRow != null && fullRow.isUserImageMessage()) {
+                        latestImageFullLine = fullLine
+                        candidate
+                    } else {
+                        // Couldn't recover full data (e.g. file changed
+                        // concurrently) — fall back to an earlier,
+                        // non-collapsed image row like before.
+                        rows.subList(0, candidate).indexOfLast { row -> row?.isUserImageMessage() == true }
+                    }
                 } else {
                     candidate
                 }
@@ -83,7 +100,7 @@ class LocalImageContextStripper(
         var changed = false
 
         val rebuilt = lines.mapIndexed { index, line ->
-            if (index == latestImageUserIndex) return@mapIndexed line
+            if (index == latestImageUserIndex) return@mapIndexed (latestImageFullLine ?: line)
 
             val row = rows.getOrNull(index) ?: return@mapIndexed line
             val content = row["content"] as? JsonArray ?: return@mapIndexed line
