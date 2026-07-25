@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import java.awt.Component
@@ -18,7 +19,6 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")
 
 /** Callbacks + loader shared by clipboard paste and file-drop image ingress. */
 internal data class DesktopImageIngressSink(
@@ -62,7 +62,7 @@ internal fun Transferable.allFiles(): List<File> =
         .orEmpty()
         .filter { it.isFile }
 
-internal fun File.isImageFile(): Boolean = extension.lowercase() in IMAGE_EXTENSIONS
+internal fun File.isImageFile(): Boolean = ImageIngressPolicy.isSupportedExtension(extension)
 
 internal fun Transferable.imageFiles(): List<File> = allFiles().filter { it.isImageFile() }
 
@@ -78,17 +78,11 @@ internal fun handleClipboardImagePaste(
     return true
 }
 
-/**
- * Ingest cap per drop/paste, matching the composer's attachment grid; files
- * beyond it are ignored rather than erroring one by one.
- */
-internal const val MAX_INGRESS_FILES = 4
-
 internal fun handleClipboardImageFilePaste(
     transferable: Transferable,
     sink: DesktopImageIngressSink,
 ): Boolean {
-    val paths = transferable.imageFiles().take(MAX_INGRESS_FILES).map { it.toPath() }
+    val paths = transferable.imageFiles().take(ImageIngressPolicy.MAX_FILES).map { it.toPath() }
     if (paths.isEmpty()) return false
     paths.forEach { path -> sink.launchLoad { load(path) } }
     return true
@@ -118,12 +112,14 @@ internal fun createImageFileDropTarget(
             // InvalidDnDOperationException, which made drops look dead.
             event.acceptDrop(DnDConstants.ACTION_COPY)
             val files = event.transferable.allFiles()
-            val paths = files.filter { it.isImageFile() }.take(MAX_INGRESS_FILES).map { it.toPath() }
+            val paths = files.filter { it.isImageFile() }
+                .take(ImageIngressPolicy.MAX_FILES)
+                .map { it.toPath() }
             when {
                 paths.isNotEmpty() -> paths.forEach { path -> sink.launchLoad { load(path) } }
                 // Give feedback instead of a silent dead drop.
                 files.isNotEmpty() -> sink.onError(
-                    "Only images can be attached for now (png, jpg, jpeg, webp, gif, bmp).",
+                    "Only images can be attached for now (${ImageIngressPolicy.supportedFormatsLabel()}).",
                 )
                 else -> sink.onError("Nothing attachable in that drop — try image files.")
             }

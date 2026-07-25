@@ -22,6 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
@@ -141,7 +142,7 @@ internal fun LettaDesktopApp(
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
-        mode = FileKitMode.Multiple(maxItems = MAX_INGRESS_FILES),
+        mode = FileKitMode.Multiple(maxItems = ImageIngressPolicy.MAX_FILES),
         dialogSettings = FileKitDialogSettings(title = "Attach images"),
     ) { files ->
         files.orEmpty().forEach { file ->
@@ -378,9 +379,14 @@ internal fun LettaDesktopApp(
                 }
             },
             onSubmitPrompt = { text, ambientContext ->
+                val prompt = quickQueryPrompt(text, ambientContext)
                 val target = chatState.selectedConversationId
                 if (target != null) {
-                    chatController.replyFromNotification(target, quickQueryPrompt(text, ambientContext))
+                    chatController.replyFromNotification(target, prompt)
+                } else {
+                    // No conversation yet: never drop the typed prompt —
+                    // stage it in the composer for the user to send.
+                    chatController.updateComposerText(prompt)
                 }
                 activateDesktopWindow(window)
                 editAgentId = null

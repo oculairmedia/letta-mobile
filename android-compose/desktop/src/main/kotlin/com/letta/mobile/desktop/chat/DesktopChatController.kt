@@ -550,16 +550,21 @@ class DesktopChatController(
     }
 
     /**
-     * User-facing interrupt (bottom-bar stop): cancels the in-flight
-     * send/stream consumption. The send pipeline's finally clears the
-     * streaming flag on cancellation; thinking is cleared here because the
-     * cancellation path deliberately rethrows before failure-path cleanup.
+     * User-facing interrupt (bottom-bar stop), scoped to [conversationId]:
+     * a no-op when the in-flight work belongs to a different conversation, so
+     * an unrelated send can never be cancelled by mistake. The send pipeline's
+     * finally clears the streaming flag on cancellation; thinking is cleared
+     * here because the cancellation path rethrows before failure-path cleanup.
      * Client-side only — the server turn may still run to completion.
      */
-    fun stopActiveRun() {
+    fun stopActiveRun(conversationId: String) {
         if (closed) return
+        val active = _streamingConversationId.value ?: _thinkingConversationId.value
+        if (active != null && active != conversationId) return
         sendJob?.cancel()
-        _thinkingConversationId.value = null
+        if (_thinkingConversationId.value == conversationId) {
+            _thinkingConversationId.value = null
+        }
     }
 
     fun send() {

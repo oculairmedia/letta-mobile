@@ -33,23 +33,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.chat.runtime.NowActiveStatus
+import com.letta.mobile.data.chat.runtime.nowActiveStatus
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
-
-/** Coarse status of the active conversation for the bottom bar. */
-internal enum class NowActiveStatus { Idle, Thinking, Streaming, Error }
-
-internal fun nowActiveStatus(
-    isThinking: Boolean,
-    isStreaming: Boolean,
-    hasError: Boolean,
-): NowActiveStatus = when {
-    hasError -> NowActiveStatus.Error
-    isThinking -> NowActiveStatus.Thinking
-    isStreaming -> NowActiveStatus.Streaming
-    else -> NowActiveStatus.Idle
-}
 
 internal data class NowActiveBarState(
     val conversationTitle: String,
@@ -92,8 +80,8 @@ internal data class NowActiveBarHostActions(
     /** Select + reveal the given conversation (bar body and work chip). */
     val onOpenConversation: (String) -> Unit,
     val onAvatarCompanion: () -> Unit,
-    /** Interrupt the pinned conversation's in-flight run. */
-    val onStopRun: () -> Unit,
+    /** Interrupt the given conversation's in-flight run. */
+    val onStopRun: (String) -> Unit,
 )
 
 /**
@@ -142,7 +130,9 @@ internal fun DesktopNowActiveBarHost(
                 host.thinkingConversationId?.let(actions.onOpenConversation)
             },
             onAvatarCompanion = actions.onAvatarCompanion,
-            onStopRun = actions.onStopRun,
+            // Scoped to the bar's pinned conversation so an unrelated
+            // in-flight send can never be cancelled by mistake.
+            onStopRun = { actions.onStopRun(barConversation.id) },
         ),
     )
 }

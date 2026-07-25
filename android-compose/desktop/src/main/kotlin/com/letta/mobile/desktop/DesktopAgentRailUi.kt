@@ -49,6 +49,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.agents.AgentRailGroup
+import com.letta.mobile.data.agents.AgentRailSpace
+import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.desktop.chat.AgentOrb
 
 private val androidx.compose.material3.Typography.countBadge
@@ -207,6 +210,11 @@ private fun ColumnScope.ExpandedAgentLibrary(
         if (needle.isEmpty()) groups else groups.filter { it.name.contains(needle, ignoreCase = true) }
     }
     val spaces = remember(filtered) { deriveAgentSpaces(filtered) }
+    // Orb colors key off the UNfiltered position so identities stay stable
+    // while filtering; precomputed map avoids O(n²) indexOf on big rosters.
+    val indexByGroup = remember(groups) {
+        groups.withIndex().associate { (index, group) -> group to index }
+    }
     LibrarySearchField(query = query, onQueryChange = { query = it })
     Column(
         modifier = Modifier
@@ -225,13 +233,10 @@ private fun ColumnScope.ExpandedAgentLibrary(
         spaces.forEach { space ->
             SpaceHeader(space = space, focus = focus)
             space.groups.forEach { group ->
-                // Orb color keys off the UNfiltered position so identities
-                // stay stable while filtering.
-                val index = groups.indexOf(group)
                 ExpandedAgentRow(
                     params = AgentRailOrbParams(
                         group = group,
-                        index = index,
+                        index = indexByGroup[group] ?: 0,
                         focus = focus,
                         onAgentSelected = onAgentSelected,
                     ),
@@ -530,40 +535,6 @@ private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** A rail entry: one or more agents that share a display name, stacked together. */
-internal data class AgentRailGroup(
-    val name: String,
-    val agentIds: List<String>,
-)
-
-/** An Element-style space: a named cluster of rail groups with aggregate impact. */
-internal data class AgentRailSpace(
-    val name: String,
-    val groups: List<AgentRailGroup>,
-) {
-    val agentCount: Int get() = groups.sumOf { it.agentIds.size }
-}
-
-/**
- * Derives spaces from naming conventions ("PM - social-hause" → space "PM"):
- * a prefix before " - " shared by at least two groups becomes a space;
- * everything else lands in the catch-all "Agents" space. Order follows first
- * appearance so recency is preserved within and across spaces.
- */
-internal fun deriveAgentSpaces(groups: List<AgentRailGroup>): List<AgentRailSpace> {
-    val prefixOf = { group: AgentRailGroup ->
-        group.name.substringBefore(" - ", missingDelimiterValue = "").takeIf { it.isNotBlank() }
-    }
-    val prefixCounts = groups.mapNotNull(prefixOf).groupingBy { it }.eachCount()
-    val spaced = LinkedHashMap<String, MutableList<AgentRailGroup>>()
-    groups.forEach { group ->
-        val prefix = prefixOf(group)?.takeIf { (prefixCounts[it] ?: 0) >= 2 }
-        spaced.getOrPut(prefix ?: RAIL_CATCH_ALL_SPACE) { mutableListOf() }.add(group)
-    }
-    return spaced.map { (name, members) -> AgentRailSpace(name = name, groups = members) }
-}
-
-internal const val RAIL_CATCH_ALL_SPACE = "Agents"
 
 private data class RailActionIconModel(
     val icon: ImageVector,

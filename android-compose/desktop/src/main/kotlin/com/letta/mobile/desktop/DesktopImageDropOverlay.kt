@@ -20,6 +20,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.attachment.ImageIngressPolicy
 
 /**
  * Full-content drop hint shown while an OS file drag hovers the window:
@@ -57,7 +58,10 @@ internal fun DesktopImageDropOverlay(modifier: Modifier = Modifier) {
                     color = MaterialTheme.colorScheme.onSurface,
                 )
                 Text(
-                    text = "Up to $MAX_INGRESS_FILES per drop · png, jpg, webp, gif, bmp",
+                    // Derived from the shared policy so the hint can never
+                    // drift from what the ingress actually accepts.
+                    text = "Up to ${ImageIngressPolicy.MAX_FILES} per drop · " +
+                        ImageIngressPolicy.supportedFormatsLabel(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
