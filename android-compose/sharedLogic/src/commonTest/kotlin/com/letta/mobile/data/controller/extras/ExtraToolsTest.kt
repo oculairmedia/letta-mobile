@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -12,6 +13,39 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ExtraToolsTest {
+
+    @Test
+    fun p06EveryToolSchemaDeclaresRequiredAndEnumAsJsonArrays() {
+        val tools = listOf(
+            ImageHydrationTool(), GoalsTool(), SchedulesTool(), SlashCommandsTool(),
+            SubagentChipsTool(), ReflectionTool(), SlimAgentsTool(),
+        )
+        for (tool in tools) {
+            val schema = assertNotNull(tool.inputSchema, "${tool.name}: inputSchema")
+            val required = schema["required"]
+            assertIs<JsonArray>(required, "${tool.name}: `required` must be a JSON array, not an object")
+            // Any `enum` inside a property must also be an array.
+            val props = schema["properties"] as? JsonObject
+            props?.values?.forEach { prop ->
+                (prop as? JsonObject)?.get("enum")?.let {
+                    assertIs<JsonArray>(it, "${tool.name}: property `enum` must be a JSON array")
+                }
+            }
+        }
+    }
+
+    @Test
+    fun p06RequiredArraysNameTheMandatoryFields() {
+        fun req(tool: ExternalTool) =
+            (assertNotNull(tool.inputSchema)["required"] as JsonArray).map { it.toString().trim('"') }
+        assertTrue(req(GoalsTool()).contains("action"))
+        assertTrue(req(SchedulesTool()).contains("action"))
+        assertTrue(req(SlashCommandsTool()).contains("command"))
+        assertTrue(req(SubagentChipsTool()).contains("subagent_id"))
+        assertTrue(req(ReflectionTool()).contains("query"))
+        assertTrue(req(SlimAgentsTool()).contains("agent_ids"))
+    }
+
     /**
      * One row per advertised-but-stub extra tool. Table-driven so the metadata and
      * invoke-error assertions stay identical across every tool (was 7 near-identical
