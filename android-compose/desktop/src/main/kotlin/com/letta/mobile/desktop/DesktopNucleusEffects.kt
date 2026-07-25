@@ -3,6 +3,7 @@ package com.letta.mobile.desktop
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +48,7 @@ internal fun activateDesktopWindow(window: Window) {
     }
 }
 
+@Immutable
 internal data class DesktopNucleusEffectBindings(
     val applicationScope: NucleusApplicationScope,
     val window: Window,
@@ -59,6 +61,7 @@ internal data class DesktopNucleusEffectBindings(
     val onReplyToConversation: (String, String) -> Unit,
 )
 
+@Immutable
 internal data class DesktopNucleusEffectState(
     val isAgentWorking: Boolean,
     val agentName: String,
@@ -83,6 +86,7 @@ internal fun subagentWorkProgress(statuses: List<String>): Double? {
     return done.toDouble() / statuses.size
 }
 
+@Immutable
 internal data class DesktopNucleusEffectActions(
     val onOpenCommandPalette: () -> Unit,
     val onOpenSettings: () -> Unit,

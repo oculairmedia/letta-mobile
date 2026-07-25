@@ -74,9 +74,19 @@ open class SubagentRepository(
     // subscribe/unsubscribe must not duplicate the initial fetch.
     private val initialized = atomic(false)
 
-    init {
-        scope.launch { observePushEvents() }
-        scope.launch { observeReconnects() }
+    private val pushJob = scope.launch { observePushEvents() }
+    private val reconnectJob = scope.launch { observeReconnects() }
+
+    /**
+     * Stops this registry's collectors. Required when the owner replaces the
+     * repository (transport/backend switch): without it the two collectors
+     * above run for the life of [scope], which for the default scope means
+     * forever. Idempotent, and deliberately does NOT cancel a caller-supplied
+     * [scope] — that belongs to the caller.
+     */
+    fun close() {
+        pushJob.cancel()
+        reconnectJob.cancel()
     }
 
     /**

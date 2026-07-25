@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -65,6 +66,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 
 /** Actions the quick-query window routes back into the main app. */
+@Immutable
 internal data class DesktopQuickQueryActions(
     /** Open a palette item (agent/conversation/page) in the main window. */
     val onSelectItem: (PaletteItem) -> Unit,

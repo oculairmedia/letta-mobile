@@ -22,10 +22,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Menu
@@ -34,6 +35,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -105,12 +107,14 @@ private fun ThinkingRing(
     )
 }
 
+@Immutable
 internal data class DesktopAgentRailFocus(
     val selectedAgentId: String?,
     val thinkingAgentId: String?,
     val avatarStyleByAgentId: Map<String, Int>,
 )
 
+@Immutable
 internal data class DesktopAgentRailState(
     val agents: List<Pair<String, String>>,
     val focus: DesktopAgentRailFocus,
@@ -118,6 +122,7 @@ internal data class DesktopAgentRailState(
     val expanded: Boolean = false,
 )
 
+@Immutable
 internal data class DesktopAgentRailActions(
     val onAgentSelected: (String) -> Unit,
     val onNewSession: () -> Unit,
@@ -216,23 +221,25 @@ private fun ColumnScope.ExpandedAgentLibrary(
         groups.withIndex().associate { (index, group) -> group to index }
     }
     LibrarySearchField(query = query, onQueryChange = { query = it })
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
-    ) {
+    // Lazy: a large roster (hundreds of agents) must not compose every row.
+    LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
         if (filtered.isEmpty()) {
-            Text(
-                text = "No agents match \"${query.text.trim()}\"",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            )
+            item(key = "library-empty") {
+                Text(
+                    text = "No agents match \"${query.text.trim()}\"",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                )
+            }
         }
         spaces.forEach { space ->
-            SpaceHeader(space = space, focus = focus)
-            space.groups.forEach { group ->
+            item(key = "space-${space.name}") {
+                SpaceHeader(space = space, focus = focus)
+            }
+            // Keyed by group name so per-row state (the thinking-ring
+            // animation) follows its agent across recency reordering.
+            items(space.groups, key = { "group-${it.name}" }) { group ->
                 ExpandedAgentRow(
                     params = AgentRailOrbParams(
                         group = group,
@@ -367,16 +374,15 @@ private fun ColumnScope.AgentRailOrbList(
     onAgentSelected: (String) -> Unit,
 ) {
     // The agent list scrolls so a long roster never pushes the bottom
-    // actions (search/settings/account) off-screen.
-    Column(
-        modifier = Modifier
-            .weight(1f)
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+    // actions off-screen, and is lazy so hundreds of agents don't all
+    // compose. Keyed by group name so each row's thinking-ring animation
+    // follows its agent across recency reordering.
+    LazyColumn(
+        modifier = Modifier.weight(1f).fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        groups.forEachIndexed { index, group ->
+        itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
             AgentRailOrb(
                 AgentRailOrbParams(
                     group = group,
