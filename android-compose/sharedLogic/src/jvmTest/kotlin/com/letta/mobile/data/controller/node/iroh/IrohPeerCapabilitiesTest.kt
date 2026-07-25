@@ -54,6 +54,13 @@ class IrohPeerCapabilitiesTest {
             // accessible to a standard paired desktop (not admin-gated).
             "provider.list", "goal.get", "group.list", "folder.list", "archive.list",
             "step.list", "identity.list", "identity.get", "run.list", "run.get",
+            // Regression fix: agent.update (model selection) and agent.context
+            // (context-window UI) fell to else->ADMIN_FULL once the admin_rpc
+            // stream path started enforcing per-method capabilities, breaking
+            // both on every paired device. agent.context is a benign read
+            // (missed in the P0.5 reclassification); agent.update is
+            // desktop-manageable config editing (agent lifecycle stays admin.full).
+            "agent.update", "agent.context",
         ).forEach { method ->
             assertTrue(
                 IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod(method)),
@@ -97,6 +104,37 @@ class IrohPeerCapabilitiesTest {
             IrohPeerCapabilities.ADMIN_FULL,
             IrohPeerCapabilities.forAdminMethod("reflection.set"),
             "reflection is an intentional memory classification, not the deny-by-default admin bucket",
+        )
+    }
+
+    @Test
+    fun agentUpdateAndAgentContextAreDeskTopReachableButLifecycleStaysAdminFull() {
+        // agent.context: benign read (context-window UI), CHAT_READ tier.
+        assertEquals(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.forAdminMethod("agent.context"))
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.context")),
+            "the default desktop role must be allowed agent.context",
+        )
+
+        // agent.update: trusted-desktop config editing (e.g. model selection),
+        // classified into CONVERSATION_MANAGE which DEFAULT_DESKTOP_ROLE holds.
+        assertEquals(IrohPeerCapabilities.CONVERSATION_MANAGE, IrohPeerCapabilities.forAdminMethod("agent.update"))
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.update")),
+            "the default desktop role must be allowed agent.update (model selection)",
+        )
+
+        // Agent LIFECYCLE (create/delete) is unchanged: still admin.full via the
+        // else branch, denied to the default desktop role.
+        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("agent.create"))
+        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("agent.delete"))
+        assertFalse(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.create")),
+            "the default desktop role must NOT allow agent.create",
+        )
+        assertFalse(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.delete")),
+            "the default desktop role must NOT allow agent.delete",
         )
     }
 
