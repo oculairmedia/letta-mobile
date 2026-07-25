@@ -372,4 +372,85 @@ class LocalImageContextStripperTest {
         assertFalse("should not contain empty image shell", persisted.contains(""""type":"image","data":""""))
         assertFalse("should not contain image with empty source", persisted.contains(""""type":"image","source":{}"""))
     }
+
+    // ── OOM guard (letta-mobile-lgns8.20): oversized rows never allocate a huge String ──
+
+    @Test
+    fun `oversized image row is stripped without a large allocation and stays bounded`() {
+        // 20MB of base64-safe filler - well beyond a real photo's base64, and
+        // well beyond the reader's cap - forcing the bounded-collapse path
+        // that used to be a plain readLines() full-String allocation.
+        val hugeData = "Q".repeat(20 * 1024 * 1024)
+        val file = write(
+            assistantRow("a0", "hello"),
+            flatImageRow(hugeData),
+        )
+        val report = stripper.stripTranscript(file)
+
+        assertTrue("oversized image should be stripped, not preserved verbatim", report.stripped)
+        assertEquals(1, report.partsStripped)
+        // Real byte count should still be reported accurately even though the
+        // in-memory value was bounded/collapsed during the read.
+        assertTrue("bytesFreed should reflect the true oversized length", report.bytesFreed >= 20 * 1024 * 1024)
+
+        val persisted = file.readText()
+        assertFalse("the huge base64 payload must never be written back out", persisted.contains(hugeData))
+        assertTrue("older image placeholder should be present", persisted.contains("[image omitted from context"))
+        // Output file itself must be small/bounded, not ~20MB.
+        assertTrue("persisted transcript should be tiny compared to the 20MB source", persisted.length < 10_000)
+    }
+
+    @Test
+    fun `even the latest oversized image row is stripped, not preserved with full base64`() {
+        // The "latest image preserved intact" carve-out exists so a normal
+        // just-uploaded photo can still be resent next turn. A pathologically
+        // oversized row breaks that assumption (it would OOM on every future
+        // read) so it must be stripped like any other image, even when it is
+        // the most recent one.
+        val hugeData = "Z".repeat(20 * 1024 * 1024)
+        val file = write(flatImageRow(hugeData))
+        val report = stripper.stripTranscript(file)
+
+        assertTrue(report.stripped)
+        val persisted = file.readText()
+        assertFalse(persisted.contains(hugeData))
+    }
+
+    // ── atomicity (letta-mobile-lgns8.20): stale-snapshot guard ──────────────────
+
+    @Test
+    fun `write is skipped when the file changes underneath a strip pass`() {
+        // Simulate the embedded letta.js node process appending to the
+        // transcript BETWEEN stripTranscript's read and its final write: a
+        // File whose length()/lastModified() report the ORIGINAL snapshot on
+        // the first two calls (the pre-write snapshot check) but a CHANGED
+        // value afterwards (an external append landed mid-pass). The
+        // original on-disk content must survive untouched - our rebuild is
+        // stale and must be discarded rather than clobbering the new data.
+        val olderData = "T0xERVI="
+        val latestData = "TEFURVNU"
+        val backing = write(flatImageRow(olderData), assistantRow(), flatImageRow(latestData))
+        val originalContent = backing.readText()
+
+        val racyFile = object : File(backing.path) {
+            var lengthCalls = 0
+            var modifiedCalls = 0
+            override fun length(): Long {
+                lengthCalls++
+                // First call is the initial snapshot (real value); every
+                // subsequent call (the pre-write re-check) reports a
+                // different value, as if letta.js appended a row.
+                return if (lengthCalls == 1) super.length() else super.length() + 999
+            }
+            override fun lastModified(): Long {
+                modifiedCalls++
+                return if (modifiedCalls == 1) super.lastModified() else super.lastModified() + 1
+            }
+        }
+
+        val report = stripper.stripTranscript(racyFile)
+
+        assertFalse("a stale rewrite must be aborted, not applied", report.stripped)
+        assertEquals("original content must be untouched", originalContent, backing.readText())
+    }
 }

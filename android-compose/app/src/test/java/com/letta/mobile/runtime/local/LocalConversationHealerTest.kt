@@ -229,4 +229,56 @@ class LocalConversationHealerTest {
         assertEquals(assistantLine, lines[1])
         assertEquals(3, lines.size)
     }
+
+    // ── OOM guard (letta-mobile-lgns8.20): an image-bloated row must not crash the heal ──
+
+    @Test
+    fun `oversized image row does not prevent healing a dangling call and is not corrupted`() {
+        // A conversation can carry an image-bloated user row alongside a
+        // dangling tool call from an interrupted turn. The heal must still
+        // settle the dangling call WITHOUT ever materializing the oversized
+        // row as one giant String (previously a plain readLines() call).
+        val hugeData = "Q".repeat(20 * 1024 * 1024)
+        val imageRow =
+            """{"id":"u1","role":"user","content":[{"type":"image","mimeType":"image/png","data":"$hugeData"}]}"""
+        val file = writeTranscript(imageRow, assistantWithToolCall("a1", "call_orphan"))
+
+        val report = healer.healTranscript(file)
+
+        assertTrue(report.healed)
+        assertEquals(1, report.rowsAppended)
+        val text = file.readText()
+        // The oversized image row is untouched structurally (healer never
+        // rewrites non-toolResult/toolCall content) - it must still be the
+        // FULL original payload, since the healer (unlike the stripper) has
+        // no reason to alter it.
+        assertTrue("image row's full payload must survive the heal", text.contains(hugeData))
+        assertTrue("synthetic heal result must be appended", text.contains("call_orphan"))
+    }
+
+    // ── atomicity (letta-mobile-lgns8.20): stale-snapshot guard ─────────────────
+
+    @Test
+    fun `write is skipped when the file changes underneath a heal pass`() {
+        // Simulate the embedded letta.js node process appending to the
+        // transcript BETWEEN healTranscript's read and its final write: a
+        // File whose length() reports the original snapshot on the first
+        // call but a changed value on the pre-write re-check. The original
+        // on-disk content must survive untouched.
+        val backing = writeTranscript(assistantWithToolCall("a1", "call_orphan"))
+        val originalContent = backing.readText()
+
+        val racyFile = object : File(backing.path) {
+            var lengthCalls = 0
+            override fun length(): Long {
+                lengthCalls++
+                return if (lengthCalls == 1) super.length() else super.length() + 999
+            }
+        }
+
+        val report = healer.healTranscript(racyFile)
+
+        assertFalse("a stale rewrite must be aborted, not applied", report.healed)
+        assertEquals("original content must be untouched", originalContent, backing.readText())
+    }
 }

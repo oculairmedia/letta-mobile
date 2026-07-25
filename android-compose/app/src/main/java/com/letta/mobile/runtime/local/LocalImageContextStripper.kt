@@ -48,16 +48,35 @@ class LocalImageContextStripper(
 
     fun stripTranscript(transcript: File): StripReport {
         if (!transcript.isFile) return StripReport(0, 0)
-        val lines = transcript.readLines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) return StripReport(0, 0)
+        // Bounded read (letta-mobile-lgns8.20): a single image-bloated row can
+        // be tens of MB of base64 (see class doc). Streaming through
+        // BoundedTranscriptReader guarantees no single JSON string value is
+        // ever materialized beyond its cap, so this pre-turn pass can never
+        // OOM on an oversized line the way a plain readLines()/full parse did.
+        val snapshotLength = transcript.length()
+        val snapshotModified = transcript.lastModified()
+        val boundedLines = BoundedTranscriptReader.readLines(transcript)
+        if (boundedLines.isEmpty()) return StripReport(0, 0)
+        val lines = boundedLines.map { it.text }
 
         // Pre-parse to locate the most-recent image-bearing user message —
         // that row is preserved so follow-up turns can still reason about the
-        // just-posted image (re-port of PR #481 behaviour).
+        // just-posted image (re-port of PR #481 behaviour). A row whose image
+        // data was ITSELF bounded/collapsed above (pathologically oversized)
+        // is never eligible for this preservation carve-out — it is stripped
+        // like any other image row below, since its "preserved" data would
+        // just be our own placeholder marker, not a resendable image.
         val rows: List<JsonObject?> = lines.map { line ->
             runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
         }
         val latestImageUserIndex = rows.indexOfLast { row -> row?.isUserImageMessage() == true }
+            .let { candidate ->
+                if (candidate >= 0 && boundedLines[candidate].collapsedValueChars > 0L) {
+                    rows.subList(0, candidate).indexOfLast { row -> row?.isUserImageMessage() == true }
+                } else {
+                    candidate
+                }
+            }
 
         var partsStripped = 0
         var bytesFreed = 0
@@ -89,6 +108,18 @@ class LocalImageContextStripper(
         }
 
         if (!changed) return StripReport(0, 0)
+
+        // letta-mobile-lgns8.20 (data-loss guard): the embedded letta.js node
+        // process OWNS this file and can append to it concurrently while we
+        // were reading/rebuilding above (it only loads the store at process
+        // start, then writes turns to disk itself). If the file changed
+        // underneath us, our rebuild is based on a STALE snapshot — writing it
+        // back now would silently clobber whatever letta.js appended in the
+        // meantime. Abort instead: skip this pass and let the NEXT pre-turn
+        // pass (which will see the now-current file) retry.
+        if (transcript.length() != snapshotLength || transcript.lastModified() != snapshotModified) {
+            return StripReport(0, 0)
+        }
         atomicWrite(transcript, rebuilt.joinToString("\n") + "\n")
         return StripReport(partsStripped, bytesFreed)
     }
@@ -111,10 +142,15 @@ class LocalImageContextStripper(
     }
 
     private fun imageDataLength(p: JsonObject): Int {
-        p["data"]?.jsonStr()?.let { return it.length }
-        (p["source"] as? JsonObject)?.get("data")?.jsonStr()?.let { return it.length }
+        p["data"]?.jsonStr()?.let { return it.oversizedAwareLength() }
+        (p["source"] as? JsonObject)?.get("data")?.jsonStr()?.let { return it.oversizedAwareLength() }
         return 0
     }
+
+    /** Reports the true original length for a value bounded-collapsed by [BoundedTranscriptReader]. */
+    private fun String.oversizedAwareLength(): Int =
+        BoundedTranscriptReader.extractOversizedLength(this)?.let { it.coerceAtMost(Int.MAX_VALUE.toLong()).toInt() }
+            ?: length
 
     /**
      * Persist image bytes to the blob store and replace the sent image with a
@@ -180,12 +216,35 @@ class LocalImageContextStripper(
         }.getOrNull()
     }
 
+    /**
+     * Durably and atomically replaces [target] with [contents] (mirrors
+     * BackendOwnershipPreflight/PairedPeerStore's sidecar-write pattern).
+     * Writes a sibling `.tmp`, fsyncs it via [FileChannel.force] so the bytes
+     * survive a crash/power loss, then swaps it in with an ATOMIC_MOVE. A
+     * crash mid-write therefore leaves either the old transcript or the new
+     * one — never a truncated/partial file.
+     */
     private fun atomicWrite(target: File, contents: String) {
-        val tmp = File(target.parentFile, "${target.name}.strip.tmp")
-        tmp.writeText(contents)
-        if (!tmp.renameTo(target)) {
-            target.writeText(contents)
-            tmp.delete()
+        val tmp = target.toPath().resolveSibling("${target.name}.strip.tmp")
+        java.nio.channels.FileChannel.open(
+            tmp,
+            java.nio.file.StandardOpenOption.CREATE,
+            java.nio.file.StandardOpenOption.WRITE,
+            java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
+        ).use { channel ->
+            val buffer = java.nio.ByteBuffer.wrap(contents.toByteArray(Charsets.UTF_8))
+            while (buffer.hasRemaining()) channel.write(buffer)
+            channel.force(true)
+        }
+        try {
+            java.nio.file.Files.move(
+                tmp,
+                target.toPath(),
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
+            java.nio.file.Files.move(tmp, target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
         }
     }
 
