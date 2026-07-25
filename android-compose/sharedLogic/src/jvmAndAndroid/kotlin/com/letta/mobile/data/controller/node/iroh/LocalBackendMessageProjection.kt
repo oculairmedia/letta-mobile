@@ -5,6 +5,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
@@ -91,6 +93,37 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
         return sb.toString()
     }
 
+    /**
+     * Normalize an on-disk `type:"image"` part to the wire shape the client's
+     * `Message.kt` attachment parser understands: `{type:"image", source:{type:"base64",
+     * media_type, data}}`. On-disk rows may use either shape (see
+     * LocalImageContextStripper): the "flat" letta.js shape
+     * `{type:"image", mimeType, data}` or the already-nested Letta wire shape
+     * `{type:"image", source:{type:"base64", media_type, data}}`. Returns null
+     * when there is no usable base64 payload (e.g. an `image_ref` pointer left
+     * by the context stripper — those are not resolvable from this on-disk
+     * reader and are dropped, same as before this normalization existed).
+     */
+    private fun normalizeImagePart(o: JsonObject): JsonObject? {
+        if (o["type"]?.stringOrNull() != "image") return null
+        val source = o["source"] as? JsonObject
+        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: return null
+        val mediaType = source?.get("media_type")?.stringOrNull()
+            ?: o["mimeType"]?.stringOrNull()
+            ?: "image/jpeg"
+        return buildJsonObject {
+            put("type", "image")
+            put(
+                "source",
+                buildJsonObject {
+                    put("type", "base64")
+                    put("media_type", mediaType)
+                    put("data", data)
+                },
+            )
+        }
+    }
+
     /** Port of translate.ts stripSystemReminders (user-role only). */
     private fun stripSystemReminders(text: String): String =
         text
@@ -154,8 +187,26 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     private fun projectUserOrSystem(ctx: ProjCtx, role: String, parts: JsonArray): List<JsonObject> {
         var text = partsToText(parts)
         if (role == "user") text = stripSystemReminders(text)
-        if (text.isEmpty()) return emptyList()
+        // letta-mobile: preserve inline `type:"image"` parts (base64 uploads /
+        // attachments) instead of dropping them via partsToText, which only
+        // concatenates `type:"text"` parts. Without this, an image sent by one
+        // client is invisible to every OTHER client that hydrates this
+        // conversation via the on-disk message.list reader (the live iroh
+        // fanout carries the raw content verbatim and is unaffected — only
+        // this disk-projection / hydrate path lost the image). Images are only
+        // normalized for user rows; assistant/system images are not produced
+        // by this on-disk writer today.
+        val images = if (role == "user") parts.mapNotNull { (it as? JsonObject)?.let(::normalizeImagePart) } else emptyList()
+        if (text.isEmpty() && images.isEmpty()) return emptyList()
         val wireType = if (role == "user") "user_message" else "system_message"
+        val content: JsonElement = if (images.isEmpty()) {
+            JsonPrimitive(text)
+        } else {
+            buildJsonArray {
+                if (text.isNotEmpty()) add(buildJsonObject { put("type", "text"); put("text", text) })
+                images.forEach { add(it) }
+            }
+        }
         val wire = buildJsonObject {
             put("id", ctx.id ?: "")
             put("date", withTypeOffset(ctx.created, wireType))
@@ -167,7 +218,7 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
             put("is_err", JsonNull)
             put("seq_id", JsonNull)
             put("run_id", ctx.projectedRunId)
-            put("content", text)
+            put("content", content)
             // attachRefsToWireMessage: only user_message, only when refs present.
             if (wireType == "user_message" && ctx.attachmentRefs != null && ctx.attachmentRefs.isNotEmpty()) {
                 put("attachments", ctx.attachmentRefs)
