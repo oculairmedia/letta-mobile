@@ -227,4 +227,61 @@ class ChatTimelineProjectorTest {
         assertFalse(secondEmptyProjection.noChange)
         assertEquals(ChatMessageListChange.Full, secondEmptyProjection.messageListChange)
     }
+
+    // === Sliding-window pagination retention tests ===
+
+    @Test
+    fun `repeated older page loads keep the resident list bounded`() {
+        val projector = ChatTimelineProjector()
+        val live = listOf(
+            UiMessage(id = "live-1", role = "assistant", content = "newest", timestamp = "2026-04-19T05:00:00Z"),
+        )
+        var existing: List<UiMessage> = live
+        // Simulate 30 scroll-back "load older" calls of 20 messages each (600
+        // total) — far more than a small cap — and assert the resident list
+        // never exceeds the configured window.
+        val cap = 100
+        repeat(30) { page ->
+            val batch = (0 until 20).map { i ->
+                UiMessage(
+                    id = "old-${page}-$i",
+                    role = "user",
+                    content = "older",
+                    timestamp = "2026-04-19T04:00:00Z",
+                )
+            }
+            existing = projector.mergeOlderPage(conv, olderMessages = batch, existingMessages = existing, maxResidentUiMessages = cap)
+            assertTrue(existing.size <= cap, "resident list grew past cap at page $page: ${existing.size}")
+        }
+        // The newest (live) message must never be evicted by pagination growth.
+        assertEquals("live-1", existing.last().id)
+    }
+
+    @Test
+    fun `releaseOlderPrefix shrinks the resident list and lets the pager refetch it`() {
+        val projector = ChatTimelineProjector()
+        val live = listOf(UiMessage(id = "live-1", role = "assistant", content = "newest", timestamp = "t"))
+        val older = (0 until 50).map { i -> UiMessage(id = "old-$i", role = "user", content = "older", timestamp = "t") }
+        val merged = projector.mergeOlderPage(conv, olderMessages = older, existingMessages = live, maxResidentUiMessages = 1000)
+        assertEquals(51, merged.size)
+
+        val released = projector.releaseOlderPrefix(conv, merged, keepNewest = 10)
+        assertEquals(10, released.size)
+        // Keeps the newest content, drops the oldest.
+        assertEquals("live-1", released.last().id)
+        assertEquals(merged.takeLast(10).map { it.id }, released.map { it.id })
+
+        // The pager's cursor is always derived from the current oldest resident
+        // message; after release that's the new front of the trimmed list —
+        // still a real id, so "load older" keeps working.
+        assertTrue(released.first().id.startsWith("old-"))
+    }
+
+    @Test
+    fun `releaseOlderPrefix is a no-op when nothing exceeds the budget`() {
+        val projector = ChatTimelineProjector()
+        val messages = listOf(UiMessage(id = "live-1", role = "assistant", content = "x", timestamp = "t"))
+        val released = projector.releaseOlderPrefix(conv, messages, keepNewest = 100)
+        assertEquals(messages, released)
+    }
 }

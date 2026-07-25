@@ -96,11 +96,18 @@ class LocalRuntimeChatSendCoordinatorTest {
         assertTrue(cleared)
         assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(resolvedConversation, local.otid), timelineRepository.sentLocals.single())
 
-        val userAppendMessage = timelineRepository.ingestedMessages[0].message as UserMessage
+        // LocalLettaBackend always emits its own LocalUserAppend (stamped
+        // with the coordinator's otid) ahead of any engine-supplied events,
+        // so the engine's synthetic append below is the second message.
+        val autoUserAppend = timelineRepository.ingestedMessages[0].message as UserMessage
+        assertEquals(local.otid, autoUserAppend.id)
+        assertEquals("hello", autoUserAppend.content)
+
+        val userAppendMessage = timelineRepository.ingestedMessages[1].message as UserMessage
         assertEquals("local-user-append-1", userAppendMessage.id)
         assertEquals("hello local append text", userAppendMessage.content)
 
-        val assistant = timelineRepository.ingestedMessages[1].message as AssistantMessage
+        val assistant = timelineRepository.ingestedMessages[2].message as AssistantMessage
         assertEquals("assistant-1", assistant.id)
         assertEquals("Hello from local runtime", assistant.content)
         assertEquals(false, uiState.value.isStreaming)
@@ -137,7 +144,12 @@ class LocalRuntimeChatSendCoordinatorTest {
 
         val local = timelineRepository.externalLocals.single()
         assertEquals(FakeTimelineExternalTransportWriter.LocalMarker(local.conversationId, local.otid), timelineRepository.failedLocals.single())
-        val error = timelineRepository.ingestedMessages.single().message as ErrorMessage
+        // LocalLettaBackend always emits a LocalUserAppend before engine
+        // events, so the failure ingest is the second ingested message.
+        assertEquals(2, timelineRepository.ingestedMessages.size)
+        val userAppendMessage = timelineRepository.ingestedMessages[0].message as UserMessage
+        assertEquals("hello", userAppendMessage.content)
+        val error = timelineRepository.ingestedMessages[1].message as ErrorMessage
         assertEquals("Embedded LettaCode runtime is not enabled in this build.", error.text)
         assertEquals("Embedded LettaCode runtime is not enabled in this build.", uiState.value.error)
         assertFalse(uiState.value.isStreaming)
@@ -145,27 +157,28 @@ class LocalRuntimeChatSendCoordinatorTest {
     }
 
     @Test
-    fun `image attachments are rejected before mutating timeline`() = runTest {
+    fun `image attachments are forwarded through the local turn`() = runTest {
+        // letta-mobile-454 added image content-part support for the embedded
+        // runtime; local sends no longer reject attachments, they carry them
+        // through to the turn command as inline multimodal parts.
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val image = com.letta.mobile.data.model.MessageContentPart.Image(
+            base64 = "AAA=",
+            mediaType = "image/png",
+        )
         val coordinator = coordinator(
             scope = backgroundScope,
             timelineRepository = timelineRepository,
             uiState = uiState,
         )
 
-        coordinator.send(
-            text = "look",
-            attachments = listOf(
-                com.letta.mobile.data.model.MessageContentPart.Image(
-                    base64 = "AAA=",
-                    mediaType = "image/png",
-                )
-            ),
-        ).join()
+        coordinator.send(text = "look", attachments = listOf(image)).join()
 
-        assertTrue(timelineRepository.externalLocals.isEmpty())
-        assertEquals("Local runtime does not support image attachments yet", uiState.value.error)
+        val local = timelineRepository.externalLocals.single()
+        assertEquals("look", local.content)
+        assertEquals(listOf(image), local.attachments)
+        assertEquals(null, uiState.value.error)
     }
 
     @Test

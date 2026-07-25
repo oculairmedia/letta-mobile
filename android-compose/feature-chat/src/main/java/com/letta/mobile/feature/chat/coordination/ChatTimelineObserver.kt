@@ -286,6 +286,17 @@ internal class ChatTimelineObserver(
     ): List<UiMessage> = presenter.mergeOlderPage(conversationId, olderMessages, existingMessages)
 
     /**
+     * Sliding-window release: shrinks the resident message list back down
+     * once the user has scrolled away from the older-page prefix they
+     * pulled in, so the window oscillates around the cap instead of only
+     * ever growing. See [ChatTimelinePresenter.releaseOlderPrefix].
+     */
+    fun releaseOlderMessages(
+        conversationId: String,
+        currentMessages: List<UiMessage>,
+    ): List<UiMessage> = presenter.releaseOlderPrefix(conversationId, currentMessages)
+
+    /**
      * A desktop-origin observer turn is absent from Android's initiator-owned
      * activeReplyStreams. Detect actual cumulative assistant growth instead:
      * stable message identity + longer text on an incremental tail update.

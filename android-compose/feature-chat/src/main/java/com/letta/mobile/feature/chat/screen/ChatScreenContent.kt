@@ -189,6 +189,7 @@ private fun ChatContentMessageArea(
         onActiveFontScaleChange = callbacks.onActiveFontScaleChange,
         onFontScaleChange = callbacks.onFontScaleChange,
         onLoadOlderMessages = callbacks.onLoadOlderMessages,
+        onReleaseOlderMessages = callbacks.onReleaseOlderMessages,
         onSendMessage = callbacks.onSendMessage,
         onRerunMessage = callbacks.onRerunMessage,
         onSubmitApproval = callbacks.onSubmitApproval,
