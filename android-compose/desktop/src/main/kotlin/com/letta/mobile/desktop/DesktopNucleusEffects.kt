@@ -26,6 +26,8 @@ import dev.nucleusframework.media.control.MediaPlaybackState
 import dev.nucleusframework.media.control.MediaPlaybackStatus
 import dev.nucleusframework.taskbarprogress.TaskbarProgress
 import dev.nucleusframework.composenativetray.tray.api.Tray
+import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.UiMessage
 import java.awt.Frame
 import java.awt.Window
 import java.awt.event.KeyEvent
@@ -49,24 +51,52 @@ internal data class DesktopNucleusEffectBindings(
     val applicationScope: NucleusApplicationScope,
     val window: Window,
     val controller: DesktopNucleusController,
+    /** Latest assistant reply preview for a conversation, for the toast body. */
+    val replyPreviewFor: (String) -> String?,
+    /** Bring the given conversation on screen (toast body click / Reply button). */
+    val onOpenConversation: (String) -> Unit,
+    /** Send inline-typed toast text into the conversation without activating. */
+    val onReplyToConversation: (String, String) -> Unit,
 )
 
 internal data class DesktopNucleusEffectState(
     val isAgentWorking: Boolean,
     val agentName: String,
     val errorMessage: String?,
+    /** Conversation the in-flight agent work belongs to, when known. */
+    val workingConversationId: String?,
+    /** Determinate work progress (0..1) when subagent steps are countable. */
+    val workProgress: Double? = null,
 )
+
+/**
+ * Deterministic taskbar progress from subagent steps: once at least one
+ * subagent of the active batch has finished, expose completed/total; while
+ * everything is still running (or there are no subagents) return null so the
+ * taskbar shows the indeterminate pulse instead. Statuses are the wire
+ * strings from [SubagentStatus].
+ */
+internal fun subagentWorkProgress(statuses: List<String>): Double? {
+    if (statuses.isEmpty()) return null
+    val done = statuses.count { it != SubagentStatus.RUNNING }
+    if (done == 0) return null
+    return done.toDouble() / statuses.size
+}
 
 internal data class DesktopNucleusEffectActions(
     val onOpenCommandPalette: () -> Unit,
     val onOpenSettings: () -> Unit,
+    /** Summon the floating quick-query bar (global hotkey), without raising the main window. */
+    val onQuickQuery: () -> Unit,
 )
 
 internal data class DesktopNucleusRuntimeState(
     val thinkingConversationId: String?,
     val isStreamingReply: Boolean,
+    val selectedConversationId: String?,
     val agentName: String,
     val errorMessage: String?,
+    val workProgress: Double? = null,
 )
 
 internal fun desktopNucleusEffectState(
@@ -75,12 +105,20 @@ internal fun desktopNucleusEffectState(
     isAgentWorking = runtime.thinkingConversationId != null || runtime.isStreamingReply,
     agentName = runtime.agentName,
     errorMessage = runtime.errorMessage,
+    // A streaming reply without a thinking marker belongs to the selected
+    // conversation (streaming presence is selected-conversation scoped).
+    workingConversationId = runtime.thinkingConversationId
+        ?: runtime.selectedConversationId.takeIf { runtime.isStreamingReply },
+    workProgress = runtime.workProgress,
 )
 
 private data class AgentCompletionBindings(
     val window: Window,
     val controller: DesktopNucleusController,
     val onActivate: () -> Unit,
+    val replyPreviewFor: (String) -> String?,
+    val onOpenConversation: (String) -> Unit,
+    val onReplyToConversation: (String, String) -> Unit,
 )
 
 private data class AgentFailureBindings(
@@ -141,7 +179,14 @@ internal fun DesktopNucleusEffects(
     )
     AgentWorkEffect(window, state)
     AgentCompletionEffect(
-        bindings = AgentCompletionBindings(window, bindings.controller, activate),
+        bindings = AgentCompletionBindings(
+            window = window,
+            controller = bindings.controller,
+            onActivate = activate,
+            replyPreviewFor = bindings.replyPreviewFor,
+            onOpenConversation = bindings.onOpenConversation,
+            onReplyToConversation = bindings.onReplyToConversation,
+        ),
         state = state,
     )
     AgentFailureEffect(
@@ -159,7 +204,7 @@ private fun DesktopIntegrationLifecycleEffect(
 ) {
     DisposableEffect(window) {
         GlobalHotKeyManager.initialize()
-        val hotKey = registerQuickSwitcher(onActivate, actions.onOpenCommandPalette)
+        val hotKey = registerQuickSwitcher(actions.onQuickQuery)
         configureLauncherMenus(onShow = onActivate, onOpenSettings = actions.onOpenSettings)
         configureMediaControls(agentName = agentName, onActivate = onActivate)
         val focusListener = desktopFocusListener(window)
@@ -173,9 +218,16 @@ private fun DesktopIntegrationLifecycleEffect(
 
 @Composable
 private fun AgentWorkEffect(window: Window, state: DesktopNucleusEffectState) {
-    LaunchedEffect(state.isAgentWorking, state.agentName) {
+    LaunchedEffect(state.isAgentWorking, state.agentName, state.workProgress) {
         if (state.isAgentWorking) {
-            TaskbarProgress.showIndeterminate(window)
+            // Countable subagent steps → precise taskbar progress; otherwise
+            // the indeterminate pulse.
+            val progress = state.workProgress
+            if (progress != null) {
+                TaskbarProgress.showProgress(window, progress)
+            } else {
+                TaskbarProgress.showIndeterminate(window)
+            }
             EnergyManager.disableLightEfficiencyMode()
             EnergyManager.keepScreenAwake()
             MediaControlService.setMetadata(
@@ -200,15 +252,47 @@ private fun AgentCompletionEffect(
     state: DesktopNucleusEffectState,
 ) {
     var wasWorking by remember { mutableStateOf(false) }
-    LaunchedEffect(state.isAgentWorking) {
+    // The working conversation clears from state before the completion
+    // transition is observed, so remember the last one seen while working.
+    var lastWorkingConversationId by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(state.isAgentWorking, state.workingConversationId) {
+        state.workingConversationId?.let { lastWorkingConversationId = it }
         if (shouldNotifyCompletion(wasWorking, state, bindings.window)) {
-            bindings.controller.notifyAgentFinished(state.agentName, bindings.onActivate)
+            val conversationId = lastWorkingConversationId
+            bindings.controller.notifyAgentFinished(
+                agentName = state.agentName,
+                replyPreview = conversationId?.let(bindings.replyPreviewFor),
+                onReply = { typedText ->
+                    if (typedText != null && conversationId != null) {
+                        // Inline toast reply: send in the background without
+                        // stealing focus, like Google Messages.
+                        bindings.onReplyToConversation(conversationId, typedText)
+                    } else {
+                        bindings.onActivate()
+                        conversationId?.let(bindings.onOpenConversation)
+                    }
+                },
+            )
             TaskbarProgress.requestAttention(bindings.window)
             setWindowsCompletionBadge()
         }
         wasWorking = state.isAgentWorking
     }
 }
+
+/**
+ * Body text for the completion toast: the last substantive assistant reply,
+ * whitespace-collapsed and truncated to toast size.
+ */
+internal fun notificationReplyPreview(messages: List<UiMessage>?): String? =
+    messages
+        ?.lastOrNull { it.role == "assistant" && !it.isReasoning && !it.isError && !it.isPending && it.content.isNotBlank() }
+        ?.content
+        ?.replace(Regex("\\s+"), " ")
+        ?.trim()
+        ?.let { if (it.length > NOTIFICATION_PREVIEW_MAX_CHARS) it.take(NOTIFICATION_PREVIEW_MAX_CHARS - 1) + "…" else it }
+
+private const val NOTIFICATION_PREVIEW_MAX_CHARS = 180
 
 private fun shouldNotifyCompletion(wasWorking: Boolean, state: DesktopNucleusEffectState, window: Window): Boolean {
     if (!wasWorking) return false
@@ -263,16 +347,16 @@ private fun failureProgressAction(
     return if (state.isAgentWorking) FailureProgressAction.None else FailureProgressAction.ClearProgress
 }
 
-private fun registerQuickSwitcher(onActivate: () -> Unit, onOpenCommandPalette: () -> Unit): Long =
+private fun registerQuickSwitcher(onQuickQuery: () -> Unit): Long =
     GlobalHotKeyManager.register(
         keyCode = KeyEvent.VK_SPACE,
         modifiers = HotKeyModifier.CONTROL + HotKeyModifier.SHIFT,
-        description = "Open Letta quick switcher",
+        description = "Open Letta quick query",
     ) { _, _ ->
-        SwingUtilities.invokeLater {
-            onActivate()
-            onOpenCommandPalette()
-        }
+        // Deliberately does NOT activate the main window: the quick-query bar
+        // floats over the user's current context (which it also captures —
+        // the foreground app must still be frontmost at this point).
+        SwingUtilities.invokeLater(onQuickQuery)
     }
 
 private fun desktopFocusListener(window: Window): WindowFocusListener = object : WindowFocusListener {

@@ -28,9 +28,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
@@ -108,6 +110,11 @@ class DesktopChatController(
      */
     private val _streamingConversationId = MutableStateFlow<String?>(null)
     val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
+
+    // The conversation the user last SENT a prompt into ("now playing" for the
+    // bottom bar): sticky across selection changes so jumping back is one click.
+    private val _lastPromptedConversationId = MutableStateFlow<String?>(null)
+    val lastPromptedConversationId: StateFlow<String?> = _lastPromptedConversationId.asStateFlow()
 
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
@@ -238,8 +245,14 @@ class DesktopChatController(
         gateway = null
     }
 
-    fun selectConversation(conversationId: String) {
-        if (closed) return
+    /**
+     * Selects [conversationId]. Returns the remote-selection [Job] when a
+     * remote load (and timeline-loop rebinding) was kicked off, so callers
+     * that must not race the loop swap — e.g. notification replies — can
+     * await it; null when the selection was a no-op or local-only.
+     */
+    fun selectConversation(conversationId: String): Job? {
+        if (closed) return null
         cleanupUnsentConversation(except = conversationId)
         var generation: Long? = null
         var shouldLoadRemote = false
@@ -254,12 +267,11 @@ class DesktopChatController(
             generation = if (shouldLoadRemote) next.selectionGeneration else null
             current.withRuntimeState(next)
         }
-        if (shouldLoadRemote) {
-            selectJob?.cancel()
-            selectJob = scope.launch {
-                selectRemoteConversation(conversationId, generation ?: return@launch)
-            }
-        }
+        if (!shouldLoadRemote) return null
+        selectJob?.cancel()
+        return scope.launch {
+            selectRemoteConversation(conversationId, generation ?: return@launch)
+        }.also { selectJob = it }
     }
 
     fun deleteConversation(conversationId: String) {
@@ -518,9 +530,47 @@ class DesktopChatController(
         _state.update { it.copy(errorMessage = message) }
     }
 
+    /**
+     * Inline reply from a notification toast: select the target conversation
+     * and await the selection's remote load — the job that rebinds the active
+     * timeline loop — before sending, so the send can never race onto the
+     * previous conversation's loop. Bounded so a wedged load still sends
+     * best-effort into the (already-updated) selection state.
+     */
+    fun replyFromNotification(conversationId: String, text: String) {
+        if (closed) return
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        scope.launch {
+            val selection = selectConversation(conversationId)
+            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) { selection?.join() }
+            updateComposerText(trimmed)
+            send()
+        }
+    }
+
+    /**
+     * User-facing interrupt (bottom-bar stop), scoped to [conversationId]:
+     * a no-op when the in-flight work belongs to a different conversation, so
+     * an unrelated send can never be cancelled by mistake. The send pipeline's
+     * finally clears the streaming flag on cancellation; thinking is cleared
+     * here because the cancellation path rethrows before failure-path cleanup.
+     * Client-side only — the server turn may still run to completion.
+     */
+    fun stopActiveRun(conversationId: String) {
+        if (closed) return
+        val active = _streamingConversationId.value ?: _thinkingConversationId.value
+        if (active != null && active != conversationId) return
+        sendJob?.cancel()
+        if (_thinkingConversationId.value == conversationId) {
+            _thinkingConversationId.value = null
+        }
+    }
+
     fun send() {
         if (closed) return
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
+        _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {
@@ -865,6 +915,9 @@ class DesktopChatController(
         }
     }
 }
+
+/** How long a notification reply waits for the conversation switch to settle. */
+private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
 
 /** Conversation-list scope filter, mapped to the `archive_status` query param. */
 enum class ConversationArchiveFilter(val apiValue: String, val label: String) {

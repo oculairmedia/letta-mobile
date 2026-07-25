@@ -630,9 +630,13 @@ class IrohAdminRpcAgentDirectory(
     }
 
     companion object {
-        // Single page sized for the desktop roster; Android's source paginates
-        // 50-at-a-time up to 2500 — revisit if a deployment outgrows this.
-        const val AGENT_LIST_LIMIT = 200
+        // Roster ceiling for the paged agent.list sweep, matching Android's
+        // 2500 cap. This is a runaway guard, not a page size — the sweep stops
+        // at the first short page, so small fleets still finish in a few
+        // requests. The old 200 cap silently truncated real deployments:
+        // agents past the first 200 never appeared in the rail, palette, or
+        // New Conversation directory.
+        const val AGENT_LIST_LIMIT = 2500
         // Per-page size for the paged agent.list read. Kept small because each
         // agent object is heavy (full system prompt + core memory): ~10 agents
         // is a few hundred KB, well under the admin_rpc timeout on a slow link,

@@ -197,11 +197,11 @@ internal class DesktopSubagentRegistry(
 )
 
 /**
- * Active-subagent registry (Background tasks). Desktop streams chat over SSE,
- * but the subagent registry only exists on the shim's mobile WS protocol, so
- * we open a lean WS side-channel and feed the shared SubagentRepository.
- * Skipped in iroh mode: IrohChannelTransport stubs sendSubagentList until
- * the iroh node serves the subagent registry.
+ * Active-subagent registry (Background tasks) side-channel for HTTP backends:
+ * desktop streams chat over SSE but the WS protocol carries the registry, so
+ * a lean WS side-channel feeds the shared SubagentRepository. Skipped in iroh
+ * mode — the registry rides the main iroh transport there (see
+ * [rememberSubagentRegistry]).
  */
 private fun createSubagentTransport(
     activeConfig: LettaConfig,
@@ -211,18 +211,32 @@ private fun createSubagentTransport(
     activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
         ?.let { DesktopWsChannelTransport(chatScope) }
 
+/** Inputs for the active-subagent registry. */
+internal data class SubagentRegistryRequest(
+    val activeConfig: LettaConfig,
+    val irohMode: Boolean,
+    val parentScope: SubagentParentScope?,
+    val irohTransport: IrohChannelTransport? = null,
+)
+
 @Composable
 internal fun rememberSubagentRegistry(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
+    request: SubagentRegistryRequest,
     chatScope: CoroutineScope,
-    parentScope: SubagentParentScope?,
 ): DesktopSubagentRegistry {
+    val activeConfig = request.activeConfig
+    val irohMode = request.irohMode
+    val parentScope = request.parentScope
+    val irohTransport = request.irohTransport
     val subagentTransport = remember(activeConfig, irohMode) {
         createSubagentTransport(activeConfig, irohMode, chatScope)
     }
-    val subagentRepository = remember(subagentTransport) {
-        subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    // iroh:// now serves the registry natively (scoped subagent.list RPC), so
+    // the repository rides the main iroh transport there; HTTP backends keep
+    // the lean WS side-channel.
+    val subagentRepository = remember(subagentTransport, irohTransport) {
+        irohTransport?.let { SubagentRepository(it, includeAll = true) }
+            ?: subagentTransport?.let { SubagentRepository(it, includeAll = true) }
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(

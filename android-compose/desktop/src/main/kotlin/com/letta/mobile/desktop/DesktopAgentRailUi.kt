@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -26,14 +28,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Face
+import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
+import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +49,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.agents.AgentRailGroup
+import com.letta.mobile.data.agents.AgentRailSpace
+import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.desktop.chat.AgentOrb
 
 private val androidx.compose.material3.Typography.countBadge
@@ -104,14 +114,14 @@ internal data class DesktopAgentRailFocus(
 internal data class DesktopAgentRailState(
     val agents: List<Pair<String, String>>,
     val focus: DesktopAgentRailFocus,
-    val avatarCompanionActive: Boolean = false,
+    /** Spotify-style expanded library mode: names + spaces, not just orbs. */
+    val expanded: Boolean = false,
 )
 
 internal data class DesktopAgentRailActions(
     val onAgentSelected: (String) -> Unit,
     val onNewSession: () -> Unit,
-    val onSearch: () -> Unit,
-    val onAvatarCompanion: () -> Unit = {},
+    val onToggleExpanded: () -> Unit = {},
 )
 
 /**
@@ -132,23 +142,221 @@ internal fun DesktopAgentRail(
         state.agents.groupBy { it.second }
             .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
     }
+    val width by animateDpAsState(if (state.expanded) 248.dp else 56.dp, label = "railWidth")
     Column(
         modifier = Modifier
-            .width(56.dp)
+            .width(width)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 15.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        RailExpandToggle(expanded = state.expanded, onToggle = actions.onToggleExpanded)
         NewSessionButton(onNewSession = actions.onNewSession)
         Spacer(Modifier.height(8.dp))
-        AgentRailOrbList(
-            groups = groups,
-            focus = state.focus,
-            onAgentSelected = actions.onAgentSelected,
+        if (state.expanded) {
+            ExpandedAgentLibrary(
+                groups = groups,
+                focus = state.focus,
+                onAgentSelected = actions.onAgentSelected,
+            )
+        } else {
+            AgentRailOrbList(
+                groups = groups,
+                focus = state.focus,
+                onAgentSelected = actions.onAgentSelected,
+            )
+            // Collapsed library search just opens the library — the search
+            // field lives inline in the expanded panel, Spotify-style.
+            RailActionIcon(
+                RailActionIconModel(
+                    icon = Icons.Outlined.Search,
+                    description = "Search agents",
+                    onClick = actions.onToggleExpanded,
+                ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun RailExpandToggle(expanded: Boolean, onToggle: () -> Unit) {
+    RailActionIcon(
+        RailActionIconModel(
+            icon = Icons.Outlined.Menu,
+            description = if (expanded) "Collapse agent library" else "Expand agent library",
+            onClick = onToggle,
+        ),
+    )
+}
+
+/**
+ * Spotify "Your Library"-style expanded rail: agents grouped into
+ * Element-style spaces (derived from naming conventions), each section
+ * headed by its aggregate impact — member count and a live working
+ * indicator — rather than one anonymous orb per agent.
+ */
+@Composable
+private fun ColumnScope.ExpandedAgentLibrary(
+    groups: List<AgentRailGroup>,
+    focus: DesktopAgentRailFocus,
+    onAgentSelected: (String) -> Unit,
+) {
+    // Spotify-style in-panel filter: search never leaves the library.
+    var query by remember { mutableStateOf(TextFieldValue("")) }
+    val filtered = remember(groups, query.text) {
+        val needle = query.text.trim()
+        if (needle.isEmpty()) groups else groups.filter { it.name.contains(needle, ignoreCase = true) }
+    }
+    val spaces = remember(filtered) { deriveAgentSpaces(filtered) }
+    // Orb colors key off the UNfiltered position so identities stay stable
+    // while filtering; precomputed map avoids O(n²) indexOf on big rosters.
+    val indexByGroup = remember(groups) {
+        groups.withIndex().associate { (index, group) -> group to index }
+    }
+    LibrarySearchField(query = query, onQueryChange = { query = it })
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .verticalScroll(rememberScrollState()),
+    ) {
+        if (filtered.isEmpty()) {
+            Text(
+                text = "No agents match \"${query.text.trim()}\"",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            )
+        }
+        spaces.forEach { space ->
+            SpaceHeader(space = space, focus = focus)
+            space.groups.forEach { group ->
+                ExpandedAgentRow(
+                    params = AgentRailOrbParams(
+                        group = group,
+                        index = indexByGroup[group] ?: 0,
+                        focus = focus,
+                        onAgentSelected = onAgentSelected,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibrarySearchField(
+    query: TextFieldValue,
+    onQueryChange: (TextFieldValue) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(8.dp))
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(14.dp),
         )
-        AgentRailBottomActions(state = state, actions = actions)
+        JewelTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            undecorated = true,
+            placeholder = {
+                Text(
+                    text = "Search agents",
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                )
+            },
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
+}
+
+@Composable
+private fun SpaceHeader(space: AgentRailSpace, focus: DesktopAgentRailFocus) {
+    val working = focus.thinkingAgentId != null &&
+        space.groups.any { focus.thinkingAgentId in it.agentIds }
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = space.name.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f),
+        )
+        if (working) {
+            Box(
+                modifier = Modifier
+                    .size(6.dp)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
+            )
+        }
+        Text(
+            text = space.agentCount.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun ExpandedAgentRow(params: AgentRailOrbParams) {
+    val flags = params.toFlags()
+    val target = params.toTarget(flags)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = { params.onAgentSelected(target.agentId) })
+            .background(
+                if (flags.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+            )
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            if (flags.thinking) {
+                ThinkingRing(diameter = 32.dp, cornerRadius = 9.dp)
+            }
+            AgentOrb(index = target.orbStyle, size = 28.dp, cornerRadius = 8.dp) {
+                Text(
+                    text = params.group.name.firstOrNull()?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.White,
+                )
+            }
+        }
+        Text(
+            text = params.group.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (flags.selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (flags.count > 1) {
+            Text(
+                text = if (flags.count > 99) "99+" else flags.count.toString(),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -181,31 +389,6 @@ private fun ColumnScope.AgentRailOrbList(
     }
 }
 
-@Composable
-private fun AgentRailBottomActions(
-    state: DesktopAgentRailState,
-    actions: DesktopAgentRailActions,
-) {
-    RailActionIcon(
-        RailActionIconModel(
-            icon = Icons.Outlined.Face,
-            description = if (state.avatarCompanionActive) "Stop avatar companion" else "Avatar companion",
-            onClick = actions.onAvatarCompanion,
-            tint = if (state.avatarCompanionActive) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            },
-        ),
-    )
-    RailActionIcon(
-        RailActionIconModel(
-            icon = Icons.Outlined.Search,
-            description = "Search",
-            onClick = actions.onSearch,
-        ),
-    )
-}
 
 @Composable
 private fun NewSessionButton(onNewSession: () -> Unit) {
@@ -352,11 +535,6 @@ private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
     }
 }
 
-/** A rail entry: one or more agents that share a display name, stacked together. */
-private data class AgentRailGroup(
-    val name: String,
-    val agentIds: List<String>,
-)
 
 private data class RailActionIconModel(
     val icon: ImageVector,
