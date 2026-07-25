@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.setValue
 import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.application.NucleusApplicationScope
@@ -36,6 +37,20 @@ import java.awt.event.WindowEvent
 import java.awt.event.WindowFocusListener
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
+
+/**
+ * Owns the Nucleus controller for the composition, closing the superseded
+ * instance so its native toast listener is unregistered rather than left
+ * duplicating deliveries.
+ */
+@Composable
+internal fun rememberDesktopNucleusController(scope: CoroutineScope): DesktopNucleusController {
+    val controller = remember(scope) { DesktopNucleusController(scope) }
+    DisposableEffect(controller) {
+        onDispose { controller.close() }
+    }
+    return controller
+}
 
 internal fun activateDesktopWindow(window: Window) {
     SwingUtilities.invokeLater {

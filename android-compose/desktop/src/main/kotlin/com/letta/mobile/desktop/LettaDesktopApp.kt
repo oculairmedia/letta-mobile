@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
@@ -85,10 +84,7 @@ internal fun LettaDesktopApp(
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
     val chatScope = rememberCoroutineScope()
-    val nucleusController = remember(chatScope) { DesktopNucleusController(chatScope) }
-    DisposableEffect(nucleusController) {
-        onDispose { nucleusController.close() }
-    }
+    val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
     val irohMode = irohTransport != null
