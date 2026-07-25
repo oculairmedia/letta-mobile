@@ -17,6 +17,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
+import com.letta.mobile.runtime.RuntimeUserInputTools
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolApprovalDecisionValue
 import com.letta.mobile.runtime.ToolCallId
@@ -482,8 +483,23 @@ class AppServerTurnEngine(
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
         val lastFrameAt = atomic(currentTimeMs())
+        // letta-mobile-vilsn.6: true while a surfaced (non-auto-approved) runtime
+        // user-input approval (AskUserQuestion / ExitPlanMode) is parked waiting
+        // for the user's answer. The idle watchdog MUST NOT fail such a turn — an
+        // unanswered question legitimately parks the turn far longer than the idle
+        // window. Set when the approval is surfaced; cleared when a genuinely new
+        // inbound frame arrives (turn resumed because the user answered) or on any
+        // terminal/settle path.
+        val awaitingUserInput = atomic(false)
         val watchdog = this.launch {
             while (true) {
+                if (awaitingUserInput.value) {
+                    // Paused: a runtime user-input approval is outstanding. Do NOT
+                    // throw — re-check periodically so normal idle behavior resumes
+                    // as soon as the approval is cleared, without failing the turn.
+                    delay(turnIdleTimeoutMs.milliseconds)
+                    continue
+                }
                 val idleFor = currentTimeMs() - lastFrameAt.value
                 val remaining = turnIdleTimeoutMs - idleFor
                 if (remaining <= 0) {
@@ -519,6 +535,9 @@ class AppServerTurnEngine(
         val returnedToolCallIds = mutableSetOf<String>()
 
         suspend fun flushTail() {
+            // letta-mobile-vilsn.6: a terminal/settle path is a definitive end to
+            // any parked user-input approval — resume normal watchdog behavior.
+            awaitingUserInput.value = false
             pendingStop?.let { emitDraft(it) }
             pendingStop = null
             pendingUsage?.let { emitDraft(it) }
@@ -623,6 +642,13 @@ class AppServerTurnEngine(
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
+                // letta-mobile-vilsn.6: a genuinely NEW inbound frame means the
+                // turn has resumed — e.g. the user answered a parked user-input
+                // approval — so resume normal idle-watchdog behavior. This runs
+                // BEFORE any approval is surfaced from this frame's drafts below,
+                // so an approval frame re-arms the pause after clearing here (the
+                // pause is never cleared by the approval frame itself).
+                awaitingUserInput.value = false
                 // lgns8.17: GUARANTEE a matched external_tool_call_response. The
                 // App Server blocks the turn until every external_tool_call_request
                 // is answered by request_id; the mapper below only turns it into a
@@ -664,7 +690,20 @@ class AppServerTurnEngine(
                     // letta-mobile-oqfbj: track tool_call emissions and returns
                     when (val payload = draft.payload) {
                         is RuntimeEventPayload.ToolCallObserved -> emittedToolCallIds.add(payload.toolCallId.value)
-                        is RuntimeEventPayload.ApprovalRequested -> emittedToolCallIds.add(payload.request.callId.value)
+                        is RuntimeEventPayload.ApprovalRequested -> {
+                            emittedToolCallIds.add(payload.request.callId.value)
+                            // letta-mobile-vilsn.6: this ApprovalRequested reached
+                            // the collect body, which means it was NOT auto-approved
+                            // (auto-approved drafts are swallowed above via
+                            // autoApprovedToolCallDraft). If it is a runtime
+                            // user-input tool (AskUserQuestion / ExitPlanMode) the
+                            // turn is now parked awaiting the user's answer — pause
+                            // the idle watchdog so the unanswered question does not
+                            // synthesize a Failed idle timeout.
+                            if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
+                                awaitingUserInput.value = true
+                            }
+                        }
                         is RuntimeEventPayload.ToolReturnObserved -> returnedToolCallIds.add(payload.toolCallId.value)
                         is RuntimeEventPayload.RemoteStreamFrame -> {
                             // Extract tool_call_id from tool_call_message and approval_request_message frames
@@ -845,6 +884,12 @@ class AppServerTurnEngine(
     ): Boolean {
         if (turnPermissionMode != AppServerPermissionMode.Unrestricted) return false
         val approval = draft.toApprovalAutoAllowRequest() ?: return false
+        // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion,
+        // ExitPlanMode) must NEVER be auto-approved — auto-approving closes them
+        // with no answer (the tool returns a "Waiting for user response..."
+        // placeholder and the agent stalls). Surface them to the client as a
+        // real approval request so the user can see the query and answer it.
+        if (RuntimeUserInputTools.requiresUserInput(approval.toolName)) return false
         Telemetry.event(
             "IrohTurn", "approval.auto_allow",
             "approvalId" to approval.requestId,

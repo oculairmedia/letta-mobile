@@ -111,6 +111,9 @@ interface AppServerController {
         approvalRequestId: String,
         approve: Boolean,
         reason: String? = null,
+        // letta-mobile-vilsn: tool_call_id lets interactive-tool answers target
+        // the `perm-call_<toolCallId>` control-request gate id.
+        toolCallId: String? = null,
     ) {
         error("submitApproval is not supported by this controller")
     }

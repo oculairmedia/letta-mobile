@@ -83,6 +83,13 @@ class DesktopChatController(
     /** Locally-tracked archived conversation ids (durable; see constructor note). */
     private var locallyArchivedIds: Set<String> = loadArchivedConversationIds()
 
+    /**
+     * Approval request ids whose decision (answer / dismiss) is in flight, so the
+     * structured AskUserQuestion card can disable its buttons while submitting.
+     */
+    private val _submittingApprovals = MutableStateFlow<Set<String>>(emptySet())
+    val submittingApprovals: StateFlow<Set<String>> = _submittingApprovals.asStateFlow()
+
     /** Conversations whose delete is in flight — the sidebar shows a spinner. */
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
@@ -500,6 +507,50 @@ class DesktopChatController(
             }
             if (!closed && _state.value.selectedConversationId == conversationId) {
                 _state.update { it.copy(composerModelLabel = label) }
+            }
+        }
+    }
+
+    /**
+     * Answer or dismiss a parked approval (e.g. AskUserQuestion) surfaced in the
+     * selected conversation. Mirrors the mobile chat contract
+     * `(requestId, toolCallIds, approve, reason)`; the answer rides the `reason`
+     * channel (see [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason]).
+     * A no-op when the active gateway can't submit approvals (demo / HTTP-only).
+     */
+    fun submitApproval(
+        requestId: String,
+        toolCallIds: List<String>,
+        approve: Boolean,
+        reason: String?,
+    ) {
+        if (closed) return
+        val submitter = gateway as? DesktopApprovalSubmitter ?: return
+        val conversation = _state.value.selectedConversation ?: return
+        val agentId = conversation.agentId?.takeIf { it.isNotBlank() } ?: return
+        _submittingApprovals.update { it + requestId }
+        scope.launch {
+            try {
+                submitter.submitApproval(
+                    DesktopApprovalSubmission(
+                        agentId = agentId,
+                        conversationId = conversation.id,
+                        requestId = requestId,
+                        toolCallId = toolCallIds.firstOrNull(),
+                        approve = approve,
+                        reason = reason,
+                    ),
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                if (!closed) {
+                    _state.update {
+                        it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not submit answer")
+                    }
+                }
+            } finally {
+                if (!closed) _submittingApprovals.update { it - requestId }
             }
         }
     }

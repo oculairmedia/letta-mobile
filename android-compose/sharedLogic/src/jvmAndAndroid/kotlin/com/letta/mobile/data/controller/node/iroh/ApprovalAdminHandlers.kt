@@ -60,6 +60,7 @@ object ApprovalAdminHandlers {
                     approvalRequestId = approvalRequestId,
                     approve = approve,
                     reason = reason,
+                    toolCallId = toolCallIds.firstOrNull(),
                 )
             }.onSuccess {
                 return buildJsonObject { put("status", if (approve) "approved" else "denied") }

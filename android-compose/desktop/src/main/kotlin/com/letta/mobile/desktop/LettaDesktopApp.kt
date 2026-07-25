@@ -109,6 +109,7 @@ internal fun LettaDesktopApp(
     val chatState by chatController.state.collectAsState()
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
+    val submittingApprovals by chatController.submittingApprovals.collectAsState()
     val modelOptions = remember(availableModels) { buildModelOptions(availableModels) }
     val httpApis = rememberDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
     val blockApi = httpApis.blockApi
@@ -526,10 +527,12 @@ internal fun LettaDesktopApp(
                                     workPlayMode,
                                     selectedAgentName,
                                 ),
+                                submittingApprovalRequestIds = submittingApprovals,
                             ),
                             actions = ChatDetailPaneActions(
                                 onComposerTextChanged = chatController::updateComposerText,
                                 onSend = chatController::send,
+                                onSubmitApproval = chatController::submitApproval,
                                 onAttachImage = { pickerLauncher.launch() },
                                 onRemoveImageAttachment = chatController::removeImageAttachment,
                                 onRetryConnection = chatController::retryConnection,

@@ -150,6 +150,7 @@ class ApprovalAdminHandlersTest {
         var submittedAgentId: String? = null
         var submittedApprovalRequestId: String? = null
         var submittedApprove: Boolean? = null
+        var submittedToolCallId: String? = null
 
         override suspend fun startRuntime(
             agentId: AgentId,
@@ -179,10 +180,12 @@ class ApprovalAdminHandlersTest {
             approvalRequestId: String,
             approve: Boolean,
             reason: String?,
+            toolCallId: String?,
         ) {
             submittedAgentId = agentId.value
             submittedApprovalRequestId = approvalRequestId
             submittedApprove = approve
+            submittedToolCallId = toolCallId
         }
     }
 }

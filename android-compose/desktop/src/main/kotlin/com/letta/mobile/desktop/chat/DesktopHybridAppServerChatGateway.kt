@@ -2,6 +2,7 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
+import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -10,9 +11,13 @@ import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.RuntimeEventServerFrameMapper
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -71,7 +76,53 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         httpGateway.getConversation(conversationId).agentId.value
     },
-) : DesktopChatGateway, ChatGatewayExtras by httpGateway, AutoCloseable {
+) : DesktopChatGateway, ChatGatewayExtras by httpGateway, DesktopApprovalSubmitter, AutoCloseable {
+
+    /**
+     * Answer / dismiss a parked runtime approval (e.g. AskUserQuestion) over the
+     * App Server input channel — desktop parity for the mobile approval-submit
+     * path. Mirrors [com.letta.mobile.data.controller.DefaultAppServerController.submitApproval]:
+     * an AskUserQuestion answer rides the `reason` channel (decoded here into an
+     * `updated_input` allow), and interactive tools resolve against letta-code's
+     * `perm-call_<callId>` control-request id — NOT the display approval id. The
+     * runtime scope is rebuilt from the conversation's agent/conversation ids
+     * (single-user desktop backend), matching the scope minted at runtime_start.
+     * See letta-mobile-vilsn.8.
+     */
+    override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
+        val scope = AppServerRuntimeScope(
+            agentId = submission.agentId,
+            conversationId = submission.conversationId,
+        )
+        val answerUpdatedInput =
+            if (submission.approve) AskUserQuestion.decodeAnswerReason(submission.reason) else null
+        val effectiveRequestId = if (answerUpdatedInput != null && submission.toolCallId != null) {
+            "perm-call_" + submission.toolCallId.removePrefix("call_")
+        } else {
+            submission.requestId
+        }
+        val decision = when {
+            submission.approve && answerUpdatedInput != null ->
+                AppServerApprovalResponseDecision.Allow(message = null, updatedInput = answerUpdatedInput)
+            submission.approve ->
+                AppServerApprovalResponseDecision.Allow(
+                    message = submission.reason ?: "Approved by desktop client.",
+                )
+            else ->
+                AppServerApprovalResponseDecision.Deny(
+                    message = submission.reason ?: "Denied by desktop client.",
+                )
+        }
+        client.input(
+            AppServerCommand.Input(
+                runtime = scope,
+                payload = AppServerInputPayload.ApprovalResponse(
+                    requestId = effectiveRequestId,
+                    decision = decision,
+                ),
+            ),
+        )
+    }
 
     /** conversationId -> agentId, learned on first send/stream per conversation. */
     private val agentIdByConversation = ConcurrentHashMap<String, String>()

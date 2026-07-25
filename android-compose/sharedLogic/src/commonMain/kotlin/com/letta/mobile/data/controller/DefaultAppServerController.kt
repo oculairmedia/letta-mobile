@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
@@ -202,6 +203,7 @@ class DefaultAppServerController(
         approvalRequestId: String,
         approve: Boolean,
         reason: String?,
+        toolCallId: String?,
     ) {
         val runtime = runtimeMutex.withLock {
             val conversationValue = conversationId?.value
@@ -210,16 +212,35 @@ class DefaultAppServerController(
             }?.value?.scope
         } ?: throw AppServerControllerException("No active runtime found for approval $approvalRequestId")
 
+        // letta-mobile-vilsn: an AskUserQuestion answer rides the `reason` channel
+        // (see AskUserQuestion.encodeAnswerReason). When present, close the tool
+        // call by returning the answer as `updated_input` rather than a bare allow.
+        val answerUpdatedInput = if (approve) AskUserQuestion.decodeAnswerReason(reason) else null
+        // letta-mobile-vilsn: interactive tools (AskUserQuestion) are gated by
+        // letta-code's `can_use_tool` control request, whose id is
+        // `perm-call_<toolCallId-suffix>` — NOT the display approval id the app
+        // renders from. Answer against the perm-call id so the gate actually
+        // resolves; the display id never matches it (confirmed empirically).
+        val effectiveRequestId = if (answerUpdatedInput != null && toolCallId != null) {
+            "perm-call_" + toolCallId.removePrefix("call_")
+        } else {
+            approvalRequestId
+        }
+
+        val decision = when {
+            approve && answerUpdatedInput != null ->
+                AppServerApprovalResponseDecision.Allow(message = null, updatedInput = answerUpdatedInput)
+            approve ->
+                AppServerApprovalResponseDecision.Allow(message = reason ?: "Approved by mobile client.")
+            else ->
+                AppServerApprovalResponseDecision.Deny(message = reason ?: "Denied by mobile client.")
+        }
         client.input(
             AppServerCommand.Input(
                 runtime = runtime,
                 payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = approvalRequestId,
-                    decision = if (approve) {
-                        AppServerApprovalResponseDecision.Allow(message = reason ?: "Approved by mobile client.")
-                    } else {
-                        AppServerApprovalResponseDecision.Deny(message = reason ?: "Denied by mobile client.")
-                    },
+                    requestId = effectiveRequestId,
+                    decision = decision,
                 ),
             ),
         )

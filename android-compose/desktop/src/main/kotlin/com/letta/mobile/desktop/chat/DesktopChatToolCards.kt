@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,19 +18,27 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.Widgets
+import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -38,6 +48,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.AskUserQuestion
+import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
@@ -211,8 +223,37 @@ internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
     }
 }
 
+/**
+ * Threads the approval-decision callback (and the set of in-flight request ids)
+ * from the chat controller down to the approval cards without widening every
+ * intermediate composable's signature. Null when no interactive approval path is
+ * wired (demo / HTTP-only gateways) — the cards then render read-only.
+ *
+ * `onDecision` mirrors the mobile chat contract
+ * `(requestId, toolCallIds, approve, reason)`; an AskUserQuestion answer rides the
+ * `reason` channel via [AskUserQuestion.encodeAnswerReason]. See letta-mobile-vilsn.8.
+ */
+internal data class DesktopApprovalDecisionHandler(
+    val onDecision: (requestId: String, toolCallIds: List<String>, approve: Boolean, reason: String?) -> Unit,
+    val submittingRequestIds: Set<String> = emptySet(),
+)
+
+internal val LocalDesktopApprovalDecision = staticCompositionLocalOf<DesktopApprovalDecisionHandler?> { null }
+
 @Composable
 internal fun ApprovalRequestCard(approvalRequest: UiApprovalRequest) {
+    val handler = LocalDesktopApprovalDecision.current
+    val isSubmitting = handler != null && approvalRequest.requestId in handler.submittingRequestIds
+    // Structured AskUserQuestion answering takes precedence; falls through to the
+    // generic disclosure when the parked call isn't an AskUserQuestion.
+    if (DesktopAskUserQuestionCard(
+            approval = approvalRequest,
+            isSubmitting = isSubmitting,
+            onDecision = handler?.onDecision,
+        )
+    ) {
+        return
+    }
     ArtifactCard(
         icon = Icons.Outlined.CheckCircle,
         title = "Approval requested",
@@ -225,6 +266,142 @@ internal fun ApprovalRequestCard(approvalRequest: UiApprovalRequest) {
             )
         }
     }
+}
+
+/**
+ * Desktop structured renderer for a parked `AskUserQuestion` tool call — parity
+ * with the mobile `AskUserQuestionCard`. Shows each question with its options as
+ * selectable chips (single- or multi-select) plus a free-text "Other" answer.
+ * "Send answer" builds the `updated_input.answers` payload that closes the tool
+ * call, riding the existing approval `onDecision` reason channel; "Dismiss"
+ * denies the approval. See letta-mobile-vilsn.8.
+ *
+ * Returns false (renders nothing) when the approval is not an AskUserQuestion —
+ * callers fall back to the generic approval card.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun DesktopAskUserQuestionCard(
+    approval: UiApprovalRequest,
+    isSubmitting: Boolean,
+    onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
+): Boolean {
+    val toolCall = approval.toolCalls.firstOrNull { it.name == AskUserQuestion.ASK_USER_QUESTION_TOOL }
+        ?: return false
+    val spec = remember(toolCall.arguments) { AskUserQuestion.parse(toolCall.arguments) } ?: return false
+
+    val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
+
+    // question text -> selected option labels
+    val selections = remember(toolCall.arguments) { mutableStateMapOf<String, MutableList<String>>() }
+    // question text -> free-text "Other" answer
+    val otherText = remember(toolCall.arguments) { mutableStateMapOf<String, String>() }
+
+    ArtifactCard(
+        icon = Icons.Outlined.HelpOutline,
+        title = "Question",
+        status = ToolStatusToken(approval.requestId),
+    ) {
+        spec.questions.forEach { question ->
+            DesktopAskUserQuestionBlock(
+                question = question,
+                selected = selections[question.question].orEmpty(),
+                otherValue = otherText[question.question].orEmpty(),
+                onToggleOption = { label ->
+                    val current = selections.getOrPut(question.question) { mutableListOf() }
+                    if (question.multiSelect) {
+                        if (!current.remove(label)) current.add(label)
+                    } else {
+                        current.clear()
+                        current.add(label)
+                    }
+                    // trigger recomposition (SnapshotStateMap tracks value identity)
+                    selections[question.question] = current.toMutableList()
+                },
+                onOtherChanged = { otherText[question.question] = it },
+            )
+        }
+
+        val answers = buildAskUserQuestionAnswers(spec.questions, selections, otherText)
+        val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { onDecision?.invoke(approval.requestId, toolCallIds, false, null) },
+                enabled = !isSubmitting && onDecision != null,
+            ) { Text("Dismiss") }
+            Button(
+                onClick = {
+                    val updatedInput = AskUserQuestion.buildUpdatedInput(toolCall.arguments, answers)
+                    onDecision?.invoke(
+                        approval.requestId,
+                        toolCallIds,
+                        true,
+                        AskUserQuestion.encodeAnswerReason(updatedInput),
+                    )
+                },
+                enabled = !isSubmitting && canSubmit && onDecision != null,
+            ) { Text(if (isSubmitting) "Sending…" else "Send answer") }
+        }
+    }
+    return true
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DesktopAskUserQuestionBlock(
+    question: AskUserQuestionItem,
+    selected: List<String>,
+    otherValue: String,
+    onToggleOption: (String) -> Unit,
+    onOtherChanged: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+        question.header?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                text = it,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+        Text(text = question.question, style = MaterialTheme.typography.bodySmall)
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            question.options.forEach { option ->
+                FilterChip(
+                    selected = option.label in selected,
+                    onClick = { onToggleOption(option.label) },
+                    label = { Text(option.label) },
+                    colors = FilterChipDefaults.filterChipColors(),
+                )
+            }
+        }
+        OutlinedTextField(
+            value = otherValue,
+            onValueChange = onOtherChanged,
+            label = { Text("Other") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        )
+    }
+}
+
+/** Collect resolved answers: selected chip labels plus any free-text "Other" value. */
+private fun buildAskUserQuestionAnswers(
+    questions: List<AskUserQuestionItem>,
+    selections: Map<String, List<String>>,
+    otherText: Map<String, String>,
+): Map<String, List<String>> {
+    val out = LinkedHashMap<String, List<String>>()
+    for (q in questions) {
+        if (q.question.isBlank()) continue
+        val picked = selections[q.question].orEmpty().toMutableList()
+        otherText[q.question]?.takeIf { it.isNotBlank() }?.let { picked.add(it) }
+        if (picked.isNotEmpty()) out[q.question] = picked
+    }
+    return out
 }
 
 @Composable
