@@ -253,16 +253,21 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                         coordinator.close()
                     },
                 )
-                QuickQueryDivider()
-                Text(
-                    text = "⏎ open top result · Ctrl+⏎ ask current agent · Esc close",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
+                QuickQueryFooter()
             }
         }
     }
+}
+
+@Composable
+private fun QuickQueryFooter() {
+    QuickQueryDivider()
+    Text(
+        text = "⏎ open top result · Ctrl+⏎ ask current agent · Esc close",
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+    )
 }
 
 private const val QUICK_QUERY_RECENT_AGENTS_LIMIT = 9

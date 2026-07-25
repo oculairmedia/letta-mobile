@@ -130,7 +130,6 @@ internal fun DesktopNewConversationSurface(
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val filtered = remember(directory, query.text) { filterAgentDirectory(directory, query.text) }
     val sections = remember(filtered) { groupAgentDirectory(filtered) }
-    val searching = query.text.isNotBlank()
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
@@ -156,84 +155,120 @@ internal fun DesktopNewConversationSurface(
                 )
                 // Hoisted here (not on the field) so Escape/Enter still work
                 // after a click moves focus off the To: field.
-                .onPreviewKeyEvent { event ->
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    when (event.key) {
-                        Key.Escape -> {
-                            actions.onDismiss()
-                            true
-                        }
-                        Key.Enter -> {
-                            filtered.firstOrNull()?.let { actions.onAgentSelected(it.id) }
-                            filtered.isNotEmpty()
-                        }
-                        else -> false
-                    }
-                },
+                .onPreviewKeyEvent { event -> handleDirectoryKey(event, filtered, actions) },
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surfaceContainer,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = 8.dp,
         ) {
             Column {
-                Text(
-                    text = "New conversation",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 16.dp),
+                NewConversationHeader(
+                    query = query,
+                    onQueryChange = { query = it },
+                    focusRequester = focusRequester,
                 )
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text(
-                        text = "To:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    JewelTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        placeholder = { Text("Type an agent name") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(focusRequester),
-                    )
-                }
                 DirectoryDivider()
                 CreateAgentRow(onClick = actions.onCreateNewAgent)
                 DirectoryDivider()
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
-                    if (!searching && recents.isNotEmpty()) {
-                        item(key = "recents") { RecentsRow(recents, actions.onAgentSelected) }
-                    }
-                    if (filtered.isEmpty()) {
-                        item(key = "empty") {
-                            Text(
-                                text = "No agents match \"${query.text}\"",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(20.dp),
-                            )
-                        }
-                    }
-                    sections.forEach { (letter, rows) ->
-                        item(key = "letter-$letter") {
-                            Text(
-                                text = letter,
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-                            )
-                        }
-                        items(rows, key = { "agent-${it.id}" }) { row ->
-                            AgentDirectoryRow(row = row, onClick = { actions.onAgentSelected(row.id) })
-                        }
-                    }
-                }
+                NewConversationDirectoryList(
+                    queryText = query.text,
+                    recents = recents,
+                    sections = sections,
+                    onAgentSelected = actions.onAgentSelected,
+                )
+            }
+        }
+    }
+}
+
+/** Escape dismisses; Enter opens the top filtered match. */
+private fun handleDirectoryKey(
+    event: androidx.compose.ui.input.key.KeyEvent,
+    filtered: List<NewConversationAgentRow>,
+    actions: DesktopNewConversationActions,
+): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    return when (event.key) {
+        Key.Escape -> {
+            actions.onDismiss()
+            true
+        }
+        Key.Enter -> {
+            filtered.firstOrNull()?.let { actions.onAgentSelected(it.id) }
+            filtered.isNotEmpty()
+        }
+        else -> false
+    }
+}
+
+@Composable
+private fun NewConversationHeader(
+    query: TextFieldValue,
+    onQueryChange: (TextFieldValue) -> Unit,
+    focusRequester: FocusRequester,
+) {
+    Text(
+        text = "New conversation",
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurface,
+        modifier = Modifier.padding(start = 16.dp, top = 14.dp, end = 16.dp),
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            text = "To:",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        JewelTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            placeholder = { Text("Type an agent name") },
+            modifier = Modifier
+                .fillMaxWidth()
+                .focusRequester(focusRequester),
+        )
+    }
+}
+
+@Composable
+private fun NewConversationDirectoryList(
+    queryText: String,
+    recents: List<NewConversationAgentRow>,
+    sections: List<Pair<String, List<NewConversationAgentRow>>>,
+    onAgentSelected: (String) -> Unit,
+) {
+    val searching = queryText.isNotBlank()
+    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+        if (!searching && recents.isNotEmpty()) {
+            item(key = "recents") { RecentsRow(recents, onAgentSelected) }
+        }
+        if (sections.isEmpty()) {
+            item(key = "empty") {
+                Text(
+                    text = "No agents match \"$queryText\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(20.dp),
+                )
+            }
+        }
+        sections.forEach { (letter, rows) ->
+            item(key = "letter-$letter") {
+                Text(
+                    text = letter,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                )
+            }
+            items(rows, key = { "agent-${it.id}" }) { row ->
+                AgentDirectoryRow(row = row, onClick = { onAgentSelected(row.id) })
             }
         }
     }
