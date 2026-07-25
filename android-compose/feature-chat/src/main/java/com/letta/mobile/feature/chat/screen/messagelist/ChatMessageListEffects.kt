@@ -55,6 +55,7 @@ internal fun ChatMessageListEffects(params: ChatMessageListEffectsParams) {
     )
     ChatMessageListAutoScrollEffect(params)
     ChatMessageListLoadOlderEffect(params)
+    ChatMessageListReleaseOlderEffect(params)
     ChatMessageListScrollToMessageEffect(params)
 }
 
@@ -180,3 +181,42 @@ private fun shouldLoadOlderMessages(params: ChatMessageListEffectsParams): Boole
     if (params.state.messages.isEmpty()) return false
     return true
 }
+
+/**
+ * Sliding-window release: pairs with [ChatMessageListLoadOlderEffect]. Once
+ * the user scrolls back near the live tail (low index in this
+ * reverseLayout list — index 0 is the newest message) after having pulled
+ * in older pages, shrink the resident window back down so repeated
+ * scroll-up/scroll-down cycles don't leave it permanently grown. Only fires
+ * once the resident list has actually grown past what a normal viewport
+ * needs, so ordinary scrolling near the tail never triggers a release.
+ */
+@Composable
+private fun ChatMessageListReleaseOlderEffect(params: ChatMessageListEffectsParams) {
+    LaunchedEffect(params.listState, params.state.messages.size, params.state.isLoadingOlderMessages) {
+        snapshotFlow { params.listState.firstVisibleItemIndex }
+            .distinctUntilChanged()
+            .collect { firstVisibleItemIndex ->
+                if (shouldReleaseOlderMessages(params, firstVisibleItemIndex)) {
+                    params.onReleaseOlderMessages()
+                }
+            }
+    }
+}
+
+private fun shouldReleaseOlderMessages(params: ChatMessageListEffectsParams, firstVisibleItemIndex: Int): Boolean {
+    if (params.state.isLoadingOlderMessages) return false
+    if (params.state.messages.size <= RELEASE_OLDER_TRIGGER_MESSAGE_COUNT) return false
+    return firstVisibleItemIndex <= RELEASE_OLDER_SCROLL_THRESHOLD
+}
+
+// Only worth releasing once the resident list has grown well past what a
+// normal viewport/window needs to hold — mirrors ChatTimelineProjector's
+// DEFAULT_MAX_RESIDENT_UI_MESSAGES (400); trigger a little below it so a
+// release actually has meaningful content to drop.
+private const val RELEASE_OLDER_TRIGGER_MESSAGE_COUNT = 250
+
+// "Back near the live tail" — reverseLayout index 0 is the newest message,
+// so a small firstVisibleItemIndex means the user scrolled back down away
+// from the older content they'd pulled in.
+private const val RELEASE_OLDER_SCROLL_THRESHOLD = 20

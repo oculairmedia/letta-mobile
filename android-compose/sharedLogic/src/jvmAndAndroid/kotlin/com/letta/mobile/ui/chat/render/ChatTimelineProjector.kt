@@ -42,6 +42,14 @@ class ChatTimelineProjector {
      * Older messages fetched via pagination need to survive the next timeline
      * emission (which overwrites `messages` with live timeline contents). Hold a
      * per-conversation prefix and prepend it on every projection.
+     *
+     * letta-mobile: sliding-window retention. Repeated "load older" pages
+     * (each [mergeOlderPage] call) used to grow this cache — and the merged
+     * [ChatUiState.messages] list it feeds — without bound, defeating the
+     * whole point of a windowed timeline for long-lived conversations. Both
+     * are now capped at [maxResidentUiMessages]; older content beyond the cap
+     * is simply dropped from residency (not deleted server-side — a scroll
+     * back up re-fetches it via the same pager, just like Timeline eviction).
      */
     private var olderMessagesPrefix: Pair<String, List<UiMessage>> = "" to emptyList()
 
@@ -63,6 +71,7 @@ class ChatTimelineProjector {
         conversationId: String,
         olderMessages: List<UiMessage>,
         existingMessages: List<UiMessage>,
+        maxResidentUiMessages: Int = DEFAULT_MAX_RESIDENT_UI_MESSAGES,
     ): List<UiMessage> {
         if (olderMessages.isEmpty()) return existingMessages
 
@@ -72,11 +81,48 @@ class ChatTimelineProjector {
         val grown = ArrayList<UiMessage>(basePrefix.size + olderMessages.size)
         for (m in olderMessages) if (seenIds.add(m.id)) grown.add(m)
         for (m in basePrefix) if (seenIds.add(m.id)) grown.add(m)
-        olderMessagesPrefix = conversationId to grown
+        // Cap the pagination prefix cache itself, dropping the OLDEST entries
+        // (front of the ascending-order list) once it grows past the window.
+        olderMessagesPrefix = conversationId to grown.takeLastCapped(maxResidentUiMessages)
 
         val existingIds = existingMessages.mapTo(mutableSetOf()) { it.id }
-        return olderMessages.filterNot { it.id in existingIds } + existingMessages
+        val merged = olderMessages.filterNot { it.id in existingIds } + existingMessages
+        // Cap the actually-displayed/held message list the same way — the
+        // returned list becomes ChatUiState.messages directly, independent
+        // of the prefix cache above, so both must be bounded for memory to
+        // stay flat regardless of how many times the user scrolls back.
+        return merged.takeLastCapped(maxResidentUiMessages)
     }
+
+    /**
+     * Release-on-scroll-down: shrinks the resident message list (and the
+     * backing prefix cache) back down to [keepNewest] once the user has
+     * scrolled back toward the live tail, so repeated scroll-up/scroll-down
+     * cycles don't leave the resident window permanently grown. The dropped
+     * older messages remain fetchable — the next [mergeOlderPage] call
+     * re-derives its `beforeMessageId` cursor from whatever is now the
+     * oldest resident message, so "load older" keeps working correctly.
+     *
+     * No-op (returns [currentMessages] unchanged) when there is nothing to
+     * release for [conversationId] or the list is already within budget.
+     */
+    fun releaseOlderPrefix(
+        conversationId: String,
+        currentMessages: List<UiMessage>,
+        keepNewest: Int = DEFAULT_MAX_RESIDENT_UI_MESSAGES,
+    ): List<UiMessage> {
+        val (prefixConv, prefixList) = olderMessagesPrefix
+        if (prefixConv != conversationId || prefixList.isEmpty()) return currentMessages
+        if (currentMessages.size <= keepNewest) return currentMessages
+
+        val trimmedTotal = currentMessages.takeLastCapped(keepNewest)
+        val keptIds = trimmedTotal.mapTo(HashSet(trimmedTotal.size)) { it.id }
+        olderMessagesPrefix = conversationId to prefixList.filter { it.id in keptIds }
+        return trimmedTotal
+    }
+
+    private fun List<UiMessage>.takeLastCapped(cap: Int): List<UiMessage> =
+        if (size <= cap) this else takeLast(cap)
 
     /**
      * Project [timeline] into a [TimelineProjection]. [prefix] is the
@@ -514,6 +560,15 @@ class ChatTimelineProjector {
         const val SUPPRESSED_TELEMETRY_SAMPLE = 32
     }
 }
+
+/**
+ * Sliding-window resident cap for the pagination prefix cache AND the merged
+ * [ChatUiState.messages] list [ChatTimelineProjector.mergeOlderPage] returns.
+ * Set above the Timeline's own resident cap (200) so normal use is
+ * unaffected — this only bounds pathological repeated scroll-back on a
+ * long-lived conversation.
+ */
+const val DEFAULT_MAX_RESIDENT_UI_MESSAGES = 400
 
 /**
  * Output of [ChatTimelineProjector.project]: the ordered UI message list, the

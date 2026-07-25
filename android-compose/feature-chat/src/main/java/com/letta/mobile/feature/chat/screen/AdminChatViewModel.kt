@@ -631,6 +631,12 @@ internal class AdminChatViewModel @Inject constructor(
         chatHistoryPager.loadOlderMessages(false)
     }
 
+    /** See [ChatHistoryPager.releaseOlderMessages]. */
+    fun releaseOlderMessages() {
+        if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) return
+        chatHistoryPager.releaseOlderMessages()
+    }
+
     fun reportComposerError(message: String) = composerCoordinator.reportComposerError(message)
 
     fun clearComposerError() = composerCoordinator.clearComposerError()
