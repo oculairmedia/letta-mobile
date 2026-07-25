@@ -29,6 +29,8 @@ import com.letta.mobile.runtime.TurnInput
 import com.letta.mobile.runtime.RunId
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.getAndUpdate
+import kotlinx.atomicfu.update
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
@@ -167,6 +169,23 @@ class AppServerTurnEngine(
      * atomicfu ref so the read accessor is safe from any thread with no locking.
      */
     private val activeTurnOwnerRef = atomic<ActiveTurnOwner?>(null)
+
+    /**
+     * letta-mobile-vilsn: tool_call_id -> real approval id (the can_use_tool
+     * control-request request_id, e.g. `perm-call_…`) for surfaced runtime
+     * user-input approvals. Populated when the approval is emitted; consumed by
+     * [consumeUserInputApprovalId] when the client submits the answer, so the
+     * ApprovalResponse targets the gate letta-code actually parked on (the id is
+     * NOT derivable from the tool_call_id — `call_…` vs `toolu_…`).
+     */
+    private val userInputApprovalIdsRef = atomic<Map<String, String>>(emptyMap())
+
+    /**
+     * Consume the recorded real approval id for [toolCallId] (removing it), or
+     * null if none was recorded (non-interactive tool, or already consumed).
+     */
+    fun consumeUserInputApprovalId(toolCallId: String): String? =
+        userInputApprovalIdsRef.getAndUpdate { it - toolCallId }[toolCallId]
 
     /**
      * Pure read accessor for the current active-turn owner (telemetry only).
@@ -702,6 +721,16 @@ class AppServerTurnEngine(
                             // synthesize a Failed idle timeout.
                             if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
                                 awaitingUserInput.value = true
+                                // letta-mobile-vilsn: record the REAL approval id
+                                // (the can_use_tool control-request request_id, e.g.
+                                // perm-call_...) keyed by tool_call_id. Interactive
+                                // answers must close the gate against THIS id, which
+                                // is not derivable from the tool_call_id across LLM
+                                // providers (call_… vs toolu_…). submitApproval
+                                // consumes it.
+                                userInputApprovalIdsRef.update { map ->
+                                    map + (payload.request.callId.value to payload.request.approvalId.value)
+                                }
                             }
                         }
                         is RuntimeEventPayload.ToolReturnObserved -> returnedToolCallIds.add(payload.toolCallId.value)

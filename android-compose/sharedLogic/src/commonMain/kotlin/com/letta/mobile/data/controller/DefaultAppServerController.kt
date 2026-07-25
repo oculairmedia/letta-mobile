@@ -217,14 +217,16 @@ class DefaultAppServerController(
         // call by returning the answer as `updated_input` rather than a bare allow.
         val answerUpdatedInput = if (approve) AskUserQuestion.decodeAnswerReason(reason) else null
         // letta-mobile-vilsn: interactive tools (AskUserQuestion) are gated by
-        // letta-code's `can_use_tool` control request, whose id is
-        // `perm-call_<toolCallId-suffix>` — NOT the display approval id the app
-        // renders from. Answer against the perm-call id so the gate actually
-        // resolves; the display id never matches it (confirmed empirically).
-        val effectiveRequestId = if (answerUpdatedInput != null && toolCallId != null) {
-            "perm-call_" + toolCallId.removePrefix("call_")
-        } else {
-            approvalRequestId
+        // letta-code's `can_use_tool` control request, whose id (e.g.
+        // `perm-call_…`) is NOT the display approval id the app renders from and
+        // is NOT reliably derivable from the tool_call_id across LLM providers
+        // (`call_…` vs `toolu_…`). Answer against the REAL id the engine captured
+        // when it surfaced the approval; fall back to the historical heuristic
+        // only if nothing was captured.
+        val effectiveRequestId = when {
+            answerUpdatedInput == null || toolCallId == null -> approvalRequestId
+            else -> turnEngine.consumeUserInputApprovalId(toolCallId)
+                ?: ("perm-" + toolCallId)
         }
 
         val decision = when {

@@ -12,6 +12,7 @@ import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
+import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -96,10 +97,14 @@ class DesktopHybridAppServerChatGateway internal constructor(
         )
         val answerUpdatedInput =
             if (submission.approve) AskUserQuestion.decodeAnswerReason(submission.reason) else null
-        val effectiveRequestId = if (answerUpdatedInput != null && submission.toolCallId != null) {
-            "perm-call_" + submission.toolCallId.removePrefix("call_")
-        } else {
-            submission.requestId
+        // letta-mobile-vilsn: answer against the REAL can_use_tool gate id the
+        // engine captured when it surfaced the approval (correct across providers:
+        // call_… vs toolu_…); the display id and the string heuristic don't match
+        // Claude's toolu_ ids. Heuristic remains only as a last-resort fallback.
+        val effectiveRequestId = when {
+            answerUpdatedInput == null || submission.toolCallId == null -> submission.requestId
+            else -> (turnEngine as? AppServerTurnEngine)?.consumeUserInputApprovalId(submission.toolCallId)
+                ?: ("perm-" + submission.toolCallId)
         }
         val decision = when {
             submission.approve && answerUpdatedInput != null ->
