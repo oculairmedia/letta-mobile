@@ -62,10 +62,7 @@ internal fun AskUserQuestionCard(
     val otherText = remember(toolCall.arguments) { mutableStateMapOf<String, String>() }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        Text(
-            text = stringResource(R.string.screen_chat_ask_user_question_title),
-            style = MaterialTheme.chatTypography.toolLabel,
-        )
+        AskUserQuestionTitle()
 
         spec.questions.forEach { question ->
             AskUserQuestionBlock(
@@ -80,7 +77,6 @@ internal fun AskUserQuestionCard(
                         current.clear()
                         current.add(label)
                     }
-                    // trigger recomposition (SnapshotStateMap tracks value identity)
                     selections[question.question] = current.toMutableList()
                     HapticEffects.contextClick(haptic, view)
                 },
@@ -91,35 +87,102 @@ internal fun AskUserQuestionCard(
         val answers = buildAnswers(spec.questions, selections, otherText)
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
 
-        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = {
-                    HapticEffects.reject(haptic, view)
-                    onDecision?.invoke(approval.requestId, toolCallIds, false, null)
-                },
-                enabled = !isSubmitting && onDecision != null,
-            ) { Text(stringResource(R.string.screen_chat_ask_user_question_dismiss)) }
-            Button(
-                onClick = {
-                    HapticEffects.confirm(haptic, view)
-                    val updatedInput = AskUserQuestion.buildUpdatedInput(toolCall.arguments, answers)
-                    onDecision?.invoke(
-                        approval.requestId,
-                        toolCallIds,
-                        true,
-                        AskUserQuestion.encodeAnswerReason(updatedInput),
-                    )
-                },
-                enabled = !isSubmitting && canSubmit && onDecision != null,
-            ) {
-                Text(
-                    if (isSubmitting) stringResource(R.string.screen_chat_approval_submitting)
-                    else stringResource(R.string.screen_chat_ask_user_question_send),
+        AskUserQuestionActionsRow(
+            isSubmitting = isSubmitting,
+            canSubmit = canSubmit,
+            onDecision = onDecision,
+            onDismiss = {
+                HapticEffects.reject(haptic, view)
+                onDecision?.invoke(approval.requestId, toolCallIds, false, null)
+            },
+            onSubmit = {
+                HapticEffects.confirm(haptic, view)
+                val updatedInput = AskUserQuestion.buildUpdatedInput(toolCall.arguments, answers)
+                onDecision?.invoke(
+                    approval.requestId,
+                    toolCallIds,
+                    true,
+                    AskUserQuestion.encodeAnswerReason(updatedInput),
                 )
-            }
-        }
+            },
+        )
     }
     return true
+}
+
+@Composable
+private fun AskUserQuestionTitle() {
+    Text(
+        text = stringResource(R.string.screen_chat_ask_user_question_title),
+        style = MaterialTheme.chatTypography.toolLabel,
+    )
+}
+
+@Composable
+private fun AskUserQuestionActionsRow(
+    isSubmitting: Boolean,
+    canSubmit: Boolean,
+    onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
+    onDismiss: () -> Unit,
+    onSubmit: () -> Unit,
+) {
+    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = onDismiss,
+            enabled = !isSubmitting && onDecision != null,
+        ) { Text(stringResource(R.string.screen_chat_ask_user_question_dismiss)) }
+        Button(
+            onClick = onSubmit,
+            enabled = !isSubmitting && canSubmit && onDecision != null,
+        ) {
+            Text(
+                if (isSubmitting) stringResource(R.string.screen_chat_approval_submitting)
+                else stringResource(R.string.screen_chat_ask_user_question_send),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AskUserQuestionHeader(header: String?) {
+    if (header.isNullOrBlank()) return
+    Text(text = header, style = MaterialTheme.chatTypography.toolLabel, fontWeight = FontWeight.SemiBold)
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AskUserQuestionOptionChips(
+    options: List<com.letta.mobile.data.model.AskUserQuestionOption>,
+    selected: List<String>,
+    onToggleOption: (String) -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option.label in selected,
+                onClick = { onToggleOption(option.label) },
+                label = { Text(option.label) },
+                colors = FilterChipDefaults.filterChipColors(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AskUserQuestionOtherField(
+    otherValue: String,
+    onOtherChanged: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = otherValue,
+        onValueChange = onOtherChanged,
+        label = { Text(stringResource(R.string.screen_chat_ask_user_question_other)) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -132,28 +195,14 @@ private fun AskUserQuestionBlock(
     onOtherChanged: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        question.header?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, style = MaterialTheme.chatTypography.toolLabel, fontWeight = FontWeight.SemiBold)
-        }
+        AskUserQuestionHeader(question.header)
         Text(text = question.question, style = MaterialTheme.chatTypography.toolDetail)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            question.options.forEach { option ->
-                val isSelected = option.label in selected
-                FilterChip(
-                    selected = isSelected,
-                    onClick = { onToggleOption(option.label) },
-                    label = { Text(option.label) },
-                    colors = FilterChipDefaults.filterChipColors(),
-                )
-            }
-        }
-        OutlinedTextField(
-            value = otherValue,
-            onValueChange = onOtherChanged,
-            label = { Text(stringResource(R.string.screen_chat_ask_user_question_other)) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        AskUserQuestionOptionChips(
+            options = question.options,
+            selected = selected,
+            onToggleOption = onToggleOption,
         )
+        AskUserQuestionOtherField(otherValue = otherValue, onOtherChanged = onOtherChanged)
     }
 }
 

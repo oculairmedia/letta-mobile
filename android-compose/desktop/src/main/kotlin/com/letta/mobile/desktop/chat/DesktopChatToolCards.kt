@@ -325,26 +325,93 @@ internal fun DesktopAskUserQuestionCard(
         val answers = buildAskUserQuestionAnswers(spec.questions, selections, otherText)
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = { onDecision?.invoke(approval.requestId, toolCallIds, false, null) },
-                enabled = !isSubmitting && onDecision != null,
-            ) { Text("Dismiss") }
-            Button(
-                onClick = {
-                    val updatedInput = AskUserQuestion.buildUpdatedInput(toolCall.arguments, answers)
-                    onDecision?.invoke(
-                        approval.requestId,
-                        toolCallIds,
-                        true,
-                        AskUserQuestion.encodeAnswerReason(updatedInput),
-                    )
-                },
-                enabled = !isSubmitting && canSubmit && onDecision != null,
-            ) { Text(if (isSubmitting) "Sending…" else "Send answer") }
-        }
+        DesktopAskUserQuestionActions(
+            requestId = approval.requestId,
+            toolCallIds = toolCallIds,
+            toolArguments = toolCall.arguments,
+            answers = answers,
+            isSubmitting = isSubmitting,
+            canSubmit = canSubmit,
+            onDecision = onDecision,
+        )
     }
     return true
+}
+
+@Composable
+private fun DesktopAskUserQuestionActions(
+    requestId: String,
+    toolCallIds: List<String>,
+    toolArguments: String,
+    answers: Map<String, List<String>>,
+    isSubmitting: Boolean,
+    canSubmit: Boolean,
+    onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(
+            onClick = { onDecision?.invoke(requestId, toolCallIds, false, null) },
+            enabled = !isSubmitting && onDecision != null,
+        ) { Text("Dismiss") }
+        Button(
+            onClick = {
+                val updatedInput = AskUserQuestion.buildUpdatedInput(toolArguments, answers)
+                onDecision?.invoke(
+                    requestId,
+                    toolCallIds,
+                    true,
+                    AskUserQuestion.encodeAnswerReason(updatedInput),
+                )
+            },
+            enabled = !isSubmitting && canSubmit && onDecision != null,
+        ) { Text(if (isSubmitting) "Sending…" else "Send answer") }
+    }
+}
+
+@Composable
+private fun DesktopAskUserQuestionHeader(header: String?) {
+    if (header.isNullOrBlank()) return
+    Text(
+        text = header,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.SemiBold,
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DesktopAskUserQuestionChipRow(
+    options: List<com.letta.mobile.data.model.AskUserQuestionOption>,
+    selected: List<String>,
+    onToggleOption: (String) -> Unit,
+) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        options.forEach { option ->
+            FilterChip(
+                selected = option.label in selected,
+                onClick = { onToggleOption(option.label) },
+                label = { Text(option.label) },
+                colors = FilterChipDefaults.filterChipColors(),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DesktopAskUserQuestionOtherField(
+    otherValue: String,
+    onOtherChanged: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = otherValue,
+        onValueChange = onOtherChanged,
+        label = { Text("Other") },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+    )
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -357,33 +424,16 @@ private fun DesktopAskUserQuestionBlock(
     onOtherChanged: (String) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        question.header?.takeIf { it.isNotBlank() }?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        DesktopAskUserQuestionHeader(question.header)
         Text(text = question.question, style = MaterialTheme.typography.bodySmall)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            question.options.forEach { option ->
-                FilterChip(
-                    selected = option.label in selected,
-                    onClick = { onToggleOption(option.label) },
-                    label = { Text(option.label) },
-                    colors = FilterChipDefaults.filterChipColors(),
-                )
-            }
-        }
-        OutlinedTextField(
-            value = otherValue,
-            onValueChange = onOtherChanged,
-            label = { Text("Other") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+        DesktopAskUserQuestionChipRow(
+            options = question.options,
+            selected = selected,
+            onToggleOption = onToggleOption,
+        )
+        DesktopAskUserQuestionOtherField(
+            otherValue = otherValue,
+            onOtherChanged = onOtherChanged,
         )
     }
 }
