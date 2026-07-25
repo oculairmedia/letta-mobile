@@ -1,6 +1,14 @@
 package com.letta.mobile.runtime.local
 
+import java.io.BufferedOutputStream
 import java.io.File
+import java.io.OutputStream
+import java.nio.channels.Channels
+import java.nio.channels.FileChannel
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.nio.file.StandardOpenOption
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -72,14 +80,32 @@ class LocalConversationHealer(
      */
     fun healTranscript(transcript: File): HealReport {
         if (!transcript.isFile) return HealReport(emptyList(), 0)
-        val lines = transcript.readLines().filter { it.isNotBlank() }
-        if (lines.isEmpty()) return HealReport(emptyList(), 0)
+        // Snapshot BEFORE the classification read (letta-mobile-lgns8.20):
+        // this covers the ENTIRE window from the first byte we read to the
+        // final atomic move below, so a concurrent letta.js append/write
+        // ANYWHERE in that window — during classification OR during the
+        // rewrite — is detected and aborts the pass rather than clobbering
+        // the newer on-disk data with decisions made against stale content.
+        val snapshotLength = transcript.length()
+        val snapshotModified = transcript.lastModified()
+        // Bounded classification read (letta-mobile-lgns8.20): an image-bloated
+        // row can be tens of MB of base64 (see LocalImageContextStripper).
+        // BoundedTranscriptReader guarantees no single JSON string value is
+        // ever materialized beyond its cap, so this scan can never OOM on an
+        // oversized line. This pass is used ONLY to decide WHAT needs
+        // healing (role/type/id fields — never "data") — the actual rewrite
+        // below re-streams the file at the byte level so an oversized row's
+        // real, uncollapsed bytes are copied through untouched (see
+        // [rewriteSelectively]), never corrupted by this bounded read.
+        val boundedLines = BoundedTranscriptReader.readLines(transcript)
+        if (boundedLines.isEmpty()) return HealReport(emptyList(), 0)
+        val lines = boundedLines.map { it.text }
 
         // Parse each line EXACTLY ONCE. All passes below operate on this single
         // parsed list — a transcript can be megabytes (image-bearing turns), so
         // re-parsing per pass on the turn hot path was a real regression.
-        val parsed: List<Pair<String, JsonObject?>> = lines.map { line ->
-            line to runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+        val parsed: List<JsonObject?> = lines.map { line ->
+            runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
         }
 
         // ── Cheap detection pass (no allocation of new lists): decide whether
@@ -88,7 +114,7 @@ class LocalConversationHealer(
         val declaredCallIds = HashSet<String>()
         val callIdToName = HashMap<String, String>()
         var hasStaleHealRow = false
-        for ((_, row) in parsed) {
+        for (row in parsed) {
             row ?: continue
             if (row.stringField("role") == "assistant") {
                 (row["content"] as? JsonArray)?.forEach { part ->
@@ -109,7 +135,7 @@ class LocalConversationHealer(
         // toolResult ids present, and orphans (no declaring call).
         val resultCallIds = HashSet<String>()
         val orphanResultIds = HashSet<String>()
-        for ((_, row) in parsed) {
+        for (row in parsed) {
             row ?: continue
             if (row.stringField("role") != "toolResult") continue
             val cid = row.stringField("toolCallId") ?: continue
@@ -123,25 +149,35 @@ class LocalConversationHealer(
             return HealReport(emptyList(), 0)
         }
 
-        // ── Repair (only reached when there is real corruption). Build the
-        //    output in one pass over the already-parsed rows.
-        // Strip stale "heal-" rows + truly-orphaned results; recompute which
-        // calls become dangling once a stale heal row is removed.
-        val keptParsed = parsed.filter { (_, row) ->
-            row ?: return@filter true
+        // ── Repair (only reached when there is real corruption). Decide, BY
+        //    LINE INDEX, which original lines to drop and where to insert
+        //    synthetic rows — the actual bytes are never rebuilt from the
+        //    (possibly bounded) parsed text; see [rewriteSelectively].
+        val keptIndices = LinkedHashSet<Int>()
+        for (i in parsed.indices) {
+            val row = parsed[i]
+            if (row == null) {
+                keptIndices.add(i)
+                continue
+            }
             val role = row.stringField("role")
-            if (role != "toolResult") return@filter true
+            if (role != "toolResult") {
+                keptIndices.add(i)
+                continue
+            }
             val id = row.stringField("id").orEmpty()
             val cid = row.stringField("toolCallId")
-            if (id.startsWith("heal-")) return@filter false      // strip stale heal rows
-            if (cid != null && cid in orphanResultIds) return@filter false // drop orphan results
-            true
+            if (id.startsWith("heal-")) continue // strip stale heal rows
+            if (cid != null && cid in orphanResultIds) continue // drop orphan results
+            keptIndices.add(i)
         }
+
         // After stripping, recompute dangling calls (a removed heal/result row
         // re-surfaces its call as dangling → to be re-inserted in position).
         val keptResultIds = HashSet<String>()
-        for ((_, row) in keptParsed) {
-            if (row?.stringField("role") == "toolResult") {
+        for (i in keptIndices) {
+            val row = parsed[i] ?: continue
+            if (row.stringField("role") == "toolResult") {
                 row.stringField("toolCallId")?.let(keptResultIds::add)
             }
         }
@@ -150,30 +186,171 @@ class LocalConversationHealer(
             syntheticToolResultRow(OrphanToolCall(callId, callIdToName[callId] ?: "unknown"))
         }
 
-        val rebuilt = ArrayList<String>(keptParsed.size + callIdToSynthetic.size)
-        for ((line, row) in keptParsed) {
-            rebuilt.add(line)
-            if (row?.stringField("role") != "assistant") continue
+        val insertAfterIndex = HashMap<Int, MutableList<JsonObject>>()
+        for (i in keptIndices) {
+            val row = parsed[i] ?: continue
+            if (row.stringField("role") != "assistant") continue
             (row["content"] as? JsonArray)?.forEach { part ->
                 val p = part as? JsonObject ?: return@forEach
                 if (p.stringField("type") != "toolCall") return@forEach
                 val callId = p.stringField("id") ?: return@forEach
-                callIdToSynthetic[callId]?.let { rebuilt.add(json.encodeToString(JsonObject.serializer(), it)) }
+                callIdToSynthetic[callId]?.let { synthetic ->
+                    insertAfterIndex.getOrPut(i) { mutableListOf() }.add(synthetic)
+                }
             }
         }
 
-        val newContent = rebuilt.joinToString("\n") + "\n"
-        if (newContent == lines.joinToString("\n") + "\n") {
-            return HealReport(emptyList(), 0) // byte-identical → true no-op
+        val dropCount = lines.size - keptIndices.size
+        if (dropCount == 0 && insertAfterIndex.isEmpty()) {
+            return HealReport(emptyList(), 0) // nothing actually changes → true no-op
         }
 
-        atomicWrite(transcript, newContent)
+        // Pure "regenerate an identical heal row" no-op detection (idempotency):
+        // a previously-synthesized "heal-<callId>" row is UNCONDITIONALLY
+        // dropped above so genuinely-stale ones (superseded by a real later
+        // result) get cleaned up - but when that callId is STILL dangling,
+        // [syntheticToolResultRow] deterministically regenerates the exact
+        // same row right back in the exact same position (immediately after
+        // its declaring assistant row). That round-trip is invisible on disk,
+        // so it must not be reported/written as a change. Every dropped
+        // heal- row's (declaring assistant index, callId) is compared against
+        // the (assistant index, callId) pairs being reinserted; if they match
+        // 1:1 and nothing else was dropped, this is a true no-op.
+        var realDrops = 0
+        val staleHealDropPairs = HashSet<Pair<Int, String>>()
+        for (i in parsed.indices) {
+            if (i in keptIndices) continue
+            val row = parsed[i] ?: continue
+            val id = row.stringField("id").orEmpty()
+            if (id.startsWith("heal-")) {
+                val callId = row.stringField("toolCallId")
+                if (callId != null) {
+                    staleHealDropPairs.add((i - 1) to callId) // always inserted right after its assistant row
+                    continue
+                }
+            }
+            realDrops++
+        }
+        val insertedPairs = insertAfterIndex.entries
+            .flatMap { (i, rows) -> rows.mapNotNull { row -> row.stringField("toolCallId")?.let { cid -> i to cid } } }
+            .toSet()
+        if (realDrops == 0 && staleHealDropPairs == insertedPairs) {
+            return HealReport(emptyList(), 0) // regenerated heal rows are byte-for-byte identical → true no-op
+        }
+
+        // letta-mobile-lgns8.20 (data-loss guard): the embedded letta.js node
+        // process OWNS this file and can append to it concurrently while we
+        // were scanning above (it only loads the store at process start, then
+        // writes turns to disk itself — e.g. it may still be flushing an
+        // abnormal-end turn's rows while this post-turn heal runs). If the
+        // file changed underneath us, our line-index decisions are based on a
+        // STALE snapshot — rewriting now would silently clobber whatever
+        // letta.js appended in the meantime. Abort instead: skip this pass
+        // and let the next heal (pre-turn, or the next settle-on-interrupt)
+        // retry against the now-current file.
+        val tmp = transcript.toPath().resolveSibling("${transcript.name}.heal.tmp")
+        FileChannel.open(tmp, StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+            .use { channel ->
+                // Do NOT `.use {}` this stream - closing it would close the
+                // underlying channel before channel.force(true) below runs.
+                val out = BufferedOutputStream(Channels.newOutputStream(channel), 64 * 1024)
+                rewriteSelectively(transcript, out, dropIndices = parsed.indices.toSet() - keptIndices, insertAfterIndex)
+                out.flush()
+                channel.force(true)
+            }
+        if (transcript.length() != snapshotLength || transcript.lastModified() != snapshotModified) {
+            Files.deleteIfExists(tmp)
+            return HealReport(emptyList(), 0)
+        }
+        try {
+            Files.move(tmp, transcript.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(tmp, transcript.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
         return HealReport(
             orphanCallIds = finalDangling,
             rowsAppended = callIdToSynthetic.size,
             orphanResultIds = orphanResultIds.toList(),
-            rowsRemoved = lines.size - keptParsed.size,
+            rowsRemoved = dropCount,
         )
+    }
+
+    /**
+     * Re-streams [source] at the BYTE level (never decoding a full line into a
+     * Kotlin String), copying every non-blank line whose 0-based index is not
+     * in [dropIndices] through to [out] VERBATIM — byte-for-byte, exactly as
+     * it exists on disk — then writing any synthetic rows from
+     * [insertAfterIndex] immediately after their anchor line. This is what
+     * makes the heal safe for an oversized (image-bloated) row: the row is
+     * never re-serialized from a bounded/collapsed in-memory representation,
+     * so its real content survives untouched even though the DECISION of
+     * what to drop/insert was made from a bounded read.
+     *
+     * Line boundaries and blank-line filtering exactly mirror
+     * [BoundedTranscriptReader] (a line "counts" — gets an index — at its
+     * first non-whitespace byte; a whitespace-only line is dropped entirely,
+     * matching the previous `readLines().filter { it.isNotBlank() }`
+     * behaviour) so indices computed from the bounded classification pass
+     * line up with indices assigned here.
+     */
+    private fun rewriteSelectively(
+        source: File,
+        out: OutputStream,
+        dropIndices: Set<Int>,
+        insertAfterIndex: Map<Int, List<JsonObject>>,
+    ) {
+        source.inputStream().buffered(64 * 1024).use { input ->
+            var lineIndex = -1
+            var sawNonWhitespace = false
+            var writingCurrentLine = false
+            var pendingWhitespace = java.io.ByteArrayOutputStream()
+
+            fun writeSyntheticRowsFor(index: Int) {
+                insertAfterIndex[index]?.forEach { synthetic ->
+                    out.write(json.encodeToString(JsonObject.serializer(), synthetic).toByteArray(Charsets.UTF_8))
+                    out.write('\n'.code)
+                }
+            }
+
+            fun finishLine() {
+                if (sawNonWhitespace) {
+                    if (writingCurrentLine) out.write('\n'.code)
+                    writeSyntheticRowsFor(lineIndex)
+                }
+                sawNonWhitespace = false
+                writingCurrentLine = false
+                pendingWhitespace.reset()
+            }
+
+            var b = input.read()
+            while (b != -1) {
+                when (b) {
+                    '\n'.code -> finishLine()
+                    '\r'.code -> { /* tolerate CRLF: dropped, LF ends the line */ }
+                    else -> {
+                        val isWhitespace = b == ' '.code || b == '\t'.code
+                        if (!sawNonWhitespace) {
+                            if (isWhitespace) {
+                                pendingWhitespace.write(b)
+                            } else {
+                                lineIndex++
+                                sawNonWhitespace = true
+                                writingCurrentLine = lineIndex !in dropIndices
+                                if (writingCurrentLine) {
+                                    pendingWhitespace.writeTo(out)
+                                    out.write(b)
+                                }
+                                pendingWhitespace.reset()
+                            }
+                        } else if (writingCurrentLine) {
+                            out.write(b)
+                        }
+                    }
+                }
+                b = input.read()
+            }
+            finishLine() // handle a final line with no trailing newline
+        }
     }
 
     internal data class OrphanToolCall(val callId: String, val name: String)
@@ -204,16 +381,6 @@ class LocalConversationHealer(
                 put("healed", true)
             },
         )
-    }
-
-    private fun atomicWrite(target: File, contents: String) {
-        val tmp = File(target.parentFile, "${target.name}.heal.tmp")
-        tmp.writeText(contents)
-        if (!tmp.renameTo(target)) {
-            // renameTo can fail across some filesystems; fall back to copy+delete.
-            target.writeText(contents)
-            tmp.delete()
-        }
     }
 
     private fun JsonObject.stringField(key: String): String? =
