@@ -84,7 +84,7 @@ internal fun LettaDesktopApp(
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
     val chatScope = rememberCoroutineScope()
-    val nucleusController = remember(chatScope) { DesktopNucleusController(chatScope) }
+    val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
     val irohMode = irohTransport != null

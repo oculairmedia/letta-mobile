@@ -352,6 +352,18 @@ internal class DesktopNucleusController(
         }
     }
 
+    /**
+     * Releases the native notification wiring. Without this a replaced
+     * controller leaves its toast listener registered (duplicate deliveries)
+     * and its pending reply handlers alive.
+     */
+    fun close() {
+        if (Platform.Current == Platform.Windows) {
+            runCatching { WindowsNotificationCenter.removeListener(windowsToastListener) }
+        }
+        toastReplyHandlers.clear()
+    }
+
     private fun initializeNotifications(): Boolean {
         val initialized = if (Platform.Current == Platform.Windows) {
             WindowsNotificationCenter.initialize(
