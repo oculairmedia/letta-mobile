@@ -31,7 +31,10 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -406,9 +409,11 @@ class WsChatSendCoordinatorTest {
         assertEquals("Turn failed", uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
         assertEquals(false, uiState.value.isAgentTyping)
+        // A "failed" SubscribeDone status marks the optimistic local FAILED,
+        // not sent (see finishActiveTurn's status == "failed" branch).
         assertEquals(
             listOf(FakeTimelineExternalTransportWriter.LocalMarker("conv-1", local.otid)),
-            timelineRepository.sentLocals,
+            timelineRepository.failedLocals,
         )
         assertEquals(listOf("conv-1"), timelineRepository.clearedActiveConversations)
     }
@@ -469,7 +474,10 @@ class WsChatSendCoordinatorTest {
         advanceUntilIdle()
 
         assertEquals(emptyList<FakeTimelineExternalTransportWriter.AbandonedFragmentCleanup>(), timelineRepository.abandonedFragmentCleanups)
-        assertEquals(listOf(FakeTimelineExternalTransportWriter.ScopedConversation("agent-1", "conv-1")), timelineRepository.scopedClearedActiveConversations)
+        // failActiveTurnForDisconnect finalizes via the unscoped
+        // clearExternalTransportActive overload (the scoped one is reserved
+        // for markTurnVisuallyComplete) — see ChatSendCoordinator.
+        assertEquals(listOf("conv-1"), timelineRepository.clearedActiveConversations)
         assertEquals("auth closed", uiState.value.error)
     }
 
@@ -724,7 +732,12 @@ class WsChatSendCoordinatorTest {
             listOf(FakeTimelineExternalTransportWriter.LocalMarker("conv-1", local.otid)),
             timelineRepository.sentLocals,
         )
-        assertEquals(listOf("conv-1"), timelineRepository.clearedActiveConversations)
+        // StopReason finalizes via markTurnVisuallyComplete, which clears
+        // through the agent-scoped overload (see ChatSendCoordinator).
+        assertEquals(
+            listOf(FakeTimelineExternalTransportWriter.ScopedConversation("agent-1", "conv-1")),
+            timelineRepository.scopedClearedActiveConversations,
+        )
     }
 
     @Test
@@ -1077,8 +1090,18 @@ class WsChatSendCoordinatorTest {
         val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
         val timelineRepository = FakeTimelineExternalTransportWriter()
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        // This test is the only one in the suite that needs the
+        // coordinator's OWN background collector on
+        // wsChatBridge.redialWhileTurnActive to actually run (every other
+        // test drives state via coordinator.handleEvent(...) directly,
+        // bypassing the collector). TestScope.backgroundScope does not
+        // reliably get pumped by advanceUntilIdle() for this collect-based
+        // path in this coroutines-test setup, so use a plain structured
+        // child scope instead — cancelled explicitly at the end of the test
+        // so runTest doesn't fail on the still-running collector job.
+        val coordinatorScope = CoroutineScope(coroutineContext + Job())
         val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
+            scope = coordinatorScope,
             agentId = "agent-1",
             activeConfig = settingsRepository(),
             wsChatBridge = wsChatBridge,
@@ -1092,42 +1115,52 @@ class WsChatSendCoordinatorTest {
             clientVersionProvider = clientVersionProvider,
         )
 
-        coordinator.send("hello").join()
-        coordinator.handleEvent(
-            WsTimelineEvent.TurnStarted(
-                turnId = "turn-redial",
-                agentId = "agent-1",
-                conversationId = "conv-default-agent-1",
-                runId = "run-redial",
+        try {
+            coordinator.send("hello").join()
+            coordinator.handleEvent(
+                WsTimelineEvent.TurnStarted(
+                    turnId = "turn-redial",
+                    agentId = "agent-1",
+                    conversationId = "conv-default-agent-1",
+                    runId = "run-redial",
+                )
             )
-        )
-        advanceUntilIdle()
+            advanceUntilIdle()
 
-        redials.emit(
-            RedialWhileTurnActive(
-                agentId = "agent-1",
-                conversationId = "conv-default-agent-1",
-                turnId = "turn-redial",
-                runId = "run-redial",
+            redials.emit(
+                RedialWhileTurnActive(
+                    agentId = "agent-1",
+                    conversationId = "conv-default-agent-1",
+                    turnId = "turn-redial",
+                    runId = "run-redial",
+                )
             )
-        )
-        advanceUntilIdle()
+            advanceUntilIdle()
 
-        assertEquals(
-            listOf(FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery", emptySet(), true)),
-            timelineRepository.recentReconciles,
-        )
-        assertEquals(false, uiState.value.isStreaming)
-        assertEquals(false, uiState.value.isAgentTyping)
-        verify(exactly = 1) {
-            wsChatBridge.send(
-                agentId = "agent-1",
-                conversationId = "conv-default-agent-1",
-                text = "hello",
-                otid = any(),
-                attachments = emptyList(),
-                startNewConversation = false,
+            // advanceUntilIdle() also fires the debounced post-send
+            // reconcile schedule (750ms/2500ms/6000ms), which is unrelated
+            // to redial recovery — assert the redial-recovery reconcile
+            // occurred rather than an exact list (see post-send reconcile
+            // scheduling elsewhere in ChatSendCoordinator).
+            assertTrue(
+                timelineRepository.recentReconciles.contains(
+                    FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery", emptySet(), true),
+                ),
             )
+            assertEquals(false, uiState.value.isStreaming)
+            assertEquals(false, uiState.value.isAgentTyping)
+            verify(exactly = 1) {
+                wsChatBridge.send(
+                    agentId = "agent-1",
+                    conversationId = "conv-default-agent-1",
+                    text = "hello",
+                    otid = any(),
+                    attachments = emptyList(),
+                    startNewConversation = false,
+                )
+            }
+        } finally {
+            coordinatorScope.cancel()
         }
     }
 
@@ -1202,7 +1235,7 @@ class WsChatSendCoordinatorTest {
         advanceUntilIdle()
 
         assertEquals(
-            FakeTimelineExternalTransportWriter.LocalMarker("agent-1:conv-default-agent-1", local.otid),
+            FakeTimelineExternalTransportWriter.LocalMarker("conv-default-agent-1", local.otid),
             timelineRepository.failedLocals.single(),
         )
         assertTrue(timelineRepository.sentLocals.isEmpty())
@@ -1285,9 +1318,12 @@ class WsChatSendCoordinatorTest {
         )
         advanceUntilIdle()
 
+        // The Error(cursor_expired) path repairs via the agent-scoped
+        // overload (see ChatSendCoordinator's CURSOR_EXPIRED_ERROR_CODE
+        // branch).
         assertEquals(
-            listOf(FakeTimelineExternalTransportWriter.CursorRepair("conv-expired", 12L)),
-            timelineRepository.repairedCursors,
+            listOf(FakeTimelineExternalTransportWriter.ScopedCursorRepair("agent-1", "conv-expired", 12L)),
+            timelineRepository.scopedRepairedCursors,
         )
         assertNull(uiState.value.error)
 

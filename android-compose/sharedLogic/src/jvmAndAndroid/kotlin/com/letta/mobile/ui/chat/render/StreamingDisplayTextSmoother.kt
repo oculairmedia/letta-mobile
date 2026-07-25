@@ -79,7 +79,24 @@ class StreamingDisplayTextSmoother(
             val steps = (elapsed / STREAMING_TEXT_PAINT_INTERVAL_MS)
                 .coerceAtLeast(1L)
                 .coerceAtMost(MAX_REVEAL_STEPS_PER_FRAME)
-            repeat(steps.toInt()) { revealState.revealNext() }
+            repeat(steps.toInt()) {
+                // letta-mobile-1kz40: a modest, steady per-step reveal reads
+                // smoothly for ordinary deltas, but a large coalesced burst
+                // (a long response landing near-instantly, or sustained
+                // faster-than-base arrival) must not leave the reveal
+                // crawling for seconds behind arrival. Once the pending
+                // backlog exceeds a soft limit, widen the per-step reveal
+                // proportionally so it converges within a bounded window
+                // instead of only ever advancing at the steady-state rate.
+                val backlog = revealState.pending.length
+                val perStepReveal = if (backlog > BACKLOG_SOFT_LIMIT_CODE_POINTS) {
+                    revealCodePointsPerStep +
+                        (backlog - BACKLOG_SOFT_LIMIT_CODE_POINTS) / BACKLOG_CATCHUP_DIVISOR
+                } else {
+                    revealCodePointsPerStep
+                }
+                revealState.revealNext(perStepReveal)
+            }
         }
         return revealState.revealed
     }
@@ -91,6 +108,17 @@ class StreamingDisplayTextSmoother(
     companion object {
         private const val DEFAULT_REVEAL_CODE_POINTS_PER_STEP = 8
         private const val MAX_REVEAL_STEPS_PER_FRAME = 4L
+
+        /**
+         * Below this pending backlog, reveal at the steady per-step rate
+         * (smooth typewriter cadence). Above it, widen the per-step reveal
+         * proportionally to the excess so a large or sustained backlog
+         * converges instead of crawling indefinitely at the base rate.
+         */
+        private const val BACKLOG_SOFT_LIMIT_CODE_POINTS = 100
+
+        /** Larger divisor = gentler catch-up; smaller = faster convergence. */
+        private const val BACKLOG_CATCHUP_DIVISOR = 2
     }
 }
 
