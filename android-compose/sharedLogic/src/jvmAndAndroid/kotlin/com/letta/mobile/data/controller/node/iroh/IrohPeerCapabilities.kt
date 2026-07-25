@@ -64,6 +64,12 @@ object IrohPeerCapabilities {
         method in ADMIN_READ_METHODS -> CHAT_READ
         method in CHAT_SEND_METHODS -> CHAT_SEND
         method in CONVERSATION_MANAGE_METHODS -> CONVERSATION_MANAGE
+        // A paired desktop must be able to edit its own agents' config — most
+        // importantly change the model (model selection) — which rides agent.update.
+        // Classify it in the trusted-desktop manage surface (CONVERSATION_MANAGE,
+        // held by DEFAULT_DESKTOP_ROLE) so it isn't denied. Agent LIFECYCLE
+        // (agent.create / agent.delete) stays admin.full via the else branch.
+        method == "agent.update" -> CONVERSATION_MANAGE
         method.startsWith("block.") || method.startsWith("passage.") ->
             if (method.isReadMethod()) MEMORY_READ else MEMORY_WRITE
         // lgns8.16: reflection/sleeptime settings control WHEN the agent
@@ -109,7 +115,7 @@ object IrohPeerCapabilities {
     private val CHAT_READ_METHODS = setOf(
         "conversation.list", "conversation.get",
         "message.list", "message.get", "tool_return.get",
-        "agent.list", "agent.get",
+        "agent.list", "agent.get", "agent.context",
         "model.list", "model.list.embedding",
         "subagent.list", "subagent.todos",
         "slash_command.list", "slash_command.list_agent",
