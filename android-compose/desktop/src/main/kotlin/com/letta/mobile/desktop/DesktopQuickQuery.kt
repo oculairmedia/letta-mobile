@@ -223,50 +223,22 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
             shadowElevation = 12.dp,
         ) {
             Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    JewelTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        // Borderless: the bar's Surface is the visual frame;
-                        // Jewel's own focus ring reads as a stray outline here.
-                        undecorated = true,
-                        placeholder = {
-                            // Explicit compact style: the M3 default leaks a
-                            // larger size into Jewel's text slot and clips
-                            // the placeholder's descenders.
-                            Text(
-                                text = "Search agents, or ask anything…",
-                                style = MaterialTheme.typography.bodyMedium,
-                                maxLines = 1,
-                            )
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = 40.dp)
-                            .focusRequester(focusRequester)
-                            .onPreviewKeyEvent { event ->
-                                handleQuickQueryKey(
-                                    event = event,
-                                    hasResults = flatResults.isNotEmpty(),
-                                    keys = QuickQueryKeyActions(
-                                        onClose = coordinator::close,
-                                        onOpenTop = ::openTopResult,
-                                        onSubmit = ::submitPrompt,
-                                    ),
-                                )
-                            },
-                    )
-                }
+                QuickQuerySearchRow(
+                    query = query,
+                    onQueryChange = { query = it },
+                    focusRequester = focusRequester,
+                    onKeyEvent = { event ->
+                        handleQuickQueryKey(
+                            event = event,
+                            hasResults = flatResults.isNotEmpty(),
+                            keys = QuickQueryKeyActions(
+                                onClose = coordinator::close,
+                                onOpenTop = ::openTopResult,
+                                onSubmit = ::submitPrompt,
+                            ),
+                        )
+                    },
+                )
                 val ambientTitle = ambient
                 if (ambientTitle != null && includeContext) {
                     AmbientContextChip(title = ambientTitle, onDismiss = { includeContext = false })
@@ -294,6 +266,48 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
 }
 
 private const val QUICK_QUERY_RECENT_AGENTS_LIMIT = 9
+
+@Composable
+private fun QuickQuerySearchRow(
+    query: TextFieldValue,
+    onQueryChange: (TextFieldValue) -> Unit,
+    focusRequester: FocusRequester,
+    onKeyEvent: (androidx.compose.ui.input.key.KeyEvent) -> Boolean,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Search,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(18.dp),
+        )
+        JewelTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            // Borderless: the bar's Surface is the visual frame; Jewel's own
+            // focus ring reads as a stray outline here.
+            undecorated = true,
+            placeholder = {
+                // Explicit compact style: the M3 default leaks a larger size
+                // into Jewel's text slot and clips the descenders.
+                Text(
+                    text = "Search agents, or ask anything…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 1,
+                )
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 40.dp)
+                .focusRequester(focusRequester)
+                .onPreviewKeyEvent(onKeyEvent),
+        )
+    }
+}
 
 private data class QuickQueryKeyActions(
     val onClose: () -> Unit,
