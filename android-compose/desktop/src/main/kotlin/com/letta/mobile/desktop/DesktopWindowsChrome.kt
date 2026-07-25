@@ -27,6 +27,10 @@ internal object DesktopWindowsChrome {
                 IntByReference(DWMWCP_ROUND),
                 Int.SIZE_BYTES,
             )
+        }.onFailure { error ->
+            // Cosmetic-only, so never fatal — but silence made the Windows 10
+            // no-op indistinguishable from a broken JNA binding.
+            DesktopCrashReporter.logCrash(error, context = "window corner preference")
         }
     }
 

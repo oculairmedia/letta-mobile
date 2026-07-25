@@ -3,11 +3,13 @@ package com.letta.mobile.desktop
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.SmartToy
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.CoroutineScope
 import androidx.compose.runtime.setValue
 import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.application.NucleusApplicationScope
@@ -36,6 +38,20 @@ import java.awt.event.WindowFocusListener
 import javax.swing.SwingUtilities
 import kotlin.system.exitProcess
 
+/**
+ * Owns the Nucleus controller for the composition, closing the superseded
+ * instance so its native toast listener is unregistered rather than left
+ * duplicating deliveries.
+ */
+@Composable
+internal fun rememberDesktopNucleusController(scope: CoroutineScope): DesktopNucleusController {
+    val controller = remember(scope) { DesktopNucleusController(scope) }
+    DisposableEffect(controller) {
+        onDispose { controller.close() }
+    }
+    return controller
+}
+
 internal fun activateDesktopWindow(window: Window) {
     SwingUtilities.invokeLater {
         window.isVisible = true
@@ -47,6 +63,7 @@ internal fun activateDesktopWindow(window: Window) {
     }
 }
 
+@Immutable
 internal data class DesktopNucleusEffectBindings(
     val applicationScope: NucleusApplicationScope,
     val window: Window,
@@ -59,6 +76,7 @@ internal data class DesktopNucleusEffectBindings(
     val onReplyToConversation: (String, String) -> Unit,
 )
 
+@Immutable
 internal data class DesktopNucleusEffectState(
     val isAgentWorking: Boolean,
     val agentName: String,
@@ -83,6 +101,7 @@ internal fun subagentWorkProgress(statuses: List<String>): Double? {
     return done.toDouble() / statuses.size
 }
 
+@Immutable
 internal data class DesktopNucleusEffectActions(
     val onOpenCommandPalette: () -> Unit,
     val onOpenSettings: () -> Unit,

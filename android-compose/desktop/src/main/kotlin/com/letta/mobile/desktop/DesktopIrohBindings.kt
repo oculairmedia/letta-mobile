@@ -18,7 +18,9 @@ import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 internal const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
@@ -91,8 +93,24 @@ private suspend fun connectSubagentTransport(transport: DesktopWsChannelTranspor
 
 private data class DesktopTransportLifecycleHooks<T>(
     val onConnect: suspend (T, LettaConfig) -> Unit,
-    val onDisposeTransport: (T) -> Unit,
+    /** Suspending so teardown can be ordered after the connect job unwinds. */
+    val onDisposeTransport: suspend (T) -> Unit,
 )
+
+/**
+ * Runs [block], letting cancellation propagate. `runCatching` must not be used
+ * around suspending work: it swallows [CancellationException] and breaks
+ * structured cancellation.
+ */
+private suspend fun runIgnoringFailures(block: suspend () -> Unit) {
+    try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        // Connect/disconnect failures surface through transport state.
+    }
+}
 
 private data class DesktopTransportLifecycleRequest<T>(
     val transport: T?,
@@ -105,10 +123,21 @@ private data class DesktopTransportLifecycleRequest<T>(
 private fun <T> DesktopTransportLifecycleEffect(request: DesktopTransportLifecycleRequest<T>) {
     DisposableEffect(request.transport, request.activeConfig) {
         val active = request.transport
-        if (active != null) {
-            request.chatScope.launch { runCatching { request.hooks.onConnect(active, request.activeConfig) } }
+        // Own the connect job so disposal can cancel an in-flight connect and
+        // wait for it to unwind. Otherwise a rapid key change lets connect
+        // complete AFTER disconnect, leaving a live transport nobody closes.
+        val connectJob = active?.let { transport ->
+            request.chatScope.launch {
+                runIgnoringFailures { request.hooks.onConnect(transport, request.activeConfig) }
+            }
         }
-        onDispose { active?.let(request.hooks.onDisposeTransport) }
+        onDispose {
+            if (active == null) return@onDispose
+            request.chatScope.launch {
+                connectJob?.cancelAndJoin()
+                runIgnoringFailures { request.hooks.onDisposeTransport(active) }
+            }
+        }
     }
 }
 
@@ -127,7 +156,7 @@ internal fun rememberIrohTransport(
             chatScope = chatScope,
             hooks = DesktopTransportLifecycleHooks(
                 onConnect = ::connectIrohTransport,
-                onDisposeTransport = { t -> chatScope.launch { runCatching { t.disconnect() } } },
+                onDisposeTransport = { t -> t.disconnect() },
             ),
         ),
     )
@@ -153,7 +182,7 @@ internal fun rememberDesktopChatController(
     bindings: DesktopChatControllerBindings,
 ): DesktopChatController {
     val runtime = bindings.runtime
-    return remember(
+    val controller = remember(
         runtime.bootstrapState,
         runtime.chatScope,
         runtime.dataBindings.sessionGraphProvider,
@@ -161,6 +190,14 @@ internal fun rememberDesktopChatController(
     ) {
         buildDesktopChatController(bindings)
     }
+    // Closing the superseded controller is what cancels its send/select/
+    // timeline/presence jobs and closes its gateway + timeline loop. Without
+    // this, a transport or backend switch leaves the old controller streaming
+    // alongside the new one for the life of the app.
+    DisposableEffect(controller) {
+        onDispose { controller.close() }
+    }
+    return controller
 }
 
 private fun buildDesktopChatController(
@@ -237,6 +274,11 @@ internal fun rememberSubagentRegistry(
     val subagentRepository = remember(subagentTransport, irohTransport) {
         irohTransport?.let { SubagentRepository(it, includeAll = true) }
             ?: subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    }
+    // The repository launches push/reconnect collectors on construction; a
+    // replaced instance must be closed or they outlive it forever.
+    DisposableEffect(subagentRepository) {
+        onDispose { subagentRepository?.close() }
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(

@@ -25,6 +25,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -39,6 +40,7 @@ import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 
+@Immutable
 internal data class NowActiveBarState(
     val conversationTitle: String,
     val agentName: String,
@@ -49,6 +51,7 @@ internal data class NowActiveBarState(
     val avatarCompanionActive: Boolean = false,
 )
 
+@Immutable
 internal data class NowActiveBarActions(
     /** Bring the active conversation on screen (bar body click). */
     val onOpenConversation: () -> Unit,
@@ -68,6 +71,7 @@ private val NowActiveStatus.label: String
         NowActiveStatus.Error -> "needs attention"
     }
 
+@Immutable
 internal data class NowActiveBarHostState(
     val thinkingConversationId: String?,
     val isStreamingReplySelected: Boolean,
@@ -76,6 +80,7 @@ internal data class NowActiveBarHostState(
     val avatarCompanionActive: Boolean,
 )
 
+@Immutable
 internal data class NowActiveBarHostActions(
     /** Select + reveal the given conversation (bar body and work chip). */
     val onOpenConversation: (String) -> Unit,

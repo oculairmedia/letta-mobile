@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,6 +18,7 @@ import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
 internal const val NEW_CONVERSATION_RECENTS_LIMIT = 8
 
 /** Mutable visibility flags for the app-level overlay stack. */
+@Stable
 internal class DesktopOverlayVisibility {
     var modelPicker by mutableStateOf(false)
     var commandPalette by mutableStateOf(false)
@@ -24,6 +27,7 @@ internal class DesktopOverlayVisibility {
     var irohResetConfirm by mutableStateOf(false)
 }
 
+@Immutable
 internal data class DesktopOverlayData(
     val availableModels: List<LlmModel>,
     val composerModelLabel: String,
@@ -35,6 +39,7 @@ internal data class DesktopOverlayData(
     val isDragActive: Boolean,
 )
 
+@Immutable
 internal data class DesktopOverlayActions(
     val onModelSelected: (String) -> Unit,
     val onSelectConversation: (String) -> Unit,

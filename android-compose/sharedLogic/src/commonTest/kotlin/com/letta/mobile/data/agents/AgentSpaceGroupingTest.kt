@@ -1,14 +1,9 @@
-package com.letta.mobile.desktop
+package com.letta.mobile.data.agents
 
-import com.letta.mobile.data.agents.AgentRailGroup
-import com.letta.mobile.data.agents.RAIL_CATCH_ALL_SPACE
-import com.letta.mobile.data.agents.deriveAgentSpaces
-import com.letta.mobile.data.chat.runtime.NowActiveStatus
-import com.letta.mobile.data.chat.runtime.nowActiveStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class DesktopAgentRailSpacesTest {
+class AgentSpaceGroupingTest {
     private fun group(name: String, vararg ids: String) = AgentRailGroup(name, ids.toList())
 
     @Test
@@ -43,10 +38,16 @@ class DesktopAgentRailSpacesTest {
     }
 
     @Test
-    fun nowActiveStatusPrecedence() {
-        assertEquals(NowActiveStatus.Error, nowActiveStatus(isThinking = true, isStreaming = true, hasError = true))
-        assertEquals(NowActiveStatus.Thinking, nowActiveStatus(isThinking = true, isStreaming = false, hasError = false))
-        assertEquals(NowActiveStatus.Streaming, nowActiveStatus(isThinking = false, isStreaming = true, hasError = false))
-        assertEquals(NowActiveStatus.Idle, nowActiveStatus(isThinking = false, isStreaming = false, hasError = false))
+    fun preservesFirstAppearanceOrderAcrossSpaces() {
+        val spaces = deriveAgentSpaces(
+            listOf(group("Meridian", "a"), group("PM - x", "b"), group("PM - y", "c")),
+        )
+        // "Agents" first because Meridian appeared first.
+        assertEquals(listOf(RAIL_CATCH_ALL_SPACE, "PM"), spaces.map { it.name })
+    }
+
+    @Test
+    fun emptyRosterProducesNoSpaces() {
+        assertEquals(emptyList(), deriveAgentSpaces(emptyList()))
     }
 }
