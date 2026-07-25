@@ -8,6 +8,8 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.utils.io.*
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -15,6 +17,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,6 +25,8 @@ import javax.inject.Singleton
 open class MessageApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
+    private val json = Json { ignoreUnknownKeys = true }
+
     companion object {
         /**
          * The Letta API's `limit` parameter counts runs/steps, not individual messages.
@@ -30,7 +35,59 @@ open class MessageApi @Inject constructor(
          */
         private const val RUN_TO_MESSAGE_MULTIPLIER = 5
         private const val MAX_OVER_FETCH_LIMIT = 200
+
+        /**
+         * Defense-in-depth cap on message-list response bodies (letta-mobile
+         * large-conversation OOM investigation). Every call site in this
+         * codebase already passes a bounded `limit`, and the Iroh admin_rpc
+         * transport (`IrohAdminRpcTimelineTransport` / `IrohRoutingTimelineTransport`)
+         * is preferred over this raw REST path whenever the active backend is
+         * `iroh://` — the LettaApiClient purity choke-point hard-fails raw
+         * HTTP calls in that mode, so this path can only be hit against a
+         * legacy non-Iroh HTTP/shim backend. A misbehaving server that
+         * ignores `limit` (or a shim that returns a full 90MB+ conversation
+         * regardless of the requested page) must not be able to materialize
+         * that entire body as one contiguous String — mirrors
+         * [AgentApi]'s `bodyAsTextAtMost` guard on the context-window read.
+         */
+        private const val MAX_MESSAGE_LIST_RESPONSE_BYTES = 2 * 1024 * 1024
+        private const val READ_BUFFER_BYTES = 8 * 1024
     }
+
+    private suspend fun HttpResponse.bodyAsTextAtMost(maxBytes: Int): String {
+        val declaredLength = headers[HttpHeaders.ContentLength]?.toLongOrNull()
+        if (declaredLength != null && declaredLength > maxBytes) {
+            throw ResponseTooLargeException(maxBytes, declaredLength)
+        }
+
+        val output = ByteArrayOutputStream(minOf(maxBytes, declaredLength?.toInt() ?: READ_BUFFER_BYTES))
+        val buffer = ByteArray(READ_BUFFER_BYTES)
+        val channel = bodyAsChannel()
+        var totalBytes = 0
+
+        while (true) {
+            val bytesRead = channel.readAvailable(buffer, 0, minOf(buffer.size, maxBytes + 1 - totalBytes))
+            if (bytesRead == -1) break
+            if (bytesRead == 0) continue
+            totalBytes += bytesRead
+            if (totalBytes > maxBytes) {
+                throw ResponseTooLargeException(maxBytes, declaredLength)
+            }
+            output.write(buffer, 0, bytesRead)
+        }
+
+        return output.toString(Charsets.UTF_8.name())
+    }
+
+    private suspend fun HttpResponse.decodeMessagesAtMost(maxBytes: Int): List<LettaMessage> {
+        val text = bodyAsTextAtMost(maxBytes)
+        return json.decodeFromString(ListSerializer(LettaMessage.serializer()), text)
+    }
+
+    class ResponseTooLargeException(maxBytes: Int, declaredBytes: Long?) : ApiException(
+        HttpStatusCode.PayloadTooLarge.value,
+        "Message list response is too large for mobile (${declaredBytes ?: "more than $maxBytes"} bytes; cap is $maxBytes bytes)."
+    )
 
     /**
      * Fetch recent messages with a true message-count limit.
@@ -64,16 +121,21 @@ open class MessageApi @Inject constructor(
         //
         // Instead: fetch desc (to get recent messages), then sort by (date, otid)
         // where otid is a string that increments monotonically within a run.
-        val response = client.get("$baseUrl/v1/conversations/${conversationId.value}/messages") {
+        val allMessages: List<LettaMessage> = client.prepareGet("$baseUrl/v1/conversations/${conversationId.value}/messages") {
             parameter("limit", runLimit)
             parameter("before", beforeMessageId)
             parameter("order", "desc")
+        }.execute { response ->
+            // NOTE: bounded read (decodeMessagesAtMost) MUST happen before the
+            // status check below can safely call bodyAsText() on an error
+            // response — both paths consume the same streamed body exactly
+            // once via `execute {}`, which (unlike plain client.get()) does
+            // not eagerly buffer the whole body ahead of our cap.
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, response.bodyAsTextAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES))
+            }
+            response.decodeMessagesAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES)
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-
-        val allMessages: List<LettaMessage> = response.body()
 
         // Take the most recent N messages (first N in desc order)
         // Then sort chronologically by date, using otid as tiebreaker for same-date messages
@@ -227,17 +289,18 @@ open class MessageApi @Inject constructor(
     ): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/agents/${agentId.value}/messages") {
+        return client.prepareGet("$baseUrl/v1/agents/${agentId.value}/messages") {
             parameter("limit", limit)
             parameter("before", before)
             parameter("after", after)
             parameter("order", order)
             conversationId?.let { parameter("conversation_id", it.value) }
+        }.execute { response ->
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, response.bodyAsTextAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES))
+            }
+            response.decodeMessagesAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES)
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
     }
 
     open suspend fun listMessages(
@@ -257,15 +320,16 @@ open class MessageApi @Inject constructor(
     ): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/conversations/${conversationId.value}/messages") {
+        return client.prepareGet("$baseUrl/v1/conversations/${conversationId.value}/messages") {
             parameter("limit", limit)
             parameter("after", after)
             parameter("order", order)
+        }.execute { response ->
+            if (response.status.value !in 200..299) {
+                throw ApiException(response.status.value, response.bodyAsTextAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES))
+            }
+            response.decodeMessagesAtMost(MAX_MESSAGE_LIST_RESPONSE_BYTES)
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
     }
 
     open suspend fun listConversationMessages(
