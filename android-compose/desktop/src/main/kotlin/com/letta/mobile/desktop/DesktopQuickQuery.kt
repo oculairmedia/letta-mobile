@@ -255,22 +255,15 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
                             .heightIn(min = 40.dp)
                             .focusRequester(focusRequester)
                             .onPreviewKeyEvent { event ->
-                                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                                when {
-                                    event.key == Key.Escape -> {
-                                        coordinator.close()
-                                        true
-                                    }
-                                    event.key == Key.Enter && event.isCtrlPressed -> {
-                                        submitPrompt()
-                                        true
-                                    }
-                                    event.key == Key.Enter -> {
-                                        if (flatResults.isNotEmpty()) openTopResult() else submitPrompt()
-                                        true
-                                    }
-                                    else -> false
-                                }
+                                handleQuickQueryKey(
+                                    event = event,
+                                    hasResults = flatResults.isNotEmpty(),
+                                    keys = QuickQueryKeyActions(
+                                        onClose = coordinator::close,
+                                        onOpenTop = ::openTopResult,
+                                        onSubmit = ::submitPrompt,
+                                    ),
+                                )
                             },
                     )
                 }
@@ -301,6 +294,36 @@ private fun QuickQueryContent(coordinator: DesktopQuickQueryCoordinator) {
 }
 
 private const val QUICK_QUERY_RECENT_AGENTS_LIMIT = 9
+
+private data class QuickQueryKeyActions(
+    val onClose: () -> Unit,
+    val onOpenTop: () -> Unit,
+    val onSubmit: () -> Unit,
+)
+
+/** Escape closes; Ctrl+Enter always submits; Enter opens the top match or submits. */
+private fun handleQuickQueryKey(
+    event: androidx.compose.ui.input.key.KeyEvent,
+    hasResults: Boolean,
+    keys: QuickQueryKeyActions,
+): Boolean {
+    if (event.type != KeyEventType.KeyDown) return false
+    return when {
+        event.key == Key.Escape -> {
+            keys.onClose()
+            true
+        }
+        event.key == Key.Enter && event.isCtrlPressed -> {
+            keys.onSubmit()
+            true
+        }
+        event.key == Key.Enter -> {
+            if (hasResults) keys.onOpenTop() else keys.onSubmit()
+            true
+        }
+        else -> false
+    }
+}
 
 @Composable
 private fun QuickQueryResults(

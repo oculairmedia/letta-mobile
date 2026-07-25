@@ -211,14 +211,23 @@ private fun createSubagentTransport(
     activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
         ?.let { DesktopWsChannelTransport(chatScope) }
 
+/** Inputs for the active-subagent registry. */
+internal data class SubagentRegistryRequest(
+    val activeConfig: LettaConfig,
+    val irohMode: Boolean,
+    val parentScope: SubagentParentScope?,
+    val irohTransport: IrohChannelTransport? = null,
+)
+
 @Composable
 internal fun rememberSubagentRegistry(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
+    request: SubagentRegistryRequest,
     chatScope: CoroutineScope,
-    parentScope: SubagentParentScope?,
-    irohTransport: IrohChannelTransport? = null,
 ): DesktopSubagentRegistry {
+    val activeConfig = request.activeConfig
+    val irohMode = request.irohMode
+    val parentScope = request.parentScope
+    val irohTransport = request.irohTransport
     val subagentTransport = remember(activeConfig, irohMode) {
         createSubagentTransport(activeConfig, irohMode, chatScope)
     }

@@ -227,24 +227,31 @@ internal fun DesktopNowActiveBar(
 
 @Composable
 private fun StopRunButton(onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(32.dp)
-            .clip(CircleShape)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.StopCircle,
-            contentDescription = "Stop run",
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(19.dp),
-        )
-    }
+    BarIconButton(
+        icon = Icons.Outlined.StopCircle,
+        description = "Stop run",
+        tint = MaterialTheme.colorScheme.error,
+        onClick = onClick,
+    )
 }
 
 @Composable
 private fun AvatarCompanionButton(active: Boolean, onClick: () -> Unit) {
+    BarIconButton(
+        icon = Icons.Outlined.Face,
+        description = if (active) "Stop avatar companion" else "Avatar companion",
+        tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+        onClick = onClick,
+    )
+}
+
+@Composable
+private fun BarIconButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    tint: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+) {
     Box(
         modifier = Modifier
             .size(32.dp)
@@ -253,10 +260,10 @@ private fun AvatarCompanionButton(active: Boolean, onClick: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            imageVector = Icons.Outlined.Face,
-            contentDescription = if (active) "Stop avatar companion" else "Avatar companion",
-            tint = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(17.dp),
+            imageVector = icon,
+            contentDescription = description,
+            tint = tint,
+            modifier = Modifier.size(18.dp),
         )
     }
 }

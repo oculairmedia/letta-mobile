@@ -117,11 +117,13 @@ internal fun LettaDesktopApp(
     val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
     var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
     val subagents = rememberSubagentRegistry(
-        activeConfig = activeConfig,
-        irohMode = irohMode,
+        request = SubagentRegistryRequest(
+            activeConfig = activeConfig,
+            irohMode = irohMode,
+            parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
+            irohTransport = irohTransport,
+        ),
         chatScope = chatScope,
-        parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
-        irohTransport = irohTransport,
     )
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
@@ -577,42 +579,13 @@ internal fun LettaDesktopApp(
                                     onRefresh = libraries.memory::reload,
                                     onAgentSelected = libraries.memory::selectAgent,
                                 ),
-                                schedules = DestinationScheduleActions(
-                                    onRefresh = libraries.schedules::reload,
-                                    onAgentSelected = libraries.schedules::selectAgent,
-                                    onDeleteCron = { id ->
-                                        if (scheduleLibraryState.schedules.any { it.id == id }) {
-                                            libraries.schedules.deleteSchedule(id)
-                                        } else {
-                                            cronPanel.delete(DesktopCronTaskId(id))
-                                        }
-                                    },
-                                    onCreateCron = { filteredAgentId, name, prompt, cron, recurring, tz ->
-                                        val targetAgent = filteredAgentId
-                                            ?: scheduleLibraryState.selectedAgentId
-                                            ?: selectedAgentId
-                                        if (targetAgent == null) {
-                                            // No agent focused — create UI should already be disabled.
-                                        } else if (cronPanel.available) {
-                                            cronPanel.create(
-                                                CronDraft(
-                                                    agentId = DesktopAgentId(targetAgent),
-                                                    name = name,
-                                                    prompt = prompt,
-                                                    cron = cron,
-                                                    recurring = recurring,
-                                                    timezone = tz,
-                                                ),
-                                            )
-                                        } else {
-                                            libraries.schedules.createRecurringSchedule(
-                                                agentId = targetAgent,
-                                                name = name,
-                                                prompt = prompt,
-                                                cronExpression = cron,
-                                            )
-                                        }
-                                    },
+                                schedules = destinationScheduleActions(
+                                    ScheduleWiringDeps(
+                                        schedules = libraries.schedules,
+                                        cronPanel = cronPanel,
+                                        scheduleLibraryState = scheduleLibraryState,
+                                        selectedAgentId = selectedAgentId,
+                                    ),
                                 ),
                                 onChannelsRefresh = libraries.channels::refresh,
                                 tools = DestinationToolsActions(
@@ -622,24 +595,10 @@ internal fun LettaDesktopApp(
                                     onClearTags = libraries.tools::clearTags,
                                     onLoadMore = libraries.tools::loadMore,
                                 ),
-                                skills = DestinationSkillsActions(
-                                    onRefresh = {
-                                        chatScope.launch {
-                                            skillsPanel.reload(selectedAgentId?.let(::DesktopAgentId))
-                                        }
-                                    },
-                                    onInstall = { name ->
-                                        skillsPanel.install(
-                                            selectedAgentId?.let(::DesktopAgentId),
-                                            DesktopSkillName(name),
-                                        )
-                                    },
-                                    onUninstall = { name ->
-                                        skillsPanel.uninstall(
-                                            selectedAgentId?.let(::DesktopAgentId),
-                                            DesktopSkillName(name),
-                                        )
-                                    },
+                                skills = destinationSkillsActions(
+                                    skillsPanel = skillsPanel,
+                                    chatScope = chatScope,
+                                    selectedAgentId = selectedAgentId,
                                 ),
                                 onConfigSaved = { applyConfig(it) },
                                 onTokenCleared = {
