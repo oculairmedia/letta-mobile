@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.chat
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
@@ -24,7 +22,6 @@ import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -34,7 +31,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -159,32 +155,24 @@ internal fun ReasoningRow(text: String) {
     }
 }
 
-/** Compact, collapsible "Run · N steps" card with one row per tool call. */
+/**
+ * The run's tool activity, rendered as a chrome-less activity log rather than a
+ * bordered card: a quiet "Ran N steps" toggle line with one tight row per tool
+ * call underneath. Nothing here should compete with the agent's narration —
+ * these rows are scannable context, not content.
+ */
 @Composable
 internal fun RunStepsCard(toolCalls: List<UiToolCall>) {
     var expanded by remember { mutableStateOf(true) }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column {
-            RunStepsCardHeader(
-                stepCount = toolCalls.size,
-                expanded = expanded,
-                onToggle = { expanded = !expanded },
-            )
-            if (expanded) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
-                )
-                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)) {
-                    toolCalls.forEach { ToolStepRow(it) }
-                }
+    Column(modifier = Modifier.fillMaxWidth()) {
+        RunStepsCardHeader(
+            stepCount = toolCalls.size,
+            expanded = expanded,
+            onToggle = { expanded = !expanded },
+        )
+        if (expanded) {
+            Column(modifier = Modifier.padding(start = 10.dp, top = 2.dp)) {
+                toolCalls.forEach { ToolStepRow(it) }
             }
         }
     }
@@ -200,26 +188,26 @@ private fun RunStepsCardHeader(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onToggle)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Icon(
             imageVector = Icons.Outlined.Terminal,
             contentDescription = null,
-            modifier = Modifier.size(15.dp),
+            modifier = Modifier.size(13.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Text(
-            text = "Run · $stepCount step${if (stepCount == 1) "" else "s"}",
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = FontWeight.SemiBold,
+            text = "Ran $stepCount step${if (stepCount == 1) "" else "s"}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f),
         )
         Icon(
             imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
             contentDescription = if (expanded) "Collapse" else "Expand",
-            modifier = Modifier.size(16.dp),
+            modifier = Modifier.size(14.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -233,18 +221,17 @@ internal fun ToolStepRow(toolCall: UiToolCall) {
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { open = !open }
-                .padding(vertical = 6.dp),
+                .padding(vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             StepStatusCircle(toolCall.stepState())
             Text(
                 text = toolCall.stepLabel(),
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
             )
             val summary = toolCall.stepSummary()
             if (summary.isNotBlank()) {
@@ -253,12 +240,14 @@ internal fun ToolStepRow(toolCall: UiToolCall) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
         if (open) {
             Column(
-                modifier = Modifier.padding(start = 28.dp, bottom = 8.dp),
+                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 toolCall.arguments.takeIf { it.isNotBlank() }?.let { CodeBlock(primaryToolArgument(ToolArgumentPayload(it))) }
@@ -277,29 +266,29 @@ internal fun StepStatusCircle(state: StepState) {
     val teal = MaterialTheme.colorScheme.primary
     when (state) {
         StepState.Done -> Box(
-            modifier = Modifier.size(16.dp).background(teal, CircleShape),
+            modifier = Modifier.size(13.dp).background(teal, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Check,
                 contentDescription = "done",
-                modifier = Modifier.size(11.dp),
+                modifier = Modifier.size(9.dp),
                 tint = MaterialTheme.colorScheme.onPrimary,
             )
         }
         StepState.Running -> Box(
             modifier = Modifier
-                .size(16.dp)
+                .size(13.dp)
                 .border(1.5.dp, teal, CircleShape),
         )
         StepState.Error -> Box(
-            modifier = Modifier.size(16.dp).background(MaterialTheme.colorScheme.error, CircleShape),
+            modifier = Modifier.size(13.dp).background(MaterialTheme.colorScheme.error, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 imageVector = Icons.Outlined.Close,
                 contentDescription = "failed",
-                modifier = Modifier.size(11.dp),
+                modifier = Modifier.size(9.dp),
                 tint = MaterialTheme.colorScheme.onError,
             )
         }

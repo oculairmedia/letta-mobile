@@ -4,6 +4,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -83,6 +86,7 @@ internal fun ChatDetailPane(
     modifier: Modifier = Modifier,
 ) {
     val surface = state.surface
+    val paneEdgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
     // Drive the ambient glow off the thinking state: a teal breath while the
     // agent works, a brief "completed" settle afterward, error tint on failure.
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
@@ -103,11 +107,22 @@ internal fun ChatDetailPane(
             else -> ambientStatus = DesktopAmbientStatus.Idle
         }
     }
+    // A hairline edge separates the chat pane from the sidebar without insetting
+    // it: the pane stays flush to the window, so this reads as one boundary line
+    // rather than a second frame floating inside the app's own window border.
     DesktopAmbientChatBackground(
         status = ambientStatus,
         modifier = modifier
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.background),
+            .background(MaterialTheme.colorScheme.background)
+            .drawBehind {
+                val stroke = 1.dp.toPx()
+                drawRect(
+                    color = paneEdgeColor,
+                    topLeft = Offset.Zero,
+                    size = Size(stroke, size.height),
+                )
+            },
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (surface.shouldShowStatePanel) {

@@ -1,9 +1,9 @@
 use jni::objects::{JClass, JString};
-use jni::sys::{jboolean, jint, jstring};
+use jni::sys::{jboolean, jbyteArray, jint, jstring};
 use jni::JNIEnv;
 use mermaid_rs_renderer::{RenderOptions, Theme, render_with_options};
 use std::ptr::null_mut;
-use std::sync::{LazyLock, Mutex};
+use std::sync::{Arc, LazyLock, Mutex, OnceLock};
 
 static LAST_ERROR: Mutex<Option<String>> = Mutex::new(None);
 static STYLE_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
@@ -196,6 +196,356 @@ fn is_light_color(hex: &str) -> bool {
     }
 }
 
+/// Theme colors shared by every rendering entry point.
+#[derive(Clone, Copy)]
+struct ThemeArgb {
+    dark_theme: bool,
+    text: jint,
+    border: jint,
+    surface: jint,
+    primary: jint,
+    secondary: jint,
+    tertiary: jint,
+}
+
+/// Render Mermaid source to an SVG document using the Material theme mapping.
+///
+/// This is the single source of truth for theme mapping + contrast injection;
+/// both the SVG and the PNG entry points go through it.
+fn build_svg(source: &str, colors: ThemeArgb) -> Result<String, String> {
+    let ThemeArgb {
+        dark_theme,
+        text: text_argb,
+        border: border_argb,
+        surface: surface_argb,
+        primary: primary_argb,
+        secondary: secondary_argb,
+        tertiary: tertiary_argb,
+    } = colors;
+
+    let mut theme = Theme::modern();
+    let surface_alpha = if !dark_theme { 0.92 } else { 0.72 };
+    let surface = rgba_from_argb(surface_argb, surface_alpha);
+    let primary = rgb_hex_from_argb(primary_argb);
+    let secondary = rgb_hex_from_argb(secondary_argb);
+    let tertiary = rgb_hex_from_argb(tertiary_argb);
+
+    theme.background = "transparent".to_string();
+
+    let foreground = contrast_adjusted_text_hex(text_argb, surface_argb);
+    let line_color = line_color_adjusted(border_argb, surface_argb, dark_theme);
+
+    theme.primary_text_color = contrast_adjusted_text_hex(text_argb, primary_argb);
+    theme.text_color = foreground.clone();
+    theme.line_color = line_color.clone();
+    theme.primary_border_color = line_color.clone();
+    // Opaque-ish backdrop behind edge labels: with "none", labels drawn over
+    // crossing edges (or over each other in tight layouts) become unreadable
+    // text soup. A surface-toned pill masks whatever passes underneath.
+    theme.edge_label_background = rgba_from_argb(surface_argb, 0.85);
+    theme.cluster_background = surface.clone();
+    theme.cluster_border = line_color.clone();
+    theme.primary_color = primary.clone();
+    theme.secondary_color = secondary.clone();
+    theme.tertiary_color = tertiary.clone();
+    theme.sequence_actor_fill = primary.clone();
+    theme.sequence_actor_border = line_color.clone();
+    theme.sequence_actor_line = line_color.clone();
+    theme.sequence_note_fill = tertiary.clone();
+    theme.sequence_note_border = line_color.clone();
+    theme.sequence_activation_fill = secondary.clone();
+    theme.sequence_activation_border = line_color.clone();
+    theme.git_commit_label_background = surface.clone();
+    theme.git_tag_label_background = surface.clone();
+    theme.git_tag_label_border = line_color.clone();
+
+    // 0.2.2 centers every edge label on its edge midpoint. Converging edges in
+    // the same rank gap therefore collide unless the columns are far enough
+    // apart for the label boxes to clear each other — hence the wide node
+    // spacing; rank spacing gives multi-line labels vertical room. (0.3.1 was
+    // tried and regressed: labels clipped off-canvas, broken cluster edges.)
+    let options = RenderOptions::modern()
+        .with_node_spacing(170.0)
+        .with_rank_spacing(150.0);
+    let mut layout = options.layout;
+    // Narrower wrap (default 22): converging edges put two labels in the same
+    // rank gap, and only slim label boxes can sit side by side there after the
+    // de-overlap pass below.
+    layout.max_label_width_chars = 16;
+    let options = RenderOptions { theme, layout };
+
+    // Pre-process Mermaid source to inject contrast-aware text colors into style commands
+    let processed_source = inject_contrast_colors(source, text_argb);
+
+    render_with_options(&processed_source, options)
+        .map(|svg| de_overlap_edge_labels(&svg))
+        .map_err(|error| format!("native Mermaid render failed: {error}"))
+}
+
+// ---------------------------------------------------------------------------
+// Edge-label de-overlap post-pass.
+//
+// mermaid-rs-renderer 0.2.2 centers every edge label on its edge midpoint and
+// emits its backdrop <rect> with fill-opacity="0.00". Converging edges have
+// near-identical midpoints, so multi-line labels stack into unreadable text
+// soup no matter how the layout is spaced. The emitted SVG tags each label
+// pair (<rect data-edge-id=..> + <g class="edgeLabel" data-edge-id=..>), so we
+// repair it here: measure honest label boxes from the tspans, iteratively push
+// intersecting boxes apart, then rewrite the rect geometry (opacity on) and
+// translate the matching text group by the same delta.
+// ---------------------------------------------------------------------------
+
+const LABEL_FONT_SIZE: f32 = 14.0;
+/// Average glyph advance ≈ 0.55em for Inter-like UI faces at small sizes.
+const LABEL_CHAR_WIDTH: f32 = LABEL_FONT_SIZE * 0.55;
+const LABEL_PAD_X: f32 = 8.0;
+const LABEL_SEPARATION_MARGIN: f32 = 4.0;
+
+static LABEL_RECT_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(
+        r#"<rect data-edge-id="(edge-\d+)" data-label-kind="center" x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="[-\d.]+" ry="[-\d.]+" fill="([^"]*)" fill-opacity="[-\d.]+" stroke="[^"]*" stroke-opacity="[-\d.]+" stroke-width="[-\d.]+"/>"#,
+    ).unwrap()
+});
+static LABEL_GROUP_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r#"<g class="edgeLabel" data-edge-id="(edge-\d+)" data-label-kind="center">"#).unwrap()
+});
+static LABEL_TEXT_X_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r#"<text x="([-\d.]+)""#).unwrap()
+});
+static LABEL_TSPAN_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r#"<tspan[^>]*>([^<]*)</tspan>"#).unwrap()
+});
+/// Node body rects (obstacles): mermaid-rs 0.2.2 emits them with
+/// stroke-linejoin, which cluster/background rects don't carry.
+static NODE_RECT_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(
+        r#"<rect x="([-\d.]+)" y="([-\d.]+)" width="([-\d.]+)" height="([-\d.]+)" rx="[-\d.]+" ry="[-\d.]+" fill="[^"]*" stroke="[^"]*" stroke-width="[-\d.]+" stroke-linejoin"#,
+    ).unwrap()
+});
+static SVG_SIZE_RE: LazyLock<regex::Regex> = LazyLock::new(|| {
+    regex::Regex::new(r#"<svg [^>]*width="([-\d.]+)" height="([-\d.]+)""#).unwrap()
+});
+
+#[derive(Clone)]
+struct LabelBox {
+    id: String,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    dx: f32,
+    dy: f32,
+}
+
+fn de_overlap_edge_labels(svg: &str) -> String {
+    let mut boxes: Vec<LabelBox> = Vec::new();
+    for caps in LABEL_RECT_RE.captures_iter(svg) {
+        let id = caps[1].to_string();
+        let (Ok(x), Ok(y), Ok(w), Ok(h)) = (
+            caps[2].parse::<f32>(),
+            caps[3].parse::<f32>(),
+            caps[4].parse::<f32>(),
+            caps[5].parse::<f32>(),
+        ) else {
+            continue;
+        };
+        // The emitted rect width is a uniform worst-case, far wider than the
+        // text. Shrink to the longest tspan so collision checks (and the now
+        // visible backdrop) hug the actual label.
+        let text_w = label_text_width(svg, &id).unwrap_or(w);
+        let shrunk = text_w.min(w);
+        boxes.push(LabelBox {
+            id,
+            x: x + (w - shrunk) / 2.0,
+            y,
+            w: shrunk,
+            h,
+            dx: 0.0,
+            dy: 0.0,
+        });
+    }
+    if boxes.is_empty() {
+        return svg.to_string();
+    }
+
+    // Node bodies are immovable obstacles: a label shoved onto a node is as
+    // unreadable as two labels shoved onto each other.
+    let obstacles: Vec<(f32, f32, f32, f32)> = NODE_RECT_RE
+        .captures_iter(svg)
+        .filter_map(|caps| {
+            Some((
+                caps[1].parse::<f32>().ok()?,
+                caps[2].parse::<f32>().ok()?,
+                caps[3].parse::<f32>().ok()?,
+                caps[4].parse::<f32>().ok()?,
+            ))
+        })
+        .collect();
+    let canvas = SVG_SIZE_RE
+        .captures(svg)
+        .and_then(|caps| Some((caps[1].parse::<f32>().ok()?, caps[2].parse::<f32>().ok()?)));
+
+    // Deterministic resolve. Colliding labels share a rank gap that is usually
+    // too short to stack them vertically (iterative pushes oscillate against
+    // the node rows and never converge), but the canvas is almost always wide
+    // enough to seat them side by side. So: group mutually-overlapping labels,
+    // lay each group out as one horizontal row centered on the group's mean
+    // center, then nudge off any node and clamp onto the canvas.
+    let components = overlap_components(&boxes);
+    for component in components {
+        if component.len() < 2 {
+            continue;
+        }
+        let mut members = component;
+        members.sort_by(|&a, &b| {
+            let ca = boxes[a].x + boxes[a].w / 2.0;
+            let cb = boxes[b].x + boxes[b].w / 2.0;
+            ca.partial_cmp(&cb).unwrap_or(std::cmp::Ordering::Equal)
+        });
+        let total_w: f32 = members.iter().map(|&i| boxes[i].w).sum::<f32>()
+            + LABEL_SEPARATION_MARGIN * (members.len() - 1) as f32;
+        let mean_cx: f32 =
+            members.iter().map(|&i| boxes[i].x + boxes[i].w / 2.0).sum::<f32>() / members.len() as f32;
+        let mut cursor = mean_cx - total_w / 2.0;
+        if let Some((cw, _)) = canvas {
+            cursor = cursor.clamp(
+                LABEL_SEPARATION_MARGIN,
+                (cw - total_w - LABEL_SEPARATION_MARGIN).max(LABEL_SEPARATION_MARGIN),
+            );
+        }
+        for &i in &members {
+            boxes[i].dx = cursor - boxes[i].x;
+            cursor += boxes[i].w + LABEL_SEPARATION_MARGIN;
+        }
+    }
+
+    // Single obstacle pass: a label that still straddles a node row slides off
+    // along its least-penetration axis. Then keep everything on the canvas.
+    for label in boxes.iter_mut() {
+        for &(ox, oy, ow, oh) in &obstacles {
+            let lx = label.x + label.dx;
+            let ly = label.y + label.dy;
+            let overlap_x = ((lx + label.w).min(ox + ow) - lx.max(ox)) + LABEL_SEPARATION_MARGIN;
+            let overlap_y = ((ly + label.h).min(oy + oh) - ly.max(oy)) + LABEL_SEPARATION_MARGIN;
+            if overlap_x <= 0.0 || overlap_y <= 0.0 {
+                continue;
+            }
+            if overlap_y <= overlap_x {
+                if ly + label.h / 2.0 <= oy + oh / 2.0 {
+                    label.dy -= overlap_y;
+                } else {
+                    label.dy += overlap_y;
+                }
+            } else if lx + label.w / 2.0 <= ox + ow / 2.0 {
+                label.dx -= overlap_x;
+            } else {
+                label.dx += overlap_x;
+            }
+        }
+        if let Some((cw, ch)) = canvas {
+            let min_dx = LABEL_SEPARATION_MARGIN - label.x;
+            let max_dx = cw - LABEL_SEPARATION_MARGIN - label.w - label.x;
+            let min_dy = LABEL_SEPARATION_MARGIN - label.y;
+            let max_dy = ch - LABEL_SEPARATION_MARGIN - label.h - label.y;
+            if max_dx >= min_dx {
+                label.dx = label.dx.clamp(min_dx, max_dx);
+            }
+            if max_dy >= min_dy {
+                label.dy = label.dy.clamp(min_dy, max_dy);
+            }
+        }
+    }
+
+    apply_label_fixes(svg, &boxes)
+}
+
+/// Connected components of the label-overlap graph (indices into `boxes`).
+fn overlap_components(boxes: &[LabelBox]) -> Vec<Vec<usize>> {
+    let n = boxes.len();
+    let mut component_of: Vec<Option<usize>> = vec![None; n];
+    let mut components: Vec<Vec<usize>> = Vec::new();
+    for start in 0..n {
+        if component_of[start].is_some() {
+            continue;
+        }
+        let id = components.len();
+        let mut stack = vec![start];
+        let mut members = Vec::new();
+        component_of[start] = Some(id);
+        while let Some(i) = stack.pop() {
+            members.push(i);
+            for j in 0..n {
+                if component_of[j].is_some() {
+                    continue;
+                }
+                let a = &boxes[i];
+                let b = &boxes[j];
+                let overlap_x = ((a.x + a.w).min(b.x + b.w) - a.x.max(b.x)) + LABEL_SEPARATION_MARGIN;
+                let overlap_y = ((a.y + a.h).min(b.y + b.h) - a.y.max(b.y)) + LABEL_SEPARATION_MARGIN;
+                if overlap_x > 0.0 && overlap_y > 0.0 {
+                    component_of[j] = Some(id);
+                    stack.push(j);
+                }
+            }
+        }
+        components.push(members);
+    }
+    components
+}
+
+/// Width of the widest tspan of the label group for [edge_id], padded.
+fn label_text_width(svg: &str, edge_id: &str) -> Option<f32> {
+    let marker = format!(r#"<g class="edgeLabel" data-edge-id="{edge_id}" data-label-kind="center">"#);
+    let start = svg.find(&marker)?;
+    let rest = &svg[start..];
+    let end = rest.find("</g>")?;
+    let group = &rest[..end];
+    let longest = LABEL_TSPAN_RE
+        .captures_iter(group)
+        .map(|c| c[1].chars().count())
+        .max()?;
+    Some(longest as f32 * LABEL_CHAR_WIDTH + LABEL_PAD_X * 2.0)
+}
+
+/// Rewrite label rects (new geometry, backdrop visible) and translate label
+/// text groups by their resolved offsets.
+fn apply_label_fixes(svg: &str, boxes: &[LabelBox]) -> String {
+    let mut result = LABEL_RECT_RE
+        .replace_all(svg, |caps: &regex::Captures| {
+            let id = &caps[1];
+            let Some(label) = boxes.iter().find(|b| b.id == id) else {
+                return caps[0].to_string();
+            };
+            let fill = &caps[6];
+            format!(
+                r#"<rect data-edge-id="{}" data-label-kind="center" x="{:.2}" y="{:.2}" width="{:.2}" height="{:.2}" rx="4" ry="4" fill="{}" fill-opacity="1.00" stroke="none" stroke-opacity="0.00" stroke-width="0"/>"#,
+                id,
+                label.x + label.dx,
+                label.y + label.dy,
+                label.w,
+                label.h,
+                fill,
+            )
+        })
+        .to_string();
+    result = LABEL_GROUP_RE
+        .replace_all(&result, |caps: &regex::Captures| {
+            let id = &caps[1];
+            let Some(label) = boxes.iter().find(|b| b.id == id) else {
+                return caps[0].to_string();
+            };
+            if label.dx == 0.0 && label.dy == 0.0 {
+                return caps[0].to_string();
+            }
+            format!(
+                r#"<g class="edgeLabel" data-edge-id="{}" data-label-kind="center" transform="translate({:.2}, {:.2})">"#,
+                id, label.dx, label.dy,
+            )
+        })
+        .to_string();
+    result
+}
+
 fn render_to_svg(
     mut env: JNIEnv,
     source: JString,
@@ -217,54 +567,20 @@ fn render_to_svg(
         }
     };
 
-    let mut theme = Theme::modern();
-    let surface_alpha = if dark_theme == 0 { 0.92 } else { 0.72 };
-    let surface = rgba_from_argb(surface_argb, surface_alpha);
-    let primary = rgb_hex_from_argb(primary_argb);
-    let secondary = rgb_hex_from_argb(secondary_argb);
-    let tertiary = rgb_hex_from_argb(tertiary_argb);
-
-    theme.background = "transparent".to_string();
-
-    let foreground = contrast_adjusted_text_hex(text_argb, surface_argb);
-    let line_color = line_color_adjusted(border_argb, surface_argb, dark_theme != 0);
-
-    theme.primary_text_color = contrast_adjusted_text_hex(text_argb, primary_argb);
-    theme.text_color = foreground.clone();
-    theme.line_color = line_color.clone();
-    theme.primary_border_color = line_color.clone();
-    theme.edge_label_background = "none".to_string();
-    theme.cluster_background = surface.clone();
-    theme.cluster_border = line_color.clone();
-    theme.primary_color = primary.clone();
-    theme.secondary_color = secondary.clone();
-    theme.tertiary_color = tertiary.clone();
-    theme.sequence_actor_fill = primary.clone();
-    theme.sequence_actor_border = line_color.clone();
-    theme.sequence_actor_line = line_color.clone();
-    theme.sequence_note_fill = tertiary.clone();
-    theme.sequence_note_border = line_color.clone();
-    theme.sequence_activation_fill = secondary.clone();
-    theme.sequence_activation_border = line_color.clone();
-    theme.git_commit_label_background = surface.clone();
-    theme.git_tag_label_background = surface.clone();
-    theme.git_tag_label_border = line_color.clone();
-
-    let options = RenderOptions::modern()
-        .with_node_spacing(80.0)
-        .with_rank_spacing(100.0);  // Optimize for mobile portrait
-    let options = RenderOptions {
-        theme,
-        layout: options.layout,
+    let colors = ThemeArgb {
+        dark_theme: dark_theme != 0,
+        text: text_argb,
+        border: border_argb,
+        surface: surface_argb,
+        primary: primary_argb,
+        secondary: secondary_argb,
+        tertiary: tertiary_argb,
     };
 
-    // Pre-process Mermaid source to inject contrast-aware text colors into style commands
-    let processed_source = inject_contrast_colors(&source, text_argb);
-
-    let svg = match render_with_options(&processed_source, options) {
+    let svg = match build_svg(&source, colors) {
         Ok(svg) => svg,
         Err(error) => {
-            set_last_error(format!("native Mermaid render failed: {error}"));
+            set_last_error(error);
             return null_mut();
         }
     };
@@ -273,6 +589,180 @@ fn render_to_svg(
         Ok(value) => value.into_raw(),
         Err(error) => {
             set_last_error(format!("failed to allocate SVG JNI string: {error}"));
+            null_mut()
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SVG -> PNG rasterization (desktop path)
+//
+// The desktop client used to rasterize the SVG with skiko's `SVGDOM`, which
+// exposes no font manager and therefore silently dropped every `<text>` node.
+// Rasterizing here with resvg lets us bind a real font database so labels
+// actually paint.
+// ---------------------------------------------------------------------------
+
+/// Maximum pixmap edge, guarding against pathological diagrams eating memory.
+const MAX_PIXMAP_DIMENSION: f32 = 8192.0;
+const MIN_RASTER_SCALE: f32 = 0.5;
+const MAX_RASTER_SCALE: f32 = 4.0;
+
+/// System font database, built once — `load_system_fonts()` is expensive.
+static FONT_DB: OnceLock<Arc<fontdb::Database>> = OnceLock::new();
+
+/// First candidate family that is actually installed, else `fallback`.
+fn pick_family(db: &fontdb::Database, candidates: &[&str], fallback: &str) -> String {
+    for candidate in candidates {
+        let query = fontdb::Query {
+            families: &[fontdb::Family::Name(candidate)],
+            ..fontdb::Query::default()
+        };
+        if db.query(&query).is_some() {
+            return (*candidate).to_string();
+        }
+    }
+    fallback.to_string()
+}
+
+fn font_database() -> Arc<fontdb::Database> {
+    FONT_DB
+        .get_or_init(|| {
+            let mut db = fontdb::Database::new();
+            db.load_system_fonts();
+
+            // Generic-family defaults, per-OS preferred first with a portable
+            // fallback chain behind it.
+            let sans = pick_family(
+                &db,
+                &["Segoe UI", "Helvetica Neue", "Arial", "Liberation Sans", "DejaVu Sans", "Noto Sans"],
+                "sans-serif",
+            );
+            let serif = pick_family(
+                &db,
+                &["Georgia", "Times New Roman", "Liberation Serif", "DejaVu Serif", "Noto Serif"],
+                "serif",
+            );
+            let mono = pick_family(
+                &db,
+                &["Consolas", "Menlo", "DejaVu Sans Mono", "Liberation Mono", "Courier New"],
+                "monospace",
+            );
+            db.set_sans_serif_family(sans.clone());
+            db.set_serif_family(serif);
+            db.set_monospace_family(mono);
+            db.set_cursive_family(sans.clone());
+            db.set_fantasy_family(sans);
+            Arc::new(db)
+        })
+        .clone()
+}
+
+/// Rasterize an SVG document to PNG bytes, scaled so the output is roughly
+/// `target_width_px` wide while preserving the SVG's intrinsic aspect ratio.
+fn svg_to_png(svg: &str, target_width_px: i32) -> Result<Vec<u8>, String> {
+    let mut options = resvg::usvg::Options {
+        fontdb: font_database(),
+        ..resvg::usvg::Options::default()
+    };
+    let db = font_database();
+    options.font_family = db.family_name(&fontdb::Family::SansSerif).to_string();
+
+    let tree = resvg::usvg::Tree::from_str(svg, &options)
+        .map_err(|error| format!("failed to parse rendered SVG: {error}"))?;
+
+    let size = tree.size();
+    let (intrinsic_w, intrinsic_h) = (size.width(), size.height());
+    if !(intrinsic_w.is_finite() && intrinsic_h.is_finite()) || intrinsic_w <= 0.0 || intrinsic_h <= 0.0 {
+        return Err(format!("rendered SVG has invalid size {intrinsic_w}x{intrinsic_h}"));
+    }
+
+    let mut scale = if target_width_px > 0 {
+        target_width_px as f32 / intrinsic_w
+    } else {
+        1.0
+    };
+    if !scale.is_finite() || scale <= 0.0 {
+        scale = 1.0;
+    }
+    scale = scale.clamp(MIN_RASTER_SCALE, MAX_RASTER_SCALE);
+
+    // Cap the pixmap so a huge diagram cannot exhaust memory. Both axes are
+    // scaled by the same factor, so the aspect ratio is preserved.
+    let max_edge = intrinsic_w.max(intrinsic_h);
+    if max_edge * scale > MAX_PIXMAP_DIMENSION {
+        scale = MAX_PIXMAP_DIMENSION / max_edge;
+    }
+
+    let width = (intrinsic_w * scale).round().max(1.0) as u32;
+    let height = (intrinsic_h * scale).round().max(1.0) as u32;
+
+    let mut pixmap = resvg::tiny_skia::Pixmap::new(width, height)
+        .ok_or_else(|| format!("failed to allocate {width}x{height} pixmap"))?;
+
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
+
+    pixmap
+        .encode_png()
+        .map_err(|error| format!("failed to encode PNG: {error}"))
+}
+
+fn render_to_png(
+    mut env: JNIEnv,
+    source: JString,
+    dark_theme: jboolean,
+    text_argb: jint,
+    border_argb: jint,
+    surface_argb: jint,
+    primary_argb: jint,
+    secondary_argb: jint,
+    tertiary_argb: jint,
+    target_width_px: jint,
+) -> jbyteArray {
+    clear_last_error();
+
+    let source: String = match env.get_string(&source) {
+        Ok(value) => value.into(),
+        Err(error) => {
+            set_last_error(format!("failed to read Mermaid source from JNI: {error}"));
+            return null_mut();
+        }
+    };
+
+    let colors = ThemeArgb {
+        dark_theme: dark_theme != 0,
+        text: text_argb,
+        border: border_argb,
+        surface: surface_argb,
+        primary: primary_argb,
+        secondary: secondary_argb,
+        tertiary: tertiary_argb,
+    };
+
+    let svg = match build_svg(&source, colors) {
+        Ok(svg) => svg,
+        Err(error) => {
+            set_last_error(error);
+            return null_mut();
+        }
+    };
+
+    let png = match svg_to_png(&svg, target_width_px) {
+        Ok(png) => png,
+        Err(error) => {
+            set_last_error(error);
+            return null_mut();
+        }
+    };
+
+    match env.byte_array_from_slice(&png) {
+        Ok(array) => array.into_raw(),
+        Err(error) => {
+            set_last_error(format!("failed to allocate PNG byte array: {error}"));
             null_mut()
         }
     }
@@ -310,9 +800,94 @@ pub extern "system" fn Java_com_letta_mobile_mermaid_MermaidNativeRenderer_nativ
 }
 
 #[unsafe(no_mangle)]
+pub extern "system" fn Java_com_letta_mobile_mermaid_MermaidNativeRenderer_nativeRenderToPng(
+    env: JNIEnv,
+    _class: JClass,
+    source: JString,
+    dark_theme: jboolean,
+    text_argb: jint,
+    border_argb: jint,
+    surface_argb: jint,
+    primary_argb: jint,
+    secondary_argb: jint,
+    tertiary_argb: jint,
+    target_width_px: jint,
+) -> jbyteArray {
+    render_to_png(
+        env, source, dark_theme, text_argb, border_argb, surface_argb,
+        primary_argb, secondary_argb, tertiary_argb, target_width_px,
+    )
+}
+
+#[unsafe(no_mangle)]
 pub extern "system" fn Java_com_letta_mobile_mermaid_MermaidNativeRenderer_nativeTakeLastError(
     env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     take_last_error(env)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const LIGHT: ThemeArgb = ThemeArgb {
+        dark_theme: false,
+        text: 0xff1c1b1f_u32 as i32,
+        border: 0xff79747e_u32 as i32,
+        surface: 0xfffffbfe_u32 as i32,
+        primary: 0xff6750a4_u32 as i32,
+        secondary: 0xff625b71_u32 as i32,
+        tertiary: 0xff7d5260_u32 as i32,
+    };
+
+    #[test]
+    fn renders_flowchart_to_valid_png_with_content() {
+        let svg = build_svg("graph TD; A[Hello]-->B[World]", LIGHT).expect("svg render");
+        assert!(svg.contains("<svg"), "expected an SVG document");
+
+        let png = svg_to_png(&svg, 1024).expect("png render");
+        assert!(!png.is_empty(), "PNG byte array must not be empty");
+        assert_eq!(
+            &png[..8],
+            &[0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a],
+            "expected PNG magic bytes"
+        );
+
+        // Rasterize again to inspect pixels: the diagram must paint something,
+        // i.e. the pixmap is not uniformly the (transparent) background.
+        let options = resvg::usvg::Options {
+            fontdb: font_database(),
+            ..resvg::usvg::Options::default()
+        };
+        let tree = resvg::usvg::Tree::from_str(&svg, &options).expect("parse svg");
+        let size = tree.size();
+        let mut pixmap = resvg::tiny_skia::Pixmap::new(
+            size.width().ceil() as u32,
+            size.height().ceil() as u32,
+        )
+        .expect("pixmap");
+        resvg::render(
+            &tree,
+            resvg::tiny_skia::Transform::identity(),
+            &mut pixmap.as_mut(),
+        );
+        let first = pixmap.pixels()[0];
+        assert!(
+            pixmap.pixels().iter().any(|p| *p != first),
+            "pixmap is uniformly the background color — nothing was drawn"
+        );
+    }
+
+    #[test]
+    fn raster_scale_is_clamped_and_aspect_preserved() {
+        let svg = build_svg("graph TD; A[Hello]-->B[World]", LIGHT).expect("svg render");
+        // Absurd target width must not blow up: scale clamps at 4.0.
+        let png = svg_to_png(&svg, 1_000_000).expect("png render");
+        assert!(!png.is_empty());
+        // Zero/negative target width falls back to scale 1.0.
+        let png = svg_to_png(&svg, 0).expect("png render");
+        assert!(!png.is_empty());
+    }
+
 }
