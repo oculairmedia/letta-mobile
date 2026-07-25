@@ -212,9 +212,9 @@ private fun shouldReleaseOlderMessages(params: ChatMessageListEffectsParams, fir
 
 // Only worth releasing once the resident list has grown well past what a
 // normal viewport/window needs to hold — mirrors ChatTimelineProjector's
-// DEFAULT_MAX_RESIDENT_UI_MESSAGES (400); trigger a little below it so a
+// DEFAULT_MAX_RESIDENT_UI_MESSAGES (3000); trigger a little below it so a
 // release actually has meaningful content to drop.
-private const val RELEASE_OLDER_TRIGGER_MESSAGE_COUNT = 250
+private const val RELEASE_OLDER_TRIGGER_MESSAGE_COUNT = 2500
 
 // "Back near the live tail" — reverseLayout index 0 is the newest message,
 // so a small firstVisibleItemIndex means the user scrolled back down away

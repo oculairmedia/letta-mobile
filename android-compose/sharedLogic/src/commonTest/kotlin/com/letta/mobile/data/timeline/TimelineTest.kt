@@ -454,34 +454,34 @@ class TimelineTest {
     @Test
     fun `append keeps resident events bounded far past the cap`() {
         var t = Timeline("c1")
-        // Simulate a long-lived conversation: 2000 confirmed messages streamed
+        // Simulate a long-lived conversation: 5000 confirmed messages streamed
         // in one at a time (28k-message scale, scaled down for test speed).
-        repeat(2000) { i ->
+        repeat(5000) { i ->
             t = t.append(confirmed("m$i", (i + 1).toDouble(), serverId = "srv-$i"))
         }
         assertTrue(
             t.events.size <= DEFAULT_MAX_RESIDENT_EVENTS + DEFAULT_EVICT_BUFFER,
             "Expected events.size (${t.events.size}) to stay bounded near the cap",
         )
-        assertEquals(2000 - t.events.size, t.releasedOlderCount)
+        assertEquals(5000 - t.events.size, t.releasedOlderCount)
         // Newest events are the ones retained.
-        assertEquals("m1999", t.events.last().otid)
+        assertEquals("m4999", t.events.last().otid)
     }
 
     @Test
     fun `append at 2x scale keeps memory flat`() {
         var t = Timeline("c1")
-        repeat(4000) { i ->
+        repeat(10000) { i ->
             t = t.append(confirmed("m$i", (i + 1).toDouble(), serverId = "srv-$i"))
         }
         assertTrue(t.events.size <= DEFAULT_MAX_RESIDENT_EVENTS + DEFAULT_EVICT_BUFFER)
-        assertEquals(4000 - t.events.size, t.releasedOlderCount)
+        assertEquals(10000 - t.events.size, t.releasedOlderCount)
     }
 
     @Test
     fun `sliding window updates backfillCursor to the new oldest resident server id`() {
         var t = Timeline("c1")
-        repeat(500) { i ->
+        repeat(3000) { i ->
             t = t.append(confirmed("m$i", (i + 1).toDouble(), serverId = "srv-$i"))
         }
         assertNotNull(t.backfillCursor)
@@ -492,23 +492,23 @@ class TimelineTest {
     fun `active streaming turn is never evicted even past the cap`() {
         var t = Timeline("c1")
         // Fill well past the cap with an old, unrelated run.
-        repeat(500) { i ->
+        repeat(2500) { i ->
             t = t.append(confirmed("old-$i", (i + 1).toDouble(), serverId = "srv-old-$i", runId = "run-old"))
         }
         // Now stream a long active turn (more events than the cap) sharing one runId.
-        var pos = 501.0
-        repeat(300) { i ->
+        var pos = 2501.0
+        repeat(2200) { i ->
             t = t.append(confirmed("turn-$i", pos, serverId = "srv-turn-$i", runId = "run-active"))
             pos += 1.0
         }
         val turnEvents = t.events.filterIsInstance<TimelineEvent.Confirmed>().filter { it.runId == "run-active" }
-        assertEquals(300, turnEvents.size, "No event from the active turn should have been evicted")
+        assertEquals(2200, turnEvents.size, "No event from the active turn should have been evicted")
     }
 
     @Test
     fun `unconfirmed local events are never evicted`() {
         var t = Timeline("c1")
-        repeat(500) { i ->
+        repeat(2500) { i ->
             t = t.append(confirmed("m$i", (i + 1).toDouble(), serverId = "srv-$i"))
         }
         t = t.append(local("pending-send", t.nextLocalPosition()))
@@ -518,7 +518,7 @@ class TimelineTest {
     @Test
     fun `insertOrdered reconcile inserts also respect the sliding window`() {
         var t = Timeline("c1")
-        repeat(500) { i ->
+        repeat(2500) { i ->
             t = t.append(confirmed("m$i", (i + 100).toDouble(), serverId = "srv-$i"))
         }
         // Reconcile inserts a missed message deep in the past — should not

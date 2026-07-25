@@ -580,12 +580,22 @@ data class AbandonedAssistantFragmentSuppression(
 
 /**
  * Sliding-window resident cap for [Timeline.events]. Chosen well above the
- * hydrate visible target (hydrate defaults to 50, capped at 500) so normal
- * scrolling/streaming sessions never observe eviction — it only kicks in
- * for long-lived/high-volume conversations (tens of thousands of messages)
- * where unbounded retention would otherwise grow memory forever.
+ * hydrate visible target (hydrate can page up to 500 messages resident, per
+ * the fetch-layer's page guard) so normal scrolling/streaming sessions never
+ * observe eviction — it only kicks in for long-lived/high-volume
+ * conversations (tens of thousands of messages) where unbounded retention
+ * would otherwise grow memory forever.
+ *
+ * letta-mobile: originally set to 200, which broke
+ * `ChatTimelineObserverTest.long history streaming tail projection does not
+ * scan full history per frame` — that test deliberately builds a 513-event
+ * history and asserts the FULL history stays resident and gets projected
+ * (`eventsTotal == 513`), matching the product's actual hydrate/scroll-back
+ * behavior for a single large-but-not-pathological session. 2000 comfortably
+ * clears that (and the 500-message hydrate ceiling) while still bounding
+ * memory by more than an order of magnitude for a 28k+ message conversation.
  */
-internal const val DEFAULT_MAX_RESIDENT_EVENTS = 200
+internal const val DEFAULT_MAX_RESIDENT_EVENTS = 2000
 
 /**
  * Hysteresis buffer added on top of [DEFAULT_MAX_RESIDENT_EVENTS] before a
@@ -594,7 +604,7 @@ internal const val DEFAULT_MAX_RESIDENT_EVENTS = 200
  * per tick — keeps firing between slides instead of falling back to a full
  * re-projection on every streamed message once the cap is reached.
  */
-internal const val DEFAULT_EVICT_BUFFER = 40
+internal const val DEFAULT_EVICT_BUFFER = 200
 
 private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
 private const val MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS = 32

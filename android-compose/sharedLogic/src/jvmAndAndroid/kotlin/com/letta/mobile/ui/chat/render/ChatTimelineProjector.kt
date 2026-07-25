@@ -564,11 +564,20 @@ class ChatTimelineProjector {
 /**
  * Sliding-window resident cap for the pagination prefix cache AND the merged
  * [ChatUiState.messages] list [ChatTimelineProjector.mergeOlderPage] returns.
- * Set above the Timeline's own resident cap (200) so normal use is
- * unaffected — this only bounds pathological repeated scroll-back on a
- * long-lived conversation.
+ *
+ * Must stay above `Timeline`'s own resident cap
+ * (`DEFAULT_MAX_RESIDENT_EVENTS` + `DEFAULT_EVICT_BUFFER`, currently 2200) —
+ * `existingMessages` passed into [ChatTimelineProjector.mergeOlderPage] can
+ * itself be all-live (no pagination prefix yet) once a long conversation's
+ * Timeline has grown to its own cap, and this method trims from the oldest
+ * end regardless of whether that's prefix or live content. Setting this
+ * below the Timeline cap would trim live messages out of the pager's
+ * immediate return value, only to have the very next live projection tick
+ * restore them in full (since `project()` itself is uncapped) — a pointless
+ * flicker. Comfortably above the Timeline cap, this only ever bounds
+ * pathological repeated scroll-back on a long-lived conversation.
  */
-const val DEFAULT_MAX_RESIDENT_UI_MESSAGES = 400
+const val DEFAULT_MAX_RESIDENT_UI_MESSAGES = 3000
 
 /**
  * Output of [ChatTimelineProjector.project]: the ordered UI message list, the
