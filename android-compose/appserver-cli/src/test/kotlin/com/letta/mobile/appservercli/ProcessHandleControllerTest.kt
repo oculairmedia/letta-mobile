@@ -45,4 +45,13 @@ class ProcessHandleControllerTest {
 
         javaFile.delete()
     }
+
+    @Test
+    fun `destroyTree returns silently when no process was spawned`() {
+        val controller = ProcessHandleController(command = listOf("echo", "test"))
+
+        // spawn() was never called, so the handle is null. destroyTree must be a no-op
+        // rather than throwing — cancel/teardown paths call it unconditionally.
+        controller.destroyTree()
+    }
 }
