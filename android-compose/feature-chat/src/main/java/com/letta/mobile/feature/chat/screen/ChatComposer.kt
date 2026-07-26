@@ -1,8 +1,11 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -39,6 +43,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.feature.chat.R
@@ -48,6 +53,8 @@ import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ToolAffordanceRow
+import com.letta.mobile.ui.components.rememberFloatingControlPressScale
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
@@ -61,6 +68,7 @@ import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
 internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
+private val ChatComposerActionTargetSize = 48.dp
 private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
 private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 private val ChatComposerInputVerticalPadding = LettaSpacing.XS
@@ -101,7 +109,17 @@ internal fun ChatComposer(
     val canSend = !isStreaming && canSendMessages && hasSendableContent
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
+    val reducedMotion = rememberReducedMotionEnabled()
+    val addInteractionSource = remember { MutableInteractionSource() }
+    val addPressScale = rememberFloatingControlPressScale(
+        interactionSource = addInteractionSource,
+        reducedMotion = reducedMotion,
+    )
     var previewAttachment by remember { mutableStateOf<MessageContentPart.Image?>(null) }
+    var showComposerActions by remember { mutableStateOf(false) }
+    val onToolSelected: (Tool) -> Unit = { tool ->
+        onTextChange(appendToolCallTemplate(inputText, buildToolCallTemplate(tool)))
+    }
 
     // letta-mobile-xtwt: defer to the IME's own Send action while the soft
     // keyboard is open and there's nothing in flight. The composer's trailing
@@ -140,7 +158,7 @@ internal fun ChatComposer(
         if (inputText.isBlank() && pendingAttachments.isEmpty() && availableTools.isNotEmpty()) {
             ToolAffordanceRow(
                 tools = availableTools,
-                onToolSelected = { tool -> onTextChange(buildToolCallTemplate(tool)) },
+                onToolSelected = onToolSelected,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )
         }
@@ -188,6 +206,7 @@ internal fun ChatComposer(
             actionSizeFraction = if (isStreaming) 0.7f else 1f,
             actionPulse = isStreaming,
             actionVisible = showAction || useVoice,
+            hasStagedContent = pendingAttachments.isNotEmpty(),
             customTrailingContent = if (useVoice && voiceVm != null) {
                 {
                     HoldToDictateButton(
@@ -217,22 +236,42 @@ internal fun ChatComposer(
             ),
             itemSpacing = ChatComposerInputItemSpacing,
             leadingContent = {
-                Surface(
-                    onClick = {
-                        HapticEffects.contextClick(haptic, view)
-                        onAttachImage()
-                    },
-                    modifier = Modifier.size(ChatComposerAttachButtonSize),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                Box(
+                    modifier = Modifier
+                        .size(ChatComposerActionTargetSize)
+                        .clickable(
+                            interactionSource = addInteractionSource,
+                            indication = LocalIndication.current,
+                            role = Role.Button,
+                            onClick = {
+                                HapticEffects.contextClick(haptic, view)
+                                if (availableTools.isEmpty()) {
+                                    onAttachImage()
+                                } else {
+                                    showComposerActions = true
+                                }
+                            },
+                        ),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            LettaIcons.Add,
-                            contentDescription = stringResource(R.string.action_attach_image),
-                            modifier = Modifier.size(ChatComposerAttachIconSize),
-                        )
+                    Surface(
+                        modifier = Modifier
+                            .size(ChatComposerAttachButtonSize)
+                            .graphicsLayer {
+                                scaleX = addPressScale
+                                scaleY = addPressScale
+                            },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                LettaIcons.Add,
+                                contentDescription = stringResource(R.string.composer_actions_open),
+                                modifier = Modifier.size(ChatComposerAttachIconSize),
+                            )
+                        }
                     }
                 }
             },
@@ -246,12 +285,35 @@ internal fun ChatComposer(
         )
     }
 
+    ChatComposerActionSheet(
+        show = showComposerActions,
+        availableTools = availableTools,
+        onDismiss = { showComposerActions = false },
+        onAttachImage = {
+            showComposerActions = false
+            onAttachImage()
+        },
+        onToolSelected = { tool ->
+            showComposerActions = false
+            onToolSelected(tool)
+        },
+    )
+
     previewAttachment?.let { image ->
         AttachmentPreviewDialog(
             image = image,
             onDismiss = { previewAttachment = null },
         )
     }
+}
+
+internal fun appendToolCallTemplate(
+    draft: String,
+    template: String,
+): String = when {
+    draft.isBlank() -> template
+    draft.last().isWhitespace() -> draft + template
+    else -> "$draft $template"
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)

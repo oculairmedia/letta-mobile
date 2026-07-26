@@ -1,7 +1,9 @@
 package com.letta.mobile.feature.chat.screen
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
@@ -16,12 +18,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.feature.chat.render.resolveRenderer
 import com.letta.mobile.ui.common.GroupPosition
+import com.letta.mobile.ui.chat.render.bubbleStyle
+import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import com.letta.mobile.ui.components.LatencyText
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.theme.LocalChatIsPinching
@@ -30,9 +38,6 @@ import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.chatTypography
 import kotlinx.collections.immutable.toImmutableList
-import com.letta.mobile.ui.chat.render.bubbleStyle
-import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
-import com.letta.mobile.feature.chat.render.resolveRenderer
 
 /**
  * A message renders bubble-less (just markdown on the page background) when
@@ -70,35 +75,66 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
  * [awaitFirstDown] with `requireUnconsumed = false` and never consumes the down
  * event for short taps. This allows child composables (e.g., mermaid diagram's
  * tap-to-fullscreen) to receive their own tap events, while the parent still
- * gets long-press-to-copy behavior.
+ * gets long-press message actions.
  *
  * The hold threshold is doubled relative to the platform default (see
  * [chatLongPressTimeoutMillis]) so incidental touches during scrolling don't
  * trigger the long-press.
  */
 internal fun Modifier.longPressPassthrough(
+    accessibilityLabel: String = "",
     onLongPress: (() -> Unit)?,
 ): Modifier {
     if (onLongPress == null) return this
-    return pointerInput(Unit) {
-        awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false)
-            val upBeforeTimeout = withTimeoutOrNull(
-                chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
-            ) {
-                // Spin until the pointer lifts (short tap) — do not consume.
-                while (true) {
-                    val event = awaitPointerEvent()
-                    if (event.changes.any { !it.pressed }) break
-                }
-            }
-            if (upBeforeTimeout == null) {
-                // Timeout expired before lift → long press.
+    return this
+        .semantics(mergeDescendants = false) {
+            onLongClick(label = accessibilityLabel) {
                 onLongPress()
+                true
             }
-            // Short tap: nothing consumed → child composables handle normally.
         }
-    }
+        .onPreviewKeyEvent { event ->
+            val nativeEvent = event.nativeKeyEvent
+            val opensContextActions = nativeEvent.action == AndroidKeyEvent.ACTION_UP &&
+                (
+                    nativeEvent.keyCode == AndroidKeyEvent.KEYCODE_MENU ||
+                        (
+                            nativeEvent.keyCode == AndroidKeyEvent.KEYCODE_F10 &&
+                                nativeEvent.isShiftPressed
+                            )
+                    )
+            if (opensContextActions) {
+                onLongPress()
+                true
+            } else {
+                false
+            }
+        }
+        .focusable()
+        .pointerInput(Unit) {
+            awaitEachGesture {
+                awaitFirstDown(requireUnconsumed = false)
+                val upBeforeTimeout = withTimeoutOrNull(
+                    chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
+                ) {
+                    // Spin until the pointer lifts (short tap) — do not consume.
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.changes.any { !it.pressed }) break
+                    }
+                }
+                if (upBeforeTimeout == null) {
+                    onLongPress()
+                    // Consume only after recognizing the long-click so release
+                    // cannot also activate an attachment or Mermaid child.
+                    do {
+                        val event = awaitPointerEvent()
+                        event.changes.forEach { it.consume() }
+                    } while (event.changes.any { it.pressed })
+                }
+                // Short taps remain unconsumed for interactive children.
+            }
+        }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -111,6 +147,7 @@ internal fun MessageBubbleSurface(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
     onLongClick: (() -> Unit)? = null,
+    longClickLabel: String = "",
     // letta-mobile-1k3ge restore: tap an attached image to open the fullscreen
     // viewer. (attachments, tappedIndex) -> open viewer. Null = not tappable.
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
@@ -277,10 +314,10 @@ internal fun MessageBubbleSurface(
     if (bubbleLess) {
         // Plain assistant prose: no Surface, no rounded shape — markdown
         // floats directly on the page background and gets the full available
-        // content width. Keep the long-press affordance for copy.
+        // content width. Keep the long-press message-action affordance.
         Box(
             modifier = if (onLongClick != null) {
-                Modifier.longPressPassthrough(onLongClick)
+                Modifier.longPressPassthrough(longClickLabel, onLongClick)
             } else Modifier,
         ) {
             contentColumn()
@@ -294,7 +331,7 @@ internal fun MessageBubbleSurface(
             modifier = if (onLongClick != null) {
                 Modifier
                     .clip(bubbleShape)
-                    .longPressPassthrough(onLongClick)
+                    .longPressPassthrough(longClickLabel, onLongClick)
             } else Modifier,
         ) {
             contentColumn()
