@@ -98,6 +98,7 @@ import com.pushpal.jetlime.JetLimeEventDefaults
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+@Suppress("ComplexMethod", "LargeMethod")
 fun ProjectIssuesScreen(
     onNavigateBack: () -> Unit,
     onNavigateToIssue: (issueId: String) -> Unit,
