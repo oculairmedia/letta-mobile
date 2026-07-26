@@ -43,10 +43,6 @@ internal fun ChatMessageListBody(
     params: ChatMessageListBodyParams,
     modifier: Modifier = Modifier,
 ) {
-    val chatDimens = MaterialTheme.chatDimens
-    val chatShapes = MaterialTheme.chatShapes
-    val density = LocalDensity.current
-    val layoutDirection = LocalLayoutDirection.current
     val renderCallbacks = remember(params.callbacks) {
         ChatMessageRenderCallbacks(
             onSendMessage = params.callbacks.onSendMessage,
@@ -66,6 +62,25 @@ internal fun ChatMessageListBody(
         params.state.toChatRenderItemState()
     }
 
+    ChatMessageListBodyContent(
+        params = params,
+        renderCallbacks = renderCallbacks,
+        itemState = itemState,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ChatMessageListBodyContent(
+    params: ChatMessageListBodyParams,
+    renderCallbacks: ChatMessageRenderCallbacks,
+    itemState: com.letta.mobile.ui.chat.render.ChatRenderItemState,
+    modifier: Modifier,
+) {
+    val chatDimens = MaterialTheme.chatDimens
+    val chatShapes = MaterialTheme.chatShapes
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val contentWidthPx = with(density) {
             (maxWidth - chatDimens.contentPaddingHorizontal - chatDimens.contentPaddingHorizontal)
@@ -221,26 +236,28 @@ private fun ChatMessageListLazyColumn(params: ChatMessageListLazyColumnParams) {
         modifier = Modifier.graphicsLayer { },
     ) {
         chatMessageListItems(
-            renderItems = bodyParams.renderItems,
-            isLoadingOlderMessages = bodyParams.state.isLoadingOlderMessages,
-            context = ChatMessageListLazyContext(
-                itemState = params.itemState,
-                conversationId = params.conversationId,
-                chatMode = bodyParams.appearance.chatMode,
-                contentWidthPx = params.contentWidthPx,
-                density = params.density,
-                layoutDirection = params.layoutDirection,
-                activeFontScale = bodyParams.appearance.activeFontScale,
-                liveFontScale = bodyParams.liveFontScale,
-                newestMessageId = params.newestMessageId,
-                highlightedMessageId = bodyParams.highlightedMessageId,
-                itemGeometryState = bodyParams.itemGeometryState,
-                pinchFontScaleController = bodyParams.pinchFontScaleController,
-                scaleWindowIndexRange = bodyParams.scaleWindowIndexRange,
-                callbacks = params.renderCallbacks,
+            ChatMessageListItemsParams(
+                renderItems = bodyParams.renderItems,
+                isLoadingOlderMessages = bodyParams.state.isLoadingOlderMessages,
+                context = ChatMessageListLazyContext(
+                    itemState = params.itemState,
+                    conversationId = params.conversationId,
+                    chatMode = bodyParams.appearance.chatMode,
+                    contentWidthPx = params.contentWidthPx,
+                    density = params.density,
+                    layoutDirection = params.layoutDirection,
+                    activeFontScale = bodyParams.appearance.activeFontScale,
+                    liveFontScale = bodyParams.liveFontScale,
+                    newestMessageId = params.newestMessageId,
+                    highlightedMessageId = bodyParams.highlightedMessageId,
+                    itemGeometryState = bodyParams.itemGeometryState,
+                    pinchFontScaleController = bodyParams.pinchFontScaleController,
+                    scaleWindowIndexRange = bodyParams.scaleWindowIndexRange,
+                    callbacks = params.renderCallbacks,
+                ),
+                chatDimens = params.chatDimens,
+                chatShapes = params.chatShapes,
             ),
-            chatDimens = params.chatDimens,
-            chatShapes = params.chatShapes,
         )
     }
 }

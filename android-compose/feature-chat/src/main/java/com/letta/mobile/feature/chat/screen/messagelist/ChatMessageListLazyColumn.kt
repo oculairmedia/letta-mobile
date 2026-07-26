@@ -50,15 +50,18 @@ internal data class ChatMessageListLazyContext(
     val callbacks: ChatMessageRenderCallbacks,
 )
 
-internal fun LazyListScope.chatMessageListItems(
-    renderItems: List<ChatRenderItem>,
-    isLoadingOlderMessages: Boolean,
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    chatShapes: ChatShapes,
-) {
-    renderItems.forEachIndexed { index, renderItem ->
-        val prevDate = renderItems.getOrNull(index + 1)?.boundaryTimestamp?.take(10)
+@Immutable
+internal data class ChatMessageListItemsParams(
+    val renderItems: List<ChatRenderItem>,
+    val isLoadingOlderMessages: Boolean,
+    val context: ChatMessageListLazyContext,
+    val chatDimens: ChatDimens,
+    val chatShapes: ChatShapes,
+)
+
+internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsParams) {
+    params.renderItems.forEachIndexed { index, renderItem ->
+        val prevDate = params.renderItems.getOrNull(index + 1)?.boundaryTimestamp?.take(10)
         val currentDate = renderItem.boundaryTimestamp.take(10)
         val showDate = prevDate != null && prevDate != currentDate
 
@@ -71,9 +74,9 @@ internal fun LazyListScope.chatMessageListItems(
                 params = ChatMessageListRenderItemParams(
                     renderItem = renderItem,
                     index = index,
-                    context = context,
-                    chatDimens = chatDimens,
-                    chatShapes = chatShapes,
+                    context = params.context,
+                    chatDimens = params.chatDimens,
+                    chatShapes = params.chatShapes,
                 ),
             )
         }
@@ -92,7 +95,7 @@ internal fun LazyListScope.chatMessageListItems(
         }
     }
 
-    if (isLoadingOlderMessages) {
+    if (params.isLoadingOlderMessages) {
         item(key = "older-loading") {
             Box(
                 modifier = Modifier
