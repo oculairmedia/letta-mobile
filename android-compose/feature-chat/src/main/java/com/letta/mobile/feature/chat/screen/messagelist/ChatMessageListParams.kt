@@ -18,7 +18,11 @@ internal data class ChatMessageListCallbacks(
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
-)
+) {
+    /** User-facing name for the historical rerun callback. */
+    val onSendAgainMessage: (UiMessage) -> Unit
+        get() = onRerunMessage
+}
 
 internal data class ChatMessageListAppearance(
     val chatMode: String,
@@ -37,7 +41,11 @@ internal data class ChatMessageRenderCallbacks(
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
-)
+) {
+    /** User-facing name for the historical rerun callback. */
+    val onSendAgainMessage: (UiMessage) -> Unit
+        get() = onRerunMessage
+}
 
 internal data class ChatMessageListEffectsParams(
     val state: com.letta.mobile.ui.chat.render.ChatUiState,

@@ -1,8 +1,11 @@
 package com.letta.mobile.feature.chat.screen
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -39,6 +43,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.letta.mobile.feature.chat.R
@@ -48,6 +53,8 @@ import com.letta.mobile.data.model.SlashCommand
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ToolAffordanceRow
+import com.letta.mobile.ui.components.rememberFloatingControlPressScale
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.components.audio.HoldToDictateButton
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
@@ -61,6 +68,7 @@ import com.letta.mobile.ui.chat.render.buildToolCallTemplate
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
 internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
+private val ChatComposerActionTargetSize = 48.dp
 private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
 private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 private val ChatComposerInputVerticalPadding = LettaSpacing.XS
@@ -74,6 +82,37 @@ internal object ChatComposerTestTags {
     const val ATTACHMENT_PREVIEW_DIALOG = "chat-composer-attachment-preview-dialog"
     const val ATTACHMENT_PREVIEW_IMAGE = "chat-composer-attachment-preview-image"
 }
+
+private data class ChatComposerUiModel(
+    val inputText: String,
+    val pendingAttachments: ImmutableList<MessageContentPart.Image>,
+    val isStreaming: Boolean,
+    val canSendMessages: Boolean,
+    val slashCommands: ImmutableList<SlashCommand>,
+    val availableTools: List<Tool>,
+)
+
+private data class ChatComposerCallbacks(
+    val onTextChange: (String) -> Unit,
+    val onSend: (String) -> Unit,
+    val onStop: () -> Unit,
+    val onRemoveAttachment: (Int) -> Unit,
+    val onAttachImage: () -> Unit,
+    val onSlashCommandSelected: (SlashCommand) -> Unit,
+    val onSlashCommandUninstall: (SlashCommand) -> Unit,
+)
+
+private data class ChatComposerVoice(
+    val viewModel: VoiceInputViewModel?,
+    val state: VoiceInputUiState,
+    val enabled: Boolean,
+)
+
+private data class ChatComposerInputState(
+    val model: ChatComposerUiModel,
+    val voice: ChatComposerVoice,
+    val showAction: Boolean,
+)
 
 /**
  * The chat input composer: text bar + staged attachment thumbnails + attach
@@ -97,11 +136,41 @@ internal fun ChatComposer(
     onSlashCommandUninstall: (SlashCommand) -> Unit = {},
     availableTools: List<Tool> = emptyList(),
 ) {
-    val hasSendableContent = inputText.isNotBlank() || pendingAttachments.isNotEmpty()
-    val canSend = !isStreaming && canSendMessages && hasSendableContent
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
+    val model = ChatComposerUiModel(
+        inputText = inputText,
+        pendingAttachments = pendingAttachments,
+        isStreaming = isStreaming,
+        canSendMessages = canSendMessages,
+        slashCommands = slashCommands,
+        availableTools = availableTools,
+    )
+    val callbacks = ChatComposerCallbacks(
+        onTextChange = onTextChange,
+        onSend = onSend,
+        onStop = onStop,
+        onRemoveAttachment = onRemoveAttachment,
+        onAttachImage = onAttachImage,
+        onSlashCommandSelected = onSlashCommandSelected,
+        onSlashCommandUninstall = onSlashCommandUninstall,
+    )
+    ChatComposerContent(
+        model = model,
+        callbacks = callbacks,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ChatComposerContent(
+    model: ChatComposerUiModel,
+    callbacks: ChatComposerCallbacks,
+    modifier: Modifier,
+) {
     var previewAttachment by remember { mutableStateOf<MessageContentPart.Image?>(null) }
+    var showComposerActions by remember { mutableStateOf(false) }
+    val onToolSelected: (Tool) -> Unit = { tool ->
+        callbacks.onTextChange(appendToolCallTemplate(model.inputText, buildToolCallTemplate(tool)))
+    }
 
     // letta-mobile-xtwt: defer to the IME's own Send action while the soft
     // keyboard is open and there's nothing in flight. The composer's trailing
@@ -110,7 +179,7 @@ internal fun ChatComposer(
     // button visible while streaming so the morphed Stop affordance stays
     // reachable even with the keyboard up.
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val showAction = isStreaming || !keyboardOpen
+    val showAction = model.isStreaming || !keyboardOpen
 
     // letta-mobile-rl0d (audio): swap the Send/Stop button for a
     // HoldToDictateButton when the field is empty. Voice path stays
@@ -126,125 +195,47 @@ internal fun ChatComposer(
     // uses ComponentActivity, not HiltTestActivity), so hiltViewModel()
     // would throw IllegalStateException. In those contexts we silently
     // skip the voice affordance — production always has the Hilt host.
-    val activity = LocalContext.current as? android.app.Activity
-    val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
-    val voiceVm: VoiceInputViewModel? = if (isHiltHost) hiltViewModel() else null
-    val voiceState by (voiceVm?.uiState ?: remember { MutableStateFlow(VoiceInputUiState()) })
-        .collectAsState()
-    val useVoice = voiceVm != null && !isStreaming && canSendMessages && !hasSendableContent
+    val voice = rememberChatComposerVoice(model)
 
     Column(modifier = modifier.fillMaxWidth()) {
         // letta-mobile-ihuz: tool-affordance chips above the input when the
         // composer is empty AND the active agent has tools. Hides as soon as
         // the user starts typing — gated by composable visibility (no flicker).
-        if (inputText.isBlank() && pendingAttachments.isEmpty() && availableTools.isNotEmpty()) {
-            ToolAffordanceRow(
-                tools = availableTools,
-                onToolSelected = { tool -> onTextChange(buildToolCallTemplate(tool)) },
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
+        ChatComposerContextRows(
+            model = model,
+            callbacks = callbacks,
+            onToolSelected = onToolSelected,
+            onPreviewAttachment = { previewAttachment = it },
+        )
 
-        val slashQuery = inputText.trimStart()
-        val matchingSlashCommands = if (slashQuery.startsWith("/")) {
-            slashCommands
-                .filter { command -> command.command.startsWith(slashQuery) }
-                .take(8)
-        } else {
-            emptyList()
-        }
-        if (matchingSlashCommands.isNotEmpty()) {
-            SlashCommandSuggestionRow(
-                commands = matchingSlashCommands,
-                onSelected = onSlashCommandSelected,
-                onUninstall = onSlashCommandUninstall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
-
-        if (pendingAttachments.isNotEmpty()) {
-            AttachmentStrip(
-                attachments = pendingAttachments,
-                onRemove = onRemoveAttachment,
-                onPreview = { previewAttachment = it },
-            )
-        }
-
-        LettaInputBar(
-            text = inputText,
-            onTextChange = onTextChange,
-            placeholder = stringResource(R.string.screen_chat_input_hint),
-            sendContentDescription = stringResource(R.string.action_send_message),
-            enabled = canSendMessages,
-            canSendOverride = if (isStreaming) true else canSend,
-            actionIcon = if (isStreaming) LettaIcons.Close else LettaIcons.Send,
-            actionContentDescription = if (isStreaming) {
-                stringResource(R.string.action_stop_run)
-            } else {
-                stringResource(R.string.action_send_message)
-            },
-            actionContainerColor = if (isStreaming) MaterialTheme.colorScheme.errorContainer else null,
-            actionContentColor = if (isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
-            actionSizeFraction = if (isStreaming) 0.7f else 1f,
-            actionPulse = isStreaming,
-            actionVisible = showAction || useVoice,
-            customTrailingContent = if (useVoice && voiceVm != null) {
-                {
-                    HoldToDictateButton(
-                        isRecognizing = voiceState.recognizing,
-                        onStart = {
-                            voiceVm.startSpeechRecognition(
-                                onDone = { dictated ->
-                                    if (dictated.isNotBlank()) {
-                                        val merged = if (inputText.isBlank()) {
-                                            dictated
-                                        } else {
-                                            "$inputText $dictated"
-                                        }
-                                        onTextChange(merged)
-                                    }
-                                },
-                            )
-                        },
-                        onStop = voiceVm::stopSpeechRecognition,
-                        onCancel = voiceVm::cancelSpeechRecognition,
-                    )
-                }
-            } else null,
-            contentPadding = PaddingValues(
-                horizontal = ChatComposerInputHorizontalPadding,
-                vertical = ChatComposerInputVerticalPadding,
+        ChatComposerInput(
+            state = ChatComposerInputState(
+                model = model,
+                voice = voice,
+                showAction = showAction,
             ),
-            itemSpacing = ChatComposerInputItemSpacing,
-            leadingContent = {
-                Surface(
-                    onClick = {
-                        HapticEffects.contextClick(haptic, view)
-                        onAttachImage()
-                    },
-                    modifier = Modifier.size(ChatComposerAttachButtonSize),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            LettaIcons.Add,
-                            contentDescription = stringResource(R.string.action_attach_image),
-                            modifier = Modifier.size(ChatComposerAttachIconSize),
-                        )
-                    }
-                }
-            },
-            onSend = { text ->
-                if (isStreaming) {
-                    onStop()
-                } else {
-                    onSend(text)
-                }
-            },
+            callbacks = callbacks,
+            onOpenActions = { showComposerActions = true },
         )
     }
+
+    ChatComposerActionSheet(
+        state = ChatComposerActionSheetState(
+            show = showComposerActions,
+            availableTools = model.availableTools,
+        ),
+        callbacks = ChatComposerActionSheetCallbacks(
+            onDismiss = { showComposerActions = false },
+            onAttachImage = {
+                showComposerActions = false
+                callbacks.onAttachImage()
+            },
+            onToolSelected = { tool ->
+                showComposerActions = false
+                onToolSelected(tool)
+            },
+        ),
+    )
 
     previewAttachment?.let { image ->
         AttachmentPreviewDialog(
@@ -252,6 +243,208 @@ internal fun ChatComposer(
             onDismiss = { previewAttachment = null },
         )
     }
+}
+
+@Composable
+private fun rememberChatComposerVoice(model: ChatComposerUiModel): ChatComposerVoice {
+    val activity = LocalContext.current as? android.app.Activity
+    val isHiltHost = activity is dagger.hilt.internal.GeneratedComponentManager<*>
+    val viewModel: VoiceInputViewModel? = if (isHiltHost) hiltViewModel() else null
+    val state by (viewModel?.uiState ?: remember { MutableStateFlow(VoiceInputUiState()) })
+        .collectAsState()
+    val hasSendableContent = model.inputText.isNotBlank() || model.pendingAttachments.isNotEmpty()
+    return ChatComposerVoice(
+        viewModel = viewModel,
+        state = state,
+        enabled = viewModel != null &&
+            !model.isStreaming &&
+            model.canSendMessages &&
+            !hasSendableContent,
+    )
+}
+
+@Composable
+private fun ChatComposerContextRows(
+    model: ChatComposerUiModel,
+    callbacks: ChatComposerCallbacks,
+    onToolSelected: (Tool) -> Unit,
+    onPreviewAttachment: (MessageContentPart.Image) -> Unit,
+) {
+    if (model.inputText.isBlank() &&
+        model.pendingAttachments.isEmpty() &&
+        model.availableTools.isNotEmpty()
+    ) {
+        ToolAffordanceRow(
+            tools = model.availableTools,
+            onToolSelected = onToolSelected,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+    }
+
+    val slashCommands = matchingSlashCommands(model.inputText, model.slashCommands)
+    if (slashCommands.isNotEmpty()) {
+        SlashCommandSuggestionRow(
+            commands = slashCommands,
+            onSelected = callbacks.onSlashCommandSelected,
+            onUninstall = callbacks.onSlashCommandUninstall,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
+    }
+
+    if (model.pendingAttachments.isNotEmpty()) {
+        AttachmentStrip(
+            attachments = model.pendingAttachments,
+            onRemove = callbacks.onRemoveAttachment,
+            onPreview = onPreviewAttachment,
+        )
+    }
+}
+
+private fun matchingSlashCommands(
+    inputText: String,
+    slashCommands: List<SlashCommand>,
+): List<SlashCommand> {
+    val query = inputText.trimStart()
+    return if (query.startsWith("/")) {
+        slashCommands.filter { it.command.startsWith(query) }.take(8)
+    } else {
+        emptyList()
+    }
+}
+
+@Composable
+private fun ChatComposerInput(
+    state: ChatComposerInputState,
+    callbacks: ChatComposerCallbacks,
+    onOpenActions: () -> Unit,
+) {
+    val model = state.model
+    val hasSendableContent = model.inputText.isNotBlank() || model.pendingAttachments.isNotEmpty()
+    val canSend = !model.isStreaming && model.canSendMessages && hasSendableContent
+    LettaInputBar(
+        text = model.inputText,
+        onTextChange = callbacks.onTextChange,
+        placeholder = stringResource(R.string.screen_chat_input_hint),
+        sendContentDescription = stringResource(R.string.action_send_message),
+        enabled = model.canSendMessages,
+        canSendOverride = if (model.isStreaming) true else canSend,
+        actionIcon = if (model.isStreaming) LettaIcons.Close else LettaIcons.Send,
+        actionContentDescription = if (model.isStreaming) {
+            stringResource(R.string.action_stop_run)
+        } else {
+            stringResource(R.string.action_send_message)
+        },
+        actionContainerColor = if (model.isStreaming) MaterialTheme.colorScheme.errorContainer else null,
+        actionContentColor = if (model.isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
+        actionSizeFraction = if (model.isStreaming) 0.7f else 1f,
+        actionPulse = model.isStreaming,
+        actionVisible = state.showAction || state.voice.enabled,
+        hasStagedContent = model.pendingAttachments.isNotEmpty(),
+        customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
+        contentPadding = PaddingValues(
+            horizontal = ChatComposerInputHorizontalPadding,
+            vertical = ChatComposerInputVerticalPadding,
+        ),
+        itemSpacing = ChatComposerInputItemSpacing,
+        leadingContent = {
+            ChatComposerAddButton(
+                hasTools = model.availableTools.isNotEmpty(),
+                onAttachImage = callbacks.onAttachImage,
+                onOpenActions = onOpenActions,
+            )
+        },
+        onSend = { text ->
+            if (model.isStreaming) callbacks.onStop() else callbacks.onSend(text)
+        },
+    )
+}
+
+private fun voiceTrailingContent(
+    model: ChatComposerUiModel,
+    callbacks: ChatComposerCallbacks,
+    voice: ChatComposerVoice,
+): (@Composable () -> Unit)? {
+    val viewModel = voice.viewModel ?: return null
+    if (!voice.enabled) return null
+    return {
+        HoldToDictateButton(
+            isRecognizing = voice.state.recognizing,
+            onStart = {
+                viewModel.startSpeechRecognition { dictated ->
+                    if (dictated.isNotBlank()) {
+                        val merged = if (model.inputText.isBlank()) dictated else "${model.inputText} $dictated"
+                        callbacks.onTextChange(merged)
+                    }
+                }
+            },
+            onStop = viewModel::stopSpeechRecognition,
+            onCancel = viewModel::cancelSpeechRecognition,
+        )
+    }
+}
+
+@Composable
+private fun ChatComposerAddButton(
+    hasTools: Boolean,
+    onAttachImage: () -> Unit,
+    onOpenActions: () -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressScale = rememberFloatingControlPressScale(
+        interactionSource = interactionSource,
+        reducedMotion = rememberReducedMotionEnabled(),
+    )
+    Box(
+        modifier = Modifier
+            .size(ChatComposerActionTargetSize)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                role = Role.Button,
+                onClick = {
+                    HapticEffects.contextClick(haptic, view)
+                    if (hasTools) onOpenActions() else onAttachImage()
+                },
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            modifier = Modifier
+                .size(ChatComposerAttachButtonSize)
+                .graphicsLayer {
+                    scaleX = pressScale
+                    scaleY = pressScale
+                },
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    LettaIcons.Add,
+                    contentDescription = stringResource(
+                        if (hasTools) {
+                            R.string.composer_actions_open
+                        } else {
+                            R.string.action_attach_image
+                        },
+                    ),
+                    modifier = Modifier.size(ChatComposerAttachIconSize),
+                )
+            }
+        }
+    }
+}
+
+internal fun appendToolCallTemplate(
+    draft: String,
+    template: String,
+): String = when {
+    draft.isBlank() -> template
+    draft.last().isWhitespace() -> draft + template
+    else -> "$draft $template"
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
