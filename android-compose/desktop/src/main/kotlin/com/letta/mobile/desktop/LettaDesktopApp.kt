@@ -41,6 +41,13 @@ import com.letta.mobile.desktop.chat.DesktopCommandPalette
 import com.letta.mobile.desktop.chat.DesktopModelPickerSheet
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import com.letta.mobile.desktop.agent.DesktopEditAgentSurface
+import com.letta.mobile.desktop.home.DesktopHomeActions
+import com.letta.mobile.desktop.home.DesktopHomeState
+import com.letta.mobile.desktop.home.FleetOverviewParams
+import com.letta.mobile.desktop.home.FleetSort
+import com.letta.mobile.desktop.home.buildFleetOverview
+import com.letta.mobile.desktop.home.preferredComposerConversationId
+import com.letta.mobile.desktop.home.toggled
 import com.letta.mobile.desktop.agent.agentAvatarStyleKey
 import com.letta.mobile.data.commands.AgentSlashCommand
 import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
@@ -69,7 +76,9 @@ internal fun LettaDesktopApp(
     val window = shell.window
     val deepLinks = shell.deepLinks
     val quickQuery = shell.quickQuery
-    var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
+    // Launch on the fleet dashboard: it is the only view that says something
+    // before a conversation is selected.
+    var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Home) }
     // Spotify-style library toggle: icon rail ↔ expanded names-and-spaces list.
     var railExpanded by rememberSaveable { mutableStateOf(false) }
     val overlays = remember { DesktopOverlayVisibility() }
@@ -315,6 +324,56 @@ internal fun LettaDesktopApp(
             fallback = selectedAgentName,
         ),
     )
+    // Home dashboard state: folded entirely from state the shell already holds
+    // (conversations + roster + who is mid-run) — no extra repositories.
+    var homeSort by remember { mutableStateOf(FleetSort()) }
+    val runningAgentIds = remember(thinkingAgentId, activeSubagents) {
+        buildSet {
+            thinkingAgentId?.let(::add)
+            activeSubagents
+                .filter { it.status == SubagentStatus.RUNNING }
+                .forEach { entry -> entry.subagentAgentId?.let(::add) }
+        }
+    }
+    val fleetOverview = remember(chatState.conversations, rosterAgents, runningAgentIds) {
+        buildFleetOverview(
+            FleetOverviewParams(
+                conversations = chatState.conversations,
+                rosterAgents = rosterAgents,
+                runningAgentIds = runningAgentIds,
+            ),
+        )
+    }
+    val homeOrbIndexes = remember(railAgents, avatarStyleByAgentId) {
+        railAgents
+            .mapIndexed { index, (id, _) -> id to (avatarStyleByAgentId[id] ?: index) }
+            .toMap()
+    }
+    val homeState = DesktopHomeState(
+        overview = fleetOverview,
+        sort = homeSort,
+        orbIndexByAgentId = homeOrbIndexes,
+        composerPlaceholder = WorkPlayLens.composerPlaceholder(workPlayMode, selectedAgentName),
+    )
+    // Home's chatbox reuses the shell's chat pipeline rather than owning a
+    // second one: pick the conversation the prompt belongs to (focused agent's
+    // newest, else the fleet's newest), hand the text to the controller's
+    // select-then-send path, and follow it to the chat pane. With no
+    // conversation at all the text is staged in the real composer instead of
+    // being dropped.
+    fun submitHomePrompt(text: String) {
+        val prompt = text.trim()
+        if (prompt.isEmpty()) return
+        editAgentId = null
+        val target = preferredComposerConversationId(chatState.conversations, selectedAgentId)
+        if (target != null) {
+            chatController.replyFromNotification(target, prompt)
+        } else {
+            chatController.updateComposerText(prompt)
+        }
+        selectedDestination = DesktopDestination.Conversations
+    }
+
     DesktopNucleusEffects(
         bindings = DesktopNucleusEffectBindings(
             applicationScope = nucleusApplicationScope,
@@ -561,6 +620,7 @@ internal fun LettaDesktopApp(
                             destination = selectedDestination,
                             inputs = DestinationContentInputs(
                                 state = bootstrapState,
+                                home = homeState,
                                 memoryState = memoryState,
                                 schedule = DestinationScheduleInputs(
                                     scheduleLibraryState = scheduleLibraryState,
@@ -586,6 +646,18 @@ internal fun LettaDesktopApp(
                                 nucleus = nucleusState,
                             ),
                             actions = DestinationContentActions(
+                                home = DesktopHomeActions(
+                                    onSortKeySelected = { homeSort = homeSort.toggled(it) },
+                                    // Reuse the shell's single "open this agent"
+                                    // pathway so Home behaves like the rail.
+                                    onOpenAgent = ::openAgent,
+                                    onOpenConversation = { conversationId ->
+                                        editAgentId = null
+                                        chatController.selectConversation(conversationId)
+                                        selectedDestination = DesktopDestination.Conversations
+                                    },
+                                    onSubmitPrompt = ::submitHomePrompt,
+                                ),
                                 memory = DestinationMemoryActions(
                                     onRefresh = libraries.memory::reload,
                                     onAgentSelected = libraries.memory::selectAgent,

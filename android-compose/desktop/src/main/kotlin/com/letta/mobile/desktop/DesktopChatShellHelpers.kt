@@ -157,17 +157,32 @@ internal fun buildRailAgents(
     conversations: List<DesktopConversationSummary>,
     rosterAgents: List<Agent>,
 ): List<Pair<String, String>> {
+    // A conversation's agentName can be a raw agent id when name resolution
+    // missed at conversation-load time; the roster often has the real name by
+    // now (refreshAgentsIfStale), so prefer whichever source has an actual
+    // name instead of parroting the id.
+    val rosterNameById = rosterAgents
+        .filter { it.name.isNotBlank() }
+        .associate { it.id.value to it.name }
     val fromConversations = conversations
         .sortedByDescending { conversationRecency(it.updatedAtLabel) }
         .filter { !it.agentId.isNullOrBlank() }
         .distinctBy { it.agentId }
-        .map { it.agentId!! to it.agentName }
+        .map { conversation ->
+            val id = conversation.agentId!!
+            val conversationName = conversation.agentName.takeIf { it.isNotBlank() && it != id }
+            id to (conversationName ?: rosterNameById[id] ?: conversation.agentName.ifBlank { id })
+        }
     val seenIds = fromConversations.mapTo(mutableSetOf()) { it.first }
     val fromRoster = rosterAgents
         .filter { it.id.value !in seenIds }
         .map { it.id.value to it.name.ifBlank { it.id.value } }
         .sortedBy { it.second.lowercase() }
-    return fromConversations + fromRoster
+    // Final dedupe by id: the server can return the same row twice in list
+    // endpoints during active runs (same defect as the conversation-list
+    // fan-out), and a duplicated roster agent crashes every LazyColumn that
+    // keys rows by agent id (e.g. the New Conversation directory).
+    return (fromConversations + fromRoster).distinctBy { it.first }
 }
 
 /**
@@ -222,7 +237,10 @@ internal fun filterStackConversations(
         // Normal agent: unchanged display-name membership over ungrouped convs.
         grouping.ungrouped.filter { it.agentName == selectedAgentName }
     }
-    return members.applyArchiveFilterNewestFirst(archiveFilter)
+    // Dedupe by id: the server can hand back the same conversation twice while
+    // a run is active on it, and the sidebar LazyColumn keys rows by id — a
+    // duplicate is an instant crash (seen live: Key "conv-…" already used).
+    return members.distinctBy { it.id }.applyArchiveFilterNewestFirst(archiveFilter)
 }
 
 /** Apply the active/archived/all filter and sort newest-first. */
@@ -299,7 +317,10 @@ internal fun buildPaletteItems(
             ),
         )
     }
-}
+}.distinctBy { it.kind to it.id }
+// ^ Palette LazyColumns key rows by "$kind-$id"; server list endpoints can
+// duplicate rows during active runs, and a duplicated item is an instant
+// crash (seen live: Key "qq-Agent-agent-…" already used).
 
 /**
  * Composer "/" palette: local navigation commands plus the focused agent's

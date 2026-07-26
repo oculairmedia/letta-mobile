@@ -1,5 +1,13 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,6 +21,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,23 +46,112 @@ import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.desktop.components.DesktopChipTab
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 
+/**
+ * Sidebar header: the home button, then the title slot, then the agent's kebab.
+ *
+ * The title slot is shared — normally the focused agent (orb + name, tap to
+ * edit), and "Home" while the fleet page is open. Home is entered from the icon
+ * here rather than from a nav row, so the nav list below stays purely per-agent.
+ */
 @Composable
 internal fun SidebarAgentHeader(
     state: DesktopAgentSidebarState,
     actions: DesktopAgentSidebarActions,
 ) {
+    val home = state.selectedDestination == DesktopDestination.Home
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.padding(start = 2.dp, bottom = 16.dp),
     ) {
-        SidebarAgentIdentity(
-            agentOrbIndex = state.agentOrbIndex,
-            agentName = state.agentName,
+        SidebarHomeButton(
+            selected = home,
+            onClick = { actions.onDestinationSelected(DesktopDestination.Home) },
+        )
+        SidebarHeaderTitleSlot(
+            state = state,
             onEditAgent = actions.onEditAgent,
             modifier = Modifier.weight(1f),
         )
-        SidebarAgentOverflowMenu(actions = actions)
+        // The kebab is the *agent's* menu; it has nothing to act on while Home
+        // is showing, so it goes away with the agent identity.
+        if (!home) SidebarAgentOverflowMenu(actions = actions)
+    }
+}
+
+@Composable
+private fun SidebarHomeButton(selected: Boolean, onClick: () -> Unit) {
+    DesktopTooltip(text = "Home") {
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(RoundedCornerShape(7.dp))
+                .background(
+                    if (selected) {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    } else {
+                        Color.Transparent
+                    },
+                )
+                .clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Home,
+                contentDescription = "Home",
+                tint = if (selected) {
+                    MaterialTheme.colorScheme.onSurface
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.size(17.dp),
+            )
+        }
+    }
+}
+
+/**
+ * Cross-fades the agent identity and the "Home" title in the same slot: the new
+ * title slides up into place while the old one slides out, so the swap reads as
+ * one control changing context rather than two widgets toggling.
+ */
+@Composable
+private fun SidebarHeaderTitleSlot(
+    state: DesktopAgentSidebarState,
+    onEditAgent: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedContent(
+        targetState = state.selectedDestination == DesktopDestination.Home,
+        transitionSpec = {
+            val duration = 180
+            (
+                slideInVertically(animationSpec = tween(duration)) { height -> height / 2 } +
+                    fadeIn(animationSpec = tween(duration))
+                ) togetherWith (
+                slideOutVertically(animationSpec = tween(duration)) { height -> -height / 2 } +
+                    fadeOut(animationSpec = tween(duration))
+                )
+        },
+        modifier = modifier,
+        label = "sidebarHeaderTitle",
+    ) { home ->
+        if (home) {
+            Text(
+                text = "Home",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        } else {
+            SidebarAgentIdentity(
+                agentOrbIndex = state.agentOrbIndex,
+                agentName = state.agentName,
+                onEditAgent = onEditAgent,
+            )
+        }
     }
 }
 
@@ -156,6 +255,8 @@ internal fun SidebarNavSection(
     state: DesktopAgentSidebarState,
     actions: DesktopAgentSidebarActions,
 ) {
+    // Every row here is scoped to the focused agent; fleet-wide Home is reached
+    // from the home icon in the header instead (see [SidebarAgentHeader]).
     WorkPlayLens.navDestinations(state.mode).forEach { lensDestination ->
         val target = lensNavTarget(state.mode, lensDestination)
         DesktopNavRow(

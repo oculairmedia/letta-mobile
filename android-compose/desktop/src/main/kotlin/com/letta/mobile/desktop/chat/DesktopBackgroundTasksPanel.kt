@@ -324,28 +324,24 @@ internal fun DesktopBackgroundTasksToggle(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        shadowElevation = 2.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+    // Icon-only: the labelled pill was wide enough to collide with the pinned
+    // prompt card; the tooltip carries the words (and the running count).
+    val tooltip = if (runningCount > 0) "Background tasks · $runningCount running" else "Background tasks"
+    com.letta.mobile.desktop.DesktopTooltip(text = tooltip) {
+        Surface(
+            onClick = onClick,
+            modifier = modifier,
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            shadowElevation = 2.dp,
         ) {
-            AgentActivityOrb(
-                size = 22.dp,
-                activity = if (runningCount > 0) AgentActivity.Working else AgentActivity.Idle,
-            )
-            Text(
-                text = if (runningCount > 0) "Background tasks · $runningCount" else "Background tasks",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-            )
+            Box(modifier = Modifier.padding(7.dp)) {
+                AgentActivityOrb(
+                    size = 22.dp,
+                    activity = if (runningCount > 0) AgentActivity.Working else AgentActivity.Idle,
+                )
+            }
         }
     }
 }

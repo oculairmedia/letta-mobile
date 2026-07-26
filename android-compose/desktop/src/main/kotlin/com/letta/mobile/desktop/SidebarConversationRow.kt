@@ -153,7 +153,9 @@ private fun SidebarConversationRowSurface(params: SidebarConversationRowSurfaceP
         interactionSource = interaction.interactionSource,
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 9.dp),
+            // Tight vertical rhythm: borderless rows read as sparse gaps when
+            // padded generously, so the list looked full of holes at 9dp.
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             horizontalArrangement = Arrangement.spacedBy(9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
