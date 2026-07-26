@@ -771,6 +771,29 @@ class AppServerTurnEngine(
                                     userInputApprovalIdsRef.update { map -> map - it }
                                 }
                             }
+                            // letta-mobile-vilsn.7: some App Server transports deliver
+                            // the tool-call approval as a StreamDelta
+                            // approval_request_message (RemoteStreamFrame) rather than
+                            // a ControlRequest (which maps to ApprovalRequested above).
+                            // That path bypassed gate registration entirely, so a
+                            // parked AskUserQuestion/ExitPlanMode arriving this way was
+                            // never added to userInputApprovalIdsRef: the idle watchdog
+                            // was not paused (vilsn.6) and the submit path could not
+                            // recover the real can_use_tool request id via
+                            // consumeUserInputApprovalId. Register it here exactly like
+                            // the ApprovalRequested branch does.
+                            if (payload.messageType == "approval_request_message") {
+                                val approval = draft.toApprovalAutoAllowRequest()
+                                val callId = approval?.toolCallId
+                                if (approval != null &&
+                                    callId != null &&
+                                    RuntimeUserInputTools.requiresUserInput(approval.toolName)
+                                ) {
+                                    userInputApprovalIdsRef.update { map ->
+                                        map + (callId to approval.requestId)
+                                    }
+                                }
+                            }
                         }
                         else -> {}
                     }

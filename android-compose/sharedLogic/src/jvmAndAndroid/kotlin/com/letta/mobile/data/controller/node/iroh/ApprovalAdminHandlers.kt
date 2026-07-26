@@ -79,6 +79,20 @@ object ApprovalAdminHandlers {
         }
 
         if (toolCallIds.isEmpty()) throw IllegalArgumentException("tool_call_id required")
+        // letta-mobile-vilsn.8: the shim's `v1/approvals/{run_id}/decision` REST
+        // endpoint only accepts decision/scope/reason — it has no updated_input
+        // field. If we reach this fallback (no live controller, or the controller
+        // submit above failed) with a structured answer to deliver, silently
+        // posting a bare decision would report success while actually
+        // closing an AskUserQuestion/ExitPlanMode call with no answer, stalling
+        // the agent on a placeholder. Fail loudly instead of lying about it.
+        if (approve && updatedInput != null) {
+            throw IllegalStateException(
+                "cannot deliver a structured answer (updated_input) through the shim " +
+                    "approvals decision fallback — no live AppServer controller available " +
+                    "for this submission",
+            )
+        }
         val pending = api.get(AdminPath.shim("v1", "approvals", "pending")) {
             query("agent_id", agentId)
         }.jsonObject["pending"]?.jsonArray.orEmpty()
