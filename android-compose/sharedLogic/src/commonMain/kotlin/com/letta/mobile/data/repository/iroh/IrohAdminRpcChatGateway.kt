@@ -177,6 +177,21 @@ class IrohAdminRpcChatGateway(
         // renders (older windows load via the existing before-cursor pager).
         val messagesElement = (result as? kotlinx.serialization.json.JsonObject)
             ?.get("messages") ?: result
+        // letta-mobile-w9k3f: if the body is an object WITHOUT a `messages` array, the
+        // `?: result` above hands the object itself to a ListSerializer, which throws
+        // "Expected JsonArray, but had JsonObject" — hydration then fails and the
+        // conversation renders empty with nothing naming the offending shape. Log the
+        // shape (keys only, never values — this is conversation content) before the
+        // decode so the producing tier is identifiable from a device log.
+        if (messagesElement is kotlinx.serialization.json.JsonObject) {
+            Telemetry.event(
+                "IrohGate", "message_list.unexpected_object_shape",
+                "conversationId" to conversationId,
+                "keyCount" to messagesElement.size,
+                "keys" to messagesElement.keys.sorted().take(12).joinToString(","),
+                level = Telemetry.Level.WARN,
+            )
+        }
         return json.decodeFromJsonElement(ListSerializer(LettaMessage.serializer()), messagesElement)
     }
 
