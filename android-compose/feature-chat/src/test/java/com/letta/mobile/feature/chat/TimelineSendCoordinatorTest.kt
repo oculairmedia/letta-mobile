@@ -36,7 +36,7 @@ class TimelineSendCoordinatorTest {
         assertEquals("new-conv", harness.activeConversationId)
         assertEquals(ConversationState.Ready("new-conv"), harness.uiState.value.conversationState)
         assertEquals(listOf("new-conv"), harness.startedObservers)
-        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("new-conv", "hello") }
+        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("agent-1", "new-conv", "hello") }
     }
 
     @Test
@@ -51,8 +51,8 @@ class TimelineSendCoordinatorTest {
         coVerify(exactly = 1) {
             harness.conversationRepository.updateConversation(ConversationId("conv-1"), AgentId("agent-1"), "first")
         }
-        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("conv-1", "first") }
-        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("conv-1", "second") }
+        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("agent-1", "conv-1", "first") }
+        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("agent-1", "conv-1", "second") }
     }
 
     @Test
@@ -64,7 +64,7 @@ class TimelineSendCoordinatorTest {
         advanceUntilIdle()
 
         assertEquals(1, harness.composerClearCount)
-        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("conv-1", "see image", listOf(image)) }
+        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("agent-1", "conv-1", "see image", listOf(image)) }
     }
 
     @Test
@@ -72,7 +72,7 @@ class TimelineSendCoordinatorTest {
         val harness = Harness(scope = this, activeConversationId = "stale-conv")
         coEvery { harness.conversationRepository.createConversation(AgentId("agent-1"), "hello") } returns
             TestData.conversation(id = "replacement-conv", agentId = "agent-1")
-        coEvery { harness.timelineRepository.sendMessage("stale-conv", "hello") } throws
+        coEvery { harness.timelineRepository.sendMessage("agent-1", "stale-conv", "hello") } throws
             ApiException(404, "Conversation not found with id='stale-conv'")
 
         harness.coordinator.send("hello")
@@ -81,13 +81,13 @@ class TimelineSendCoordinatorTest {
         assertEquals("replacement-conv", harness.activeConversationId)
         assertEquals(ConversationState.Ready("replacement-conv"), harness.uiState.value.conversationState)
         assertEquals(listOf("stale-conv", "replacement-conv"), harness.startedObservers)
-        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("replacement-conv", "hello") }
+        coVerify(exactly = 1) { harness.timelineRepository.sendMessage("agent-1", "replacement-conv", "hello") }
     }
 
     @Test
     fun `timeline send failure clears streaming flags`() = runTest {
         val harness = Harness(scope = this, activeConversationId = "conv-1")
-        coEvery { harness.timelineRepository.sendMessage("conv-1", "boom") } throws IllegalStateException("offline")
+        coEvery { harness.timelineRepository.sendMessage("agent-1", "conv-1", "boom") } throws IllegalStateException("offline")
 
         harness.coordinator.send("boom")
         advanceUntilIdle()
@@ -124,7 +124,6 @@ class TimelineSendCoordinatorTest {
         )
 
         init {
-            coEvery { timelineRepository.sendMessage(any<String>(), any<String>()) } returns "otid"
             coEvery { timelineRepository.sendMessage(any<String>(), any<String>(), any<String>()) } returns "otid"
             coEvery { timelineRepository.sendMessage(any<String>(), any<String>(), any<String>(), any()) } returns "otid"
             coEvery { conversationRepository.updateConversation(any<ConversationId>(), any<AgentId>(), any()) } returns Unit

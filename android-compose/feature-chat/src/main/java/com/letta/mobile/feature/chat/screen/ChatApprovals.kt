@@ -33,6 +33,9 @@ internal fun ApprovalRequestCard(
     isSubmitting: Boolean,
     onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
 ) {
+    // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion) render a
+    // structured question/answer card instead of the generic approve/reject card.
+    if (AskUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = stringResource(R.string.screen_chat_approval_request_title),
@@ -84,16 +87,21 @@ internal fun ApprovalRequestControls(
                 modifier = Modifier.padding(top = 4.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    text = stringResource(R.string.screen_chat_approval_request_body),
-                    style = MaterialTheme.chatTypography.toolDetail,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                ApprovalActionRow(
-                    approval = visibleApproval,
-                    isSubmitting = isSubmitting,
-                    onDecision = onDecision,
-                )
+                // letta-mobile-vilsn: structured question/answer card for
+                // runtime user-input tools (AskUserQuestion); falls back to the
+                // generic approve/reject controls otherwise.
+                if (!AskUserQuestionCard(approval = visibleApproval, isSubmitting = isSubmitting, onDecision = onDecision)) {
+                    Text(
+                        text = stringResource(R.string.screen_chat_approval_request_body),
+                        style = MaterialTheme.chatTypography.toolDetail,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    ApprovalActionRow(
+                        approval = visibleApproval,
+                        isSubmitting = isSubmitting,
+                        onDecision = onDecision,
+                    )
+                }
             }
         }
     }

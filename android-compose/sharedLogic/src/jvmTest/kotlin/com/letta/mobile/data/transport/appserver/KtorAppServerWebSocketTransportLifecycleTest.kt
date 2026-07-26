@@ -26,6 +26,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
@@ -63,10 +64,16 @@ class KtorAppServerWebSocketTransportLifecycleTest {
         }
         val transport = transport(port)
 
+        // Deflake: streamFrames is replay=0, so subscribe BEFORE asserting readiness
+        // — otherwise a frame emitted in the window between Ready and .first() is
+        // lost and the collector waits for the next 250ms tick (a snapshot-after-async
+        // race under CI load). Collecting first closes the window deterministically.
+        val streamFrameDeferred = async { withTimeout(TIMEOUT) { transport.streamFrames.first() } }
+
         withTimeout(TIMEOUT) { transport.connectionState.first { it == AppServerConnectionState.Ready } }
 
         // Stream-channel event is delivered to the transport.
-        val streamFrame = withTimeout(TIMEOUT) { transport.streamFrames.first() }
+        val streamFrame = streamFrameDeferred.await()
         assertIs<AppServerInboundFrame.UpdateLoopStatus>(streamFrame.frame)
 
         // Control-channel send reaches the server.

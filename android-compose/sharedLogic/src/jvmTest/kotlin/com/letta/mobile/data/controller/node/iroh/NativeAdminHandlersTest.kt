@@ -50,6 +50,9 @@ class NativeAdminHandlersTest {
 
     private class FakeNativeClient(
         var failNative: Boolean = false,
+        // Extra conversation ids the native conversation.list returns in addition
+        // to conv-1 — used to prove P3.4 cross-conversation scope filtering.
+        val extraConversationIds: List<String> = emptyList(),
     ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
         val calls = mutableListOf<String>()
@@ -118,7 +121,10 @@ class NativeAdminHandlersTest {
             AppServerInboundFrame.ConversationListResponse(
                 requestId = command.requestId,
                 success = true,
-                conversations = buildJsonArray { add(buildJsonObject { put("id", "conv-1") }) },
+                conversations = buildJsonArray {
+                    add(buildJsonObject { put("id", "conv-1") })
+                    extraConversationIds.forEach { convId -> add(buildJsonObject { put("id", convId) }) }
+                },
             ),
         )
 
@@ -224,6 +230,59 @@ class NativeAdminHandlersTest {
         // Unreachable shim -> failure, but no native calls were possible.
         assertTrue(response.contains("\"success\":false"))
         assertFalse(response.contains("native"))
+    }
+
+    @Test
+    fun conversationListFiltersCrossConversationMetadataForScopedPeer() = runTest {
+        // P3.4 (gn7kr.23): a lesser peer scoped to conv-1 must not learn that
+        // conv-2 exists via the agent-wide conversation.list metadata.
+        val client = FakeNativeClient(extraConversationIds = listOf("conv-2"))
+        val r = router(client)
+        val response = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "scope-list",
+                method = "conversation.list",
+                params = buildJsonObject { put("agent_id", "agent-1") },
+                context = AdminRpcRequestContext(authenticated = true, authorizedConversationIds = setOf("conv-1")),
+            ),
+        )
+        assertTrue(response.contains("\"success\":true"), "in-scope list still serves: $response")
+        assertTrue(response.contains("conv-1"), "authorized conversation must remain visible")
+        assertFalse(response.contains("conv-2"), "out-of-scope conversation metadata must be filtered out")
+    }
+
+    @Test
+    fun conversationListReturnsAllForUnrestrictedPeer() = runTest {
+        val client = FakeNativeClient(extraConversationIds = listOf("conv-2"))
+        val r = router(client)
+        val response = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "unrestricted-list",
+                method = "conversation.list",
+                params = buildJsonObject { put("agent_id", "agent-1") },
+                context = AdminRpcRequestContext(authenticated = true, authorizedConversationIds = null),
+            ),
+        )
+        assertTrue(response.contains("conv-1") && response.contains("conv-2"), "manage/admin peer sees the full list: $response")
+    }
+
+    @Test
+    fun conversationGetIsForbiddenCrossScopeAndAllowedInScope() = runTest {
+        val client = FakeNativeClient()
+        val r = router(client)
+        val restricted = AdminRpcRequestContext(authenticated = true, authorizedConversationIds = setOf("conv-mine"))
+
+        val denied = r.dispatch(
+            AdminRpcInvocation("get-deny", "conversation.get", buildJsonObject { put("conversation_id", "conv-other") }, restricted),
+        )
+        assertTrue(denied.contains("\"success\":false"), "cross-scope conversation.get must fail")
+        assertTrue(denied.contains("out of authorized scope"), "must deny on scope")
+        assertFalse(denied.contains("conv-other"), "denial must not echo the target conversation")
+
+        val allowed = r.dispatch(
+            AdminRpcInvocation("get-ok", "conversation.get", buildJsonObject { put("conversation_id", "conv-mine") }, restricted),
+        )
+        assertTrue(allowed.contains("\"success\":true"), "in-scope conversation.get serves natively: $allowed")
     }
 
     @Test

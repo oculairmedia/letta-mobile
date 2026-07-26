@@ -18,7 +18,9 @@ import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import com.letta.mobile.desktop.data.DesktopDataBindings
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
 import com.letta.mobile.desktop.data.DesktopWsChannelTransport
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
 
 internal const val DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS = 30_000L
@@ -91,8 +93,24 @@ private suspend fun connectSubagentTransport(transport: DesktopWsChannelTranspor
 
 private data class DesktopTransportLifecycleHooks<T>(
     val onConnect: suspend (T, LettaConfig) -> Unit,
-    val onDisposeTransport: (T) -> Unit,
+    /** Suspending so teardown can be ordered after the connect job unwinds. */
+    val onDisposeTransport: suspend (T) -> Unit,
 )
+
+/**
+ * Runs [block], letting cancellation propagate. `runCatching` must not be used
+ * around suspending work: it swallows [CancellationException] and breaks
+ * structured cancellation.
+ */
+private suspend fun runIgnoringFailures(block: suspend () -> Unit) {
+    try {
+        block()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        // Connect/disconnect failures surface through transport state.
+    }
+}
 
 private data class DesktopTransportLifecycleRequest<T>(
     val transport: T?,
@@ -105,10 +123,21 @@ private data class DesktopTransportLifecycleRequest<T>(
 private fun <T> DesktopTransportLifecycleEffect(request: DesktopTransportLifecycleRequest<T>) {
     DisposableEffect(request.transport, request.activeConfig) {
         val active = request.transport
-        if (active != null) {
-            request.chatScope.launch { runCatching { request.hooks.onConnect(active, request.activeConfig) } }
+        // Own the connect job so disposal can cancel an in-flight connect and
+        // wait for it to unwind. Otherwise a rapid key change lets connect
+        // complete AFTER disconnect, leaving a live transport nobody closes.
+        val connectJob = active?.let { transport ->
+            request.chatScope.launch {
+                runIgnoringFailures { request.hooks.onConnect(transport, request.activeConfig) }
+            }
         }
-        onDispose { active?.let(request.hooks.onDisposeTransport) }
+        onDispose {
+            if (active == null) return@onDispose
+            request.chatScope.launch {
+                connectJob?.cancelAndJoin()
+                runIgnoringFailures { request.hooks.onDisposeTransport(active) }
+            }
+        }
     }
 }
 
@@ -127,7 +156,7 @@ internal fun rememberIrohTransport(
             chatScope = chatScope,
             hooks = DesktopTransportLifecycleHooks(
                 onConnect = ::connectIrohTransport,
-                onDisposeTransport = { t -> chatScope.launch { runCatching { t.disconnect() } } },
+                onDisposeTransport = { t -> t.disconnect() },
             ),
         ),
     )
@@ -153,7 +182,7 @@ internal fun rememberDesktopChatController(
     bindings: DesktopChatControllerBindings,
 ): DesktopChatController {
     val runtime = bindings.runtime
-    return remember(
+    val controller = remember(
         runtime.bootstrapState,
         runtime.chatScope,
         runtime.dataBindings.sessionGraphProvider,
@@ -161,6 +190,14 @@ internal fun rememberDesktopChatController(
     ) {
         buildDesktopChatController(bindings)
     }
+    // Closing the superseded controller is what cancels its send/select/
+    // timeline/presence jobs and closes its gateway + timeline loop. Without
+    // this, a transport or backend switch leaves the old controller streaming
+    // alongside the new one for the life of the app.
+    DisposableEffect(controller) {
+        onDispose { controller.close() }
+    }
+    return controller
 }
 
 private fun buildDesktopChatController(
@@ -197,11 +234,11 @@ internal class DesktopSubagentRegistry(
 )
 
 /**
- * Active-subagent registry (Background tasks). Desktop streams chat over SSE,
- * but the subagent registry only exists on the shim's mobile WS protocol, so
- * we open a lean WS side-channel and feed the shared SubagentRepository.
- * Skipped in iroh mode: IrohChannelTransport stubs sendSubagentList until
- * the iroh node serves the subagent registry.
+ * Active-subagent registry (Background tasks) side-channel for HTTP backends:
+ * desktop streams chat over SSE but the WS protocol carries the registry, so
+ * a lean WS side-channel feeds the shared SubagentRepository. Skipped in iroh
+ * mode — the registry rides the main iroh transport there (see
+ * [rememberSubagentRegistry]).
  */
 private fun createSubagentTransport(
     activeConfig: LettaConfig,
@@ -211,18 +248,37 @@ private fun createSubagentTransport(
     activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
         ?.let { DesktopWsChannelTransport(chatScope) }
 
+/** Inputs for the active-subagent registry. */
+internal data class SubagentRegistryRequest(
+    val activeConfig: LettaConfig,
+    val irohMode: Boolean,
+    val parentScope: SubagentParentScope?,
+    val irohTransport: IrohChannelTransport? = null,
+)
+
 @Composable
 internal fun rememberSubagentRegistry(
-    activeConfig: LettaConfig,
-    irohMode: Boolean,
+    request: SubagentRegistryRequest,
     chatScope: CoroutineScope,
-    parentScope: SubagentParentScope?,
 ): DesktopSubagentRegistry {
+    val activeConfig = request.activeConfig
+    val irohMode = request.irohMode
+    val parentScope = request.parentScope
+    val irohTransport = request.irohTransport
     val subagentTransport = remember(activeConfig, irohMode) {
         createSubagentTransport(activeConfig, irohMode, chatScope)
     }
-    val subagentRepository = remember(subagentTransport) {
-        subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    // iroh:// now serves the registry natively (scoped subagent.list RPC), so
+    // the repository rides the main iroh transport there; HTTP backends keep
+    // the lean WS side-channel.
+    val subagentRepository = remember(subagentTransport, irohTransport) {
+        irohTransport?.let { SubagentRepository(it, includeAll = true) }
+            ?: subagentTransport?.let { SubagentRepository(it, includeAll = true) }
+    }
+    // The repository launches push/reconnect collectors on construction; a
+    // replaced instance must be closed or they outlive it forever.
+    DisposableEffect(subagentRepository) {
+        onDispose { subagentRepository?.close() }
     }
     DesktopTransportLifecycleEffect(
         DesktopTransportLifecycleRequest(

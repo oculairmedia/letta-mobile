@@ -24,7 +24,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -200,22 +200,29 @@ private data class CopyButtonInteraction(
     val onCopy: () -> Unit,
 )
 
-/** User prompt — teal bubble, right-aligned, with a copy affordance. */
+/**
+ * User prompt — a full-width, quietly outlined card rather than a right-aligned
+ * teal bubble. It is rendered as a sticky header by the message list, so the
+ * question stays pinned at the top of the pane while its (often long) answer
+ * scrolls underneath. That means the fill must be fully opaque: content passes
+ * behind it.
+ */
 @Composable
 internal fun UserPrompt(message: UiMessage) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
     ) {
-        Surface(
-            modifier = Modifier.widthIn(max = 520.dp),
-            shape = RoundedCornerShape(10.dp),
-            color = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        Row(
+            modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (message.content.isNotBlank()) {
@@ -228,16 +235,16 @@ internal fun UserPrompt(message: UiMessage) {
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-        }
-        // Copy is the only wired affordance — a message "edit"/resend needs
-        // conversation-fork support that isn't in place, so it's omitted rather
-        // than shown as a dead control.
-        if (message.content.isNotBlank()) {
-            CopyIconButton(
-                text = message.content,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                config = CopyActionConfig(contentDescription = "Copy message"),
-            )
+            // Copy is the only wired affordance — a message "edit"/resend needs
+            // conversation-fork support that isn't in place, so it's omitted rather
+            // than shown as a dead control.
+            if (message.content.isNotBlank()) {
+                CopyIconButton(
+                    text = message.content,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                    config = CopyActionConfig(contentDescription = "Copy message", emphasized = false),
+                )
+            }
         }
     }
 }

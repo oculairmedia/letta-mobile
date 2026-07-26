@@ -2,6 +2,9 @@ package com.letta.mobile.desktop
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,8 +23,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,15 +108,9 @@ private fun DesktopWindowTitleBar(
                         .background(MaterialTheme.colorScheme.surfaceContainerLow),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    // Left third: app menu.
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        Text(
-                            text = "File     Edit     View     Window",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(start = 16.dp),
-                        )
-                    }
+                    // Left third: plain drag area — no faux menu bar
+                    // (Spotify-style chromeless top).
+                    Box(modifier = Modifier.weight(1f))
                     // Center: conversation title.
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -158,6 +158,9 @@ private fun DesktopWindowTitleBar(
     }
 }
 
+/** Windows 11 close-button hover red. */
+private val WindowsCloseHoverRed = Color(0xFFC42B1C)
+
 @Composable
 private fun WindowControlButton(
     icon: ImageVector,
@@ -165,17 +168,32 @@ private fun WindowControlButton(
     onClick: () -> Unit,
     hoverDestructive: Boolean = false,
 ) {
+    // Standard Windows caption-button hover: subtle wash for min/max, the
+    // system red with a white glyph for close.
+    val interactionSource = remember { MutableInteractionSource() }
+    val hovered by interactionSource.collectIsHoveredAsState()
+    val background = when {
+        hovered && hoverDestructive -> WindowsCloseHoverRed
+        hovered -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+        else -> Color.Transparent
+    }
     Box(
         modifier = Modifier
             .size(width = 46.dp, height = 44.dp)
-            .clickable(onClick = onClick),
+            .hoverable(interactionSource)
+            .background(background)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = description,
-            tint = if (hoverDestructive) {
-                MaterialTheme.colorScheme.onSurfaceVariant
+            tint = if (hovered && hoverDestructive) {
+                Color.White
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },

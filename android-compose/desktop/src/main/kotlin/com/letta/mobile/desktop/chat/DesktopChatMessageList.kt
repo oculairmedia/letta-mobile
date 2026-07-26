@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,9 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.material.icons.Icons
@@ -113,11 +113,13 @@ internal fun MessageList(
     Box(modifier = modifier.fillMaxWidth()) {
         // The fade wraps ONLY the list (not the scroll-to-latest button, which is
         // a sibling below) so the button is never dimmed by the bottom fade.
+        // No top fade: the user prompt pins to the top as a sticky header, and a
+        // fade there dissolved the pinned card itself instead of loose text.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .chatFadingEdges(
-                    topFadeAlpha = fadeAlphas.top,
+                    topFadeAlpha = 0f,
                     bottomFadeAlpha = fadeAlphas.bottom,
                     fadeLength = 44.dp,
                 ),
@@ -146,26 +148,20 @@ internal fun MessageList(
     }
 }
 
-private data class ChatListFadeAlphas(val top: Float, val bottom: Float)
+private data class ChatListFadeAlphas(val bottom: Float)
 
 @Composable
 private fun rememberChatListFadeAlphas(listState: LazyListState): ChatListFadeAlphas {
-    // Soft gradient fades at the top/bottom of the list so content dissolves
-    // into the background instead of hard-clipping where it meets the title bar
-    // and the composer (mirrors the mobile chat fading edges).
-    val showTopFade by remember(listState) { derivedStateOf { listState.canScrollBackward } }
+    // Soft gradient fade at the bottom of the list so content dissolves into
+    // the composer instead of hard-clipping (mirrors the mobile chat fading
+    // edges). Top has no fade — the pinned prompt card owns that edge.
     val showBottomFade by remember(listState) { derivedStateOf { listState.canScrollForward } }
-    val topFadeAlpha by animateFloatAsState(
-        targetValue = if (showTopFade) 1f else 0f,
-        animationSpec = tween(durationMillis = 250),
-        label = "topFadeAlpha",
-    )
     val bottomFadeAlpha by animateFloatAsState(
         targetValue = if (showBottomFade) 1f else 0f,
         animationSpec = tween(durationMillis = 250),
         label = "bottomFadeAlpha",
     )
-    return ChatListFadeAlphas(top = topFadeAlpha, bottom = bottomFadeAlpha)
+    return ChatListFadeAlphas(bottom = bottomFadeAlpha)
 }
 
 private data class MessageListFollowParams(
@@ -236,6 +232,10 @@ private data class MessageListColumnParams(
     val isSending: Boolean,
 )
 
+private fun ChatRenderItem.isUserPrompt(): Boolean =
+    this is ChatRenderItem.Single && MessageRoleToken(message.role).isUser()
+
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MessageListColumn(params: MessageListColumnParams) {
     val listState = params.listState
@@ -258,7 +258,7 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             // line from content ending mid-gradient.
             contentPadding = PaddingValues(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item(key = "__today__") {
                 Text(
@@ -269,11 +269,35 @@ private fun MessageListColumn(params: MessageListColumnParams) {
                     textAlign = TextAlign.Center,
                 )
             }
-            items(
-                items = renderItems,
-                key = { it.key },
-            ) { item ->
-                MessageListItem(item = item, streamingMessageId = streamingMessageId)
+            // User prompts are sticky headers: the question stays pinned to the
+            // top of the viewport while its (usually much taller) answer scrolls
+            // underneath, so you never lose track of what was asked. Everything
+            // else is an ordinary row. Item count is unchanged — one lazy item
+            // per render item — so the bottom-index arithmetic above still holds.
+            renderItems.forEach { item ->
+                if (item.isUserPrompt()) {
+                    stickyHeader(key = item.key) {
+                        // No backdrop fill: an opaque strip here would paint over
+                        // the ambient glow as a black band. The prompt card is
+                        // itself opaque, so only the narrow gutters beside it let
+                        // scrolled content show through.
+                        // A pinned sticky header sticks at the viewport's actual
+                        // top edge, ignoring the LazyColumn's top contentPadding —
+                        // so once pinned the card touched the pane's edge with no
+                        // breathing room. Top padding here applies whether pinned
+                        // or scrolled inline, keeping the gap consistent either way.
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                            contentAlignment = Alignment.TopCenter,
+                        ) {
+                            MessageListItem(item = item, streamingMessageId = streamingMessageId)
+                        }
+                    }
+                } else {
+                    item(key = item.key) {
+                        MessageListItem(item = item, streamingMessageId = streamingMessageId)
+                    }
+                }
             }
             if (isSending) {
                 item(key = "__thinking__") {
@@ -321,18 +345,21 @@ private fun ScrollToLatestButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Compact squircle: a 44dp circle read as a floating action button and
+    // dominated the reading area; this is a quiet utility control.
     Surface(
         onClick = onClick,
-        modifier = modifier.size(44.dp),
-        shape = CircleShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        modifier = modifier.size(30.dp),
+        shape = RoundedCornerShape(9.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = Icons.Outlined.KeyboardArrowDown,
                 contentDescription = "Scroll to latest message",
+                modifier = Modifier.size(18.dp),
             )
         }
     }

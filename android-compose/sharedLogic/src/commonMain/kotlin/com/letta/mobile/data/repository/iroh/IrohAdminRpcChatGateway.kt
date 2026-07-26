@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
@@ -7,6 +8,9 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.ApprovalCreate
+import com.letta.mobile.data.model.ApprovalSubmission
+import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
@@ -68,13 +72,57 @@ import kotlin.time.Duration.Companion.milliseconds
  * subscription while the agent is idle (letta-mobile-yh92w).
  */
 class IrohAdminRpcChatGateway(
+    // letta-mobile-vilsn: ApprovalSubmittingGateway makes desktop-over-Iroh able
+    // to answer AskUserQuestion — it had no approval path, so submits were a no-op.
     private val transport: IChannelTransport,
     private val deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway {
 
     private val bridge = WsChatBridge(transport)
     private val json = lettaWireJson
+
+    // letta-mobile-vilsn: answer / dismiss a parked runtime approval (e.g.
+    // AskUserQuestion) over the same `admin_rpc` `approval.submit` path the
+    // Android/mobile client uses (IrohAdminRpcApprovalSource). Decodes an
+    // AskUserQuestion answer from the reason sentinel into the structured
+    // `updated_input` close payload; the server ApprovalAdminHandlers resolves
+    // the perm-* gate id from the tool_call_id.
+    override suspend fun submitApproval(
+        agentId: String,
+        conversationId: String,
+        approvalRequestId: String,
+        toolCallId: String?,
+        approve: Boolean,
+        reason: String?,
+    ) {
+        val decoded = if (approve) AskUserQuestion.decodeAnswerReason(reason) else null
+        val effectiveReason = if (decoded != null) null else reason?.takeIf { it.isNotBlank() }
+        val approvalCreate = ApprovalCreate(
+            approvals = toolCallId?.let {
+                listOf(ApprovalSubmission(toolCallId = it, approve = approve, reason = effectiveReason))
+            },
+            approve = approve,
+            approvalRequestId = approvalRequestId,
+            reason = effectiveReason,
+            updatedInput = decoded,
+        )
+        val payload = MessageCreateRequest(
+            messages = listOf(json.encodeToJsonElement(ApprovalCreate.serializer(), approvalCreate)),
+            streaming = false,
+        )
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            conversationId.takeIf { it.isNotBlank() }?.let { put("conversation_id", it) }
+            put("payload", json.encodeToJsonElement(MessageCreateRequest.serializer(), payload))
+        }
+        val response = transport.adminRpc(
+            method = "approval.submit",
+            path = "/v1/agents/$agentId/messages",
+            body = body.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc approval.submit failed")
+    }
 
     /** conversationId -> agentId, learned from conversation.get/list. */
     private val agentIdByConversation = mutableMapOf<ConversationId, AgentId>()
@@ -630,9 +678,13 @@ class IrohAdminRpcAgentDirectory(
     }
 
     companion object {
-        // Single page sized for the desktop roster; Android's source paginates
-        // 50-at-a-time up to 2500 — revisit if a deployment outgrows this.
-        const val AGENT_LIST_LIMIT = 200
+        // Roster ceiling for the paged agent.list sweep, matching Android's
+        // 2500 cap. This is a runaway guard, not a page size — the sweep stops
+        // at the first short page, so small fleets still finish in a few
+        // requests. The old 200 cap silently truncated real deployments:
+        // agents past the first 200 never appeared in the rail, palette, or
+        // New Conversation directory.
+        const val AGENT_LIST_LIMIT = 2500
         // Per-page size for the paged agent.list read. Kept small because each
         // agent object is heavy (full system prompt + core memory): ~10 agents
         // is a few hundred KB, well under the admin_rpc timeout on a slow link,

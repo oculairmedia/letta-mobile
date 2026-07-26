@@ -316,6 +316,54 @@ class LocalBackendAdminStoreTest {
     }
 
     @Test
+    fun `message list preserves an inline image part instead of dropping it to text only`() {
+        val base = tempStore()
+        val key = "conversation:conv-img"
+        // Already-nested Letta wire shape, as written by the client's outbound
+        // MessageContentPart.toJsonArray().
+        writeMessages(
+            base, key,
+            """{"type":"message","id":"e1","message":{"id":"ui-1","role":"user","content":[{"type":"text","text":"check this out"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"QUJD"}}]}}""",
+        )
+        writeConversation(base, key, """{"id":"conv-img","agent_id":"agent-i"}""")
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val msgs = store.listMessagesProjected("conv-img", null, MessagePage(null, null, null, null))!!
+        assertEquals(1, msgs.size)
+        val content = msgs[0].jsonObject["content"] as JsonArray
+        assertEquals(2, content.size)
+        assertEquals("text", content[0].jsonObject["type"]!!.jsonPrimitive.content)
+        assertEquals("check this out", content[0].jsonObject["text"]!!.jsonPrimitive.content)
+        val img = content[1].jsonObject
+        assertEquals("image", img["type"]!!.jsonPrimitive.content)
+        val source = img["source"]!!.jsonObject
+        assertEquals("base64", source["type"]!!.jsonPrimitive.content)
+        assertEquals("image/png", source["media_type"]!!.jsonPrimitive.content)
+        assertEquals("QUJD", source["data"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `message list normalizes a flat letta-code image part to the nested wire shape`() {
+        val base = tempStore()
+        val key = "conversation:conv-img-flat"
+        // "Flat" on-disk shape written by the embedded letta.js runtime
+        // (LocalImageContextStripper docs): {type:"image", mimeType, data}.
+        writeMessages(
+            base, key,
+            """{"type":"message","id":"e1","message":{"id":"ui-1","role":"user","content":[{"type":"image","mimeType":"image/jpeg","data":"WFla"}]}}""",
+        )
+        writeConversation(base, key, """{"id":"conv-img-flat","agent_id":"agent-i"}""")
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val msgs = store.listMessagesProjected("conv-img-flat", null, MessagePage(null, null, null, null))!!
+        assertEquals(1, msgs.size)
+        // No caption text -> the image-only message must NOT be dropped.
+        val content = msgs[0].jsonObject["content"] as JsonArray
+        assertEquals(1, content.size)
+        val source = content[0].jsonObject["source"]!!.jsonObject
+        assertEquals("image/jpeg", source["media_type"]!!.jsonPrimitive.content)
+        assertEquals("WFla", source["data"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `skips malformed agent json without failing the whole list`() {
         val base = tempStore()
         writeAgent(base, "good.json", """{"id":"agent-good"}""", mtimeMs = 2_000L)
