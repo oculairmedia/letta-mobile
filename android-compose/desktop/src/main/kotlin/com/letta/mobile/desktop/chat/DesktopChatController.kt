@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
@@ -217,7 +218,7 @@ class DesktopChatController(
      */
     private fun bindGateway(next: DesktopChatGateway?) {
         gateway = next
-        _canSubmitApprovals.value = next is DesktopApprovalSubmitter
+        _canSubmitApprovals.value = next is ApprovalSubmittingGateway || next is DesktopApprovalSubmitter
     }
 
     // Per-conversation model overrides set this session (the picker). The
@@ -553,23 +554,37 @@ class DesktopChatController(
         reason: String?,
     ) {
         if (closed) return
-        val submitter = gateway as? DesktopApprovalSubmitter ?: return
+        val gw = gateway
+        // letta-mobile-vilsn: the Iroh gateway answers via the shared
+        // ApprovalSubmittingGateway (admin_rpc approval.submit); the direct
+        // App Server gateway answers via DesktopApprovalSubmitter.
+        if (gw !is ApprovalSubmittingGateway && gw !is DesktopApprovalSubmitter) return
         val conversation = _state.value.selectedConversation ?: return
         val agentId = conversation.agentId?.takeIf { it.isNotBlank() } ?: return
         submittedApprovalConversations[requestId] = conversation.id
         _submittingApprovals.update { it + requestId }
         scope.launch {
             try {
-                submitter.submitApproval(
-                    DesktopApprovalSubmission(
+                when (gw) {
+                    is ApprovalSubmittingGateway -> gw.submitApproval(
                         agentId = agentId,
                         conversationId = conversation.id,
-                        requestId = requestId,
+                        approvalRequestId = requestId,
                         toolCallId = toolCallIds.firstOrNull(),
                         approve = approve,
                         reason = reason,
-                    ),
-                )
+                    )
+                    is DesktopApprovalSubmitter -> gw.submitApproval(
+                        DesktopApprovalSubmission(
+                            agentId = agentId,
+                            conversationId = conversation.id,
+                            requestId = requestId,
+                            toolCallId = toolCallIds.firstOrNull(),
+                            approve = approve,
+                            reason = reason,
+                        ),
+                    )
+                }
                 // Success: leave the request marked submitting. The write is a
                 // one-way socket send, so the approval is not yet reconciled —
                 // clearing here would let a second click re-submit a
