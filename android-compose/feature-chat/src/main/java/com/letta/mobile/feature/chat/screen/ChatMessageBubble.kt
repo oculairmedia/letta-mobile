@@ -18,7 +18,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.onLongClick
@@ -137,25 +141,36 @@ private class LongPressInteraction(
 
     private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectLongPress() {
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false)
-            handleGestureCompletion(releasedBeforeLongPressTimeout())
+            val down = awaitFirstDown(requireUnconsumed = false)
+            handleGestureCompletion(cancelledBeforeLongPressTimeout(down))
         }
     }
 
     private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope
-        .releasedBeforeLongPressTimeout(): Boolean =
+        .cancelledBeforeLongPressTimeout(down: PointerInputChange): Boolean =
         withTimeoutOrNull(
             chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
         ) {
-            awaitReleaseWithoutConsuming()
+            awaitReleaseOrCancellation(
+                pointerId = down.id,
+                initialPosition = down.position,
+            )
         } != null
 
     private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope
-        .awaitReleaseWithoutConsuming() {
-        // Short taps remain unconsumed for interactive children.
-        do {
-            val event = awaitPointerEvent()
-        } while (event.changes.all { it.pressed })
+        .awaitReleaseOrCancellation(
+            pointerId: PointerId,
+            initialPosition: Offset,
+        ) {
+        while (true) {
+            // Observe the final pass so scrolling ancestors have a chance to
+            // consume movement before message actions are recognized.
+            val event = awaitPointerEvent(PointerEventPass.Final)
+            val change = event.changes.firstOrNull { it.id == pointerId } ?: return
+            val movedPastTouchSlop =
+                (change.position - initialPosition).getDistance() > viewConfiguration.touchSlop
+            if (!change.pressed || change.isConsumed || movedPastTouchSlop) return
+        }
     }
 
     private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope

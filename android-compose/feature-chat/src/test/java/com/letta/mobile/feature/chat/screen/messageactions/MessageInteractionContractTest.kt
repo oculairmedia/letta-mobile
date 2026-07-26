@@ -27,7 +27,9 @@ class MessageInteractionContractTest {
     @Test
     fun `message bubble preserves short child taps without combined clickable`() {
         assertTrue(source.contains("awaitFirstDown(requireUnconsumed = false)"))
-        assertTrue(source.contains("Short taps remain unconsumed"))
+        assertTrue(source.contains("PointerEventPass.Final"))
+        assertTrue(source.contains("change.isConsumed"))
+        assertTrue(source.contains("viewConfiguration.touchSlop"))
         assertFalse(source.contains(".combinedClickable("))
     }
 

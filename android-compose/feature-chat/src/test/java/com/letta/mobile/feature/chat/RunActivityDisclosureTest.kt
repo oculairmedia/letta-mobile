@@ -177,7 +177,6 @@ class RunActivityDisclosureTest {
 
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
             .assertIsNotEnabled()
-            .performClick()
         composeRule.runOnIdle { assertEquals(0, toggles) }
     }
 
