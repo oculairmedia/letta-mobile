@@ -47,7 +47,6 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
             onSendMessage = { params.viewModel.sendMessage(it) },
             onRerunMessage = { params.viewModel.rerunMessage(it) },
             onLoadOlderMessages = { params.viewModel.loadOlderMessages() },
-            onReleaseOlderMessages = { params.viewModel.releaseOlderMessages() },
             onSubmitApproval = { requestId, toolCallIds, approve, reason ->
                 params.viewModel.submitApproval(requestId, toolCallIds, approve, reason)
             },

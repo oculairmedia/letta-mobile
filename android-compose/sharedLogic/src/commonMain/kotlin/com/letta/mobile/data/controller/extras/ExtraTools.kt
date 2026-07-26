@@ -2,8 +2,6 @@ package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.Capability
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -25,14 +23,14 @@ class ImageHydrationTool : ExternalTool {
                 put("description", "The ID of the image to hydrate")
             })
         })
-        // image_id is optional -> no required fields (JSON Schema requires an array).
-        put("required", buildJsonArray {})
+        put("required", buildJsonObject {
+            // Empty array for now - image_id could be optional
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. The capability may be advertised (server negotiated it),
-        // but the handler is a stub, so return a structured error rather than a fake success.
-        return ExternalToolResult.Error("image_hydration is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Image hydration not yet implemented")
     }
 }
 
@@ -52,7 +50,9 @@ class GoalsTool : ExternalTool {
             put("action", buildJsonObject {
                 put("type", "string")
                 put("description", "Action to perform: list, add, update, remove")
-                put("enum", buildJsonArray { add("list"); add("add"); add("update"); add("remove") })
+                put("enum", buildJsonObject {
+                    // Could add enum values here
+                })
             })
             put("goal_id", buildJsonObject {
                 put("type", "string")
@@ -63,12 +63,14 @@ class GoalsTool : ExternalTool {
                 put("description", "The goal text (for add/update)")
             })
         })
-        put("required", buildJsonArray { add("action") })
+        put("required", buildJsonObject {
+            // action is required
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
-        return ExternalToolResult.Error("goals is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Goals management not yet implemented")
     }
 }
 
@@ -88,7 +90,6 @@ class SchedulesTool : ExternalTool {
             put("action", buildJsonObject {
                 put("type", "string")
                 put("description", "Action to perform: list, add, update, remove")
-                put("enum", buildJsonArray { add("list"); add("add"); add("update"); add("remove") })
             })
             put("schedule_id", buildJsonObject {
                 put("type", "string")
@@ -103,12 +104,14 @@ class SchedulesTool : ExternalTool {
                 put("description", "Description of the task to schedule")
             })
         })
-        put("required", buildJsonArray { add("action") })
+        put("required", buildJsonObject {
+            // action is required
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
-        return ExternalToolResult.Error("schedules is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Schedules management not yet implemented")
     }
 }
 
@@ -137,12 +140,14 @@ class SlashCommandsTool : ExternalTool {
                 })
             })
         })
-        put("required", buildJsonArray { add("command") })
+        put("required", buildJsonObject {
+            // command is required
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
-        return ExternalToolResult.Error("slash_commands is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Slash commands execution not yet implemented")
     }
 }
 
@@ -172,12 +177,14 @@ class SubagentChipsTool : ExternalTool {
                 put("description", "Additional metadata about the subagent state")
             })
         })
-        put("required", buildJsonArray { add("subagent_id") })
+        put("required", buildJsonObject {
+            // subagent_id is required
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
-        return ExternalToolResult.Error("subagent_chips is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Subagent chips not yet implemented")
     }
 }
 
@@ -203,12 +210,14 @@ class ReflectionTool : ExternalTool {
                 put("description", "Scope of the reflection: memory, context, state")
             })
         })
-        put("required", buildJsonArray { add("query") })
+        put("required", buildJsonObject {
+            // query is required
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
-        return ExternalToolResult.Error("reflection is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Reflection not yet implemented")
     }
 }
 
@@ -237,11 +246,13 @@ class SlimAgentsTool : ExternalTool {
                 put("description", "Type of projection: summary, state, capabilities")
             })
         })
-        put("required", buildJsonArray { add("agent_ids") })
+        put("required", buildJsonObject {
+            // agent_ids is required
+        })
     }
 
     override suspend fun invoke(input: JsonObject): ExternalToolResult {
-        // Not yet implemented. Advertised-but-stub: return a structured error, not a fake success.
-        return ExternalToolResult.Error("slim_agents is not yet implemented")
+        // Stub implementation: return a placeholder response
+        return ExternalToolResult.Success("Slim agents projection not yet implemented")
     }
 }

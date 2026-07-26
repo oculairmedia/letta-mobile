@@ -180,17 +180,6 @@ data class Timeline(
     val stablePrefixVersion: Long = events.stablePrefixFingerprint(),
     /** Monotonic nudge for event-driven visible timeline invalidations with unchanged event lists. */
     val visibleRevision: Long = 0L,
-    /**
-     * Sliding-window retention (letta-mobile: bound resident timeline memory).
-     *
-     * Count of older events evicted from [events] because the resident window
-     * slid forward. These events are NOT lost — they remain fetchable from the
-     * server via the existing older-page pager ([backfillCursor] is the cursor
-     * for that fetch). This is the lightweight "released older" marker: no
-     * summary is kept, just a count + cursor so the UI can still show an
-     * accurate "load older" affordance.
-     */
-    val releasedOlderCount: Int = 0,
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashMap<String, Int>(events.size).also { map ->
@@ -311,7 +300,6 @@ data class Timeline(
             event
         }
         return copy(events = events.adding(safeEvent), stablePrefixVersion = stablePrefixVersion + 1)
-            .slideResidentWindow()
     }
 
     /**
@@ -350,82 +338,6 @@ data class Timeline(
         val newEvents = if (insertIdx == -1) events.adding(event)
                        else events.addingAt(insertIdx, event)
         return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
-            .slideResidentWindow()
-    }
-
-    /**
-     * Sliding-window eviction: once [events] grows past [evictTriggerSize],
-     * drop the oldest resident events down to [maxResident] so memory stays
-     * flat regardless of how long the conversation has run (target: fine at
-     * tens of thousands of messages).
-     *
-     * Hysteresis ([evictTriggerSize] > [maxResident]) means eviction runs in
-     * infrequent batches rather than on every single append, so the
-     * projector's incremental append-tail fast path (which requires
-     * `events.size` to grow by exactly 1 per tick) keeps working between
-     * slides instead of falling back to a full re-projection on every
-     * message.
-     *
-     * Safety: never evicts (a) any [TimelineEvent.Local] — optimistic/unsent
-     * messages must never be lost — or (b) any trailing [TimelineEvent.Confirmed]
-     * that shares the tail event's `runId` — i.e. the in-flight/most-recent
-     * streaming turn. If honoring that floor means fewer than [maxResident]
-     * events end up evicted (or none at all), that's correct: turn safety
-     * wins over strict cap adherence.
-     *
-     * Evicted events are not lost — they remain fetchable from the server via
-     * the existing older-page pager. [backfillCursor] is updated to the new
-     * oldest resident server id and [releasedOlderCount] tracks how many were
-     * released, so the UI can still present an accurate "load older"
-     * affordance without holding the content resident.
-     */
-    private fun slideResidentWindow(
-        maxResident: Int = DEFAULT_MAX_RESIDENT_EVENTS,
-        evictTriggerSize: Int = maxResident + DEFAULT_EVICT_BUFFER,
-    ): Timeline {
-        if (events.size <= evictTriggerSize) return this
-        val protectedFloorIndex = protectedFloorIndex()
-        val desiredCutoff = events.size - maxResident
-        val cutoff = minOf(desiredCutoff, protectedFloorIndex)
-        if (cutoff <= 0) return this
-
-        val evictedCount = cutoff
-        val remaining = events.subList(cutoff, events.size).toPersistentList()
-        val newOldestServerId = remaining.firstNotNullOfOrNull { (it as? TimelineEvent.Confirmed)?.serverId }
-        Telemetry.event(
-            "Timeline", "slideResidentWindow.evicted",
-            "conversationId" to conversationId,
-            "evictedCount" to evictedCount,
-            "residentCount" to remaining.size,
-            "totalReleasedOlderCount" to (releasedOlderCount + evictedCount),
-        )
-        return copy(
-            events = remaining,
-            backfillCursor = newOldestServerId ?: backfillCursor,
-            releasedOlderCount = releasedOlderCount + evictedCount,
-        )
-    }
-
-    /**
-     * Index below which eviction must not cut: the start of the trailing
-     * block of events that belong to the active/most-recent streaming turn
-     * (matching the tail [TimelineEvent.Confirmed.runId]) plus any trailing
-     * unconfirmed [TimelineEvent.Local] events (optimistic sends must never
-     * be evicted). When the tail is Local or a Confirmed event with a blank
-     * runId, only that trailing run of Local events is protected.
-     */
-    private fun protectedFloorIndex(): Int {
-        val tail = events.lastOrNull() ?: return 0
-        val activeRunId = (tail as? TimelineEvent.Confirmed)?.runId?.takeIf { it.isNotBlank() }
-        var floor = events.size
-        for (i in events.indices.reversed()) {
-            val belongsToActiveTurn = when (val e = events[i]) {
-                is TimelineEvent.Local -> true
-                is TimelineEvent.Confirmed -> activeRunId != null && e.runId == activeRunId
-            }
-            if (belongsToActiveTurn) floor = i else break
-        }
-        return floor
     }
 
     /**
@@ -577,34 +489,6 @@ data class AbandonedAssistantFragmentSuppression(
     val runId: String?,
     val contentFingerprint: String,
 )
-
-/**
- * Sliding-window resident cap for [Timeline.events]. Chosen well above the
- * hydrate visible target (hydrate can page up to 500 messages resident, per
- * the fetch-layer's page guard) so normal scrolling/streaming sessions never
- * observe eviction — it only kicks in for long-lived/high-volume
- * conversations (tens of thousands of messages) where unbounded retention
- * would otherwise grow memory forever.
- *
- * letta-mobile: originally set to 200, which broke
- * `ChatTimelineObserverTest.long history streaming tail projection does not
- * scan full history per frame` — that test deliberately builds a 513-event
- * history and asserts the FULL history stays resident and gets projected
- * (`eventsTotal == 513`), matching the product's actual hydrate/scroll-back
- * behavior for a single large-but-not-pathological session. 2000 comfortably
- * clears that (and the 500-message hydrate ceiling) while still bounding
- * memory by more than an order of magnitude for a 28k+ message conversation.
- */
-internal const val DEFAULT_MAX_RESIDENT_EVENTS = 2000
-
-/**
- * Hysteresis buffer added on top of [DEFAULT_MAX_RESIDENT_EVENTS] before a
- * slide is triggered. Keeps eviction infrequent (batched) so the projector's
- * append-tail fast path — which requires events.size to grow by exactly 1
- * per tick — keeps firing between slides instead of falling back to a full
- * re-projection on every streamed message once the cap is reached.
- */
-internal const val DEFAULT_EVICT_BUFFER = 200
 
 private const val ORPHAN_ASSISTANT_FRAGMENT_MIN_CHARS = 3
 private const val MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS = 32

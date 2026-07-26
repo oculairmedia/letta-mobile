@@ -4,9 +4,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -66,8 +62,6 @@ internal data class ChatDetailPaneState(
     val commands: List<ComposerCommand>,
     val mentionables: List<Mentionable> = emptyList(),
     val composerPlaceholder: String = "Message…",
-    /** Approval request ids whose answer/dismiss is currently in flight. */
-    val submittingApprovalRequestIds: Set<String> = emptySet(),
 )
 
 /** Interaction callbacks for [ChatDetailPane]. */
@@ -80,8 +74,6 @@ internal data class ChatDetailPaneActions(
     val onModelSelected: (String) -> Unit,
     val onOpenModelPicker: (() -> Unit)? = null,
     val onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
-    /** Answer / dismiss a parked approval: (requestId, toolCallIds, approve, reason). */
-    val onSubmitApproval: ((String, List<String>, Boolean, String?) -> Unit)? = null,
 )
 
 @Composable
@@ -91,13 +83,6 @@ internal fun ChatDetailPane(
     modifier: Modifier = Modifier,
 ) {
     val surface = state.surface
-    val approvalHandler = actions.onSubmitApproval?.let { onDecision ->
-        DesktopApprovalDecisionHandler(
-            onDecision = onDecision,
-            submittingRequestIds = state.submittingApprovalRequestIds,
-        )
-    }
-    val paneEdgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
     // Drive the ambient glow off the thinking state: a teal breath while the
     // agent works, a brief "completed" settle afterward, error tint on failure.
     var ambientStatus by remember { mutableStateOf(DesktopAmbientStatus.Idle) }
@@ -118,23 +103,11 @@ internal fun ChatDetailPane(
             else -> ambientStatus = DesktopAmbientStatus.Idle
         }
     }
-    // A hairline edge separates the chat pane from the sidebar without insetting
-    // it: the pane stays flush to the window, so this reads as one boundary line
-    // rather than a second frame floating inside the app's own window border.
-    CompositionLocalProvider(LocalDesktopApprovalDecision provides approvalHandler) {
     DesktopAmbientChatBackground(
         status = ambientStatus,
         modifier = modifier
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.background)
-            .drawBehind {
-                val stroke = 1.dp.toPx()
-                drawRect(
-                    color = paneEdgeColor,
-                    topLeft = Offset.Zero,
-                    size = Size(stroke, size.height),
-                )
-            },
+            .background(MaterialTheme.colorScheme.background),
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
             if (surface.shouldShowStatePanel) {
@@ -182,7 +155,6 @@ internal fun ChatDetailPane(
                 ),
             )
         }
-    }
     }
 }
 

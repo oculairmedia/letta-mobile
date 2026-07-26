@@ -36,12 +36,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         otid: String,
         attachments: List<MessageContentPart.Image>,
     ): String {
-        // Production keys timeline loops on the compound (agentId,
-        // conversationId) pair (see TimelineRepository's TimelineCacheKey) —
-        // the conversation id string itself is never mangled with the agent
-        // id, so the agent-scoped overload records the same plain id as the
-        // unscoped one.
-        externalLocals += ExternalLocal(conversationId, content, otid, attachments)
+        externalLocals += ExternalLocal(scopedConversationId(agentId, conversationId), content, otid, attachments)
         return otid
     }
 
@@ -50,7 +45,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     }
 
     override suspend fun ingestExternalTransportMessage(agentId: String?, conversationId: String, message: LettaMessage, source: String) {
-        ingestedMessages += IngestedMessage(conversationId, message)
+        ingestedMessages += IngestedMessage(scopedConversationId(agentId, conversationId), message)
     }
 
     override suspend fun markExternalTransportLocalSent(conversationId: String, otid: String) {
@@ -58,7 +53,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     }
 
     override suspend fun markExternalTransportLocalSent(agentId: String?, conversationId: String, otid: String) {
-        sentLocals += LocalMarker(conversationId, otid)
+        sentLocals += LocalMarker(scopedConversationId(agentId, conversationId), otid)
     }
 
     override suspend fun markExternalTransportLocalFailed(conversationId: String, otid: String) {
@@ -66,7 +61,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
     }
 
     override suspend fun markExternalTransportLocalFailed(agentId: String?, conversationId: String, otid: String) {
-        failedLocals += LocalMarker(conversationId, otid)
+        failedLocals += LocalMarker(scopedConversationId(agentId, conversationId), otid)
     }
 
     override suspend fun reconcileExternalTransportSend(
@@ -84,7 +79,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         externalConversationId: String,
         otid: String,
     ) {
-        reconciledSends += ReconciledSend(conversationId, agentId.orEmpty(), externalConversationId, otid)
+        reconciledSends += ReconciledSend(scopedConversationId(agentId, conversationId), agentId.orEmpty(), externalConversationId, otid)
     }
 
     override suspend fun repairExpiredConversationCursor(conversationId: String, fallbackSeq: Long?) {
@@ -187,4 +182,6 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         val forceRefresh: Boolean,
     )
 
+    private fun scopedConversationId(agentId: String?, conversationId: String): String =
+        agentId?.let { "$it:$conversationId" } ?: conversationId
 }

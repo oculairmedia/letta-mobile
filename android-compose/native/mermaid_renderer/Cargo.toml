@@ -11,8 +11,6 @@ name = "letta_mermaid_renderer"
 crate-type = ["cdylib"]
 
 [dependencies]
-fontdb = { version = "0.23", default-features = false, features = ["fs", "memmap", "std"] }
 jni = "0.21"
 mermaid-rs-renderer = { version = "0.2.2", default-features = false }
 regex = "1"
-resvg = { version = "0.47.0", default-features = false, features = ["text", "system-fonts", "memmap-fonts"] }

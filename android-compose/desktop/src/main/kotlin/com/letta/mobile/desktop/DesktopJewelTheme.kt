@@ -3,11 +3,9 @@ package com.letta.mobile.desktop
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
-import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -22,6 +20,7 @@ import org.jetbrains.jewel.intui.standalone.theme.lightThemeDefinition
 import org.jetbrains.jewel.intui.window.decoratedWindow
 import org.jetbrains.jewel.ui.ComponentStyling
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
+import dev.nucleusframework.systemcolor.systemAccentColor
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
@@ -52,13 +51,7 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  * Desktop Material theme — re-based onto the Letta palette (teal primary,
  * #0A0A0A background, #1E1E1E surfaces) instead of Jewel-derived hues, so the
  * desktop app matches the mobile design template while following live OS
- * light/dark appearance changes through Nucleus.
- *
- * The OS accent color deliberately does NOT repaint `primary`: the rest of the
- * pairing (onPrimary, containers, the fixed orb gradients) is brand-derived,
- * so a non-teal accent (e.g. Windows red) turned the thinking ring and
- * selection markers into what read as error states. The live accent remains
- * visible as a read-only row in Settings.
+ * appearance and accent changes through Nucleus.
  *
  * `LocalCustomColors` is provided with the same fixed brand agent-status values
  * the Android `deriveCustomColors()` uses. Desktop only depends on
@@ -68,10 +61,11 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
 @Composable
 internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkMode()
+    val systemAccent = systemAccentColor()
     // Cool-slate palette (2026-06-23 retune) — sourced from the shared
     // LettaColorTokens so desktop and Android stay in lockstep (no duplication).
     val scheme = if (dark) darkColorScheme(
-        primary = Color(LettaColorTokens.DARK_PRIMARY),
+        primary = systemAccent ?: Color(LettaColorTokens.DARK_PRIMARY),
         onPrimary = Color(0xFF06302B),
         primaryContainer = Color(LettaColorTokens.DARK_PRIMARY_VARIANT),
         onPrimaryContainer = Color(0xFFE6F4F1),
@@ -101,9 +95,9 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
         onError = Color(0xFF000000),
         onErrorContainer = Color(0xFFFFDAD6),
     ) else lightColorScheme(
-        primary = Color(LettaColorTokens.LIGHT_PRIMARY),
+        primary = systemAccent ?: Color(LettaColorTokens.LIGHT_PRIMARY),
         onPrimary = Color.White,
-        primaryContainer = Color(LettaColorTokens.LIGHT_PRIMARY).copy(alpha = 0.16f),
+        primaryContainer = (systemAccent ?: Color(LettaColorTokens.LIGHT_PRIMARY)).copy(alpha = 0.16f),
         onPrimaryContainer = Color(LettaColorTokens.LIGHT_ON_SURFACE),
         secondary = Color(LettaColorTokens.LIGHT_PRIMARY),
         onSecondary = Color.White,
@@ -173,41 +167,8 @@ internal fun DesktopMaterialTheme(content: @Composable () -> Unit) {
     }
 
     CompositionLocalProvider(LocalCustomColors provides customColors) {
-        MaterialTheme(
-            colorScheme = scheme,
-            shapes = DesktopShapes,
-            typography = DesktopTypography,
-            content = content,
-        )
+        MaterialTheme(colorScheme = scheme, shapes = DesktopShapes, content = content)
     }
-}
-
-/**
- * Desktop type scale — the Material 3 defaults are sized for phones held at
- * arm's length; on a monitor they read oversized and the chat column runs short
- * of words per line. Every role is stepped down ~2sp (body/label ~1–2sp, display
- * headings more) with line heights kept at a ~1.45 ratio so prose still breathes.
- * Roles keep their relative hierarchy, so callers stay on
- * `MaterialTheme.typography.*` and need no per-site sizes.
- */
-private val DesktopTypography = Typography().let { base ->
-    base.copy(
-        displayLarge = base.displayLarge.copy(fontSize = 44.sp, lineHeight = 52.sp),
-        displayMedium = base.displayMedium.copy(fontSize = 36.sp, lineHeight = 44.sp),
-        displaySmall = base.displaySmall.copy(fontSize = 28.sp, lineHeight = 36.sp),
-        headlineLarge = base.headlineLarge.copy(fontSize = 26.sp, lineHeight = 32.sp),
-        headlineMedium = base.headlineMedium.copy(fontSize = 22.sp, lineHeight = 28.sp),
-        headlineSmall = base.headlineSmall.copy(fontSize = 19.sp, lineHeight = 26.sp),
-        titleLarge = base.titleLarge.copy(fontSize = 17.sp, lineHeight = 24.sp),
-        titleMedium = base.titleMedium.copy(fontSize = 14.sp, lineHeight = 20.sp),
-        titleSmall = base.titleSmall.copy(fontSize = 13.sp, lineHeight = 18.sp),
-        bodyLarge = base.bodyLarge.copy(fontSize = 14.sp, lineHeight = 21.sp),
-        bodyMedium = base.bodyMedium.copy(fontSize = 13.sp, lineHeight = 19.sp),
-        bodySmall = base.bodySmall.copy(fontSize = 12.sp, lineHeight = 17.sp),
-        labelLarge = base.labelLarge.copy(fontSize = 12.sp, lineHeight = 16.sp),
-        labelMedium = base.labelMedium.copy(fontSize = 11.sp, lineHeight = 15.sp),
-        labelSmall = base.labelSmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
-    )
 }
 
 /**

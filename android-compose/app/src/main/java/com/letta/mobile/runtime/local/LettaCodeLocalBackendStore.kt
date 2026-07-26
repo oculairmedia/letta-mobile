@@ -278,36 +278,21 @@ class LettaCodeLocalBackendStore @Inject constructor(
      * Resolves image_ref pointers back to normal image parts before typed
      * parsing (letta-mobile-xybm2 embedded image hydration). The typed model
      * never sees image_ref — it's a JSON-only persistence concept.
-     *
-     * Bounded read (letta-mobile-lgns8.20): this hydrates on EVERY app
-     * restart / conversation switch, so a single pathologically
-     * image-bloated row (tens of MB of base64 — see
-     * [BoundedTranscriptReader]'s doc) used to OOM the same way the
-     * pre-turn strip/heal passes did before they were bounded. Streaming
-     * through [BoundedTranscriptReader] guarantees no single JSON string
-     * value is ever materialized beyond its cap; any row whose image (or
-     * text) value was collapsed is rendered as a lightweight placeholder
-     * via [collapseOversizedPart] instead of being dropped, so the row
-     * still shows up in the timeline.
      */
     suspend fun readTranscript(agentId: String): List<LettaMessage> = withContext(Dispatchers.IO) {
         val conversationDir = File(File(storageDirectory, "conversations"), base64Url("default:$agentId"))
         val transcript = File(conversationDir, "messages.jsonl")
         if (!transcript.isFile) return@withContext emptyList()
         val blobStore = LocalImageBlobStore(conversationDir)
-        val boundedLines = BoundedTranscriptReader.readLines(transcript)
-        boundedLines.flatMapIndexed { index, boundedLine ->
-                val row = runCatching { json.parseToJsonElement(boundedLine.text).jsonObject }.getOrNull()
+        transcript.useLines { lines ->
+            lines.filter { it.isNotBlank() }.flatMapIndexed { index, line ->
+                val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
                     ?: return@flatMapIndexed emptyList()
                 val id = row.stringField("id") ?: return@flatMapIndexed emptyList()
                 val role = row.stringField("role") ?: return@flatMapIndexed emptyList()
                 val date = (row["metadata"] as? JsonObject)?.stringField("created_at")
-                // Collapse any bounded-oversized value (tens-of-MB image/text
-                // row) to a small placeholder BEFORE resolving image_ref
-                // pointers, so downstream typed parsing never sees the
-                // marker and the row is still visible.
+                // Resolve image_ref parts before typed parsing
                 val rawContentParts = (row["content"] as? JsonArray)?.filterIsInstance<JsonObject>().orEmpty()
-                    .map { part -> collapseOversizedPart(part) }
                 val contentParts = rawContentParts.map { part -> resolveImageRef(part, blobStore) }
                 val text = contentParts
                     .filter { it.stringField("type") == "text" }
@@ -377,6 +362,7 @@ class LettaCodeLocalBackendStore @Inject constructor(
                     }
                     else -> emptyList()
                 }
+            }.toList()
         }
     }
 
@@ -480,46 +466,6 @@ class LettaCodeLocalBackendStore @Inject constructor(
     private fun unavailableImagePlaceholder(): JsonObject = buildJsonObject {
         put("type", JsonPrimitive("text"))
         put("text", JsonPrimitive("[image unavailable]"))
-    }
-
-    /**
-     * Replaces a content part whose only value [BoundedTranscriptReader]
-     * collapsed (an oversized `data`/`text` string — see its class doc) with
-     * a small, same-shape-tolerant `text` placeholder carrying the original
-     * byte length, instead of the raw marker string. Every other part is
-     * returned unchanged.
-     *
-     * WHY here (letta-mobile-lgns8.20): [readTranscript] hydrates the chat
-     * UI on every app restart / conversation switch, so a row this pass
-     * would otherwise silently drop (image rows never populate `text`) or
-     * leak the internal marker text into the timeline needs an explicit,
-     * user-legible stand-in. A `text` part is the shape the renderer
-     * already handles for every other message, so no UI changes are
-     * required to display it.
-     */
-    private fun collapseOversizedPart(part: JsonObject): JsonObject {
-        val type = part.stringField("type")
-        val oversizedChars = when (type) {
-            "image" -> part.stringField("data")?.let(BoundedTranscriptReader::extractOversizedLength)
-                ?: (part["source"] as? JsonObject)?.stringField("data")
-                    ?.let(BoundedTranscriptReader::extractOversizedLength)
-            "text" -> part.stringField("text")?.let(BoundedTranscriptReader::extractOversizedLength)
-            else -> null
-        } ?: return part
-
-        // Base64 → bytes is roughly 3/4 of the character count; approximate
-        // is fine, this is a human-readable label, not a stored value.
-        val approxMb = (oversizedChars * 3 / 4) / (1024.0 * 1024.0)
-        val label = if (type == "image") {
-            "[image omitted: too large to load (~%.1f MB)]".format(approxMb)
-        } else {
-            "[content omitted: too large to load (~%.1f MB)]".format(approxMb)
-        }
-        return buildJsonObject {
-            put("type", JsonPrimitive("text"))
-            put("text", JsonPrimitive(label))
-            put("oversized", JsonPrimitive(true))
-        }
     }
 
     private fun base64Url(value: String): String = Base64.getUrlEncoder().withoutPadding()

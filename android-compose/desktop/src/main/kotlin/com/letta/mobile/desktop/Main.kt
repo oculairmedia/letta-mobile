@@ -69,7 +69,6 @@ private fun runDesktopApplication(
 ) {
     val deepLinkSequence = AtomicLong()
     val deepLinks = MutableStateFlow<DesktopDeepLinkRequest?>(null)
-    val quickQuery = DesktopQuickQueryCoordinator()
     nucleusApplication(
         args = args,
         backend = NucleusBackend.Awt,
@@ -100,24 +99,15 @@ private fun runDesktopApplication(
                     LaunchedEffect(Unit) {
                         activationHandler.attach(window)
                         window.minimumSize = Dimension(960, 640)
-                        // Windows 11 standard rounded corners + outline on the
-                        // undecorated frame.
-                        DesktopWindowsChrome.applyStandardChrome(window)
                     }
 
                     LettaDesktopApp(
-                        shell = DesktopAppShellBindings(
-                            nucleusApplicationScope = nucleusScope,
-                            window = window,
-                            deepLinks = deepLinks,
-                            quickQuery = quickQuery,
-                        ),
+                        nucleusApplicationScope = nucleusScope,
+                        window = window,
+                        deepLinks = deepLinks,
                         onActiveTitleChange = { windowTitle = it },
                     )
                 }
-                // Spotlight-style floating query bar, summoned by the global
-                // hotkey without raising the main window.
-                DesktopQuickQueryWindow(quickQuery)
             }
         }
 }
@@ -129,7 +119,7 @@ private fun runDesktopApplication(
  * a readable, actionable dialog before exiting.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-internal val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactory { window ->
+private val CrashReportingExceptionHandlerFactory = WindowExceptionHandlerFactory { window ->
     WindowExceptionHandler { throwable ->
         DesktopCrashReporter.logCrash(throwable, context = "window composition")
         val message = buildString {

@@ -71,31 +71,6 @@ class ChatHistoryPagerTest {
         assertEquals(listOf("live-1"), harness.uiState.value.messages.map { it.id })
     }
 
-    @Test
-    fun `releaseOlderMessages shrinks resident messages via the timeline observer`() = runTest {
-        val harness = Harness(scope = this)
-        val trimmed = listOf(uiMessage("live-1", "new"))
-        every { harness.chatTimelineObserver.releaseOlderMessages("conv-1", any()) } returns trimmed
-
-        harness.pager.releaseOlderMessages()
-        advanceUntilIdle()
-
-        assertEquals(trimmed.map { it.id }, harness.uiState.value.messages.map { it.id })
-        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) }
-    }
-
-    @Test
-    fun `releaseOlderMessages is a no-op when the observer reports nothing to release`() = runTest {
-        val harness = Harness(scope = this)
-        val before = harness.uiState.value.messages
-        every { harness.chatTimelineObserver.releaseOlderMessages("conv-1", any()) } returns before
-
-        harness.pager.releaseOlderMessages()
-        advanceUntilIdle()
-
-        assertEquals(before, harness.uiState.value.messages)
-    }
-
     private class Harness(
         scope: kotlinx.coroutines.CoroutineScope,
     ) {

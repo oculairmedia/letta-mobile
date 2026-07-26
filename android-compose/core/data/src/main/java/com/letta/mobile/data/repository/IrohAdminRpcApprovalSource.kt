@@ -30,18 +30,9 @@ class IrohAdminRpcApprovalSource(
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun submitApproval(
-        agentId: AgentId,
-        payload: MessageCreateRequest,
-        conversationId: String? = null,
-    ) {
+    suspend fun submitApproval(agentId: AgentId, payload: MessageCreateRequest) {
         val body = buildJsonObject {
             put("agent_id", agentId.value)
-            // letta-mobile-vilsn: thread the already-validated active conversation
-            // id so ApprovalAdminHandlers can pass it to the controller, which
-            // otherwise picks the FIRST cached runtime for the agent and answers
-            // the WRONG conversation when several are open.
-            conversationId?.takeIf { it.isNotBlank() }?.let { put("conversation_id", it) }
             put(
                 "payload",
                 json.encodeToJsonElement(MessageCreateRequest.serializer(), payload),

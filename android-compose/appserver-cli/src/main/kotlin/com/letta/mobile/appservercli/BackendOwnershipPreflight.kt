@@ -1,13 +1,8 @@
 package com.letta.mobile.appservercli
 
-import java.nio.ByteBuffer
-import java.nio.channels.FileChannel
-import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
-import java.nio.file.StandardOpenOption
 
 /**
  * Ownership fencing preflight for a Letta local-backend root
@@ -93,7 +88,7 @@ class BackendOwnershipPreflight(
             unit = unit,
             acquiredAtIso = nowIso(),
         )
-        writeSidecarAtomically(dir.resolve(OWNER_FILENAME), info.toJson())
+        Files.writeString(dir.resolve(OWNER_FILENAME), info.toJson())
         return FencedOwnership(lock, dir.resolve(OWNER_FILENAME), info)
     }
 
@@ -113,33 +108,6 @@ class BackendOwnershipPreflight(
 
     companion object {
         const val OWNER_FILENAME = ".owner.json"
-
-        /**
-         * Durably and atomically replace [target] with [content] (P1.4,
-         * letta-mobile-gn7kr.10). Writes a sibling `.tmp`, fsyncs it via
-         * [FileChannel.force] so the bytes survive power loss, then swaps it in with
-         * an ATOMIC_MOVE. A crash therefore leaves either the old sidecar or the new
-         * one — never a truncated/zero-byte record that would parse as a live owner.
-         */
-        private fun writeSidecarAtomically(target: Path, content: String) {
-            val tmp = target.resolveSibling("${target.fileName}.tmp")
-            FileChannel.open(
-                tmp,
-                StandardOpenOption.CREATE,
-                StandardOpenOption.WRITE,
-                StandardOpenOption.TRUNCATE_EXISTING,
-            ).use { channel ->
-                val buffer = ByteBuffer.wrap(content.toByteArray(Charsets.UTF_8))
-                while (buffer.hasRemaining()) channel.write(buffer)
-                channel.force(true)
-            }
-            try {
-                Files.move(tmp, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-            } catch (_: AtomicMoveNotSupportedException) {
-                // Filesystem can't do an atomic rename; fall back to a plain replace.
-                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
-            }
-        }
 
         private fun expandTilde(path: String): String {
             if (path == "~") return System.getProperty("user.home")

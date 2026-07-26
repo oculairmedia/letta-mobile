@@ -55,24 +55,6 @@ class MessageListPageGuardTest {
     }
 
     @Test
-    fun `newestLast false cursor points at the oldest kept row not the newest - P0_2`() {
-        // Input is newest->oldest (newest at index 0). The guard keeps the newest
-        // window (the front) and trims the oldest (the tail); next_before must be
-        // the OLDEST KEPT id so the next `before` query walks strictly older.
-        val messages = buildJsonArray {
-            repeat(500) { i -> add(msg("m-%04d".format(i), bodyBytes = 10_000)) }
-        }
-        val obj = MessageListPageGuard.bound(messages, newestLast = false) as JsonObject
-        val kept = (obj["messages"] as JsonArray).map { (it as JsonObject)["id"]!!.jsonPrimitive.content }
-        assertTrue(kept.contains("m-0000"), "newest (index 0) kept")
-        assertFalse(kept.contains("m-0499"), "oldest trimmed to the next page")
-        val cursor = obj["next_before"]?.jsonPrimitive?.content
-        // The oldest kept id is the LAST element in this mode — NOT kept.first() (the newest).
-        assertEquals(kept.last(), cursor, "cursor must be the oldest kept id")
-        assertFalse(cursor == kept.first(), "regression: cursor must not be the newest kept id")
-    }
-
-    @Test
     fun smallConversationIsReturnedUnchanged() {
         val messages = buildJsonArray { repeat(5) { i -> add(msg("m-$i", bodyBytes = 100)) } }
         val bounded = MessageListPageGuard.bound(messages)

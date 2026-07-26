@@ -323,7 +323,7 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 return
             }
             val host = uri.host
-            if (BridgeEgressGuard.isBlockedHost(host)) {
+            if (isBlockedHost(host)) {
                 output.writeJsonResponse(403, errorBody("blocked_host", "Requests to $host are not allowed."))
                 return
             }
@@ -347,56 +347,11 @@ class LocalAndroidNetworkBridge @Inject constructor(
             headers: List<Pair<String, String>>,
             bodyText: String?,
         ) {
-            // Auto-redirect is disabled so every hop's host is re-validated against
-            // the egress block list. Without this a public URL could 3xx-redirect to
-            // loopback / link-local / the cloud metadata endpoint (169.254.169.254)
-            // and bypass the front-door isBlockedHost() check (audit P1.5).
-            var currentUrl = url
-            var currentMethod = method
-            var currentBody = bodyText
-            var hop = 0
-            while (true) {
-                val connection = openFetchConnection(currentUrl, currentMethod, headers, currentBody)
-                val status = connection.responseCode
-                if (!isRedirectStatus(status)) {
-                    streamFetchResponse(output, connection)
-                    return
-                }
-                val location = connection.getHeaderField("Location")
-                connection.disconnect()
-                if (location.isNullOrBlank()) {
-                    throw IllegalStateException("Redirect response missing Location header.")
-                }
-                hop += 1
-                if (hop > MAX_REDIRECT_HOPS) {
-                    throw IllegalStateException("Too many redirects.")
-                }
-                val nextUri = resolveRedirectTarget(currentUrl, location)
-                    ?: throw IllegalStateException("Redirect to unsupported target: $location")
-                if (BridgeEgressGuard.isBlockedHost(nextUri.host)) {
-                    output.writeJsonResponse(403, errorBody("blocked_host", "Redirect to ${nextUri.host} is not allowed."))
-                    throw BridgeResponseStartedException(IllegalStateException("blocked redirect target"))
-                }
-                if (shouldDowngradeToGet(status, currentMethod)) {
-                    currentMethod = "GET"
-                    currentBody = null
-                }
-                currentUrl = nextUri.toString()
-            }
-        }
-
-        /** Opens a redirect-disabled connection with the bridge's timeouts, header allow-list, and bounded body. */
-        private fun openFetchConnection(
-            url: String,
-            method: String,
-            headers: List<Pair<String, String>>,
-            bodyText: String?,
-        ): HttpURLConnection =
-            (URL(url).openConnection() as HttpURLConnection).apply {
+            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = method
                 connectTimeout = FETCH_CONNECT_TIMEOUT_MS
                 readTimeout = FETCH_READ_IDLE_TIMEOUT_MS
-                instanceFollowRedirects = false
+                instanceFollowRedirects = true
                 headers.forEach { (key, value) ->
                     if (key.lowercase(Locale.US) !in BLOCKED_REQUEST_HEADERS) {
                         setRequestProperty(key, value)
@@ -411,31 +366,6 @@ class LocalAndroidNetworkBridge @Inject constructor(
                     outputStream.use { it.write(bytes) }
                 }
             }
-
-        /** A redirect we must follow (and re-validate): any 3xx except 304 Not Modified. */
-        private fun isRedirectStatus(status: Int): Boolean = status in 300..399 && status != 304
-
-        /**
-         * Resolves a Location header against the current URL and enforces the http(s)+host
-         * shape. Returns null when the target is unusable so the caller rejects it; note the
-         * egress block-list check is applied by the caller on the returned host.
-         */
-        private fun resolveRedirectTarget(currentUrl: String, location: String): URI? {
-            val nextUri = runCatching { URI(currentUrl).resolve(location) }.getOrNull() ?: return null
-            if (nextUri.scheme?.lowercase(Locale.US) !in setOf("http", "https") || nextUri.host.isNullOrBlank()) {
-                return null
-            }
-            return nextUri
-        }
-
-        /**
-         * 303, and 301/302 for non-HEAD, downgrade to a bodyless GET per the HTTP redirect
-         * semantics browsers follow; 307/308 preserve the original method and body.
-         */
-        private fun shouldDowngradeToGet(status: Int, method: String): Boolean =
-            status == 303 || ((status == 301 || status == 302) && method != "HEAD")
-
-        private fun streamFetchResponse(output: OutputStream, connection: HttpURLConnection) {
             connection.useResponse { input ->
                 val responseHeaders = connection.headerFields.orEmpty()
                     .filterKeys { it != null }
@@ -450,6 +380,20 @@ class LocalAndroidNetworkBridge @Inject constructor(
                 } catch (error: Throwable) {
                     throw BridgeResponseStartedException(error)
                 }
+            }
+        }
+
+        private fun isBlockedHost(host: String): Boolean {
+            val normalized = host.lowercase(Locale.US).trimEnd('.')
+            if (java.lang.Boolean.getBoolean(ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY) && (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "[::1]" || normalized == "::1")) return false
+            if (normalized == "localhost") return true
+            val addresses = runCatching { InetAddress.getAllByName(normalized).toList() }.getOrNull() ?: return false
+            return addresses.any { address ->
+                address.isAnyLocalAddress ||
+                    address.isLoopbackAddress ||
+                    address.isLinkLocalAddress ||
+                    address.isMulticastAddress ||
+                    address.hostAddress.orEmpty().startsWith("169.254.169.254")
             }
         }
 
@@ -568,59 +512,16 @@ class LocalAndroidNetworkBridge @Inject constructor(
         private const val MAX_RESPONSE_BYTES = 5 * 1024 * 1024
         private const val FETCH_CONNECT_TIMEOUT_MS = 30_000
         private const val FETCH_READ_IDLE_TIMEOUT_MS = 120_000
-        private const val MAX_REDIRECT_HOPS = 5
         private val ALLOWED_METHODS = setOf("GET", "POST", "PUT", "PATCH", "DELETE", "HEAD")
         private val METHODS_WITH_BODY = setOf("POST", "PUT", "PATCH", "DELETE")
         private val BLOCKED_REQUEST_HEADERS = setOf("host", "connection", "content-length", "transfer-encoding")
         private val BLOCKED_RESPONSE_HEADERS = setOf("connection", "content-length", "transfer-encoding")
+        private const val ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY = "com.letta.mobile.androidNetworkBridge.allowLoopbackFetchForTests"
 
         private fun newBridgeToken(): String {
             val bytes = ByteArray(32)
             SecureRandom().nextBytes(bytes)
             return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
-        }
-    }
-}
-
-/**
- * Egress guard for the on-device network bridge. Decides whether a host is off-limits
- * for the `/fetch` proxy so agent-triggered requests cannot reach loopback, private,
- * link-local, multicast, or cloud-metadata (169.254.169.254) endpoints (SSRF).
- *
- * Extracted to an internal object so the block decision is unit-testable in isolation
- * and so the same check can be re-applied on every redirect hop, not just the front door.
- */
-object BridgeEgressGuard {
-    private const val ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY =
-        "com.letta.mobile.androidNetworkBridge.allowLoopbackFetchForTests"
-
-    /**
-     * @param resolve DNS resolver, injectable for tests. Defaults to the system resolver.
-     * @return true when the host must NOT be reached.
-     *
-     * Fails CLOSED: if DNS resolution throws (NXDOMAIN, timeout, offline) the host is
-     * treated as blocked rather than allowed, so a resolution failure can never be used
-     * to slip past the guard (audit P1.5).
-     */
-    fun isBlockedHost(
-        host: String,
-        resolve: (String) -> List<InetAddress> = { InetAddress.getAllByName(it).toList() },
-    ): Boolean {
-        val normalized = host.lowercase(Locale.US).trimEnd('.')
-        if (java.lang.Boolean.getBoolean(ALLOW_LOOPBACK_FETCH_FOR_TESTS_PROPERTY) &&
-            (normalized == "localhost" || normalized == "127.0.0.1" || normalized == "[::1]" || normalized == "::1")
-        ) {
-            return false
-        }
-        if (normalized == "localhost") return true
-        val addresses = runCatching { resolve(normalized) }.getOrNull() ?: return true
-        if (addresses.isEmpty()) return true
-        return addresses.any { address ->
-            address.isAnyLocalAddress ||
-                address.isLoopbackAddress ||
-                address.isLinkLocalAddress ||
-                address.isMulticastAddress ||
-                address.hostAddress.orEmpty().startsWith("169.254.169.254")
         }
     }
 }

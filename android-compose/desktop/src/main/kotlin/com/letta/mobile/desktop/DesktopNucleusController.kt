@@ -6,12 +6,8 @@ import dev.nucleusframework.nativehttp.NativeHttpClient
 import dev.nucleusframework.notification.common.NotificationManager
 import dev.nucleusframework.notification.common.NotificationResult
 import dev.nucleusframework.notification.common.notification
-import dev.nucleusframework.notification.windows.DismissalReason
 import dev.nucleusframework.notification.windows.ShortcutPolicy
-import dev.nucleusframework.notification.windows.ToastNotificationListener
 import dev.nucleusframework.notification.windows.WindowsNotificationCenter
-import dev.nucleusframework.notification.windows.toast
-import java.util.concurrent.ConcurrentHashMap
 import dev.nucleusframework.core.runtime.Platform
 import dev.nucleusframework.systeminfo.SystemInfo
 import dev.nucleusframework.updater.NucleusUpdater
@@ -264,81 +260,13 @@ internal class DesktopNucleusController(
         }
     }
 
-    /**
-     * Completion toast carrying the agent's actual reply (truncated) instead
-     * of a generic line, plus a reply affordance. On Windows the toast has an
-     * inline text box (Google Messages-style: type and send without opening
-     * the app) via the platform toast DSL; elsewhere the cross-platform API
-     * only supports buttons, so Reply opens the conversation instead.
-     *
-     * [onReply] receives the typed inline text, or null when the user clicked
-     * the toast body / a plain Reply button (open the conversation).
-     */
-    fun notifyAgentFinished(
-        agentName: String,
-        replyPreview: String?,
-        onReply: (String?) -> Unit,
-    ) {
+    fun notifyAgentFinished(agentName: String, onActivated: () -> Unit) {
         scope.launch(Dispatchers.IO) {
-            val message = replyPreview?.takeIf { it.isNotBlank() } ?: "Your agent finished responding."
-            if (Platform.Current == Platform.Windows && WindowsNotificationCenter.isAvailable) {
-                showWindowsReplyToast(agentName, message, onReply)
-            } else {
-                notification(
-                    title = agentName,
-                    message = message,
-                    onActivated = { onReply(null) },
-                ) {
-                    button("Reply") { onReply(null) }
-                }.send()
-            }
-        }
-    }
-
-    private fun showWindowsReplyToast(
-        agentName: String,
-        message: String,
-        onReply: (String?) -> Unit,
-    ) {
-        val tag = "letta-finished-${toastTagCounter.incrementAndGet()}"
-        toastReplyHandlers[tag] = onReply
-        val content = toast {
-            visual {
-                text(agentName)
-                text(message)
-            }
-            actions {
-                textBox(
-                    id = TOAST_REPLY_INPUT_ID,
-                    placeholder = "Reply to $agentName…",
-                )
-                button(
-                    content = "Reply",
-                    arguments = TOAST_REPLY_ARGUMENT,
-                    inputId = TOAST_REPLY_INPUT_ID,
-                )
-            }
-        }
-        WindowsNotificationCenter.show(content, tag, TOAST_GROUP) {
-            toastReplyHandlers.remove(tag)
-        }
-    }
-
-    private val toastReplyHandlers = ConcurrentHashMap<String, (String?) -> Unit>()
-    private val toastTagCounter = java.util.concurrent.atomic.AtomicLong()
-
-    private val windowsToastListener = object : ToastNotificationListener {
-        override fun onActivated(tag: String, group: String, arguments: String, userInputs: Map<String, String>) {
-            val handler = toastReplyHandlers.remove(tag) ?: return
-            handler(userInputs[TOAST_REPLY_INPUT_ID]?.takeIf { it.isNotBlank() })
-        }
-
-        override fun onDismissed(tag: String, group: String, reason: DismissalReason) {
-            toastReplyHandlers.remove(tag)
-        }
-
-        override fun onFailed(tag: String, group: String, errorCode: Int) {
-            toastReplyHandlers.remove(tag)
+            notification(
+                title = agentName,
+                message = "Your agent finished responding.",
+                onActivated = onActivated,
+            ).send()
         }
     }
 
@@ -352,29 +280,13 @@ internal class DesktopNucleusController(
         }
     }
 
-    /**
-     * Releases the native notification wiring. Without this a replaced
-     * controller leaves its toast listener registered (duplicate deliveries)
-     * and its pending reply handlers alive.
-     */
-    fun close() {
-        if (Platform.Current == Platform.Windows) {
-            runCatching { WindowsNotificationCenter.removeListener(windowsToastListener) }
-        }
-        toastReplyHandlers.clear()
-    }
-
     private fun initializeNotifications(): Boolean {
         val initialized = if (Platform.Current == Platform.Windows) {
             WindowsNotificationCenter.initialize(
                 aumid = LETTA_WINDOWS_AUMID,
                 appName = LETTA_DESKTOP_APP_NAME,
                 shortcutPolicy = ShortcutPolicy.REQUIRE_CREATE,
-            ).also { ok ->
-                // Inline-reply toasts route their typed text back through this
-                // listener (tag → pending handler).
-                if (ok) WindowsNotificationCenter.addListener(windowsToastListener)
-            }
+            )
         } else {
             NotificationManager.isAvailable()
         }
@@ -384,7 +296,3 @@ internal class DesktopNucleusController(
         return initialized && NotificationManager.isAvailable()
     }
 }
-
-private const val TOAST_REPLY_INPUT_ID = "letta-toast-reply"
-private const val TOAST_REPLY_ARGUMENT = "letta-reply"
-private const val TOAST_GROUP = "letta-agent-finished"

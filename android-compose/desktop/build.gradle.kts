@@ -6,20 +6,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // This repo does not yet use a Gradle version catalog. Keep desktop-only
 // versions named here until dependency versions are centralized project-wide.
-//
-// WARNING — the Compose versions below are FLOORS, not the versions that ship.
-// The runtime classpath resolves the whole `org.jetbrains.compose` atomic group
-// to 1.11.1 by conflict resolution across eight requested versions (1.11.1,
-// 1.10.3, 1.10.0, 1.9.3, 1.9.1, 1.9.0, 1.7.0, 1.7.0-beta01). The 1.11.1 comes
-// transitively from `dev.nucleusframework:composenativetray-jvm`, so a Nucleus
-// bump silently moves the entire Compose runtime under us — that is exactly how
-// Jewel's LocalTextContextMenu ABI broke (see the bridge in DesktopJewelTheme).
-// Verify with:
-//   ./gradlew :desktop:dependencyInsight --configuration runtimeClasspath \
-//     --dependency org.jetbrains.compose.runtime:runtime
-// Pinning the group deliberately is worth doing, but it must be validated
-// against Jewel AND Nucleus together (both are compiled against different
-// Compose baselines) — do it as its own change, not as a drive-by bump.
 val composeDesktopMaterial3Version = "1.9.0"
 val composeDesktopMaterialIconsVersion = "1.7.3"
 val coroutinesVersion = "1.11.0"

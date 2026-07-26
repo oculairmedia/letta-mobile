@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
@@ -18,7 +17,6 @@ import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.ui.chat.render.ChatTimelineProjector
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -30,11 +28,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 import kotlin.time.Duration.Companion.milliseconds
 class DesktopChatController(
@@ -85,30 +81,6 @@ class DesktopChatController(
     /** Locally-tracked archived conversation ids (durable; see constructor note). */
     private var locallyArchivedIds: Set<String> = loadArchivedConversationIds()
 
-    /**
-     * Approval request ids whose decision (answer / dismiss) is in flight, so the
-     * structured AskUserQuestion card can disable its buttons while submitting.
-     */
-    private val _submittingApprovals = MutableStateFlow<Set<String>>(emptySet())
-    val submittingApprovals: StateFlow<Set<String>> = _submittingApprovals.asStateFlow()
-
-    /**
-     * Whether the active gateway can actually submit approvals (i.e. is a
-     * [DesktopApprovalSubmitter]). Demo / HTTP-only gateways can't, so the UI must
-     * disable/hide the approval-answer buttons instead of offering a silent no-op.
-     */
-    private val _canSubmitApprovals = MutableStateFlow(false)
-    val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
-
-    /**
-     * requestId -> conversationId for approvals submitted this session and awaiting
-     * reconciliation. The submit socket write returning is not proof the approval
-     * is closed, so the request stays marked submitting until it disappears from
-     * that conversation's projected timeline (see [reconcileSubmittedApprovals]),
-     * which prevents a second click re-submitting a non-idempotent approval.
-     */
-    private val submittedApprovalConversations = mutableMapOf<String, String>()
-
     /** Conversations whose delete is in flight — the sidebar shows a spinner. */
     private val _deletingConversationIds = MutableStateFlow<Set<String>>(emptySet())
     val deletingConversationIds: StateFlow<Set<String>> = _deletingConversationIds.asStateFlow()
@@ -136,11 +108,6 @@ class DesktopChatController(
      */
     private val _streamingConversationId = MutableStateFlow<String?>(null)
     val streamingConversationId: StateFlow<String?> = _streamingConversationId.asStateFlow()
-
-    // The conversation the user last SENT a prompt into ("now playing" for the
-    // bottom bar): sticky across selection changes so jumping back is one click.
-    private val _lastPromptedConversationId = MutableStateFlow<String?>(null)
-    val lastPromptedConversationId: StateFlow<String?> = _lastPromptedConversationId.asStateFlow()
 
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
@@ -211,16 +178,6 @@ class DesktopChatController(
 
     private var gateway: DesktopChatGateway? = null
 
-    /**
-     * Single point of truth for the active gateway. Keeps [_canSubmitApprovals] in
-     * sync so the approval cards only enable their buttons when the gateway can
-     * actually submit (a [DesktopApprovalSubmitter]).
-     */
-    private fun bindGateway(next: DesktopChatGateway?) {
-        gateway = next
-        _canSubmitApprovals.value = next is ApprovalSubmittingGateway || next is DesktopApprovalSubmitter
-    }
-
     // Per-conversation model overrides set this session (the picker). The
     // effective composer model otherwise comes from the conversation's agent.
     private var conversationModelById: Map<String, String> = emptyMap()
@@ -253,7 +210,7 @@ class DesktopChatController(
         activeLoop?.close()
         activeLoop = null
         (gateway as? AutoCloseable)?.close()
-        bindGateway(null)
+        gateway = null
         started = false
         _state.update { current ->
             initialState.withRuntimeState(
@@ -278,17 +235,11 @@ class DesktopChatController(
         activeLoop?.close()
         activeLoop = null
         (gateway as? AutoCloseable)?.close()
-        bindGateway(null)
+        gateway = null
     }
 
-    /**
-     * Selects [conversationId]. Returns the remote-selection [Job] when a
-     * remote load (and timeline-loop rebinding) was kicked off, so callers
-     * that must not race the loop swap — e.g. notification replies — can
-     * await it; null when the selection was a no-op or local-only.
-     */
-    fun selectConversation(conversationId: String): Job? {
-        if (closed) return null
+    fun selectConversation(conversationId: String) {
+        if (closed) return
         cleanupUnsentConversation(except = conversationId)
         var generation: Long? = null
         var shouldLoadRemote = false
@@ -303,11 +254,12 @@ class DesktopChatController(
             generation = if (shouldLoadRemote) next.selectionGeneration else null
             current.withRuntimeState(next)
         }
-        if (!shouldLoadRemote) return null
-        selectJob?.cancel()
-        return scope.launch {
-            selectRemoteConversation(conversationId, generation ?: return@launch)
-        }.also { selectJob = it }
+        if (shouldLoadRemote) {
+            selectJob?.cancel()
+            selectJob = scope.launch {
+                selectRemoteConversation(conversationId, generation ?: return@launch)
+            }
+        }
     }
 
     fun deleteConversation(conversationId: String) {
@@ -540,96 +492,6 @@ class DesktopChatController(
         }
     }
 
-    /**
-     * Answer or dismiss a parked approval (e.g. AskUserQuestion) surfaced in the
-     * selected conversation. Mirrors the mobile chat contract
-     * `(requestId, toolCallIds, approve, reason)`; the answer rides the `reason`
-     * channel (see [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason]).
-     * A no-op when the active gateway can't submit approvals (demo / HTTP-only).
-     */
-    fun submitApproval(
-        requestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-    ) {
-        if (closed) return
-        val gw = gateway
-        // letta-mobile-vilsn: the Iroh gateway answers via the shared
-        // ApprovalSubmittingGateway (admin_rpc approval.submit); the direct
-        // App Server gateway answers via DesktopApprovalSubmitter.
-        if (gw !is ApprovalSubmittingGateway && gw !is DesktopApprovalSubmitter) return
-        val conversation = _state.value.selectedConversation ?: return
-        val agentId = conversation.agentId?.takeIf { it.isNotBlank() } ?: return
-        submittedApprovalConversations[requestId] = conversation.id
-        _submittingApprovals.update { it + requestId }
-        scope.launch {
-            try {
-                when (gw) {
-                    is ApprovalSubmittingGateway -> gw.submitApproval(
-                        agentId = agentId,
-                        conversationId = conversation.id,
-                        approvalRequestId = requestId,
-                        toolCallId = toolCallIds.firstOrNull(),
-                        approve = approve,
-                        reason = reason,
-                    )
-                    is DesktopApprovalSubmitter -> gw.submitApproval(
-                        DesktopApprovalSubmission(
-                            agentId = agentId,
-                            conversationId = conversation.id,
-                            requestId = requestId,
-                            toolCallId = toolCallIds.firstOrNull(),
-                            approve = approve,
-                            reason = reason,
-                        ),
-                    )
-                }
-                // Success: leave the request marked submitting. The write is a
-                // one-way socket send, so the approval is not yet reconciled —
-                // clearing here would let a second click re-submit a
-                // non-idempotent approval. reconcileSubmittedApprovals() drops it
-                // once the approval disappears from the timeline (replaced by its
-                // response).
-            } catch (cancelled: CancellationException) {
-                clearSubmittedApproval(requestId)
-                throw cancelled
-            } catch (t: Throwable) {
-                clearSubmittedApproval(requestId)
-                if (!closed) {
-                    _state.update {
-                        it.copy(errorMessage = t.message ?: t::class.simpleName ?: "Could not submit answer")
-                    }
-                }
-            }
-        }
-    }
-
-    /** Re-enable a request (submit failed / was cancelled) so it can be retried. */
-    private fun clearSubmittedApproval(requestId: String) {
-        submittedApprovalConversations.remove(requestId)
-        if (!closed) _submittingApprovals.update { it - requestId }
-    }
-
-    /**
-     * Drop any submitted approval that has disappeared from [conversationId]'s
-     * projected timeline — the host has reconciled it (the request was replaced by
-     * its response), so the card can leave its disabled/submitting state. Scoped by
-     * conversation so switching chats never re-enables another chat's in-flight
-     * approval.
-     */
-    private fun reconcileSubmittedApprovals(conversationId: String, messages: List<UiMessage>) {
-        if (submittedApprovalConversations.isEmpty()) return
-        val present = messages.mapNotNull { it.approvalRequest?.requestId }.toSet()
-        val reconciled = submittedApprovalConversations
-            .filterValues { it == conversationId }
-            .keys
-            .filter { it !in present }
-        if (reconciled.isEmpty()) return
-        reconciled.forEach { submittedApprovalConversations.remove(it) }
-        _submittingApprovals.update { it - reconciled.toSet() }
-    }
-
     fun updateComposerText(text: String) {
         if (closed) return
         _state.update { it.withRuntimeState(ChatSessionReducer.updateComposerText(it.runtimeState, text)) }
@@ -656,47 +518,9 @@ class DesktopChatController(
         _state.update { it.copy(errorMessage = message) }
     }
 
-    /**
-     * Inline reply from a notification toast: select the target conversation
-     * and await the selection's remote load — the job that rebinds the active
-     * timeline loop — before sending, so the send can never race onto the
-     * previous conversation's loop. Bounded so a wedged load still sends
-     * best-effort into the (already-updated) selection state.
-     */
-    fun replyFromNotification(conversationId: String, text: String) {
-        if (closed) return
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
-        scope.launch {
-            val selection = selectConversation(conversationId)
-            withTimeoutOrNull(NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS) { selection?.join() }
-            updateComposerText(trimmed)
-            send()
-        }
-    }
-
-    /**
-     * User-facing interrupt (bottom-bar stop), scoped to [conversationId]:
-     * a no-op when the in-flight work belongs to a different conversation, so
-     * an unrelated send can never be cancelled by mistake. The send pipeline's
-     * finally clears the streaming flag on cancellation; thinking is cleared
-     * here because the cancellation path rethrows before failure-path cleanup.
-     * Client-side only — the server turn may still run to completion.
-     */
-    fun stopActiveRun(conversationId: String) {
-        if (closed) return
-        val active = _streamingConversationId.value ?: _thinkingConversationId.value
-        if (active != null && active != conversationId) return
-        sendJob?.cancel()
-        if (_thinkingConversationId.value == conversationId) {
-            _thinkingConversationId.value = null
-        }
-    }
-
     fun send() {
         if (closed) return
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
-        _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
         val loop = activeLoop
         if (loop == null || !_state.value.isRemoteBacked) {
             _state.update {
@@ -880,7 +704,7 @@ class DesktopChatController(
 
         try {
             val nextGateway = gatewayFactory()
-            bindGateway(nextGateway)
+            gateway = nextGateway
 
             // Load the model catalog for the composer model picker (best-effort).
             scope.launch {
@@ -1018,7 +842,6 @@ class DesktopChatController(
         )
         if (projection.noChange) return
         val messages = projection.ui
-        reconcileSubmittedApprovals(conversationId, messages)
         // Stop "thinking" once the agent's reply begins to land. Use the
         // timeline tail (projection.tailIsAssistant) as well as the projected
         // list: an A2UI-only reply is extracted out of the rendered text, so
@@ -1042,9 +865,6 @@ class DesktopChatController(
         }
     }
 }
-
-/** How long a notification reply waits for the conversation switch to settle. */
-private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
 
 /** Conversation-list scope filter, mapped to the `archive_status` query param. */
 enum class ConversationArchiveFilter(val apiValue: String, val label: String) {

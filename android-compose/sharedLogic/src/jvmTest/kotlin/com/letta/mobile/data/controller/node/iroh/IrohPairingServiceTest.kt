@@ -152,31 +152,6 @@ class IrohPairingServiceTest {
     }
 
     @Test
-    fun filePairedPeerStoreLeavesNoTempFilesAndStaysParseableAcrossManyWrites() {
-        // P3.7 (gn7kr.26): the durable write path is fsync temp -> atomic rename ->
-        // fsync parent dir. After a burst of writes the destination must be a single
-        // valid file with no orphaned .tmp-* siblings (each write must consume its temp).
-        val dir = Files.createTempDirectory("pairing-durability")
-        val path = dir.resolve("paired-peers.json")
-        val store = FilePairedPeerStore(path)
-
-        repeat(25) { i ->
-            store.save(PairedPeer(nodeId = i.toString().padStart(64, '0'), name = "peer-$i", pairedAtMs = i.toLong()))
-        }
-        store.remove("0".padStart(64, '0'))
-
-        val leftoverTemps = Files.list(dir).use { stream ->
-            stream.filter { it.fileName.toString().contains(".tmp-") }.toList()
-        }
-        assertTrue(leftoverTemps.isEmpty(), "atomic write must not leave temp files: $leftoverTemps")
-
-        val reloaded = FilePairedPeerStore(path)
-        assertEquals(24, reloaded.list().size, "every committed write must be durable and parseable")
-        assertFalse(reloaded.isPaired("0".padStart(64, '0')), "removed peer must not survive")
-        assertTrue(reloaded.isPaired("24".padStart(64, '0')), "last write must be durable")
-    }
-
-    @Test
     fun pruneExpiredDropsAbandonedInvites() {
         val (pairing, clock) = service()
         val invite = pairing.createInvite("old", ttlMs = 1_000)

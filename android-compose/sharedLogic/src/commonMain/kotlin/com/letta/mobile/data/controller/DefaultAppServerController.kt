@@ -6,6 +6,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import kotlin.time.Clock
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -201,8 +202,6 @@ class DefaultAppServerController(
         approvalRequestId: String,
         approve: Boolean,
         reason: String?,
-        toolCallId: String?,
-        updatedInput: kotlinx.serialization.json.JsonObject?,
     ) {
         val runtime = runtimeMutex.withLock {
             val conversationValue = conversationId?.value
@@ -211,38 +210,16 @@ class DefaultAppServerController(
             }?.value?.scope
         } ?: throw AppServerControllerException("No active runtime found for approval $approvalRequestId")
 
-        // letta-mobile-vilsn: the structured close payload (e.g. an AskUserQuestion
-        // answer) is now threaded as a first-class `updated_input` param (decoded
-        // upstream in MessageRepositoryApproval), so this terminal no longer
-        // re-decodes the `reason` sentinel. When present, close the tool call by
-        // returning the answer as `updated_input` rather than a bare allow.
-        val answerUpdatedInput = if (approve) updatedInput else null
-        // letta-mobile-vilsn: interactive tools (AskUserQuestion) are gated by
-        // letta-code's `can_use_tool` control request, whose id (e.g.
-        // `perm-call_…`) is NOT the display approval id the app renders from and
-        // is NOT reliably derivable from the tool_call_id across LLM providers
-        // (`call_…` vs `toolu_…`). Answer against the REAL id the engine captured
-        // when it surfaced the approval; fall back to the historical heuristic
-        // only if nothing was captured.
-        val effectiveRequestId = when {
-            answerUpdatedInput == null || toolCallId == null -> approvalRequestId
-            else -> turnEngine.consumeUserInputApprovalId(toolCallId)
-                ?: ("perm-" + toolCallId)
-        }
-
-        val decision = AppServerApprovalDecisions.decide(
-            approve = approve,
-            updatedInput = answerUpdatedInput,
-            message = reason,
-            defaultApproveMessage = "Approved by mobile client.",
-            defaultDenyMessage = "Denied by mobile client.",
-        )
         client.input(
             AppServerCommand.Input(
                 runtime = runtime,
                 payload = AppServerInputPayload.ApprovalResponse(
-                    requestId = effectiveRequestId,
-                    decision = decision,
+                    requestId = approvalRequestId,
+                    decision = if (approve) {
+                        AppServerApprovalResponseDecision.Allow(message = reason ?: "Approved by mobile client.")
+                    } else {
+                        AppServerApprovalResponseDecision.Deny(message = reason ?: "Denied by mobile client.")
+                    },
                 ),
             ),
         )

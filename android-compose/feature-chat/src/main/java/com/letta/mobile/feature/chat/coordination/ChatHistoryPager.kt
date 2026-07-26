@@ -173,31 +173,6 @@ internal class ChatHistoryPager(
             }
         }
     }
-
-    /**
-     * Sliding-window release: called when the user scrolls back toward the
-     * live tail after having pulled in older pages, so the resident window
-     * shrinks again instead of only ever growing across a chat session.
-     * Older content is never lost — it's re-fetched via [loadOlderMessages]
-     * the next time the user scrolls back up, using the standard cursor
-     * derived from whatever is now the oldest resident message.
-     */
-    fun releaseOlderMessages() {
-        val conversationId = activeConversationId() ?: return
-        val current = uiState.value
-        val released = chatTimelineObserver.releaseOlderMessages(conversationId, current.messages)
-        if (released.size == current.messages.size) return
-        Telemetry.event(
-            "ChatHistoryPager", "releaseOlder",
-            "conversationId" to conversationId,
-            "beforeCount" to current.messages.size,
-            "afterCount" to released.size,
-        )
-        uiState.value = current.copy(
-            messages = released.toImmutableList(),
-            messageListChange = ChatMessageListChange.Full,
-        )
-    }
 }
 
 /**

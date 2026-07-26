@@ -1,11 +1,9 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -22,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
@@ -52,27 +49,15 @@ import kotlinx.coroutines.flow.StateFlow
 import java.awt.Window
 import dev.nucleusframework.application.NucleusApplicationScope
 
-/** Application-scoped inputs the desktop shell composes over. */
-internal data class DesktopAppShellBindings(
-    val nucleusApplicationScope: NucleusApplicationScope,
-    val window: Window,
-    val deepLinks: StateFlow<DesktopDeepLinkRequest?>,
-    val quickQuery: DesktopQuickQueryCoordinator,
-)
-
 @Composable
 internal fun LettaDesktopApp(
-    shell: DesktopAppShellBindings,
+    nucleusApplicationScope: NucleusApplicationScope,
+    window: Window,
+    deepLinks: StateFlow<DesktopDeepLinkRequest?>,
     onActiveTitleChange: (String) -> Unit = {},
 ) {
-    val nucleusApplicationScope = shell.nucleusApplicationScope
-    val window = shell.window
-    val deepLinks = shell.deepLinks
-    val quickQuery = shell.quickQuery
     var selectedDestination by rememberSaveable { mutableStateOf(DesktopDestination.Conversations) }
-    // Spotify-style library toggle: icon rail ↔ expanded names-and-spaces list.
-    var railExpanded by rememberSaveable { mutableStateOf(false) }
-    val overlays = remember { DesktopOverlayVisibility() }
+    var showNewAgentDialog by remember { mutableStateOf(false) }
     // Avatar styles chosen via the editor this session, applied immediately to the
     // orbs regardless of whether the backend round-trips agent metadata.
     var avatarOverrides by remember { mutableStateOf(emptyMap<String, Int>()) }
@@ -84,7 +69,7 @@ internal fun LettaDesktopApp(
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
     val chatScope = rememberCoroutineScope()
-    val nucleusController = rememberDesktopNucleusController(chatScope)
+    val nucleusController = remember(chatScope) { DesktopNucleusController(chatScope) }
     val nucleusState by nucleusController.state.collectAsState()
     val irohTransport = rememberIrohTransport(activeConfig, chatScope)
     val irohMode = irohTransport != null
@@ -109,28 +94,20 @@ internal fun LettaDesktopApp(
     val chatState by chatController.state.collectAsState()
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
-    val submittingApprovals by chatController.submittingApprovals.collectAsState()
-    val canSubmitApprovals by chatController.canSubmitApprovals.collectAsState()
     val modelOptions = remember(availableModels) { buildModelOptions(availableModels) }
     val httpApis = rememberDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
     val blockApi = httpApis.blockApi
     val cronPanel = remember(httpApis.cronApi) { DesktopCronPanelState(httpApis.cronApi, chatScope) }
     val skillsPanel = remember(httpApis.skillApi) { DesktopSkillsPanelState(httpApis.skillApi, chatScope) }
     var agentSlashCommands by remember(httpApis.slashCommandApi) { mutableStateOf<List<AgentSlashCommand>>(emptyList()) }
-    val subagents = rememberSubagentRegistry(
-        request = SubagentRegistryRequest(
-            activeConfig = activeConfig,
-            irohMode = irohMode,
-            parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
-            irohTransport = irohTransport,
-        ),
-        chatScope = chatScope,
-    )
+    val subagents = rememberSubagentRegistry(activeConfig, irohMode, chatScope, subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId))
     val subagentRepository = subagents.repository
     val activeSubagents by subagents.activeSubagents
     var showBackgroundTasks by remember { mutableStateOf(false) }
     // Work | Play presentation lens over the same agents/memory/conversations.
     var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
+    var showModelPicker by remember { mutableStateOf(false) }
+    var showCommandPalette by remember { mutableStateOf(false) }
     val libraries = rememberDesktopLibraryControllers(
         sessionGraphId = bootstrapState.sessionGraphId,
         sessionGraphProvider = dataBindings.sessionGraphProvider,
@@ -140,14 +117,14 @@ internal fun LettaDesktopApp(
     val scheduleLibraryState by libraries.schedules.state.collectAsState()
     val channelLibraryState by libraries.channels.state.collectAsState()
     val toolLibraryState by libraries.tools.state.collectAsState()
-    CommandPaletteKeyDispatcherEffect(onOpenPalette = { overlays.commandPalette = true })
+    CommandPaletteKeyDispatcherEffect(onOpenPalette = { showCommandPalette = true })
     val imageAttachmentLoader = remember { DesktopImageAttachmentLoader() }
     val pickerLauncher = rememberFilePickerLauncher(
         type = FileKitType.Image,
-        mode = FileKitMode.Multiple(maxItems = ImageIngressPolicy.MAX_FILES),
-        dialogSettings = FileKitDialogSettings(title = "Attach images"),
-    ) { files ->
-        files.orEmpty().forEach { file ->
+        mode = FileKitMode.Single,
+        dialogSettings = FileKitDialogSettings(title = "Attach image"),
+    ) { file ->
+        if (file != null) {
             chatScope.launch {
                 runCatching {
                     val path = file.file.toPath()
@@ -161,7 +138,7 @@ internal fun LettaDesktopApp(
             }
         }
     }
-    val isDragActive by DesktopImageIngressEffect(
+    DesktopImageIngressEffect(
         DesktopImageIngressConfig(
             enabled = selectedDestination == DesktopDestination.Conversations,
             scope = chatScope,
@@ -316,86 +293,25 @@ internal fun LettaDesktopApp(
         ),
     )
     DesktopNucleusEffects(
-        bindings = DesktopNucleusEffectBindings(
-            applicationScope = nucleusApplicationScope,
-            window = window,
-            controller = nucleusController,
-            // Read through the controller's live state: the toast fires from a
-            // coroutine after composition-captured chatState may be stale.
-            replyPreviewFor = { conversationId ->
-                notificationReplyPreview(
-                    chatController.state.value.messagesByConversationId[conversationId],
-                )
-            },
-            onOpenConversation = { conversationId ->
-                editAgentId = null
-                chatController.selectConversation(conversationId)
-                selectedDestination = DesktopDestination.Conversations
-            },
-            onReplyToConversation = chatController::replyFromNotification,
-        ),
+        bindings = DesktopNucleusEffectBindings(nucleusApplicationScope, window, nucleusController),
         state = desktopNucleusEffectState(
             DesktopNucleusRuntimeState(
                 thinkingConversationId = thinkingConversationId,
                 isStreamingReply = replyPresence.isStreaming,
-                selectedConversationId = chatState.selectedConversationId,
                 agentName = workingAgentName,
                 errorMessage = chatState.errorMessage,
-                workProgress = subagentWorkProgress(activeSubagents.map { it.status }),
             ),
         ),
         actions = DesktopNucleusEffectActions(
-            onOpenCommandPalette = { overlays.commandPalette = true },
+            onOpenCommandPalette = { showCommandPalette = true },
             // Clear the full-page agent editor like the sidebar and deep-link
             // paths do, or the editor branch keeps rendering over Settings.
             onOpenSettings = {
                 editAgentId = null
                 selectedDestination = DesktopDestination.Settings
             },
-            onQuickQuery = quickQuery::open,
         ),
     )
-
-    // Publish palette data + routing into the application-scoped quick-query
-    // window. Selecting an item mirrors the in-app command palette; free text
-    // goes to the selected conversation and raises the main window to show
-    // the streaming response.
-    LaunchedEffect(paletteItems) { quickQuery.items.value = paletteItems }
-    SideEffect {
-        quickQuery.actions.value = DesktopQuickQueryActions(
-            onSelectItem = { item ->
-                activateDesktopWindow(window)
-                when (item.kind) {
-                    PaletteItemKind.Conversation -> {
-                        editAgentId = null
-                        chatController.selectConversation(item.id)
-                        selectedDestination = DesktopDestination.Conversations
-                    }
-                    PaletteItemKind.Agent -> openAgent(item.id)
-                    PaletteItemKind.Destination ->
-                        DesktopDestination.entries.firstOrNull { it.name == item.id }
-                            ?.let {
-                                editAgentId = null
-                                selectedDestination = it
-                            }
-                }
-            },
-            onSubmitPrompt = { text, ambientContext ->
-                val prompt = quickQueryPrompt(text, ambientContext)
-                val target = chatState.selectedConversationId
-                if (target != null) {
-                    chatController.replyFromNotification(target, prompt)
-                } else {
-                    // No conversation yet: never drop the typed prompt —
-                    // stage it in the composer for the user to send.
-                    chatController.updateComposerText(prompt)
-                }
-                activateDesktopWindow(window)
-                editAgentId = null
-                selectedDestination = DesktopDestination.Conversations
-            },
-        )
-    }
 
     AvatarPresenceEffects(
         avatar = avatar,
@@ -424,8 +340,7 @@ internal fun LettaDesktopApp(
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background,
         ) {
-          Column(Modifier.fillMaxSize()) {
-          Box(Modifier.weight(1f).fillMaxWidth()) {
+          Box(Modifier.fillMaxSize()) {
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -436,14 +351,13 @@ internal fun LettaDesktopApp(
                             thinkingAgentId = thinkingAgentId,
                             avatarStyleByAgentId = avatarStyleByAgentId,
                         ),
-                        expanded = railExpanded,
+                        avatarCompanionActive = avatar.isActive,
                     ),
                     actions = DesktopAgentRailActions(
                         onAgentSelected = { agentId -> openAgent(agentId) },
-                        // Contacts-style picker over the persistent-agent
-                        // roster; agent creation lives inside it.
-                        onNewSession = { overlays.newConversation = true },
-                        onToggleExpanded = { railExpanded = !railExpanded },
+                        onNewSession = { showNewAgentDialog = true },
+                        onSearch = { showCommandPalette = true },
+                        onAvatarCompanion = avatar.toggle,
                     ),
                 )
                 RailDivider()
@@ -511,7 +425,7 @@ internal fun LettaDesktopApp(
                             BuildComposerCommandsParams(
                                 chatController = chatController,
                                 agentSlashCommands = agentSlashCommands,
-                                onCreateAgent = { overlays.newAgent = true },
+                                onCreateAgent = { showNewAgentDialog = true },
                                 onEditAgent = { editAgentId = selectedAgentId },
                                 onNavigate = { selectedDestination = it },
                             ),
@@ -528,22 +442,15 @@ internal fun LettaDesktopApp(
                                     workPlayMode,
                                     selectedAgentName,
                                 ),
-                                submittingApprovalRequestIds = submittingApprovals,
                             ),
                             actions = ChatDetailPaneActions(
                                 onComposerTextChanged = chatController::updateComposerText,
                                 onSend = chatController::send,
-                                // Only wire the submit handler when the active gateway can actually
-                                // submit approvals; on demo / HTTP-only gateways the cast in
-                                // submitApproval fails and the write is a silent no-op, so pass null
-                                // and let the card disable/hide its buttons instead.
-                                onSubmitApproval = chatController::submitApproval
-                                    .takeIf { canSubmitApprovals },
                                 onAttachImage = { pickerLauncher.launch() },
                                 onRemoveImageAttachment = chatController::removeImageAttachment,
                                 onRetryConnection = chatController::retryConnection,
                                 onModelSelected = chatController::setConversationModel,
-                                onOpenModelPicker = { overlays.modelPicker = true },
+                                onOpenModelPicker = { showModelPicker = true },
                                 onOnboardingTask = { kind ->
                                     when (kind) {
                                         OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
@@ -590,13 +497,42 @@ internal fun LettaDesktopApp(
                                     onRefresh = libraries.memory::reload,
                                     onAgentSelected = libraries.memory::selectAgent,
                                 ),
-                                schedules = destinationScheduleActions(
-                                    ScheduleWiringDeps(
-                                        schedules = libraries.schedules,
-                                        cronPanel = cronPanel,
-                                        scheduleLibraryState = scheduleLibraryState,
-                                        selectedAgentId = selectedAgentId,
-                                    ),
+                                schedules = DestinationScheduleActions(
+                                    onRefresh = libraries.schedules::reload,
+                                    onAgentSelected = libraries.schedules::selectAgent,
+                                    onDeleteCron = { id ->
+                                        if (scheduleLibraryState.schedules.any { it.id == id }) {
+                                            libraries.schedules.deleteSchedule(id)
+                                        } else {
+                                            cronPanel.delete(DesktopCronTaskId(id))
+                                        }
+                                    },
+                                    onCreateCron = { filteredAgentId, name, prompt, cron, recurring, tz ->
+                                        val targetAgent = filteredAgentId
+                                            ?: scheduleLibraryState.selectedAgentId
+                                            ?: selectedAgentId
+                                        if (targetAgent == null) {
+                                            // No agent focused — create UI should already be disabled.
+                                        } else if (cronPanel.available) {
+                                            cronPanel.create(
+                                                CronDraft(
+                                                    agentId = DesktopAgentId(targetAgent),
+                                                    name = name,
+                                                    prompt = prompt,
+                                                    cron = cron,
+                                                    recurring = recurring,
+                                                    timezone = tz,
+                                                ),
+                                            )
+                                        } else {
+                                            libraries.schedules.createRecurringSchedule(
+                                                agentId = targetAgent,
+                                                name = name,
+                                                prompt = prompt,
+                                                cronExpression = cron,
+                                            )
+                                        }
+                                    },
                                 ),
                                 onChannelsRefresh = libraries.channels::refresh,
                                 tools = DestinationToolsActions(
@@ -606,18 +542,35 @@ internal fun LettaDesktopApp(
                                     onClearTags = libraries.tools::clearTags,
                                     onLoadMore = libraries.tools::loadMore,
                                 ),
-                                skills = destinationSkillsActions(
-                                    skillsPanel = skillsPanel,
-                                    chatScope = chatScope,
-                                    selectedAgentId = selectedAgentId,
+                                skills = DestinationSkillsActions(
+                                    onRefresh = {
+                                        chatScope.launch {
+                                            skillsPanel.reload(selectedAgentId?.let(::DesktopAgentId))
+                                        }
+                                    },
+                                    onInstall = { name ->
+                                        skillsPanel.install(
+                                            selectedAgentId?.let(::DesktopAgentId),
+                                            DesktopSkillName(name),
+                                        )
+                                    },
+                                    onUninstall = { name ->
+                                        skillsPanel.uninstall(
+                                            selectedAgentId?.let(::DesktopAgentId),
+                                            DesktopSkillName(name),
+                                        )
+                                    },
                                 ),
                                 onConfigSaved = { applyConfig(it) },
                                 onTokenCleared = {
                                     applyConfig(activeConfig.copy(accessToken = null))
                                 },
-                                // Destructive (breaks device pairings) — route
-                                // through the confirmation dialog first.
-                                onIrohIdentityReset = { overlays.irohResetConfirm = true },
+                                onIrohIdentityReset = {
+                                    com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
+                                    // Rebuild the session graph so the next dial
+                                    // mints and uses the new identity.
+                                    applyConfig(activeConfig)
+                                },
                                 nucleus = destinationNucleusActions(nucleusController, window),
                             ),
                             modifier = Modifier.fillMaxSize(),
@@ -645,64 +598,52 @@ internal fun LettaDesktopApp(
                     modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp),
                 )
             }
-            DesktopAppOverlays(
-                visibility = overlays,
-                data = DesktopOverlayData(
-                    availableModels = availableModels,
-                    composerModelLabel = chatState.composerModelLabel,
-                    modelOptions = modelOptions,
-                    paletteItems = paletteItems,
-                    railAgents = railAgents,
-                    rosterAgents = rosterAgents,
-                    avatarStyleByAgentId = avatarStyleByAgentId,
-                    isDragActive = isDragActive,
-                ),
-                actions = DesktopOverlayActions(
-                    onModelSelected = chatController::setConversationModel,
-                    onSelectConversation = {
-                        chatController.selectConversation(it)
-                        selectedDestination = DesktopDestination.Conversations
+            if (showModelPicker) {
+                DesktopModelPickerSheet(
+                    models = availableModels,
+                    selectedValue = chatState.composerModelLabel,
+                    onSelect = chatController::setConversationModel,
+                    onDismiss = { showModelPicker = false },
+                )
+            }
+            if (showCommandPalette) {
+                DesktopCommandPalette(
+                    items = paletteItems,
+                    onSelect = { item ->
+                        when (item.kind) {
+                            PaletteItemKind.Conversation -> {
+                                chatController.selectConversation(item.id)
+                                selectedDestination = DesktopDestination.Conversations
+                            }
+                            PaletteItemKind.Agent -> openAgent(item.id)
+                            PaletteItemKind.Destination ->
+                                DesktopDestination.entries.firstOrNull { it.name == item.id }
+                                    ?.let { selectedDestination = it }
+                        }
                     },
-                    onOpenAgent = ::openAgent,
-                    onNavigate = { selectedDestination = it },
-                    onCreateAgent = { name, modelValue ->
-                        val (model, embedding) = resolveNewAgentDefaults(
-                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                            templateAgentId = selectedAgentId,
-                            modelValue = modelValue,
-                        )
-                        chatController.createAgent(name = name, model = model, embedding = embedding)
-                        selectedDestination = DesktopDestination.Conversations
-                    },
-                    onIrohIdentityReset = {
-                        com.letta.mobile.desktop.security.DesktopIrohIdentity.reset()
-                        // Rebuild the session graph so the next dial mints and
-                        // uses the new identity.
-                        applyConfig(activeConfig)
-                    },
-                ),
-            )
-          }
-          DesktopNowActiveBarHost(
-              chatController = chatController,
-              chatState = chatState,
-              host = NowActiveBarHostState(
-                  thinkingConversationId = thinkingConversationId,
-                  isStreamingReplySelected = isStreamingReplySelected,
-                  avatarStyleByAgentId = avatarStyleByAgentId,
-                  fallbackOrbIndex = selectedAgentOrbIndex,
-                  avatarCompanionActive = avatar.isActive,
-              ),
-              actions = NowActiveBarHostActions(
-                  onOpenConversation = { conversationId ->
-                      editAgentId = null
-                      chatController.selectConversation(conversationId)
-                      selectedDestination = DesktopDestination.Conversations
-                  },
-                  onAvatarCompanion = avatar.toggle,
-                  onStopRun = chatController::stopActiveRun,
-              ),
-          )
+                    onDismiss = { showCommandPalette = false },
+                )
+            }
+            // Edit agent is now a full-page surface in the main content pane
+            // (see DesktopEditAgentSurface), not a modal overlay.
+            if (showNewAgentDialog) {
+                NewAgentDialog(
+                    NewAgentDialogParams(
+                        modelOptions = modelOptions,
+                        onDismiss = { showNewAgentDialog = false },
+                        onCreate = { name, modelValue ->
+                            showNewAgentDialog = false
+                            val (model, embedding) = resolveNewAgentDefaults(
+                                agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                                templateAgentId = selectedAgentId,
+                                modelValue = modelValue,
+                            )
+                            chatController.createAgent(name = name, model = model, embedding = embedding)
+                            selectedDestination = DesktopDestination.Conversations
+                        },
+                    ),
+                )
+            }
           }
         }
     }

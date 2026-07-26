@@ -4,8 +4,6 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.runtime.ConversationId
 import kotlin.time.Clock
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -33,18 +31,6 @@ class RuntimeRegistryCoordinator(
     private val registry: RuntimeRegistry,
 ) {
     private val recoveryMutex = Mutex()
-
-    /**
-     * Guards [ensureRecordLocks] itself (the map of per-key locks).
-     */
-    private val ensureRecordLocksGuard = Mutex()
-
-    /**
-     * Per-(agentId, conversationId) locks that serialize the check-then-insert in
-     * [ensureRecord]. Without this, two concurrent callers for the same
-     * agent/conversation could both observe "no record" and both insert.
-     */
-    private val ensureRecordLocks = mutableMapOf<Pair<String, String>, Mutex>()
 
     /**
      * Recovers all active runtime records from the registry.
@@ -120,56 +106,40 @@ class RuntimeRegistryCoordinator(
         displayName: String? = null,
         role: String? = null,
     ): RuntimeRecord {
-        // Serialize check-then-insert per (agentId, conversationId) so two
-        // concurrent callers cannot both observe "no record" and both insert.
-        val perKeyLock = lockFor(agentId, conversationId)
-        return perKeyLock.withLock {
-            // Check if record already exists
-            val existing = try {
-                registry.findByAgentAndConversation(agentId, conversationId)
-            } catch (e: Exception) {
-                throw RuntimeRegistryCoordinatorException(
-                    "Failed to find runtime record for $agentId/$conversationId",
-                    e,
-                )
-            }
-
-            if (existing != null) {
-                return@withLock existing
-            }
-
-            // Create new record
-            val newRecord = RuntimeRecord(
-                id = generateRuntimeRecordId(),
-                agentId = agentId,
-                conversationId = conversationId,
-                cwd = cwd,
-                displayName = displayName,
-                role = role,
+        // Check if record already exists
+        val existing = try {
+            registry.findByAgentAndConversation(agentId, conversationId)
+        } catch (e: Exception) {
+            throw RuntimeRegistryCoordinatorException(
+                "Failed to find runtime record for $agentId/$conversationId",
+                e,
             )
-
-            try {
-                registry.save(newRecord)
-            } catch (e: Exception) {
-                throw RuntimeRegistryCoordinatorException(
-                    "Failed to save new runtime record for $agentId/$conversationId",
-                    e,
-                )
-            }
-
-            newRecord
         }
-    }
 
-    /**
-     * Returns the per-(agentId, conversationId) [Mutex], creating it on first use.
-     * The map itself is guarded by [ensureRecordLocksGuard].
-     */
-    private suspend fun lockFor(agentId: AgentId, conversationId: ConversationId): Mutex {
-        val key = agentId.value to conversationId.value
-        return ensureRecordLocksGuard.withLock {
-            ensureRecordLocks.getOrPut(key) { Mutex() }
+        if (existing != null) {
+            return existing
         }
+
+        // Create new record
+        val newRecord = RuntimeRecord(
+            id = generateRuntimeRecordId(),
+            agentId = agentId,
+            conversationId = conversationId,
+            cwd = cwd,
+            displayName = displayName,
+            role = role,
+        )
+
+        try {
+            registry.save(newRecord)
+        } catch (e: Exception) {
+            throw RuntimeRegistryCoordinatorException(
+                "Failed to save new runtime record for $agentId/$conversationId",
+                e,
+            )
+        }
+
+        return newRecord
     }
 
     /**
@@ -194,16 +164,17 @@ class RuntimeRegistryCoordinator(
     }
 
     companion object {
+        private var nextRecordId = 0
+
         /**
-         * Generates a globally-unique runtime record ID.
+         * Generates a unique runtime record ID.
          *
-         * Uses a random UUID so IDs are stable and collision-free across process
-         * restarts and concurrent callers (the previous counter reset to 0 on
-         * restart and was unsynchronized, which could collide records).
+         * In production, this should use a UUID or similar stable ID generator.
+         * For testing, we use a simple counter.
          */
-        @OptIn(ExperimentalUuidApi::class)
         private fun generateRuntimeRecordId(): String {
-            return "runtime-record-${Uuid.random()}"
+            nextRecordId += 1
+            return "runtime-record-$nextRecordId"
         }
     }
 }

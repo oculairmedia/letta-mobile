@@ -3,7 +3,6 @@ package com.letta.mobile.data.controller.fanout
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.runtime.ConversationId
-import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -76,9 +75,8 @@ class RuntimeEventFanout {
      * the given runtime. Multiple subscribers can subscribe to the same runtime;
      * each will receive all events.
      *
-     * The flow is hot with a replay of 1: a subscriber that joins after the last
-     * event was emitted immediately receives that most-recent event, so late
-     * subscribers can recover current state rather than waiting for the next one.
+     * The flow is hot: events are buffered with a replay of 0 (no replay).
+     * Subscribers will only receive events emitted AFTER they subscribe.
      *
      * @param agentId The agent ID for the runtime
      * @param conversationId The conversation ID for the runtime
@@ -95,7 +93,7 @@ class RuntimeEventFanout {
         // Get or create the shared flow for this runtime
         val flow = runtimeFlows.getOrPut(key) {
             MutableSharedFlow(
-                replay = 1, // Replay the last event so late subscribers can recover it
+                replay = 0,
                 extraBufferCapacity = 64, // Buffer up to 64 events if no subscriber is ready
             )
         }
@@ -248,15 +246,14 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
-        // Atomic so concurrent subscribe() calls that auto-generate IDs cannot
-        // collide on the same counter value.
-        private val nextSubscriberId = atomic(0)
+        private var nextSubscriberId = 0
 
         /**
          * Generates a unique subscriber ID.
          */
         private fun generateSubscriberId(): String {
-            return "subscriber-${nextSubscriberId.incrementAndGet()}"
+            nextSubscriberId += 1
+            return "subscriber-$nextSubscriberId"
         }
     }
 }

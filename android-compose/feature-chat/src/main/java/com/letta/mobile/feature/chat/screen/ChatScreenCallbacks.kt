@@ -16,7 +16,6 @@ internal data class ChatContentCallbacks(
     val onSendMessage: (String) -> Unit,
     val onRerunMessage: (UiMessage) -> Unit,
     val onLoadOlderMessages: () -> Unit,
-    val onReleaseOlderMessages: () -> Unit = {},
     val onSubmitApproval: (String, List<String>, Boolean, String?) -> Unit,
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,

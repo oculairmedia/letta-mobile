@@ -52,9 +52,7 @@ object MessageListPageGuard {
         newestLast: Boolean = true,
     ): JsonElement {
         val messages = extractMessages(projected) ?: return projected
-        // P3.1: sum per-element byte lengths (each already needed below) instead of
-        // re-serializing the whole array into a throwaway string just to size it.
-        if (!isWrapped(projected) && totalByteLen(messages) <= maxPageBytes) {
+        if (byteLen(JsonArray(messages)) <= maxPageBytes && !isWrapped(projected)) {
             return projected
         }
         // Keep the newest rows that fit under the budget.
@@ -70,12 +68,7 @@ object MessageListPageGuard {
         val trimmed = kept.size < messages.size
         val keptArray = JsonArray(kept.toList())
         if (!trimmed) return keptArray
-        // P0.2: `kept` is always oldest->newest (addFirst on the reversed newest-first
-        // stream, addLast on the natural newest-first stream). The oldest kept row —
-        // the `next_before` cursor for the older window — is at the FRONT when
-        // newestLast, and at the BACK otherwise. Both branches previously returned
-        // firstOrNull(), so newestLast=false emitted the NEWEST id -> overlapping/skipped pages.
-        val oldestKeptId = idOf(if (newestLast) kept.firstOrNull() else kept.lastOrNull())
+        val oldestKeptId = idOf(if (newestLast) kept.firstOrNull() else kept.firstOrNull())
         return buildJsonObject {
             put("messages", keptArray)
             put("has_more", JsonPrimitive(true))
@@ -95,14 +88,6 @@ object MessageListPageGuard {
         (el as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
 
     private fun byteLen(el: JsonElement): Int = el.toString().encodeToByteArray().size
-
-    /** UTF-8 size of the elements as a JSON array ("[]" + elements + commas), without materializing the array. */
-    private fun totalByteLen(messages: List<JsonElement>): Int {
-        if (messages.isEmpty()) return 2 // "[]"
-        var bytes = 2 + (messages.size - 1) // brackets + inter-element commas
-        for (m in messages) bytes += byteLen(m)
-        return bytes
-    }
 
     /**
      * letta-mobile-c4igq.9: bound an object response (e.g. agent.context) that is

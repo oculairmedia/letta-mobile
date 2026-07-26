@@ -24,7 +24,6 @@ internal class ChatApprovalCoordinator(
                 toolCallIds = toolCallIds,
                 approve = approve,
                 reason = reason,
-                conversationId = activeConversationId,
             )
             ChatApprovalResult.Submitted
         } catch (e: Exception) {

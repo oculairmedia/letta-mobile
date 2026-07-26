@@ -61,11 +61,7 @@ search_kotlin() {
     matches="$(rg -n --with-filename --glob '*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
   else
     tool="grep"
-    # -r is required: --include only filters during a RECURSIVE search, and the
-    # TARGETS include directories. Without -r, grep hits a directory arg and exits
-    # 2 ("Is a directory") under `set -e` on runners without ripgrep (the CI path),
-    # AND never actually descends into .kt files. rg above recurses by default.
-    matches="$(grep -rEnH --include='*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
+    matches="$(grep -EnH --include='*.kt' "$pattern" "${TARGETS[@]}" 2>/dev/null)"
   fi
   status=$?
   set -e

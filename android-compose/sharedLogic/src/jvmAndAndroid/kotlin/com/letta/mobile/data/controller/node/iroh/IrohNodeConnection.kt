@@ -257,14 +257,6 @@ class IrohNodeConnection(
             maxFrameBytes = MAX_FRAME_BYTES,
             peerSupportsFrameParts = { peerSupportsFrameParts() },
             requestContextProvider = ::currentAdminRpcRequestContext,
-            // P0.4: enforce the SAME per-method capability matrix the control
-            // channel uses (handleControlAdminRpc). Returns the missing capability
-            // to deny, or null to allow — evaluated against the peer's CURRENT
-            // effective capabilities at dispatch time.
-            capabilityGate = { method ->
-                val required = IrohPeerCapabilities.forAdminMethod(method)
-                if (IrohPeerCapabilities.isAllowed(effectiveCapabilities(), required)) null else required
-            },
             // eaczz.3: the OBSERVER signal. admin_rpc runs on its own BiStream,
             // so the shared message.list handler has no connection identity —
             // associate it HERE, where remoteEndpointId + selfViewer are in

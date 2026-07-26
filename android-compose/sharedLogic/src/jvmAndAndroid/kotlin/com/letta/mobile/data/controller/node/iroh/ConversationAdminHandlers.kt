@@ -3,10 +3,6 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 
 object ConversationAdminHandlers {
     fun register(
@@ -31,27 +27,63 @@ object ConversationAdminHandlers {
         nativeClient: AppServerClient?,
         localStore: LocalBackendAdminStore?,
     ) {
-        router.registerScoped("conversation.list") { params, context ->
+        router.register("conversation.list") { params ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            val conversations =
-                conversationListNative(nativeClient, agentId, params)
-                    ?: conversationListLocal(localStore, agentId, params)
-                    ?: conversationListProxy(api, agentId, params)
-            // P3.4 (gn7kr.23): conversation.list previously trusted the capability
-            // tier alone, letting a lesser (non-conversation-manage) peer enumerate
-            // cross-conversation metadata (id, agent_id, last_message_at, summary,
-            // archived) for a whole agent. Mirror the message.list scope mechanism:
-            // conversation.manage/admin.full peers (authorizedConversationIds == null)
-            // stay unrestricted; a scoped peer sees only the conversation(s) it is
-            // authorized for (its viewed conversation, or nothing).
-            scopeConversationList(conversations, context)
+            NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
+                val response = c.conversationList(
+                    AppServerCommand.ConversationList(
+                        requestId = NativeAdmin.requestId(),
+                        query = NativeAdmin.queryOf(
+                            "agent_id" to agentId,
+                            "limit" to param(params, AdminParamKey("limit")),
+                            "after" to param(params, AdminParamKey("after")),
+                            "archive_status" to param(params, AdminParamKey("archive_status")),
+                            "summary_search" to param(params, AdminParamKey("summary_search")),
+                            "order" to param(params, AdminParamKey("order")),
+                            "order_by" to param(params, AdminParamKey("order_by")),
+                        ),
+                    ),
+                )
+                if (response.success) response.conversations ?: JsonArray(emptyList()) else null
+            }
+                // lgns8.9 native-store tier: serve from disk (null on any error),
+                // else fall through to the shim proxy. Verified to match the shim's
+                // withRealTimes ordering byte-for-byte on the live store.
+                //
+                // The local store only implements the shim's default shape (agent
+                // scope + archive_status filter, last_message_at desc, offset/limit).
+                // If the caller supplies a query shape it cannot honor — a cursor
+                // (`after`), text search (`summary_search`), or a custom
+                // `order`/`order_by` — DON'T serve a wrong-ordered/wrong-page result
+                // from disk; bypass the local tier so the native/proxy path (which
+                // forwards those params) handles it. (CodeRabbit #998.)
+                ?: (if (conversationListLocallyServable(params)) {
+                    localStore?.listConversationsProjected(
+                        agentId = agentId,
+                        archiveStatus = param(params, AdminParamKey("archive_status")),
+                        limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
+                        offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
+                    )
+                } else {
+                    null
+                })
+                ?: run {
+                // #962: the App Server only serves the flat GET /v1/conversations
+                // route, filtering by an agent_id query param; the agent-scoped
+                // /v1/agents/{id}/conversations route is not registered and 404s.
+                api.get(AdminPath.v1("conversations")) {
+                    query("agent_id", agentId)
+                    query("limit", param(params, AdminParamKey("limit")))
+                    query("after", param(params, AdminParamKey("after")))
+                    query("archive_status", param(params, AdminParamKey("archive_status")))
+                    query("summary_search", param(params, AdminParamKey("summary_search")))
+                    query("order", param(params, AdminParamKey("order")))
+                    query("order_by", param(params, AdminParamKey("order_by")))
+                }
+            }
         }
-        router.registerScoped("conversation.get") { params, context ->
+        router.register("conversation.get") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
-            // P3.4 (gn7kr.23): scope-check before any read/proxy side effect, exactly
-            // as message.get does — a lesser peer can only read the conversation it is
-            // actively viewing; conversation.manage/admin.full read any.
-            requireConversationAccess(context, id)
             NativeAdmin.attempt(nativeClient, "conversation.get") { c ->
                 val response = c.conversationRetrieve(
                     AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = id),
@@ -59,97 +91,6 @@ object ConversationAdminHandlers {
                 if (response.success) response.conversation else null
             } ?: api.get(AdminPath.v1("conversations", id))
         }
-    }
-
-    /**
-     * lgns8.9 native tier: fetch the conversation list from the App Server client.
-     * Returns null on any error so the caller falls through to the local/proxy tiers.
-     */
-    private suspend fun conversationListNative(
-        nativeClient: AppServerClient?,
-        agentId: String?,
-        params: JsonObject?,
-    ): JsonElement? =
-        NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
-            val response = c.conversationList(
-                AppServerCommand.ConversationList(
-                    requestId = NativeAdmin.requestId(),
-                    query = NativeAdmin.queryOf(
-                        "agent_id" to agentId,
-                        "limit" to param(params, AdminParamKey("limit")),
-                        "after" to param(params, AdminParamKey("after")),
-                        "archive_status" to param(params, AdminParamKey("archive_status")),
-                        "summary_search" to param(params, AdminParamKey("summary_search")),
-                        "order" to param(params, AdminParamKey("order")),
-                        "order_by" to param(params, AdminParamKey("order_by")),
-                    ),
-                ),
-            )
-            if (response.success) response.conversations ?: JsonArray(emptyList()) else null
-        }
-
-    /**
-     * lgns8.9 native-store tier: serve from disk (null on any error), else fall
-     * through to the shim proxy. Verified to match the shim's withRealTimes ordering
-     * byte-for-byte on the live store.
-     *
-     * The local store only implements the shim's default shape (agent scope +
-     * archive_status filter, last_message_at desc, offset/limit). If the caller
-     * supplies a query shape it cannot honor — a cursor (`after`), text search
-     * (`summary_search`), or a custom `order`/`order_by` — DON'T serve a
-     * wrong-ordered/wrong-page result from disk; bypass the local tier so the
-     * native/proxy path (which forwards those params) handles it. (CodeRabbit #998.)
-     */
-    private suspend fun conversationListLocal(
-        localStore: LocalBackendAdminStore?,
-        agentId: String?,
-        params: JsonObject?,
-    ): JsonElement? {
-        if (!conversationListLocallyServable(params)) return null
-        return localStore?.listConversationsProjected(
-            agentId = agentId,
-            archiveStatus = param(params, AdminParamKey("archive_status")),
-            limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
-            offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
-        )
-    }
-
-    /**
-     * Shim proxy tier for conversation.list. #962: the App Server only serves the flat
-     * GET /v1/conversations route, filtering by an agent_id query param; the
-     * agent-scoped /v1/agents/{id}/conversations route is not registered and 404s.
-     */
-    private suspend fun conversationListProxy(
-        api: AdminHandlerSupport,
-        agentId: String?,
-        params: JsonObject?,
-    ): JsonElement =
-        api.get(AdminPath.v1("conversations")) {
-            query("agent_id", agentId)
-            query("limit", param(params, AdminParamKey("limit")))
-            query("after", param(params, AdminParamKey("after")))
-            query("archive_status", param(params, AdminParamKey("archive_status")))
-            query("summary_search", param(params, AdminParamKey("summary_search")))
-            query("order", param(params, AdminParamKey("order")))
-            query("order_by", param(params, AdminParamKey("order_by")))
-        }
-
-    /**
-     * P3.4 (gn7kr.23): restricts a conversation-list result to the peer's authorized
-     * conversation scope. Unrestricted peers (conversation.manage / admin.full, i.e.
-     * [AdminRpcRequestContext.authorizedConversationIds] == null) get the list
-     * unchanged; scoped peers get only the entries whose `id` is in their authorized
-     * set (empty when they are viewing no conversation). Non-array results (e.g. a
-     * proxy error object) pass through untouched — filtering only ever narrows.
-     */
-    private fun scopeConversationList(result: JsonElement, context: AdminRpcRequestContext): JsonElement {
-        val authorized = context.authorizedConversationIds ?: return result
-        if (result !is JsonArray) return result
-        val filtered = result.filter { element ->
-            val id = (element as? JsonObject)?.get("id")?.let { it as? JsonPrimitive }?.contentOrNull
-            id != null && id in authorized
-        }
-        return JsonArray(filtered)
     }
 
     private fun registerConversationWriteRoutes(

@@ -66,14 +66,13 @@ class ChatApprovalCoordinatorTest {
                 toolCallIds = listOf("tool-1", "tool-2"),
                 approve = false,
                 reason = "not safe",
-                conversationId = "conv-1",
             )
         }
     }
 
     @Test
     fun `submitApproval maps repository failure`() = runTest {
-        coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any(), any()) } throws IllegalStateException("boom")
+        coEvery { messageRepository.submitApproval(any<AgentId>(), any(), any(), any(), any()) } throws IllegalStateException("boom")
 
         val result = coordinator.submitApproval(
             agentId = "agent-1",

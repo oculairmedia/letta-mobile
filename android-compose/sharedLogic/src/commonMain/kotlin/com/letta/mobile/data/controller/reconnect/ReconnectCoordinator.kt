@@ -4,7 +4,6 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
-import kotlin.time.Clock
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -132,16 +131,6 @@ class ReconnectCoordinator(
             cwd = record.cwd,
             recoverApprovals = true,
             forceDeviceStatus = true,
-        )
-
-        // Step 1b: Persist the new canonical runtime back into the registry.
-        // The App Server may have restarted and handed us a fresh runtime scope;
-        // without this write the record's canonicalRuntime stays stale until the
-        // next markStarted, so subsequent readers would target a dead runtime.
-        registry.markStarted(
-            id = record.id,
-            canonicalRuntime = canonical,
-            lastStartedAt = Clock.System.now(),
         )
 
         // Step 2: Re-register external tools

@@ -578,11 +578,6 @@ data class ApprovalCreate(
     val approve: Boolean? = null,
     @SerialName("approval_request_id") val approvalRequestId: String? = null,
     val reason: String? = null,
-    // letta-mobile-vilsn: structured close payload for interactive tools (e.g. an
-    // AskUserQuestion answer). Carried as a first-class field so BOTH the Iroh
-    // admin_rpc and plain-HTTP transports deliver the answer instead of the Iroh
-    // path re-decoding it from a `reason` sentinel and the HTTP path dropping it.
-    @SerialName("updated_input") val updatedInput: JsonObject? = null,
 )
 
 @Serializable

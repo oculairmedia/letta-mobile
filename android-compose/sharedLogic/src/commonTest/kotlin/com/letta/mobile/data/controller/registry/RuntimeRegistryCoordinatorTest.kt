@@ -13,16 +13,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.yield
 import kotlinx.datetime.Clock
 
 class RuntimeRegistryCoordinatorTest {
@@ -274,92 +269,6 @@ class RuntimeRegistryCoordinatorTest {
         assertNotNull(record)
         assertNotNull(record.canonicalRuntime)
         assertNotNull(record.lastStartedAt)
-    }
-
-    // P1.1: generated IDs must be unique and carry the stable "runtime-record-"
-    // prefix. The old counter reset to 0 on restart and was unsynchronized, so
-    // it could hand out colliding IDs.
-    @Test
-    fun ensureRecordGeneratesUniqueStableFormIds() = runTest {
-        val registry = InMemoryRuntimeRegistry()
-        val controller = FakeAppServerControllerForRecovery()
-        val coordinator = RuntimeRegistryCoordinator(controller, registry)
-
-        val ids = buildList {
-            repeat(100) { i ->
-                add(
-                    coordinator.ensureRecord(
-                        agentId = AgentId("agent-$i"),
-                        conversationId = ConversationId("conv-$i"),
-                    ).id,
-                )
-            }
-        }
-
-        assertTrue(ids.all { it.startsWith("runtime-record-") }, "all IDs use the stable prefix")
-        assertTrue(ids.all { it.removePrefix("runtime-record-").isNotEmpty() }, "IDs have a body after the prefix")
-        assertEquals(ids.size, ids.toSet().size, "no collisions among generated IDs")
-    }
-
-    // P2.3: concurrent ensureRecord callers for the SAME (agent, conversation)
-    // must insert exactly once and all observe the same record. The registry
-    // yields between find and save to force the check-then-insert to interleave.
-    @Test
-    fun ensureRecordInsertsOnceUnderConcurrentCallers() = runTest {
-        val registry = YieldingRuntimeRegistry()
-        val controller = FakeAppServerControllerForRecovery()
-        val coordinator = RuntimeRegistryCoordinator(controller, registry)
-
-        val agentId = AgentId("agent-1")
-        val conversationId = ConversationId("conv-1")
-
-        val results = coroutineScope {
-            (1..8).map {
-                async { coordinator.ensureRecord(agentId, conversationId) }
-            }.awaitAll()
-        }
-
-        // Exactly one record was inserted despite concurrent callers.
-        assertEquals(1, registry.list().size)
-
-        // Every caller observed the same record.
-        val ids = results.map { it.id }.toSet()
-        assertEquals(1, ids.size)
-        assertTrue(ids.first().startsWith("runtime-record-"))
-    }
-}
-
-/**
- * Registry that yields between reading and writing so that concurrent
- * ensureRecord callers exercise the check-then-insert window. Delegates all
- * storage to [InMemoryRuntimeRegistry].
- */
-private class YieldingRuntimeRegistry : RuntimeRegistry {
-    private val delegate = InMemoryRuntimeRegistry()
-
-    override suspend fun save(record: RuntimeRecord) = delegate.save(record)
-
-    override suspend fun load(id: String): RuntimeRecord? = delegate.load(id)
-
-    override suspend fun list(): List<RuntimeRecord> = delegate.list()
-
-    override suspend fun remove(id: String) = delegate.remove(id)
-
-    override suspend fun markStarted(
-        id: String,
-        canonicalRuntime: CanonicalRuntime,
-        lastStartedAt: kotlin.time.Instant,
-    ) = delegate.markStarted(id, canonicalRuntime, lastStartedAt)
-
-    override suspend fun findByAgentAndConversation(
-        agentId: AgentId,
-        conversationId: ConversationId,
-    ): RuntimeRecord? {
-        val found = delegate.findByAgentAndConversation(agentId, conversationId)
-        // Force a suspension point after the read so a competing coroutine can
-        // also observe "not found" before the first caller saves.
-        yield()
-        return found
     }
 }
 

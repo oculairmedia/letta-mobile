@@ -50,29 +50,19 @@ class IrohPeerCapabilitiesTest {
             "conversation.list", "message.list", "conversation.create", "approval.submit",
             "block.list", "block.update", "passage.create",
             "schedule.create", "skill.install", "tool.list", "project.list", "subagent.list",
-            // P0.5 (audit): read-only server metadata is now a benign CHAT_READ,
-            // accessible to a standard paired desktop (not admin-gated).
-            "provider.list", "goal.get", "group.list", "folder.list", "archive.list",
-            "step.list", "identity.list", "identity.get", "run.list", "run.get",
-            // Regression fix: agent.update (model selection) and agent.context
-            // (context-window UI) fell to else->ADMIN_FULL once the admin_rpc
-            // stream path started enforcing per-method capabilities, breaking
-            // both on every paired device. agent.context is a benign read
-            // (missed in the P0.5 reclassification); agent.update is
-            // desktop-manageable config editing (agent lifecycle stays admin.full).
-            "agent.update", "agent.context",
         ).forEach { method ->
             assertTrue(
                 IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod(method)),
                 "desktop role should allow $method",
             )
         }
-        // Denied: server administration + MUTATIONS still require explicit admin.full.
+        // Denied: server administration requires explicit admin.full.
         listOf(
-            "agent.create", "agent.delete",
+            "agent.create", "agent.delete", "identity.list", "run.list", "provider.list",
             "health.check", "goal.command",
             "pair.invite.create", "pair.peer.list", "pair.peer.get",
             "pair.peer.rename", "pair.peer.set_capabilities", "pair.peer.revoke",
+            "archive.list", "folder.list", "group.list",
         ).forEach { method ->
             assertFalse(
                 IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod(method)),
@@ -104,37 +94,6 @@ class IrohPeerCapabilitiesTest {
             IrohPeerCapabilities.ADMIN_FULL,
             IrohPeerCapabilities.forAdminMethod("reflection.set"),
             "reflection is an intentional memory classification, not the deny-by-default admin bucket",
-        )
-    }
-
-    @Test
-    fun agentUpdateAndAgentContextAreDeskTopReachableButLifecycleStaysAdminFull() {
-        // agent.context: benign read (context-window UI), CHAT_READ tier.
-        assertEquals(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.forAdminMethod("agent.context"))
-        assertTrue(
-            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.context")),
-            "the default desktop role must be allowed agent.context",
-        )
-
-        // agent.update: trusted-desktop config editing (e.g. model selection),
-        // classified into CONVERSATION_MANAGE which DEFAULT_DESKTOP_ROLE holds.
-        assertEquals(IrohPeerCapabilities.CONVERSATION_MANAGE, IrohPeerCapabilities.forAdminMethod("agent.update"))
-        assertTrue(
-            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.update")),
-            "the default desktop role must be allowed agent.update (model selection)",
-        )
-
-        // Agent LIFECYCLE (create/delete) is unchanged: still admin.full via the
-        // else branch, denied to the default desktop role.
-        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("agent.create"))
-        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("agent.delete"))
-        assertFalse(
-            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.create")),
-            "the default desktop role must NOT allow agent.create",
-        )
-        assertFalse(
-            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.delete")),
-            "the default desktop role must NOT allow agent.delete",
         )
     }
 

@@ -21,14 +21,6 @@ import java.nio.file.Paths
  * so a second owner — in this or any other process — fails immediately rather
  * than racing.
  *
- * SCOPE — advisory across *cooperating* processes only (P3.5, letta-mobile
- * -gn7kr.25, by design): the guarantee holds only for processes that also call
- * [acquire] before writing the backend root. A rogue or legacy Node child started
- * manually (e.g. `letta app-server` run by hand, bypassing the serve command) never
- * takes this lock and is therefore NOT fenced by it — the kernel does not make the
- * lock mandatory. Defense against that class of writer is the operational
- * one-owner topology (a single systemd unit / supervisor), not this file lock.
- *
  * JVM-only by design; kept out of commonMain so shared code stays process/file
  * -channel free.
  */

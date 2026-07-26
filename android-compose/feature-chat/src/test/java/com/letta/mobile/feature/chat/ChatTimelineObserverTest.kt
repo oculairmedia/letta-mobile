@@ -57,11 +57,8 @@ class ChatTimelineObserverTest {
         harness.observer.start("conv-1")
         runCurrent()
 
-        // ChatTimelineObserver.start(conversationId) delegates to the
-        // agentId-scoped start(agentId = null, conversationId), which calls
-        // the two-arg observe/getOrCreate overloads.
-        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-1") }
-        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate(null, "conv-1") }
+        coVerify(exactly = 1) { harness.timelineRepository.observe("conv-1") }
+        coVerify(exactly = 1) { harness.timelineRepository.getOrCreate("conv-1") }
         assertEquals("conv-1", harness.currentConversationTracker.current)
     }
 
@@ -76,8 +73,8 @@ class ChatTimelineObserverTest {
         harness.observer.start("conv-2")
         runCurrent()
 
-        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-1") }
-        coVerify(exactly = 1) { harness.timelineRepository.observe(null, "conv-2") }
+        coVerify(exactly = 1) { harness.timelineRepository.observe("conv-1") }
+        coVerify(exactly = 1) { harness.timelineRepository.observe("conv-2") }
         assertEquals("conv-2", harness.currentConversationTracker.current)
     }
 
@@ -183,15 +180,11 @@ class ChatTimelineObserverTest {
         assertTrue(harness.uiState.value.isAgentTyping)
         assertEquals(0, clearCount)
 
-        // A genuine assistant reply (not a reasoning frame — see the sibling
-        // "stays active during streamed reasoning frames" test, which proves
-        // reasoning-typed messages must NOT clear it) is what actually
-        // clears the a2ui thinking gate.
         flow.value = Timeline(
             "conv-1",
             events = persistentListOf(
                 confirmed("user-1", "approved"),
-                confirmed("assistant-2", "working", TimelineMessageType.ASSISTANT),
+                confirmed("assistant-2", "working", TimelineMessageType.REASONING),
             ),
         )
         runCurrent()

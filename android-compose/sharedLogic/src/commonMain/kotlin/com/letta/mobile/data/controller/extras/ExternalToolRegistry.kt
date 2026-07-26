@@ -82,26 +82,21 @@ class ExternalToolRegistry(
     }
 
     /**
-     * Re-registration hook invoked after `runtime_start` on reconnect.
+     * Re-registers all advertised external tools for the given runtime.
      *
-     * Intentionally a no-op. External tools are startup-bound: they are advertised
-     * to the App Server via the `external_tools` field of the `runtime_start`
-     * command itself, at the moment the controller (re)issues `runtime_start`. On
-     * reconnect, [com.letta.mobile.data.controller.reconnect.ReconnectCoordinator]
-     * calls `controller.startRuntime(...)` for every active record, which re-issues
-     * `runtime_start` and therefore re-advertises the tools as a side effect of that
-     * single call — there is no separate "re-advertise tools" frame in the protocol.
+     * This method is called after runtime_start on reconnect to restore the
+     * external tool definitions.
      *
-     * This registry is a pure definition provider ([listAdvertisedTools]); it holds
-     * no transport handle and receives only the [runtime] scope here, so it has no
-     * reachable primitive to re-advertise independently. The re-advertisement seam
-     * is `runtime_start`, owned by the controller, not this hook. Keeping the hook
-     * (rather than deleting the interface) preserves the seam for a future protocol
-     * that adds an out-of-band tool-registration frame.
+     * @param runtime The runtime scope to re-register tools for
      */
     override suspend fun reRegisterAll(runtime: AppServerRuntimeScope) {
-        // No-op by design — see KDoc. Re-advertisement rides on runtime_start,
-        // which the reconnect coordinator already re-issues per active runtime.
+        // TODO: In a real implementation, this would send the tool definitions
+        // to the App Server via runtime_start's external_tools field.
+        // For now, this is a no-op since the actual registration happens
+        // during runtime_start (which the reconnect coordinator already calls).
+        //
+        // The registry's role is to provide the tool definitions that the
+        // controller uses when building the runtime_start command.
     }
 
     companion object {

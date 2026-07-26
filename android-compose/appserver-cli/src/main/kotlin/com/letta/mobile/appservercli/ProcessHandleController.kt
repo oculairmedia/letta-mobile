@@ -50,12 +50,6 @@ class ProcessHandleController(
         return if (p.isAlive) null else p.exitValue()
     }
 
-    /** Block until the spawned process exits, returning its exit code. */
-    fun awaitExit(): Int {
-        val p = process ?: error("awaitExit() called before spawn()")
-        return p.waitFor()
-    }
-
     override fun terminateGracefully() {
         process?.destroy() // SIGTERM on POSIX
     }

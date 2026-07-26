@@ -43,10 +43,6 @@
   <string name="screen_chat_approval_request_body">Review the requested tool actions before continuing.</string>
   <string name="screen_chat_approval_request_title">Approval required</string>
   <string name="screen_chat_approval_submitting">Submitting…</string>
-  <string name="screen_chat_ask_user_question_title">The agent has a question</string>
-  <string name="screen_chat_ask_user_question_send">Send answer</string>
-  <string name="screen_chat_ask_user_question_dismiss">Dismiss</string>
-  <string name="screen_chat_ask_user_question_other">Other (type an answer)</string>
   <string name="screen_chat_context_window_percent">%1$d%%</string>
   <string name="screen_chat_context_window_title">Context utilization</string>
   <string name="screen_chat_context_window_unavailable">Context usage is not available yet.</string>

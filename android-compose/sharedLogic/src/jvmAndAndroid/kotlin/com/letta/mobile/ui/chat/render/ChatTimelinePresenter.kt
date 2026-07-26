@@ -65,12 +65,6 @@ class ChatTimelinePresenter {
         existingMessages: List<UiMessage>,
     ): List<UiMessage> = projector.mergeOlderPage(conversationId, olderMessages, existingMessages)
 
-    /** See [ChatTimelineProjector.releaseOlderPrefix]. */
-    fun releaseOlderPrefix(
-        conversationId: String,
-        currentMessages: List<UiMessage>,
-    ): List<UiMessage> = projector.releaseOlderPrefix(conversationId, currentMessages)
-
     /** Project the timeline into the cached [TimelineProjection]. */
     fun project(
         timeline: Timeline,

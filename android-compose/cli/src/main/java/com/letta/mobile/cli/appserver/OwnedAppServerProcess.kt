@@ -26,16 +26,10 @@ import java.util.concurrent.TimeUnit
  * announces its bound URL on stdout ("Listening on ws://127.0.0.1:<port>"); [spawn]
  * blocks until that line, or fails if the child exits / times out first.
  *
- * KNOWN LIMITATION (P1.3, letta-mobile-gn7kr.9 — reviewed, left documented): on a hard
- * parent kill (SIGKILL / JVM crash) the JVM cannot run a shutdown hook, so the child can
- * orphan and hold its (ephemeral) port. Graceful shutdown is covered by [close] (destroy
- * → wait → destroyForcibly → wait) plus a shutdown hook at the call site. A robust fix
- * for the hard-kill window — whole-tree teardown via ProcessHandle.descendants(), or a
- * kernel-level process-group `kill(-pgid)` / PR_SET_PDEATHSIG so the child dies WITH the
- * parent — is NOT available here: this module is Android-targeted and android.jar exposes
- * neither java.lang.ProcessHandle nor prctl, and expressing a process group needs native
- * (JNI/FFI) code. We deliberately do NOT fake it. On the systemd server the unit's cgroup
- * reaps the whole tree on stop, which covers the deployment that matters.
+ * KNOWN LIMITATION: on a hard parent kill (SIGKILL / JVM crash) the JVM cannot run a
+ * shutdown hook, so the child can orphan and hold its (ephemeral) port. Graceful
+ * shutdown is covered by [close] + a shutdown hook at the call site; a
+ * PR_SET_PDEATHSIG / process-group teardown for the SIGKILL case is a follow-up.
  */
 class OwnedAppServerProcess private constructor(
     val process: Process,

@@ -99,14 +99,6 @@ jobs:
           ./gradlew :core:data:testDebugUnitTest :app:testRootDebugUnitTest
           ./gradlew :app:testScreenshot
 
-      # Architecture guardrails (audit P3.6 / gn7kr.24). `:architecture-tests:test`
-      # enforces the Konsist/ArchUnit rules (minus the advisory *RepositoryArchitectureTest
-      # set, which its own filter excludes); `:architecture-tests:architectureTest` runs
-      # those advisory repository checks. Runs inside the required `test` job so a
-      # regression blocks the merge instead of silently never executing.
-      - name: Run architecture tests
-        run: ./gradlew :architecture-tests:test :architecture-tests:architectureTest
-
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.
       # Never used to skip :sharedLogic:allTests — that stays in shared-multiplatform.

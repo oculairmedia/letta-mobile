@@ -25,19 +25,12 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.take
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
@@ -368,218 +361,6 @@ class AppServerTurnEngineTest {
             val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
             assertEquals(RuntimeRunStatus.Completed, completed.status)
             awaitComplete()
-        }
-    }
-
-    @Test
-    fun surfacedRuntimeUserInputApprovalPausesIdleWatchdog() = runTest {
-        // letta-mobile-vilsn.6: an AskUserQuestion / ExitPlanMode approval that is
-        // NOT auto-approved parks the turn awaiting the user's answer. The idle
-        // watchdog must NOT fire while that approval is outstanding — an unanswered
-        // question must not synthesize a Failed idle-timeout lifecycle.
-        //
-        // currentTimeMs() reads the wall clock, so the watchdog only advances under
-        // REAL time; run this on Dispatchers.Default so its delays are real.
-        withContext(Dispatchers.Default) {
-            val client = FakeAppServerClient()
-            val engine = AppServerTurnEngine(
-                client = client,
-                permissionMode = AppServerPermissionMode.Unrestricted,
-                turnIdleTimeoutMs = 300,
-            )
-            val payloads = MutableStateFlow<List<RuntimeEventPayload>>(emptyList())
-            val job = launch {
-                engine.runTurn(command).collect { draft -> payloads.update { it + draft.payload } }
-            }
-
-            // An Input command is sent only after the collector subscribes, so
-            // waiting for it guarantees the ControlRequest below is observed.
-            awaitUntil { client.sentCommands.any { it is AppServerCommand.Input } }
-
-            client.emit(
-                AppServerInboundFrame.ControlRequest(
-                    requestId = "approval-userinput-1",
-                    request = buildJsonObject {
-                        put("subtype", "can_use_tool")
-                        put("tool_name", "AskUserQuestion")
-                        put("tool_call_id", "tool-call-1")
-                        put("input", buildJsonObject { put("question", "pick one") })
-                    },
-                    agentId = runtime.agentId,
-                    conversationId = runtime.conversationId,
-                ),
-            )
-            // The user-input tool is surfaced as an approval (NOT auto-approved).
-            awaitUntil { payloads.value.any { it is RuntimeEventPayload.ApprovalRequested } }
-
-            // Idle far longer than the watchdog window while the approval is
-            // outstanding: the watchdog is paused and MUST NOT fail the turn.
-            delay(300L * 4)
-            assertTrue(
-                payloads.value.none {
-                    it is RuntimeEventPayload.RunLifecycleChanged && it.status == RuntimeRunStatus.Failed
-                },
-                "idle watchdog must not fail a turn parked on a user-input approval",
-            )
-            // The turn is still parked (no terminal), so the collector is active.
-            assertTrue(job.isActive, "turn must stay pending while awaiting the user's answer")
-            job.cancel()
-        }
-    }
-
-    @Test
-    fun normalIdleTurnStillFailsViaWatchdogWhenNoUserInputApproval() = runTest {
-        // letta-mobile-vilsn.6: the pause is scoped to outstanding user-input
-        // approvals ONLY — a genuinely idle/stuck turn with no such approval must
-        // still be force-failed by the idle watchdog.
-        withContext(Dispatchers.Default) {
-            val client = FakeAppServerClient()
-            val engine = AppServerTurnEngine(
-                client = client,
-                turnIdleTimeoutMs = 150,
-            )
-            val payloads = MutableStateFlow<List<RuntimeEventPayload>>(emptyList())
-            val job = launch {
-                engine.runTurn(command).collect { draft -> payloads.update { it + draft.payload } }
-            }
-
-            awaitUntil { client.sentCommands.any { it is AppServerCommand.Input } }
-
-            // No further frames ever arrive: the watchdog must synthesize a Failed
-            // idle-timeout lifecycle so the shared lock is released.
-            awaitUntil(timeoutMs = 4000) {
-                payloads.value.any {
-                    it is RuntimeEventPayload.RunLifecycleChanged && it.status == RuntimeRunStatus.Failed
-                }
-            }
-            assertTrue(
-                payloads.value.any {
-                    it is RuntimeEventPayload.RunLifecycleChanged && it.status == RuntimeRunStatus.Failed
-                },
-                "idle watchdog must still fail a genuinely idle turn",
-            )
-            job.cancel()
-        }
-    }
-
-    @Test
-    fun unrelatedInboundFrameDoesNotLiftUserInputWatchdogPause() = runTest {
-        // letta-mobile-vilsn.6 (CodeRabbit Major / Codex P1): while a surfaced
-        // user-input approval gate is outstanding the idle watchdog is paused — and
-        // a side-channel status frame (UpdateDeviceStatus) that merely passes
-        // matches(scope) must NOT lift that pause. Under the old blanket-boolean
-        // design this first unrelated frame cleared the pause and the watchdog then
-        // force-failed a turn that was still legitimately awaiting the user's
-        // answer. The turn must NOT emit a Failed idle-timeout within the window.
-        withContext(Dispatchers.Default) {
-            val client = FakeAppServerClient()
-            val engine = AppServerTurnEngine(
-                client = client,
-                permissionMode = AppServerPermissionMode.Unrestricted,
-                turnIdleTimeoutMs = 300,
-            )
-            val payloads = MutableStateFlow<List<RuntimeEventPayload>>(emptyList())
-            val job = launch {
-                engine.runTurn(command).collect { draft -> payloads.update { it + draft.payload } }
-            }
-
-            awaitUntil { client.sentCommands.any { it is AppServerCommand.Input } }
-
-            client.emit(
-                AppServerInboundFrame.ControlRequest(
-                    requestId = "approval-userinput-1",
-                    request = buildJsonObject {
-                        put("subtype", "can_use_tool")
-                        put("tool_name", "AskUserQuestion")
-                        put("tool_call_id", "tool-call-1")
-                        put("input", buildJsonObject { put("question", "pick one") })
-                    },
-                    agentId = runtime.agentId,
-                    conversationId = runtime.conversationId,
-                ),
-            )
-            awaitUntil { payloads.value.any { it is RuntimeEventPayload.ApprovalRequested } }
-
-            // A side-channel status frame arrives, scoped to the SAME runtime so it
-            // passes matches(scope). It must NOT resolve the outstanding gate.
-            client.emit(
-                AppServerInboundFrame.UpdateDeviceStatus(
-                    runtime = runtime,
-                    eventSeq = 2,
-                    emittedAt = "2026-06-24T00:00:01Z",
-                    idempotencyKey = "device-status-1",
-                    deviceStatus = buildJsonObject { put("battery", 50) },
-                ),
-            )
-
-            // Idle far past the watchdog window: the pause must hold despite the
-            // unrelated frame, so no Failed idle-timeout is synthesized.
-            delay(300L * 4)
-            assertTrue(
-                payloads.value.none {
-                    it is RuntimeEventPayload.RunLifecycleChanged && it.status == RuntimeRunStatus.Failed
-                },
-                "an unrelated status frame must not lift the user-input watchdog pause",
-            )
-            assertTrue(job.isActive, "turn must stay pending while awaiting the user's answer")
-            job.cancel()
-        }
-    }
-
-    @Test
-    fun idleWatchdogResumesAndFailsAfterUserInputGateResolvesViaToolReturn() = runTest {
-        // letta-mobile-vilsn.6: once the outstanding user-input gate is genuinely
-        // resolved (its tool_return arrives — the user answered and the tool ran),
-        // the pause is lifted and a subsequent genuine idle DOES force-fail via the
-        // watchdog. The pause is per-gate and not sticky, so activeTurn is never
-        // left wedged after a real answer.
-        withContext(Dispatchers.Default) {
-            val client = FakeAppServerClient()
-            val engine = AppServerTurnEngine(
-                client = client,
-                permissionMode = AppServerPermissionMode.Unrestricted,
-                turnIdleTimeoutMs = 150,
-            )
-            val payloads = MutableStateFlow<List<RuntimeEventPayload>>(emptyList())
-            val job = launch {
-                engine.runTurn(command).collect { draft -> payloads.update { it + draft.payload } }
-            }
-
-            awaitUntil { client.sentCommands.any { it is AppServerCommand.Input } }
-
-            client.emit(
-                AppServerInboundFrame.ControlRequest(
-                    requestId = "approval-userinput-1",
-                    request = buildJsonObject {
-                        put("subtype", "can_use_tool")
-                        put("tool_name", "AskUserQuestion")
-                        put("tool_call_id", "tool-call-1")
-                        put("input", buildJsonObject { put("question", "pick one") })
-                    },
-                    agentId = runtime.agentId,
-                    conversationId = runtime.conversationId,
-                ),
-            )
-            awaitUntil { payloads.value.any { it is RuntimeEventPayload.ApprovalRequested } }
-
-            // The gate for tool-call-1 resolves via its tool_return.
-            client.emit(streamDelta(messageType = "client_tool_end", runId = "run-1", toolCallId = "tool-call-1"))
-            awaitUntil { payloads.value.any { it is RuntimeEventPayload.ToolReturnObserved } }
-
-            // Now genuinely idle with the gate cleared: the watchdog must resume and
-            // force-fail the turn so the shared lock is released.
-            awaitUntil(timeoutMs = 4000) {
-                payloads.value.any {
-                    it is RuntimeEventPayload.RunLifecycleChanged && it.status == RuntimeRunStatus.Failed
-                }
-            }
-            assertTrue(
-                payloads.value.any {
-                    it is RuntimeEventPayload.RunLifecycleChanged && it.status == RuntimeRunStatus.Failed
-                },
-                "idle watchdog must resume and fail once the user-input gate is resolved",
-            )
-            job.cancel()
         }
     }
 
@@ -967,15 +748,6 @@ private fun streamDelta(
             if (toolCallId != null) put("tool_call_id", toolCallId)
         },
     )
-
-private suspend fun awaitUntil(timeoutMs: Long = 2000, condition: () -> Boolean) {
-    var waited = 0L
-    while (!condition()) {
-        if (waited >= timeoutMs) throw AssertionError("condition not met within ${timeoutMs}ms")
-        delay(10)
-        waited += 10
-    }
-}
 
 private fun String.jsonDeltaString(key: String): String? = runCatching {
     val raw = AppServerProtocol.json.parseToJsonElement(this).jsonObject

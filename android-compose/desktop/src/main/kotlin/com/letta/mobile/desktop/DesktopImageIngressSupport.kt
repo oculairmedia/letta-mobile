@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop
 
-import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.desktop.chat.DesktopImageAttachmentLoader
 import java.awt.Component
@@ -19,6 +18,7 @@ import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
+private val IMAGE_EXTENSIONS = setOf("png", "jpg", "jpeg", "webp", "gif", "bmp")
 
 /** Callbacks + loader shared by clipboard paste and file-drop image ingress. */
 internal data class DesktopImageIngressSink(
@@ -56,15 +56,11 @@ private inline fun <T : java.awt.Graphics> T.use(block: (T) -> Unit) {
 }
 
 @Suppress("UNCHECKED_CAST")
-internal fun Transferable.allFiles(): List<File> =
+internal fun Transferable.imageFiles(): List<File> =
     runCatching { getTransferData(DataFlavor.javaFileListFlavor) as? List<File> }
         .getOrNull()
         .orEmpty()
-        .filter { it.isFile }
-
-internal fun File.isImageFile(): Boolean = ImageIngressPolicy.isSupportedExtension(extension)
-
-internal fun Transferable.imageFiles(): List<File> = allFiles().filter { it.isImageFile() }
+        .filter { it.isFile && it.extension.lowercase() in IMAGE_EXTENSIONS }
 
 internal fun handleClipboardImagePaste(
     transferable: Transferable,
@@ -82,47 +78,21 @@ internal fun handleClipboardImageFilePaste(
     transferable: Transferable,
     sink: DesktopImageIngressSink,
 ): Boolean {
-    val paths = transferable.imageFiles().take(ImageIngressPolicy.MAX_FILES).map { it.toPath() }
-    if (paths.isEmpty()) return false
-    paths.forEach { path -> sink.launchLoad { load(path) } }
+    val path = transferable.imageFiles().firstOrNull()?.toPath() ?: return false
+    sink.launchLoad { load(path) }
     return true
 }
 
-internal fun createImageFileDropTarget(
-    sink: DesktopImageIngressSink,
-    onDragActive: (Boolean) -> Unit = {},
-): DropTargetAdapter =
+internal fun createImageFileDropTarget(sink: DesktopImageIngressSink): DropTargetAdapter =
     object : DropTargetAdapter() {
-        override fun dragEnter(event: java.awt.dnd.DropTargetDragEvent) {
-            onDragActive(true)
-        }
-
-        override fun dragOver(event: java.awt.dnd.DropTargetDragEvent) {
-            onDragActive(true)
-        }
-
-        override fun dragExit(event: java.awt.dnd.DropTargetEvent) {
-            onDragActive(false)
-        }
-
         override fun drop(event: DropTargetDropEvent) {
-            onDragActive(false)
-            // acceptDrop MUST precede transferable access: on Windows, reading
-            // the file list from an unaccepted drop throws
-            // InvalidDnDOperationException, which made drops look dead.
-            event.acceptDrop(DnDConstants.ACTION_COPY)
-            val files = event.transferable.allFiles()
-            val paths = files.filter { it.isImageFile() }
-                .take(ImageIngressPolicy.MAX_FILES)
-                .map { it.toPath() }
-            when {
-                paths.isNotEmpty() -> paths.forEach { path -> sink.launchLoad { load(path) } }
-                // Give feedback instead of a silent dead drop.
-                files.isNotEmpty() -> sink.onError(
-                    "Only images can be attached for now (${ImageIngressPolicy.supportedFormatsLabel()}).",
-                )
-                else -> sink.onError("Nothing attachable in that drop — try image files.")
+            val path = event.transferable.imageFiles().firstOrNull()?.toPath()
+            if (path == null) {
+                event.rejectDrop()
+                return
             }
+            event.acceptDrop(DnDConstants.ACTION_COPY)
+            sink.launchLoad { load(path) }
             event.dropComplete(true)
         }
     }

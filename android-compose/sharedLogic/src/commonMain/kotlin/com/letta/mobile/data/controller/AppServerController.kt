@@ -111,14 +111,6 @@ interface AppServerController {
         approvalRequestId: String,
         approve: Boolean,
         reason: String? = null,
-        // letta-mobile-vilsn: tool_call_id lets interactive-tool answers target
-        // the `perm-call_<toolCallId>` control-request gate id.
-        toolCallId: String? = null,
-        // letta-mobile-vilsn: structured close payload (e.g. an AskUserQuestion
-        // answer) shaped upstream and threaded as a first-class param instead of
-        // being re-decoded from the `reason` sentinel here. When present and
-        // approving, the tool call is closed via `Allow(updated_input=…)`.
-        updatedInput: kotlinx.serialization.json.JsonObject? = null,
     ) {
         error("submitApproval is not supported by this controller")
     }
