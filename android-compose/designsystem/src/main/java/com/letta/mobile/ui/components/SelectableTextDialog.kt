@@ -33,7 +33,6 @@ fun SelectableTextDialog(
     text: String,
     closeText: String,
     onDismiss: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val focusRequester = remember { FocusRequester() }
     var fieldValue by remember(text) {
@@ -68,7 +67,6 @@ fun SelectableTextDialog(
                 Text(closeText)
             }
         },
-        modifier = modifier,
     )
 
     LaunchedEffect(text) {
