@@ -19,6 +19,7 @@ import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -49,9 +50,16 @@ class DesktopChatInteractionUiTest {
             }
         }
 
+        waitUntil(timeoutMillis = 5_000L) {
+            onAllNodesWithText(longerText).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithText(longerText).assertExists()
         runOnIdle { markdown = "**$shorterText**" }
+        waitUntil(timeoutMillis = 5_000L) {
+            onAllNodesWithText(shorterText).fetchSemanticsNodes().isNotEmpty()
+        }
         onNodeWithText(shorterText).assertExists()
+        onNodeWithText(longerText).assertDoesNotExist()
     }
 
     @Test

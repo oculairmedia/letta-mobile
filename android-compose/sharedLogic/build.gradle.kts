@@ -8,6 +8,14 @@ plugins {
     id("org.jetbrains.kotlinx.kover")
 }
 
+kover {
+    currentProject {
+        createVariant("ci") {
+            add("jvm")
+        }
+    }
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")

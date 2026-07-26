@@ -1,64 +1,126 @@
 package com.letta.mobile.ui.components
 
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToString
+import com.letta.mobile.ui.theme.LettaTheme
+import org.intellij.markdown.ast.getTextInNode
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
+import org.intellij.markdown.parser.MarkdownParser
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.junit.Assert.assertTrue
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], instrumentedPackages = ["androidx.loader.content"])
 class MarkdownGlyphPreservationTest {
-
     @get:Rule
-    val composeTestRule = createComposeRule()
+    val composeRule = createComposeRule()
 
-    private fun assertRendersText(sourceText: String, expectedVisibleText: String) {
-        composeTestRule.setContent {
-            MarkdownText(text = sourceText)
-        }
-        val treeString = composeTestRule.onRoot().printToString()
-        assertTrue(
-            "Expected '$expectedVisibleText' to be visible, but tree was:\n$treeString",
-            treeString.contains(expectedVisibleText)
+    @Test
+    fun `preserves spaces around inline code`() {
+        val text = "Press ` Enter ` to continue"
+
+        assertEquals(text, autolinkBareUrls(text))
+        assertRenderedTextContains(text, "Press", " Enter ", "to continue")
+    }
+
+    @Test
+    fun `preserves sentence punctuation adjacent to a bare URL`() {
+        assertEquals(
+            "Visit [https://example.com/](https://example.com/).",
+            autolinkBareUrls("Visit https://example.com/."),
         )
     }
 
     @Test
-    fun `preserves spaces around inline code`() {
-        assertRendersText("Press ` Enter ` to continue", " Enter ")
-    }
-
-    @Test
-    fun `preserves punctuation adjacent to bare URLs`() {
-        assertRendersText("Visit https://example.com/.", "Visit https://example.com/.")
-        assertRendersText("(See https://example.com/)", "(See https://example.com/)")
+    fun `preserves parentheses adjacent to a bare URL`() {
+        assertEquals(
+            "(See [https://example.com/](https://example.com/))",
+            autolinkBareUrls("(See https://example.com/)"),
+        )
     }
 
     @Test
     fun `preserves escaped markdown chars`() {
-        assertRendersText("Use \\* and \\_ for literal asterisks and underscores", "Use * and _ for literal asterisks and underscores")
+        val text = "Use \\* and \\_ for literal asterisks and underscores"
+
+        assertEquals(text, autolinkBareUrls(text))
+        assertRenderedTextContains(text, "Use", "*", "_", "literal asterisks and underscores")
     }
 
     @Test
     fun `preserves emoji and combining marks`() {
-        assertRendersText("Here is an emoji 👨‍👩‍👧‍👦 with combining marks", "Here is an emoji 👨‍👩‍👧‍👦 with combining marks")
+        val familyEmoji =
+            "\uD83D\uDC68\u200D\uD83D\uDC69\u200D\uD83D\uDC67\u200D\uD83D\uDC66"
+        val text = "Here is an emoji $familyEmoji and a combining mark: cafe\u0301"
+
+        assertEquals(text, autolinkBareUrls(text))
+        assertRenderedTextContains(text, familyEmoji, "cafe\u0301")
     }
 
     @Test
     fun `preserves CJK text adjacent to markdown emphasis`() {
-        assertRendersText("これは **重要** なテストです", "これは 重要 なテストです")
+        val text =
+            "\u3053\u308C\u306F **\u91CD\u8981** \u306A\u30C6\u30B9\u30C8\u3067\u3059"
+        val parsed = MarkdownParser(GFMFlavourDescriptor())
+            .buildMarkdownTreeFromString(autolinkBareUrls(text))
+            .getTextInNode(text)
+            .toString()
+
+        assertTrue(parsed.contains("\u3053\u308C\u306F"))
+        assertTrue(parsed.contains("\u91CD\u8981"))
+        assertTrue(parsed.contains("\u306A\u30C6\u30B9\u30C8\u3067\u3059"))
+        assertRenderedTextContains(
+            text,
+            "\u3053\u308C\u306F",
+            "\u91CD\u8981",
+            "\u306A\u30C6\u30B9\u30C8\u3067\u3059",
+        )
     }
 
     @Test
     fun `preserves inline math delimiters with normal text around them`() {
-        // Rendered via MathBlock, but let's check it doesn't drop the surrounding text
-        assertRendersText("The equation \$E = mc^2\$ is famous", "The equation")
-        assertRendersText("The equation \$E = mc^2\$ is famous", "is famous")
+        val text = "The equation \$E = mc^2\$ is famous"
+        assertEquals(
+            listOf(
+                MathSegment.Text("The equation "),
+                MathSegment.Math("E = mc^2"),
+                MathSegment.Text(" is famous"),
+            ),
+            splitInlineMathSegments(text),
+        )
+        assertRenderedTextContains(text, "The equation", "is famous")
+        assertRenderedContentDescriptionContains("E = mc^2")
+    }
+
+    private fun assertRenderedTextContains(text: String, vararg fragments: String) {
+        composeRule.setContent {
+            LettaTheme {
+                MarkdownText(text)
+            }
+        }
+        composeRule.waitForIdle()
+
+        fragments.forEach { fragment ->
+            val nodes = composeRule
+                .onAllNodes(hasText(fragment, substring = true), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+            assertTrue("Expected rendered MarkdownText to contain <$fragment>", nodes.isNotEmpty())
+        }
+    }
+
+    private fun assertRenderedContentDescriptionContains(fragment: String) {
+        val nodes = composeRule
+            .onAllNodes(
+                hasContentDescription(fragment, substring = true),
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNodes()
+        assertTrue("Expected rendered MarkdownText to expose <$fragment>", nodes.isNotEmpty())
     }
 }

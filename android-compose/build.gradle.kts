@@ -204,9 +204,17 @@ dependencies {
     kover(project(":sharedLogic"))
     kover(project(":designsystem"))
     kover(project(":feature-chat"))
+    kover(project(":feature-editagent"))
 }
 
 kover {
+    currentProject {
+        // Keep CI coverage representative without compiling every flavor and
+        // release/benchmark variant. Each merged module maps this name to its
+        // JVM or debug report variant.
+        createVariant("ci") {}
+    }
+
     reports {
         filters {
             excludes {
@@ -237,6 +245,13 @@ kover {
             }
             xml {
                 onCheck = false
+            }
+        }
+
+        variant("ci") {
+            xml {
+                onCheck = false
+                xmlFile = layout.buildDirectory.file("reports/kover/report.xml").get().asFile
             }
         }
     }
