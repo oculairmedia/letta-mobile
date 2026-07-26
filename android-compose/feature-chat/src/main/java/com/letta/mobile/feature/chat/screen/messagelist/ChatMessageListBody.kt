@@ -6,6 +6,7 @@ import com.letta.mobile.feature.chat.screen.ChatFadingEdgesBox
 import com.letta.mobile.feature.chat.screen.chatFadeTargetColor
 import com.letta.mobile.feature.chat.screen.toChatViewportSnapshot
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
+import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.LocalChatIsPinching
@@ -42,19 +43,44 @@ internal fun ChatMessageListBody(
     params: ChatMessageListBodyParams,
     modifier: Modifier = Modifier,
 ) {
+    val renderCallbacks = remember(params.callbacks) {
+        ChatMessageRenderCallbacks(
+            onSendMessage = params.callbacks.onSendMessage,
+            onRerunMessage = params.callbacks.onRerunMessage,
+            onSubmitApproval = params.callbacks.onSubmitApproval,
+            onToggleRunCollapsed = params.callbacks.onToggleRunCollapsed,
+            onToggleReasoningExpanded = params.callbacks.onToggleReasoningExpanded,
+            onAttachmentImageTap = params.callbacks.onAttachmentImageTap,
+        )
+    }
+    val itemState = remember(
+        params.state.isStreaming,
+        params.state.activeApprovalRequestId,
+        params.state.collapsedRunIds,
+        params.state.expandedReasoningMessageIds,
+    ) {
+        params.state.toChatRenderItemState()
+    }
+
+    ChatMessageListBodyContent(
+        params = params,
+        renderCallbacks = renderCallbacks,
+        itemState = itemState,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ChatMessageListBodyContent(
+    params: ChatMessageListBodyParams,
+    renderCallbacks: ChatMessageRenderCallbacks,
+    itemState: com.letta.mobile.ui.chat.render.ChatRenderItemState,
+    modifier: Modifier,
+) {
     val chatDimens = MaterialTheme.chatDimens
     val chatShapes = MaterialTheme.chatShapes
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    val renderCallbacks = ChatMessageRenderCallbacks(
-        onSendMessage = params.callbacks.onSendMessage,
-        onRerunMessage = params.callbacks.onRerunMessage,
-        onSubmitApproval = params.callbacks.onSubmitApproval,
-        onToggleRunCollapsed = params.callbacks.onToggleRunCollapsed,
-        onToggleReasoningExpanded = params.callbacks.onToggleReasoningExpanded,
-        onAttachmentImageTap = params.callbacks.onAttachmentImageTap,
-    )
-
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
         val contentWidthPx = with(density) {
             (maxWidth - chatDimens.contentPaddingHorizontal - chatDimens.contentPaddingHorizontal)
@@ -65,6 +91,11 @@ internal fun ChatMessageListBody(
         val lazyColumnParams = ChatMessageListLazyColumnParams(
             bodyParams = params,
             renderCallbacks = renderCallbacks,
+            itemState = itemState,
+            conversationId = (
+                params.state.conversationState as?
+                    com.letta.mobile.ui.chat.render.ConversationState.Ready
+                )?.conversationId,
             contentWidthPx = contentWidthPx,
             newestMessageId = newestMessageId,
             density = density,
@@ -75,6 +106,7 @@ internal fun ChatMessageListBody(
         val activeStreamingGeometryBuckets = rememberActiveStreamingGeometryBuckets(
             ActiveStreamingGeometryInput(
                 bodyParams = params,
+                itemState = itemState,
                 newestMessageId = newestMessageId,
                 contentWidthPx = contentWidthPx,
                 density = density,
@@ -124,7 +156,7 @@ private fun rememberActiveStreamingGeometryBuckets(
                 .filter { it.containsMessageId(input.newestMessageId) }
                 .map {
                     it.chatGeometrySignature(
-                        state = params.state,
+                        state = input.itemState,
                         chatMode = params.appearance.chatMode,
                         widthPx = input.contentWidthPx,
                         density = input.density,
@@ -204,24 +236,28 @@ private fun ChatMessageListLazyColumn(params: ChatMessageListLazyColumnParams) {
         modifier = Modifier.graphicsLayer { },
     ) {
         chatMessageListItems(
-            ChatMessageListLazyContext(
-                state = bodyParams.state,
+            ChatMessageListItemsParams(
                 renderItems = bodyParams.renderItems,
-                chatMode = bodyParams.appearance.chatMode,
-                contentWidthPx = params.contentWidthPx,
-                density = params.density,
-                layoutDirection = params.layoutDirection,
-                activeFontScale = bodyParams.appearance.activeFontScale,
-                liveFontScale = bodyParams.liveFontScale,
-                newestMessageId = params.newestMessageId,
-                highlightedMessageId = bodyParams.highlightedMessageId,
-                itemGeometryState = bodyParams.itemGeometryState,
-                pinchFontScaleController = bodyParams.pinchFontScaleController,
-                scaleWindowIndexRange = bodyParams.scaleWindowIndexRange,
-                callbacks = params.renderCallbacks,
+                isLoadingOlderMessages = bodyParams.state.isLoadingOlderMessages,
+                context = ChatMessageListLazyContext(
+                    itemState = params.itemState,
+                    conversationId = params.conversationId,
+                    chatMode = bodyParams.appearance.chatMode,
+                    contentWidthPx = params.contentWidthPx,
+                    density = params.density,
+                    layoutDirection = params.layoutDirection,
+                    activeFontScale = bodyParams.appearance.activeFontScale,
+                    liveFontScale = bodyParams.liveFontScale,
+                    newestMessageId = params.newestMessageId,
+                    highlightedMessageId = bodyParams.highlightedMessageId,
+                    itemGeometryState = bodyParams.itemGeometryState,
+                    pinchFontScaleController = bodyParams.pinchFontScaleController,
+                    scaleWindowIndexRange = bodyParams.scaleWindowIndexRange,
+                    callbacks = params.renderCallbacks,
+                ),
+                chatDimens = params.chatDimens,
+                chatShapes = params.chatShapes,
             ),
-            chatDimens = params.chatDimens,
-            chatShapes = params.chatShapes,
         )
     }
 }

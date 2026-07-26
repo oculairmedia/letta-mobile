@@ -163,7 +163,7 @@ private fun ChatScreenA2uiSnackbarEffect(
             SnackbarMessage(
                 message = current.message,
                 actionLabel = current.actionLabel,
-                duration = current.duration,
+                duration = current.duration.toMaterialDuration(),
                 onAction = current.retryAction?.let { retry -> { onRetry(retry) } },
             ),
         )

@@ -1,0 +1,64 @@
+package com.letta.mobile.feature.chat.screen
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.model.Tool
+import com.letta.mobile.feature.chat.R
+import com.letta.mobile.ui.components.ActionSheet
+import com.letta.mobile.ui.components.ActionSheetItem
+import com.letta.mobile.ui.icons.LettaIcons
+
+internal data class ChatComposerActionSheetState(
+    val show: Boolean,
+    val availableTools: List<Tool>,
+)
+
+internal data class ChatComposerActionSheetCallbacks(
+    val onDismiss: () -> Unit,
+    val onAttachImage: () -> Unit,
+    val onToolSelected: (Tool) -> Unit,
+)
+
+@Composable
+internal fun ChatComposerActionSheet(
+    state: ChatComposerActionSheetState,
+    callbacks: ChatComposerActionSheetCallbacks,
+) {
+    val availableHeight = LocalConfiguration.current.screenHeightDp.dp
+    val actionListMaxHeight = (availableHeight - 112.dp)
+        .coerceAtLeast(96.dp)
+        .coerceAtMost(320.dp)
+
+    ActionSheet(
+        show = state.show,
+        onDismiss = callbacks.onDismiss,
+        title = stringResource(R.string.composer_actions_title),
+    ) {
+        Column(
+            modifier = Modifier
+                .heightIn(max = actionListMaxHeight)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            ActionSheetItem(
+                text = stringResource(R.string.action_attach_image),
+                icon = LettaIcons.Add,
+                onClick = callbacks.onAttachImage,
+            )
+            state.availableTools.forEach { tool ->
+                ActionSheetItem(
+                    text = tool.name,
+                    icon = LettaIcons.Tool,
+                    supportingText = stringResource(R.string.composer_action_tool_template_supporting),
+                    onClick = { callbacks.onToolSelected(tool) },
+                )
+            }
+        }
+    }
+}

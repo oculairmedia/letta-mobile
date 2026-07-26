@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="message_actions_title">Message actions</string>
+    <string name="message_actions_open">Show message actions</string>
+    <string name="message_action_select_text">Select text</string>
+    <string name="message_action_send_again">Send again</string>
+</resources>

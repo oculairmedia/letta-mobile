@@ -432,10 +432,24 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     val isForwardGrowthFragment = liveAssistant != null &&
         confirmed.messageType == TimelineMessageType.ASSISTANT &&
         liveAssistant.serverId != confirmed.serverId &&
-        confirmed.runId?.takeIf { it.isNotBlank() }?.let { inRun ->
-            liveAssistant.runId?.takeIf { it.isNotBlank() }
-                ?.isCompatibleAssistantPrefixRunId(inRun) == true
-        } == true &&
+        // letta-mobile-w0ctr: widen the run-id gate by EXACTLY the promotion case —
+        // a synthetic existing run id growing into a real incoming one. The first streamed
+        // fragment is committed before run-id promotion lands, so `iroh-run-*` vs `run-*`
+        // failed isCompatibleAssistantPrefixRunId (which only accepts equal ids, or BOTH
+        // sides synthetic) and the second fragment appended a new row instead of growing
+        // the first — stranding the opening chunk as its own bubble.
+        //
+        // Both ids must stay non-blank. A blank existing run id is indistinguishable from
+        // an older RECONCILED reply (those carry runId = null), and merging into one would
+        // overwrite an unrelated earlier message whose text happens to be a prefix — the
+        // #827 regression guarded by "reconcile final does not overwrite an unrelated older
+        // reply that is a substring". So the blank case is deliberately NOT relaxed here.
+        run {
+            val existingRun = liveAssistant.runId?.takeIf { it.isNotBlank() }
+            val incomingRun = confirmed.runId?.takeIf { it.isNotBlank() }
+            existingRun != null && incomingRun != null &&
+                (existingRun == incomingRun || existingRun.isIrohSyntheticRunId())
+        } &&
         run {
             val existing = liveAssistant.content.trim()
             val incoming = confirmed.content.trim()

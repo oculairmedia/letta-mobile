@@ -2,8 +2,7 @@ package com.letta.mobile.feature.chat.screen.messagelist
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
-import com.letta.mobile.ui.chat.render.ChatUiState
-import com.letta.mobile.ui.chat.render.ConversationState
+import com.letta.mobile.ui.chat.render.ChatRenderItemState
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
 import com.letta.mobile.feature.chat.render.LocalToolCardBodyParentVisible
 import com.letta.mobile.feature.chat.screen.RunBlock
@@ -23,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,9 +32,10 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.zoom.PinchScalePreviewController
 import java.time.LocalDate
 
+@Immutable
 internal data class ChatMessageListLazyContext(
-    val state: ChatUiState,
-    val renderItems: List<ChatRenderItem>,
+    val itemState: ChatRenderItemState,
+    val conversationId: String?,
     val chatMode: String,
     val contentWidthPx: Int,
     val density: Density,
@@ -49,13 +50,18 @@ internal data class ChatMessageListLazyContext(
     val callbacks: ChatMessageRenderCallbacks,
 )
 
-internal fun LazyListScope.chatMessageListItems(
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    chatShapes: ChatShapes,
-) {
-    context.renderItems.forEachIndexed { index, renderItem ->
-        val prevDate = context.renderItems.getOrNull(index + 1)?.boundaryTimestamp?.take(10)
+@Immutable
+internal data class ChatMessageListItemsParams(
+    val renderItems: List<ChatRenderItem>,
+    val isLoadingOlderMessages: Boolean,
+    val context: ChatMessageListLazyContext,
+    val chatDimens: ChatDimens,
+    val chatShapes: ChatShapes,
+)
+
+internal fun LazyListScope.chatMessageListItems(params: ChatMessageListItemsParams) {
+    params.renderItems.forEachIndexed { index, renderItem ->
+        val prevDate = params.renderItems.getOrNull(index + 1)?.boundaryTimestamp?.take(10)
         val currentDate = renderItem.boundaryTimestamp.take(10)
         val showDate = prevDate != null && prevDate != currentDate
 
@@ -68,9 +74,9 @@ internal fun LazyListScope.chatMessageListItems(
                 params = ChatMessageListRenderItemParams(
                     renderItem = renderItem,
                     index = index,
-                    context = context,
-                    chatDimens = chatDimens,
-                    chatShapes = chatShapes,
+                    context = params.context,
+                    chatDimens = params.chatDimens,
+                    chatShapes = params.chatShapes,
                 ),
             )
         }
@@ -89,7 +95,7 @@ internal fun LazyListScope.chatMessageListItems(
         }
     }
 
-    if (context.state.isLoadingOlderMessages) {
+    if (params.isLoadingOlderMessages) {
         item(key = "older-loading") {
             Box(
                 modifier = Modifier
@@ -110,7 +116,7 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
     if (com.letta.mobile.ui.chat.render.RenderDiagnostics.enabled()) {
         SideEffect {
             com.letta.mobile.ui.chat.render.RenderDiagnostics.onLazyItemComposed(
-                conversationId = (context.state.conversationState as? ConversationState.Ready)?.conversationId ?: "<active>",
+                conversationId = context.conversationId ?: "<active>",
                 key = renderItem.key,
                 contentType = when (renderItem) {
                     is ChatRenderItem.Single -> "single"
@@ -121,14 +127,14 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
         }
     }
     val geometrySignature = renderItem.chatGeometrySignature(
-        state = context.state,
+        state = context.itemState,
         chatMode = context.chatMode,
         widthPx = context.contentWidthPx,
         density = context.density,
         layoutDirection = context.layoutDirection,
         activeFontScale = context.activeFontScale,
     )
-    val isStreamingRenderItem = context.state.isStreaming &&
+    val isStreamingRenderItem = context.itemState.isStreaming &&
         context.newestMessageId != null &&
         renderItem.containsMessageId(context.newestMessageId)
     val itemSeesLiveScale = chatRenderItemSeesLiveScale(
@@ -204,14 +210,14 @@ private fun ChatMessageListRenderSingleItem(
         val runId = renderItem.stableRunId ?: stableKey.removePrefix("run-")
         RunBlock(
             messages = listOf(msg),
-            collapsed = runId in context.state.collapsedRunIds,
+            collapsed = runId in context.itemState.collapsedRunIds,
             onToggleCollapsed = {
                 context.itemGeometryState.clearStreamingFloors()
                 context.callbacks.onToggleRunCollapsed(runId)
             },
             modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
-            isStreaming = context.state.isStreaming,
-            activeApprovalRequestId = context.state.activeApprovalRequestId,
+            isStreaming = isStreamingRenderItem,
+            activeApprovalRequestId = context.itemState.activeApprovalRequestId,
             onApprovalDecision = context.callbacks.onSubmitApproval,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
@@ -251,14 +257,14 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
     }
     RunBlock(
         messages = renderItem.messages.map { it.first },
-        collapsed = renderItem.runId in context.state.collapsedRunIds,
+        collapsed = renderItem.runId in context.itemState.collapsedRunIds,
         onToggleCollapsed = {
             context.itemGeometryState.clearStreamingFloors()
             context.callbacks.onToggleRunCollapsed(renderItem.runId)
         },
         modifier = highlightModifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
-        isStreaming = context.state.isStreaming,
-        activeApprovalRequestId = context.state.activeApprovalRequestId,
+        isStreaming = params.isStreamingRenderItem,
+        activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
@@ -291,12 +297,12 @@ private fun RenderChatMessageRow(
         message = message,
         position = params.position,
         isStreaming = params.isStreamingRenderItem && message.id == context.newestMessageId,
-        rerunEnabled = !context.state.isStreaming,
-        approvalInFlight = context.state.activeApprovalRequestId == message.approvalRequest?.requestId,
+        rerunEnabled = !context.itemState.isStreaming,
+        approvalInFlight = context.itemState.activeApprovalRequestId == message.approvalRequest?.requestId,
         chatMode = context.chatMode,
         highlightedMessageId = context.highlightedMessageId,
         callbacks = context.callbacks,
-        reasoningCollapsed = message.id !in context.state.expandedReasoningMessageIds,
+        reasoningCollapsed = message.id !in context.itemState.expandedReasoningMessageIds,
         onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(message.id) },
         modifier = modifier,
     )

@@ -892,4 +892,7 @@ private fun ChannelTransport.disconnectForTest() {
     }
 }
 
-private const val TIMEOUT_MS = 5_000L
+// MockWebServer callbacks share constrained CI workers with the full Compose
+// integration suite. Keep the interaction budgets above strict, but allow the
+// transport callback enough wall-clock time to be scheduled under contention.
+private const val TIMEOUT_MS = 15_000L

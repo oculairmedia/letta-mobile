@@ -87,7 +87,7 @@ class ChatMessageGeometryState(
 }
 
 fun ChatRenderItem.chatGeometrySignature(
-    state: ChatUiState,
+    state: ChatRenderItemState,
     chatMode: String,
     widthPx: Int,
     density: Density,
@@ -117,7 +117,9 @@ private data class ChatRenderItemContentFingerprint(
     val hash: Int,
 )
 
-private fun ChatRenderItem.geometryContentFingerprint(state: ChatUiState): ChatRenderItemContentFingerprint {
+private fun ChatRenderItem.geometryContentFingerprint(
+    state: ChatRenderItemState,
+): ChatRenderItemContentFingerprint {
     var length = 0
     var hash = key.hashCode()
 
@@ -176,7 +178,7 @@ private fun ChatRenderItem.geometryContentFingerprint(state: ChatUiState): ChatR
     return ChatRenderItemContentFingerprint(length = length, hash = hash)
 }
 
-private fun ChatRenderItem.geometryExpansionHash(state: ChatUiState): Int {
+private fun ChatRenderItem.geometryExpansionHash(state: ChatRenderItemState): Int {
     var hash = 17
     fun include(value: Int) {
         hash = 31 * hash + value

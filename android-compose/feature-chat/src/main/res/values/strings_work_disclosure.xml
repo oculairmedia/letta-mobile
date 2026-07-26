@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="work_disclosure_working">Working</string>
+    <string name="work_disclosure_thought">Thought</string>
+    <string name="work_disclosure_thought_duration">Thought for %1$s</string>
+    <string name="work_disclosure_worked">Worked</string>
+    <string name="work_disclosure_worked_duration">Worked for %1$s</string>
+    <string name="work_disclosure_expand">Expand agent work</string>
+    <string name="work_disclosure_collapse">Collapse agent work</string>
+    <string name="work_disclosure_state_working">Agent work in progress</string>
+    <string name="work_disclosure_state_collapsed">Agent work collapsed</string>
+    <string name="work_disclosure_state_expanded">Agent work expanded</string>
+    <plurals name="work_disclosure_tool_count">
+        <item quantity="one">%1$d tool</item>
+        <item quantity="other">%1$d tools</item>
+    </plurals>
+    <plurals name="work_disclosure_failure_count">
+        <item quantity="one">%1$d failure</item>
+        <item quantity="other">%1$d failures</item>
+    </plurals>
+</resources>

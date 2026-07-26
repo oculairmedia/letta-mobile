@@ -10,6 +10,14 @@ plugins {
     id("org.jetbrains.kotlinx.kover") // version inherited from root
 }
 
+kover {
+    currentProject {
+        createVariant("ci") {
+            add("debug")
+        }
+    }
+}
+
 allOpen {
     annotation("javax.inject.Singleton")
 }

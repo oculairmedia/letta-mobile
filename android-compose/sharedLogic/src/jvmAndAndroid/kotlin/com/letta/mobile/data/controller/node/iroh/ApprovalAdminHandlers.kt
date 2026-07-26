@@ -47,6 +47,16 @@ object ApprovalAdminHandlers {
             ?: throw IllegalArgumentException("approval decision required")
         val reason = approval["reason"]?.jsonPrimitive?.contentOrNull
             ?: approval["approvals"]?.jsonArray?.firstOrNull()?.jsonObject?.get("reason")?.jsonPrimitive?.contentOrNull
+        // letta-mobile-vilsn: structured close payload (e.g. an AskUserQuestion
+        // answer), decoded upstream in MessageRepositoryApproval and threaded here
+        // as a first-class field instead of the controller re-decoding a `reason`
+        // sentinel.
+        // Backward-compat: older clients still encode the answer into the `reason`
+        // sentinel (AskUserQuestion.encodeAnswerReason) rather than sending
+        // `updated_input`. Decode it here so a new host keeps working with an
+        // un-upgraded app/desktop client.
+        val updatedInput = approval["updated_input"]?.jsonObject
+            ?: com.letta.mobile.data.model.AskUserQuestion.decodeAnswerReason(reason)
         val toolCallIds = approval["approvals"]?.jsonArray
             ?.mapNotNull { it.jsonObject["tool_call_id"]?.jsonPrimitive?.contentOrNull }
             ?.takeIf { it.isNotEmpty() }
@@ -60,6 +70,8 @@ object ApprovalAdminHandlers {
                     approvalRequestId = approvalRequestId,
                     approve = approve,
                     reason = reason,
+                    toolCallId = toolCallIds.firstOrNull(),
+                    updatedInput = updatedInput,
                 )
             }.onSuccess {
                 return buildJsonObject { put("status", if (approve) "approved" else "denied") }
@@ -67,6 +79,20 @@ object ApprovalAdminHandlers {
         }
 
         if (toolCallIds.isEmpty()) throw IllegalArgumentException("tool_call_id required")
+        // letta-mobile-vilsn.8: the shim's `v1/approvals/{run_id}/decision` REST
+        // endpoint only accepts decision/scope/reason — it has no updated_input
+        // field. If we reach this fallback (no live controller, or the controller
+        // submit above failed) with a structured answer to deliver, silently
+        // posting a bare decision would report success while actually
+        // closing an AskUserQuestion/ExitPlanMode call with no answer, stalling
+        // the agent on a placeholder. Fail loudly instead of lying about it.
+        if (approve && updatedInput != null) {
+            throw IllegalStateException(
+                "cannot deliver a structured answer (updated_input) through the shim " +
+                    "approvals decision fallback — no live AppServer controller available " +
+                    "for this submission",
+            )
+        }
         val pending = api.get(AdminPath.shim("v1", "approvals", "pending")) {
             query("agent_id", agentId)
         }.jsonObject["pending"]?.jsonArray.orEmpty()

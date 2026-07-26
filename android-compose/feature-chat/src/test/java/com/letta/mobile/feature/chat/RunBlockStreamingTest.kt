@@ -7,6 +7,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -32,6 +33,42 @@ import com.letta.mobile.feature.chat.screen.RunBlockTestTags
 class RunBlockStreamingTest {
     @get:Rule
     val composeRule = createComposeRule()
+
+    @Test
+    fun activeRunIgnoresCollapsedFlagAndKeepsEveryStepOpen() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    RunBlock(
+                        messages = listOf(
+                            message(id = "reasoning-1", content = "Inspecting", isReasoning = true),
+                            message(
+                                id = "reasoning-2",
+                                content = "Still inspecting",
+                                isPending = true,
+                                isReasoning = true,
+                            ),
+                        ),
+                        collapsed = true,
+                        onToggleCollapsed = {},
+                        isStreaming = true,
+                    ) { message, _, rowModifier ->
+                        Text(
+                            text = message.content,
+                            modifier = rowModifier.testTag("run-row-${message.id}"),
+                        )
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithTag("run-row-reasoning-1").assertIsDisplayed()
+        composeRule.onNodeWithTag("run-row-reasoning-2").assertIsDisplayed()
+    }
 
     @Test
     fun dotsKeepStablePositionsWhenStreamingStepAppendsAndSettles() {

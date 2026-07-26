@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="composer_actions_open">Open composer actions</string>
+    <string name="composer_actions_title">Add to message</string>
+    <string name="composer_action_tool_template_supporting">Insert tool template</string>
+</resources>

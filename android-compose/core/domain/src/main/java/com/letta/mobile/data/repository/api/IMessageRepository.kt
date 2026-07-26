@@ -70,6 +70,10 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String? = null,
+        // letta-mobile-vilsn: the already-validated active conversation id, threaded
+        // to the Iroh admin_rpc source so the host controller answers the RIGHT
+        // conversation when several runtimes are open for the same agent.
+        conversationId: String? = null,
     )
     suspend fun submitApproval(
         agentId: String,
@@ -77,7 +81,8 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String? = null,
-    ) = submitApproval(AgentId(agentId), approvalRequestId, toolCallIds, approve, reason)
+        conversationId: String? = null,
+    ) = submitApproval(AgentId(agentId), approvalRequestId, toolCallIds, approve, reason, conversationId)
 
     /**
      * Reset all messages for an agent (agent-scoped, not conversation-scoped).

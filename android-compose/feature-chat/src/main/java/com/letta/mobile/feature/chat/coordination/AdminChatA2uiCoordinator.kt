@@ -1,7 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
 import android.util.Log
-import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.a2ui.A2uiFrameEvent
 import com.letta.mobile.data.a2ui.A2uiMessage
@@ -23,6 +22,7 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import com.letta.mobile.ui.chat.render.A2uiActionSnackbarUi
+import com.letta.mobile.ui.chat.render.ChatSnackbarDuration
 import com.letta.mobile.ui.chat.render.A2uiDebugFrameUi
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.feature.chat.a2ui.toToolApprovalSubmission
@@ -318,7 +318,7 @@ internal class AdminChatA2uiCoordinator(
             id = ++nextA2uiSnackbarId,
             message = message,
             actionLabel = if (retryable) "Retry" else null,
-            duration = if (retryable) SnackbarDuration.Indefinite else SnackbarDuration.Short,
+            duration = ChatSnackbarDuration.forRetryableAction(retryable),
             retryAction = action.takeIf { retryable },
         )
     }

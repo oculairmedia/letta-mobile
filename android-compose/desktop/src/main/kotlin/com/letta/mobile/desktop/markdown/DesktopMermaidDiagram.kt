@@ -1,45 +1,39 @@
 package com.letta.mobile.desktop.markdown
 
 import com.letta.mobile.mermaid.MermaidNativeRenderer
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.graphics.toComposeImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.markdown.MermaidDiagramRenderer
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import org.jetbrains.skia.Data
-import org.jetbrains.skia.Rect
-import org.jetbrains.skia.svg.SVGDOM
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
@@ -62,13 +56,24 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
             darkTheme = isDarkTheme,
         )
     }
+    // The chat list is a LazyColumn: the same diagram re-enters composition on every scroll pass.
+    // A synchronous cache probe lets us seed produceState with the finished SVG so a revisit never
+    // flashes "Rendering diagram..." nor pays for another mutex-serialized JNI render.
+    val cached = remember(source, style) { DesktopMermaidRenderCache.get(source, style) }
     val result by produceState<DesktopMermaidRenderResult>(
-        initialValue = DesktopMermaidRenderResult.Loading,
+        initialValue = cached ?: DesktopMermaidRenderResult.Loading,
         source,
         style,
     ) {
+        if (cached != null) return@produceState
         value = withContext(Dispatchers.Default) {
-            DesktopMermaidNativeBridge.renderToSvg(source, style)
+            DesktopMermaidNativeBridge.renderToPng(source, style).also { rendered ->
+                // Only successful renders are worth keeping; failures may be transient (library
+                // still loading, native error state) and must stay retryable.
+                if (rendered is DesktopMermaidRenderResult.Rendered) {
+                    DesktopMermaidRenderCache.put(source, style, rendered)
+                }
+            }
         }
     }
 
@@ -78,14 +83,14 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
         shape = MaterialTheme.shapes.small,
     ) {
         Column {
-            MermaidHeader(source)
+            MermaidHeader()
             when (val current = result) {
                 DesktopMermaidRenderResult.Loading -> Text(
                     text = "Rendering diagram...",
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 16.dp),
                     style = MaterialTheme.typography.bodySmall,
                 )
-                is DesktopMermaidRenderResult.Rendered -> MermaidSvg(current.svg, source)
+                is DesktopMermaidRenderResult.Rendered -> MermaidImage(current.png, source)
                 is DesktopMermaidRenderResult.Failed -> MermaidSourceFallback(source, current.reason)
             }
         }
@@ -93,65 +98,73 @@ private fun DesktopMermaidDiagram(source: String, modifier: Modifier = Modifier)
 }
 
 @Composable
-private fun MermaidHeader(source: String) {
-    val clipboard = LocalClipboardManager.current
-    Row(modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp)) {
+private fun MermaidHeader() {
+    // No copy affordance here: the message-level "Copy response" pill floats at
+    // the same top-right corner and already includes the mermaid fence source,
+    // so a second glyph read as a confusing duplicate.
+    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
         Text(
             text = "mermaid",
-            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            modifier = Modifier.weight(1f).padding(vertical = 10.dp),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        IconButton(onClick = { clipboard.setText(AnnotatedString(source)) }) {
-            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy Mermaid source")
-        }
     }
 }
 
 @Composable
-private fun MermaidSvg(svg: String, source: String) {
-    val parsed = remember(svg) {
+private fun MermaidImage(png: ByteArray, source: String) {
+    // The native renderer rasterizes with real system fonts (skiko's SVGDOM has no font manager,
+    // so the old SVG path silently dropped every label). Decoding the PNG is cheap relative to the
+    // render and is remembered per composition; the bytes themselves live in the process-wide cache.
+    val bitmap = remember(png) {
         runCatching {
-            val data = Data.makeFromBytes(svg.encodeToByteArray())
-            MermaidSvgDom(data = data, dom = SVGDOM(data))
+            org.jetbrains.skia.Image.makeFromEncoded(png).toComposeImageBitmap()
         }.getOrNull()
     }
-    DisposableEffect(parsed) {
-        onDispose { parsed?.close() }
-    }
-    if (parsed == null) {
-        MermaidSourceFallback(svg, "Rendered SVG could not be decoded")
+    if (bitmap == null) {
+        MermaidSourceFallback(source, "Rendered image could not be decoded")
         return
     }
-    val aspectRatio = mermaidAspectRatio(parsed.dom.root?.viewBox)
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height((360f / aspectRatio).coerceIn(180f, 480f).dp)
-            .padding(12.dp)
-            .semantics { contentDescription = "Mermaid diagram:\n$source" },
-    ) {
-        parsed.dom.setContainerSize(size.width, size.height)
-        drawContext.canvas.nativeCanvas.save()
-        parsed.dom.render(drawContext.canvas.nativeCanvas)
-        drawContext.canvas.nativeCanvas.restore()
+    val aspectRatio = mermaidAspectRatio(bitmap)
+    // Size from the diagram's intrinsic aspect ratio at the width we were actually granted (not a
+    // fixed reference width). Height is capped at a screenful; past that, ContentScale.Fit shrinks
+    // the whole diagram to fit rather than cropping it or letting it swallow the viewport.
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val drawWidth = (maxWidth - MermaidCanvasPadding * 2).coerceAtLeast(1.dp)
+        val drawHeight = (drawWidth.value / aspectRatio)
+            .coerceIn(MermaidMinDrawHeight, MermaidMaxDrawHeight)
+            .dp
+        Image(
+            bitmap = bitmap,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(drawHeight + MermaidCanvasPadding * 2)
+                .padding(MermaidCanvasPadding)
+                .semantics { contentDescription = "Mermaid diagram:\n$source" },
+        )
     }
 }
 
-private fun mermaidAspectRatio(viewBox: Rect?): Float =
-    viewBox?.takeIf(::hasPositiveSize)?.let { it.width / it.height } ?: (16f / 9f)
+private val MermaidCanvasPadding: Dp = 12.dp
 
-private fun hasPositiveSize(viewBox: Rect): Boolean =
-    viewBox.width > 0f && viewBox.height > 0f
+/**
+ * Floor keeps single-node diagrams from collapsing. The ceiling keeps tall
+ * flowcharts inside a screenful: ContentScale.Fit scales the whole diagram
+ * down to fit the capped box, so everything stays visible at once instead of
+ * the block swallowing the viewport.
+ */
+private const val MermaidMinDrawHeight = 120f
+private const val MermaidMaxDrawHeight = 560f
 
-private class MermaidSvgDom(
-    private val data: Data,
-    val dom: SVGDOM,
-) {
-    fun close() {
-        runCatching { data.close() }
+private fun mermaidAspectRatio(bitmap: ImageBitmap): Float =
+    if (bitmap.width > 0 && bitmap.height > 0) {
+        bitmap.width.toFloat() / bitmap.height.toFloat()
+    } else {
+        16f / 9f
     }
-}
 
 @Composable
 private fun MermaidSourceFallback(source: String, reason: String) {
@@ -187,8 +200,36 @@ private data class DesktopMermaidStyle(
 
 private sealed interface DesktopMermaidRenderResult {
     data object Loading : DesktopMermaidRenderResult
-    data class Rendered(val svg: String) : DesktopMermaidRenderResult
+
+    /** PNG bytes from the native rasterizer. Identity equality is fine: instances are cache-shared. */
+    class Rendered(val png: ByteArray) : DesktopMermaidRenderResult
+
     data class Failed(val reason: String) : DesktopMermaidRenderResult
+}
+
+/**
+ * Process-wide LRU of successful renders. Keyed by source *and* style because the same diagram must
+ * be re-rendered when the theme palette changes.
+ */
+private object DesktopMermaidRenderCache {
+    private const val MAX_ENTRIES = 64
+
+    private data class Key(val source: String, val style: DesktopMermaidStyle)
+
+    // accessOrder = true so a scroll-back counts as a use and keeps the entry hot.
+    private val entries = object : LinkedHashMap<Key, DesktopMermaidRenderResult.Rendered>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: Map.Entry<Key, DesktopMermaidRenderResult.Rendered>): Boolean =
+            size > MAX_ENTRIES
+    }
+
+    // Reads happen on the composition thread, writes on Dispatchers.Default; LinkedHashMap is not
+    // thread-safe and even get() mutates access order, so every touch is guarded by the same lock.
+    fun get(source: String, style: DesktopMermaidStyle): DesktopMermaidRenderResult.Rendered? =
+        synchronized(entries) { entries[Key(source, style)] }
+
+    fun put(source: String, style: DesktopMermaidStyle, rendered: DesktopMermaidRenderResult.Rendered) {
+        synchronized(entries) { entries[Key(source, style)] = rendered }
+    }
 }
 
 private object DesktopMermaidNativeBridge {
@@ -211,12 +252,19 @@ private object DesktopMermaidNativeBridge {
         }.getOrDefault(false)
     }
 
-    suspend fun renderToSvg(source: String, style: DesktopMermaidStyle): DesktopMermaidRenderResult {
+    /**
+     * Rasterization target width. Fixed rather than measured so the cache key stays width-free
+     * (window resizes don't trigger re-renders); at 1600px a diagram stays sharp up to ~800dp of
+     * column width at 2x density, and ContentScale.Fit handles everything narrower.
+     */
+    private const val TARGET_WIDTH_PX = 1600
+
+    suspend fun renderToPng(source: String, style: DesktopMermaidStyle): DesktopMermaidRenderResult {
         if (!available) return DesktopMermaidRenderResult.Failed("Desktop Mermaid renderer is unavailable")
         // Native LAST_ERROR is process-global; serialize renders across diagrams.
         return renderMutex.withLock {
             runCatching {
-                val svg = MermaidNativeRenderer.nativeRenderToSvg(
+                val png = MermaidNativeRenderer.nativeRenderToPng(
                     source = source,
                     darkTheme = style.darkTheme,
                     textArgb = style.textArgb,
@@ -225,13 +273,14 @@ private object DesktopMermaidNativeBridge {
                     primaryArgb = style.primaryArgb,
                     secondaryArgb = style.secondaryArgb,
                     tertiaryArgb = style.tertiaryArgb,
+                    targetWidthPx = TARGET_WIDTH_PX,
                 )
-                if (svg.isNullOrBlank()) {
+                if (png == null || png.isEmpty()) {
                     DesktopMermaidRenderResult.Failed(
-                        MermaidNativeRenderer.nativeTakeLastError().orEmpty().ifBlank { "Renderer returned no SVG" },
+                        MermaidNativeRenderer.nativeTakeLastError().orEmpty().ifBlank { "Renderer returned no image" },
                     )
                 } else {
-                    DesktopMermaidRenderResult.Rendered(svg)
+                    DesktopMermaidRenderResult.Rendered(png)
                 }
             }.getOrElse { DesktopMermaidRenderResult.Failed(it.message ?: it::class.java.simpleName) }
         }
