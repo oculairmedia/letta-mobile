@@ -1,16 +1,18 @@
 package com.letta.mobile.ui.screens.config
 
 import android.content.ActivityNotFoundException
+import android.content.Context
+import android.content.Intent
 import android.os.Build
-import com.letta.mobile.BuildConfig
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -29,6 +31,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.letta.mobile.BuildConfig
 import com.letta.mobile.R
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
@@ -168,28 +171,12 @@ fun ConfigScreen(
                 onSelectEmbeddedModel = { viewModel.selectEmbeddedModel(it) },
                 batteryOptimizationExempt = batteryOptimizationExempt,
                 onRequestBatteryOptimizationExemption = {
-                    Telemetry.event(
-                        "BatteryOptimization",
-                        "requestTapped",
-                        "exemptBefore" to batteryOptimizationExempt,
+                    requestBatteryOptimizationExemption(
+                        context = context,
+                        launcher = batteryOptimizationLauncher,
+                        exempt = batteryOptimizationExempt,
+                        onFailure = snackbar::dispatch,
                     )
-                    try {
-                        batteryOptimizationLauncher.launch(BatteryOptimizationHelper.requestExemptionIntent(context))
-                        Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "requestExemption")
-                    } catch (primaryError: ActivityNotFoundException) {
-                        try {
-                            batteryOptimizationLauncher.launch(BatteryOptimizationHelper.batteryOptimizationSettingsIntent())
-                            Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "settingsFallback")
-                        } catch (fallbackError: ActivityNotFoundException) {
-                            Telemetry.error(
-                                "BatteryOptimization",
-                                "requestFailed",
-                                fallbackError,
-                                "primaryError" to primaryError.javaClass.simpleName,
-                            )
-                            snackbar.dispatch(context.getString(R.string.screen_config_battery_optimization_request_failed))
-                        }
-                    }
                 },
                 onNavigateToSystemAccess = onNavigateToSystemAccess,
                 onNavigateToVibesyncDebug = onNavigateToVibesyncDebug,
@@ -202,6 +189,32 @@ fun ConfigScreen(
                 },
                 modifier = Modifier.padding(paddingValues)
             )
+        }
+    }
+}
+
+private fun requestBatteryOptimizationExemption(
+    context: Context,
+    launcher: ActivityResultLauncher<Intent>,
+    exempt: Boolean,
+    onFailure: (String) -> Unit,
+) {
+    Telemetry.event("BatteryOptimization", "requestTapped", "exemptBefore" to exempt)
+    try {
+        launcher.launch(BatteryOptimizationHelper.requestExemptionIntent(context))
+        Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "requestExemption")
+    } catch (primaryError: ActivityNotFoundException) {
+        try {
+            launcher.launch(BatteryOptimizationHelper.batteryOptimizationSettingsIntent())
+            Telemetry.event("BatteryOptimization", "requestLaunched", "target" to "settingsFallback")
+        } catch (fallbackError: ActivityNotFoundException) {
+            Telemetry.error(
+                "BatteryOptimization",
+                "requestFailed",
+                fallbackError,
+                "primaryError" to primaryError.javaClass.simpleName,
+            )
+            onFailure(context.getString(R.string.screen_config_battery_optimization_request_failed))
         }
     }
 }
@@ -259,62 +272,19 @@ private fun ConfigContent(
         }) {
             item(
                 headlineContent = {
-                    FormItem(
-                        label = { Text(stringResource(R.string.screen_config_connection_mode)) },
-                        description = { Text(stringResource(R.string.screen_config_connection_mode_description)) },
-                    ) {
-                        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                            SegmentedButton(
-                                selected = state.mode == ServerMode.CLOUD,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.CLOUD)
-                                    onModeChange(ServerMode.CLOUD)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 0, count = 3),
-                                label = { Text(stringResource(R.string.common_cloud)) },
-                            )
-                            SegmentedButton(
-                                selected = state.mode == ServerMode.SELF_HOSTED,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.SELF_HOSTED)
-                                    onModeChange(ServerMode.SELF_HOSTED)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 1, count = 3),
-                                label = { Text(stringResource(R.string.common_self_hosted)) },
-                            )
-                            SegmentedButton(
-                                selected = state.mode == ServerMode.LOCAL,
-                                onClick = {
-                                    HapticEffects.segmentTick(haptic, view, enabled = state.mode != ServerMode.LOCAL)
-                                    onModeChange(ServerMode.LOCAL)
-                                },
-                                shape = SegmentedButtonDefaults.itemShape(index = 2, count = 3),
-                                label = { Text(stringResource(R.string.common_local_runtime)) },
-                            )
-                        }
-                    }
+                    ConnectionModeSelector(
+                        mode = state.mode,
+                        onModeChange = onModeChange,
+                    )
                 },
             )
             item(
                 headlineContent = {
-                    val isCloud = state.mode == ServerMode.CLOUD
-                    val isLocal = state.mode == ServerMode.LOCAL
-                    FormItem(label = { Text(stringResource(R.string.common_server_url)) }) {
-                        OutlinedTextField(
-                            value = when {
-                                isCloud -> ConfigViewModel.DEFAULT_CLOUD_URL
-                                isLocal -> ConfigViewModel.LOCAL_RUNTIME_URL
-                                else -> state.serverUrl
-                            },
-                            onValueChange = onServerUrlChange,
-                            placeholder = { Text(stringResource(R.string.screen_config_server_url_placeholder)) },
-                            modifier = Modifier.fillMaxWidth(),
-                            leadingIcon = { Icon(LettaIcons.Link, null) },
-                            readOnly = isCloud || isLocal,
-                            enabled = !isCloud && !isLocal,
-                            singleLine = true,
-                        )
-                    }
+                    ServerUrlField(
+                        mode = state.mode,
+                        serverUrl = state.serverUrl,
+                        onServerUrlChange = onServerUrlChange,
+                    )
                 },
             )
             if (state.mode == ServerMode.LOCAL) {
@@ -346,31 +316,10 @@ private fun ConfigContent(
             if (state.mode != ServerMode.LOCAL) {
                 item(
                     headlineContent = {
-                        var tokenVisible by remember { mutableStateOf(false) }
-                        FormItem(label = { Text(stringResource(R.string.common_api_token)) }) {
-                            OutlinedTextField(
-                                value = state.apiToken,
-                                onValueChange = onApiTokenChange,
-                                visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                                modifier = Modifier.fillMaxWidth(),
-                                leadingIcon = { Icon(LettaIcons.Key, null) },
-                                trailingIcon = {
-                                    IconButton(onClick = { tokenVisible = !tokenVisible }) {
-                                        Icon(
-                                            imageVector = if (tokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                            contentDescription = stringResource(
-                                                if (tokenVisible) {
-                                                    R.string.screen_config_hide_token
-                                                } else {
-                                                    R.string.screen_config_show_token
-                                                }
-                                            ),
-                                        )
-                                    }
-                                },
-                                singleLine = true,
-                            )
-                        }
+                        ApiTokenField(
+                            value = state.apiToken,
+                            onValueChange = onApiTokenChange,
+                        )
                     },
                 )
             }
@@ -562,6 +511,103 @@ private fun ConfigContent(
 }
 
 @Composable
+private fun ConnectionModeSelector(
+    mode: ServerMode,
+    onModeChange: (ServerMode) -> Unit,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    val options = listOf(
+        ServerMode.CLOUD to R.string.common_cloud,
+        ServerMode.SELF_HOSTED to R.string.common_self_hosted,
+        ServerMode.LOCAL to R.string.common_local_runtime,
+    )
+    FormItem(
+        label = { Text(stringResource(R.string.screen_config_connection_mode)) },
+        description = { Text(stringResource(R.string.screen_config_connection_mode_description)) },
+    ) {
+        SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+            options.forEachIndexed { index, (option, label) ->
+                SegmentedButton(
+                    selected = mode == option,
+                    onClick = {
+                        HapticEffects.segmentTick(haptic, view, enabled = mode != option)
+                        onModeChange(option)
+                    },
+                    shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
+                    label = { Text(stringResource(label)) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ServerUrlField(
+    mode: ServerMode,
+    serverUrl: String,
+    onServerUrlChange: (String) -> Unit,
+) {
+    val isCloud = mode == ServerMode.CLOUD
+    val isLocal = mode == ServerMode.LOCAL
+    FormItem(label = { Text(stringResource(R.string.common_server_url)) }) {
+        OutlinedTextField(
+            value = when {
+                isCloud -> ConfigViewModel.DEFAULT_CLOUD_URL
+                isLocal -> ConfigViewModel.LOCAL_RUNTIME_URL
+                else -> serverUrl
+            },
+            onValueChange = onServerUrlChange,
+            placeholder = { Text(stringResource(R.string.screen_config_server_url_placeholder)) },
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Link, null) },
+            readOnly = isCloud || isLocal,
+            enabled = !isCloud && !isLocal,
+            singleLine = true,
+        )
+    }
+}
+
+@Composable
+private fun ApiTokenField(
+    value: String,
+    onValueChange: (String) -> Unit,
+) {
+    var tokenVisible by remember { mutableStateOf(false) }
+    FormItem(label = { Text(stringResource(R.string.common_api_token)) }) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            visualTransformation = if (tokenVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            modifier = Modifier.fillMaxWidth(),
+            leadingIcon = { Icon(LettaIcons.Key, null) },
+            trailingIcon = {
+                TokenVisibilityButton(
+                    visible = tokenVisible,
+                    onToggle = { tokenVisible = !tokenVisible },
+                )
+            },
+            singleLine = true,
+        )
+    }
+}
+
+@Composable
+private fun TokenVisibilityButton(
+    visible: Boolean,
+    onToggle: () -> Unit,
+) {
+    IconButton(onClick = onToggle) {
+        Icon(
+            imageVector = if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+            contentDescription = stringResource(
+                if (visible) R.string.screen_config_hide_token else R.string.screen_config_show_token
+            ),
+        )
+    }
+}
+
+@Composable
 private fun ConfigRefreshStatus(
     isRefreshing: Boolean,
     error: String?,
@@ -725,18 +771,10 @@ private fun LocalModelSettingsItem(
             modifier = Modifier.fillMaxWidth(),
             leadingIcon = { Icon(LettaIcons.Key, null) },
             trailingIcon = {
-                IconButton(onClick = { hfTokenVisible = !hfTokenVisible }) {
-                    Icon(
-                        imageVector = if (hfTokenVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                        contentDescription = stringResource(
-                            if (hfTokenVisible) {
-                                R.string.screen_config_hide_token
-                            } else {
-                                R.string.screen_config_show_token
-                            }
-                        ),
-                    )
-                }
+                TokenVisibilityButton(
+                    visible = hfTokenVisible,
+                    onToggle = { hfTokenVisible = !hfTokenVisible },
+                )
             },
             singleLine = true,
         )

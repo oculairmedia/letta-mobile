@@ -115,54 +115,17 @@ fun ProviderAdminScreen(
             }
         },
     ) { paddingValues ->
-        when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(
-                modifier = Modifier
-                    .padding(paddingValues)
-                    .padding(16.dp),
-            )
-            is UiState.Error -> ErrorContent(
-                message = state.message,
-                onRetry = viewModel::loadProviders,
-                modifier = Modifier.padding(paddingValues),
-            )
-            is UiState.Success -> {
-                val filtered = remember(state.data.providers, state.data.searchQuery) { viewModel.getFilteredProviders() }
-                PullToRefreshBox(
-                    isRefreshing = state.data.isRefreshing,
-                    onRefresh = viewModel::loadProviders,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                ) {
-                    if (filtered.isEmpty()) {
-                        EmptyState(
-                            icon = LettaIcons.Cloud,
-                            message = if (state.data.searchQuery.isBlank()) {
-                                stringResource(R.string.screen_providers_empty)
-                            } else {
-                                stringResource(R.string.screen_providers_empty_search, state.data.searchQuery)
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(filtered, key = { it.id ?: it.name }) { provider ->
-                                ProviderCard(
-                                    provider = provider,
-                                    onInspect = { provider.id?.let(viewModel::inspectProvider) },
-                                    onEdit = { editTarget = provider },
-                                    onDelete = { deleteTarget = provider },
-                                )
-                            }
-                        }
-                    }
+        ProviderAdminBody(
+            uiState = uiState,
+            viewModel = viewModel,
+            paddingValues = paddingValues,
+            onContextAction = { provider, action ->
+                when (action) {
+                    ProviderContextAction.Edit -> editTarget = provider
+                    ProviderContextAction.Delete -> deleteTarget = provider
                 }
-            }
-        }
+            },
+        )
     }
 
     val state = (uiState as? UiState.Success)?.data
@@ -257,6 +220,69 @@ fun ProviderAdminScreen(
     }
 }
 
+private enum class ProviderContextAction {
+    Edit,
+    Delete,
+}
+
+@Composable
+private fun ProviderAdminBody(
+    uiState: UiState<ProviderAdminUiState>,
+    viewModel: ProviderAdminViewModel,
+    paddingValues: PaddingValues,
+    onContextAction: (Provider, ProviderContextAction) -> Unit,
+) {
+    when (uiState) {
+        is UiState.Loading -> ShimmerCard(
+            modifier = Modifier
+                .padding(paddingValues)
+                .padding(16.dp),
+        )
+        is UiState.Error -> ErrorContent(
+            message = uiState.message,
+            onRetry = viewModel::loadProviders,
+            modifier = Modifier.padding(paddingValues),
+        )
+        is UiState.Success -> {
+            val data = uiState.data
+            val filtered = remember(data.providers, data.searchQuery) { viewModel.getFilteredProviders() }
+            PullToRefreshBox(
+                isRefreshing = data.isRefreshing,
+                onRefresh = viewModel::loadProviders,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+            ) {
+                if (filtered.isEmpty()) {
+                    EmptyState(
+                        icon = LettaIcons.Cloud,
+                        message = if (data.searchQuery.isBlank()) {
+                            stringResource(R.string.screen_providers_empty)
+                        } else {
+                            stringResource(R.string.screen_providers_empty_search, data.searchQuery)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(filtered, key = { it.id ?: it.name }) { provider ->
+                            ProviderCard(
+                                provider = provider,
+                                onInspect = { provider.id?.let(viewModel::inspectProvider) },
+                                onEdit = { onContextAction(provider, ProviderContextAction.Edit) },
+                                onDelete = { onContextAction(provider, ProviderContextAction.Delete) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun ProviderCard(
     provider: Provider,
@@ -338,15 +364,7 @@ private fun ProviderDetailDialog(
         onDismiss = onDismiss,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (isRefreshing) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = stringResource(R.string.screen_providers_refreshing_details),
-                        style = MaterialTheme.typography.listItemSupporting,
-                    )
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                }
-            }
+            ProviderDetailRefreshStatus(isRefreshing)
             CardGroup {
                 provider.id?.let { id ->
                     item(
@@ -405,6 +423,18 @@ private fun ProviderDetailDialog(
                 TextButton(onClick = onCheck) { Text(stringResource(R.string.action_check)) }
             }
         }
+    }
+}
+
+@Composable
+private fun ProviderDetailRefreshStatus(isRefreshing: Boolean) {
+    if (!isRefreshing) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = stringResource(R.string.screen_providers_refreshing_details),
+            style = MaterialTheme.typography.listItemSupporting,
+        )
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
     }
 }
 
