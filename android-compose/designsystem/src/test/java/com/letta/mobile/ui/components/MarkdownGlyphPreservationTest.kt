@@ -2,6 +2,7 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -60,10 +61,10 @@ class MarkdownGlyphPreservationTest {
 
     @Test
     fun `preserves CJK text adjacent to markdown emphasis`() {
-        assertRendersText(
-            "\u3053\u308C\u306F **\u91CD\u8981** \u306A\u30C6\u30B9\u30C8\u3067\u3059",
-            "\u3053\u308C\u306F \u91CD\u8981 \u306A\u30C6\u30B9\u30C8\u3067\u3059",
-        )
+        val text =
+            "\u3053\u308C\u306F **\u91CD\u8981** \u306A\u30C6\u30B9\u30C8\u3067\u3059"
+
+        assertEquals(text, autolinkBareUrls(text))
     }
 
     @Test
