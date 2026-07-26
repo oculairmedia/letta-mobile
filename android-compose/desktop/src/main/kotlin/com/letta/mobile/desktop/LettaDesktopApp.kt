@@ -21,6 +21,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.lens.WorkPlayLens
@@ -484,7 +487,29 @@ internal fun LettaDesktopApp(
             color = MaterialTheme.colorScheme.background,
         ) {
           Column(Modifier.fillMaxSize()) {
-          Box(Modifier.weight(1f).fillMaxWidth()) {
+          Box(
+              Modifier
+                  .weight(1f)
+                  .fillMaxWidth()
+                  // Light-dismiss for the expanded agent library: any press to
+                  // the right of the rail collapses it. Observed on the Initial
+                  // pass and never consumed, so the press still lands on
+                  // whatever was clicked.
+                  .pointerInput(railExpanded) {
+                      if (!railExpanded) return@pointerInput
+                      awaitPointerEventScope {
+                          while (true) {
+                              val event = awaitPointerEvent(PointerEventPass.Initial)
+                              if (event.type == PointerEventType.Press) {
+                                  val x = event.changes.firstOrNull()?.position?.x
+                                  if (x != null && x > 248.dp.toPx()) {
+                                      railExpanded = false
+                                  }
+                              }
+                          }
+                      }
+                  },
+          ) {
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -498,7 +523,12 @@ internal fun LettaDesktopApp(
                         expanded = railExpanded,
                     ),
                     actions = DesktopAgentRailActions(
-                        onAgentSelected = { agentId -> openAgent(agentId) },
+                        onAgentSelected = { agentId ->
+                            // Search-driven library: picking an agent is the
+                            // "done" gesture, so the expanded panel closes.
+                            railExpanded = false
+                            openAgent(agentId)
+                        },
                         // Contacts-style picker over the persistent-agent
                         // roster; agent creation lives inside it.
                         onNewSession = { overlays.newConversation = true },
@@ -615,6 +645,20 @@ internal fun LettaDesktopApp(
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )
+                        // Direct child of the chat-pane Box: the align is
+                        // unambiguous here (a deeper nesting level once resolved
+                        // it against an outer scope and the chip landed on the
+                        // rail's hamburger). Floats beside the pinned prompt,
+                        // which reserves end padding for it.
+                        if (!showBackgroundTasks && subagentRepository != null) {
+                            DesktopBackgroundTasksToggle(
+                                runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
+                                onClick = { showBackgroundTasks = true },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(top = 12.dp, end = 16.dp),
+                            )
+                        }
                     } else {
                         DestinationContent(
                             destination = selectedDestination,
@@ -706,16 +750,6 @@ internal fun LettaDesktopApp(
                         },
                     )
                 }
-            }
-            if (selectedDestination == DesktopDestination.Conversations &&
-                !showBackgroundTasks &&
-                subagentRepository != null
-            ) {
-                DesktopBackgroundTasksToggle(
-                    runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
-                    onClick = { showBackgroundTasks = true },
-                    modifier = Modifier.align(Alignment.TopEnd).padding(top = 12.dp, end = 16.dp),
-                )
             }
             DesktopAppOverlays(
                 visibility = overlays,

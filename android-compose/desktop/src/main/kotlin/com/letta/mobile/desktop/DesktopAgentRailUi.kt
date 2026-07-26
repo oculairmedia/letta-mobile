@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -156,16 +155,13 @@ internal fun DesktopAgentRail(
         horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        RailHeaderRow(onClick = actions.onToggleExpanded) {
-            RailExpandToggle(expanded = state.expanded, onToggle = actions.onToggleExpanded)
-        }
+        // No hamburger: the search icon IS the library trigger — it expands
+        // the panel, and choosing an agent collapses it again (the shell
+        // resets `expanded` on selection).
         RailHeaderRow(onClick = actions.onNewSession, label = if (state.expanded) "New session" else null) {
             NewSessionButton(onNewSession = actions.onNewSession)
         }
         if (!state.expanded) {
-            // Collapsed library search just opens the library — the search
-            // field lives inline in the expanded panel, Spotify-style. Lives
-            // up top with the other actions, not below the roster.
             RailHeaderRow(onClick = actions.onToggleExpanded) {
                 RailActionIcon(
                     RailActionIconModel(
@@ -176,8 +172,7 @@ internal fun DesktopAgentRail(
                 )
             }
         }
-        // Clear separation between the action block and the roster.
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(4.dp))
         if (state.expanded) {
             ExpandedAgentLibrary(
                 groups = groups,
@@ -226,17 +221,6 @@ private fun RailHeaderRow(
             )
         }
     }
-}
-
-@Composable
-private fun RailExpandToggle(expanded: Boolean, onToggle: () -> Unit) {
-    RailActionIcon(
-        RailActionIconModel(
-            icon = Icons.Outlined.Menu,
-            description = if (expanded) "Collapse agent library" else "Expand agent library",
-            onClick = onToggle,
-        ),
-    )
 }
 
 /**
@@ -520,26 +504,25 @@ private fun AgentRailOrbContent(
     target: AgentRailOrbTarget,
 ) {
     Box(
-        modifier = Modifier.size(width = 46.dp, height = 40.dp),
+        modifier = Modifier.size(width = 46.dp, height = 34.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (flags.selected) {
             SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
         }
         if (flags.thinking) {
-            // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
-            // and sized to fit the 40dp slot so it doesn't crowd
-            // neighbouring orbs.
-            ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
+            // Concentric with the 30dp orb (2dp gap) and sized to fit the
+            // slot so it doesn't crowd neighbouring orbs.
+            ThinkingRing(diameter = 34.dp, cornerRadius = 9.dp)
         }
         AgentOrb(
             index = target.orbStyle,
-            size = 36.dp,
+            size = 30.dp,
             onClick = { params.onAgentSelected(target.agentId) },
         ) {
             Text(
                 text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
             )

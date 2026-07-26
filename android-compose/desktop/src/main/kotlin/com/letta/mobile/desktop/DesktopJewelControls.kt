@@ -53,7 +53,8 @@ import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import org.jetbrains.jewel.ui.component.Text as JewelText
 
 import kotlin.time.Duration.Companion.milliseconds
-private const val TooltipShowDelayMs = 450L
+// Snappy: 450ms read as "the tooltip is broken" on quick hovers.
+private const val TooltipShowDelayMs = 150L
 private const val TooltipGapPx = 6
 
 /**

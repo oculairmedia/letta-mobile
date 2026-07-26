@@ -28,8 +28,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.background
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
+import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.desktop.DesktopControlText
@@ -171,6 +184,100 @@ internal fun DesktopImageAttachmentsGrid(
                     .weight(1f)
                     .height(cellHeight),
             )
+        }
+    }
+}
+
+/**
+ * Compact strip of image thumbnails for surfaces where a full grid would
+ * dominate (the pinned prompt card): small fixed-height thumbs, click any of
+ * them to view the image fullscreen (click or Esc dismisses).
+ */
+@Composable
+internal fun DesktopImageAttachmentThumbnailStrip(
+    attachments: List<UiImageAttachment>,
+    modifier: Modifier = Modifier,
+) {
+    if (attachments.isEmpty()) return
+    var fullscreen by remember { mutableStateOf<UiImageAttachment?>(null) }
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        attachments.take(6).forEach { attachment ->
+            DesktopAttachmentImage(
+                attachment = attachment,
+                modifier = Modifier
+                    .size(width = 56.dp, height = 40.dp)
+                    .clickable { fullscreen = attachment },
+            )
+        }
+        if (attachments.size > 6) {
+            Text(
+                text = "+${attachments.size - 6}",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+    fullscreen?.let { attachment ->
+        DesktopFullscreenImageOverlay(attachment = attachment, onDismiss = { fullscreen = null })
+    }
+}
+
+/** Window-covering lightbox: dark scrim, image fit within, click/Esc closes. */
+@Composable
+internal fun DesktopFullscreenImageOverlay(
+    attachment: UiImageAttachment,
+    onDismiss: () -> Unit,
+) {
+    val imageBitmap = remember(attachment.base64) {
+        runCatching {
+            SkiaImage.makeFromEncoded(Base64.getDecoder().decode(attachment.base64)).toComposeImageBitmap()
+        }.getOrNull()
+    }
+    Popup(
+        popupPositionProvider = object : PopupPositionProvider {
+            override fun calculatePosition(
+                anchorBounds: IntRect,
+                windowSize: IntSize,
+                layoutDirection: LayoutDirection,
+                popupContentSize: IntSize,
+            ): IntOffset = IntOffset.Zero
+        },
+        onDismissRequest = onDismiss,
+        properties = PopupProperties(focusable = true),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.88f))
+                .clickable(onClick = onDismiss)
+                .onPreviewKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                        onDismiss()
+                        true
+                    } else {
+                        false
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            if (imageBitmap != null) {
+                Image(
+                    bitmap = imageBitmap,
+                    contentDescription = "Attachment fullscreen",
+                    modifier = Modifier.fillMaxSize().padding(40.dp),
+                    contentScale = ContentScale.Fit,
+                )
+            } else {
+                Text(
+                    text = "Image could not be decoded",
+                    color = Color.White,
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
         }
     }
 }
