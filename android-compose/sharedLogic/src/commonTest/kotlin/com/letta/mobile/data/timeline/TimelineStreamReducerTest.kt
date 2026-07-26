@@ -1589,6 +1589,104 @@ class TimelineStreamReducerTest {
     }
 
     @Test
+    fun `first fragment committed before run-id promotion still grows into one row w0ctr`() {
+        // The orphan-first-chunk bug. Every prior fixture gives all fragments the same
+        // otid and run id FROM FRAGMENT 1, so none of them cover the real failure: the
+        // opening fragment is committed while the transport still holds a SYNTHETIC run
+        // id, and promotion to the real run id lands with the second fragment. The
+        // forward-growth net used isCompatibleAssistantPrefixRunId, which rejects
+        // synthetic-vs-real, so fragment 2 appended a new row and "It" was stranded as
+        // its own bubble beneath the finished reply.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-1799",
+                contentRaw = JsonPrimitive("It"),
+                runId = "iroh-run-9f3c1e", // synthetic: promotion has not landed yet
+                otid = null,
+                seqId = 0,
+            ),
+        ).next
+        tl.events shouldHaveSize 1
+
+        listOf("It looks", "It looks like", "It looks like it worked.").forEachIndexed { i, cumulative ->
+            tl = reduce(
+                prev = tl,
+                frame = AssistantMessage(
+                    id = "letta-msg-${1800 + i}", // rotating per fragment, as the real wire does
+                    contentRaw = JsonPrimitive(cumulative),
+                    runId = "run-real-42", // promoted to the real run id
+                    otid = null,
+                    seqId = i + 1,
+                ),
+            ).next
+        }
+
+        tl.events shouldHaveSize 1
+        val event = tl.events.single() as TimelineEvent.Confirmed
+        event.content shouldBe "It looks like it worked."
+    }
+
+    @Test
+    fun `blank existing run id must NOT absorb a later stream w0ctr`() {
+        // The other half of the orphan cause is deliberately NOT fixed by relaxing this
+        // gate. A blank run id is indistinguishable from an older RECONCILED reply, so
+        // merging into it would overwrite an unrelated earlier message whose text happens
+        // to be a prefix (the #827 regression). This pins that decision: the blank case
+        // stays a separate row here, and must be addressed at settle time instead.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-2100",
+                contentRaw = JsonPrimitive("Su"),
+                runId = null,
+                otid = null,
+                seqId = 0,
+            ),
+        ).next
+
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "letta-msg-2101",
+                contentRaw = JsonPrimitive("Sure, here it is."),
+                runId = "run-real-77",
+                otid = null,
+                seqId = 1,
+            ),
+        ).next
+
+        tl.events shouldHaveSize 2
+    }
+
+    @Test
+    fun `post-tool continuation still starts its own row after the run-id gate change w0ctr`() {
+        // Guards the relaxation: a post-tool continuation arrives SHORTER than the prior
+        // assistant row, so it is not forward growth and must remain a separate message.
+        // This is the case the strict discriminator protects, and it must survive.
+        var tl = reduce(
+            frame = AssistantMessage(
+                id = "letta-msg-3000",
+                contentRaw = JsonPrimitive("Let me check that for you."),
+                runId = "iroh-run-aaa",
+                otid = null,
+                seqId = 0,
+            ),
+        ).next
+
+        tl = reduce(
+            prev = tl,
+            frame = AssistantMessage(
+                id = "letta-msg-3001",
+                contentRaw = JsonPrimitive("Done"), // shorter: a new message, not growth
+                runId = "run-real-99",
+                otid = null,
+                seqId = 1,
+            ),
+        ).next
+
+        tl.events shouldHaveSize 2
+    }
+
+    @Test
     fun `REAL WIRE rotating per-fragment ids with NULL otid must reduce to one row h30cy`() {
         // Faithful replay of the ACTUAL Iroh wire shape captured headlessly via
         // app-server-iroh-probe: a single assistant reply arrives as N stream_delta
