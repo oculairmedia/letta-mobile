@@ -394,6 +394,130 @@ class ProjectedToolTimelineTest {
         composeRule.onNodeWithText("/root").assertDoesNotExist()
     }
 
+    // Reproduces the exact on-device report (PR #1030): two consecutive Bash calls with a
+    // realistic three-key payload each rendered a SECOND card whose title/args were the raw
+    // request JSON. Asserts the raw envelope is nowhere on screen, collapsed or expanded.
+    @Test
+    fun realisticBashPayloadRendersExactlyOneCardPerCall() {
+        val rawArgsA =
+            """{"command":"uname -srm","description":"Check operating system details","timeout":5000}"""
+        val rawArgsB =
+            """{"command":"id -un","description":"Check current user","timeout":5000}"""
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
+                        RunBlock(
+                            messages = listOf(
+                                rawToolMessage("tc-a", rawArgsA, "Linux 6.17.9-1-pve x86_64"),
+                                rawToolMessage("tc-b", rawArgsB, "root"),
+                            ),
+                            collapsed = false,
+                            onToggleCollapsed = {},
+                        ) { message, _, rowModifier ->
+                            Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Structured summaries render.
+        composeRule.onNodeWithText("Bash(uname -srm)").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(id -un)").assertIsDisplayed()
+
+        // The raw request envelope must appear nowhere — collapsed...
+        composeRule.onNodeWithText(rawArgsA).assertDoesNotExist()
+        composeRule.onNodeWithText(rawArgsB).assertDoesNotExist()
+
+        // ...and expanded.
+        composeRule.onNodeWithText("Bash(uname -srm)").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(rawArgsA).assertDoesNotExist()
+
+        // And no legacy row was emitted alongside the projected cards.
+        composeRule.onNodeWithText("LEGACY-ROW-tc-a").assertDoesNotExist()
+        composeRule.onNodeWithText("LEGACY-ROW-tc-b").assertDoesNotExist()
+    }
+
+    private fun rawToolMessage(id: String, rawArguments: String, result: String) = UiMessage(
+        id = id,
+        role = "assistant",
+        content = "",
+        timestamp = "2026-05-09T00:00:00Z",
+        runId = "run-1",
+        toolCalls = listOf(
+            UiToolCall(
+                name = "Bash",
+                arguments = rawArguments,
+                result = result,
+                status = "success",
+                toolCallId = "call-$id",
+            )
+        ),
+    )
+
+    // A run holding a LONE tool call must still reach the projected timeline. Two gates
+    // used to send it to a legacy row instead: RunBlock's single-message short circuit,
+    // and compactRunToolCallSteps emitting a plain Message for a group of one.
+    @Test
+    fun singleToolCallRunStillRendersThroughTheProjectedTimeline() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
+                        RunBlock(
+                            messages = listOf(toolMessage(id = "tc-only", command = "pwd")),
+                            collapsed = false,
+                            onToggleCollapsed = {},
+                        ) { message, _, rowModifier ->
+                            // Reaching this means the run fell out to the legacy row path.
+                            Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("LEGACY-ROW-tc-only").assertDoesNotExist()
+    }
+
+    // With the flag OFF, that same lone tool call must keep the legacy behaviour.
+    @Test
+    fun singleToolCallRunKeepsLegacyRowWhenFlagOff() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides false) {
+                        RunBlock(
+                            messages = listOf(toolMessage(id = "tc-only", command = "pwd")),
+                            collapsed = false,
+                            onToggleCollapsed = {},
+                        ) { message, _, rowModifier ->
+                            Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
+                        }
+                    }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("LEGACY-ROW-tc-only").assertIsDisplayed()
+    }
+
     // Regression: an expanded row rendered the cleaned summary AND the raw arguments
     // envelope underneath it, so every tool call showed a duplicate row of raw JSON.
     // The monospace fallback must be suppressed whenever a structured summary exists.
