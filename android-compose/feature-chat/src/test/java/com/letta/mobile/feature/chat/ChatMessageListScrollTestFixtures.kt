@@ -20,6 +20,7 @@ import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
+import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.common.GroupPosition
 import org.junit.Assert.assertEquals
 
@@ -261,7 +262,7 @@ internal fun ChatRenderItem.scrollTestGeometrySignature(
     options: ScrollTestGeometryOptions = ScrollTestGeometryOptions(),
 ): ChatRenderItemGeometrySignature =
     chatGeometrySignature(
-        state = options.state,
+        state = options.state.toChatRenderItemState(),
         chatMode = "interactive",
         widthPx = options.widthPx,
         density = Density(density = 2f, fontScale = 1f),
