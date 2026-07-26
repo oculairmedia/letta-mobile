@@ -73,47 +73,16 @@ fun projectChatUsageStatistics(
     ttftNs: Long? = null,
     totalDurationNs: Long? = null,
 ): ChatUsageStatistics? {
-    val isFirstTokenMonotonic = firstTokenEpochMs != null &&
-        (startEpochMs == null || firstTokenEpochMs >= startEpochMs)
-
-    val firstTokenLatencyMs = when {
-        ttftNs != null && ttftNs > 0L -> ttftNs / 1_000_000L
-        isFirstTokenMonotonic && startEpochMs != null -> firstTokenEpochMs!! - startEpochMs
-        else -> null
-    }
-
     val validCompletionTokens = completionTokens?.takeIf { it > 0 }
 
-    // Any timestamp ordering that contradicts itself poisons every duration-derived
-    // metric: falling back to a wider span (e.g. start -> completion when completion
-    // precedes the first token) would publish a plausible rate computed from data we
-    // already know is untrustworthy.
-    val timestampsContradictory =
-        (startEpochMs != null && firstTokenEpochMs != null && firstTokenEpochMs < startEpochMs) ||
-            (firstTokenEpochMs != null && completionEpochMs != null && completionEpochMs < firstTokenEpochMs) ||
-            (startEpochMs != null && completionEpochMs != null && completionEpochMs < startEpochMs)
-
-    val generationDurationMs: Long? = when {
-        timestampsContradictory -> null
-        completionEpochMs != null && firstTokenEpochMs != null -> {
-            (completionEpochMs - firstTokenEpochMs).takeIf { it > 0L }
-        }
-        completionEpochMs != null && startEpochMs != null -> {
-            (completionEpochMs - startEpochMs).takeIf { it > 0L }
-        }
-        totalDurationNs != null && totalDurationNs > 0L -> {
-            totalDurationNs / 1_000_000L
-        }
-        else -> null
-    }
-
-    val outputTokensPerSecond: Double? = if (validCompletionTokens != null && generationDurationMs != null && generationDurationMs > 0L) {
-        val durationSeconds = generationDurationMs.toDouble() / 1000.0
-        val rate = validCompletionTokens.toDouble() / durationSeconds
-        if (rate.isFinite() && rate > 0.0) rate else null
-    } else {
-        null
-    }
+    val firstTokenLatencyMs = firstTokenLatencyMs(startEpochMs, firstTokenEpochMs, ttftNs)
+    val generationDurationMs = generationDurationMs(
+        startEpochMs = startEpochMs,
+        firstTokenEpochMs = firstTokenEpochMs,
+        completionEpochMs = completionEpochMs,
+        totalDurationNs = totalDurationNs,
+    )
+    val outputTokensPerSecond = outputTokensPerSecond(validCompletionTokens, generationDurationMs)
 
     if (firstTokenLatencyMs == null && outputTokensPerSecond == null) {
         return null
@@ -125,6 +94,62 @@ fun projectChatUsageStatistics(
         completionTokens = validCompletionTokens,
         generationDurationMs = generationDurationMs,
     )
+}
+
+/**
+ * Server-reported TTFT wins when present; otherwise the start -> first-token span, and only
+ * when that span is monotonic. Absent means "not trustworthy", never zero.
+ */
+private fun firstTokenLatencyMs(
+    startEpochMs: Long?,
+    firstTokenEpochMs: Long?,
+    ttftNs: Long?,
+): Long? {
+    if (ttftNs != null && ttftNs > 0L) return ttftNs / 1_000_000L
+    if (firstTokenEpochMs == null || startEpochMs == null) return null
+    if (firstTokenEpochMs < startEpochMs) return null
+    return firstTokenEpochMs - startEpochMs
+}
+
+/**
+ * True when the supplied timestamps contradict each other. Any contradiction poisons every
+ * duration-derived metric: falling back to a wider span (start -> completion when completion
+ * precedes the first token) would publish a plausible rate computed from data already known
+ * to be untrustworthy.
+ */
+private fun timestampsContradictory(
+    startEpochMs: Long?,
+    firstTokenEpochMs: Long?,
+    completionEpochMs: Long?,
+): Boolean =
+    (startEpochMs != null && firstTokenEpochMs != null && firstTokenEpochMs < startEpochMs) ||
+        (firstTokenEpochMs != null && completionEpochMs != null && completionEpochMs < firstTokenEpochMs) ||
+        (startEpochMs != null && completionEpochMs != null && completionEpochMs < startEpochMs)
+
+/**
+ * Active generation span, preferring first-token -> completion, then start -> completion, then
+ * a server-reported total. Null whenever the timestamps contradict or the span is not positive.
+ */
+private fun generationDurationMs(
+    startEpochMs: Long?,
+    firstTokenEpochMs: Long?,
+    completionEpochMs: Long?,
+    totalDurationNs: Long?,
+): Long? = when {
+    timestampsContradictory(startEpochMs, firstTokenEpochMs, completionEpochMs) -> null
+    completionEpochMs != null && firstTokenEpochMs != null ->
+        (completionEpochMs - firstTokenEpochMs).takeIf { it > 0L }
+    completionEpochMs != null && startEpochMs != null ->
+        (completionEpochMs - startEpochMs).takeIf { it > 0L }
+    totalDurationNs != null && totalDurationNs > 0L -> totalDurationNs / 1_000_000L
+    else -> null
+}
+
+/** Output rate, or null when either input is absent or the result is not a finite positive. */
+private fun outputTokensPerSecond(validCompletionTokens: Int?, generationDurationMs: Long?): Double? {
+    if (validCompletionTokens == null || generationDurationMs == null || generationDurationMs <= 0L) return null
+    val rate = validCompletionTokens.toDouble() / (generationDurationMs.toDouble() / 1000.0)
+    return if (rate.isFinite() && rate > 0.0) rate else null
 }
 
 /**

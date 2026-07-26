@@ -78,42 +78,41 @@ fun classifyToolCallState(
     if (toolCall.approvalDecision == UiToolApprovalDecision.Rejected) {
         return ToolTimelineState.Rejected
     }
-
-    val isPendingApproval = messageApprovalRequest != null &&
-        toolCall.approvalDecision == null &&
-        toolCall.result == null &&
-        toolCall.status == null &&
-        (
-            toolCall.toolCallId == null ||
-                messageApprovalRequest.toolCalls.any { reqCall ->
-                    reqCall.toolCallId == toolCall.toolCallId || reqCall.name == toolCall.name
-                }
-        )
-
-    if (isPendingApproval) {
+    if (toolCall.isAwaitingApproval(messageApprovalRequest)) {
         return ToolTimelineState.AwaitingApproval
     }
 
     val status = toolCall.status
-    if (status != null) {
-        return when {
-            ToolReturnStatus.isError(status) || status.equals("failed", ignoreCase = true) -> ToolTimelineState.Failed
-            status.equals("warning", ignoreCase = true) -> ToolTimelineState.Warning
-            status.equals(ToolReturnStatus.SUCCESS, ignoreCase = true) || status.equals("completed", ignoreCase = true) -> ToolTimelineState.Succeeded
-            else -> {
-                // Unknown/unrecognized status string:
-                // unknown/null status is NOT failure!
-                if (toolCall.result != null) ToolTimelineState.Succeeded else ToolTimelineState.Running
-            }
-        }
-    }
+        ?: return toolCall.settledStateWithoutStatus()
 
-    if (toolCall.result != null) {
-        return ToolTimelineState.Succeeded
-    }
-
-    return ToolTimelineState.Running
+    return status.toTerminalState()
+    // An unrecognised status is NOT a failure: fall back to whether a result landed.
+        ?: toolCall.settledStateWithoutStatus()
 }
+
+/**
+ * A call is awaiting approval only while it has no decision, no status and no result, and the
+ * owning request actually references it (by id, or by name when the call carries no id).
+ */
+private fun UiToolCall.isAwaitingApproval(request: UiApprovalRequest?): Boolean {
+    if (request == null) return false
+    if (approvalDecision != null || result != null || status != null) return false
+    if (toolCallId == null) return true
+    return request.toolCalls.any { it.toolCallId == toolCallId || it.name == name }
+}
+
+/** Maps a recognised status string to its terminal state, or null when unrecognised. */
+private fun String.toTerminalState(): ToolTimelineState? = when {
+    ToolReturnStatus.isError(this) || equals("failed", ignoreCase = true) -> ToolTimelineState.Failed
+    equals("warning", ignoreCase = true) -> ToolTimelineState.Warning
+    equals(ToolReturnStatus.SUCCESS, ignoreCase = true) || equals("completed", ignoreCase = true) ->
+        ToolTimelineState.Succeeded
+    else -> null
+}
+
+/** With no usable status, a call is Succeeded once a result exists and Running until then. */
+private fun UiToolCall.settledStateWithoutStatus(): ToolTimelineState =
+    if (result != null) ToolTimelineState.Succeeded else ToolTimelineState.Running
 
 /**
  * Derives a human-readable safe summary for a tool call without risking platform exceptions.

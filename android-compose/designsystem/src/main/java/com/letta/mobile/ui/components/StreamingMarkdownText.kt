@@ -29,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -336,67 +337,13 @@ private fun StreamingMarkdownDocumentBlocks(
     repairIncompleteMarkdown: Boolean,
     fadeAppendedText: Boolean = false,
 ) {
-    val motionPolicy = rememberChatMotionPolicy()
-    val isReducedMotion = motionPolicy.isReducedMotionEnabled
-    val fadeSpec = motionPolicy.terminalSwap.crossfadeSpec
-
-    val fadeState = remember { StreamingAppendedDeltaFadeState() }
-    val activeBlock = blocks.lastOrNull()
-    val activeBlockId = activeBlock?.id
-    val activeSource = activeBlock?.source ?: ""
-    val activeRenderSource = if (activeBlock != null) tailTransform(activeSource) else ""
-
-    val isEligibleKind = activeBlock != null && activeBlock.supportsAppendedDeltaFade()
-    val hasOpenFence = tailHasOpenBlockFence(activeRenderSource)
-
-    val isFadeEligible = fadeAppendedText &&
-        isStreaming &&
-        !isReducedMotion &&
-        isEligibleKind &&
-        !hasOpenFence
-
-    val hasDeltaToAnimate = remember(
-        activeBlockId,
-        activeRenderSource,
-        isFadeEligible,
-    ) {
-        if (isFadeEligible && activeBlockId != null) {
-            fadeState.update(
-                activeBlockId = activeBlockId,
-                activeSource = activeRenderSource,
-                isStreaming = true,
-                isReducedMotion = false,
-                isEligibleBlockKind = true,
-            )
-        } else {
-            fadeState.reset()
-            false
-        }
-    }
-
-    val activeFadingRange = if (isFadeEligible && fadeState.fadingBlockId == activeBlockId) {
-        fadeState.fadingDeltaRange
-    } else {
-        null
-    }
-
-    val fadingRangeKey = remember(activeBlockId, activeFadingRange, hasDeltaToAnimate) {
-        if (activeFadingRange != null && activeBlockId != null) {
-            "$activeBlockId:${activeFadingRange.first}:${activeFadingRange.last}"
-        } else {
-            null
-        }
-    }
-
-    val animatableAlpha = remember { Animatable(1f) }
-    LaunchedEffect(fadingRangeKey) {
-        if (fadingRangeKey != null) {
-            animatableAlpha.snapTo(0f)
-            animatableAlpha.animateTo(1f, animationSpec = fadeSpec)
-        } else {
-            animatableAlpha.snapTo(1f)
-        }
-    }
+    val fade = rememberAppendedDeltaFade(
+        blocks = blocks,
+        isStreaming = isStreaming,
+        tailTransform = tailTransform,
+        fadeAppendedText = fadeAppendedText,
+    )
+    val activeFadingRange = fade.range
 
     // Each block renders in its own key group. Unchanged blocks keep the same object and key, while
     // the final active block alone receives tail transforms and cursor injection.
@@ -432,7 +379,7 @@ private fun StreamingMarkdownDocumentBlocks(
         }
 
         val currentFadeRange = if (isActiveBlock) activeFadingRange else null
-        val currentFadeAlpha = if (isActiveBlock && currentFadeRange != null) animatableAlpha.value else 1f
+        val currentFadeAlpha = if (isActiveBlock && currentFadeRange != null) fade.alpha else 1f
 
         if (parsedTable != null) {
             key(block.key) {
@@ -525,6 +472,86 @@ internal fun buildFadingAnnotatedString(
             end = safeEnd,
         )
     }.toAnnotatedString()
+}
+
+/**
+ * Resolved appended-delta fade for the active block: the source range to fade, and the
+ * alpha to paint it at. [range] is null whenever nothing should fade, in which case
+ * [alpha] stays at 1f.
+ */
+@Stable
+private class ActiveDeltaFade(
+    val range: IntRange?,
+    val alpha: Float,
+)
+
+/**
+ * Owns the whole appended-delta fade decision (letta-mobile-8kdjm.10) so that
+ * [StreamingMarkdownDocumentBlocks] can stay a per-block rendering loop. Eligibility,
+ * range tracking and the alpha animation all live here.
+ *
+ * The fade engages only for a strict prefix extension of an eligible active block while
+ * streaming; reduced motion, an open code fence, or an ineligible block kind all disable
+ * it, and a replacement resets without replaying settled text.
+ */
+@Composable
+private fun rememberAppendedDeltaFade(
+    blocks: List<StreamingMarkdownDocumentBlock>,
+    isStreaming: Boolean,
+    tailTransform: (String) -> String,
+    fadeAppendedText: Boolean,
+): ActiveDeltaFade {
+    val motionPolicy = rememberChatMotionPolicy()
+    val fadeSpec = motionPolicy.terminalSwap.crossfadeSpec
+
+    val fadeState = remember { StreamingAppendedDeltaFadeState() }
+    val activeBlock = blocks.lastOrNull()
+    val activeBlockId = activeBlock?.id
+    val activeRenderSource = if (activeBlock != null) tailTransform(activeBlock.source) else ""
+
+    val isFadeEligible = fadeAppendedText &&
+        isStreaming &&
+        !motionPolicy.isReducedMotionEnabled &&
+        activeBlock != null &&
+        activeBlock.supportsAppendedDeltaFade() &&
+        !tailHasOpenBlockFence(activeRenderSource)
+
+    val hasDeltaToAnimate = remember(activeBlockId, activeRenderSource, isFadeEligible) {
+        if (isFadeEligible && activeBlockId != null) {
+            fadeState.update(
+                activeBlockId = activeBlockId,
+                activeSource = activeRenderSource,
+                isStreaming = true,
+                isReducedMotion = false,
+                isEligibleBlockKind = true,
+            )
+        } else {
+            fadeState.reset()
+            false
+        }
+    }
+
+    val range = if (isFadeEligible && fadeState.fadingBlockId == activeBlockId) {
+        fadeState.fadingDeltaRange
+    } else {
+        null
+    }
+
+    val fadingRangeKey = remember(activeBlockId, range, hasDeltaToAnimate) {
+        if (range != null && activeBlockId != null) "$activeBlockId:${range.first}:${range.last}" else null
+    }
+
+    val animatableAlpha = remember { Animatable(1f) }
+    LaunchedEffect(fadingRangeKey) {
+        if (fadingRangeKey != null) {
+            animatableAlpha.snapTo(0f)
+            animatableAlpha.animateTo(1f, animationSpec = fadeSpec)
+        } else {
+            animatableAlpha.snapTo(1f)
+        }
+    }
+
+    return ActiveDeltaFade(range = range, alpha = animatableAlpha.value)
 }
 
 internal class StreamingAppendedDeltaFadeState {
