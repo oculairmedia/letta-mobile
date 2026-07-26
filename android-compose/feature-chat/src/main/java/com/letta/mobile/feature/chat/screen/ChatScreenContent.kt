@@ -330,7 +330,7 @@ internal fun GoalStatusCard(
     loading: Boolean,
     callbacks: GoalStatusCallbacks,
 ) {
-    if (goal == null && !loading) return
+    if (goal == null) return
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -344,19 +344,15 @@ internal fun GoalStatusCard(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             GoalStatusCardHeader(goal = goal, loading = loading, onRefresh = callbacks.onRefresh)
-            if (goal != null) {
-                GoalStatusCardDetails(goal = goal)
-                GoalStatusCardActions(goal = goal, callbacks = callbacks)
-            } else {
-                GoalStatusCardLoadingBody()
-            }
+            GoalStatusCardDetails(goal = goal)
+            GoalStatusCardActions(goal = goal, callbacks = callbacks)
         }
     }
 }
 
 @Composable
 private fun GoalStatusCardHeader(
-    goal: GoalStatusUi?,
+    goal: GoalStatusUi,
     loading: Boolean,
     onRefresh: () -> Unit,
 ) {
@@ -366,7 +362,7 @@ private fun GoalStatusCardHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = if (loading) "Goal" else "Goal • ${goal?.status.orEmpty()}",
+            text = if (loading) "Goal" else "Goal • ${goal.status}",
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -386,15 +382,6 @@ private fun GoalStatusCardDetails(goal: GoalStatusUi) {
     Text(
         text = "Tokens ${goal.tokensUsed}$budget • active ${goal.activeTimeSeconds}s",
         style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
-@Composable
-private fun GoalStatusCardLoadingBody() {
-    Text(
-        text = "Loading goal status…",
-        style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
 }

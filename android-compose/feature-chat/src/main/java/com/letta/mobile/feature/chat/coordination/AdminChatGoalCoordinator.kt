@@ -7,12 +7,16 @@ import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.feature.chat.state.ChatBannerController
 import com.letta.mobile.ui.chat.render.ChatUiState
+import com.letta.mobile.ui.chat.render.ConversationState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -30,6 +34,8 @@ internal class AdminChatGoalCoordinator(
     private val localRuntimeRouting: () -> LocalRuntimeRouting,
     private val onGoalSlashCommandsDetected: () -> Unit,
 ) {
+    private var goalStatusJob: Job? = null
+
     fun startObserving() {
         scope.launch {
             wsChatBridge.events.collect { event ->
@@ -42,24 +48,49 @@ internal class AdminChatGoalCoordinator(
                 .distinctUntilChanged()
                 .collect { refreshGoalStatus() }
         }
+        scope.launch {
+            uiState
+                .map { (it.conversationState as? ConversationState.Ready)?.conversationId }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    goalStatusJob?.cancel()
+                    goalStatusJob = null
+                    uiState.update { state ->
+                        state.copy(goalStatus = null, isGoalStatusLoading = false)
+                    }
+                    refreshGoalStatus()
+                }
+        }
     }
 
     fun refreshGoalStatus() {
+        goalStatusJob?.cancel()
         if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
+            goalStatusJob = null
             uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
             return
         }
-        scope.launch {
+        val originatingConversationId = currentConversationId()
+        goalStatusJob = scope.launch {
             uiState.update { it.copy(isGoalStatusLoading = true) }
             slashCommandRepository.getGoalStatus(agentId.value)
                 .onSuccess { status ->
+                    if (currentConversationId() != originatingConversationId) return@onSuccess
                     uiState.update {
                         it.copy(goalStatus = status.goal?.toUi(), isGoalStatusLoading = false)
                     }
                 }
-                .onFailure { uiState.update { it.copy(isGoalStatusLoading = false) } }
+                .onFailure {
+                    if (currentConversationId() == originatingConversationId) {
+                        uiState.update { it.copy(isGoalStatusLoading = false) }
+                    }
+                }
         }
     }
+
+    private fun currentConversationId(): String? =
+        (uiState.value.conversationState as? ConversationState.Ready)?.conversationId
 
     fun sendGoalCommand(command: String) {
         if (!isShimBackend.value) return
