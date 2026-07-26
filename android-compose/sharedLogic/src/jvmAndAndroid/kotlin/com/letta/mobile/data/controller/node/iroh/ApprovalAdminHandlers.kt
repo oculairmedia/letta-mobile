@@ -47,6 +47,16 @@ object ApprovalAdminHandlers {
             ?: throw IllegalArgumentException("approval decision required")
         val reason = approval["reason"]?.jsonPrimitive?.contentOrNull
             ?: approval["approvals"]?.jsonArray?.firstOrNull()?.jsonObject?.get("reason")?.jsonPrimitive?.contentOrNull
+        // letta-mobile-vilsn: structured close payload (e.g. an AskUserQuestion
+        // answer), decoded upstream in MessageRepositoryApproval and threaded here
+        // as a first-class field instead of the controller re-decoding a `reason`
+        // sentinel.
+        // Backward-compat: older clients still encode the answer into the `reason`
+        // sentinel (AskUserQuestion.encodeAnswerReason) rather than sending
+        // `updated_input`. Decode it here so a new host keeps working with an
+        // un-upgraded app/desktop client.
+        val updatedInput = approval["updated_input"]?.jsonObject
+            ?: com.letta.mobile.data.model.AskUserQuestion.decodeAnswerReason(reason)
         val toolCallIds = approval["approvals"]?.jsonArray
             ?.mapNotNull { it.jsonObject["tool_call_id"]?.jsonPrimitive?.contentOrNull }
             ?.takeIf { it.isNotEmpty() }
@@ -61,6 +71,7 @@ object ApprovalAdminHandlers {
                     approve = approve,
                     reason = reason,
                     toolCallId = toolCallIds.firstOrNull(),
+                    updatedInput = updatedInput,
                 )
             }.onSuccess {
                 return buildJsonObject { put("status", if (approve) "approved" else "denied") }

@@ -52,23 +52,32 @@ internal fun AskUserQuestionCard(
         ?: return false
     val spec = remember(toolCall.arguments) { AskUserQuestion.parse(toolCall.arguments) } ?: return false
 
-    val toolCallIds = remember(approval) { approval.toolCalls.map { it.toolCallId } }
+    // Submit only the AskUserQuestion tool call's id — if the approval bundles other
+    // tool calls, they must not be picked up by the host's firstOrNull() decode.
+    val toolCallIds = remember(toolCall.toolCallId) { listOf(toolCall.toolCallId) }
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
 
+    // Keyed by requestId + toolCallId (+ arguments) so a new approval never reuses
+    // stale answers from a prior request with identical arguments JSON.
+    val stateKey = "${approval.requestId}:${toolCall.toolCallId}:${toolCall.arguments}"
     // question text -> selected option labels
-    val selections = remember(toolCall.arguments) { mutableStateMapOf<String, MutableList<String>>() }
+    val selections = remember(stateKey) { mutableStateMapOf<String, MutableList<String>>() }
     // question text -> free-text "Other" answer
-    val otherText = remember(toolCall.arguments) { mutableStateMapOf<String, String>() }
+    val otherText = remember(stateKey) { mutableStateMapOf<String, String>() }
 
     Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-        AskUserQuestionTitle()
+        Text(
+            text = stringResource(R.string.screen_chat_ask_user_question_title),
+            style = MaterialTheme.chatTypography.toolLabel,
+        )
 
         spec.questions.forEach { question ->
-            AskUserQuestionBlock(
-                question = question,
+            val answerState = AskUserQuestionAnswerState(
                 selected = selections[question.question].orEmpty(),
                 otherValue = otherText[question.question].orEmpty(),
+            )
+            val actions = AskUserQuestionAnswerActions(
                 onToggleOption = { label ->
                     val current = selections.getOrPut(question.question) { mutableListOf() }
                     if (question.multiSelect) {
@@ -76,137 +85,123 @@ internal fun AskUserQuestionCard(
                     } else {
                         current.clear()
                         current.add(label)
+                        // Single-select is mutually exclusive with "Other": picking a
+                        // chip clears any free-text answer for this question.
+                        otherText[question.question] = ""
                     }
+                    // trigger recomposition (SnapshotStateMap tracks value identity)
                     selections[question.question] = current.toMutableList()
                     HapticEffects.contextClick(haptic, view)
                 },
-                onOtherChanged = { otherText[question.question] = it },
+                onOtherChanged = { text ->
+                    otherText[question.question] = text
+                    if (!question.multiSelect && text.isNotBlank()) {
+                        // Single-select is mutually exclusive with chips: typing in
+                        // "Other" clears any picked option for this question.
+                        selections[question.question] = mutableListOf()
+                    }
+                },
+            )
+            AskUserQuestionBlock(
+                question = question,
+                answer = answerState,
+                actions = actions,
             )
         }
 
         val answers = buildAnswers(spec.questions, selections, otherText)
         val canSubmit = answers.isNotEmpty() && answers.size == spec.questions.count { it.question.isNotBlank() }
 
-        AskUserQuestionActionsRow(
-            isSubmitting = isSubmitting,
-            canSubmit = canSubmit,
-            onDecision = onDecision,
-            onDismiss = {
-                HapticEffects.reject(haptic, view)
-                onDecision?.invoke(approval.requestId, toolCallIds, false, null)
-            },
-            onSubmit = {
-                HapticEffects.confirm(haptic, view)
-                val updatedInput = AskUserQuestion.buildUpdatedInput(toolCall.arguments, answers)
-                onDecision?.invoke(
-                    approval.requestId,
-                    toolCallIds,
-                    true,
-                    AskUserQuestion.encodeAnswerReason(updatedInput),
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = {
+                    HapticEffects.reject(haptic, view)
+                    onDecision?.invoke(approval.requestId, toolCallIds, false, null)
+                },
+                enabled = !isSubmitting && onDecision != null,
+            ) { Text(stringResource(R.string.screen_chat_ask_user_question_dismiss)) }
+            Button(
+                onClick = {
+                    HapticEffects.confirm(haptic, view)
+                    val updatedInput = AskUserQuestion.buildUpdatedInput(toolCall.arguments, answers)
+                    onDecision?.invoke(
+                        approval.requestId,
+                        toolCallIds,
+                        true,
+                        AskUserQuestion.encodeAnswerReason(updatedInput),
+                    )
+                },
+                enabled = !isSubmitting && canSubmit && onDecision != null,
+            ) {
+                Text(
+                    if (isSubmitting) stringResource(R.string.screen_chat_approval_submitting)
+                    else stringResource(R.string.screen_chat_ask_user_question_send),
                 )
-            },
-        )
+            }
+        }
     }
     return true
 }
 
-@Composable
-private fun AskUserQuestionTitle() {
-    Text(
-        text = stringResource(R.string.screen_chat_ask_user_question_title),
-        style = MaterialTheme.chatTypography.toolLabel,
-    )
-}
+/** Selected chip labels plus the free-text "Other" value for one question. */
+private data class AskUserQuestionAnswerState(
+    val selected: List<String>,
+    val otherValue: String,
+)
 
-@Composable
-private fun AskUserQuestionActionsRow(
-    isSubmitting: Boolean,
-    canSubmit: Boolean,
-    onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
-    onDismiss: () -> Unit,
-    onSubmit: () -> Unit,
-) {
-    androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(
-            onClick = onDismiss,
-            enabled = !isSubmitting && onDecision != null,
-        ) { Text(stringResource(R.string.screen_chat_ask_user_question_dismiss)) }
-        Button(
-            onClick = onSubmit,
-            enabled = !isSubmitting && canSubmit && onDecision != null,
-        ) {
-            Text(
-                if (isSubmitting) stringResource(R.string.screen_chat_approval_submitting)
-                else stringResource(R.string.screen_chat_ask_user_question_send),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AskUserQuestionHeader(header: String?) {
-    if (header.isNullOrBlank()) return
-    Text(text = header, style = MaterialTheme.chatTypography.toolLabel, fontWeight = FontWeight.SemiBold)
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun AskUserQuestionOptionChips(
-    options: List<com.letta.mobile.data.model.AskUserQuestionOption>,
-    selected: List<String>,
-    onToggleOption: (String) -> Unit,
-) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        options.forEach { option ->
-            FilterChip(
-                selected = option.label in selected,
-                onClick = { onToggleOption(option.label) },
-                label = { Text(option.label) },
-                colors = FilterChipDefaults.filterChipColors(),
-            )
-        }
-    }
-}
-
-@Composable
-private fun AskUserQuestionOtherField(
-    otherValue: String,
-    onOtherChanged: (String) -> Unit,
-) {
-    OutlinedTextField(
-        value = otherValue,
-        onValueChange = onOtherChanged,
-        label = { Text(stringResource(R.string.screen_chat_ask_user_question_other)) },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-    )
-}
+/** Callbacks for one question's chip toggling and "Other" text changes. */
+private data class AskUserQuestionAnswerActions(
+    val onToggleOption: (String) -> Unit,
+    val onOtherChanged: (String) -> Unit,
+)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AskUserQuestionBlock(
     question: AskUserQuestionItem,
-    selected: List<String>,
-    otherValue: String,
-    onToggleOption: (String) -> Unit,
-    onOtherChanged: (String) -> Unit,
+    answer: AskUserQuestionAnswerState,
+    actions: AskUserQuestionAnswerActions,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
-        AskUserQuestionHeader(question.header)
+        question.header?.takeIf { it.isNotBlank() }?.let {
+            Text(text = it, style = MaterialTheme.chatTypography.toolLabel, fontWeight = FontWeight.SemiBold)
+        }
         Text(text = question.question, style = MaterialTheme.chatTypography.toolDetail)
-        AskUserQuestionOptionChips(
-            options = question.options,
-            selected = selected,
-            onToggleOption = onToggleOption,
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            question.options.forEach { option ->
+                val isSelected = option.label in answer.selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { actions.onToggleOption(option.label) },
+                    label = { Text(option.label) },
+                    colors = FilterChipDefaults.filterChipColors(),
+                )
+            }
+        }
+        question.options.forEach { option ->
+            option.description?.takeIf { it.isNotBlank() }?.let { description ->
+                Text(
+                    text = "${option.label}: $description",
+                    style = MaterialTheme.chatTypography.toolDetail,
+                )
+            }
+        }
+        OutlinedTextField(
+            value = answer.otherValue,
+            onValueChange = actions.onOtherChanged,
+            label = { Text(stringResource(R.string.screen_chat_ask_user_question_other)) },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
         )
-        AskUserQuestionOtherField(otherValue = otherValue, onOtherChanged = onOtherChanged)
     }
 }
 
-/** Collect resolved answers: selected chip labels plus any free-text "Other" value. */
+/**
+ * Collect resolved answers: selected chip labels plus any free-text "Other" value.
+ * Multi-select questions append the "Other" text to picked chips; single-select
+ * questions are mutually exclusive (enforced upstream), so at most one value is
+ * ever present here.
+ */
 private fun buildAnswers(
     questions: List<AskUserQuestionItem>,
     selections: Map<String, List<String>>,
@@ -216,7 +211,14 @@ private fun buildAnswers(
     for (q in questions) {
         if (q.question.isBlank()) continue
         val picked = selections[q.question].orEmpty().toMutableList()
-        otherText[q.question]?.takeIf { it.isNotBlank() }?.let { picked.add(it) }
+        val other = otherText[q.question]?.takeIf { it.isNotBlank() }
+        if (other != null) {
+            if (q.multiSelect) {
+                picked.add(other)
+            } else if (picked.isEmpty()) {
+                picked.add(other)
+            }
+        }
         if (picked.isNotEmpty()) out[q.question] = picked
     }
     return out

@@ -146,6 +146,7 @@ open class MessageRepository @Inject constructor(
         toolCallIds: List<String>,
         approve: Boolean,
         reason: String?,
+        conversationId: String?,
     ) {
         MessageRepositoryApproval.submitApproval(
             ApprovalSubmitParams(
@@ -157,6 +158,7 @@ open class MessageRepository @Inject constructor(
                 toolCallIds = toolCallIds,
                 approve = approve,
                 reason = reason,
+                conversationId = conversationId,
             )
         )
     }

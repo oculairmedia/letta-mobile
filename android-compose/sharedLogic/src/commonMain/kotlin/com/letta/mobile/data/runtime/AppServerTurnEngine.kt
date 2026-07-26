@@ -502,21 +502,32 @@ class AppServerTurnEngine(
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
         val lastFrameAt = atomic(currentTimeMs())
-        // letta-mobile-vilsn.6: true while a surfaced (non-auto-approved) runtime
-        // user-input approval (AskUserQuestion / ExitPlanMode) is parked waiting
-        // for the user's answer. The idle watchdog MUST NOT fail such a turn — an
+        // letta-mobile-vilsn.6: the idle watchdog is PAUSED while ANY surfaced
+        // (non-auto-approved) runtime user-input approval gate is outstanding
+        // (AskUserQuestion / ExitPlanMode parked awaiting the user's answer). An
         // unanswered question legitimately parks the turn far longer than the idle
-        // window. Set when the approval is surfaced; cleared when a genuinely new
-        // inbound frame arrives (turn resumed because the user answered) or on any
-        // terminal/settle path.
-        val awaitingUserInput = atomic(false)
+        // window, so the watchdog MUST NOT fail it. The outstanding gates are the
+        // keys of [userInputApprovalIdsRef] (keyed by tool_call_id): a gate is
+        // ADDED when the approval is surfaced (below) and cleared ONLY when THAT
+        // specific gate is genuinely resolved — the submit path consumes it via
+        // [consumeUserInputApprovalId], a matching tool_return is observed, or a
+        // terminal/settle path clears everything. Crucially it is NOT lifted by an
+        // arbitrary inbound frame: a side-channel status frame (UpdateDeviceStatus /
+        // UpdateQueue / UpdateSubagentState) that merely passes matches(scope) must
+        // never resume the watchdog while the user still owes an answer.
+        fun hasOutstandingUserInputGate(): Boolean = userInputApprovalIdsRef.value.isNotEmpty()
         val watchdog = this.launch {
+            // Short recheck cadence while paused so the watchdog resumes PROMPTLY
+            // once the last gate clears (from ANY source — collect-loop tool_return,
+            // the submit path's consume, or a terminal), never sleeping a full stale
+            // window. Re-stamp lastFrameAt on each paused tick so a resumed watchdog
+            // starts a FULL idle window instead of instantly firing on a stale
+            // timestamp left over from when the approval was surfaced.
+            val pauseRecheckMs = minOf(turnIdleTimeoutMs, WATCHDOG_PAUSE_RECHECK_MS)
             while (true) {
-                if (awaitingUserInput.value) {
-                    // Paused: a runtime user-input approval is outstanding. Do NOT
-                    // throw — re-check periodically so normal idle behavior resumes
-                    // as soon as the approval is cleared, without failing the turn.
-                    delay(turnIdleTimeoutMs.milliseconds)
+                if (hasOutstandingUserInputGate()) {
+                    lastFrameAt.value = currentTimeMs()
+                    delay(pauseRecheckMs.milliseconds)
                     continue
                 }
                 val idleFor = currentTimeMs() - lastFrameAt.value
@@ -555,8 +566,10 @@ class AppServerTurnEngine(
 
         suspend fun flushTail() {
             // letta-mobile-vilsn.6: a terminal/settle path is a definitive end to
-            // any parked user-input approval — resume normal watchdog behavior.
-            awaitingUserInput.value = false
+            // ANY parked user-input approval gate — clear every outstanding gate so
+            // the watchdog resumes normal behavior and no stale gate leaks into a
+            // later turn.
+            userInputApprovalIdsRef.update { emptyMap() }
             pendingStop?.let { emitDraft(it) }
             pendingStop = null
             pendingUsage?.let { emitDraft(it) }
@@ -661,13 +674,15 @@ class AppServerTurnEngine(
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
-                // letta-mobile-vilsn.6: a genuinely NEW inbound frame means the
-                // turn has resumed — e.g. the user answered a parked user-input
-                // approval — so resume normal idle-watchdog behavior. This runs
-                // BEFORE any approval is surfaced from this frame's drafts below,
-                // so an approval frame re-arms the pause after clearing here (the
-                // pause is never cleared by the approval frame itself).
-                awaitingUserInput.value = false
+                // letta-mobile-vilsn.6: the idle-watchdog pause is intentionally NOT
+                // lifted here. An arbitrary inbound frame that merely passes
+                // matches(scope) — including a side-channel status frame
+                // (UpdateDeviceStatus / UpdateQueue / UpdateSubagentState) — must NOT
+                // resume the watchdog while a user-input gate is still outstanding.
+                // A gate is lifted only when THAT gate is genuinely resolved (its
+                // tool_return below, the submit path's consume, or a terminal/settle
+                // path), so an unanswered question can never be force-failed by a
+                // stray frame, and a real answer can never leave the watchdog wedged.
                 // lgns8.17: GUARANTEE a matched external_tool_call_response. The
                 // App Server blocks the turn until every external_tool_call_request
                 // is answered by request_id; the mapper below only turns it into a
@@ -716,30 +731,45 @@ class AppServerTurnEngine(
                             // (auto-approved drafts are swallowed above via
                             // autoApprovedToolCallDraft). If it is a runtime
                             // user-input tool (AskUserQuestion / ExitPlanMode) the
-                            // turn is now parked awaiting the user's answer — pause
-                            // the idle watchdog so the unanswered question does not
-                            // synthesize a Failed idle timeout.
+                            // turn is now parked awaiting the user's answer — record
+                            // an outstanding gate so the idle watchdog is paused and
+                            // the unanswered question does not synthesize a Failed
+                            // idle timeout.
                             if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
-                                awaitingUserInput.value = true
                                 // letta-mobile-vilsn: record the REAL approval id
                                 // (the can_use_tool control-request request_id, e.g.
-                                // perm-call_...) keyed by tool_call_id. Interactive
-                                // answers must close the gate against THIS id, which
-                                // is not derivable from the tool_call_id across LLM
-                                // providers (call_… vs toolu_…). submitApproval
-                                // consumes it.
+                                // perm-call_...) keyed by tool_call_id. This map is
+                                // BOTH the submit path's source (submitApproval
+                                // consumes it via consumeUserInputApprovalId) AND the
+                                // watchdog's outstanding-gate set (vilsn.6): a non-empty
+                                // map pauses the idle watchdog. Interactive answers must
+                                // close the gate against THIS id, which is not derivable
+                                // from the tool_call_id across LLM providers (call_… vs
+                                // toolu_…).
                                 userInputApprovalIdsRef.update { map ->
                                     map + (payload.request.callId.value to payload.request.approvalId.value)
                                 }
                             }
                         }
-                        is RuntimeEventPayload.ToolReturnObserved -> returnedToolCallIds.add(payload.toolCallId.value)
+                        is RuntimeEventPayload.ToolReturnObserved -> {
+                            returnedToolCallIds.add(payload.toolCallId.value)
+                            // letta-mobile-vilsn.6: a tool_return for a parked
+                            // user-input tool_call_id genuinely resolves THAT gate —
+                            // lift the pause for this specific id (no-op if the submit
+                            // path already consumed it).
+                            userInputApprovalIdsRef.update { it - payload.toolCallId.value }
+                        }
                         is RuntimeEventPayload.RemoteStreamFrame -> {
                             // Extract tool_call_id from tool_call_message and approval_request_message frames
                             extractToolCallId(payload.body)?.let { emittedToolCallIds.add(it) }
                             // Extract returned tool_call_id from tool_return_message frames
                             if (payload.messageType == "tool_return_message") {
-                                extractToolCallId(payload.body)?.let { returnedToolCallIds.add(it) }
+                                extractToolCallId(payload.body)?.let {
+                                    returnedToolCallIds.add(it)
+                                    // letta-mobile-vilsn.6: a streamed tool_return
+                                    // resolves that specific outstanding gate.
+                                    userInputApprovalIdsRef.update { map -> map - it }
+                                }
                             }
                         }
                         else -> {}
@@ -856,6 +886,11 @@ class AppServerTurnEngine(
             }
             terminalSettleJob?.cancel()
             watchdog.cancel()
+            // letta-mobile-vilsn.6: the collect loop has ended (terminal, idle
+            // timeout, cancellation, or stream error) — clear every outstanding
+            // user-input gate so none leaks into a later turn and keeps a fresh
+            // watchdog wrongly paused.
+            userInputApprovalIdsRef.update { emptyMap() }
         }
     }
 
@@ -1414,6 +1449,12 @@ class AppServerTurnEngine(
         // turn never trips. Tunable via the ctor param.
         const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
         const val DEFAULT_TERMINAL_SETTLE_QUIET_MS: Long = 1_500L
+
+        // letta-mobile-vilsn.6: while the watchdog is paused on an outstanding
+        // user-input gate it re-checks on this cadence (capped at the idle window)
+        // so it resumes promptly once the gate clears, rather than sleeping a full
+        // stale interval. Bounds how stale lastFrameAt can be on resume.
+        const val WATCHDOG_PAUSE_RECHECK_MS: Long = 250L
 
         fun defaultRequestId(): String {
             nextRequestId += 1

@@ -6,12 +6,12 @@ import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.controller.AppServerApprovalDecisions
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway
 import com.letta.mobile.data.runtime.AppServerRuntimeEventMapper
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
-import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -106,18 +106,13 @@ class DesktopHybridAppServerChatGateway internal constructor(
             else -> (turnEngine as? AppServerTurnEngine)?.consumeUserInputApprovalId(submission.toolCallId)
                 ?: ("perm-" + submission.toolCallId)
         }
-        val decision = when {
-            submission.approve && answerUpdatedInput != null ->
-                AppServerApprovalResponseDecision.Allow(message = null, updatedInput = answerUpdatedInput)
-            submission.approve ->
-                AppServerApprovalResponseDecision.Allow(
-                    message = submission.reason ?: "Approved by desktop client.",
-                )
-            else ->
-                AppServerApprovalResponseDecision.Deny(
-                    message = submission.reason ?: "Denied by desktop client.",
-                )
-        }
+        val decision = AppServerApprovalDecisions.decide(
+            approve = submission.approve,
+            updatedInput = answerUpdatedInput,
+            message = submission.reason,
+            defaultApproveMessage = "Approved by desktop client.",
+            defaultDenyMessage = "Denied by desktop client.",
+        )
         client.input(
             AppServerCommand.Input(
                 runtime = scope,

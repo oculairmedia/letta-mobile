@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import kotlinx.serialization.json.JsonObject
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.CanonicalRuntime
@@ -151,6 +152,7 @@ class ApprovalAdminHandlersTest {
         var submittedApprovalRequestId: String? = null
         var submittedApprove: Boolean? = null
         var submittedToolCallId: String? = null
+        var submittedUpdatedInput: kotlinx.serialization.json.JsonObject? = null
 
         override suspend fun startRuntime(
             agentId: AgentId,
@@ -181,11 +183,13 @@ class ApprovalAdminHandlersTest {
             approve: Boolean,
             reason: String?,
             toolCallId: String?,
+            updatedInput: JsonObject?,
         ) {
             submittedAgentId = agentId.value
             submittedApprovalRequestId = approvalRequestId
             submittedApprove = approve
             submittedToolCallId = toolCallId
+            submittedUpdatedInput = updatedInput
         }
     }
 }

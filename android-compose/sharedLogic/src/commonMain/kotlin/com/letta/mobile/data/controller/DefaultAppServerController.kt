@@ -4,10 +4,8 @@ import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import kotlin.time.Clock
-import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -204,6 +202,7 @@ class DefaultAppServerController(
         approve: Boolean,
         reason: String?,
         toolCallId: String?,
+        updatedInput: kotlinx.serialization.json.JsonObject?,
     ) {
         val runtime = runtimeMutex.withLock {
             val conversationValue = conversationId?.value
@@ -212,10 +211,12 @@ class DefaultAppServerController(
             }?.value?.scope
         } ?: throw AppServerControllerException("No active runtime found for approval $approvalRequestId")
 
-        // letta-mobile-vilsn: an AskUserQuestion answer rides the `reason` channel
-        // (see AskUserQuestion.encodeAnswerReason). When present, close the tool
-        // call by returning the answer as `updated_input` rather than a bare allow.
-        val answerUpdatedInput = if (approve) AskUserQuestion.decodeAnswerReason(reason) else null
+        // letta-mobile-vilsn: the structured close payload (e.g. an AskUserQuestion
+        // answer) is now threaded as a first-class `updated_input` param (decoded
+        // upstream in MessageRepositoryApproval), so this terminal no longer
+        // re-decodes the `reason` sentinel. When present, close the tool call by
+        // returning the answer as `updated_input` rather than a bare allow.
+        val answerUpdatedInput = if (approve) updatedInput else null
         // letta-mobile-vilsn: interactive tools (AskUserQuestion) are gated by
         // letta-code's `can_use_tool` control request, whose id (e.g.
         // `perm-call_…`) is NOT the display approval id the app renders from and
@@ -229,14 +230,13 @@ class DefaultAppServerController(
                 ?: ("perm-" + toolCallId)
         }
 
-        val decision = when {
-            approve && answerUpdatedInput != null ->
-                AppServerApprovalResponseDecision.Allow(message = null, updatedInput = answerUpdatedInput)
-            approve ->
-                AppServerApprovalResponseDecision.Allow(message = reason ?: "Approved by mobile client.")
-            else ->
-                AppServerApprovalResponseDecision.Deny(message = reason ?: "Denied by mobile client.")
-        }
+        val decision = AppServerApprovalDecisions.decide(
+            approve = approve,
+            updatedInput = answerUpdatedInput,
+            message = reason,
+            defaultApproveMessage = "Approved by mobile client.",
+            defaultDenyMessage = "Denied by mobile client.",
+        )
         client.input(
             AppServerCommand.Input(
                 runtime = runtime,
