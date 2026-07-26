@@ -13,7 +13,6 @@ concurrency:
 
 permissions:
   contents: read
-  id-token: write
 
 env:
   GRADLE_OPTS: --enable-native-access=ALL-UNNAMED
