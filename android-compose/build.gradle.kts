@@ -204,6 +204,7 @@ dependencies {
     kover(project(":sharedLogic"))
     kover(project(":designsystem"))
     kover(project(":feature-chat"))
+    kover(project(":feature-editagent"))
 }
 
 kover {

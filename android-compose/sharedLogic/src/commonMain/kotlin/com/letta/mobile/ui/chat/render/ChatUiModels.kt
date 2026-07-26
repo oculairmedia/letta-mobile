@@ -44,7 +44,12 @@ data class A2uiDebugFrameUi(
 @androidx.compose.runtime.Immutable
 enum class ChatSnackbarDuration {
     Short,
-    Indefinite,
+    Indefinite;
+
+    companion object {
+        fun forRetryableAction(retryable: Boolean): ChatSnackbarDuration =
+            if (retryable) Indefinite else Short
+    }
 }
 
 @androidx.compose.runtime.Immutable

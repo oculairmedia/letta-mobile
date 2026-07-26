@@ -318,7 +318,7 @@ internal class AdminChatA2uiCoordinator(
             id = ++nextA2uiSnackbarId,
             message = message,
             actionLabel = if (retryable) "Retry" else null,
-            duration = if (retryable) ChatSnackbarDuration.Indefinite else ChatSnackbarDuration.Short,
+            duration = ChatSnackbarDuration.forRetryableAction(retryable),
             retryAction = action.takeIf { retryable },
         )
     }
