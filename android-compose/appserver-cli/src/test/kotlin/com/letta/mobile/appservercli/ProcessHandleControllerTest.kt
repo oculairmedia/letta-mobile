@@ -3,6 +3,7 @@ package com.letta.mobile.appservercli
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.io.File
+import java.net.URI
 
 class ProcessHandleControllerTest {
 
@@ -53,5 +54,21 @@ class ProcessHandleControllerTest {
         // spawn() was never called, so the handle is null. destroyTree must be a no-op
         // rather than throwing — cancel/teardown paths call it unconditionally.
         controller.destroyTree()
+    }
+
+    @Test
+    fun `toHttpReadyUri falls back to 4500 when the listen url has no port`() {
+        val uri = HttpReadinessProbe.toHttpReadyUri("http://localhost", "/readyz")
+
+        assertEquals(4500, uri.port)
+        assertEquals(URI("http://localhost:4500/readyz"), uri)
+    }
+
+    @Test
+    fun `toHttpReadyUri preserves an explicit port`() {
+        val uri = HttpReadinessProbe.toHttpReadyUri("http://localhost:8080", "/readyz")
+
+        assertEquals(8080, uri.port)
+        assertEquals(URI("http://localhost:8080/readyz"), uri)
     }
 }
