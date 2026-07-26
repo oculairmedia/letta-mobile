@@ -279,7 +279,13 @@
     <string name="screen_config_dialog_delete_title">Delete Configuration</string>
     <string name="screen_config_dialog_delete_confirm">Are you sure you want to delete this configuration?</string>
     <string name="screen_config_server_section">Server Configuration</string>
+    <string name="screen_config_connection_mode">Connection mode</string>
+    <string name="screen_config_connection_mode_description">Choose where this app connects and runs your agents.</string>
     <string name="screen_config_server_url_placeholder">https://your-server.com</string>
+    <string name="screen_config_refreshing">Refreshing settings…</string>
+    <string name="screen_config_refresh_failed">Couldn’t refresh settings</string>
+    <string name="screen_config_show_token">Show token</string>
+    <string name="screen_config_hide_token">Hide token</string>
     <string name="screen_config_embedded_runtime_title">Embedded LettaCode runtime</string>
     <string name="screen_config_embedded_runtime_disabled_placeholder">Model import and configuration are available, but local turn execution is disabled in this build.</string>
     <string name="screen_config_embedded_runtime_enabled_placeholder">Local turns run fully on this device through the embedded runtime.</string>
@@ -817,6 +823,7 @@
     <string name="screen_providers_base_url_input">Base URL</string>
     <string name="screen_providers_access_key_input">Access Key</string>
     <string name="screen_providers_region_input">Region</string>
+    <string name="screen_providers_refreshing_details">Refreshing provider details…</string>
     <string name="screen_schedules_title">Schedules</string>
     <string name="screen_schedules_empty">No schedules configured</string>
     <string name="screen_schedules_unavailable">Schedule admin isn\'t available on this Letta server.</string>

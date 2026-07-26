@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -63,6 +65,8 @@ data class ConfigUiState(
         version = "disabled",
         integrity = "",
     ),
+    val isRefreshing: Boolean = false,
+    val refreshError: String? = null,
     val isSaving: Boolean = false,
 )
 
@@ -104,24 +108,24 @@ class ConfigViewModel @Inject constructor(
 
     fun loadConfig() {
         viewModelScope.launch {
-            _uiState.value = UiState.Loading
+            val retainedState = (_uiState.value as? UiState.Success)?.data
+            _uiState.value = retainedState
+                ?.copy(isRefreshing = true, refreshError = null)
+                ?.let { UiState.Success(it) }
+                ?: UiState.Loading
             try {
                 val activeConfig = settingsRepository.activeConfig.value
-                val appTheme = settingsRepository.getTheme().first()
-                val themePreset = settingsRepository.getThemePreset().first()
-                val dynamicColor = settingsRepository.getDynamicColor().first()
-                val enableProjects = settingsRepository.getEnableProjects().first()
-                val hapticsEnabled = settingsRepository.getHapticsEnabled().first()
+                val preferences = loadDisplayPreferences()
                 val configUiState = if (activeConfig != null && !createNew) {
                     ConfigUiState(
                         mode = activeConfig.mode.toServerMode(),
                         serverUrl = activeConfig.serverUrl,
                         apiToken = activeConfig.accessToken ?: "",
-                        theme = appTheme,
-                        themePreset = themePreset,
-                        dynamicColor = dynamicColor,
-                        enableProjects = enableProjects,
-                        hapticsEnabled = hapticsEnabled,
+                        theme = preferences.theme,
+                        themePreset = preferences.themePreset,
+                        dynamicColor = preferences.dynamicColor,
+                        enableProjects = preferences.enableProjects,
+                        hapticsEnabled = preferences.hapticsEnabled,
                         localModelPath = activeConfig.localModelPath.orEmpty(),
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -141,11 +145,11 @@ class ConfigViewModel @Inject constructor(
                     // — the existing first-time setup expects that default,
                     // and the user toggles to SELF_HOSTED inline if needed.
                     ConfigUiState(
-                        theme = appTheme,
-                        themePreset = themePreset,
-                        dynamicColor = dynamicColor,
-                        enableProjects = enableProjects,
-                        hapticsEnabled = hapticsEnabled,
+                        theme = preferences.theme,
+                        themePreset = preferences.themePreset,
+                        dynamicColor = preferences.dynamicColor,
+                        enableProjects = preferences.enableProjects,
+                        hapticsEnabled = preferences.hapticsEnabled,
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
@@ -154,10 +158,37 @@ class ConfigViewModel @Inject constructor(
                 }
                 _uiState.value = UiState.Success(configUiState)
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load config")
+                val message = e.message ?: "Failed to load config"
+                _uiState.value = retainedState
+                    ?.copy(isRefreshing = false, refreshError = message)
+                    ?.let { UiState.Success(it) }
+                    ?: UiState.Error(message)
             }
         }
     }
+
+    private suspend fun loadDisplayPreferences(): DisplayPreferences = coroutineScope {
+        val theme = async { settingsRepository.getTheme().first() }
+        val themePreset = async { settingsRepository.getThemePreset().first() }
+        val dynamicColor = async { settingsRepository.getDynamicColor().first() }
+        val enableProjects = async { settingsRepository.getEnableProjects().first() }
+        val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
+        DisplayPreferences(
+            theme = theme.await(),
+            themePreset = themePreset.await(),
+            dynamicColor = dynamicColor.await(),
+            enableProjects = enableProjects.await(),
+            hapticsEnabled = hapticsEnabled.await(),
+        )
+    }
+
+    private data class DisplayPreferences(
+        val theme: AppTheme,
+        val themePreset: ThemePreset,
+        val dynamicColor: Boolean,
+        val enableProjects: Boolean,
+        val hapticsEnabled: Boolean,
+    )
 
     fun updateMode(mode: ServerMode) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return

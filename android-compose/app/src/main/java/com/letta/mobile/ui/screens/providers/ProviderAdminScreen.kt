@@ -18,14 +18,14 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import com.letta.mobile.ui.components.ExpandableSearchField
-import com.letta.mobile.ui.components.ExpandableTitleSearch
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,15 +47,17 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
+import com.letta.mobile.ui.components.EmptyState
+import com.letta.mobile.ui.components.ErrorContent
+import com.letta.mobile.ui.components.ExpandableSearchField
+import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MultiFieldInputDialog
-import com.letta.mobile.ui.components.EmptyState
-import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
+import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
-import com.letta.mobile.ui.icons.LettaIcons
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -114,7 +116,11 @@ fun ProviderAdminScreen(
         },
     ) { paddingValues ->
         when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+            is UiState.Loading -> ShimmerCard(
+                modifier = Modifier
+                    .padding(paddingValues)
+                    .padding(16.dp),
+            )
             is UiState.Error -> ErrorContent(
                 message = state.message,
                 onRetry = viewModel::loadProviders,
@@ -122,7 +128,9 @@ fun ProviderAdminScreen(
             )
             is UiState.Success -> {
                 val filtered = remember(state.data.providers, state.data.searchQuery) { viewModel.getFilteredProviders() }
-                Column(
+                PullToRefreshBox(
+                    isRefreshing = state.data.isRefreshing,
+                    onRefresh = viewModel::loadProviders,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(paddingValues),
@@ -161,6 +169,7 @@ fun ProviderAdminScreen(
     state?.selectedProvider?.let { provider ->
         ProviderDetailDialog(
             provider = provider,
+            isRefreshing = state.inspectingProviderId == provider.id,
             onDismiss = viewModel::clearSelectedProvider,
             onEdit = {
                 viewModel.clearSelectedProvider()
@@ -315,6 +324,7 @@ private fun ProviderCard(
 @Composable
 private fun ProviderDetailDialog(
     provider: Provider,
+    isRefreshing: Boolean,
     onDismiss: () -> Unit,
     onEdit: () -> Unit,
     onCheck: () -> Unit,
@@ -328,6 +338,15 @@ private fun ProviderDetailDialog(
         onDismiss = onDismiss,
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (isRefreshing) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = stringResource(R.string.screen_providers_refreshing_details),
+                        style = MaterialTheme.typography.listItemSupporting,
+                    )
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+            }
             CardGroup {
                 provider.id?.let { id ->
                     item(

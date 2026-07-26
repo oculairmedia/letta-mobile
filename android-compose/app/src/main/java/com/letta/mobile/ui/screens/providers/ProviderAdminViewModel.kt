@@ -24,6 +24,8 @@ data class ProviderAdminUiState(
     val providers: ImmutableList<Provider> = persistentListOf(),
     val searchQuery: String = "",
     val selectedProvider: Provider? = null,
+    val isRefreshing: Boolean = false,
+    val inspectingProviderId: ProviderId? = null,
     val operationError: String? = null,
     val operationMessage: String? = null,
 )
@@ -43,21 +45,46 @@ class ProviderAdminViewModel @Inject constructor(
     fun loadProviders() {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data
-            _uiState.value = UiState.Loading
+            if (current == null) {
+                _uiState.value = UiState.Loading
+            } else {
+                _uiState.value = UiState.Success(
+                    current.copy(
+                        isRefreshing = true,
+                        operationError = null,
+                        operationMessage = null,
+                    )
+                )
+            }
             try {
                 providerRepository.refreshProviders()
                 val providers = providerRepository.providers.value
+                val latest = (_uiState.value as? UiState.Success)?.data
                 _uiState.value = UiState.Success(
                     ProviderAdminUiState(
                         providers = providers.toImmutableList(),
-                        searchQuery = current?.searchQuery.orEmpty(),
-                        selectedProvider = current?.selectedProvider?.let { selected ->
+                        searchQuery = latest?.searchQuery.orEmpty(),
+                        selectedProvider = latest?.selectedProvider?.let { selected ->
                             providers.firstOrNull { it.id == selected.id } ?: selected
                         },
+                        isRefreshing = false,
+                        inspectingProviderId = latest?.inspectingProviderId,
                     )
                 )
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load providers"))
+                val message = mapErrorToUserMessage(e, "Failed to load providers")
+                _uiState.value = if (current == null) {
+                    UiState.Error(message)
+                } else {
+                    val latest = (_uiState.value as? UiState.Success)?.data ?: current
+                    UiState.Success(
+                        latest.copy(
+                            isRefreshing = false,
+                            operationError = message,
+                            operationMessage = null,
+                        )
+                    )
+                }
             }
         }
     }
@@ -83,18 +110,38 @@ class ProviderAdminViewModel @Inject constructor(
     fun inspectProvider(providerId: ProviderId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            val cachedProvider = current.providers.firstOrNull { it.id == providerId } ?: return@launch
+            _uiState.value = UiState.Success(
+                current.copy(
+                    selectedProvider = cachedProvider,
+                    inspectingProviderId = providerId,
+                    operationError = null,
+                    operationMessage = null,
+                )
+            )
             try {
                 val provider = providerRepository.getProvider(providerId)
+                val latest = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                if (latest.inspectingProviderId != providerId) return@launch
                 _uiState.value = UiState.Success(
-                    current.copy(
-                        providers = current.providers.replaceProvider(provider).toImmutableList(),
+                    latest.copy(
+                        providers = latest.providers.replaceProvider(provider).toImmutableList(),
                         selectedProvider = provider,
+                        inspectingProviderId = null,
                         operationError = null,
                         operationMessage = null,
                     )
                 )
             } catch (e: Exception) {
-                setOperationError(mapErrorToUserMessage(e, "Failed to load provider details"))
+                val latest = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                if (latest.inspectingProviderId != providerId) return@launch
+                _uiState.value = UiState.Success(
+                    latest.copy(
+                        inspectingProviderId = null,
+                        operationError = mapErrorToUserMessage(e, "Failed to load provider details"),
+                        operationMessage = null,
+                    )
+                )
             }
         }
     }
@@ -216,7 +263,13 @@ class ProviderAdminViewModel @Inject constructor(
 
     fun clearSelectedProvider() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(selectedProvider = null, operationMessage = null))
+        _uiState.value = UiState.Success(
+            current.copy(
+                selectedProvider = null,
+                inspectingProviderId = null,
+                operationMessage = null,
+            )
+        )
     }
 
     fun clearOperationError() {

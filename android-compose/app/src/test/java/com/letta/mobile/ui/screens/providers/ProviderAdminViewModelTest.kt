@@ -1,17 +1,26 @@
 package com.letta.mobile.ui.screens.providers
 
 import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderCheckParams
+import com.letta.mobile.data.model.ProviderCreateParams
 import com.letta.mobile.data.model.ProviderId
+import com.letta.mobile.data.model.ProviderUpdateParams
 import com.letta.mobile.data.repository.ProviderRepository
+import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.testutil.FakeProviderApi
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -54,6 +63,48 @@ class ProviderAdminViewModelTest {
     }
 
     @Test
+    fun `refresh keeps cached content visible until replacement arrives`() = runTest {
+        val initialProviders = fakeApi.providers.toList()
+        val replacementProviders = initialProviders + Provider(
+            id = ProviderId("provider-3"),
+            name = "Local",
+            providerType = "openai-compatible",
+        )
+        val controlledRepository = ControlledProviderRepository(initialProviders)
+        val controlledViewModel = ProviderAdminViewModel(controlledRepository)
+        val refreshGate = controlledRepository.pauseNextRefresh(replacementProviders)
+        controlledViewModel.updateSearchQuery("open")
+
+        controlledViewModel.loadProviders()
+
+        val refreshing = controlledViewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertTrue(refreshing.data.isRefreshing)
+        assertEquals(initialProviders, refreshing.data.providers)
+        assertEquals("open", refreshing.data.searchQuery)
+
+        refreshGate.complete(Unit)
+
+        val refreshed = controlledViewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertFalse(refreshed.data.isRefreshing)
+        assertEquals(replacementProviders, refreshed.data.providers)
+        assertEquals("open", refreshed.data.searchQuery)
+    }
+
+    @Test
+    fun `refresh failure keeps cached content and exposes lightweight error`() = runTest {
+        viewModel.updateSearchQuery("anthropic")
+        fakeApi.shouldFail = true
+
+        viewModel.loadProviders()
+
+        val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertFalse(state.data.isRefreshing)
+        assertEquals(2, state.data.providers.size)
+        assertEquals("anthropic", state.data.searchQuery)
+        assertNotNull(state.data.operationError)
+    }
+
+    @Test
     fun `updateSearchQuery filters providers locally`() = runTest {
         viewModel.loadProviders()
         viewModel.updateSearchQuery("anthropic")
@@ -72,6 +123,28 @@ class ProviderAdminViewModelTest {
     }
 
     @Test
+    fun `inspectProvider opens cached details before remote details arrive`() = runTest {
+        val cached = fakeApi.providers.first()
+        val detailed = cached.copy(providerCategory = "cloud")
+        val controlledRepository = ControlledProviderRepository(fakeApi.providers.toList())
+        val controlledViewModel = ProviderAdminViewModel(controlledRepository)
+        val inspectionGate = controlledRepository.pauseNextInspection(detailed)
+
+        controlledViewModel.inspectProvider(cached.id!!)
+
+        val inspecting = controlledViewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertEquals(cached, inspecting.data.selectedProvider)
+        assertEquals(cached.id, inspecting.data.inspectingProviderId)
+
+        inspectionGate.complete(Unit)
+
+        val inspected = controlledViewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
+        assertEquals(detailed, inspected.data.selectedProvider)
+        assertEquals(null, inspected.data.inspectingProviderId)
+        assertEquals(detailed, inspected.data.providers.first())
+    }
+
+    @Test
     fun `checkProvider delegates to repository`() = runTest {
         viewModel.checkProvider(ProviderId("provider-1"))
 
@@ -87,4 +160,56 @@ class ProviderAdminViewModelTest {
         val state = viewModel.uiState.value as com.letta.mobile.ui.common.UiState.Success
         assertEquals(1, state.data.providers.size)
     }
+}
+
+private class ControlledProviderRepository(
+    initialProviders: List<Provider>,
+) : IProviderRepository {
+    private val mutableProviders = MutableStateFlow(initialProviders)
+    override val providers: StateFlow<List<Provider>> = mutableProviders
+
+    private var refreshGate: CompletableDeferred<Unit>? = null
+    private var refreshResult: List<Provider>? = null
+    private var inspectionGate: CompletableDeferred<Unit>? = null
+    private var inspectionResult: Provider? = null
+
+    fun pauseNextRefresh(result: List<Provider>): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also {
+            refreshResult = result
+            refreshGate = it
+        }
+
+    fun pauseNextInspection(result: Provider): CompletableDeferred<Unit> =
+        CompletableDeferred<Unit>().also {
+            inspectionResult = result
+            inspectionGate = it
+        }
+
+    override suspend fun refreshProviders(name: String?, providerType: String?) {
+        refreshGate?.await()
+        refreshResult?.let { mutableProviders.value = it }
+        refreshGate = null
+        refreshResult = null
+    }
+
+    override suspend fun getProvider(providerId: ProviderId): Provider {
+        inspectionGate?.await()
+        return inspectionResult
+            ?: mutableProviders.value.first { it.id == providerId }
+    }
+
+    override suspend fun createProvider(params: ProviderCreateParams): Provider =
+        error("Not used in this test")
+
+    override suspend fun updateProvider(providerId: ProviderId, params: ProviderUpdateParams): Provider =
+        error("Not used in this test")
+
+    override suspend fun checkProvider(params: ProviderCheckParams) =
+        error("Not used in this test")
+
+    override suspend fun checkExistingProvider(providerId: ProviderId) =
+        error("Not used in this test")
+
+    override suspend fun deleteProvider(providerId: ProviderId) =
+        error("Not used in this test")
 }
