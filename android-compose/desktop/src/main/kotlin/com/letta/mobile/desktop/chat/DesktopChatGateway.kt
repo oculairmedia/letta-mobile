@@ -14,6 +14,30 @@ import dev.nucleusframework.nativessl.NativeTrustManager
 typealias DesktopChatGateway = ChatGateway
 
 /**
+ * Optional capability a [DesktopChatGateway] may implement to answer / dismiss a
+ * parked runtime approval (e.g. AskUserQuestion). Only the App Server-backed
+ * gateway supports it; HTTP-only / demo gateways don't, so callers detect it via
+ * `gateway as? DesktopApprovalSubmitter`. See letta-mobile-vilsn.8.
+ */
+interface DesktopApprovalSubmitter {
+    suspend fun submitApproval(submission: DesktopApprovalSubmission)
+}
+
+/**
+ * A decision for a parked approval. [reason] carries an AskUserQuestion answer
+ * when encoded via [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason];
+ * otherwise it's a plain allow/deny message.
+ */
+data class DesktopApprovalSubmission(
+    val agentId: String,
+    val conversationId: String,
+    val requestId: String,
+    val toolCallId: String?,
+    val approve: Boolean,
+    val reason: String?,
+)
+
+/**
  * Desktop binding for the shared [LettaHttpChatGateway]. The platform-neutral
  * conversations/messages/streaming HTTP logic lives in commonMain; the desktop
  * module supplies only the JVM Ktor CIO engine (letta-mobile-mqzkc).
