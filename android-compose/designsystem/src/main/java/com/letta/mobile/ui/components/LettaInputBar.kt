@@ -2,8 +2,11 @@ package com.letta.mobile.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
@@ -40,6 +43,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -66,6 +71,58 @@ private val ComposerEngagedCorner = 20.dp
 private val ComposerRestingElevation = 0.dp
 private val ComposerEngagedElevation = 2.dp
 private const val ComposerPressedScale = 0.96f
+
+@Stable
+private data class ComposerTrailingActionSpec(
+    val visible: Boolean,
+    val canSend: Boolean,
+    val text: String,
+    val onSend: (String) -> Unit,
+    val icon: ImageVector,
+    val contentDescription: String,
+    val containerColor: Color,
+    val contentColor: Color,
+    val iconSize: Dp,
+    val visualScale: State<Float>,
+    val pulseScale: State<Float>,
+    val reducedMotion: Boolean,
+    val customContent: (@Composable () -> Unit)?,
+)
+
+private data class ComposerVisualTargets(
+    val corner: Dp,
+    val elevation: Dp,
+    val color: Color,
+)
+
+private fun composerVisualTargets(
+    engaged: Boolean,
+    restingColor: Color,
+    engagedColor: Color,
+): ComposerVisualTargets = if (engaged) {
+    ComposerVisualTargets(
+        corner = ComposerEngagedCorner,
+        elevation = ComposerEngagedElevation,
+        color = engagedColor,
+    )
+} else {
+    ComposerVisualTargets(
+        corner = ComposerRestingCorner,
+        elevation = ComposerRestingElevation,
+        color = restingColor,
+    )
+}
+
+private fun <T> composerMotionSpec(
+    reducedMotion: Boolean,
+    animatedSpec: FiniteAnimationSpec<T>,
+): FiniteAnimationSpec<T> = if (reducedMotion) snap() else animatedSpec
+
+private fun resolveCanSend(
+    text: String,
+    enabled: Boolean,
+    canSendOverride: Boolean?,
+): Boolean = (canSendOverride ?: text.isNotBlank()) && enabled
 
 internal fun isLivingComposerEngaged(
     focused: Boolean,
@@ -138,36 +195,56 @@ fun LettaInputBar(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val reducedMotion = rememberReducedMotionEnabled()
-    val canSend = (canSendOverride ?: text.isNotBlank()) && enabled
+    val canSend = resolveCanSend(text, enabled, canSendOverride)
     val focused = remember { mutableStateOf(false) }
     val engaged = isLivingComposerEngaged(
         focused = focused.value,
         text = text,
         hasStagedContent = hasStagedContent,
     )
+    val visualTargets = composerVisualTargets(
+        engaged = engaged,
+        restingColor = colorScheme.surfaceContainerLow,
+        engagedColor = colorScheme.surfaceContainer,
+    )
     val composerCorner by animateDpAsState(
-        targetValue = if (engaged) ComposerEngagedCorner else ComposerRestingCorner,
-        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.fastSpatialSpec(),
+        targetValue = visualTargets.corner,
+        animationSpec = composerMotionSpec(
+            reducedMotion,
+            MaterialTheme.motionScheme.fastSpatialSpec(),
+        ),
         label = "inputComposerCorner",
     )
     val composerElevation by animateDpAsState(
-        targetValue = if (engaged) ComposerEngagedElevation else ComposerRestingElevation,
-        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.fastSpatialSpec(),
+        targetValue = visualTargets.elevation,
+        animationSpec = composerMotionSpec(
+            reducedMotion,
+            MaterialTheme.motionScheme.fastSpatialSpec(),
+        ),
         label = "inputComposerElevation",
     )
     val composerColor by animateColorAsState(
-        targetValue = if (engaged) colorScheme.surfaceContainer else colorScheme.surfaceContainerLow,
-        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.fastEffectsSpec(),
+        targetValue = visualTargets.color,
+        animationSpec = composerMotionSpec(
+            reducedMotion,
+            MaterialTheme.motionScheme.fastEffectsSpec(),
+        ),
         label = "inputComposerColor",
     )
     val actionVisualScale = animateFloatAsState(
         targetValue = actionSizeFraction.coerceIn(0.7f, 1f),
-        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.fastSpatialSpec(),
+        animationSpec = composerMotionSpec(
+            reducedMotion,
+            MaterialTheme.motionScheme.fastSpatialSpec(),
+        ),
         label = "inputActionVisualScale",
     )
     val actionIconSize by animateDpAsState(
         targetValue = ComposerActionIconSize * actionSizeFraction.coerceIn(0.7f, 1f),
-        animationSpec = if (reducedMotion) snap() else MaterialTheme.motionScheme.fastSpatialSpec(),
+        animationSpec = composerMotionSpec(
+            reducedMotion,
+            MaterialTheme.motionScheme.fastSpatialSpec(),
+        ),
         label = "inputActionIconSize",
     )
 
@@ -179,20 +256,9 @@ fun LettaInputBar(
     // motion so the button stays static. The pulse is applied through
     // graphicsLayer rather than layout, so the touch target stays at the
     // baseline 48 dp regardless of phase.
-    val actionPulseScale = if (actionPulse && !reducedMotion) {
-        val pulseTransition = rememberInfiniteTransition(label = "actionHeartbeat")
-        pulseTransition.animateFloat(
-            initialValue = 1f,
-            targetValue = 1.04f,
-            animationSpec = infiniteRepeatable(
-                animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-            label = "actionHeartbeatScale",
-        )
-    } else {
-        remember { mutableFloatStateOf(1f) }
-    }
+    val actionPulseScale = rememberActionPulseScale(
+        enabled = actionPulse && !reducedMotion,
+    )
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -250,102 +316,159 @@ fun LettaInputBar(
                 ),
             )
 
-        // letta-mobile-xtwt: hide the trailing action button when the host
-        // wants to defer to the IME's Send (e.g. soft keyboard is open and
-        // no run is streaming). AnimatedVisibility with horizontal expand /
-        // shrink lets the text field flow into the freed space rather than
-        // leaving a hole. Wrapped around the FilledIconButton (not just its
-        // contents) so the layout actually reclaims the width.
-        AnimatedVisibility(
-            visible = actionVisible,
-            enter = if (reducedMotion) {
-                fadeIn(tween(durationMillis = 0))
-            } else {
-                fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
-                    expandHorizontally(
-                        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        expandFrom = Alignment.End,
-                    )
-            },
-            exit = if (reducedMotion) {
-                fadeOut(tween(durationMillis = 0))
-            } else {
-                fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
-                    shrinkHorizontally(
-                        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                        shrinkTowards = Alignment.End,
-                    )
-            },
-            modifier = Modifier.align(Alignment.Bottom),
-            label = "inputActionVisibility",
-        ) {
-            if (customTrailingContent != null) {
-                customTrailingContent()
-                return@AnimatedVisibility
-            }
-            FilledIconButton(
-                onClick = {
-                    if (canSend) {
-                        HapticEffects.confirm(haptic, view)
-                        onSend(text)
-                    }
-                },
-                enabled = canSend,
-                modifier = Modifier
-                    .size(ComposerActionTargetSize)
-                    .graphicsLayer {
-                        val scale = actionVisualScale.value * actionPulseScale.value
-                        scaleX = scale
-                        scaleY = scale
-                    },
-                colors = IconButtonDefaults.filledIconButtonColors(
+            ComposerTrailingAction(
+                spec = ComposerTrailingActionSpec(
+                    visible = actionVisible,
+                    canSend = canSend,
+                    text = text,
+                    onSend = onSend,
+                    icon = actionIcon,
+                    contentDescription = actionContentDescription,
                     containerColor = actionContainerColor ?: colorScheme.primary,
                     contentColor = actionContentColor ?: colorScheme.onPrimary,
-                    disabledContainerColor = colorScheme.surfaceContainerHigh,
-                    disabledContentColor = colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                    iconSize = actionIconSize,
+                    visualScale = actionVisualScale,
+                    pulseScale = actionPulseScale,
+                    reducedMotion = reducedMotion,
+                    customContent = customTrailingContent,
                 ),
-            ) {
-                // letta-mobile-d9zy.5 (retry): crossfade + scale the action icon
-                // between Send / Stop instead of hard-swapping. AnimatedContent
-                // is keyed on the icon vector so any caller-supplied vector
-                // change drives the morph, not just Send <-> Stop. Reduced
-                // motion bypasses the animation and renders the icon directly.
-                if (reducedMotion) {
-                    Icon(
-                        actionIcon,
-                        contentDescription = actionContentDescription,
-                        modifier = Modifier.size(actionIconSize),
-                    )
-                } else {
-                    val iconTransition =
-                        (fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
-                            scaleIn(
-                                initialScale = 0.76f,
-                                animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                            ))
-                            .togetherWith(
-                                fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
-                                    scaleOut(
-                                        targetScale = 0.76f,
-                                        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
-                                    ),
-                            )
-                    AnimatedContent(
-                        targetState = actionIcon,
-                        transitionSpec = { iconTransition },
-                        label = "inputActionIconMorph",
-                    ) { icon ->
-                        Icon(
-                            icon,
-                            contentDescription = actionContentDescription,
-                            modifier = Modifier.size(actionIconSize),
-                        )
-                    }
-                }
-            }
-        }
+                modifier = Modifier.align(Alignment.Bottom),
+            )
         }
     }
+}
+
+/**
+ * Keeps visibility, custom-slot dispatch, and icon morph decisions out of the
+ * input field's composition path. Animated scale values remain deferred to the
+ * graphics layer so heartbeat frames do not recompose the button.
+ */
+@Composable
+private fun ComposerTrailingAction(
+    spec: ComposerTrailingActionSpec,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    AnimatedVisibility(
+        visible = spec.visible,
+        enter = composerActionEnterTransition(spec.reducedMotion),
+        exit = composerActionExitTransition(spec.reducedMotion),
+        modifier = modifier,
+        label = "inputActionVisibility",
+    ) {
+        spec.customContent?.let {
+            it()
+            return@AnimatedVisibility
+        }
+        FilledIconButton(
+            onClick = {
+                HapticEffects.confirm(haptic, view)
+                spec.onSend(spec.text)
+            },
+            enabled = spec.canSend,
+            modifier = Modifier
+                .size(ComposerActionTargetSize)
+                .graphicsLayer {
+                    val scale = spec.visualScale.value * spec.pulseScale.value
+                    scaleX = scale
+                    scaleY = scale
+                },
+            colors = IconButtonDefaults.filledIconButtonColors(
+                containerColor = spec.containerColor,
+                contentColor = spec.contentColor,
+                disabledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+            ),
+        ) {
+            ComposerActionIcon(
+                icon = spec.icon,
+                contentDescription = spec.contentDescription,
+                size = spec.iconSize,
+                reducedMotion = spec.reducedMotion,
+            )
+        }
+    }
+}
+
+@Composable
+private fun composerActionEnterTransition(reducedMotion: Boolean): EnterTransition =
+    if (reducedMotion) {
+        fadeIn(tween(durationMillis = 0))
+    } else {
+        fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+            expandHorizontally(
+                animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                expandFrom = Alignment.End,
+            )
+    }
+
+@Composable
+private fun composerActionExitTransition(reducedMotion: Boolean): ExitTransition =
+    if (reducedMotion) {
+        fadeOut(tween(durationMillis = 0))
+    } else {
+        fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+            shrinkHorizontally(
+                animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                shrinkTowards = Alignment.End,
+            )
+    }
+
+@Composable
+private fun ComposerActionIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    size: Dp,
+    reducedMotion: Boolean,
+) {
+    if (reducedMotion) {
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(size),
+        )
+        return
+    }
+    val iconTransition =
+        (fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+            scaleIn(
+                initialScale = 0.76f,
+                animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+            ))
+            .togetherWith(
+                fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
+                    scaleOut(
+                        targetScale = 0.76f,
+                        animationSpec = MaterialTheme.motionScheme.fastSpatialSpec(),
+                    ),
+            )
+    AnimatedContent(
+        targetState = icon,
+        transitionSpec = { iconTransition },
+        label = "inputActionIconMorph",
+    ) { targetIcon ->
+        Icon(
+            targetIcon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(size),
+        )
+    }
+}
+
+@Composable
+private fun rememberActionPulseScale(enabled: Boolean): State<Float> {
+    if (!enabled) return remember { mutableFloatStateOf(1f) }
+    val pulseTransition = rememberInfiniteTransition(label = "actionHeartbeat")
+    return pulseTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "actionHeartbeatScale",
+    )
 }
 
 /**

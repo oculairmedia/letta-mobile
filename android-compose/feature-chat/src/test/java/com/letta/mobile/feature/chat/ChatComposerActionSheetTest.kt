@@ -35,6 +35,14 @@ class ChatComposerActionSheetTest {
         name = "fetch_url",
     )
 
+    private data class ComposerScenario(
+        val inputText: String = "",
+        val pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
+        val onTextChange: (String) -> Unit = {},
+        val onAttachImage: () -> Unit = {},
+        val availableTools: List<Tool>? = null,
+    )
+
     @Test
     fun `plus opens attach and tool actions for an empty draft`() {
         setComposer()
@@ -49,7 +57,7 @@ class ChatComposerActionSheetTest {
 
     @Test
     fun `tool action remains reachable for a non-empty draft`() {
-        setComposer(inputText = "text draft")
+        setComposer(ComposerScenario(inputText = "text draft"))
 
         openComposerActions()
 
@@ -59,10 +67,12 @@ class ChatComposerActionSheetTest {
     @Test
     fun `tool action remains reachable with an attachment`() {
         setComposer(
-            pendingAttachments = persistentListOf(
-                MessageContentPart.Image(
-                    base64 = "",
-                    mediaType = "image/png",
+            ComposerScenario(
+                pendingAttachments = persistentListOf(
+                    MessageContentPart.Image(
+                        base64 = "",
+                        mediaType = "image/png",
+                    ),
                 ),
             ),
         )
@@ -76,8 +86,10 @@ class ChatComposerActionSheetTest {
     fun `selecting a tool inserts the existing template and closes the sheet`() {
         var capturedText = "existing draft"
         setComposer(
-            inputText = capturedText,
-            onTextChange = { capturedText = it },
+            ComposerScenario(
+                inputText = capturedText,
+                onTextChange = { capturedText = it },
+            ),
         )
 
         openComposerActions()
@@ -94,8 +106,10 @@ class ChatComposerActionSheetTest {
     fun `plus directly attaches when no tools are available`() {
         var attachInvoked = false
         setComposer(
-            availableTools = emptyList(),
-            onAttachImage = { attachInvoked = true },
+            ComposerScenario(
+                availableTools = emptyList(),
+                onAttachImage = { attachInvoked = true },
+            ),
         )
 
         openComposerActions()
@@ -107,7 +121,7 @@ class ChatComposerActionSheetTest {
     @Test
     fun `attach action invokes attachment callback and closes the sheet`() {
         var attachInvoked = false
-        setComposer(onAttachImage = { attachInvoked = true })
+        setComposer(ComposerScenario(onAttachImage = { attachInvoked = true }))
 
         openComposerActions()
         composeRule.onNodeWithText("Attach image").performClick()
@@ -116,26 +130,20 @@ class ChatComposerActionSheetTest {
         composeRule.onNodeWithText("Add to message").assertDoesNotExist()
     }
 
-    private fun setComposer(
-        inputText: String = "",
-        pendingAttachments: ImmutableList<MessageContentPart.Image> = persistentListOf(),
-        onTextChange: (String) -> Unit = {},
-        onAttachImage: () -> Unit = {},
-        availableTools: List<Tool> = listOf(tool),
-    ) {
+    private fun setComposer(scenario: ComposerScenario = ComposerScenario()) {
         composeRule.setContent {
             LettaTheme {
                 ChatComposer(
-                    inputText = inputText,
-                    pendingAttachments = pendingAttachments,
+                    inputText = scenario.inputText,
+                    pendingAttachments = scenario.pendingAttachments,
                     isStreaming = false,
                     canSendMessages = true,
-                    onTextChange = onTextChange,
+                    onTextChange = scenario.onTextChange,
                     onSend = {},
                     onStop = {},
                     onRemoveAttachment = {},
-                    onAttachImage = onAttachImage,
-                    availableTools = availableTools,
+                    onAttachImage = scenario.onAttachImage,
+                    availableTools = scenario.availableTools ?: listOf(tool),
                 )
             }
         }

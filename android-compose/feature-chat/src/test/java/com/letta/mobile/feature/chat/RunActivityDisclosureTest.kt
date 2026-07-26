@@ -136,7 +136,7 @@ class RunActivityDisclosureTest {
                 toolCount = 2,
                 failureCount = 1,
             ),
-            collapsed = true,
+            disclosure = DisclosureConfiguration(collapsed = true),
         )
 
         composeRule.onNodeWithText("Worked for 3.2s").assertIsDisplayed()
@@ -171,7 +171,7 @@ class RunActivityDisclosureTest {
                 toolCount = 0,
                 failureCount = 0,
             ),
-            collapsible = false,
+            disclosure = DisclosureConfiguration(collapsible = false),
             onToggle = { toggles++ },
         )
 
@@ -183,8 +183,7 @@ class RunActivityDisclosureTest {
 
     private fun setContent(
         activity: RunActivityProjection,
-        collapsed: Boolean = false,
-        collapsible: Boolean = true,
+        disclosure: DisclosureConfiguration = DisclosureConfiguration(),
         onToggle: () -> Unit = {},
     ) {
         composeRule.setContent {
@@ -196,8 +195,8 @@ class RunActivityDisclosureTest {
                 LettaChatTheme {
                     RunActivityDisclosure(
                         activity = activity,
-                        collapsed = collapsed,
-                        collapsible = collapsible,
+                        collapsed = disclosure.collapsed,
+                        collapsible = disclosure.collapsible,
                         onToggleCollapsed = onToggle,
                     )
                 }
@@ -207,4 +206,9 @@ class RunActivityDisclosureTest {
 
     private fun hasStateDescription(value: String): SemanticsMatcher =
         SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, value)
+
+    private data class DisclosureConfiguration(
+        val collapsed: Boolean = false,
+        val collapsible: Boolean = true,
+    )
 }

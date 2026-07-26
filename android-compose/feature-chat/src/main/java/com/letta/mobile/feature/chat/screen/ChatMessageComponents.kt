@@ -29,6 +29,8 @@ import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheet
+import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheetActions
+import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheetState
 import com.letta.mobile.feature.chat.screen.messageactions.copyMessageText
 import com.letta.mobile.feature.chat.screen.messageactions.messageActionAvailability
 import com.letta.mobile.ui.common.GroupPosition
@@ -96,13 +98,17 @@ internal fun ChatMessageItem(
     }
 
     MessageActionsSheet(
-        message = message,
-        copyText = copyText,
-        availability = actionAvailability,
-        show = showMessageActions,
-        onDismiss = { showMessageActions = false },
-        onCopy = { copyMessageText(context, copyText) },
-        onSendAgain = { onSendAgainMessage?.invoke(message) },
+        state = MessageActionsSheetState(
+            message = message,
+            copyText = copyText,
+            availability = actionAvailability,
+            show = showMessageActions,
+        ),
+        actions = MessageActionsSheetActions(
+            onDismiss = { showMessageActions = false },
+            onCopy = { copyMessageText(context, copyText) },
+            onSendAgain = { onSendAgainMessage?.invoke(message) },
+        ),
     )
 
     // New layout: avatar floats ABOVE the bubble rather than occupying a

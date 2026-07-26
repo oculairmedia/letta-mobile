@@ -6,6 +6,7 @@ import android.content.Context
 import android.os.Build
 import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,57 +20,67 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.icons.LettaIcons
 import java.util.Locale
 
+@Stable
+internal data class MessageActionsSheetState(
+    val message: UiMessage,
+    val copyText: String,
+    val availability: MessageActionAvailability,
+    val show: Boolean,
+)
+
+@Stable
+internal data class MessageActionsSheetActions(
+    val onDismiss: () -> Unit,
+    val onCopy: () -> Unit,
+    val onSendAgain: () -> Unit,
+)
+
 @Composable
 internal fun MessageActionsSheet(
-    message: UiMessage,
-    copyText: String,
-    availability: MessageActionAvailability,
-    show: Boolean,
-    onDismiss: () -> Unit,
-    onCopy: () -> Unit,
-    onSendAgain: () -> Unit,
+    state: MessageActionsSheetState,
+    actions: MessageActionsSheetActions,
 ) {
-    var showTextSelection by remember(message.id) { mutableStateOf(false) }
+    var showTextSelection by remember(state.message.id) { mutableStateOf(false) }
     val configuration = LocalConfiguration.current
     val locale = remember(configuration) {
         configuration.locales[0]?.let { Locale.forLanguageTag(it.toLanguageTag()) }
             ?: Locale.getDefault()
     }
-    val timestampHeader = remember(message.timestamp, locale) {
-        formatMessageActionTimestamp(message.timestamp, locale = locale)
+    val timestampHeader = remember(state.message.timestamp, locale) {
+        formatMessageActionTimestamp(state.message.timestamp, locale = locale)
     } ?: stringResource(R.string.message_actions_title)
 
     ActionSheet(
-        show = show,
-        onDismiss = onDismiss,
+        show = state.show,
+        onDismiss = actions.onDismiss,
         title = timestampHeader,
     ) {
-        if (availability.canSendAgain) {
+        if (state.availability.canSendAgain) {
             ActionSheetItem(
                 text = stringResource(R.string.message_action_send_again),
                 icon = LettaIcons.Send,
                 onClick = {
-                    onDismiss()
-                    onSendAgain()
+                    actions.onDismiss()
+                    actions.onSendAgain()
                 },
             )
         }
-        if (availability.canCopy) {
+        if (state.availability.canCopy) {
             ActionSheetItem(
                 text = stringResource(R.string.action_copy),
                 icon = LettaIcons.Copy,
                 onClick = {
-                    onDismiss()
-                    onCopy()
+                    actions.onDismiss()
+                    actions.onCopy()
                 },
             )
         }
-        if (availability.canSelectText) {
+        if (state.availability.canSelectText) {
             ActionSheetItem(
                 text = stringResource(R.string.message_action_select_text),
                 icon = LettaIcons.ManageSearch,
                 onClick = {
-                    onDismiss()
+                    actions.onDismiss()
                     showTextSelection = true
                 },
             )
@@ -78,7 +89,7 @@ internal fun MessageActionsSheet(
 
     if (showTextSelection) {
         MessageTextSelectionDialog(
-            text = copyText,
+            text = state.copyText,
             onDismiss = { showTextSelection = false },
         )
     }

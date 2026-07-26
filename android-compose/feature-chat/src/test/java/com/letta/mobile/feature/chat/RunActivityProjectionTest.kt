@@ -19,7 +19,7 @@ class RunActivityProjectionTest {
     @Test
     fun `streaming reasoning is working and has no duration`() {
         val activity = projectRunActivity(
-            messages = listOf(message("reasoning", isReasoning = true)),
+            messages = listOf(message("reasoning") { copy(isReasoning = true) }),
             isStreaming = true,
         )!!
 
@@ -32,15 +32,16 @@ class RunActivityProjectionTest {
     fun `completed reasoning is thought with run latency and counts`() {
         val activity = projectRunActivity(
             messages = listOf(
-                message("reasoning", isReasoning = true),
-                message(
-                    id = "tool",
-                    toolCalls = listOf(
-                        toolCall("ok", status = "success"),
-                        toolCall("bad", status = "error"),
-                    ),
-                ),
-                message("answer", content = "Done", latencyMs = 2_400L),
+                message("reasoning") { copy(isReasoning = true) },
+                message("tool") {
+                    copy(
+                        toolCalls = listOf(
+                            successfulToolCall("ok"),
+                            failedToolCall("bad"),
+                        ),
+                    )
+                },
+                message("answer") { copy(content = "Done", latencyMs = 2_400L) },
             ),
             isStreaming = false,
         )!!
@@ -56,13 +57,14 @@ class RunActivityProjectionTest {
     fun `completed tool-only work sums execution duration when timeline has no span`() {
         val activity = projectRunActivity(
             messages = listOf(
-                message(
-                    id = "tools",
-                    toolCalls = listOf(
-                        toolCall("one", status = "success", executionTimeMs = 400L),
-                        toolCall("two", status = "success", executionTimeMs = 600L),
-                    ),
-                ),
+                message("tools") {
+                    copy(
+                        toolCalls = listOf(
+                            successfulToolCall("one", executionTimeMs = 400L),
+                            successfulToolCall("two", executionTimeMs = 600L),
+                        ),
+                    )
+                },
             ),
             isStreaming = false,
         )!!
@@ -77,12 +79,13 @@ class RunActivityProjectionTest {
     fun `message failures are counted without double-counting failed tools`() {
         val activity = projectRunActivity(
             messages = listOf(
-                message("run-error", isError = true),
-                message(
-                    id = "tool-error",
-                    isError = true,
-                    toolCalls = listOf(toolCall("bad", status = "error")),
-                ),
+                message("run-error") { copy(isError = true) },
+                message("tool-error") {
+                    copy(
+                        isError = true,
+                        toolCalls = listOf(failedToolCall("bad")),
+                    )
+                },
             ),
             isStreaming = false,
         )!!
@@ -92,33 +95,31 @@ class RunActivityProjectionTest {
 
     private fun message(
         id: String,
-        content: String = "",
-        isReasoning: Boolean = false,
-        isError: Boolean = false,
-        latencyMs: Long? = null,
-        toolCalls: List<UiToolCall>? = null,
-    ) = UiMessage(
+        customize: UiMessage.() -> UiMessage = { this },
+    ): UiMessage = UiMessage(
         id = id,
         role = "assistant",
-        content = content,
+        content = "",
         timestamp = "2026-07-25T12:00:00Z",
         runId = "run-1",
-        isReasoning = isReasoning,
-        isError = isError,
-        latencyMs = latencyMs,
-        toolCalls = toolCalls,
-    )
+    ).customize()
 
-    private fun toolCall(
+    private fun successfulToolCall(
         id: String,
-        status: String,
         executionTimeMs: Long? = null,
-    ) = UiToolCall(
+    ): UiToolCall = toolCall(id).copy(executionTimeMs = executionTimeMs)
+
+    private fun failedToolCall(id: String): UiToolCall =
+        toolCall(id).copy(
+            result = "failed",
+            status = "error",
+        )
+
+    private fun toolCall(id: String) = UiToolCall(
         name = "shell",
         arguments = """{"command":"$id"}""",
-        result = if (status == "success") "done" else "failed",
-        status = status,
-        executionTimeMs = executionTimeMs,
+        result = "done",
+        status = "success",
         toolCallId = id,
     )
 }

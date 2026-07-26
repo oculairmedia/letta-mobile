@@ -14,35 +14,43 @@ import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.icons.LettaIcons
 
+internal data class ChatComposerActionSheetState(
+    val show: Boolean,
+    val availableTools: List<Tool>,
+)
+
+internal data class ChatComposerActionSheetCallbacks(
+    val onDismiss: () -> Unit,
+    val onAttachImage: () -> Unit,
+    val onToolSelected: (Tool) -> Unit,
+)
+
 @Composable
 internal fun ChatComposerActionSheet(
-    show: Boolean,
-    availableTools: List<Tool>,
-    onDismiss: () -> Unit,
-    onAttachImage: () -> Unit,
-    onToolSelected: (Tool) -> Unit,
+    state: ChatComposerActionSheetState,
+    callbacks: ChatComposerActionSheetCallbacks,
 ) {
     ActionSheet(
-        show = show,
-        onDismiss = onDismiss,
+        show = state.show,
+        onDismiss = callbacks.onDismiss,
         title = stringResource(R.string.composer_actions_title),
     ) {
         ActionSheetItem(
             text = stringResource(R.string.action_attach_image),
             icon = LettaIcons.Add,
-            onClick = onAttachImage,
+            onClick = callbacks.onAttachImage,
         )
         Column(
             modifier = Modifier
                 .heightIn(max = 320.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            availableTools.forEach { tool ->
+            state.availableTools.forEach { tool ->
                 ActionSheetItem(
                     text = tool.name,
                     icon = LettaIcons.Tool,
                     supportingText = stringResource(R.string.composer_action_tool_template_supporting),
-                    onClick = { onToolSelected(tool) },
+                    onClick = { callbacks.onToolSelected(tool) },
                 )
             }
         }

@@ -19,7 +19,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
@@ -44,45 +46,21 @@ internal fun RunActivityDisclosure(
     activity: RunActivityProjection,
     collapsed: Boolean,
     onToggleCollapsed: () -> Unit,
-    modifier: Modifier = Modifier,
     collapsible: Boolean = true,
 ) {
-    val duration = activity.durationMs?.let(::formatToolExecutionTime)
-    val title = when (activity.state) {
-        RunActivityState.Working -> stringResource(R.string.work_disclosure_working)
-        RunActivityState.Thought -> if (duration == null) {
-            stringResource(R.string.work_disclosure_thought)
-        } else {
-            stringResource(R.string.work_disclosure_thought_duration, duration)
-        }
-        RunActivityState.Worked -> if (duration == null) {
-            stringResource(R.string.work_disclosure_worked)
-        } else {
-            stringResource(R.string.work_disclosure_worked_duration, duration)
-        }
-    }
-    val interactionLabel = if (collapsed) {
-        stringResource(R.string.work_disclosure_expand)
-    } else {
-        stringResource(R.string.work_disclosure_collapse)
-    }
-    val disclosureState = when {
-        activity.isActive -> stringResource(R.string.work_disclosure_state_working)
-        collapsible && collapsed -> stringResource(R.string.work_disclosure_state_collapsed)
-        else -> stringResource(R.string.work_disclosure_state_expanded)
-    }
+    val text = activity.disclosureText(collapsed, collapsible)
 
     Row(
-        modifier = modifier
+        modifier = Modifier
             .fillMaxWidth()
             .testTag(RunActivityDisclosureTestTags.Header)
             .heightIn(min = 48.dp)
             .semantics(mergeDescendants = true) {
-                stateDescription = disclosureState
+                stateDescription = text.stateDescription
             }
             .clickable(
                 enabled = collapsible && !activity.isActive,
-                onClickLabel = interactionLabel,
+                onClickLabel = text.interactionLabel,
                 onClick = onToggleCollapsed,
             )
             .padding(horizontal = 4.dp, vertical = 6.dp),
@@ -102,7 +80,7 @@ internal fun RunActivityDisclosure(
             )
         }
         Text(
-            text = title,
+            text = text.title,
             style = MaterialTheme.typography.labelMedium,
             color = if (activity.isActive) {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
@@ -110,28 +88,74 @@ internal fun RunActivityDisclosure(
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
-        if (activity.toolCount > 0) {
-            Text(
-                text = pluralStringResource(
-                    R.plurals.work_disclosure_tool_count,
-                    activity.toolCount,
-                    activity.toolCount,
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-            )
-        }
-        if (activity.failureCount > 0) {
-            Text(
-                text = pluralStringResource(
-                    R.plurals.work_disclosure_failure_count,
-                    activity.failureCount,
-                    activity.failureCount,
-                ),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
+        ActivityCounts(activity)
+    }
+}
+
+private data class DisclosureText(
+    val title: String,
+    val interactionLabel: String,
+    val stateDescription: String,
+)
+
+@Composable
+private fun RunActivityProjection.disclosureText(
+    collapsed: Boolean,
+    collapsible: Boolean,
+): DisclosureText {
+    val duration = durationMs?.let(::formatToolExecutionTime)
+    return DisclosureText(
+        title = activityTitle(duration),
+        interactionLabel = stringResource(
+            if (collapsed) R.string.work_disclosure_expand else R.string.work_disclosure_collapse,
+        ),
+        stateDescription = stringResource(stateDescriptionResource(collapsed, collapsible)),
+    )
+}
+
+@Composable
+private fun RunActivityProjection.activityTitle(duration: String?): String = when (state) {
+    RunActivityState.Working -> stringResource(R.string.work_disclosure_working)
+    RunActivityState.Thought -> duration?.let {
+        stringResource(R.string.work_disclosure_thought_duration, it)
+    } ?: stringResource(R.string.work_disclosure_thought)
+    RunActivityState.Worked -> duration?.let {
+        stringResource(R.string.work_disclosure_worked_duration, it)
+    } ?: stringResource(R.string.work_disclosure_worked)
+}
+
+private fun RunActivityProjection.stateDescriptionResource(
+    collapsed: Boolean,
+    collapsible: Boolean,
+): Int = when {
+    isActive -> R.string.work_disclosure_state_working
+    collapsible && collapsed -> R.string.work_disclosure_state_collapsed
+    else -> R.string.work_disclosure_state_expanded
+}
+
+@Composable
+private fun ActivityCounts(activity: RunActivityProjection) {
+    if (activity.toolCount > 0) {
+        Text(
+            text = pluralStringResource(
+                R.plurals.work_disclosure_tool_count,
+                activity.toolCount,
+                activity.toolCount,
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
+        )
+    }
+    if (activity.failureCount > 0) {
+        Text(
+            text = pluralStringResource(
+                R.plurals.work_disclosure_failure_count,
+                activity.failureCount,
+                activity.failureCount,
+            ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.error,
+        )
     }
 }
 
@@ -148,11 +172,11 @@ private fun WorkingIndicator(
     modifier: Modifier = Modifier,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
-    val indicatorAlpha = if (reducedMotion) {
-        WorkingIndicatorRestingAlpha
+    val indicatorAlpha: State<Float> = if (reducedMotion) {
+        remember { mutableFloatStateOf(WorkingIndicatorRestingAlpha) }
     } else {
         val transition = rememberInfiniteTransition(label = "agentWorkCue")
-        val animatedAlpha by transition.animateFloat(
+        transition.animateFloat(
             initialValue = WorkingIndicatorDimAlpha,
             targetValue = WorkingIndicatorBrightAlpha,
             animationSpec = infiniteRepeatable(
@@ -164,7 +188,6 @@ private fun WorkingIndicator(
             ),
             label = "agentWorkCueAlpha",
         )
-        animatedAlpha
     }
 
     Box(
@@ -172,7 +195,7 @@ private fun WorkingIndicator(
             .testTag(RunActivityDisclosureTestTags.WorkingIndicator)
             .size(6.dp)
             .graphicsLayer {
-                alpha = indicatorAlpha
+                alpha = indicatorAlpha.value
             }
             .background(
                 color = MaterialTheme.colorScheme.primary,

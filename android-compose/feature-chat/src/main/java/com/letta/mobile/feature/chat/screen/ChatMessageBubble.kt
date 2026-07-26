@@ -84,57 +84,81 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
 internal fun Modifier.longPressPassthrough(
     accessibilityLabel: String = "",
     onLongPress: (() -> Unit)?,
-): Modifier {
-    if (onLongPress == null) return this
-    return this
+): Modifier = LongPressInteraction.applyTo(
+    modifier = this,
+    accessibilityLabel = accessibilityLabel,
+    onLongPress = onLongPress,
+)
+
+private class LongPressInteraction(
+    private val onLongPress: () -> Unit,
+) {
+    companion object {
+        fun applyTo(
+            modifier: Modifier,
+            accessibilityLabel: String,
+            onLongPress: (() -> Unit)?,
+        ): Modifier {
+            if (onLongPress == null) return modifier
+            return LongPressInteraction(onLongPress).applyTo(
+                modifier = modifier,
+                accessibilityLabel = accessibilityLabel,
+            )
+        }
+    }
+
+    fun applyTo(
+        modifier: Modifier,
+        accessibilityLabel: String,
+    ): Modifier = modifier
         .semantics(mergeDescendants = false) {
             onLongClick(label = accessibilityLabel) {
                 onLongPress()
                 true
             }
         }
-        .onPreviewKeyEvent { event ->
-            val nativeEvent = event.nativeKeyEvent
-            val opensContextActions = nativeEvent.action == AndroidKeyEvent.ACTION_UP &&
-                (
-                    nativeEvent.keyCode == AndroidKeyEvent.KEYCODE_MENU ||
-                        (
-                            nativeEvent.keyCode == AndroidKeyEvent.KEYCODE_F10 &&
-                                nativeEvent.isShiftPressed
-                            )
-                    )
-            if (opensContextActions) {
-                onLongPress()
-                true
-            } else {
-                false
-            }
-        }
+        .onPreviewKeyEvent { event -> handleKeyEvent(event.nativeKeyEvent) }
         .focusable()
-        .pointerInput(Unit) {
-            awaitEachGesture {
-                awaitFirstDown(requireUnconsumed = false)
-                val upBeforeTimeout = withTimeoutOrNull(
-                    chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
-                ) {
-                    // Spin until the pointer lifts (short tap) — do not consume.
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        if (event.changes.any { !it.pressed }) break
-                    }
-                }
-                if (upBeforeTimeout == null) {
-                    onLongPress()
-                    // Consume only after recognizing the long-click so release
-                    // cannot also activate an attachment or Mermaid child.
-                    do {
-                        val event = awaitPointerEvent()
-                        event.changes.forEach { it.consume() }
-                    } while (event.changes.any { it.pressed })
-                }
-                // Short taps remain unconsumed for interactive children.
-            }
+        .pointerInput(Unit) { detectLongPress() }
+
+    private fun handleKeyEvent(event: AndroidKeyEvent): Boolean =
+        if (event.opensContextActions()) {
+            onLongPress()
+            true
+        } else {
+            false
         }
+
+    private fun AndroidKeyEvent.opensContextActions(): Boolean {
+        if (action != AndroidKeyEvent.ACTION_UP) return false
+        if (keyCode == AndroidKeyEvent.KEYCODE_MENU) return true
+        return keyCode == AndroidKeyEvent.KEYCODE_F10 && isShiftPressed
+    }
+
+    private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectLongPress() {
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            val upBeforeTimeout = withTimeoutOrNull(
+                chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
+            ) {
+                // Spin until the pointer lifts (short tap) — do not consume.
+                while (true) {
+                    val event = awaitPointerEvent()
+                    if (event.changes.any { !it.pressed }) break
+                }
+            }
+            if (upBeforeTimeout == null) {
+                onLongPress()
+                // Consume only after recognizing the long-click so release
+                // cannot also activate an attachment or Mermaid child.
+                do {
+                    val event = awaitPointerEvent()
+                    event.changes.forEach { it.consume() }
+                } while (event.changes.any { it.pressed })
+            }
+            // Short taps remain unconsumed for interactive children.
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
