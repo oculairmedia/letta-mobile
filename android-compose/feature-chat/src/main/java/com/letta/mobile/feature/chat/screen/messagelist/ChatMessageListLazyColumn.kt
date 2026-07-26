@@ -216,7 +216,7 @@ private fun ChatMessageListRenderSingleItem(
                 context.callbacks.onToggleRunCollapsed(runId)
             },
             modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
-            isStreaming = context.itemState.isStreaming,
+            isStreaming = isStreamingRenderItem,
             activeApprovalRequestId = context.itemState.activeApprovalRequestId,
             onApprovalDecision = context.callbacks.onSubmitApproval,
         ) { message, position, rowModifier ->
@@ -263,7 +263,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
             context.callbacks.onToggleRunCollapsed(renderItem.runId)
         },
         modifier = highlightModifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
-        isStreaming = context.itemState.isStreaming,
+        isStreaming = params.isStreamingRenderItem,
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,
     ) { message, position, rowModifier ->

@@ -98,6 +98,19 @@ class RunActivityProjectionTest {
     }
 
     @Test
+    fun finalAssistantLatencyWinsOverAuxiliaryLatency() {
+        val activity = projectRunActivity(
+            messages = listOf(
+                message("tool") { copy(role = "tool", latencyMs = 10_000L) },
+                message("answer") { copy(content = "Done", latencyMs = 2_400L) },
+            ),
+            isActiveRunStreaming = false,
+        )!!
+
+        assertEquals(2_400L, activity.durationMs)
+    }
+
+    @Test
     fun completedToolOnlyWorkSumsExecutionDurationWithoutTimelineSpan() {
         val activity = projectRunActivity(
             messages = listOf(

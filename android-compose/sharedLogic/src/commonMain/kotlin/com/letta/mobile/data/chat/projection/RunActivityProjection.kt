@@ -87,7 +87,9 @@ private fun List<UiMessage>.failureCount(): Int {
 }
 
 private fun List<UiMessage>.runDurationMs(toolDurations: List<Long>): Long? {
-    maxOfOrNull { it.latencyMs ?: -1L }
+    asReversed()
+        .firstOrNull { it.role == "assistant" && !it.isReasoning && it.latencyMs != null }
+        ?.latencyMs
         ?.takeIf { it >= 0L }
         ?.let { return it }
 

@@ -32,7 +32,7 @@ import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheet
 import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheetActions
 import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheetState
 import com.letta.mobile.feature.chat.screen.messageactions.copyMessageText
-import com.letta.mobile.feature.chat.screen.messageactions.messageActionAvailability
+import com.letta.mobile.data.chat.projection.messageActionAvailability
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons

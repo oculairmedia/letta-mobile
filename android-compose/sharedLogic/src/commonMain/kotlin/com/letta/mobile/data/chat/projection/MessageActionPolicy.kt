@@ -1,8 +1,8 @@
-package com.letta.mobile.feature.chat.screen.messageactions
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
 
-internal data class MessageActionAvailability(
+data class MessageActionAvailability(
     val canCopy: Boolean,
     val canSelectText: Boolean,
     val canSendAgain: Boolean,
@@ -11,7 +11,7 @@ internal data class MessageActionAvailability(
         get() = canCopy || canSelectText || canSendAgain
 }
 
-internal fun messageActionAvailability(
+fun messageActionAvailability(
     message: UiMessage,
     copyText: String,
     sendAgainAvailable: Boolean,
@@ -29,9 +29,7 @@ internal fun messageActionAvailability(
     return MessageActionAvailability(
         canCopy = hasText,
         canSelectText = hasText,
-        // The current coordinator drops attachments. Hiding this action for
-        // multimodal messages prevents a misleading text-only resend until
-        // the send boundary can preserve the original attachment payload.
+        // The current coordinator drops attachments, so a resend would be lossy.
         canSendAgain = sendAgainAvailable &&
             message.role == "user" &&
             message.content.isNotBlank() &&

@@ -1,10 +1,10 @@
-package com.letta.mobile.feature.chat.screen.messageactions
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class MessageActionPolicyTest {
 
@@ -20,7 +20,7 @@ class MessageActionPolicyTest {
     }
 
     @Test
-    fun `send again is user-only and uses the historical callback availability`() {
+    fun `send again is user-only and uses callback availability`() {
         assertTrue(availability(message(role = "user")).canSendAgain)
         assertFalse(availability(message(role = "assistant")).canSendAgain)
         assertFalse(availability(message(role = "user"), sendAgainAvailable = false).canSendAgain)
