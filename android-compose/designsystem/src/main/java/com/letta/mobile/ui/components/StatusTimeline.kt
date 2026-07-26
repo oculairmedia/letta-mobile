@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -32,6 +31,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -390,41 +390,29 @@ fun StatusTimelineItem(
     content: @Composable () -> Unit,
 ) {
     Row(
-        // height(IntrinsicSize.Min) makes the row size to its CONTENT, so the rail's
-        // fillMaxHeight() below resolves to the content height. Without it the rail
-        // fills the incoming (screen) constraint instead, making every item as tall as
-        // the viewport and pushing later rows out of view.
+        // The rail is painted with drawBehind on the Row itself rather than by a
+        // fillMaxHeight() child. A fill-height child resolves against the incoming
+        // (screen) constraint, making every item viewport-tall; and forcing the Row to
+        // IntrinsicSize.Min to fix that throws on any content built on SubcomposeLayout
+        // (lazy lists, BoxWithConstraints), which expanded tool output uses. drawBehind
+        // runs after layout, so `size.height` is the real measured content height —
+        // no intrinsics, no positioning callbacks.
         modifier = modifier
             .fillMaxWidth()
-            .height(IntrinsicSize.Min),
-        verticalAlignment = Alignment.Top,
-    ) {
-        Box(
-            modifier = Modifier
-                .width(railWidth)
-                .fillMaxHeight()
-                .clearAndSetSemantics { },
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            // Draw continuous connector line segments
-            Canvas(
-                modifier = Modifier
-                    .width(connectorWidth)
-                    .fillMaxHeight(),
-            ) {
+            .drawBehind {
+                val centerX = railWidth.toPx() / 2f
+                val anchorY = nodeHeaderHeight.toPx() / 2f
                 val pathEffect = if (isConnectorDashed) {
                     PathEffect.dashPathEffect(floatArrayOf(12f, 8f), 0f)
                 } else {
                     null
                 }
 
-                val anchorY = nodeHeaderHeight.toPx() / 2f
-
                 if (showTopConnector) {
                     drawLine(
                         color = connectorColor,
-                        start = Offset(x = size.width / 2f, y = 0f),
-                        end = Offset(x = size.width / 2f, y = anchorY),
+                        start = Offset(x = centerX, y = 0f),
+                        end = Offset(x = centerX, y = anchorY),
                         strokeWidth = connectorWidth.toPx(),
                         pathEffect = pathEffect,
                     )
@@ -433,14 +421,21 @@ fun StatusTimelineItem(
                 if (showBottomConnector) {
                     drawLine(
                         color = connectorColor,
-                        start = Offset(x = size.width / 2f, y = anchorY),
-                        end = Offset(x = size.width / 2f, y = size.height),
+                        start = Offset(x = centerX, y = anchorY),
+                        end = Offset(x = centerX, y = size.height),
                         strokeWidth = connectorWidth.toPx(),
                         pathEffect = pathEffect,
                     )
                 }
-            }
-
+            },
+        verticalAlignment = Alignment.Top,
+    ) {
+        Box(
+            modifier = Modifier
+                .width(railWidth)
+                .clearAndSetSemantics { },
+            contentAlignment = Alignment.TopCenter,
+        ) {
             if (node != null) {
                 Box(
                     modifier = Modifier

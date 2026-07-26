@@ -32,9 +32,37 @@ import com.letta.mobile.ui.components.LiveStatusText
 import com.letta.mobile.ui.components.StatusTimeline
 import com.letta.mobile.ui.components.StatusTimelineItem
 import com.letta.mobile.ui.components.TimelineNode
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import com.letta.mobile.ui.theme.chatTypography
+import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LocalChatFontScale
 import com.letta.mobile.ui.theme.customColors
+
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberUpdatedState
+import kotlinx.coroutines.delay
+import com.letta.mobile.ui.chat.render.RenderDiagnostics
+import com.letta.mobile.ui.motion.rememberChatMotionPolicy
+
+const val DEFAULT_AUTO_EXPAND_DELAY_MS = 1500L
+const val DEFAULT_STAGED_COLLAPSE_DELAY_MS = 300L
+
+/**
+ * Provenance / origin of tool call expansion.
+ * Distinguishes explicit user actions from system auto-expansion.
+ */
+enum class ExpansionProvenance {
+    None,
+    Auto,
+    User,
+}
 
 /**
  * Step row adapter that projects tool lifecycle timeline into designsystem timeline primitives.
@@ -51,11 +79,15 @@ internal fun ProjectedToolTimelineGroupStepRow(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
     modifier: Modifier = Modifier,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
+    autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
+    stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
 ) {
     // Project step.messages using ToolTimelineProjector to get stable, referentially-cached ToolTimelineGroup(s)
     val projector = remember(step.key) { ToolTimelineProjector() }
     val groups = remember(step.messages) {
-        projector.project(step.messages)
+        RenderDiagnostics.measureProjection {
+            projector.project(step.messages)
+        }
     }
 
     // Determine dot color for outer run gutter from overall aggregated group state
@@ -100,6 +132,8 @@ internal fun ProjectedToolTimelineGroupCard(
     modifier: Modifier = Modifier,
     animateRows: Boolean = false,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
+    autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
+    stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -115,6 +149,14 @@ internal fun ProjectedToolTimelineGroupCard(
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            if (RenderDiagnostics.enabled()) {
+                RenderDiagnostics.onVisibleGroups(
+                    conversationId = "",
+                    totalGroups = groups.size,
+                    visibleGroups = groups.size,
+                )
+            }
+
             // Render all tool groups through a single StatusTimeline component family
             groups.forEach { group ->
                 key(group.key) {
@@ -128,6 +170,8 @@ internal fun ProjectedToolTimelineGroupCard(
                             isFirst = isFirst,
                             isLast = isLast,
                             onAttachmentImageTap = onAttachmentImageTap,
+                            autoExpandDelayMs = autoExpandDelayMs,
+                            stagedCollapseDelayMs = stagedCollapseDelayMs,
                         )
                     }
                 }
@@ -158,6 +202,8 @@ private fun ProjectedToolTimelineCallRow(
     isFirst: Boolean,
     isLast: Boolean,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
+    autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
+    stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
 ) {
     // Check for special card fallbacks: image generation and subagent dispatch / notification
     val specialSubagentNotification = remember(call.result) {
@@ -167,6 +213,28 @@ private fun ProjectedToolTimelineCallRow(
     val isSpecialSubagentDispatchCard = call.subagentDispatch != null
     val isSpecialSubagentNotificationCard = specialSubagentNotification != null
     val isSpecialCard = isSpecialImageCard || isSpecialSubagentDispatchCard || isSpecialSubagentNotificationCard
+
+    if (RenderDiagnostics.enabled()) {
+        RenderDiagnostics.onToolRowRecomposed(
+            conversationId = "",
+            callKey = call.key,
+            state = call.state.name,
+            isExpanded = false,
+        )
+        if (isSpecialCard) {
+            val fallbackReason = when {
+                isSpecialImageCard -> "image_card"
+                isSpecialSubagentDispatchCard -> "subagent_dispatch"
+                isSpecialSubagentNotificationCard -> "subagent_notification"
+                else -> "special_card"
+            }
+            RenderDiagnostics.onLegacyFallback(
+                conversationId = "",
+                callKey = call.key,
+                fallbackReason = fallbackReason,
+            )
+        }
+    }
 
     val (nodeContainerColor, nodeContentColor, nodeIcon) = when (call.state) {
         ToolTimelineState.AwaitingApproval -> Triple(
@@ -246,6 +314,47 @@ private fun ProjectedToolTimelineCallRow(
         } else {
             // Standard tool call row using CollapsibleStatusRow primitive
             var expanded by remember(call.key) { mutableStateOf(false) }
+            var provenance by remember(call.key) { mutableStateOf(ExpansionProvenance.None) }
+
+            val motionPolicy = rememberChatMotionPolicy()
+            val currentCall by rememberUpdatedState(call)
+
+            // Record monotonic start timestamp (in milliseconds) when call.key mounts
+            val startMonotonicMs = remember(call.key) { System.nanoTime() / 1_000_000L }
+
+            // Bounded Auto-Expand Effect:
+            // Keyed strictly on call.key (a stable String ID) so recompositions from streaming token updates
+            // DO NOT cancel or restart the delay timer.
+            LaunchedEffect(call.key) {
+                if (!currentCall.isTerminal && provenance == ExpansionProvenance.None && !expanded) {
+                    val elapsedMs = (System.nanoTime() / 1_000_000L) - startMonotonicMs
+                    val remainingDelayMs = maxOf(0L, autoExpandDelayMs - elapsedMs)
+                    if (remainingDelayMs > 0L) {
+                        delay(remainingDelayMs)
+                    }
+                    if (!currentCall.isTerminal && provenance == ExpansionProvenance.None && !expanded) {
+                        provenance = ExpansionProvenance.Auto
+                        expanded = true
+                    }
+                }
+            }
+
+            // Staged Auto-Collapse Effect:
+            // Triggered on terminal completion (isTerminal = true).
+            // When an auto-expanded row completes:
+            // 1. The summary header updates to show the completed static outcome FIRST on this frame (while still expanded).
+            // 2. After a staged delay (or immediately if reduced motion is enabled), children details collapse.
+            LaunchedEffect(call.key, call.isTerminal) {
+                if (call.isTerminal && provenance == ExpansionProvenance.Auto && expanded) {
+                    val collapseDelay = if (motionPolicy.isReducedMotionEnabled) 0L else stagedCollapseDelayMs
+                    if (collapseDelay > 0L) {
+                        delay(collapseDelay)
+                    }
+                    if (provenance == ExpansionProvenance.Auto) {
+                        expanded = false
+                    }
+                }
+            }
 
             // Truncation / full-result fetch on expansion
             val uiToolCall = remember(call) {
@@ -288,9 +397,13 @@ private fun ProjectedToolTimelineCallRow(
             CollapsibleStatusRow(
                 title = call.summary,
                 expanded = expanded,
-                onExpandedChange = { expanded = it },
+                onExpandedChange = { newExpanded ->
+                    provenance = ExpansionProvenance.User
+                    expanded = newExpanded
+                },
                 statusLabel = statusLabel,
                 statusColor = statusColor,
+                motionPolicy = motionPolicy,
                 badge = if (call.approvalDecision != null || call.state == ToolTimelineState.AwaitingApproval) {
                     {
                         val chipState = when {
@@ -330,10 +443,12 @@ private fun ProjectedToolTimelineCallRow(
                     }
 
                     if (displayResult != null) {
+                        val isError = call.state == ToolTimelineState.Failed ||
+                            call.state == ToolTimelineState.Rejected
                         ToolOutputRenderer(
                             raw = displayResult,
                             expanded = expanded,
-                            isError = call.state == ToolTimelineState.Failed || call.state == ToolTimelineState.Rejected,
+                            isError = isError,
                         )
                     }
                 }

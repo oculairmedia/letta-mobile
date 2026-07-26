@@ -2,6 +2,8 @@ package com.letta.mobile.feature.chat
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -205,6 +207,190 @@ class ProjectedToolTimelineTest {
 
         // Legacy rendering uses "2 tool calls" header
         composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
+    }
+
+    @Test
+    fun projectedToolTimeline_autoExpandsAfterBoundedDelay() {
+        val group = com.letta.mobile.data.chat.projection.ToolTimelineGroup(
+            key = "group-1",
+            calls = listOf(
+                com.letta.mobile.data.chat.projection.ToolTimelineCall(
+                    key = "call:c1",
+                    toolCallId = "c1",
+                    name = "Bash",
+                    arguments = """{"command":"pwd"}""",
+                    result = null,
+                    state = com.letta.mobile.data.chat.projection.ToolTimelineState.Running,
+                    summary = "Bash(pwd)",
+                )
+            ),
+            state = com.letta.mobile.data.chat.projection.ToolTimelineState.Running,
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    com.letta.mobile.feature.chat.screen.ProjectedToolTimelineGroupCard(
+                        groups = listOf(group),
+                        autoExpandDelayMs = 200L,
+                        stagedCollapseDelayMs = 100L,
+                    )
+                }
+            }
+        }
+
+        // Before delay expires, live status is not visible in collapsed state
+        composeRule.onNodeWithText("Executing Bash...").assertDoesNotExist()
+
+        // Advance virtual time past bounded auto-expand delay (200ms)
+        composeRule.mainClock.advanceTimeBy(250L)
+        composeRule.waitForIdle()
+
+        // Auto-expand fires: live status line inside expanded content is now displayed
+        composeRule.onNodeWithText("Executing Bash...").assertIsDisplayed()
+    }
+
+    @Test
+    fun projectedToolTimeline_explicitUserExpansion_winsOverAutoCollapse() {
+        var groupState by androidx.compose.runtime.mutableStateOf(
+            com.letta.mobile.data.chat.projection.ToolTimelineGroup(
+                key = "group-1",
+                calls = listOf(
+                    com.letta.mobile.data.chat.projection.ToolTimelineCall(
+                        key = "call:c1",
+                        toolCallId = "c1",
+                        name = "Bash",
+                        arguments = """{"command":"pwd"}""",
+                        result = null,
+                        state = com.letta.mobile.data.chat.projection.ToolTimelineState.Running,
+                        summary = "Bash(pwd)",
+                    )
+                ),
+                state = com.letta.mobile.data.chat.projection.ToolTimelineState.Running,
+            )
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    com.letta.mobile.feature.chat.screen.ProjectedToolTimelineGroupCard(
+                        groups = listOf(groupState),
+                        autoExpandDelayMs = 1000L,
+                        stagedCollapseDelayMs = 200L,
+                    )
+                }
+            }
+        }
+
+        // User explicitly clicks row to expand before auto-expand delay
+        composeRule.onNodeWithText("Bash(pwd)").performClick()
+        composeRule.waitForIdle()
+
+        // Verify content expanded by user
+        composeRule.onNodeWithText("Executing Bash...").assertIsDisplayed()
+
+        // Complete the call
+        groupState = com.letta.mobile.data.chat.projection.ToolTimelineGroup(
+            key = "group-1",
+            calls = listOf(
+                com.letta.mobile.data.chat.projection.ToolTimelineCall(
+                    key = "call:c1",
+                    toolCallId = "c1",
+                    name = "Bash",
+                    arguments = """{"command":"pwd"}""",
+                    result = "/home/user",
+                    state = com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded,
+                    summary = "Bash(pwd)",
+                    executionTimeMs = 150L,
+                )
+            ),
+            state = com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded,
+        )
+
+        // Advance past staged collapse delay
+        composeRule.mainClock.advanceTimeBy(300L)
+        composeRule.waitForIdle()
+
+        // Explicit user expansion MUST WIN over auto-collapse: content stays displayed!
+        composeRule.onNodeWithText("/home/user").assertIsDisplayed()
+    }
+
+    @Test
+    fun projectedToolTimeline_autoExpandedRow_showsSummaryFirstThenCollapsesOnCompletion() {
+        var groupState by androidx.compose.runtime.mutableStateOf(
+            com.letta.mobile.data.chat.projection.ToolTimelineGroup(
+                key = "group-1",
+                calls = listOf(
+                    com.letta.mobile.data.chat.projection.ToolTimelineCall(
+                        key = "call:c1",
+                        toolCallId = "c1",
+                        name = "Bash",
+                        arguments = """{"command":"pwd"}""",
+                        result = null,
+                        state = com.letta.mobile.data.chat.projection.ToolTimelineState.Running,
+                        summary = "Bash(pwd)",
+                    )
+                ),
+                state = com.letta.mobile.data.chat.projection.ToolTimelineState.Running,
+            )
+        )
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    com.letta.mobile.feature.chat.screen.ProjectedToolTimelineGroupCard(
+                        groups = listOf(groupState),
+                        autoExpandDelayMs = 100L,
+                        stagedCollapseDelayMs = 300L,
+                    )
+                }
+            }
+        }
+
+        // Advance clock so row auto-expands
+        composeRule.mainClock.advanceTimeBy(150L)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("Executing Bash...").assertIsDisplayed()
+
+        // Complete the tool call
+        groupState = com.letta.mobile.data.chat.projection.ToolTimelineGroup(
+            key = "group-1",
+            calls = listOf(
+                com.letta.mobile.data.chat.projection.ToolTimelineCall(
+                    key = "call:c1",
+                    toolCallId = "c1",
+                    name = "Bash",
+                    arguments = """{"command":"pwd"}""",
+                    result = "/root",
+                    state = com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded,
+                    summary = "Bash(pwd)",
+                    executionTimeMs = 120L,
+                )
+            ),
+            state = com.letta.mobile.data.chat.projection.ToolTimelineState.Succeeded,
+        )
+
+        // Frame 1 after completion: static summary ("120ms") is visible immediately
+        composeRule.onNodeWithText("120ms").assertIsDisplayed()
+
+        // Advance past staged collapse delay (300ms)
+        composeRule.mainClock.advanceTimeBy(350L)
+        composeRule.waitForIdle()
+
+        // Auto-expanded row collapsed after staged delay: detail output is no longer displayed
+        composeRule.onNodeWithText("/root").assertDoesNotExist()
     }
 
     private fun approvalRequest() = UiApprovalRequest(
