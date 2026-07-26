@@ -5,9 +5,7 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.data.model.UiToolResultTruncation
 import com.letta.mobile.data.timeline.Timeline
-import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineHydrationReducer
 import com.letta.mobile.data.timeline.TimelineReducerInput
 import com.letta.mobile.data.timeline.ToolTimelineFixtures
@@ -15,9 +13,7 @@ import com.letta.mobile.data.timeline.reduceStreamFrame
 import kotlinx.collections.immutable.persistentMapOf
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 

@@ -4,7 +4,6 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.deduplicateRenderKeys
 import com.letta.mobile.data.chat.projection.groupMessagesForRender
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
-import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.collections.immutable.persistentMapOf
