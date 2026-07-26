@@ -210,17 +210,16 @@ class ThemeColorsTest {
 
     @Test
     fun `deriveCustomColors keeps stable dark status colors across presets`() {
-        val scheme = darkColorScheme(
-            background = Color.Black,
-            primary = Color(0xFF66CCBB),
-        )
-        val custom = deriveCustomColors(scheme)
+        ThemePreset.entries.forEach { preset ->
+            val scheme = presetThemeColors(preset).darkScheme
+            val custom = deriveCustomColors(scheme)
 
-        assertEquals(Color(0xFF46C08F), custom.successColor)
-        assertEquals(Color(0xFF06302B), custom.onSuccessColor)
-        assertEquals(Color(0xFFE0A458), custom.runningColor)
-        assertEquals(Color(0xFF2B1B00), custom.onRunningColor)
-        assertEquals(Color(0xFF66CCBB), custom.harmonizedSuccess)
+            assertEquals("$preset success", Color(0xFF46C08F), custom.successColor)
+            assertEquals("$preset on-success", Color(0xFF06302B), custom.onSuccessColor)
+            assertEquals("$preset running", Color(0xFFE0A458), custom.runningColor)
+            assertEquals("$preset on-running", Color(0xFF2B1B00), custom.onRunningColor)
+            assertEquals("$preset harmonized success", scheme.primary, custom.harmonizedSuccess)
+        }
     }
 
     // ── ThemePreset enum ─────────────────────────────────────

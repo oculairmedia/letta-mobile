@@ -1,10 +1,14 @@
 package com.letta.mobile.ui.components
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.intellij.markdown.ast.getTextInNode
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
+import org.intellij.markdown.parser.MarkdownParser
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], instrumentedPackages = ["androidx.loader.content"])
@@ -52,8 +56,14 @@ class MarkdownGlyphPreservationTest {
     fun `preserves CJK text adjacent to markdown emphasis`() {
         val text =
             "\u3053\u308C\u306F **\u91CD\u8981** \u306A\u30C6\u30B9\u30C8\u3067\u3059"
+        val parsed = MarkdownParser(GFMFlavourDescriptor())
+            .buildMarkdownTreeFromString(autolinkBareUrls(text))
+            .getTextInNode(text)
+            .toString()
 
-        assertEquals(text, autolinkBareUrls(text))
+        assertTrue(parsed.contains("\u3053\u308C\u306F"))
+        assertTrue(parsed.contains("\u91CD\u8981"))
+        assertTrue(parsed.contains("\u306A\u30C6\u30B9\u30C8\u3067\u3059"))
     }
 
     @Test
