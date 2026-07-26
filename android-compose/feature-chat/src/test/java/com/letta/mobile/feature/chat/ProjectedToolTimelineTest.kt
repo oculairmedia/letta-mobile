@@ -394,6 +394,43 @@ class ProjectedToolTimelineTest {
         composeRule.onNodeWithText("/root").assertDoesNotExist()
     }
 
+    // Regression: an expanded row rendered the cleaned summary AND the raw arguments
+    // envelope underneath it, so every tool call showed a duplicate row of raw JSON.
+    // The monospace fallback must be suppressed whenever a structured summary exists.
+    @Test
+    fun expandedToolRow_doesNotRepeatRawArgumentsBesideTheStructuredSummary() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
+                        RunBlock(
+                            messages = listOf(
+                                toolMessage(id = "tc-a", command = "pwd"),
+                                toolMessage(id = "tc-b", command = "ls"),
+                            ),
+                            collapsed = false,
+                            onToggleCollapsed = {},
+                        ) { message, _, rowModifier ->
+                            Text(text = message.id, modifier = rowModifier)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Expand the first call's row.
+        composeRule.onNodeWithText("Bash(pwd)").performClick()
+        composeRule.waitForIdle()
+
+        // The structured summary is what carries the command; the raw JSON envelope
+        // must not be painted as a second block.
+        composeRule.onNodeWithText("""{"command":"pwd"}""").assertDoesNotExist()
+    }
+
     @Test
     fun togglingTimelineMode_preservesCanonicalDataAndKeys() {
         val messageA = toolMessage(id = "tc-a", command = "pwd")

@@ -444,11 +444,19 @@ private fun ProjectedToolTimelineCallRow(
                         )
                     }
 
-                    // letta-mobile-8kdjm.9: full command in a selectable monospace
-                    // surface. This lives inside CollapsibleStatusRow's content lambda,
-                    // which AnimatedVisibility only composes while expanded — so a
-                    // collapsed row does none of this work.
-                    ProjectedToolCommandBlock(arguments = call.arguments)
+                    // letta-mobile-8kdjm.9: selectable monospace command surface, shown
+                    // ONLY when there is no structured summary above. summarizeToolArguments
+                    // already renders the command cleanly via ToolSummaryLine; rendering the
+                    // raw arguments envelope underneath it duplicated every tool call with a
+                    // second row of raw JSON. The fallback exists for tools whose arguments
+                    // do not summarize — never alongside a structured card.
+                    //
+                    // Lives inside CollapsibleStatusRow's content lambda, which
+                    // AnimatedVisibility only composes while expanded, so a collapsed row
+                    // does none of this work.
+                    if (argumentSummary == null) {
+                        ProjectedToolCommandBlock(arguments = call.arguments)
+                    }
 
                     if (displayResult != null) {
                         val isError = call.state == ToolTimelineState.Failed ||
