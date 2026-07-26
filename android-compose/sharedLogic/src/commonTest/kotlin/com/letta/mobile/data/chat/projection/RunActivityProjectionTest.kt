@@ -1,26 +1,25 @@
-package com.letta.mobile.feature.chat
+package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.feature.chat.screen.RunActivityState
-import com.letta.mobile.feature.chat.screen.projectRunActivity
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import com.letta.mobile.ui.common.GroupPosition
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class RunActivityProjectionTest {
     @Test
-    fun `empty timeline has no disclosure`() {
-        assertNull(projectRunActivity(emptyList(), isStreaming = false))
+    fun emptyTimelineHasNoDisclosure() {
+        assertNull(projectRunActivity(emptyList(), isActiveRunStreaming = false))
     }
 
     @Test
-    fun `streaming reasoning is working and has no duration`() {
+    fun activeStreamingReasoningIsWorkingAndHasNoDuration() {
         val activity = projectRunActivity(
             messages = listOf(message("reasoning") { copy(isReasoning = true) }),
-            isStreaming = true,
+            isActiveRunStreaming = true,
         )!!
 
         assertEquals(RunActivityState.Working, activity.state)
@@ -29,7 +28,41 @@ class RunActivityProjectionTest {
     }
 
     @Test
-    fun `completed reasoning is thought with run latency and counts`() {
+    fun historicalReasoningDoesNotBecomeActiveDuringLaterStreamingResponse() {
+        val historicalRun = runBlock(
+            runId = "historical",
+            messages = listOf(message("historical-reasoning", runId = "historical") { copy(isReasoning = true) }),
+        )
+        val activeRun = runBlock(
+            runId = "active",
+            messages = listOf(message("active-reasoning", runId = "active") { copy(isReasoning = true) }),
+        )
+
+        assertFalse(
+            isActiveStreamingRenderItem(
+                renderItem = historicalRun,
+                conversationIsStreaming = true,
+                newestMessageId = "active-reasoning",
+            ),
+        )
+        assertTrue(
+            isActiveStreamingRenderItem(
+                renderItem = activeRun,
+                conversationIsStreaming = true,
+                newestMessageId = "active-reasoning",
+            ),
+        )
+
+        val historicalActivity = projectRunActivity(
+            messages = historicalRun.messages.map { it.first },
+            isActiveRunStreaming = false,
+        )!!
+        assertEquals(RunActivityState.Thought, historicalActivity.state)
+        assertFalse(historicalActivity.isActive)
+    }
+
+    @Test
+    fun completedReasoningUsesLatencyAndCountsFailures() {
         val activity = projectRunActivity(
             messages = listOf(
                 message("reasoning") { copy(isReasoning = true) },
@@ -43,7 +76,7 @@ class RunActivityProjectionTest {
                 },
                 message("answer") { copy(content = "Done", latencyMs = 2_400L) },
             ),
-            isStreaming = false,
+            isActiveRunStreaming = false,
         )!!
 
         assertEquals(RunActivityState.Thought, activity.state)
@@ -54,7 +87,7 @@ class RunActivityProjectionTest {
     }
 
     @Test
-    fun `completed tool-only work sums execution duration when timeline has no span`() {
+    fun completedToolOnlyWorkSumsExecutionDurationWithoutTimelineSpan() {
         val activity = projectRunActivity(
             messages = listOf(
                 message("tools") {
@@ -66,7 +99,7 @@ class RunActivityProjectionTest {
                     )
                 },
             ),
-            isStreaming = false,
+            isActiveRunStreaming = false,
         )!!
 
         assertEquals(RunActivityState.Worked, activity.state)
@@ -76,20 +109,26 @@ class RunActivityProjectionTest {
     }
 
     @Test
-    fun `completed work uses positive timeline span when latency is unavailable`() {
+    fun completedWorkUsesPositiveTimelineSpanWhenLatencyIsUnavailable() {
         val activity = projectRunActivity(
             messages = listOf(
                 message("start"),
                 message("finish") { copy(timestamp = "2026-07-25T12:00:02Z") },
             ),
-            isStreaming = false,
+            isActiveRunStreaming = false,
         )!!
 
         assertEquals(2_000L, activity.durationMs)
     }
 
     @Test
-    fun `message failures are counted without double-counting failed tools`() {
+    fun malformedTimestampIsRejectedBySharedParser() {
+        assertNull(parseTimestampEpochMillis("not-a-timestamp"))
+        assertEquals(1_753_488_000_000L, parseTimestampEpochMillis("2025-07-26T00:00:00Z"))
+    }
+
+    @Test
+    fun messageFailuresAreCountedWithoutDoubleCountingFailedTools() {
         val activity = projectRunActivity(
             messages = listOf(
                 message("run-error") { copy(isError = true) },
@@ -100,21 +139,30 @@ class RunActivityProjectionTest {
                     )
                 },
             ),
-            isStreaming = false,
+            isActiveRunStreaming = false,
         )!!
 
         assertEquals(2, activity.failureCount)
     }
 
+    private fun runBlock(
+        runId: String,
+        messages: List<UiMessage>,
+    ) = ChatRenderItem.RunBlock(
+        runId = runId,
+        messages = messages.map { it to GroupPosition.None },
+    )
+
     private fun message(
         id: String,
+        runId: String = "run-1",
         customize: UiMessage.() -> UiMessage = { this },
     ): UiMessage = UiMessage(
         id = id,
         role = "assistant",
         content = "",
         timestamp = "2026-07-25T12:00:00Z",
-        runId = "run-1",
+        runId = runId,
     ).customize()
 
     private fun successfulToolCall(

@@ -169,7 +169,9 @@ private class LongPressInteraction(
             val change = event.changes.firstOrNull { it.id == pointerId } ?: return
             val movedPastTouchSlop =
                 (change.position - initialPosition).getDistance() > viewConfiguration.touchSlop
-            if (!change.pressed || change.isConsumed || movedPastTouchSlop) return
+            if (!change.pressed) return
+            if (change.isConsumed) return
+            if (movedPastTouchSlop) return
         }
     }
 

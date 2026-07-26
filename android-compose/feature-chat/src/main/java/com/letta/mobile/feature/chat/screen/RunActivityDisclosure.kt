@@ -49,6 +49,7 @@ internal fun RunActivityDisclosure(
     collapsible: Boolean = true,
 ) {
     val text = activity.disclosureText(collapsed, collapsible)
+    val canToggle = collapsible && !activity.isActive
 
     Row(
         modifier = Modifier
@@ -58,10 +59,15 @@ internal fun RunActivityDisclosure(
             .semantics(mergeDescendants = true) {
                 stateDescription = text.stateDescription
             }
-            .clickable(
-                enabled = collapsible && !activity.isActive,
-                onClickLabel = text.interactionLabel,
-                onClick = onToggleCollapsed,
+            .then(
+                if (canToggle) {
+                    Modifier.clickable(
+                        onClickLabel = text.interactionLabel,
+                        onClick = onToggleCollapsed,
+                    )
+                } else {
+                    Modifier
+                },
             )
             .padding(horizontal = 4.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -198,7 +204,7 @@ private fun WorkingIndicator(
                 alpha = indicatorAlpha.value
             }
             .background(
-                color = MaterialTheme.colorScheme.primary,
+                color = MaterialTheme.colorScheme.tertiary,
                 shape = androidx.compose.foundation.shape.CircleShape,
             ),
     )

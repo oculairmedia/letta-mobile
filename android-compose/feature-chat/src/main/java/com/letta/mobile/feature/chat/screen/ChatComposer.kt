@@ -424,7 +424,13 @@ private fun ChatComposerAddButton(
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     LettaIcons.Add,
-                    contentDescription = stringResource(R.string.composer_actions_open),
+                    contentDescription = stringResource(
+                        if (hasTools) {
+                            R.string.composer_actions_open
+                        } else {
+                            R.string.action_attach_image
+                        },
+                    ),
                     modifier = Modifier.size(ChatComposerAttachIconSize),
                 )
             }

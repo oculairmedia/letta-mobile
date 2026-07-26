@@ -1,12 +1,13 @@
 package com.letta.mobile.feature.chat
 
 import android.provider.Settings
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHeightIsAtLeast
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -58,7 +59,7 @@ class RunActivityDisclosureTest {
             )
             .assertExists()
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
-            .assertIsNotEnabled()
+            .assert(hasNoClickAction())
             .assertHeightIsAtLeast(48.dp)
             .assert(hasStateDescription("Agent work in progress"))
         composeRule.runOnIdle { assertEquals(0, toggles) }
@@ -123,6 +124,7 @@ class RunActivityDisclosureTest {
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
             .assertHeightIsAtLeast(48.dp)
             .assert(hasStateDescription("Agent work expanded"))
+            .assertHasClickAction()
             .performClick()
         composeRule.runOnIdle { assertEquals(1, toggles) }
     }
@@ -176,7 +178,8 @@ class RunActivityDisclosureTest {
         )
 
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
-            .assertIsNotEnabled()
+            .assert(hasNoClickAction())
+            .assert(hasStateDescription("Agent work expanded"))
         composeRule.runOnIdle { assertEquals(0, toggles) }
     }
 
@@ -205,6 +208,9 @@ class RunActivityDisclosureTest {
 
     private fun hasStateDescription(value: String): SemanticsMatcher =
         SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, value)
+
+    private fun hasNoClickAction(): SemanticsMatcher =
+        SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick)
 
     private data class DisclosureConfiguration(
         val collapsed: Boolean = false,

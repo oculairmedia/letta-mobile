@@ -110,7 +110,6 @@ private data class ComposerTrailingActionSpec(
     val contentDescription: String,
     val containerColor: Color,
     val contentColor: Color,
-    val iconSize: Dp,
     val visualScale: State<Float>,
     val pulseScale: State<Float>,
     val motionPreference: ComposerMotionPreference,
@@ -120,7 +119,6 @@ private data class ComposerTrailingActionSpec(
 private data class ComposerActionIconSpec(
     val icon: ImageVector,
     val contentDescription: String,
-    val size: Dp,
     val motionPreference: ComposerMotionPreference,
 )
 
@@ -278,14 +276,6 @@ fun LettaInputBar(
         ),
         label = "inputActionVisualScale",
     )
-    val actionIconSize by animateDpAsState(
-        targetValue = ComposerActionIconSize * actionSizeFraction.coerceIn(0.7f, 1f),
-        animationSpec = composerMotionSpec(
-            motionPreference,
-            MaterialTheme.motionScheme.fastSpatialSpec(),
-        ),
-        label = "inputActionIconSize",
-    )
 
     // letta-mobile-d9zy.5 (retry): subtle heartbeat pulse on the action
     // button. Replaces the 2026-05-12 attempt to ring the button with a
@@ -369,7 +359,6 @@ fun LettaInputBar(
                     contentDescription = actionContentDescription,
                     containerColor = actionContainerColor ?: colorScheme.primary,
                     contentColor = actionContentColor ?: colorScheme.onPrimary,
-                    iconSize = actionIconSize,
                     visualScale = actionVisualScale,
                     pulseScale = actionPulseScale,
                     motionPreference = motionPreference,
@@ -428,7 +417,6 @@ private fun ComposerTrailingAction(
                 spec = ComposerActionIconSpec(
                     icon = spec.icon,
                     contentDescription = spec.contentDescription,
-                    size = spec.iconSize,
                     motionPreference = spec.motionPreference,
                 ),
             )
@@ -472,7 +460,7 @@ private fun ComposerActionIcon(
         Icon(
             spec.icon,
             contentDescription = spec.contentDescription,
-            modifier = Modifier.size(spec.size),
+            modifier = Modifier.size(ComposerActionIconSize),
         )
         return
     }
@@ -497,7 +485,7 @@ private fun ComposerActionIcon(
         Icon(
             targetIcon,
             contentDescription = spec.contentDescription,
-            modifier = Modifier.size(spec.size),
+            modifier = Modifier.size(ComposerActionIconSize),
         )
     }
 }

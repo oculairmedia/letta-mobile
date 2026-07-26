@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Tool
@@ -30,21 +31,26 @@ internal fun ChatComposerActionSheet(
     state: ChatComposerActionSheetState,
     callbacks: ChatComposerActionSheetCallbacks,
 ) {
+    val availableHeight = LocalConfiguration.current.screenHeightDp.dp
+    val actionListMaxHeight = (availableHeight - 112.dp)
+        .coerceAtLeast(96.dp)
+        .coerceAtMost(320.dp)
+
     ActionSheet(
         show = state.show,
         onDismiss = callbacks.onDismiss,
         title = stringResource(R.string.composer_actions_title),
     ) {
-        ActionSheetItem(
-            text = stringResource(R.string.action_attach_image),
-            icon = LettaIcons.Add,
-            onClick = callbacks.onAttachImage,
-        )
         Column(
             modifier = Modifier
-                .heightIn(max = 320.dp)
+                .heightIn(max = actionListMaxHeight)
                 .verticalScroll(rememberScrollState()),
         ) {
+            ActionSheetItem(
+                text = stringResource(R.string.action_attach_image),
+                icon = LettaIcons.Add,
+                onClick = callbacks.onAttachImage,
+            )
             state.availableTools.forEach { tool ->
                 ActionSheetItem(
                     text = tool.name,

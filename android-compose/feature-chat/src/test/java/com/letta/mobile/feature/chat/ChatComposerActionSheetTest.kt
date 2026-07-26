@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
@@ -112,10 +113,37 @@ class ChatComposerActionSheetTest {
             ),
         )
 
-        openComposerActions()
+        composeRule
+            .onNodeWithContentDescription("Attach image")
+            .assertIsDisplayed()
+            .performClick()
 
         assertTrue(attachInvoked)
         composeRule.onNodeWithText("Add to message").assertDoesNotExist()
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w640dp-h320dp-land")
+    fun `last tool remains reachable in compact landscape`() {
+        val tools = (1..12).map { index ->
+            Tool(
+                id = ToolId("tool-$index"),
+                name = "tool_$index",
+            )
+        }
+        setComposer(
+            ComposerScenario(
+                inputText = "draft",
+                availableTools = tools,
+            ),
+        )
+
+        openComposerActions()
+
+        composeRule
+            .onNodeWithText("tool_12")
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     @Test
