@@ -1,23 +1,32 @@
 package com.letta.mobile.ui.components
 
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.junit4.createComposeRule
+import com.letta.mobile.ui.theme.LettaTheme
+import org.intellij.markdown.ast.getTextInNode
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
+import org.intellij.markdown.parser.MarkdownParser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
-import org.intellij.markdown.ast.getTextInNode
-import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
-import org.intellij.markdown.parser.MarkdownParser
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], instrumentedPackages = ["androidx.loader.content"])
 class MarkdownGlyphPreservationTest {
+    @get:Rule
+    val composeRule = createComposeRule()
+
     @Test
     fun `preserves spaces around inline code`() {
         val text = "Press ` Enter ` to continue"
 
         assertEquals(text, autolinkBareUrls(text))
+        assertRenderedTextContains(text, "Press", " Enter ", "to continue")
     }
 
     @Test
@@ -41,6 +50,7 @@ class MarkdownGlyphPreservationTest {
         val text = "Use \\* and \\_ for literal asterisks and underscores"
 
         assertEquals(text, autolinkBareUrls(text))
+        assertRenderedTextContains(text, "Use", "*", "_", "literal asterisks and underscores")
     }
 
     @Test
@@ -50,6 +60,7 @@ class MarkdownGlyphPreservationTest {
         val text = "Here is an emoji $familyEmoji and a combining mark: cafe\u0301"
 
         assertEquals(text, autolinkBareUrls(text))
+        assertRenderedTextContains(text, familyEmoji, "cafe\u0301")
     }
 
     @Test
@@ -64,17 +75,52 @@ class MarkdownGlyphPreservationTest {
         assertTrue(parsed.contains("\u3053\u308C\u306F"))
         assertTrue(parsed.contains("\u91CD\u8981"))
         assertTrue(parsed.contains("\u306A\u30C6\u30B9\u30C8\u3067\u3059"))
+        assertRenderedTextContains(
+            text,
+            "\u3053\u308C\u306F",
+            "\u91CD\u8981",
+            "\u306A\u30C6\u30B9\u30C8\u3067\u3059",
+        )
     }
 
     @Test
     fun `preserves inline math delimiters with normal text around them`() {
+        val text = "The equation \$E = mc^2\$ is famous"
         assertEquals(
             listOf(
                 MathSegment.Text("The equation "),
                 MathSegment.Math("E = mc^2"),
                 MathSegment.Text(" is famous"),
             ),
-            splitInlineMathSegments("The equation \$E = mc^2\$ is famous"),
+            splitInlineMathSegments(text),
         )
+        assertRenderedTextContains(text, "The equation", "is famous")
+        assertRenderedContentDescriptionContains("E = mc^2")
+    }
+
+    private fun assertRenderedTextContains(text: String, vararg fragments: String) {
+        composeRule.setContent {
+            LettaTheme {
+                MarkdownText(text)
+            }
+        }
+        composeRule.waitForIdle()
+
+        fragments.forEach { fragment ->
+            val nodes = composeRule
+                .onAllNodes(hasText(fragment, substring = true), useUnmergedTree = true)
+                .fetchSemanticsNodes()
+            assertTrue("Expected rendered MarkdownText to contain <$fragment>", nodes.isNotEmpty())
+        }
+    }
+
+    private fun assertRenderedContentDescriptionContains(fragment: String) {
+        val nodes = composeRule
+            .onAllNodes(
+                hasContentDescription(fragment, substring = true),
+                useUnmergedTree = true,
+            )
+            .fetchSemanticsNodes()
+        assertTrue("Expected rendered MarkdownText to expose <$fragment>", nodes.isNotEmpty())
     }
 }
