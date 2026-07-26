@@ -1,0 +1,48 @@
+package com.letta.mobile.appservercli
+
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import java.io.File
+
+class ProcessHandleControllerTest {
+
+    @Test
+    fun `bounded buffer overwrites old output when capacity exceeded`() {
+        val tempDir = System.getProperty("java.io.tmpdir")
+        val javaFile = File(tempDir, "EchoMore.java")
+        val expectedSuffix = "901234567890" // 12 bytes
+        val fullOutput = "12345678901234567890" // 20 bytes total
+
+        javaFile.writeText(
+            """
+            public class EchoMore {
+                public static void main(String[] args) {
+                    System.out.print("$fullOutput");
+                }
+            }
+            """.trimIndent()
+        )
+
+        val javaExecutable = System.getProperty("java.home") + File.separator + "bin" + File.separator + "java"
+        val capacity = 12
+
+        val controller = ProcessHandleController(
+            command = listOf(javaExecutable, javaFile.absolutePath),
+            diagnosticBufferBytes = capacity
+        )
+
+        controller.spawn()
+        val exitCode = controller.awaitExit()
+
+        assertEquals(0, exitCode, "Java process should exit successfully")
+
+        // Wait a small amount to let daemon drain output reliably
+        Thread.sleep(100)
+
+        val diagnostics = controller.drainDiagnostics(100)
+
+        assertEquals(expectedSuffix, diagnostics, "Diagnostics should only contain the newest $capacity bytes")
+
+        javaFile.delete()
+    }
+}
