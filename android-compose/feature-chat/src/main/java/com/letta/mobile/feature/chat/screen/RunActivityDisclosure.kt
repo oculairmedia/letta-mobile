@@ -57,7 +57,7 @@ internal fun RunActivityDisclosure(
             .testTag(RunActivityDisclosureTestTags.Header)
             .heightIn(min = 48.dp)
             .semantics(mergeDescendants = true) {
-                stateDescription = text.stateDescription
+                text.stateDescription?.let { stateDescription = it }
             }
             .then(
                 if (canToggle) {
@@ -101,7 +101,7 @@ internal fun RunActivityDisclosure(
 private data class DisclosureText(
     val title: String,
     val interactionLabel: String,
-    val stateDescription: String,
+    val stateDescription: String?,
 )
 
 @Composable
@@ -115,7 +115,7 @@ private fun RunActivityProjection.disclosureText(
         interactionLabel = stringResource(
             if (collapsed) R.string.work_disclosure_expand else R.string.work_disclosure_collapse,
         ),
-        stateDescription = stringResource(stateDescriptionResource(collapsed, collapsible)),
+        stateDescription = stateDescriptionResource(collapsed, collapsible)?.let { stringResource(it) },
     )
 }
 
@@ -133,10 +133,11 @@ private fun RunActivityProjection.activityTitle(duration: String?): String = whe
 private fun RunActivityProjection.stateDescriptionResource(
     collapsed: Boolean,
     collapsible: Boolean,
-): Int = when {
+): Int? = when {
     isActive -> R.string.work_disclosure_state_working
     collapsible && collapsed -> R.string.work_disclosure_state_collapsed
-    else -> R.string.work_disclosure_state_expanded
+    collapsible -> R.string.work_disclosure_state_expanded
+    else -> null
 }
 
 @Composable

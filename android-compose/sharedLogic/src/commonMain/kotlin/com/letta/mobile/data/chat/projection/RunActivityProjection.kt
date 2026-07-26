@@ -2,7 +2,6 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.UiToolCall
 import kotlin.time.Instant
 
 enum class RunActivityState {
@@ -68,19 +67,7 @@ fun isActiveStreamingRenderItem(
 
 private fun List<UiMessage>.hasActiveWork(isActiveRunStreaming: Boolean): Boolean {
     if (any { it.isPending }) return true
-    return isActiveRunStreaming && last().hasOpenWork()
-}
-
-private fun UiMessage.hasOpenWork(): Boolean {
-    if (isReasoning) return true
-    if (approvalRequest != null) return true
-    return toolCalls.orEmpty().any { it.isOpen() }
-}
-
-private fun UiToolCall.isOpen(): Boolean {
-    if (result != null) return false
-    if (ToolReturnStatus.isError(status)) return false
-    return status != ToolReturnStatus.SUCCESS && status != "warning"
+    return isActiveRunStreaming
 }
 
 private fun List<UiMessage>.activityState(active: Boolean): RunActivityState = when {

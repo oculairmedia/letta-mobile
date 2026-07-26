@@ -167,10 +167,11 @@ private class LongPressInteraction(
             // consume movement before message actions are recognized.
             val event = awaitPointerEvent(PointerEventPass.Final)
             val change = event.changes.firstOrNull { it.id == pointerId } ?: return
+            val positionChanged = change.position != change.previousPosition
             val movedPastTouchSlop =
                 (change.position - initialPosition).getDistance() > viewConfiguration.touchSlop
             if (!change.pressed) return
-            if (change.isConsumed) return
+            if (change.isConsumed && positionChanged) return
             if (movedPastTouchSlop) return
         }
     }

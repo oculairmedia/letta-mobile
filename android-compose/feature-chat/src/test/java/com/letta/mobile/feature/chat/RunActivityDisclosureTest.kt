@@ -179,7 +179,7 @@ class RunActivityDisclosureTest {
 
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
             .assert(hasNoClickAction())
-            .assert(hasStateDescription("Agent work expanded"))
+            .assert(hasNoStateDescription())
         composeRule.runOnIdle { assertEquals(0, toggles) }
     }
 
@@ -211,6 +211,9 @@ class RunActivityDisclosureTest {
 
     private fun hasNoClickAction(): SemanticsMatcher =
         SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick)
+
+    private fun hasNoStateDescription(): SemanticsMatcher =
+        SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription)
 
     private data class DisclosureConfiguration(
         val collapsed: Boolean = false,

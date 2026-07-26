@@ -28,6 +28,17 @@ class RunActivityProjectionTest {
     }
 
     @Test
+    fun activeStreamingAssistantProseRemainsWorking() {
+        val activity = projectRunActivity(
+            messages = listOf(message("assistant-prose")),
+            isActiveRunStreaming = true,
+        )!!
+
+        assertEquals(RunActivityState.Working, activity.state)
+        assertTrue(activity.isActive)
+    }
+
+    @Test
     fun historicalReasoningDoesNotBecomeActiveDuringLaterStreamingResponse() {
         val historicalRun = runBlock(
             runId = "historical",
