@@ -16,7 +16,6 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarMessage
-import com.letta.mobile.ui.chat.render.ChatSnackbarDuration
 import com.letta.mobile.ui.haptics.HapticEffects
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -164,10 +163,7 @@ private fun ChatScreenA2uiSnackbarEffect(
             SnackbarMessage(
                 message = current.message,
                 actionLabel = current.actionLabel,
-                duration = when (current.duration) {
-                    ChatSnackbarDuration.Short -> SnackbarDuration.Short
-                    ChatSnackbarDuration.Indefinite -> SnackbarDuration.Indefinite
-                },
+                duration = current.duration.toMaterialDuration(),
                 onAction = current.retryAction?.let { retry -> { onRetry(retry) } },
             ),
         )
