@@ -1926,6 +1926,91 @@ class TimelineStreamReducerTest {
         return Telemetry.snapshot().map { it.name }.toSet()
     }
 
+    @Test
+    fun argumentDeltasUpdateToolCallInPlaceWithoutChangingServerId() {
+        val seeded = reduce(frame = ToolTimelineFixtures.ArgumentDeltas.initialCall).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.ArgumentDeltas.updatedCall)
+
+        output.next.events shouldHaveSize 1
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.serverId shouldBe "msg-tool-delta"
+        event.toolCalls.single().arguments shouldBe """{"command":"ls -la"}"""
+    }
+
+    @Test
+    fun runningToSuccessStateTransitionAttachesToolReturn() {
+        val seeded = reduce(frame = ToolTimelineFixtures.RunningToSuccess.callFrame).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.RunningToSuccess.returnFrame)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.toolReturnContentByCallId["call-succ-1"] shouldBe "file content ok"
+        event.toolReturnIsErrorByCallId["call-succ-1"] shouldBe false
+        event.approvalDecided shouldBe true
+    }
+
+    @Test
+    fun runningToExplicitErrorStateTransitionSetsErrorFlag() {
+        val seeded = reduce(frame = ToolTimelineFixtures.RunningToExplicitError.callFrame).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.RunningToExplicitError.returnFrame)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.toolReturnIsErrorByCallId["call-err-1"] shouldBe true
+        event.toolReturnContentByCallId["call-err-1"] shouldBe "permission denied"
+    }
+
+    @Test
+    fun approvalPendingToApprovedStateTransitionMarksDecided() {
+        val seeded = reduce(frame = ToolTimelineFixtures.ApprovalPendingApprovedRunningSuccess.requestFrame).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.ApprovalPendingApprovedRunningSuccess.responseFrame)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.approvalDecided shouldBe true
+    }
+
+    @Test
+    fun rejectionStateTransitionMarksDecided() {
+        val seeded = reduce(frame = ToolTimelineFixtures.Rejection.requestFrame).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.Rejection.responseFrame)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.approvalDecided shouldBe true
+    }
+
+    @Test
+    fun returnBeforeCallIsBufferedAndAttachedWhenToolCallArrives() {
+        val bufferedOutput = reduce(frame = ToolTimelineFixtures.ReturnBeforeCall.returnFrameEarly)
+        bufferedOutput.next.events shouldHaveSize 0
+        bufferedOutput.updatedPendingToolReturnsByCallId.containsKey("call-early-1") shouldBe true
+
+        val attachedOutput = reduce(
+            prev = bufferedOutput.next,
+            frame = ToolTimelineFixtures.ReturnBeforeCall.callFrameLate,
+            pendingToolReturnsByCallId = bufferedOutput.updatedPendingToolReturnsByCallId,
+        )
+        val event = attachedOutput.next.events.single() as TimelineEvent.Confirmed
+        event.toolReturnContentByCallId["call-early-1"] shouldBe "early output arrived first"
+        event.approvalDecided shouldBe true
+    }
+
+    @Test
+    fun truncatedResultStoresTruncationMarker() {
+        val seeded = reduce(frame = ToolTimelineFixtures.TruncatedResult.callFrame).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.TruncatedResult.returnFrame)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        val trunc = event.toolReturnTruncationByCallId["call-trunc-1"]
+        trunc?.byteLen shouldBe 250000L
+    }
+
+    @Test
+    fun blankToolCallIdIsIgnoredAndDoesNotAttach() {
+        val seeded = reduce(frame = ToolTimelineFixtures.BlankAndDuplicateToolCallId.blankCallFrame).next
+        val output = reduce(prev = seeded, frame = ToolTimelineFixtures.BlankAndDuplicateToolCallId.blankReturnFrame)
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        event.toolReturnContentByCallId.isEmpty() shouldBe true
+    }
+
     private fun realCapturedSkillEnvelope(): String = """
         <asus-router>
         name: asus-router
