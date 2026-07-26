@@ -34,9 +34,11 @@ import com.letta.mobile.ui.components.StatusTimelineItem
 import com.letta.mobile.ui.components.TimelineNode
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import com.letta.mobile.ui.theme.chatTypography
@@ -442,9 +444,22 @@ private fun ProjectedToolTimelineCallRow(
                         )
                     }
 
+                    // letta-mobile-8kdjm.9: full command in a selectable monospace
+                    // surface. This lives inside CollapsibleStatusRow's content lambda,
+                    // which AnimatedVisibility only composes while expanded — so a
+                    // collapsed row does none of this work.
+                    ProjectedToolCommandBlock(arguments = call.arguments)
+
                     if (displayResult != null) {
                         val isError = call.state == ToolTimelineState.Failed ||
                             call.state == ToolTimelineState.Rejected
+
+                        ProjectedToolOutcomeLabel(state = call.state)
+
+                        // Deliberately NOT wrapped in a SelectionContainer:
+                        // ToolOutputRenderer owns its own long-press-to-copy affordance
+                        // (ToolOutputRendererTest.longPressCopiesRawOutputInsteadOfRenderedText),
+                        // and nesting selection breaks it.
                         ToolOutputRenderer(
                             raw = displayResult,
                             expanded = expanded,
@@ -454,5 +469,96 @@ private fun ProjectedToolTimelineCallRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * letta-mobile-8kdjm.9: selectable monospace presentation of a tool's full command.
+ *
+ * Only rendered inside an EXPANDED [CollapsibleStatusRow], so no work happens while
+ * collapsed. Formatting is a bounded, allocation-cheap normalisation — deliberately not
+ * a JSON/language parse, since this sits on the streaming render path.
+ *
+ * This is projected-path only. It must never be routed through composables the legacy
+ * rendering also uses: the kill switch has to keep legacy byte-for-byte identical.
+ */
+@Composable
+private fun ProjectedToolCommandBlock(
+    arguments: String,
+    modifier: Modifier = Modifier,
+) {
+    val command = remember(arguments) { arguments.toDisplayCommand() }
+    if (command.isEmpty()) return
+
+    SelectionContainer {
+        Text(
+            text = command,
+            style = MaterialTheme.chatTypography.codeBlock
+                .scaledBy(LocalChatFontScale.current),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            // Soft wrap rather than horizontal scroll: a nested horizontal scroller
+            // inside the vertically scrolling chat list fights the parent for drags,
+            // and wrapping stays readable at narrow widths and large font scales.
+            softWrap = true,
+            maxLines = PROJECTED_COMMAND_MAX_LINES,
+            overflow = TextOverflow.Ellipsis,
+            modifier = modifier.fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * Outcome indicator for an expanded tool row. Pairs an icon and a text label with the
+ * colour so success/failure is not conveyed by colour alone.
+ */
+@Composable
+private fun ProjectedToolOutcomeLabel(
+    state: ToolTimelineState,
+    modifier: Modifier = Modifier,
+) {
+    val (icon, label, tint) = when (state) {
+        ToolTimelineState.Failed, ToolTimelineState.Rejected ->
+            Triple(LettaIcons.Error, "Failed", MaterialTheme.colorScheme.error)
+        ToolTimelineState.Warning ->
+            Triple(LettaIcons.Warning, "Warning", MaterialTheme.customColors.warningTextColor)
+        ToolTimelineState.Succeeded ->
+            Triple(LettaIcons.CheckCircle, "Succeeded", MaterialTheme.colorScheme.primary)
+        else -> return
+    }
+
+    Row(
+        modifier = modifier.semantics(mergeDescendants = true) { contentDescription = label },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(12.dp),
+            tint = tint,
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall.scaledBy(LocalChatFontScale.current),
+            color = tint,
+        )
+    }
+}
+
+private const val PROJECTED_COMMAND_MAX_LINES = 12
+private const val PROJECTED_COMMAND_MAX_CHARS = 4000
+
+/**
+ * Bounded normalisation of a raw tool-argument payload for monospace display.
+ * Trims, caps length so a huge argument blob cannot drive unbounded text layout, and
+ * drops the empty-object placeholder. No parsing.
+ */
+private fun String.toDisplayCommand(): String {
+    val trimmed = trim()
+    if (trimmed.isEmpty() || trimmed == "{}") return ""
+    return if (trimmed.length > PROJECTED_COMMAND_MAX_CHARS) {
+        trimmed.take(PROJECTED_COMMAND_MAX_CHARS) + "…"
+    } else {
+        trimmed
     }
 }

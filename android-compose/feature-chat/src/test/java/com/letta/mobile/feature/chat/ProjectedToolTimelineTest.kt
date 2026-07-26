@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat
 import androidx.compose.material3.Text
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -391,6 +392,56 @@ class ProjectedToolTimelineTest {
 
         // Auto-expanded row collapsed after staged delay: detail output is no longer displayed
         composeRule.onNodeWithText("/root").assertDoesNotExist()
+    }
+
+    @Test
+    fun togglingTimelineMode_preservesCanonicalDataAndKeys() {
+        val messageA = toolMessage(id = "tc-a", command = "pwd")
+        val messageB = toolMessage(id = "tc-b", command = "ls")
+        val messages = listOf(messageA, messageB)
+
+        val stepKeysBefore = com.letta.mobile.feature.chat.screen
+            .compactRunToolCallSteps(messages).map { it.key }
+
+        // The mode is toggled inside ONE composition. Calling setContent twice throws
+        // ("has already set content") and would not exercise a live switch anyway.
+        var useProjected by mutableStateOf(false)
+
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides useProjected) {
+                        RunBlock(
+                            messages = messages,
+                            collapsed = false,
+                            onToggleCollapsed = {},
+                        ) { message, _, rowModifier ->
+                            Text(text = message.id, modifier = rowModifier)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Legacy presentation renders the compact group card.
+        composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
+
+        composeRule.runOnIdle { useProjected = true }
+        composeRule.waitForIdle()
+
+        // Projected presentation renders per-call rows from the same messages.
+        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(ls)").assertIsDisplayed()
+
+        // The canonical step keys are unchanged by the switch — no migration, no rewrite.
+        val stepKeysAfter = com.letta.mobile.feature.chat.screen
+            .compactRunToolCallSteps(messages).map { it.key }
+        assertEquals(stepKeysBefore, stepKeysAfter)
+        assertEquals(listOf(messageA, messageB), messages)
     }
 
     private fun approvalRequest() = UiApprovalRequest(

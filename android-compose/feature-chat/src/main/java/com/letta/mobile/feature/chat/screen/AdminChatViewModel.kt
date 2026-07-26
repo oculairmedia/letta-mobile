@@ -13,6 +13,7 @@ import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.health.ShimBackendDetector
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
@@ -388,6 +389,9 @@ internal class AdminChatViewModel @Inject constructor(
     val chatBackground: StateFlow<ChatBackground> = settingsRepository.getChatBackgroundKey()
         .map { ChatBackground.fromKey(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatBackground.Default)
+
+    val chatTimelineMode: StateFlow<ChatTimelineMode> = settingsRepository.getChatTimelineMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), settingsRepository.chatTimelineMode.value)
 
     val chatFontScale: StateFlow<Float> = settingsRepository.getChatFontScale()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 1f)
