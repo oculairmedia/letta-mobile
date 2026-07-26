@@ -5,7 +5,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import com.letta.mobile.feature.chat.screen.LocalUseProjectedToolTimeline
 import com.letta.mobile.ui.components.StreamingMarkdownText
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.chat.render.RenderDiagnostics
@@ -47,12 +46,12 @@ internal fun AssistantResponseText(props: AssistantResponseTextProps) {
         stabilizeTables = streamingState.hasStreamed || streamingState.hasTable,
         isStreaming = effectivelyStreaming,
         animateSettledSize = effectivelyStreaming,
-        // letta-mobile-8kdjm.10: fade only the appended delta, and only under the
-        // TimelineV1 presentation mode. Gating on the same switch .14 persists keeps
-        // legacy rendering byte-for-byte identical when the kill switch is off.
-        // The fade itself is already inert under reduced motion and inside
-        // code/math/table blocks, and only engages on a strict prefix extension.
-        fadeAppendedText = LocalUseProjectedToolTimeline.current,
+        // letta-mobile-8kdjm.10's appended-delta fade stays OFF here. Enabling it made the
+        // streaming tail visibly flicker on device: every delta starts a new fade range,
+        // snapping the freshly appended text to alpha 0, and deltas arrive faster than a
+        // fade completes, so the tail pulses instead of easing in. The fade needs to
+        // coalesce across deltas (or run once per settled block) before it can ship —
+        // tracked on the bead rather than left on in a worse state than dormant.
         modifier = props.modifier,
     )
 }
