@@ -72,6 +72,34 @@ private val ComposerRestingElevation = 0.dp
 private val ComposerEngagedElevation = 2.dp
 private const val ComposerPressedScale = 0.96f
 
+internal data class LivingComposerState(
+    val focused: Boolean,
+    val text: String,
+    val hasStagedContent: Boolean,
+) {
+    val isEngaged: Boolean
+        get() = focused || text.isNotBlank() || hasStagedContent
+}
+
+private data class ComposerSendState(
+    val text: String,
+    val enabled: Boolean,
+    val canSendOverride: Boolean?,
+) {
+    val canSend: Boolean
+        get() = (canSendOverride ?: text.isNotBlank()) && enabled
+}
+
+private enum class ComposerMotionPreference {
+    Full,
+    Reduced,
+}
+
+private enum class ComposerPulseMode {
+    Active,
+    Static,
+}
+
 @Stable
 private data class ComposerTrailingActionSpec(
     val visible: Boolean,
@@ -85,8 +113,20 @@ private data class ComposerTrailingActionSpec(
     val iconSize: Dp,
     val visualScale: State<Float>,
     val pulseScale: State<Float>,
-    val reducedMotion: Boolean,
+    val motionPreference: ComposerMotionPreference,
     val customContent: (@Composable () -> Unit)?,
+)
+
+private data class ComposerActionIconSpec(
+    val icon: ImageVector,
+    val contentDescription: String,
+    val size: Dp,
+    val motionPreference: ComposerMotionPreference,
+)
+
+private data class ComposerSurfaceColors(
+    val resting: Color,
+    val engaged: Color,
 )
 
 private data class ComposerVisualTargets(
@@ -96,39 +136,27 @@ private data class ComposerVisualTargets(
 )
 
 private fun composerVisualTargets(
-    engaged: Boolean,
-    restingColor: Color,
-    engagedColor: Color,
-): ComposerVisualTargets = if (engaged) {
+    state: LivingComposerState,
+    colors: ComposerSurfaceColors,
+): ComposerVisualTargets = if (state.isEngaged) {
     ComposerVisualTargets(
         corner = ComposerEngagedCorner,
         elevation = ComposerEngagedElevation,
-        color = engagedColor,
+        color = colors.engaged,
     )
 } else {
     ComposerVisualTargets(
         corner = ComposerRestingCorner,
         elevation = ComposerRestingElevation,
-        color = restingColor,
+        color = colors.resting,
     )
 }
 
 private fun <T> composerMotionSpec(
-    reducedMotion: Boolean,
+    preference: ComposerMotionPreference,
     animatedSpec: FiniteAnimationSpec<T>,
-): FiniteAnimationSpec<T> = if (reducedMotion) snap() else animatedSpec
-
-private fun resolveCanSend(
-    text: String,
-    enabled: Boolean,
-    canSendOverride: Boolean?,
-): Boolean = (canSendOverride ?: text.isNotBlank()) && enabled
-
-internal fun isLivingComposerEngaged(
-    focused: Boolean,
-    text: String,
-    hasStagedContent: Boolean,
-): Boolean = focused || text.isNotBlank() || hasStagedContent
+): FiniteAnimationSpec<T> =
+    if (preference == ComposerMotionPreference.Reduced) snap() else animatedSpec
 
 /**
  * Shared pill-shaped input bar with send button.
@@ -195,22 +223,33 @@ fun LettaInputBar(
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current
     val reducedMotion = rememberReducedMotionEnabled()
-    val canSend = resolveCanSend(text, enabled, canSendOverride)
+    val motionPreference = if (reducedMotion) {
+        ComposerMotionPreference.Reduced
+    } else {
+        ComposerMotionPreference.Full
+    }
+    val canSend = ComposerSendState(
+        text = text,
+        enabled = enabled,
+        canSendOverride = canSendOverride,
+    ).canSend
     val focused = remember { mutableStateOf(false) }
-    val engaged = isLivingComposerEngaged(
+    val livingState = LivingComposerState(
         focused = focused.value,
         text = text,
         hasStagedContent = hasStagedContent,
     )
     val visualTargets = composerVisualTargets(
-        engaged = engaged,
-        restingColor = colorScheme.surfaceContainerLow,
-        engagedColor = colorScheme.surfaceContainer,
+        state = livingState,
+        colors = ComposerSurfaceColors(
+            resting = colorScheme.surfaceContainerLow,
+            engaged = colorScheme.surfaceContainer,
+        ),
     )
     val composerCorner by animateDpAsState(
         targetValue = visualTargets.corner,
         animationSpec = composerMotionSpec(
-            reducedMotion,
+            motionPreference,
             MaterialTheme.motionScheme.fastSpatialSpec(),
         ),
         label = "inputComposerCorner",
@@ -218,7 +257,7 @@ fun LettaInputBar(
     val composerElevation by animateDpAsState(
         targetValue = visualTargets.elevation,
         animationSpec = composerMotionSpec(
-            reducedMotion,
+            motionPreference,
             MaterialTheme.motionScheme.fastSpatialSpec(),
         ),
         label = "inputComposerElevation",
@@ -226,7 +265,7 @@ fun LettaInputBar(
     val composerColor by animateColorAsState(
         targetValue = visualTargets.color,
         animationSpec = composerMotionSpec(
-            reducedMotion,
+            motionPreference,
             MaterialTheme.motionScheme.fastEffectsSpec(),
         ),
         label = "inputComposerColor",
@@ -234,7 +273,7 @@ fun LettaInputBar(
     val actionVisualScale = animateFloatAsState(
         targetValue = actionSizeFraction.coerceIn(0.7f, 1f),
         animationSpec = composerMotionSpec(
-            reducedMotion,
+            motionPreference,
             MaterialTheme.motionScheme.fastSpatialSpec(),
         ),
         label = "inputActionVisualScale",
@@ -242,7 +281,7 @@ fun LettaInputBar(
     val actionIconSize by animateDpAsState(
         targetValue = ComposerActionIconSize * actionSizeFraction.coerceIn(0.7f, 1f),
         animationSpec = composerMotionSpec(
-            reducedMotion,
+            motionPreference,
             MaterialTheme.motionScheme.fastSpatialSpec(),
         ),
         label = "inputActionIconSize",
@@ -257,7 +296,11 @@ fun LettaInputBar(
     // graphicsLayer rather than layout, so the touch target stays at the
     // baseline 48 dp regardless of phase.
     val actionPulseScale = rememberActionPulseScale(
-        enabled = actionPulse && !reducedMotion,
+        mode = if (actionPulse && !reducedMotion) {
+            ComposerPulseMode.Active
+        } else {
+            ComposerPulseMode.Static
+        },
     )
 
     Surface(
@@ -329,7 +372,7 @@ fun LettaInputBar(
                     iconSize = actionIconSize,
                     visualScale = actionVisualScale,
                     pulseScale = actionPulseScale,
-                    reducedMotion = reducedMotion,
+                    motionPreference = motionPreference,
                     customContent = customTrailingContent,
                 ),
                 modifier = Modifier.align(Alignment.Bottom),
@@ -352,8 +395,8 @@ private fun ComposerTrailingAction(
     val view = LocalView.current
     AnimatedVisibility(
         visible = spec.visible,
-        enter = composerActionEnterTransition(spec.reducedMotion),
-        exit = composerActionExitTransition(spec.reducedMotion),
+        enter = composerActionEnterTransition(spec.motionPreference),
+        exit = composerActionExitTransition(spec.motionPreference),
         modifier = modifier,
         label = "inputActionVisibility",
     ) {
@@ -382,18 +425,22 @@ private fun ComposerTrailingAction(
             ),
         ) {
             ComposerActionIcon(
-                icon = spec.icon,
-                contentDescription = spec.contentDescription,
-                size = spec.iconSize,
-                reducedMotion = spec.reducedMotion,
+                spec = ComposerActionIconSpec(
+                    icon = spec.icon,
+                    contentDescription = spec.contentDescription,
+                    size = spec.iconSize,
+                    motionPreference = spec.motionPreference,
+                ),
             )
         }
     }
 }
 
 @Composable
-private fun composerActionEnterTransition(reducedMotion: Boolean): EnterTransition =
-    if (reducedMotion) {
+private fun composerActionEnterTransition(
+    preference: ComposerMotionPreference,
+): EnterTransition =
+    if (preference == ComposerMotionPreference.Reduced) {
         fadeIn(tween(durationMillis = 0))
     } else {
         fadeIn(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
@@ -404,8 +451,10 @@ private fun composerActionEnterTransition(reducedMotion: Boolean): EnterTransiti
     }
 
 @Composable
-private fun composerActionExitTransition(reducedMotion: Boolean): ExitTransition =
-    if (reducedMotion) {
+private fun composerActionExitTransition(
+    preference: ComposerMotionPreference,
+): ExitTransition =
+    if (preference == ComposerMotionPreference.Reduced) {
         fadeOut(tween(durationMillis = 0))
     } else {
         fadeOut(animationSpec = MaterialTheme.motionScheme.fastEffectsSpec()) +
@@ -417,16 +466,13 @@ private fun composerActionExitTransition(reducedMotion: Boolean): ExitTransition
 
 @Composable
 private fun ComposerActionIcon(
-    icon: ImageVector,
-    contentDescription: String,
-    size: Dp,
-    reducedMotion: Boolean,
+    spec: ComposerActionIconSpec,
 ) {
-    if (reducedMotion) {
+    if (spec.motionPreference == ComposerMotionPreference.Reduced) {
         Icon(
-            icon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(size),
+            spec.icon,
+            contentDescription = spec.contentDescription,
+            modifier = Modifier.size(spec.size),
         )
         return
     }
@@ -444,21 +490,21 @@ private fun ComposerActionIcon(
                     ),
             )
     AnimatedContent(
-        targetState = icon,
+        targetState = spec.icon,
         transitionSpec = { iconTransition },
         label = "inputActionIconMorph",
     ) { targetIcon ->
         Icon(
             targetIcon,
-            contentDescription = contentDescription,
-            modifier = Modifier.size(size),
+            contentDescription = spec.contentDescription,
+            modifier = Modifier.size(spec.size),
         )
     }
 }
 
 @Composable
-private fun rememberActionPulseScale(enabled: Boolean): State<Float> {
-    if (!enabled) return remember { mutableFloatStateOf(1f) }
+private fun rememberActionPulseScale(mode: ComposerPulseMode): State<Float> {
+    if (mode == ComposerPulseMode.Static) return remember { mutableFloatStateOf(1f) }
     val pulseTransition = rememberInfiniteTransition(label = "actionHeartbeat")
     return pulseTransition.animateFloat(
         initialValue = 1f,

@@ -76,6 +76,19 @@ class RunActivityProjectionTest {
     }
 
     @Test
+    fun `completed work uses positive timeline span when latency is unavailable`() {
+        val activity = projectRunActivity(
+            messages = listOf(
+                message("start"),
+                message("finish") { copy(timestamp = "2026-07-25T12:00:02Z") },
+            ),
+            isStreaming = false,
+        )!!
+
+        assertEquals(2_000L, activity.durationMs)
+    }
+
+    @Test
     fun `message failures are counted without double-counting failed tools`() {
         val activity = projectRunActivity(
             messages = listOf(

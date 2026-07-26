@@ -153,6 +153,19 @@ internal fun ChatComposer(
         onSlashCommandSelected = onSlashCommandSelected,
         onSlashCommandUninstall = onSlashCommandUninstall,
     )
+    ChatComposerContent(
+        model = model,
+        callbacks = callbacks,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun ChatComposerContent(
+    model: ChatComposerUiModel,
+    callbacks: ChatComposerCallbacks,
+    modifier: Modifier,
+) {
     var previewAttachment by remember { mutableStateOf<MessageContentPart.Image?>(null) }
     var showComposerActions by remember { mutableStateOf(false) }
     val onToolSelected: (Tool) -> Unit = { tool ->
@@ -166,7 +179,7 @@ internal fun ChatComposer(
     // button visible while streaming so the morphed Stop affordance stays
     // reachable even with the keyboard up.
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val showAction = isStreaming || !keyboardOpen
+    val showAction = model.isStreaming || !keyboardOpen
 
     // letta-mobile-rl0d (audio): swap the Send/Stop button for a
     // HoldToDictateButton when the field is empty. Voice path stays

@@ -81,15 +81,17 @@ private fun List<UiMessage>.runDurationMs(toolDurations: List<Long>): Long? {
         ?.takeIf { it >= 0L }
         ?.let { return it }
 
-    val first = firstNotNullOfOrNull { it.timestamp.toEpochMillisOrNull() }
-    val last = asReversed().firstNotNullOfOrNull { it.timestamp.toEpochMillisOrNull() }
-    if (first != null && last != null && last > first) {
-        return last - first
-    }
+    timestampDurationMs()?.let { return it }
 
     return toolDurations
         .takeIf { it.isNotEmpty() }
         ?.fold(0L) { total, duration -> total + duration.coerceAtLeast(0L) }
+}
+
+private fun List<UiMessage>.timestampDurationMs(): Long? {
+    val first = firstNotNullOfOrNull { it.timestamp.toEpochMillisOrNull() } ?: return null
+    val last = asReversed().firstNotNullOfOrNull { it.timestamp.toEpochMillisOrNull() } ?: return null
+    return (last - first).takeIf { it > 0L }
 }
 
 private fun String.toEpochMillisOrNull(): Long? =

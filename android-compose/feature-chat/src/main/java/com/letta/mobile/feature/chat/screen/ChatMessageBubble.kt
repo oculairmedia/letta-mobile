@@ -138,26 +138,40 @@ private class LongPressInteraction(
     private suspend fun androidx.compose.ui.input.pointer.PointerInputScope.detectLongPress() {
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
-            val upBeforeTimeout = withTimeoutOrNull(
-                chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
-            ) {
-                // Spin until the pointer lifts (short tap) — do not consume.
-                while (true) {
-                    val event = awaitPointerEvent()
-                    if (event.changes.any { !it.pressed }) break
-                }
-            }
-            if (upBeforeTimeout == null) {
-                onLongPress()
-                // Consume only after recognizing the long-click so release
-                // cannot also activate an attachment or Mermaid child.
-                do {
-                    val event = awaitPointerEvent()
-                    event.changes.forEach { it.consume() }
-                } while (event.changes.any { it.pressed })
-            }
-            // Short taps remain unconsumed for interactive children.
+            handleGestureCompletion(releasedBeforeLongPressTimeout())
         }
+    }
+
+    private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope
+        .releasedBeforeLongPressTimeout(): Boolean =
+        withTimeoutOrNull(
+            chatLongPressTimeoutMillis(viewConfiguration.longPressTimeoutMillis),
+        ) {
+            awaitReleaseWithoutConsuming()
+        } != null
+
+    private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope
+        .awaitReleaseWithoutConsuming() {
+        // Short taps remain unconsumed for interactive children.
+        do {
+            val event = awaitPointerEvent()
+        } while (event.changes.all { it.pressed })
+    }
+
+    private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope
+        .handleGestureCompletion(releasedBeforeTimeout: Boolean) {
+        if (releasedBeforeTimeout) return
+        onLongPress()
+        consumeUntilReleased()
+    }
+
+    private suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.consumeUntilReleased() {
+        // Consume only after recognizing the long-click so release cannot
+        // also activate an attachment or Mermaid child.
+        do {
+            val event = awaitPointerEvent()
+            event.changes.forEach { it.consume() }
+        } while (event.changes.any { it.pressed })
     }
 }
 

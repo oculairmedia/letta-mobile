@@ -11,44 +11,44 @@ class LettaInputBarLivingMotionTest {
     @Test
     fun `composer rests only when unfocused and empty`() {
         assertFalse(
-            isLivingComposerEngaged(
+            LivingComposerState(
                 focused = false,
                 text = "",
                 hasStagedContent = false,
-            ),
+            ).isEngaged,
         )
     }
 
     @Test
     fun `focus engages composer without a draft`() {
         assertTrue(
-            isLivingComposerEngaged(
+            LivingComposerState(
                 focused = true,
                 text = "",
                 hasStagedContent = false,
-            ),
+            ).isEngaged,
         )
     }
 
     @Test
     fun `draft engages composer without focus`() {
         assertTrue(
-            isLivingComposerEngaged(
+            LivingComposerState(
                 focused = false,
                 text = "Continue the analysis",
                 hasStagedContent = false,
-            ),
+            ).isEngaged,
         )
     }
 
     @Test
     fun `staged content engages composer without text`() {
         assertTrue(
-            isLivingComposerEngaged(
+            LivingComposerState(
                 focused = false,
                 text = "",
                 hasStagedContent = true,
-            ),
+            ).isEngaged,
         )
     }
 }
