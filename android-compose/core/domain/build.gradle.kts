@@ -4,6 +4,14 @@ plugins {
     id("org.jetbrains.kotlinx.kover") // version inherited from root
 }
 
+kover {
+    currentProject {
+        createVariant("ci") {
+            add("jvm")
+        }
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17

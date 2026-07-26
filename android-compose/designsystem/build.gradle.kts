@@ -6,6 +6,14 @@ plugins {
     id("org.jetbrains.kotlinx.kover") // version inherited from root
 }
 
+kover {
+    currentProject {
+        createVariant("ci") {
+            add("debug")
+        }
+    }
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")
