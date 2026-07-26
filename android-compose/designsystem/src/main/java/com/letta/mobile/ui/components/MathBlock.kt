@@ -31,6 +31,8 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -90,6 +92,7 @@ fun MathBlock(
             modifier = Modifier
                 .then(if (displayMode) Modifier.fillMaxWidth() else Modifier)
                 .defaultMinSize(minHeight = if (displayMode) 60.dp else 32.dp)
+                .semantics { contentDescription = source }
                 .combinedClickable(
                     onClick = {},
                     onLongClick = { clipboard.setText(AnnotatedString(source)) },

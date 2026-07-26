@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.screen.messagelist
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.theme.ChatBackground
+import androidx.compose.runtime.Immutable
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -17,7 +18,11 @@ internal data class ChatMessageListCallbacks(
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
-)
+) {
+    /** User-facing name for the historical rerun callback. */
+    val onSendAgainMessage: (UiMessage) -> Unit
+        get() = onRerunMessage
+}
 
 internal data class ChatMessageListAppearance(
     val chatMode: String,
@@ -28,6 +33,7 @@ internal data class ChatMessageListAppearance(
     val scrollToMessageId: String? = null,
 )
 
+@Immutable
 internal data class ChatMessageRenderCallbacks(
     val onSendMessage: (String) -> Unit,
     val onRerunMessage: (UiMessage) -> Unit,
@@ -35,7 +41,11 @@ internal data class ChatMessageRenderCallbacks(
     val onToggleRunCollapsed: (String) -> Unit,
     val onToggleReasoningExpanded: (String) -> Unit,
     val onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
-)
+) {
+    /** User-facing name for the historical rerun callback. */
+    val onSendAgainMessage: (UiMessage) -> Unit
+        get() = onRerunMessage
+}
 
 internal data class ChatMessageListEffectsParams(
     val state: com.letta.mobile.ui.chat.render.ChatUiState,
@@ -53,6 +63,8 @@ internal data class ChatMessageListEffectsParams(
 internal data class ChatMessageListLazyColumnParams(
     val bodyParams: ChatMessageListBodyParams,
     val renderCallbacks: ChatMessageRenderCallbacks,
+    val itemState: com.letta.mobile.ui.chat.render.ChatRenderItemState,
+    val conversationId: String?,
     val contentWidthPx: Int,
     val newestMessageId: String?,
     val density: androidx.compose.ui.unit.Density,
@@ -63,6 +75,7 @@ internal data class ChatMessageListLazyColumnParams(
 
 internal data class ActiveStreamingGeometryInput(
     val bodyParams: ChatMessageListBodyParams,
+    val itemState: com.letta.mobile.ui.chat.render.ChatRenderItemState,
     val newestMessageId: String?,
     val contentWidthPx: Int,
     val density: androidx.compose.ui.unit.Density,
@@ -87,6 +100,7 @@ internal data class ChatMessageListBodyParams(
     val showFontIndicator: Boolean,
 )
 
+@Immutable
 internal data class ChatMessageListRenderItemParams(
     val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem,
     val index: Int,
@@ -95,6 +109,7 @@ internal data class ChatMessageListRenderItemParams(
     val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
 )
 
+@Immutable
 internal data class ChatMessageListRenderItemBodyParams(
     val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem,
     val context: ChatMessageListLazyContext,
@@ -103,6 +118,7 @@ internal data class ChatMessageListRenderItemBodyParams(
     val isStreamingRenderItem: Boolean,
 )
 
+@Immutable
 internal data class ChatMessageListRenderRunBlockItemParams(
     val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock,
     val context: ChatMessageListLazyContext,

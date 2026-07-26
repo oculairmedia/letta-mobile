@@ -1,10 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.os.Build
-import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -29,14 +24,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheet
+import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheetActions
+import com.letta.mobile.feature.chat.screen.messageactions.MessageActionsSheetState
+import com.letta.mobile.feature.chat.screen.messageactions.copyMessageText
+import com.letta.mobile.data.chat.projection.messageActionAvailability
 import com.letta.mobile.ui.common.GroupPosition
-import com.letta.mobile.ui.components.ActionSheet
-import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.theme.LettaSpacing
@@ -78,55 +75,41 @@ internal fun ChatMessageItem(
     val showAvatar = false
     val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    val copyLabel = stringResource(R.string.action_copy)
+    val actionsAccessibilityLabel = stringResource(R.string.message_actions_open)
     val copyText = remember(message) { buildMessageCopyText(message) }
+    // Keep the historical parameter name for source compatibility with the
+    // screen/list wiring outside this bead's ownership.
+    val onSendAgainMessage = onRerunMessage
     var showMessageActions by remember { mutableStateOf(false) }
-    val hasUserActions = isUser && onRerunMessage != null
-    val onLongClick: (() -> Unit)? = when {
-        hasUserActions -> {
-            {
-                HapticEffects.longPress(haptic)
-                showMessageActions = true
-            }
+    val actionAvailability = remember(message, copyText, onSendAgainMessage, rerunEnabled) {
+        messageActionAvailability(
+            message = message,
+            copyText = copyText,
+            sendAgainAvailable = onSendAgainMessage != null && rerunEnabled,
+        )
+    }
+    val onLongClick: (() -> Unit)? = if (actionAvailability.hasActions) {
+        {
+            HapticEffects.longPress(haptic)
+            showMessageActions = true
         }
-        copyText.isNotBlank() -> {
-            {
-                HapticEffects.longPress(haptic)
-                copyToClipboard(context, copyLabel, copyText)
-            }
-        }
-        else -> null
+    } else {
+        null
     }
 
-    ActionSheet(
-        show = showMessageActions,
-        onDismiss = { showMessageActions = false },
-        title = "Message actions",
-    ) {
-        if (hasUserActions && rerunEnabled) {
-            ActionSheetItem(
-                text = "Run again",
-                icon = LettaIcons.Refresh,
-                onClick = {
-                    showMessageActions = false
-                    HapticEffects.confirm(haptic, view)
-                    onRerunMessage(message)
-                },
-            )
-        }
-        if (copyText.isNotBlank()) {
-            ActionSheetItem(
-                text = copyLabel,
-                icon = LettaIcons.Copy,
-                onClick = {
-                    showMessageActions = false
-                    HapticEffects.contextClick(haptic, view)
-                    copyToClipboard(context, copyLabel, copyText)
-                },
-            )
-        }
-    }
+    MessageActionsSheet(
+        state = MessageActionsSheetState(
+            message = message,
+            copyText = copyText,
+            availability = actionAvailability,
+            show = showMessageActions,
+        ),
+        actions = MessageActionsSheetActions(
+            onDismiss = { showMessageActions = false },
+            onCopy = { copyMessageText(context, copyText) },
+            onSendAgain = { onSendAgainMessage?.invoke(message) },
+        ),
+    )
 
     // New layout: avatar floats ABOVE the bubble rather than occupying a
     // 40dp-wide gutter next to it. Assistant/tool/reasoning bubbles can then
@@ -185,6 +168,7 @@ internal fun ChatMessageItem(
                 onApprovalDecision = onApprovalDecision,
                 approvalInFlight = approvalInFlight,
                 onLongClick = onLongClick,
+                longClickLabel = actionsAccessibilityLabel,
                 onAttachmentImageTap = onAttachmentImageTap,
             )
         }
@@ -275,17 +259,5 @@ internal fun buildMessageCopyText(message: UiMessage): String {
                 append(result)
             }
         }
-    }
-}
-
-private fun copyToClipboard(
-    context: Context,
-    label: String,
-    text: String,
-) {
-    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Toast.makeText(context, context.getString(R.string.action_copied), Toast.LENGTH_SHORT).show()
     }
 }

@@ -4,8 +4,6 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,16 +14,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -36,7 +31,6 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
-import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.ui.chat.render.runStepDotColor
 import com.letta.mobile.data.chat.projection.runStepDotIcon
@@ -128,14 +122,16 @@ internal fun RunBlock(
     // the OS animation scale is 0, swap instantly instead of playing the ramp.
     val reducedMotion = rememberReducedMotionEnabled()
 
-    // Defensive: the grouping layer already guarantees â‰¥2 messages for a
-    // RunBlock, but if we ever get a single-message run (e.g. via a future
-    // caller), short-circuit to a plain row so we don't paint a degenerate
-    // 1-dot gutter. letta-mobile-m772.10.
-    if (messages.size == 1) {
-        renderRow(messages.single(), GroupPosition.None, Modifier.fillMaxWidth())
-        return
-    }
+    // Stable run keys can also wrap one message. The disclosure still renders
+    // for that work, while the body avoids a degenerate one-dot gutter below.
+    val activity = remember(messages, isStreaming) {
+        projectRunActivity(messages, isStreaming)
+    } ?: return
+    // Active work is not a complete disclosure body yet. Ignore a stale
+    // auto-collapse flag until completion without mutating the caller-owned
+    // expansion state.
+    val collapsible = messages.size > 1
+    val effectiveCollapsed = collapsible && collapsed && !activity.isActive
 
     val runIdentityColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.24f)
 
@@ -147,11 +143,19 @@ internal fun RunBlock(
         modifier = modifier
             .fillMaxWidth(),
     ) {
-        RunHeader(
-            messageCount = messages.size,
-            collapsed = collapsed,
+        RunActivityDisclosure(
+            activity = activity,
+            collapsed = effectiveCollapsed,
+            collapsible = collapsible,
             onToggleCollapsed = onToggleCollapsed,
         )
+
+        // Keep the historical one-step geometry: the disclosure is additive,
+        // but a single message still has no degenerate gutter or connector.
+        if (messages.size == 1) {
+            renderRow(messages.single(), GroupPosition.None, Modifier.fillMaxWidth())
+            return@Column
+        }
 
         Box(modifier = Modifier.fillMaxWidth()) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
@@ -183,7 +187,7 @@ internal fun RunBlock(
                 // transition. Mirrors the pattern in ToolOutputRenderer
                 // (single source of truth for expand/collapse motion).
                 AnimatedContent(
-                    targetState = collapsed,
+                    targetState = effectiveCollapsed,
                     transitionSpec = {
                         if (reducedMotion) {
                             (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
@@ -350,46 +354,6 @@ private fun selectCollapsedPreview(messages: List<UiMessage>): UiMessage {
         if (!messages[i].isReasoning) return messages[i]
     }
     return messages.last()
-}
-
-/**
- * Header row: chevron + step count summary. Click toggles collapse.
- */
-@Composable
-private fun RunHeader(
-    messageCount: Int,
-    collapsed: Boolean,
-    onToggleCollapsed: () -> Unit,
-) {
-    val label = if (collapsed) {
-        "Run · $messageCount steps · tap to expand"
-    } else {
-        "Run · $messageCount steps · tap to collapse"
-    }
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(
-                onClickLabel = if (collapsed) "Expand run" else "Collapse run",
-            ) { onToggleCollapsed() }
-            .padding(horizontal = 4.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(
-            imageVector = LettaIcons.ExpandMore,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-            modifier = Modifier
-                .size(16.dp)
-                .rotate(if (collapsed) 0f else 180f),
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 /**

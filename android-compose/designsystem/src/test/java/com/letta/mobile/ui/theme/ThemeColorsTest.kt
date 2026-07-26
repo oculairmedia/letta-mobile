@@ -10,6 +10,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
+import kotlin.math.abs
 
 @Tag("unit")
 class ThemeColorsTest {
@@ -75,11 +76,16 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `deriveCustomColors maps primary to textLink and harmonized successColor`() {
+    fun `deriveCustomColors maps primary to textLink and harmonized success`() {
         val scheme = lightColorScheme(primary = Color(0xFF123456))
         val custom = deriveCustomColors(scheme)
         assertEquals(Color(0xFF123456), custom.textLink)
-        assertEquals(Color(0xFF123456), custom.successColor)
+        assertColorApproximatelyEquals(
+            expected = Color(0xFF123456),
+            actual = custom.harmonizedSuccess,
+            label = "harmonized success",
+        )
+        assertEquals(Color(0xFF2E9E73), custom.successColor)
     }
 
     @Test
@@ -203,8 +209,26 @@ class ThemeColorsTest {
             ),
             custom.errorContainerColor,
         )
-        assertEquals(Color(0xFF00897B), custom.successColor)
+        assertEquals(Color(0xFF2E9E73), custom.successColor)
         assertEquals(Color(0xFFB2DFDB), custom.successContainerColor)
+    }
+
+    @Test
+    fun `deriveCustomColors keeps stable dark status colors across presets`() {
+        ThemePreset.entries.forEach { preset ->
+            val scheme = presetThemeColors(preset).darkScheme
+            val custom = deriveCustomColors(scheme)
+
+            assertEquals("$preset success", Color(0xFF46C08F), custom.successColor)
+            assertEquals("$preset on-success", Color(0xFF06302B), custom.onSuccessColor)
+            assertEquals("$preset running", Color(0xFFE0A458), custom.runningColor)
+            assertEquals("$preset on-running", Color(0xFF2B1B00), custom.onRunningColor)
+            assertColorApproximatelyEquals(
+                expected = scheme.primary,
+                actual = custom.harmonizedSuccess,
+                label = "$preset harmonized success",
+            )
+        }
     }
 
     // ── ThemePreset enum ─────────────────────────────────────
@@ -212,5 +236,17 @@ class ThemeColorsTest {
     @Test
     fun `ThemePreset has exactly 6 values`() {
         assertEquals(6, ThemePreset.entries.size)
+    }
+
+    private fun assertColorApproximatelyEquals(
+        expected: Color,
+        actual: Color,
+        label: String,
+        tolerance: Float = 2f / 255f,
+    ) {
+        assertTrue("$label red channel differs", abs(expected.red - actual.red) <= tolerance)
+        assertTrue("$label green channel differs", abs(expected.green - actual.green) <= tolerance)
+        assertTrue("$label blue channel differs", abs(expected.blue - actual.blue) <= tolerance)
+        assertTrue("$label alpha channel differs", abs(expected.alpha - actual.alpha) <= tolerance)
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -39,10 +40,13 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
     var composerHeightDp by remember { mutableStateOf(0.dp) }
     val bottomPaddingDp = composerHeightDp + params.bottomInsetDp
 
-    val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = { attachments, index ->
-        imageViewerState = attachments.toImmutableList() to index
+    val openImageViewer: (List<UiImageAttachment>, Int) -> Unit = remember {
+        { attachments, index ->
+            imageViewerState = attachments.toImmutableList() to index
+        }
     }
-    val contentCallbacks = remember(params.viewModel, openImageViewer, params.onActiveFontScaleChange) {
+    val activeFontScaleChange = rememberUpdatedState(params.onActiveFontScaleChange)
+    val contentCallbacks = remember(params.viewModel, openImageViewer) {
         ChatContentCallbacks(
             onSendMessage = { params.viewModel.sendMessage(it) },
             onRerunMessage = { params.viewModel.rerunMessage(it) },
@@ -56,7 +60,7 @@ internal fun rememberChatScreenLayoutLocalState(params: ChatScreenLayoutParams):
             onA2uiAction = params.viewModel::submitA2uiAction,
             onDismissA2uiSurface = params.viewModel::dismissA2uiSurface,
             onAttachmentImageTap = openImageViewer,
-            onActiveFontScaleChange = params.onActiveFontScaleChange,
+            onActiveFontScaleChange = { activeFontScaleChange.value(it) },
             onFontScaleChange = { params.viewModel.setChatFontScale(it) },
         )
     }

@@ -1,3 +1,5 @@
+@file:Suppress("LargeMethod", "ComplexMethod")
+
 package com.letta.mobile.ui.screens.projects
 
 import androidx.compose.animation.AnimatedVisibility
@@ -196,15 +198,23 @@ fun ProjectIssuesScreen(
                 // entry when the user expands it. Items in the LazyColumn use
                 // either the raw `issue.id` (All section) or `"ready-${id}"`
                 // (Ready section); anything else is non-issue chrome.
-                val highlightedIssueId by remember(filteredIssues, filteredReadyWork) {
+                // ⚡ Bolt Optimization: Pre-compute a Set of issue IDs to prevent O(VisibleItems * TotalIssues)
+                // calculations inside the `derivedStateOf` block below. Since `listState.layoutInfo`
+                // forces the block to re-evaluate on every scroll frame (60-120fps), using an O(1)
+                // Set lookup prevents severe CPU thrashing and UI jank.
+                val issueIds = remember(filteredIssues, filteredReadyWork) {
+                    val ids = mutableSetOf<String>()
+                    filteredIssues.forEach { ids.add(it.id) }
+                    filteredReadyWork.forEach { ids.add(it.id) }
+                    ids
+                }
+                val highlightedIssueId by remember(issueIds, listState) {
                     derivedStateOf {
                         val visibleKeys = listState.layoutInfo.visibleItemsInfo.asSequence()
                         visibleKeys
                             .mapNotNull { it.key as? String }
                             .map { key -> if (key.startsWith("ready-")) key.removePrefix("ready-") else key }
-                            .firstOrNull { id ->
-                                filteredIssues.any { it.id == id } || filteredReadyWork.any { it.id == id }
-                            }
+                            .firstOrNull { it in issueIds }
                     }
                 }
                 PullToRefreshBox(
@@ -266,17 +276,7 @@ fun ProjectIssuesScreen(
                             )
                         }
                         if (filteredIssues.isEmpty()) {
-                            item {
-                                EmptyState(
-                                    icon = LettaIcons.ListIcon,
-                                    message = if (state.data.searchQuery.isBlank()) {
-                                        stringResource(R.string.screen_project_issues_empty)
-                                    } else {
-                                        stringResource(R.string.screen_project_issues_empty_search, state.data.searchQuery)
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
+                            item { ProjectIssuesEmptyState(state.data.searchQuery) }
                         } else {
                             itemsIndexed(filteredIssues, key = { _, issue -> issue.id }) { index, issue ->
                                 if (index == filteredIssues.lastIndex && state.data.hasMoreIssues && state.data.isLoadingMoreIssues.not()) {
@@ -295,6 +295,20 @@ fun ProjectIssuesScreen(
             }
         }
     }
+}
+
+
+@Composable
+private fun ProjectIssuesEmptyState(searchQuery: String) {
+    EmptyState(
+        icon = LettaIcons.ListIcon,
+        message = if (searchQuery.isBlank()) {
+            stringResource(R.string.screen_project_issues_empty)
+        } else {
+            stringResource(R.string.screen_project_issues_empty_search, searchQuery)
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

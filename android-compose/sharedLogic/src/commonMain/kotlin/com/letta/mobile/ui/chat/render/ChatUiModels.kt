@@ -1,6 +1,5 @@
 package com.letta.mobile.ui.chat.render
 
-import androidx.compose.material3.SnackbarDuration
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
@@ -29,7 +28,7 @@ data class ProjectChatContext(
 data class PendingToolCall(
     val id: String,
     val name: String,
-    val startedAt: Long = System.currentTimeMillis(),
+    val startedAt: Long,
 )
 
 @androidx.compose.runtime.Immutable
@@ -43,11 +42,22 @@ data class A2uiDebugFrameUi(
 )
 
 @androidx.compose.runtime.Immutable
+enum class ChatSnackbarDuration {
+    Short,
+    Indefinite;
+
+    companion object {
+        fun forRetryableAction(retryable: Boolean): ChatSnackbarDuration =
+            if (retryable) Indefinite else Short
+    }
+}
+
+@androidx.compose.runtime.Immutable
 data class A2uiActionSnackbarUi(
     val id: Long,
     val message: String,
     val actionLabel: String? = null,
-    val duration: SnackbarDuration = SnackbarDuration.Short,
+    val duration: ChatSnackbarDuration = ChatSnackbarDuration.Short,
     val retryAction: com.letta.mobile.data.a2ui.A2uiAction? = null,
 )
 
