@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -34,6 +35,12 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.ui.chat.render.runStepDotColor
 import com.letta.mobile.data.chat.projection.runStepDotIcon
+
+/**
+ * Kill switch for projected tool timeline rendering in RunBlock.
+ * Defaults to LEGACY (false). Bead .14 will persist this value.
+ */
+val LocalUseProjectedToolTimeline = compositionLocalOf { false }
 
 /**
  * Width of the timeline gutter on the left of a run block. Sized to fit a
@@ -67,7 +74,7 @@ private val ToolCallStepDotCenterY = 25.5f.dp
  * through the normal chat-message wrapper, so their first text line sits much
  * closer to the top. Keep this dot on that first-line midline.
  */
-private val CompactToolCallGroupStepDotCenterY = 18.dp
+internal val CompactToolCallGroupStepDotCenterY = 18.dp
 
 internal object RunBlockTestTags {
     fun dot(stepKey: String) = "run-dot-$stepKey"
@@ -403,6 +410,19 @@ private fun RunToolCallGroupStepRow(
     activeApprovalRequestId: String?,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
 ) {
+    if (LocalUseProjectedToolTimeline.current) {
+        ProjectedToolTimelineGroupStepRow(
+            step = step,
+            runIdentityColor = runIdentityColor,
+            drawLineAbove = drawLineAbove,
+            drawLineBelow = drawLineBelow,
+            animateRows = animateRows,
+            activeApprovalRequestId = activeApprovalRequestId,
+            onApprovalDecision = onApprovalDecision,
+        )
+        return
+    }
+
     val dotColor = if (step.pendingApprovalToolCallIds.isNotEmpty()) {
         MaterialTheme.colorScheme.secondary
     } else {
@@ -430,7 +450,7 @@ private fun RunToolCallGroupStepRow(
 }
 
 @Composable
-private fun RunStepRow(
+internal fun RunStepRow(
     stepKey: String,
     dotColor: androidx.compose.ui.graphics.Color,
     stepDotCenterY: androidx.compose.ui.unit.Dp,

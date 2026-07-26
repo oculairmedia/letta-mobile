@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -389,7 +390,13 @@ fun StatusTimelineItem(
     content: @Composable () -> Unit,
 ) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        // height(IntrinsicSize.Min) makes the row size to its CONTENT, so the rail's
+        // fillMaxHeight() below resolves to the content height. Without it the rail
+        // fills the incoming (screen) constraint instead, making every item as tall as
+        // the viewport and pushing later rows out of view.
+        modifier = modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.Top,
     ) {
         Box(
