@@ -6,10 +6,12 @@ import com.letta.mobile.ui.components.PreviewAccordionsContent
 import com.letta.mobile.ui.components.PreviewEmptyStateContent
 import com.letta.mobile.ui.components.PreviewErrorDialogContent
 import com.letta.mobile.ui.components.PreviewLatencyTextContent
+import com.letta.mobile.ui.components.PreviewLiveStatusTextContent
 import com.letta.mobile.ui.components.PreviewMessageActionButtonsContent
 import com.letta.mobile.ui.components.PreviewMessageBubbleContent
 import com.letta.mobile.ui.components.PreviewMessageSenderContent
 import com.letta.mobile.ui.components.PreviewRotationalLoaderContent
+import com.letta.mobile.ui.components.PreviewStatusTimelineContent
 import com.letta.mobile.ui.components.PreviewThinkingSectionContent
 import org.junit.Ignore
 import org.junit.Rule
@@ -68,5 +70,15 @@ class PreviewScreenshotTest {
     @Test
     fun messageSender() {
         paparazzi.snapshot { PreviewMessageSenderContent() }
+    }
+
+    @Test
+    fun liveStatusText() {
+        paparazzi.snapshot { PreviewLiveStatusTextContent() }
+    }
+
+    @Test
+    fun statusTimeline() {
+        paparazzi.snapshot { PreviewStatusTimelineContent() }
     }
 }

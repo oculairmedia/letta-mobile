@@ -64,12 +64,22 @@ fun MarkdownText(
     text: String,
     modifier: Modifier = Modifier,
     textColor: Color = MaterialTheme.colorScheme.onSurface,
+    appendedFadeRange: IntRange? = null,
+    appendedFadeAlpha: Float = 1f,
 ) {
     if (text.isBlank()) return
 
+    val effectiveTextColor = remember(textColor, appendedFadeRange, appendedFadeAlpha) {
+        if (appendedFadeRange != null && appendedFadeRange.first == 0 && appendedFadeAlpha < 0.999f) {
+            textColor.copy(alpha = appendedFadeAlpha.coerceIn(0f, 1f))
+        } else {
+            textColor
+        }
+    }
+
     val renderText = remember(text) { exposeA2uiJsonTagsAsCodeFences(text) }
     if (renderText != text) {
-        MarkdownTextRaw(text = renderText, modifier = modifier, textColor = textColor)
+        MarkdownTextRaw(text = renderText, modifier = modifier, textColor = effectiveTextColor)
         return
     }
 
@@ -107,12 +117,12 @@ fun MarkdownText(
                     when (seg) {
                         is MathSegment.Text -> {
                             if (containsLikelyInlineMath(seg.content)) {
-                                InlineMathParagraph(text = seg.content, textColor = textColor)
+                                InlineMathParagraph(text = seg.content, textColor = effectiveTextColor)
                             } else {
                                 MarkdownTextRaw(
                                     text = seg.content,
                                     modifier = Modifier,
-                                    textColor = textColor,
+                                    textColor = effectiveTextColor,
                                 )
                             }
                         }
@@ -125,7 +135,7 @@ fun MarkdownText(
         }
     }
 
-    MarkdownTextRaw(text = renderText, modifier = modifier, textColor = textColor)
+    MarkdownTextRaw(text = renderText, modifier = modifier, textColor = effectiveTextColor)
 }
 
 /**
