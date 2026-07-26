@@ -75,11 +75,12 @@ class ThemeColorsTest {
     }
 
     @Test
-    fun `deriveCustomColors maps primary to textLink and harmonized successColor`() {
+    fun `deriveCustomColors maps primary to textLink and harmonized success`() {
         val scheme = lightColorScheme(primary = Color(0xFF123456))
         val custom = deriveCustomColors(scheme)
         assertEquals(Color(0xFF123456), custom.textLink)
-        assertEquals(Color(0xFF123456), custom.successColor)
+        assertEquals(Color(0xFF123456), custom.harmonizedSuccess)
+        assertEquals(Color(0xFF2E9E73), custom.successColor)
     }
 
     @Test
@@ -203,8 +204,23 @@ class ThemeColorsTest {
             ),
             custom.errorContainerColor,
         )
-        assertEquals(Color(0xFF00897B), custom.successColor)
+        assertEquals(Color(0xFF2E9E73), custom.successColor)
         assertEquals(Color(0xFFB2DFDB), custom.successContainerColor)
+    }
+
+    @Test
+    fun `deriveCustomColors keeps stable dark status colors across presets`() {
+        val scheme = darkColorScheme(
+            background = Color.Black,
+            primary = Color(0xFF66CCBB),
+        )
+        val custom = deriveCustomColors(scheme)
+
+        assertEquals(Color(0xFF46C08F), custom.successColor)
+        assertEquals(Color(0xFF06302B), custom.onSuccessColor)
+        assertEquals(Color(0xFFE0A458), custom.runningColor)
+        assertEquals(Color(0xFF2B1B00), custom.onRunningColor)
+        assertEquals(Color(0xFF66CCBB), custom.harmonizedSuccess)
     }
 
     // ── ThemePreset enum ─────────────────────────────────────
