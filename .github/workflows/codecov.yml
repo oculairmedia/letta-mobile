@@ -50,15 +50,31 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
-      - name: Generate aggregated Kover XML report
-        run: ./gradlew koverXmlReport
+      # The root merging task cannot consume the external variants published
+      # by sharedLogic's KMP graph. Generate each owned module report directly
+      # and let Codecov merge the XML inputs.
+      - name: Generate module Kover XML reports
+        run: |
+          ./gradlew --no-configuration-cache \
+            :feature-chat:koverXmlReport \
+            :designsystem:koverXmlReport \
+            :sharedLogic:koverXmlReport
+
+      - name: Verify coverage reports
+        run: |
+          test -s feature-chat/build/reports/kover/report.xml
+          test -s designsystem/build/reports/kover/report.xml
+          test -s sharedLogic/build/reports/kover/report.xml
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
           use_oidc: true
           fail_ci_if_error: true
-          files: android-compose/build/reports/kover/report.xml
+          files: >-
+            android-compose/feature-chat/build/reports/kover/report.xml,
+            android-compose/designsystem/build/reports/kover/report.xml,
+            android-compose/sharedLogic/build/reports/kover/report.xml
           flags: kotlin
           name: kotlin-coverage
           verbose: true
