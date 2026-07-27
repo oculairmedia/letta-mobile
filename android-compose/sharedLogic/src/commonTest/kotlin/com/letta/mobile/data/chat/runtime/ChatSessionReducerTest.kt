@@ -240,6 +240,7 @@ class ChatSessionReducerTest {
         assertEquals(ChatConnectionState.Live, hydrated.connectionState)
         assertEquals("new text", withMessages.selectedMessages.single().content)
         assertEquals("new text", withMessages.conversations.single().lastMessagePreview)
+        assertEquals("2026-06-07T00:00:00Z", withMessages.conversations.single().updatedAtLabel)
     }
 
     @Test

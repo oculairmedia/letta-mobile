@@ -286,8 +286,13 @@ private fun MessageListColumn(params: MessageListColumnParams) {
                         // so once pinned the card touched the pane's edge with no
                         // breathing room. Top padding here applies whether pinned
                         // or scrolled inline, keeping the gap consistent either way.
+                        // End padding clears the floating background-tasks
+                        // toggle at the pane's top-right, so the pinned card
+                        // floats beside it instead of running underneath.
                         Box(
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 12.dp, end = 44.dp),
                             contentAlignment = Alignment.TopCenter,
                         ) {
                             MessageListItem(item = item, streamingMessageId = streamingMessageId)

@@ -27,6 +27,10 @@ enum class DesktopDestination(
     val label: String,
     val summary: String,
 ) {
+    Home(
+        label = "Home",
+        summary = "Recent conversations across every agent, a chatbox, and the fleet dashboard below.",
+    ),
     Overview(
         label = "Overview",
         summary = "Windows desktop launch status and backend configuration.",

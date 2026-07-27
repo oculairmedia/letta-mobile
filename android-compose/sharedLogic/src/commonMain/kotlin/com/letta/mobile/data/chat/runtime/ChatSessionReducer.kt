@@ -256,7 +256,10 @@ object ChatSessionReducer {
                 messagesByConversationId = state.messagesByConversationId + (conversationId to messages),
                 conversations = state.conversations.map { conversation ->
                     if (conversation.id == conversationId) {
-                        conversation.copy(lastMessagePreview = messages.lastPreviewOr(conversation.lastMessagePreview))
+                        conversation.copy(
+                            lastMessagePreview = messages.lastPreviewOr(conversation.lastMessagePreview),
+                            updatedAtLabel = messages.lastTimestampOr(conversation.updatedAtLabel),
+                        )
                     } else {
                         conversation
                     }
@@ -348,6 +351,9 @@ object ChatSessionReducer {
 
     private fun List<UiMessage>.lastPreviewOr(fallback: String): String =
         lastOrNull { it.content.isNotBlank() }?.content?.lineSequence()?.firstOrNull()?.take(140) ?: fallback
+
+    private fun List<UiMessage>.lastTimestampOr(fallback: String): String =
+        lastOrNull { it.timestamp.isNotBlank() }?.timestamp ?: fallback
 
     private val sendEnabledStates = setOf(
         ChatConnectionState.Live,

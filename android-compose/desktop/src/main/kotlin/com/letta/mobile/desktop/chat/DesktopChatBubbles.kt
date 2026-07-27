@@ -21,7 +21,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.BorderStroke
@@ -31,6 +34,8 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.ContentCopy
+import androidx.compose.material.icons.outlined.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,13 +49,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
@@ -209,12 +219,41 @@ private data class CopyButtonInteraction(
  */
 @Composable
 internal fun UserPrompt(message: UiMessage) {
+    // Clamped by default: this card stays pinned as a sticky header, so a
+    // massive prompt must not swallow the viewport. A chevron (shown only when
+    // the text actually overflows) expands the card in place for a closer look
+    // and collapses it back.
+    var expanded by remember(message.id) { mutableStateOf(false) }
+    var overflowed by remember(message.id) { mutableStateOf(false) }
+    // The whole card toggles expansion (enabled only when there is hidden
+    // text), so a huge expanded prompt can always be collapsed by clicking
+    // anywhere on it — not just a chevron that may sit outside the fold.
+    // Hand-drawn outline instead of Surface border: sides + bottom only, no
+    // top line — a full box read too heavy, and the pinned card's top edge
+    // doubles up against the pane's own boundary.
+    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
     Surface(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        onClick = { expanded = !expanded },
+        enabled = overflowed || expanded,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+            .drawBehind {
+                val stroke = 1.dp.toPx()
+                val radius = 10.dp.toPx()
+                // Clip away the strip above the corner arcs so only the side
+                // and bottom segments of the rounded outline survive.
+                clipRect(top = radius) {
+                    drawRoundRect(
+                        color = edgeColor,
+                        cornerRadius = CornerRadius(radius, radius),
+                        style = Stroke(width = stroke),
+                    )
+                }
+            },
         shape = RoundedCornerShape(10.dp),
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         contentColor = MaterialTheme.colorScheme.onSurface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
     ) {
         Row(
             modifier = Modifier.padding(start = 14.dp, end = 6.dp, top = 10.dp, bottom = 10.dp),
@@ -226,18 +265,45 @@ internal fun UserPrompt(message: UiMessage) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (message.content.isNotBlank()) {
-                    SelectionContainer {
-                        Text(text = message.content, style = MaterialTheme.typography.bodyMedium)
+                    // Expanded height is capped with internal scrolling so the
+                    // card (and its collapse affordances) never outgrows the
+                    // viewport. No SelectionContainer: it would swallow the
+                    // card's toggle clicks, and the copy button already carries
+                    // the full text.
+                    Box(
+                        modifier = if (expanded) {
+                            Modifier
+                                .heightIn(max = PromptExpandedMaxHeight)
+                                .verticalScroll(rememberScrollState())
+                        } else {
+                            Modifier
+                        },
+                    ) {
+                        Text(
+                            text = message.content,
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = if (expanded) Int.MAX_VALUE else 3,
+                            overflow = TextOverflow.Ellipsis,
+                            onTextLayout = { if (!expanded) overflowed = it.hasVisualOverflow },
+                        )
                     }
                 }
-                DesktopImageAttachmentsGrid(
+                // Compact thumbnails, not the full grid: this card pins as a
+                // sticky header, so a 220dp image cell would blow the fold out.
+                // Click a thumb for fullscreen.
+                DesktopImageAttachmentThumbnailStrip(
                     attachments = message.attachments,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
-            // Copy is the only wired affordance — a message "edit"/resend needs
-            // conversation-fork support that isn't in place, so it's omitted rather
-            // than shown as a dead control.
+            // Expand appears only when there is hidden text (or while expanded,
+            // so it can always collapse back).
+            if (overflowed || expanded) {
+                PromptExpandButton(expanded = expanded, onToggle = { expanded = !expanded })
+            }
+            // Copy is the only other wired affordance — a message "edit"/resend
+            // needs conversation-fork support that isn't in place, so it's
+            // omitted rather than shown as a dead control.
             if (message.content.isNotBlank()) {
                 CopyIconButton(
                     text = message.content,
@@ -245,6 +311,30 @@ internal fun UserPrompt(message: UiMessage) {
                     config = CopyActionConfig(contentDescription = "Copy message", emphasized = false),
                 )
             }
+        }
+    }
+}
+
+/** Cap for the expanded prompt: tall enough to read, never a full viewport. */
+private val PromptExpandedMaxHeight = 340.dp
+
+@Composable
+private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
+    val description = if (expanded) "Collapse prompt" else "Expand prompt"
+    DesktopTooltip(text = description) {
+        Box(
+            modifier = Modifier
+                .sizeIn(minWidth = 28.dp, minHeight = 28.dp)
+                .clip(CircleShape)
+                .clickable(onClick = onToggle),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = description,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                modifier = Modifier.size(16.dp),
+            )
         }
     }
 }
