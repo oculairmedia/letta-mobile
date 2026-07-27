@@ -57,9 +57,11 @@ import io.github.vinceglb.filekit.dialogs.compose.rememberFilePickerLauncher
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.FileKitDialogSettings
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.StateFlow
 import java.awt.Window
+import java.time.Instant
 import dev.nucleusframework.application.NucleusApplicationScope
 
 /** Application-scoped inputs the desktop shell composes over. */
@@ -330,20 +332,34 @@ internal fun LettaDesktopApp(
     // Home dashboard state: folded entirely from state the shell already holds
     // (conversations + roster + who is mid-run) — no extra repositories.
     var homeSort by remember { mutableStateOf(FleetSort()) }
-    val runningAgentIds = remember(thinkingAgentId, activeSubagents) {
+    val streamingAgentId = if (replyPresence.isStreaming) {
+        chatState.conversations.firstOrNull { it.id == chatState.selectedConversationId }?.agentId
+    } else {
+        null
+    }
+    val runningAgentIds = remember(thinkingAgentId, streamingAgentId, activeSubagents) {
         buildSet {
             thinkingAgentId?.let(::add)
+            streamingAgentId?.let(::add)
             activeSubagents
                 .filter { it.status == SubagentStatus.RUNNING }
                 .forEach { entry -> entry.subagentAgentId?.let(::add) }
         }
     }
-    val fleetOverview = remember(chatState.conversations, rosterAgents, runningAgentIds) {
+    var fleetClock by remember { mutableStateOf(Instant.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60_000)
+            fleetClock = Instant.now()
+        }
+    }
+    val fleetOverview = remember(chatState.conversations, rosterAgents, runningAgentIds, fleetClock) {
         buildFleetOverview(
             FleetOverviewParams(
                 conversations = chatState.conversations,
                 rosterAgents = rosterAgents,
                 runningAgentIds = runningAgentIds,
+                now = fleetClock,
             ),
         )
     }
@@ -499,8 +515,8 @@ internal fun LettaDesktopApp(
                       if (!railExpanded) return@pointerInput
                       awaitPointerEventScope {
                           while (true) {
-                              val event = awaitPointerEvent(PointerEventPass.Initial)
-                              if (event.type == PointerEventType.Press) {
+                              val event = awaitPointerEvent(PointerEventPass.Final)
+                              if (event.type == PointerEventType.Release) {
                                   val x = event.changes.firstOrNull()?.position?.x
                                   if (x != null && x > 248.dp.toPx()) {
                                       railExpanded = false

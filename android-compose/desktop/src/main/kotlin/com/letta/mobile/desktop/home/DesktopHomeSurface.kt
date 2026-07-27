@@ -151,7 +151,6 @@ private fun HomeHeader(summary: FleetSummary) {
         Text(
             text = "Home",
             style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
         )
         Text(
             text = fleetSubtitle(summary),

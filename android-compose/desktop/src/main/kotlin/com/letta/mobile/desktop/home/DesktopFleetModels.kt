@@ -180,11 +180,12 @@ const val FLEET_RECENT_LIMIT: Int = 12
  * conversation-only agents (roster not yet refreshed) both get a row.
  */
 fun buildFleetOverview(params: FleetOverviewParams): FleetOverview {
+    val conversations = params.conversations.distinctBy { it.id }
     val days = params.days.coerceAtLeast(1)
     val hours = params.hours.coerceAtLeast(1)
     val today = LocalDate.ofInstant(params.now, params.zone)
     val rosterById = params.rosterAgents.associateBy { it.id.value }
-    val conversationsByAgent = params.conversations
+    val conversationsByAgent = conversations
         .filter { !it.agentId.isNullOrBlank() }
         .groupBy { it.agentId!! }
 
@@ -230,7 +231,7 @@ fun buildFleetOverview(params: FleetOverviewParams): FleetOverview {
     return FleetOverview(
         summary = FleetSummary(
             totalAgents = agents.size,
-            totalConversations = params.conversations.size,
+            totalConversations = conversations.size,
             activeToday = agents.count { stat ->
                 stat.lastActivity?.let { LocalDate.ofInstant(it, params.zone) == today } == true
             },
@@ -240,7 +241,7 @@ fun buildFleetOverview(params: FleetOverviewParams): FleetOverview {
         ),
         agents = agents,
         recent = buildRecentConversations(
-            conversations = params.conversations,
+            conversations = conversations,
             nameByAgentId = agents.associate { it.agentId to it.name },
             limit = params.recentLimit,
         ),

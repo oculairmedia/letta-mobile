@@ -314,7 +314,7 @@ private fun RunningDot() {
         modifier = Modifier
             .size(7.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primary),
+            .background(MaterialTheme.colorScheme.tertiary),
     )
 }
 

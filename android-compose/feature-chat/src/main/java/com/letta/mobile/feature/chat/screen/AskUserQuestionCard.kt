@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
@@ -164,7 +163,7 @@ private fun AskUserQuestionBlock(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
         question.header?.takeIf { it.isNotBlank() }?.let {
-            Text(text = it, style = MaterialTheme.chatTypography.toolLabel, fontWeight = FontWeight.SemiBold)
+            Text(text = it, style = MaterialTheme.chatTypography.toolLabel)
         }
         Text(text = question.question, style = MaterialTheme.chatTypography.toolDetail)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
