@@ -8,6 +8,7 @@ import com.letta.mobile.data.api.CloudConnectionValidator
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatus
 import com.letta.mobile.runtime.local.EmbeddedLettaCodeRuntimeStatusProvider
 import com.letta.mobile.runtime.local.EndpointOpenAiModelCatalog
@@ -21,11 +22,14 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.ui.common.UiState
 import io.mockk.mockk
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
@@ -61,16 +65,19 @@ class ConfigViewModelTest {
         // from SavedStateHandle. Empty handle is fine for the existing edit-
         // active-config test cases (createNew defaults to false when the
         // route arg is absent).
-        viewModel = ConfigViewModel(
+        viewModel = createViewModel(fakeRepository)
+    }
+
+    private fun createViewModel(settingsRepository: ISettingsRepository): ConfigViewModel =
+        ConfigViewModel(
             SavedStateHandle(),
-            fakeRepository,
+            settingsRepository,
             fakeValidator,
             FakeEmbeddedLettaCodeRuntimeStatusProvider(),
             fakeModelImporter,
             fakeEmbeddedModelRepository,
             fakeEndpointCatalog,
         )
-    }
 
     @After
     fun tearDown() {
@@ -94,6 +101,24 @@ class ConfigViewModelTest {
             assertEquals(ThemePreset.DEFAULT, successState.themePreset)
             assertEquals(true, successState.dynamicColor)
         }
+    }
+
+    @Test
+    fun loadConfig_doesNotReplaceUnsavedEdits() = runTest {
+        fakeRepository.activeConfigState.value = LettaConfig(
+            id = "config-1",
+            mode = LettaConfig.Mode.CLOUD,
+            serverUrl = "https://cloud.letta.ai",
+            accessToken = "persisted-token",
+        )
+        viewModel.loadConfig()
+        viewModel.updateApiToken("unsaved-token")
+
+        viewModel.loadConfig()
+
+        val state = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("unsaved-token", state.apiToken)
+        assertTrue(state.hasUnsavedChanges)
     }
 
     @Test
@@ -180,6 +205,62 @@ class ConfigViewModelTest {
             val successState = (state as UiState.Success).data
             assertEquals("", successState.apiToken)
         }
+    }
+
+    @Test
+    fun loadConfig_duringRefresh_retainsLoadedContentAndExposesProgress() = runTest {
+        val existingConfig = LettaConfig(
+            id = "retained-config",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "https://retained.example.com",
+            accessToken = "retained-token",
+        )
+        fakeRepository.activeConfigState.value = existingConfig
+        val refreshedTheme = CompletableDeferred<AppTheme>()
+        val refreshRepository = RefreshTestSettingsRepository(
+            delegate = fakeRepository,
+            refreshedTheme = flow { emit(refreshedTheme.await()) },
+        )
+        viewModel = createViewModel(refreshRepository)
+
+        viewModel.loadConfig()
+
+        val refreshing = (viewModel.uiState.value as UiState.Success).data
+        assertTrue(refreshing.isRefreshing)
+        assertEquals("https://retained.example.com", refreshing.serverUrl)
+        assertEquals("retained-token", refreshing.apiToken)
+
+        refreshedTheme.complete(AppTheme.DARK)
+
+        val refreshed = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(false, refreshed.isRefreshing)
+        assertEquals(null, refreshed.refreshError)
+        assertEquals(AppTheme.DARK, refreshed.theme)
+        assertEquals("https://retained.example.com", refreshed.serverUrl)
+    }
+
+    @Test
+    fun loadConfig_whenRefreshFails_retainsLoadedContentAndExposesRetryableError() = runTest {
+        val existingConfig = LettaConfig(
+            id = "retained-config",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "https://retained.example.com",
+            accessToken = "retained-token",
+        )
+        fakeRepository.activeConfigState.value = existingConfig
+        val refreshRepository = RefreshTestSettingsRepository(
+            delegate = fakeRepository,
+            refreshedTheme = flow { error("Refresh unavailable") },
+        )
+        viewModel = createViewModel(refreshRepository)
+
+        viewModel.loadConfig()
+
+        val retained = (viewModel.uiState.value as UiState.Success).data
+        assertEquals(false, retained.isRefreshing)
+        assertEquals("Refresh unavailable", retained.refreshError)
+        assertEquals("https://retained.example.com", retained.serverUrl)
+        assertEquals("retained-token", retained.apiToken)
     }
 
     @Test
@@ -889,6 +970,18 @@ class ConfigViewModelTest {
             version = "disabled",
             integrity = "",
         )
+    }
+
+    private class RefreshTestSettingsRepository(
+        private val delegate: FakeSettingsRepository,
+        private val refreshedTheme: Flow<AppTheme>,
+    ) : ISettingsRepository by delegate {
+        private var themeReadCount = 0
+
+        override fun getTheme(): Flow<AppTheme> {
+            themeReadCount += 1
+            return if (themeReadCount == 1) delegate.getTheme() else refreshedTheme
+        }
     }
 
     private class FakeOnDeviceModelImporter : OnDeviceModelImporter {

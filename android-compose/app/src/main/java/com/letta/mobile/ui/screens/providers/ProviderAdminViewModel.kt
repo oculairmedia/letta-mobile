@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.model.ProviderUpdateParams
 import com.letta.mobile.data.repository.api.IProviderRepository
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.ui.state.RetainedContentRefresh
 import com.letta.mobile.util.mapErrorToUserMessage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -24,6 +25,8 @@ data class ProviderAdminUiState(
     val providers: ImmutableList<Provider> = persistentListOf(),
     val searchQuery: String = "",
     val selectedProvider: Provider? = null,
+    val isRefreshing: Boolean = false,
+    val inspectingProviderId: ProviderId? = null,
     val operationError: String? = null,
     val operationMessage: String? = null,
 )
@@ -35,6 +38,7 @@ class ProviderAdminViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<UiState<ProviderAdminUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ProviderAdminUiState>> = _uiState.asStateFlow()
+    private var latestLoadRequestId = 0L
 
     init {
         loadProviders()
@@ -42,22 +46,63 @@ class ProviderAdminViewModel @Inject constructor(
 
     fun loadProviders() {
         viewModelScope.launch {
-            val current = (_uiState.value as? UiState.Success)?.data
-            _uiState.value = UiState.Loading
+            val requestId = RetainedContentRefresh.nextRequestId(latestLoadRequestId)
+            when (
+                val start = RetainedContentRefresh.begin(
+                    requestId = requestId,
+                    retainedContent = (_uiState.value as? UiState.Success)?.data,
+                )
+            ) {
+                RetainedContentRefresh.Start.Skip -> return@launch
+                is RetainedContentRefresh.Start.Loading -> {
+                    latestLoadRequestId = start.requestId
+                    _uiState.value = UiState.Loading
+                }
+                is RetainedContentRefresh.Start.Retaining -> {
+                    latestLoadRequestId = start.requestId
+                    _uiState.value = UiState.Success(
+                        start.content.copy(
+                            isRefreshing = true,
+                            operationError = null,
+                            operationMessage = null,
+                        )
+                    )
+                }
+            }
             try {
                 providerRepository.refreshProviders()
+                if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
                 val providers = providerRepository.providers.value
+                val latest = (_uiState.value as? UiState.Success)?.data
                 _uiState.value = UiState.Success(
                     ProviderAdminUiState(
                         providers = providers.toImmutableList(),
-                        searchQuery = current?.searchQuery.orEmpty(),
-                        selectedProvider = current?.selectedProvider?.let { selected ->
-                            providers.firstOrNull { it.id == selected.id } ?: selected
-                        },
+                        searchQuery = latest?.searchQuery.orEmpty(),
+                        // A completed inspection contains fields the list projection may omit
+                        // (notably credentials). Preserve it until it is dismissed or updated.
+                        selectedProvider = latest?.selectedProvider,
+                        isRefreshing = false,
+                        inspectingProviderId = latest?.inspectingProviderId,
                     )
                 )
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(mapErrorToUserMessage(e, "Failed to load providers"))
+                if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
+                val latest = (_uiState.value as? UiState.Success)?.data
+                when (
+                    val failure = RetainedContentRefresh.failure(
+                        retainedContent = latest,
+                        message = mapErrorToUserMessage(e, "Failed to load providers"),
+                    )
+                ) {
+                    is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
+                    is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(
+                        failure.content.copy(
+                            isRefreshing = false,
+                            operationError = failure.message,
+                            operationMessage = null,
+                        )
+                    )
+                }
             }
         }
     }
@@ -83,18 +128,38 @@ class ProviderAdminViewModel @Inject constructor(
     fun inspectProvider(providerId: ProviderId) {
         viewModelScope.launch {
             val current = (_uiState.value as? UiState.Success)?.data ?: return@launch
+            val cachedProvider = current.providers.firstOrNull { it.id == providerId } ?: return@launch
+            _uiState.value = UiState.Success(
+                current.copy(
+                    selectedProvider = cachedProvider,
+                    inspectingProviderId = providerId,
+                    operationError = null,
+                    operationMessage = null,
+                )
+            )
             try {
                 val provider = providerRepository.getProvider(providerId)
+                val latest = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                if (latest.inspectingProviderId != providerId) return@launch
                 _uiState.value = UiState.Success(
-                    current.copy(
-                        providers = current.providers.replaceProvider(provider).toImmutableList(),
+                    latest.copy(
+                        providers = latest.providers.replaceProvider(provider).toImmutableList(),
                         selectedProvider = provider,
+                        inspectingProviderId = null,
                         operationError = null,
                         operationMessage = null,
                     )
                 )
             } catch (e: Exception) {
-                setOperationError(mapErrorToUserMessage(e, "Failed to load provider details"))
+                val latest = (_uiState.value as? UiState.Success)?.data ?: return@launch
+                if (latest.inspectingProviderId != providerId) return@launch
+                _uiState.value = UiState.Success(
+                    latest.copy(
+                        inspectingProviderId = null,
+                        operationError = mapErrorToUserMessage(e, "Failed to load provider details"),
+                        operationMessage = null,
+                    )
+                )
             }
         }
     }
@@ -216,7 +281,13 @@ class ProviderAdminViewModel @Inject constructor(
 
     fun clearSelectedProvider() {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(current.copy(selectedProvider = null, operationMessage = null))
+        _uiState.value = UiState.Success(
+            current.copy(
+                selectedProvider = null,
+                inspectingProviderId = null,
+                operationMessage = null,
+            )
+        )
     }
 
     fun clearOperationError() {

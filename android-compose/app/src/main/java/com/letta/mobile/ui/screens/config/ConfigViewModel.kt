@@ -21,11 +21,14 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
+import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.util.UUID
 import javax.inject.Inject
@@ -63,6 +66,9 @@ data class ConfigUiState(
         version = "disabled",
         integrity = "",
     ),
+    val isRefreshing: Boolean = false,
+    val refreshError: String? = null,
+    val hasUnsavedChanges: Boolean = false,
     val isSaving: Boolean = false,
 )
 
@@ -96,6 +102,7 @@ class ConfigViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<UiState<ConfigUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ConfigUiState>> = _uiState.asStateFlow()
+    private var latestLoadRequestId = 0L
 
     init {
         loadConfig()
@@ -104,24 +111,42 @@ class ConfigViewModel @Inject constructor(
 
     fun loadConfig() {
         viewModelScope.launch {
-            _uiState.value = UiState.Loading
+            val retainedState = (_uiState.value as? UiState.Success)?.data
+            val requestId = RetainedContentRefresh.nextRequestId(latestLoadRequestId)
+            when (
+                val start = RetainedContentRefresh.begin(
+                    requestId = requestId,
+                    retainedContent = retainedState,
+                    // A refresh reconstructs the form from persisted state. Never let it
+                    // replace edits that have not gone through saveConfig yet.
+                    canRefresh = { !it.hasUnsavedChanges },
+                )
+            ) {
+                RetainedContentRefresh.Start.Skip -> return@launch
+                is RetainedContentRefresh.Start.Loading -> {
+                    latestLoadRequestId = start.requestId
+                    _uiState.value = UiState.Loading
+                }
+                is RetainedContentRefresh.Start.Retaining -> {
+                    latestLoadRequestId = start.requestId
+                    _uiState.value = UiState.Success(
+                        start.content.copy(isRefreshing = true, refreshError = null)
+                    )
+                }
+            }
             try {
                 val activeConfig = settingsRepository.activeConfig.value
-                val appTheme = settingsRepository.getTheme().first()
-                val themePreset = settingsRepository.getThemePreset().first()
-                val dynamicColor = settingsRepository.getDynamicColor().first()
-                val enableProjects = settingsRepository.getEnableProjects().first()
-                val hapticsEnabled = settingsRepository.getHapticsEnabled().first()
+                val preferences = loadDisplayPreferences()
                 val configUiState = if (activeConfig != null && !createNew) {
                     ConfigUiState(
                         mode = activeConfig.mode.toServerMode(),
                         serverUrl = activeConfig.serverUrl,
                         apiToken = activeConfig.accessToken ?: "",
-                        theme = appTheme,
-                        themePreset = themePreset,
-                        dynamicColor = dynamicColor,
-                        enableProjects = enableProjects,
-                        hapticsEnabled = hapticsEnabled,
+                        theme = preferences.theme,
+                        themePreset = preferences.themePreset,
+                        dynamicColor = preferences.dynamicColor,
+                        enableProjects = preferences.enableProjects,
+                        hapticsEnabled = preferences.hapticsEnabled,
                         localModelPath = activeConfig.localModelPath.orEmpty(),
                         localModelHandle = activeConfig.localModelHandle.normalizedLocalModelHandle(),
                         localModelAccelerator = activeConfig.localModelAccelerator.normalizedLocalModelAccelerator(),
@@ -141,23 +166,59 @@ class ConfigViewModel @Inject constructor(
                     // — the existing first-time setup expects that default,
                     // and the user toggles to SELF_HOSTED inline if needed.
                     ConfigUiState(
-                        theme = appTheme,
-                        themePreset = themePreset,
-                        dynamicColor = dynamicColor,
-                        enableProjects = enableProjects,
-                        hapticsEnabled = hapticsEnabled,
+                        theme = preferences.theme,
+                        themePreset = preferences.themePreset,
+                        dynamicColor = preferences.dynamicColor,
+                        enableProjects = preferences.enableProjects,
+                        hapticsEnabled = preferences.hapticsEnabled,
                         huggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         savedHuggingFaceToken = settingsRepository.huggingFaceToken.value.orEmpty(),
                         embeddedModelCatalog = embeddedModelRepository.catalog.value,
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 }
-                _uiState.value = UiState.Success(configUiState)
+                if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
+                    _uiState.value = UiState.Success(configUiState)
+                }
             } catch (e: Exception) {
-                _uiState.value = UiState.Error(e.message ?: "Failed to load config")
+                if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
+                when (
+                    val failure = RetainedContentRefresh.failure(
+                        retainedContent = retainedState,
+                        message = e.message ?: "Failed to load config",
+                    )
+                ) {
+                    is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
+                    is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(
+                        failure.content.copy(isRefreshing = false, refreshError = failure.message)
+                    )
+                }
             }
         }
     }
+
+    private suspend fun loadDisplayPreferences(): DisplayPreferences = coroutineScope {
+        val theme = async { settingsRepository.getTheme().first() }
+        val themePreset = async { settingsRepository.getThemePreset().first() }
+        val dynamicColor = async { settingsRepository.getDynamicColor().first() }
+        val enableProjects = async { settingsRepository.getEnableProjects().first() }
+        val hapticsEnabled = async { settingsRepository.getHapticsEnabled().first() }
+        DisplayPreferences(
+            theme = theme.await(),
+            themePreset = themePreset.await(),
+            dynamicColor = dynamicColor.await(),
+            enableProjects = enableProjects.await(),
+            hapticsEnabled = hapticsEnabled.await(),
+        )
+    }
+
+    private data class DisplayPreferences(
+        val theme: AppTheme,
+        val themePreset: ThemePreset,
+        val dynamicColor: Boolean,
+        val enableProjects: Boolean,
+        val hapticsEnabled: Boolean,
+    )
 
     fun updateMode(mode: ServerMode) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
@@ -172,28 +233,28 @@ class ConfigViewModel @Inject constructor(
                 }
         }
         _uiState.value = UiState.Success(
-            currentState.copy(mode = mode, serverUrl = updatedUrl)
+            currentState.copy(hasUnsavedChanges = true, mode = mode, serverUrl = updatedUrl)
         )
     }
 
     fun updateServerUrl(url: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(serverUrl = url))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, serverUrl = url))
         }
     }
 
     fun updateApiToken(token: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(apiToken = token))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, apiToken = token))
         }
     }
 
     fun updateTheme(theme: AppTheme) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(theme = theme))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, theme = theme))
             viewModelScope.launch {
                 settingsRepository.setTheme(theme)
             }
@@ -206,6 +267,7 @@ class ConfigViewModel @Inject constructor(
             val dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false
             _uiState.value = UiState.Success(
                 currentState.copy(
+                    hasUnsavedChanges = true,
                     themePreset = themePreset,
                     dynamicColor = dynamicColor,
                 )
@@ -220,7 +282,7 @@ class ConfigViewModel @Inject constructor(
     fun updateDynamicColor(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(dynamicColor = enabled))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, dynamicColor = enabled))
             viewModelScope.launch {
                 settingsRepository.setDynamicColor(enabled)
             }
@@ -230,7 +292,7 @@ class ConfigViewModel @Inject constructor(
     fun updateEnableProjects(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(enableProjects = enabled))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, enableProjects = enabled))
             viewModelScope.launch {
                 settingsRepository.setEnableProjects(enabled)
             }
@@ -240,7 +302,7 @@ class ConfigViewModel @Inject constructor(
     fun updateHapticsEnabled(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hapticsEnabled = enabled))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, hapticsEnabled = enabled))
             viewModelScope.launch {
                 settingsRepository.setHapticsEnabled(enabled)
             }
@@ -249,13 +311,14 @@ class ConfigViewModel @Inject constructor(
 
     fun updateLocalModelPath(path: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelPath = path))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localModelPath = path))
     }
 
     fun updateLocalModelHandle(handle: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(
             currentState.copy(
+                hasUnsavedChanges = true,
                 localModelHandle = handle,
                 localProviderBaseUrl = "",
                 localProviderApiKey = "",
@@ -266,32 +329,32 @@ class ConfigViewModel @Inject constructor(
 
     fun updateLocalModelAccelerator(accelerator: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelAccelerator = accelerator))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localModelAccelerator = accelerator))
     }
 
     fun updateLocalModelMaxTokens(maxTokens: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localModelMaxTokens = maxTokens))
     }
 
     fun updateLocalProviderBaseUrl(baseUrl: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localProviderBaseUrl = baseUrl))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localProviderBaseUrl = baseUrl))
     }
 
     fun updateLocalProviderApiKey(apiKey: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localProviderApiKey = apiKey))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localProviderApiKey = apiKey))
     }
 
     fun updateLocalProviderModel(model: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localProviderModel = model))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localProviderModel = model))
     }
 
     fun updateHuggingFaceToken(token: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(huggingFaceToken = token))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, huggingFaceToken = token))
     }
 
     fun downloadEmbeddedModel(item: EmbeddedModelCatalogItem) {
@@ -318,6 +381,7 @@ class ConfigViewModel @Inject constructor(
         val downloaded = item.state as? EmbeddedModelDownloadState.Downloaded ?: return
         _uiState.value = UiState.Success(
             currentState.copy(
+                hasUnsavedChanges = true,
                 mode = ServerMode.LOCAL,
                 serverUrl = LOCAL_RUNTIME_URL,
                 localModelPath = downloaded.localPath,
@@ -515,7 +579,12 @@ class ConfigViewModel @Inject constructor(
                 // (selectEmbeddedModel/importLocalModel) keep the screen open,
                 // and a stuck flag short-circuits every subsequent save.
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
-                _uiState.value = UiState.Success(latest.copy(isSaving = false))
+                _uiState.value = UiState.Success(
+                    latest.copy(
+                        hasUnsavedChanges = false,
+                        isSaving = false,
+                    )
+                )
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(state.copy(isSaving = false))
