@@ -331,48 +331,46 @@ fun projectToolTimelineGroups(
     val previousGroupByKey = previousGroups.associateBy { it.key }
     val seenGroupKeys = HashSet<String>()
     val result = ArrayList<ToolTimelineGroup>()
-    var reusedAll = previousGroups.isNotEmpty() && previousGroups.size == messages.count { !it.toolCalls.isNullOrEmpty() }
 
     var groupIndex = 0
     for (message in messages) {
         if (message.toolCalls.isNullOrEmpty()) continue
 
         val baseKey = if (message.id.isNotBlank()) "group:${message.id}" else "group::$groupIndex"
-        var candidateKey = baseKey
-        var dupCount = 1
-        while (!seenGroupKeys.add(candidateKey)) {
-            candidateKey = "$baseKey#${dupCount++}"
-        }
-
-        val prevGroup = previousGroupByKey[candidateKey]
+        val key = seenGroupKeys.claimUnique(baseKey)
         val group = projectToolTimelineGroup(
             message = message,
-            groupKeyOverride = candidateKey,
+            groupKeyOverride = key,
             fallbackIndex = groupIndex,
-            previousGroup = prevGroup,
-        )
+            previousGroup = previousGroupByKey[key],
+        ) ?: continue
 
-        if (group != null) {
-            if (prevGroup !== group) {
-                reusedAll = false
-            }
-            result.add(group)
-            groupIndex++
-        }
+        result.add(group)
+        groupIndex++
     }
 
-    // Reuse the OUTER list only when every group was reused AND they appear in the same
-    // order. Key-matching alone is not enough: hydration or reconcile can hand back the
-    // same unchanged groups reordered, and returning previousGroups then pins the timeline
-    // to a stale chronological order.
-    val sameOrder = result.size == previousGroups.size &&
-        result.indices.all { result[it] === previousGroups[it] }
-    if (reusedAll && sameOrder) {
-        return previousGroups
-    }
-
-    return result
+    return if (result.matchesByIdentity(previousGroups)) previousGroups else result
 }
+
+/** Claims [base], or the first `base#n` not already taken, and records it as seen. */
+private fun MutableSet<String>.claimUnique(base: String): String {
+    if (add(base)) return base
+    var suffix = 1
+    while (true) {
+        val candidate = "$base#${suffix++}"
+        if (add(candidate)) return candidate
+    }
+}
+
+/**
+ * True when both lists hold the same instances in the same positions — i.e. nothing was
+ * re-projected AND nothing moved. Identity-per-position subsumes an "all reused" flag:
+ * if every element IS previousGroups[i], every group was reused by definition. Order has
+ * to be part of the test because hydration and reconcile can hand back the same unchanged
+ * groups reordered, and reusing the old list then pins the timeline to a stale chronology.
+ */
+private fun List<ToolTimelineGroup>.matchesByIdentity(other: List<ToolTimelineGroup>): Boolean =
+    size == other.size && indices.all { this[it] === other[it] }
 
 /**
  * Stateful projector that holds cached timeline groups across updates to enforce referential identity.
