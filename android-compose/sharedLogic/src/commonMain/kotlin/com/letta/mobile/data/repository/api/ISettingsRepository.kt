@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository.api
 
 import com.letta.mobile.data.model.AppTheme
+import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
@@ -30,6 +31,9 @@ interface ISettingsRepository {
     val adminAgentId: StateFlow<String?>
     val lastChatSelection: StateFlow<LastChatSelection?>
     val huggingFaceToken: StateFlow<String?>
+    val chatTimelineMode: StateFlow<ChatTimelineMode>
+    fun getChatTimelineMode(): Flow<ChatTimelineMode>
+    suspend fun setChatTimelineMode(mode: ChatTimelineMode)
     fun getActiveConfig(): Flow<LettaConfig?>
     suspend fun saveConfig(config: LettaConfig)
     suspend fun setActiveConfigId(id: String)

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -34,6 +35,12 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.ui.chat.render.runStepDotColor
 import com.letta.mobile.data.chat.projection.runStepDotIcon
+
+/**
+ * Kill switch for projected tool timeline rendering in RunBlock.
+ * Defaults to LEGACY (false). Bead .14 will persist this value.
+ */
+val LocalUseProjectedToolTimeline = compositionLocalOf { false }
 
 /**
  * Width of the timeline gutter on the left of a run block. Sized to fit a
@@ -67,7 +74,7 @@ private val ToolCallStepDotCenterY = 25.5f.dp
  * through the normal chat-message wrapper, so their first text line sits much
  * closer to the top. Keep this dot on that first-line midline.
  */
-private val CompactToolCallGroupStepDotCenterY = 18.dp
+internal val CompactToolCallGroupStepDotCenterY = 18.dp
 
 internal object RunBlockTestTags {
     fun dot(stepKey: String) = "run-dot-$stepKey"
@@ -121,6 +128,7 @@ internal fun RunBlock(
     // the run expand/collapse the same way the tool-card lifecycle does â€” when
     // the OS animation scale is 0, swap instantly instead of playing the ramp.
     val reducedMotion = rememberReducedMotionEnabled()
+    val useProjectedTimeline = LocalUseProjectedToolTimeline.current
 
     // Stable run keys can also wrap one message. The disclosure still renders
     // for that work, while the body avoids a degenerate one-dot gutter below.
@@ -152,7 +160,15 @@ internal fun RunBlock(
 
         // Keep the historical one-step geometry: the disclosure is additive,
         // but a single message still has no degenerate gutter or connector.
-        if (messages.size == 1) {
+        //
+        // Exception (letta-mobile-8kdjm.7): under the projected timeline a lone tool-call
+        // message must still reach the timeline rather than fall out to a legacy row —
+        // otherwise a one-tool-call turn shows none of the new presentation. Non-tool
+        // single messages keep the original short circuit.
+        val singleToolCallGoesToTimeline = useProjectedTimeline &&
+            messages.size == 1 &&
+            messages.single().isRunCompactableToolCallMessage()
+        if (messages.size == 1 && !singleToolCallGoesToTimeline) {
             renderRow(messages.single(), GroupPosition.None, Modifier.fillMaxWidth())
             return@Column
         }
@@ -204,8 +220,8 @@ internal fun RunBlock(
                     } else {
                         messages
                     }
-                    val visibleSteps = remember(visibleMessages) {
-                        compactRunToolCallSteps(visibleMessages)
+                    val visibleSteps = remember(visibleMessages, useProjectedTimeline) {
+                        compactRunToolCallSteps(visibleMessages, groupSingleToolCall = useProjectedTimeline)
                     }
                     Column(modifier = Modifier.fillMaxWidth()) {
                         visibleSteps.forEachIndexed { idx, step ->
@@ -267,7 +283,15 @@ internal sealed interface RunTimelineStep {
     }
 }
 
-internal fun compactRunToolCallSteps(messages: List<UiMessage>): List<RunTimelineStep> {
+/**
+ * [groupSingleToolCall] lets the projected timeline (letta-mobile-8kdjm.7) render a LONE
+ * tool call through the same component family as a multi-call group. Legacy leaves it
+ * false so a single call stays a plain message row exactly as before.
+ */
+internal fun compactRunToolCallSteps(
+    messages: List<UiMessage>,
+    groupSingleToolCall: Boolean = false,
+): List<RunTimelineStep> {
     if (messages.isEmpty()) return emptyList()
     val steps = ArrayList<RunTimelineStep>(messages.size)
     val pendingToolMessages = ArrayList<UiMessage>()
@@ -275,7 +299,21 @@ internal fun compactRunToolCallSteps(messages: List<UiMessage>): List<RunTimelin
     fun flushToolMessages() {
         when (pendingToolMessages.size) {
             0 -> Unit
-            1 -> steps.add(RunTimelineStep.Message(pendingToolMessages.single()))
+            1 -> if (!groupSingleToolCall) {
+                steps.add(RunTimelineStep.Message(pendingToolMessages.single()))
+            } else {
+                val single = pendingToolMessages.single()
+                steps.add(
+                    RunTimelineStep.ToolCallGroup(
+                        messages = listOf(single),
+                        toolCalls = single.toolCalls.orEmpty(),
+                        pendingApprovalToolCallIds = single.approvalRequest?.toolCalls
+                            .orEmpty()
+                            .mapTo(mutableSetOf()) { it.toolCallId },
+                        approvalRequests = listOfNotNull(single.approvalRequest),
+                    )
+                )
+            }
             else -> {
                 val groupedMessages = pendingToolMessages.toList()
                 steps.add(
@@ -403,6 +441,19 @@ private fun RunToolCallGroupStepRow(
     activeApprovalRequestId: String?,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
 ) {
+    if (LocalUseProjectedToolTimeline.current) {
+        ProjectedToolTimelineGroupStepRow(
+            step = step,
+            runIdentityColor = runIdentityColor,
+            drawLineAbove = drawLineAbove,
+            drawLineBelow = drawLineBelow,
+            animateRows = animateRows,
+            activeApprovalRequestId = activeApprovalRequestId,
+            onApprovalDecision = onApprovalDecision,
+        )
+        return
+    }
+
     val dotColor = if (step.pendingApprovalToolCallIds.isNotEmpty()) {
         MaterialTheme.colorScheme.secondary
     } else {
@@ -430,7 +481,7 @@ private fun RunToolCallGroupStepRow(
 }
 
 @Composable
-private fun RunStepRow(
+internal fun RunStepRow(
     stepKey: String,
     dotColor: androidx.compose.ui.graphics.Color,
     stepDotCenterY: androidx.compose.ui.unit.Dp,

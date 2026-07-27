@@ -262,3 +262,33 @@ internal fun PreviewDateSeparatorContent() {
         }
     }
 }
+
+@PreviewLightDark
+@Composable
+internal fun PreviewLiveStatusTextContent() {
+    LettaTheme(dynamicColor = false) {
+        Surface {
+            Column(
+                modifier = Modifier.padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LiveStatusText(text = "Running tool execution...", active = true)
+                LiveStatusText(text = "Completed tool execution", active = false)
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun LiveStatusTextPreview() = PreviewLiveStatusTextContent()
+
+
+@PreviewLightDark
+@Composable
+private fun DateSeparatorPreview() = PreviewDateSeparatorContent()
+
+@PreviewLightDark
+@Composable
+private fun StatusTimelinePreview() = PreviewStatusTimelineContent()
+

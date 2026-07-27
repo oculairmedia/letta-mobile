@@ -701,4 +701,60 @@ class MessageGroupingTest {
             )
         ),
     )
+
+    @Test
+    fun `key stays stable when tool call result and status mutate`() {
+        val initialCall = UiMessage(
+            id = "msg-tool-1",
+            role = "assistant",
+            content = "",
+            timestamp = "2026-04-19T12:00:00Z",
+            runId = "run-stable-key",
+            toolCalls = listOf(
+                UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = null, status = null, toolCallId = "call-1")
+            ),
+        )
+        val initialItem = groupMessagesForRender(listOf(initialCall to GroupPosition.None)).single()
+
+        val updatedCall = initialCall.copy(
+            toolCalls = listOf(
+                UiToolCall(name = "Bash", arguments = """{"command":"ls"}""", result = "file.txt", status = "success", toolCallId = "call-1")
+            ),
+        )
+        val updatedItem = groupMessagesForRender(listOf(updatedCall to GroupPosition.None)).single()
+
+        assertEquals(initialItem.key, updatedItem.key)
+        assertEquals("run-stable-key", initialItem.key)
+    }
+
+    @Test
+    fun `sibling append in same run preserves key`() {
+        val msg1 = assistant("a1", runId = "run-sibling-key")
+        val itemBefore = groupMessagesForRender(listOf(msg1 to GroupPosition.None)).single()
+
+        val msg2 = assistant("a2", runId = "run-sibling-key")
+        val itemAfter = groupMessagesForRender(
+            listOf(
+                msg2 to GroupPosition.First,
+                msg1 to GroupPosition.Last,
+            )
+        ).single()
+
+        assertEquals("run-sibling-key", itemBefore.key)
+        assertEquals("run-sibling-key", itemAfter.key)
+    }
+
+    @Test
+    fun `duplicate render keys resolves collisions with deterministic suffix`() {
+        val msgA = UiMessage(id = "msg-dup-key", role = "user", content = "hello", timestamp = "2026-04-19T12:00:00Z")
+        val itemA = ChatRenderItem.Single(msgA, GroupPosition.None, keyOverride = "fixed-colliding-key")
+        val itemB = ChatRenderItem.Single(msgA, GroupPosition.None, keyOverride = "fixed-colliding-key")
+
+        val deduped = deduplicateRenderKeys(listOf(itemA, itemB))
+        val keys = deduped.map { it.key }
+
+        assertEquals(2, keys.toSet().size)
+        assertEquals("fixed-colliding-key", keys[0])
+        assertEquals("fixed-colliding-key#msg-dup-key", keys[1])
+    }
 }

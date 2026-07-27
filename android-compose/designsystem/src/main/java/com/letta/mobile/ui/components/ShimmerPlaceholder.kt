@@ -25,19 +25,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+import com.letta.mobile.ui.motion.ChatMotionTokens
+
 @Composable
 fun shimmerColor(): Color {
-    val transition = rememberInfiniteTransition(label = "shimmer")
-    val alpha by transition.animateFloat(
-        initialValue = 0.15f,
-        targetValue = 0.35f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "shimmerAlpha",
-    )
-    return MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+    val reducedMotion = rememberReducedMotionEnabled()
+    return if (reducedMotion) {
+        MaterialTheme.colorScheme.onSurface.copy(alpha = ChatMotionTokens.RUNNING_CUE_STATIC_ALPHA)
+    } else {
+        val transition = rememberInfiniteTransition(label = "shimmer")
+        val alpha by transition.animateFloat(
+            initialValue = ChatMotionTokens.RUNNING_CUE_MIN_ALPHA,
+            targetValue = ChatMotionTokens.RUNNING_CUE_MAX_ALPHA,
+            animationSpec = infiniteRepeatable(
+                animation = tween(ChatMotionTokens.RUNNING_CUE_DURATION_MILLIS),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "shimmerAlpha",
+        )
+        MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
+    }
 }
 
 @Composable
