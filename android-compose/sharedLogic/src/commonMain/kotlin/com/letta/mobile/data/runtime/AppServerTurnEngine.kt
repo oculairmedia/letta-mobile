@@ -85,7 +85,7 @@ class AppServerTurnEngine(
      */
     private val turnIdleTimeoutMs: Long = DEFAULT_TURN_IDLE_TIMEOUT_MS,
     private val terminalSettleQuietMs: Long = DEFAULT_TERMINAL_SETTLE_QUIET_MS,
-    private val turnContextRecovery: TurnContextRecovery = TurnContextRecovery.None,
+    private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     /**
      * lgns8.17: controller-owned external tools. letta-code's App-Server (WS)
      * route does NOT self-execute tool calls — it emits external_tool_call_request
@@ -409,24 +409,20 @@ class AppServerTurnEngine(
         try {
             val turnPermissionMode = permissionModeProvider(command)
             if (command.input is TurnInput.UserMessage) {
-                runCatching {
-                    turnContextRecovery.recover(
-                        agentId = command.agentId.value,
-                        conversationId = command.conversationId.value,
+                val result = turnContextPreflight.prepare(
+                    agentId = command.agentId.value,
+                    conversationId = command.conversationId.value,
+                )
+                if (result.configuredContextLimit || result.compacted) {
+                    runtime = null
+                    Telemetry.event(
+                        "AppServerTurnEngine",
+                        "context.preflightApplied",
+                        "agentId" to command.agentId.value,
+                        "conversationId" to command.conversationId.value,
+                        "configuredContextLimit" to result.configuredContextLimit.toString(),
+                        "compacted" to result.compacted.toString(),
                     )
-                }.onSuccess { removedIds ->
-                    if (removedIds.isNotEmpty()) {
-                        Telemetry.event(
-                            "AppServerTurnEngine",
-                            "context.recovered",
-                            "agentId" to command.agentId.value,
-                            "conversationId" to command.conversationId.value,
-                            "removedCount" to removedIds.size,
-                            "removedIds" to removedIds.joinToString(","),
-                        )
-                    }
-                }.onFailure { error ->
-                    Telemetry.error("AppServerTurnEngine", "context.recoveryFailed", error)
                 }
             }
             Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)

@@ -71,6 +71,7 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.AgentDelete -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ConversationCreate -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.ConversationUpdate -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.ConversationCompact -> AmbiguousMutation(dedupKey = null)
 
             // Control capabilities (lgns8.8): model listing is a read; skill
             // enable/disable are idempotent-by-target but treated as ambiguous.

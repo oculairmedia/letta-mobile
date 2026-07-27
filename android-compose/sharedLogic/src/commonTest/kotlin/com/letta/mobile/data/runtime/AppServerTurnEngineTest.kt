@@ -56,22 +56,22 @@ import kotlinx.serialization.json.put
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineTest {
     @Test
-    fun contextRecoveryRunsBeforeRuntimeStartForUserMessages() = runTest {
+    fun contextPreflightRunsBeforeRuntimeStartForUserMessages() = runTest {
         val order = mutableListOf<String>()
         val client = FakeAppServerClient(onRuntimeStart = { order += "runtime_start" }, onInput = { order += "input" })
         val engine = AppServerTurnEngine(
             client = client,
-            turnContextRecovery = TurnContextRecovery { agentId, conversationId ->
+            turnContextPreflight = TurnContextPreflight { agentId, conversationId ->
                 assertEquals("agent-1", agentId)
                 assertEquals("conv-1", conversationId)
-                order += "recovery"
-                listOf("empty-1")
+                order += "preflight"
+                TurnContextPreflightResult(configuredContextLimit = true)
             },
         )
 
         engine.runTurn(command).test {
             awaitItem()
-            assertEquals(listOf("recovery", "runtime_start", "input"), order)
+            assertEquals(listOf("preflight", "runtime_start", "input"), order)
             client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
             awaitItem()
             awaitItem()
@@ -80,14 +80,14 @@ class AppServerTurnEngineTest {
     }
 
     @Test
-    fun contextRecoverySkipsApprovalResponses() = runTest {
-        var recoveryCalls = 0
+    fun contextPreflightSkipsApprovalResponses() = runTest {
+        var preflightCalls = 0
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(
             client = client,
-            turnContextRecovery = TurnContextRecovery { _, _ ->
-                recoveryCalls += 1
-                emptyList()
+            turnContextPreflight = TurnContextPreflight { _, _ ->
+                preflightCalls += 1
+                TurnContextPreflightResult()
             },
         )
         val approvalCommand = command.copy(
@@ -103,7 +103,7 @@ class AppServerTurnEngineTest {
 
         engine.runTurn(approvalCommand).test {
             awaitItem()
-            assertEquals(0, recoveryCalls)
+            assertEquals(0, preflightCalls)
             assertIs<AppServerInputPayload.ApprovalResponse>(
                 assertIs<AppServerCommand.Input>(client.sentCommands.single()).payload,
             )

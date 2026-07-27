@@ -71,6 +71,11 @@ interface AppServerClient {
     ): AppServerInboundFrame.ConversationMessagesListResponse =
         throw UnsupportedOperationException("conversation_messages_list is not supported by this client")
 
+    suspend fun conversationCompact(
+        command: AppServerCommand.ConversationCompact,
+    ): AppServerInboundFrame.ConversationCompactResponse =
+        throw UnsupportedOperationException("conversation_compact is not supported by this client")
+
     suspend fun listModels(command: AppServerCommand.ListModels): AppServerInboundFrame.ListModelsResponse =
         throw UnsupportedOperationException("list_models is not supported by this client")
 
@@ -229,6 +234,11 @@ class DefaultAppServerClient(
         command: AppServerCommand.ConversationMessagesList,
     ): AppServerInboundFrame.ConversationMessagesListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationMessagesListResponse }) { transport.sendControl(command) }
+
+    override suspend fun conversationCompact(
+        command: AppServerCommand.ConversationCompact,
+    ): AppServerInboundFrame.ConversationCompactResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ConversationCompactResponse }) { transport.sendControl(command) }
 
     override suspend fun listModels(command: AppServerCommand.ListModels): AppServerInboundFrame.ListModelsResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ListModelsResponse }) { transport.sendControl(command) }

@@ -288,6 +288,9 @@ class ReconnectingAppServerClient(
     override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
         ready().conversationMessagesList(command)
 
+    override suspend fun conversationCompact(command: AppServerCommand.ConversationCompact) =
+        ready().conversationCompact(command)
+
     override suspend fun listModels(command: AppServerCommand.ListModels) = ready().listModels(command)
 
     override suspend fun skillEnable(command: AppServerCommand.SkillEnable) = ready().skillEnable(command)

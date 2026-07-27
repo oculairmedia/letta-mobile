@@ -103,6 +103,7 @@ object AppServerProtocol {
             "conversation_create_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCreateResponse>(raw) }
             "conversation_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationUpdateResponse>(raw) }
             "conversation_messages_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationMessagesListResponse>(raw) }
+            "conversation_compact_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCompactResponse>(raw) }
             else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
         }
         return AppServerReceivedFrame(channel = channel, frame = frame, raw = raw)
@@ -380,6 +381,14 @@ sealed interface AppServerCommand {
         @SerialName("request_id") val requestId: String,
         @SerialName("conversation_id") val conversationId: String,
         val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_compact")
+    data class ConversationCompact(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val body: JsonObject? = null,
     ) : AppServerCommand
 
     // Policy-gated control capabilities (lgns8.8).
@@ -1073,6 +1082,19 @@ sealed interface AppServerInboundFrame {
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "conversation_messages_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_compact_response")
+    data class ConversationCompactResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val compaction: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_compact_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }

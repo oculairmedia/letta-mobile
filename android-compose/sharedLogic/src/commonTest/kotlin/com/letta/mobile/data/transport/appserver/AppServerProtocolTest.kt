@@ -15,6 +15,30 @@ import kotlinx.serialization.json.put
 
 class AppServerProtocolTest {
     @Test
+    fun encodesConversationCompactAndDecodesItsResponse() {
+        val encoded = AppServerProtocol.json.parseToJsonElement(
+            AppServerProtocol.encodeCommand(
+                AppServerCommand.ConversationCompact(
+                    requestId = "compact-1",
+                    conversationId = "conv-1",
+                    body = buildJsonObject { put("agent_id", "agent-1") },
+                ),
+            ),
+        ).jsonObject
+        assertEquals("conversation_compact", encoded["type"]?.jsonPrimitive?.content)
+        assertEquals("compact-1", encoded["request_id"]?.jsonPrimitive?.content)
+        assertEquals("conv-1", encoded["conversation_id"]?.jsonPrimitive?.content)
+
+        val received = AppServerProtocol.decodeFrame(
+            """{"type":"conversation_compact_response","request_id":"compact-1","success":true,"compaction":{"num_messages_before":743,"num_messages_after":150}}""",
+            AppServerChannel.Control,
+        )
+        val response = assertIs<AppServerInboundFrame.ConversationCompactResponse>(received.frame)
+        assertTrue(response.success)
+        assertEquals("150", response.compaction?.get("num_messages_after")?.jsonPrimitive?.content)
+    }
+
+    @Test
     fun encodesAuthCommandAndDecodesAuthResponse() {
         val encoded = AppServerProtocol.json.parseToJsonElement(
             AppServerProtocol.encodeCommand(AppServerCommand.Auth(requestId = "auth-1", token = "secret")),

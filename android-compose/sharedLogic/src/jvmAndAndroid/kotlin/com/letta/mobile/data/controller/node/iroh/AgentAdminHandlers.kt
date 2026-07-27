@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
@@ -63,28 +64,30 @@ object AgentAdminHandlers {
             } ?: api.get(AdminPath.v1("agents", id))
         }
         router.register("agent.create") { params ->
+            val body = params.withDefaultContextWindow()
             NativeAdmin.attempt(nativeClient, "agent.create") { c ->
                 val response = c.agentCreate(
                     AppServerCommand.AgentCreate(
                         requestId = NativeAdmin.requestId(),
-                        body = params ?: buildJsonObject { },
+                        body = body,
                     ),
                 )
                 if (response.success) response.agent else null
-            } ?: api.post(AdminPath.v1("agents"), body = params?.toString() ?: "{}")
+            } ?: api.post(AdminPath.v1("agents"), body = body.toString())
         }
         router.register("agent.update") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
+            val body = if (params?.get("model") != null) params.withDefaultContextWindow() else params
             val result = NativeAdmin.attempt(nativeClient, "agent.update") { c ->
                 val response = c.agentUpdate(
                     AppServerCommand.AgentUpdate(
                         requestId = NativeAdmin.requestId(),
                         agentId = id,
-                        body = params ?: buildJsonObject { },
+                        body = body ?: buildJsonObject { },
                     ),
                 )
                 if (response.success) response.agent else null
-            } ?: api.patch(AdminPath.v1("agents", id), body = params.toString())
+            } ?: api.patch(AdminPath.v1("agents", id), body = body.toString())
             // letta-mobile-eeu5p: a model switch persists via this PATCH, but the
             // App Server caches its runtime per (agent, conversation) and keeps
             // serving the OLD model until restart. When the update changes the
@@ -127,4 +130,18 @@ object AgentAdminHandlers {
             )
         }
     }
+
+    private fun JsonObject?.withDefaultContextWindow(): JsonObject =
+        buildJsonObject {
+            this@withDefaultContextWindow?.forEach { (key, value) -> put(key, value) }
+            val modelSettings = this@withDefaultContextWindow?.get("model_settings") as? JsonObject
+            val hasExplicitLimit =
+                this@withDefaultContextWindow?.get("context_window_limit") != null ||
+                    this@withDefaultContextWindow?.get("contextWindowLimit") != null ||
+                    modelSettings?.get("context_window_limit") != null ||
+                    modelSettings?.get("contextWindowLimit") != null
+            if (!hasExplicitLimit) {
+                put("context_window_limit", DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT)
+            }
+        }
 }

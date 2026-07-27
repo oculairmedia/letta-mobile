@@ -36,6 +36,7 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.ConversationCreateResponse,
             is AppServerInboundFrame.ConversationUpdateResponse,
             is AppServerInboundFrame.ConversationMessagesListResponse,
+            is AppServerInboundFrame.ConversationCompactResponse,
             is AppServerInboundFrame.ListModelsResponse,
             is AppServerInboundFrame.SkillEnableResponse,
             is AppServerInboundFrame.SkillDisableResponse,
