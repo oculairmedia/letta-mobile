@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import com.letta.mobile.util.Telemetry
 
 /**
  * letta-mobile-c4igq.9: server-side page-size guard for message.list over Iroh
@@ -51,7 +52,7 @@ object MessageListPageGuard {
         maxPageBytes: Int = MAX_PAGE_BYTES,
         newestLast: Boolean = true,
     ): JsonElement {
-        val messages = extractMessages(projected) ?: return projected
+        val messages = extractMessages(projected) ?: return projected.alsoLogUnboundableShape()
         // P3.1: sum per-element byte lengths (each already needed below) instead of
         // re-serializing the whole array into a throwaway string just to size it.
         if (!isWrapped(projected) && totalByteLen(messages) <= maxPageBytes) {
@@ -82,6 +83,40 @@ object MessageListPageGuard {
             if (oldestKeptId != null) put("next_before", JsonPrimitive(oldestKeptId))
         }
     }
+
+    /**
+     * letta-mobile-w9k3f: a message.list response that is neither a bare array nor
+     * { messages: [...] } is passed through UNCHANGED by this guard, by
+     * MessageListWireProjection.projectMessageList (`else -> response`), and then by
+     * the client, which hands it to a ListSerializer and dies with
+     * "Expected JsonArray, but had JsonObject" — hydration fails and the
+     * conversation renders empty, with nothing anywhere naming the actual shape.
+     *
+     * Log the SHAPE so the next occurrence is diagnosable: element type, top-level
+     * keys, and size. Never the values — a message.list body is conversation
+     * content, and keys alone identify the producing tier.
+     */
+    private fun JsonElement.alsoLogUnboundableShape(): JsonElement {
+        val kind = when (this) {
+            is JsonObject -> "object"
+            is JsonArray -> "array"
+            is JsonPrimitive -> if (isString) "string" else "primitive"
+            else -> "unknown"
+        }
+        val keys = (this as? JsonObject)?.keys.orEmpty().sorted().take(MAX_LOGGED_KEYS)
+        Telemetry.event(
+            "IrohNode", "message_list.unboundable_shape",
+            "kind" to kind,
+            "keyCount" to ((this as? JsonObject)?.size ?: 0),
+            "keys" to keys.joinToString(","),
+            "byteLen" to byteLen(this),
+            level = Telemetry.Level.WARN,
+        )
+        return this
+    }
+
+    /** Bounded so a pathological object cannot turn a diagnostic into a huge log line. */
+    private const val MAX_LOGGED_KEYS = 12
 
     private fun extractMessages(el: JsonElement): List<JsonElement>? = when (el) {
         is JsonArray -> el.toList()

@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -143,6 +144,19 @@ object ConversationAdminHandlers {
      * proxy error object) pass through untouched — filtering only ever narrows.
      */
     private fun scopeConversationList(result: JsonElement, context: AdminRpcRequestContext): JsonElement {
+        // letta-mobile-w9k3f: a non-array conversation.list body is passed through here
+        // and then decoded client-side straight into a List, throwing "Expected JsonArray,
+        // but had JsonObject". Log the shape (keys only, never values) so the producing
+        // tier — native / local store / shim proxy — is identifiable.
+        if (result !is JsonArray) {
+            Telemetry.event(
+                "IrohNode", "conversation_list.non_array_shape",
+                "kind" to if (result is JsonObject) "object" else "other",
+                "keyCount" to ((result as? JsonObject)?.size ?: 0),
+                "keys" to ((result as? JsonObject)?.keys.orEmpty().sorted().take(12).joinToString(",")),
+                level = Telemetry.Level.WARN,
+            )
+        }
         val authorized = context.authorizedConversationIds ?: return result
         if (result !is JsonArray) return result
         val filtered = result.filter { element ->

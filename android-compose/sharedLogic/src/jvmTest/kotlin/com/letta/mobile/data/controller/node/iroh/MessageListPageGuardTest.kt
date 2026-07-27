@@ -129,4 +129,25 @@ class MessageListPageGuardTest {
         val arr = buildJsonArray { add(JsonPrimitive(1)) }
         assertEquals(arr, MessageListPageGuard.dropField(arr, "messages"))
     }
+
+    /**
+     * letta-mobile-w9k3f: an unrecognised body (neither a bare array nor
+     * { messages: [...] }) must still pass through UNCHANGED — the guard bounds
+     * pages, it does not reshape or reject. This pins that contract while the
+     * diagnostic added alongside it reports the shape, so a future change cannot
+     * quietly start rewriting or dropping an unknown response.
+     */
+    @Test
+    fun unrecognisedResponseShapePassesThroughUnchanged() {
+        val errorEnvelope = buildJsonObject {
+            put("error", JsonPrimitive("boom"))
+            put("code", JsonPrimitive(500))
+        }
+        assertEquals(errorEnvelope, MessageListPageGuard.bound(errorEnvelope))
+
+        val altKeyEnvelope = buildJsonObject {
+            put("data", buildJsonArray { add(msg("m1", 10)) })
+        }
+        assertEquals(altKeyEnvelope, MessageListPageGuard.bound(altKeyEnvelope))
+    }
 }

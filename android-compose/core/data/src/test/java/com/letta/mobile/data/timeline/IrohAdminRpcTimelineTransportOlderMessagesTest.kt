@@ -73,4 +73,46 @@ class IrohAdminRpcTimelineTransportOlderMessagesTest {
 
         assertEquals(1, messages.size)
     }
+
+    /**
+     * letta-mobile-w9k3f: MessageListPageGuard wraps a page as
+     * { messages, has_more, next_before } whenever it trims an oversized window — i.e. on
+     * exactly the long conversations users care about. Both message.list paths in this
+     * transport decoded that wrapper straight into a ListSerializer and threw
+     * "Expected JsonArray, but had JsonObject", so hydration failed and the conversation
+     * rendered empty.
+     */
+    @Test
+    fun `listConversationMessages decodes the trimmed wrapper shape`() = runTest {
+        val fake = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                ok(
+                    """{"messages":[{"id":"letta-msg-30","message_type":"assistant_message","content":"newest"}],""" +
+                        """"has_more":true,"next_before":"letta-msg-30"}""",
+                )
+            }
+        }
+
+        val messages = transport(fake).listConversationMessages("conv-1", limit = 50)
+
+        assertEquals(1, messages.size)
+        assertEquals("letta-msg-30", messages.single().id)
+    }
+
+    @Test
+    fun `listOlderConversationMessages decodes the trimmed wrapper shape`() = runTest {
+        val fake = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                ok(
+                    """{"messages":[{"id":"letta-msg-31","message_type":"assistant_message","content":"older"}],""" +
+                        """"has_more":true,"next_before":"letta-msg-31"}""",
+                )
+            }
+        }
+
+        val messages = transport(fake).listOlderConversationMessages("conv-1", "letta-msg-40", 20)
+
+        assertEquals(1, messages.size)
+        assertEquals("letta-msg-31", messages.single().id)
+    }
 }

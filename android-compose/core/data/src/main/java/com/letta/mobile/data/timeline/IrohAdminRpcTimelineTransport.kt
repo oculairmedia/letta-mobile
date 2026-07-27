@@ -8,6 +8,8 @@ import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ConcurrentHashMap
 
 class IrohAdminRpcTimelineTransport(
@@ -69,7 +71,7 @@ class IrohAdminRpcTimelineTransport(
             throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc message.list failed")
         }
         val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(LettaMessage.serializer()), result)
+        return decodeMessageListBody(result)
     }
 
     /**
@@ -90,7 +92,7 @@ class IrohAdminRpcTimelineTransport(
             throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc message.list (before) failed")
         }
         val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(kotlinx.serialization.builtins.ListSerializer(LettaMessage.serializer()), result)
+        return decodeMessageListBody(result)
     }
 
     override suspend fun listAgentMessages(
@@ -127,6 +129,36 @@ class IrohAdminRpcTimelineTransport(
         if (gatedTelemetryPaths.add(path)) {
             Telemetry.event("TimelineSync", "irohMode.httpGated", "path" to path)
         }
+    }
+
+    /**
+     * letta-mobile-w9k3f: decode a `message.list` body that may be EITHER a bare array or
+     * the trimmed `{ messages, has_more, next_before }` wrapper.
+     *
+     * MessageListPageGuard (letta-mobile-c4igq.9) wraps a page whenever it has to trim an
+     * oversized window — i.e. exactly on long conversations. IrohAdminRpcChatGateway was
+     * taught to unwrap that; this transport was not, so both of its message.list paths
+     * decoded the wrapper straight into a ListSerializer and threw
+     * "Expected JsonArray, but had JsonObject". Hydration and reconcile-on-open then failed
+     * and the conversation rendered EMPTY, with the guard silent because it had done its
+     * job correctly.
+     */
+    private fun decodeMessageListBody(result: JsonElement): List<LettaMessage> {
+        val messages = (result as? JsonObject)?.get("messages") ?: result
+        if (result is JsonObject && result["messages"] == null) {
+            // Neither a bare array nor the known wrapper: report the shape (keys only —
+            // this is conversation content) instead of failing with an opaque decode error.
+            Telemetry.event(
+                "IrohTransport", "message_list.unexpected_object_shape",
+                "keyCount" to result.size,
+                "keys" to result.keys.sorted().take(12).joinToString(","),
+                level = Telemetry.Level.WARN,
+            )
+        }
+        return json.decodeFromJsonElement(
+            kotlinx.serialization.builtins.ListSerializer(LettaMessage.serializer()),
+            messages,
+        )
     }
 
     private companion object {
