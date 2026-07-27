@@ -253,21 +253,24 @@ private fun ProviderAdminBody(
                     .fillMaxSize()
                     .padding(paddingValues),
             ) {
-                if (filtered.isEmpty()) {
-                    EmptyState(
-                        icon = LettaIcons.Cloud,
-                        message = if (data.searchQuery.isBlank()) {
-                            stringResource(R.string.screen_providers_empty)
-                        } else {
-                            stringResource(R.string.screen_providers_empty_search, data.searchQuery)
-                        },
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (filtered.isEmpty()) {
+                        item {
+                            EmptyState(
+                                icon = LettaIcons.Cloud,
+                                message = if (data.searchQuery.isBlank()) {
+                                    stringResource(R.string.screen_providers_empty)
+                                } else {
+                                    stringResource(R.string.screen_providers_empty_search, data.searchQuery)
+                                },
+                                modifier = Modifier.fillParentMaxSize(),
+                            )
+                        }
+                    } else {
                         items(filtered, key = { it.id ?: it.name }) { provider ->
                             ProviderCard(
                                 provider = provider,
@@ -419,8 +422,18 @@ private fun ProviderDetailDialog(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(onClick = onEdit) { Text(stringResource(R.string.screen_providers_edit_title)) }
-                TextButton(onClick = onCheck) { Text(stringResource(R.string.action_check)) }
+                TextButton(
+                    onClick = onEdit,
+                    enabled = !isRefreshing,
+                ) {
+                    Text(stringResource(R.string.screen_providers_edit_title))
+                }
+                TextButton(
+                    onClick = onCheck,
+                    enabled = !isRefreshing,
+                ) {
+                    Text(stringResource(R.string.action_check))
+                }
             }
         }
     }

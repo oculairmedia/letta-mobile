@@ -21,6 +21,7 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.navigation.ConfigRoute
+import com.letta.mobile.ui.state.RetainedContentRefresh
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -101,6 +102,7 @@ class ConfigViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow<UiState<ConfigUiState>>(UiState.Loading)
     val uiState: StateFlow<UiState<ConfigUiState>> = _uiState.asStateFlow()
+    private var latestLoadRequestId = 0L
 
     init {
         loadConfig()
@@ -110,13 +112,28 @@ class ConfigViewModel @Inject constructor(
     fun loadConfig() {
         viewModelScope.launch {
             val retainedState = (_uiState.value as? UiState.Success)?.data
-            // A refresh reconstructs the form from persisted state. Never let it
-            // replace edits that have not gone through saveConfig yet.
-            if (retainedState?.hasUnsavedChanges == true) return@launch
-            _uiState.value = retainedState
-                ?.copy(isRefreshing = true, refreshError = null)
-                ?.let { UiState.Success(it) }
-                ?: UiState.Loading
+            val requestId = RetainedContentRefresh.nextRequestId(latestLoadRequestId)
+            when (
+                val start = RetainedContentRefresh.begin(
+                    requestId = requestId,
+                    retainedContent = retainedState,
+                    // A refresh reconstructs the form from persisted state. Never let it
+                    // replace edits that have not gone through saveConfig yet.
+                    canRefresh = { !it.hasUnsavedChanges },
+                )
+            ) {
+                RetainedContentRefresh.Start.Skip -> return@launch
+                is RetainedContentRefresh.Start.Loading -> {
+                    latestLoadRequestId = start.requestId
+                    _uiState.value = UiState.Loading
+                }
+                is RetainedContentRefresh.Start.Retaining -> {
+                    latestLoadRequestId = start.requestId
+                    _uiState.value = UiState.Success(
+                        start.content.copy(isRefreshing = true, refreshError = null)
+                    )
+                }
+            }
             try {
                 val activeConfig = settingsRepository.activeConfig.value
                 val preferences = loadDisplayPreferences()
@@ -160,13 +177,22 @@ class ConfigViewModel @Inject constructor(
                         embeddedRuntimeStatus = embeddedRuntimeStatusProvider.status,
                     )
                 }
-                _uiState.value = UiState.Success(configUiState)
+                if (RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) {
+                    _uiState.value = UiState.Success(configUiState)
+                }
             } catch (e: Exception) {
-                val message = e.message ?: "Failed to load config"
-                _uiState.value = retainedState
-                    ?.copy(isRefreshing = false, refreshError = message)
-                    ?.let { UiState.Success(it) }
-                    ?: UiState.Error(message)
+                if (!RetainedContentRefresh.isCurrent(requestId, latestLoadRequestId)) return@launch
+                when (
+                    val failure = RetainedContentRefresh.failure(
+                        retainedContent = retainedState,
+                        message = e.message ?: "Failed to load config",
+                    )
+                ) {
+                    is RetainedContentRefresh.Failure.ShowError -> _uiState.value = UiState.Error(failure.message)
+                    is RetainedContentRefresh.Failure.Retain -> _uiState.value = UiState.Success(
+                        failure.content.copy(isRefreshing = false, refreshError = failure.message)
+                    )
+                }
             }
         }
     }
