@@ -77,6 +77,17 @@ internal class AdminChatGoalCoordinator(
             slashCommandRepository.getGoalStatus(agentId.value)
                 .onSuccess { status ->
                     if (currentConversationId() != originatingConversationId) return@onSuccess
+                    // getGoalStatus is agent-scoped, so it can answer with a goal belonging to a
+                    // DIFFERENT conversation of the same agent. The check above only proves the UI
+                    // has not switched since the request began — it cannot prove the goal is ours.
+                    // Show nothing rather than another conversation's objective.
+                    // An empty conversation_id means the server does not report one, so trust it.
+                    if (status.conversationId.isNotEmpty() &&
+                        status.conversationId != originatingConversationId
+                    ) {
+                        uiState.update { it.copy(goalStatus = null, isGoalStatusLoading = false) }
+                        return@onSuccess
+                    }
                     uiState.update {
                         it.copy(goalStatus = status.goal?.toUi(), isGoalStatusLoading = false)
                     }
