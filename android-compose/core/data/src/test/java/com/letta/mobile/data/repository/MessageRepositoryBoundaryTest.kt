@@ -32,6 +32,11 @@ class MessageRepositoryBoundaryTest {
                 "fetchLatestConversationInspectorMessages",
                 "fetchMessages",
                 "fetchOlderMessages",
+                // letta-mobile-f0ixs: same bounded older-page read as fetchOlderMessages, but it
+                // also returns the guard's has_more so the pager stops guessing end-of-history
+                // from page size. No new state and no new responsibility — this repository stays
+                // a stateless HTTP helper.
+                "fetchOlderMessagesPage",
                 "getMessagesPaged",
                 "listBatchMessages",
                 "listBatches",

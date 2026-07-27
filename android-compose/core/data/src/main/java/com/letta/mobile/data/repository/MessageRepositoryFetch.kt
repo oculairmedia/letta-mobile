@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.api.MessageApi
+import com.letta.mobile.data.repository.api.OlderMessagesPage
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
@@ -100,6 +101,44 @@ internal object MessageRepositoryFetch {
             messageLimit = olderMessagesPageSize,
             beforeMessageId = beforeMessageId,
         ).toAppMessages()
+    }
+
+    /**
+     * letta-mobile-f0ixs: [fetchOlderMessages] that preserves the guard's continuation signal.
+     *
+     * Only the Iroh path can answer; the HTTP path reports null so the caller keeps its
+     * page-size heuristic and its behaviour is unchanged.
+     */
+    suspend fun fetchOlderMessagesPage(
+        messageApi: MessageApi,
+        irohTimelineTransport: com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport?,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        beforeMessageId: String,
+        olderMessagesPageSize: Int,
+    ): OlderMessagesPage {
+        if (beforeMessageId.isBlank()) return OlderMessagesPage(emptyList(), hasMore = null)
+
+        if (irohTimelineTransport?.shouldUseIroh() == true) {
+            val page = irohTimelineTransport.listOlderConversationMessagesPage(
+                conversationId = conversationId.value,
+                beforeMessageId = beforeMessageId,
+                limit = olderMessagesPageSize,
+            )
+            return OlderMessagesPage(page.messages.toAppMessages(), hasMore = page.hasMore)
+        }
+
+        return OlderMessagesPage(
+            messages = fetchOlderMessages(
+                messageApi = messageApi,
+                irohTimelineTransport = irohTimelineTransport,
+                agentId = agentId,
+                conversationId = conversationId,
+                beforeMessageId = beforeMessageId,
+                olderMessagesPageSize = olderMessagesPageSize,
+            ),
+            hasMore = null,
+        )
     }
 
     private suspend fun fetchRecentMessages(params: MessageFetchParams): List<AppMessage> =
