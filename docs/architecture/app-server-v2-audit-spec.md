@@ -24,6 +24,9 @@ The machine-readable inventories remain authoritative for exact discriminants
 and registered methods. This document explains how those inventories compose
 into the running system and records known consistency risks.
 
+Implementation and rollout handoff:
+[LettaShim Retirement Implementation and Deployment Runbook](lettashim-retirement-deployment-runbook.md)
+
 ## Required End State: No LettaShim
 
 LettaShim is a migration dependency, not a permanent architecture component.
