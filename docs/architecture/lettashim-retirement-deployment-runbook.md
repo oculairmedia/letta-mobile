@@ -111,6 +111,8 @@ expected reasons.
 
 ### Phase 2: Port native-owned operations
 
+Status: partial on PR #1036 / `letta-mobile-lgns8.10.2`
+
 For agent, conversation, message, model, skill, approval, cron, and reflection
 operations:
 
@@ -129,15 +131,26 @@ operations:
    - conversation-scoped overrides.
 7. Reconcile ambiguous mutations before reissuing them.
 
-Specific known gaps:
+Landed in this Phase 2 slice:
 
-- `message.get` and `tool_return.get` still need a native projection from
-  `conversation_messages_list` or a separately approved owner.
-- `model.list` must stop defaulting to the shim catalog shape.
-- Skill list/install semantics must be reconciled with upstream
-  enable/disable semantics.
-- Approval fallback must be replaced by v2 sync/recovery.
-- Conversation delete must become archive or fail closed unconditionally.
+- `NativeAdmin.require` fail-closed path for runtime-owned ops (no shim
+  fallback);
+- agent/conversation/message CRUD+list native-only;
+- `message.get` / `tool_return.get` projected from `conversation_messages_list`;
+- `model.list` native-only by default;
+- `approval.submit` controller-only (no shim pending-approval REST);
+- `conversation.delete` always `capability_unavailable`;
+- production CLI no longer wires `LETTA_LOCAL_BACKEND_DIR`;
+- agent.update also invalidates runtime on context-window changes;
+- ownership matrix fallbacks reduced to 5 `shim_until_cutover` rows.
+
+Still open inside Phase 2:
+
+- agent-scoped skill list/install/uninstall still on shim semantics;
+- global native circuit breaker is still process-wide (now fail-closed, not
+  shim-diverting);
+- deeper single-message fetch than a bounded newest window;
+- full per-field runtime invalidation registry.
 
 ### Phase 3: Replace non-v2 admin domains
 
