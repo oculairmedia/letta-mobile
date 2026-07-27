@@ -408,23 +408,7 @@ class AppServerTurnEngine(
         var releaseReason = "normal_completion"
         try {
             val turnPermissionMode = permissionModeProvider(command)
-            if (command.input is TurnInput.UserMessage) {
-                val result = turnContextPreflight.prepare(
-                    agentId = command.agentId.value,
-                    conversationId = command.conversationId.value,
-                )
-                if (result.configuredContextLimit || result.compacted) {
-                    runtime = null
-                    Telemetry.event(
-                        "AppServerTurnEngine",
-                        "context.preflightApplied",
-                        "agentId" to command.agentId.value,
-                        "conversationId" to command.conversationId.value,
-                        "configuredContextLimit" to result.configuredContextLimit.toString(),
-                        "compacted" to result.compacted.toString(),
-                    )
-                }
-            }
+            prepareContextIfNeeded(command)
             Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
             val scope = ensureRuntime(command, turnPermissionMode)
             Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
@@ -512,6 +496,25 @@ class AppServerTurnEngine(
             }
             }
         }
+    }
+
+    private suspend fun prepareContextIfNeeded(command: TurnCommand) {
+        if (command.input !is TurnInput.UserMessage) return
+        val result = turnContextPreflight.prepare(
+            agentId = command.agentId.value,
+            conversationId = command.conversationId.value,
+        )
+        if (!result.configuredContextLimit && !result.compacted) return
+
+        runtime = null
+        Telemetry.event(
+            "AppServerTurnEngine",
+            "context.preflightApplied",
+            "agentId" to command.agentId.value,
+            "conversationId" to command.conversationId.value,
+            "configuredContextLimit" to result.configuredContextLimit.toString(),
+            "compacted" to result.compacted.toString(),
+        )
     }
 
     /**

@@ -137,12 +137,17 @@ private fun JsonElement.isActive(activeMessageIds: Set<String>?): Boolean {
 
 private fun JsonElement.recordsProviderOverflow(contextWindowLimit: Int): Boolean {
     val objects = allObjects()
-    val lengthStop = objects.any {
+    return objects.hasLengthStop() &&
+        (objects.hasInputAtOrBeyond(contextWindowLimit) || objects.hasEmptyAssistant())
+}
+
+private fun List<JsonObject>.hasLengthStop(): Boolean =
+    any {
         it.string("stop_reason") == "length" || it.string("stopReason") == "length"
     }
-    if (!lengthStop) return false
 
-    val inputAtOrBeyondLimit = objects.any { objectValue ->
+private fun List<JsonObject>.hasInputAtOrBeyond(contextWindowLimit: Int): Boolean =
+    any { objectValue ->
         val usage = objectValue.objectValue("usage") ?: objectValue
         val input = usage.long("input")
             ?: usage.long("input_tokens")
@@ -152,14 +157,13 @@ private fun JsonElement.recordsProviderOverflow(contextWindowLimit: Int): Boolea
             ?: 0L
         input != null && input + cacheRead >= contextWindowLimit.toLong()
     }
-    if (inputAtOrBeyondLimit) return true
 
-    return objects.any { objectValue ->
+private fun List<JsonObject>.hasEmptyAssistant(): Boolean =
+    any { objectValue ->
         val role = objectValue.string("role")
         val content = objectValue["content"] ?: objectValue["parts"]
         role == "assistant" && (content == JsonNull || content == JsonArray(emptyList()))
     }
-}
 
 private fun JsonElement.allObjects(): List<JsonObject> {
     val found = mutableListOf<JsonObject>()

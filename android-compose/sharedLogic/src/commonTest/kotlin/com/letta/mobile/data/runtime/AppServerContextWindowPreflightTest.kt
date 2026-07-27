@@ -28,10 +28,10 @@ class AppServerContextWindowPreflightTest {
             messages = JsonArray(
                 listOf(
                     providerMessage(
-                        stopReason = "length",
-                        input = 407_000,
-                        output = 1,
-                        contentEmpty = true,
+                        ProviderMessageFixture(
+                            stopReason = "length",
+                            input = 407_000,
+                        ),
                     ),
                 ),
             ),
@@ -66,7 +66,16 @@ class AppServerContextWindowPreflightTest {
                 )
             },
             messages = JsonArray(
-                listOf(providerMessage(stopReason = "stop", input = 40_000, output = 300, contentEmpty = false)),
+                listOf(
+                    providerMessage(
+                        ProviderMessageFixture(
+                            stopReason = "stop",
+                            input = 40_000,
+                            output = 300,
+                            contentEmpty = false,
+                        ),
+                    ),
+                ),
             ),
         )
 
@@ -83,7 +92,7 @@ class AppServerContextWindowPreflightTest {
         val client = PreflightClient(
             agent = buildJsonObject { put("context_window_limit", 200_000) },
             messages = JsonArray(
-                listOf(providerMessage(stopReason = "length", input = null, output = 1, contentEmpty = true)),
+                listOf(providerMessage(ProviderMessageFixture(stopReason = "length"))),
             ),
         )
 
@@ -100,11 +109,11 @@ class AppServerContextWindowPreflightTest {
             messages = JsonArray(
                 listOf(
                     providerMessage(
-                        id = "old-overflow",
-                        stopReason = "length",
-                        input = 407_000,
-                        output = 1,
-                        contentEmpty = true,
+                        ProviderMessageFixture(
+                            id = "old-overflow",
+                            stopReason = "length",
+                            input = 407_000,
+                        ),
                     ),
                 ),
             ),
@@ -132,30 +141,36 @@ class AppServerContextWindowPreflightTest {
         assertEquals(null, client.compactCommand)
     }
 
-    private fun providerMessage(
-        id: String = "msg-overflow",
-        stopReason: String,
-        input: Int?,
-        output: Int,
-        contentEmpty: Boolean,
-    ) = buildJsonObject {
-        put("id", id)
+    private fun providerMessage(fixture: ProviderMessageFixture) = buildJsonObject {
+        put("id", fixture.id)
         put("role", "assistant")
-        put("content", if (contentEmpty) JsonArray(emptyList()) else JsonArray(listOf(buildJsonObject { put("text", "ok") })))
+        put(
+            "content",
+            if (fixture.contentEmpty) JsonArray(emptyList())
+            else JsonArray(listOf(buildJsonObject { put("text", "ok") })),
+        )
         put(
             "provider_result",
             buildJsonObject {
-                put("stopReason", stopReason)
+                put("stopReason", fixture.stopReason)
                 put(
                     "usage",
                     buildJsonObject {
-                        input?.let { put("input", it) }
-                        put("output", output)
+                        fixture.input?.let { put("input", it) }
+                        put("output", fixture.output)
                     },
                 )
             },
         )
     }
+
+    private data class ProviderMessageFixture(
+        val id: String = "msg-overflow",
+        val stopReason: String,
+        val input: Int? = null,
+        val output: Int = 1,
+        val contentEmpty: Boolean = true,
+    )
 }
 
 private class PreflightClient(
