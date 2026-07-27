@@ -1,5 +1,9 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.desktop.chat.ChatStatePanel
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Schedule
@@ -26,6 +31,9 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.schedules.CronTask
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.desktop.channels.DesktopChannelLibraryState
+import com.letta.mobile.desktop.home.DesktopHomeActions
+import com.letta.mobile.desktop.home.DesktopHomeState
+import com.letta.mobile.desktop.home.DesktopHomeSurface
 import com.letta.mobile.desktop.channels.DesktopChannelLibrarySurface
 import com.letta.mobile.desktop.memory.DesktopBlockApi
 import com.letta.mobile.desktop.memory.DesktopMemorySurface
@@ -98,6 +106,8 @@ private data class DestinationAgentsActions(
 
 internal data class DestinationContentInputs(
     val state: DesktopBootstrapState,
+    val home: DesktopHomeState,
+    val chat: DesktopChatSurfaceState,
     val memoryState: DesktopMemorySurfaceState,
     val schedule: DestinationScheduleInputs,
     val channelLibraryState: DesktopChannelLibraryState,
@@ -118,6 +128,8 @@ internal data class DestinationNucleusActions(
 )
 
 internal data class DestinationContentActions(
+    val home: DesktopHomeActions,
+    val onRetryConnection: () -> Unit,
     val memory: DestinationMemoryActions,
     val schedules: DestinationScheduleActions,
     val onChannelsRefresh: () -> Unit,
@@ -144,6 +156,7 @@ private data class ScrollableDestinationInputs(
 
 private val DesktopDestination.icon: ImageVector
     get() = when (this) {
+        DesktopDestination.Home -> Icons.Outlined.Home
         DesktopDestination.Overview -> Icons.Outlined.Dashboard
         DesktopDestination.Agents -> Icons.Outlined.SmartToy
         DesktopDestination.Memory -> Icons.Outlined.Memory
@@ -161,6 +174,28 @@ internal fun DestinationContent(
     modifier: Modifier = Modifier,
 ) {
     when (destination) {
+        // The fleet dashboard. Rendered natively today; see DesktopHomeSurface's
+        // KDoc for the Letta Code mod / A2UI document seam.
+        DesktopDestination.Home -> {
+            if (inputs.chat.connectionState in setOf(
+                    ChatConnectionState.Loading,
+                    ChatConnectionState.ConfigNeeded,
+                    ChatConnectionState.Offline,
+                )
+            ) {
+                ChatStatePanel(
+                    state = inputs.chat,
+                    onRetryConnection = actions.onRetryConnection,
+                    modifier = modifier,
+                )
+            } else {
+                DesktopHomeSurface(
+                    state = inputs.home,
+                    actions = actions.home,
+                    modifier = modifier,
+                )
+            }
+        }
         DesktopDestination.Memory -> MemoryDestinationContent(
             memoryState = inputs.memoryState,
             blockApi = inputs.blockApi,

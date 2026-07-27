@@ -28,6 +28,7 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
@@ -259,13 +260,22 @@ class A2uiToolApprovalRoundTripTest {
         val bridge = WsChatBridge(transport)
         connect(transport, bridge, server)
 
+        // letta-mobile-ddpc2 family (b): bridge.events is a cold merge(), so collecting it
+        // launches child collectors that must be dispatched before they attach. UNDISPATCHED only
+        // guarantees this coroutine STARTS synchronously — not that the merge is attached — so a
+        // send that lands first is dropped and take(3) then waits out the whole timeout. The
+        // sibling test below synchronizes on a server frame first; this one had no barrier at all.
+        // onStart fires from inside collection, so awaiting it puts the sends strictly after it.
+        val subscribed = CompletableDeferred<Unit>()
         val observed = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
             bridge.events
+                .onStart { subscribed.complete(Unit) }
                 .mapNotNull { event -> (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage }
                 .map { it.content }
                 .take(3)
                 .toList()
         }
+        withRealTimeout { subscribed.await() }
 
         server.sendRaw(
             """

@@ -15,7 +15,9 @@ object RuntimeUserInputTools {
     const val EXIT_PLAN_MODE = "ExitPlanMode"
 
     /** Tool names that require a real user answer rather than an auto-approval. */
-    val names: Set<String> = setOf(ASK_USER_QUESTION, EXIT_PLAN_MODE)
+    // ExitPlanMode stays auto-approved until every host has an actionable renderer;
+    // classifying it as interactive without controls parks the turn permanently.
+    val names: Set<String> = setOf(ASK_USER_QUESTION)
 
     fun requiresUserInput(toolName: String?): Boolean = toolName != null && toolName in names
 }

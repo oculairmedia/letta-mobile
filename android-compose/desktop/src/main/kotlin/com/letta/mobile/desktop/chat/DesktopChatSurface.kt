@@ -385,7 +385,7 @@ private fun OnboardingTaskRow(task: OnboardingTask, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ChatStatePanel(
+internal fun ChatStatePanel(
     state: DesktopChatSurfaceState,
     onRetryConnection: () -> Unit,
     modifier: Modifier = Modifier,

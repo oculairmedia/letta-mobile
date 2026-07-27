@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,7 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -55,9 +53,6 @@ import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.desktop.chat.AgentOrb
-
-private val androidx.compose.material3.Typography.countBadge
-    get() = labelSmall.copy(fontWeight = FontWeight.SemiBold)
 
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
@@ -148,18 +143,36 @@ internal fun DesktopAgentRail(
             .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
     }
     val width by animateDpAsState(if (state.expanded) 248.dp else 56.dp, label = "railWidth")
+    // Start-aligned in BOTH modes, with each header control wrapped in a
+    // fixed 56dp-wide centering slot: expanding the rail must not shift the
+    // icons horizontally — labels appear beside them, the icons stay put.
     Column(
         modifier = Modifier
             .width(width)
             .fillMaxHeight()
             .background(MaterialTheme.colorScheme.background)
             .padding(vertical = 15.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        RailExpandToggle(expanded = state.expanded, onToggle = actions.onToggleExpanded)
-        NewSessionButton(onNewSession = actions.onNewSession)
-        Spacer(Modifier.height(8.dp))
+        // No hamburger: the search icon IS the library trigger — it expands
+        // the panel, and choosing an agent collapses it again (the shell
+        // resets `expanded` on selection).
+        RailHeaderRow(onClick = actions.onNewSession, label = if (state.expanded) "New session" else null) {
+            NewSessionButton(onNewSession = actions.onNewSession)
+        }
+        if (!state.expanded) {
+            RailHeaderRow(onClick = actions.onToggleExpanded) {
+                RailActionIcon(
+                    RailActionIconModel(
+                        icon = Icons.Outlined.Search,
+                        description = "Search agents",
+                        onClick = actions.onToggleExpanded,
+                    ),
+                )
+            }
+        }
+        Spacer(Modifier.height(4.dp))
         if (state.expanded) {
             ExpandedAgentLibrary(
                 groups = groups,
@@ -172,28 +185,42 @@ internal fun DesktopAgentRail(
                 focus = state.focus,
                 onAgentSelected = actions.onAgentSelected,
             )
-            // Collapsed library search just opens the library — the search
-            // field lives inline in the expanded panel, Spotify-style.
-            RailActionIcon(
-                RailActionIconModel(
-                    icon = Icons.Outlined.Search,
-                    description = "Search agents",
-                    onClick = actions.onToggleExpanded,
-                ),
-            )
         }
     }
 }
 
+/**
+ * Header control slot: the icon is centered inside a fixed 56dp column (the
+ * collapsed rail width) so it occupies the same x whether the rail is
+ * collapsed or expanded; an optional [label] reveals to the icon's right in
+ * expanded mode. The whole row is clickable so the label acts as part of the
+ * control.
+ */
 @Composable
-private fun RailExpandToggle(expanded: Boolean, onToggle: () -> Unit) {
-    RailActionIcon(
-        RailActionIconModel(
-            icon = Icons.Outlined.Menu,
-            description = if (expanded) "Collapse agent library" else "Expand agent library",
-            onClick = onToggle,
-        ),
-    )
+private fun RailHeaderRow(
+    onClick: () -> Unit,
+    label: String? = null,
+    icon: @Composable () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(if (label != null) Modifier.clickable(onClick = onClick) else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.width(56.dp), contentAlignment = Alignment.Center) {
+            icon()
+        }
+        if (label != null) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 /**
@@ -331,7 +358,7 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
             .background(
                 if (flags.selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
             )
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -357,13 +384,9 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        if (flags.count > 1) {
-            Text(
-                text = if (flags.count > 99) "99+" else flags.count.toString(),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // No per-row member count: PM groups aggregate hundreds of spawns, so
+        // the number was always a meaningless "99+" — the space header already
+        // carries the aggregate.
     }
 }
 
@@ -481,36 +504,32 @@ private fun AgentRailOrbContent(
     target: AgentRailOrbTarget,
 ) {
     Box(
-        modifier = Modifier.size(width = 46.dp, height = 40.dp),
+        modifier = Modifier.size(width = 46.dp, height = 34.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (flags.selected) {
             SelectedAgentRailMarker(modifier = Modifier.align(Alignment.CenterStart))
         }
         if (flags.thinking) {
-            // Concentric with the 36dp/7dp orb (2dp gap → 9dp corner)
-            // and sized to fit the 40dp slot so it doesn't crowd
-            // neighbouring orbs.
-            ThinkingRing(diameter = 40.dp, cornerRadius = 9.dp)
+            // Concentric with the 30dp orb (2dp gap) and sized to fit the
+            // slot so it doesn't crowd neighbouring orbs.
+            ThinkingRing(diameter = 34.dp, cornerRadius = 9.dp)
         }
         AgentOrb(
             index = target.orbStyle,
-            size = 36.dp,
+            size = 30.dp,
             onClick = { params.onAgentSelected(target.agentId) },
         ) {
             Text(
                 text = params.group.name.firstOrNull()?.uppercase() ?: "?",
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White,
             )
         }
-        if (flags.count > 1) {
-            AgentCountChip(
-                count = flags.count,
-                modifier = Modifier.align(Alignment.TopEnd),
-            )
-        }
+        // No member-count chip on stacked orbs: PM groups aggregate hundreds
+        // of spawns, so every orb wore a meaningless "99+". The tooltip still
+        // reports the exact count for anyone who cares.
     }
 }
 
@@ -521,24 +540,6 @@ private fun SelectedAgentRailMarker(modifier: Modifier = Modifier) {
             .size(width = 3.dp, height = 28.dp)
             .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(2.dp)),
     )
-}
-
-@Composable
-private fun AgentCountChip(count: Int, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier
-            .defaultMinSize(minWidth = 17.dp, minHeight = 17.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape)
-            .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
-            .padding(horizontal = 5.dp, vertical = 1.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = if (count > 99) "99+" else count.toString(),
-            style = MaterialTheme.typography.countBadge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
 }
 
 
