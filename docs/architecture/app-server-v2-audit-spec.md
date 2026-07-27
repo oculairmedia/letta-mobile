@@ -431,9 +431,9 @@ The current machine matrix contains 89 registered methods:
 | `capability_gated_unsupported` | 1 | Typed fail-closed response |
 
 Exact method rows, authorization classes, data stores, native discriminants,
-fallbacks, and migration slices are maintained in
-`iroh-admin-ownership-matrix.json`. CI compares that file to the methods
-actually registered by `AdminRpcRegistry.buildRouter`.
+fallbacks, production first routes, post-shim owners, and migration slices are
+maintained in `iroh-admin-ownership-matrix.json`. CI compares that file to the
+methods actually registered by `AdminRpcRegistry.buildRouter`.
 
 ### Native-first agent mutation path
 
@@ -470,13 +470,14 @@ the next turn starts a fresh runtime.
 
 The ownership-matrix fallback totals are:
 
-- 70 as `shim_until_cutover`
-- 18 as `none`
-- 1 as `deny_fail_closed`
+- 20 as `shim_until_cutover`
+- 69 as `none`
 
-Those declarations are not a complete picture of runtime dependence because some
-handlers have already moved to direct services while other supposedly
-controller-native paths still source data from the shim.
+`deny_fail_closed` moved to `post_shim_fallback` for cutover targets
+(conversation delete plus the 40 admin REST domains that must not keep a
+generic shim proxy after retirement). Phase 1 also records
+`production_first_route` and `post_shim_owner` on every method so gates can
+compare observed production routing against the shim-free end state.
 
 ### Current dependency classes
 
@@ -694,14 +695,18 @@ These are known inconsistencies, not accepted architecture:
 10. **Runtime persistence semantics are not schema-classified.** There is no
     single registry stating which agent/conversation fields are read live and
     which are captured when a runtime starts.
-11. **Seventy ownership rows still declare shim fallback.** The cutover cannot
-    be audited as complete while `shim_until_cutover` remains an allowed
-    production fallback.
-12. **Subagent ownership is incorrectly described.** The methods are labelled
-    controller-native, but production builds their source by probing LettaShim.
-13. **Conversation delete does not currently fail closed.** The ownership
-    matrix says it should, but production leaves `shimRetired=false` and calls
-    the shim delete route.
+11. **Twenty ownership rows still declare shim fallback.** Phase 1 reduced the
+    migration `shim_until_cutover` count from 70 to 20 by correcting VibeSync
+    and direct admin-REST routes. Cutover still cannot complete while any
+    production fallback remains.
+12. **Subagent ownership is incorrectly described at runtime.** The methods are
+    labelled controller-native, but production builds their source by probing
+    LettaShim. The matrix now records production_first_route=`shim_http` while
+    keeping the post-shim owner as controller-native.
+13. **Conversation delete does not currently fail closed in production.** The
+    matrix now records production_first_route=`shim_http` with migration
+    fallback `shim_until_cutover`, while `post_shim_fallback` remains
+    `deny_fail_closed`. Production still leaves `shimRetired=false`.
 14. **Model and skill parity is semantic, not mechanical.** Upstream model and
     skill operations have different wire shapes/scopes from the shim APIs, so
     merely switching route names would change product behavior.

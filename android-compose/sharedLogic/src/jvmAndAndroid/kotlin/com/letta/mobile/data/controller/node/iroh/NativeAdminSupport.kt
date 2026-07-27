@@ -1,7 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
-import com.letta.mobile.util.Telemetry
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -69,13 +68,32 @@ internal object NativeAdmin {
     ): T? {
         if (client == null) return null
         // Native known-unavailable: don't probe, go straight to the proxy.
-        if (circuitOpen()) return null
+        if (circuitOpen()) {
+            AdminRouteTelemetry.fallback(
+                method = op,
+                fromRoute = "app_server_v2",
+                toRoute = "shim_http",
+                reason = "circuit_open",
+            )
+            return null
+        }
         return try {
             val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
             if (result != null) {
                 nativeDownSince = null // native answered — prefer it again
+                AdminRouteTelemetry.selected(
+                    method = op,
+                    owner = "app_server_v2",
+                    route = "app_server_v2",
+                    outcome = "success",
+                )
             } else {
-                Telemetry.event("IrohAdminNative", "fallback", "op" to op, "reason" to "native_unsuccessful")
+                AdminRouteTelemetry.fallback(
+                    method = op,
+                    fromRoute = "app_server_v2",
+                    toRoute = "shim_http",
+                    reason = "native_unsuccessful",
+                )
             }
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -85,16 +103,22 @@ internal object NativeAdmin {
             // it must be caught BEFORE the generic rethrow below.) Trip the breaker
             // so sibling/subsequent ops skip the dead native path.
             tripBreaker()
-            Telemetry.event("IrohAdminNative", "fallback", "op" to op, "reason" to "native_timeout")
+            AdminRouteTelemetry.fallback(
+                method = op,
+                fromRoute = "app_server_v2",
+                toRoute = "shim_http",
+                reason = "native_timeout",
+            )
             null
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             tripBreaker()
-            Telemetry.event(
-                "IrohAdminNative", "fallback",
-                "op" to op,
-                "reason" to (e.message ?: e::class.simpleName ?: "error"),
+            AdminRouteTelemetry.fallback(
+                method = op,
+                fromRoute = "app_server_v2",
+                toRoute = "shim_http",
+                reason = e.message ?: e::class.simpleName ?: "error",
             )
             null
         }

@@ -28,13 +28,16 @@ import kotlinx.serialization.json.put
  * runtime-owned path serves NATIVELY, capability-gated ops deny cleanly, and
  * every remaining bounded-admin method degrades to a well-formed
  * `success:false` envelope — the router NEVER throws or hangs, so a shim
- * outage can never crash chat. This is the achievable core of the acceptance
- * gate: the runtime path is off-shim; the admin surface degrades gracefully
- * (the admin surface itself cannot be fully off-shim — see
- * docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md).
+ * outage can never crash chat.
+ *
+ * Phase 1 strengthening (runbook):
+ * - native successes must not dial the proxy transport;
+ * - intentionally unavailable methods must return typed capability errors;
+ * - a bare `success:false` is not enough for required product methods.
  */
 class ShimOffParityGateTest {
     private var savedFactory: (() -> AdminProxyTransport)? = null
+    private val proxyDialCount = java.util.concurrent.atomic.AtomicInteger(0)
 
     @BeforeTest
     fun shimOff() {
@@ -42,10 +45,14 @@ class ShimOffParityGateTest {
         // native-timeout test can't leave native short-circuited for the
         // runtime-owned ops this gate asserts serve natively.
         NativeAdmin.resetCircuitForTest()
+        proxyDialCount.set(0)
         // lettashim is unreachable: every proxy dial fails fast (not a hang).
         savedFactory = AdminProxyClient.defaultTransportFactory
         AdminProxyClient.defaultTransportFactory = {
-            AdminProxyTransport { _, _, _ -> error("shim unavailable (parity gate: shim off)") }
+            AdminProxyTransport { _, _, _ ->
+                proxyDialCount.incrementAndGet()
+                error("shim unavailable (parity gate: shim off)")
+            }
         }
     }
 
@@ -207,14 +214,28 @@ class ShimOffParityGateTest {
             "model.list", "skill.install",
             "cron.list", "cron.add", "cron.get", "cron.trigger",
         )
+        val dialsBefore = proxyDialCount.get()
         nativeOk.forEach { method ->
             val obj = Json.parseToJsonElement(
                 router.dispatch(
                     AdminRpcInvocation("g", method, params(method), AdminRpcRequestContext.Authenticated),
                 ),
             ).jsonObject
-            assertEquals("true", obj["success"]?.jsonPrimitive?.content, "$method must serve natively shim-off: $obj")
+            assertEquals(
+                "true",
+                obj["success"]?.jsonPrimitive?.content,
+                "$method must serve natively shim-off (success:true required; bare success:false is not parity): $obj",
+            )
+            assertTrue(
+                obj["error"] == null || obj["error"]?.jsonPrimitive?.content.isNullOrBlank(),
+                "$method native success must not carry an error payload: $obj",
+            )
         }
+        assertEquals(
+            dialsBefore,
+            proxyDialCount.get(),
+            "required native product methods must not dial AdminProxyClient when App Server answers",
+        )
     }
 
     @Test

@@ -60,6 +60,8 @@ class IrohAdminOwnershipMatrixTest {
         val dataStores = enums.stringSet("data_stores")
         val fallbacks = enums.stringSet("fallbacks")
         val migrationSlices = enums.stringSet("migration_slices")
+        val productionFirstRoutes = enums.stringSet("production_first_routes")
+        val postShimFallbacks = enums.stringSet("post_shim_fallbacks")
 
         operations.forEach { row ->
             val method = row.requiredString("method")
@@ -76,6 +78,22 @@ class IrohAdminOwnershipMatrixTest {
             assertTrue(
                 row.requiredString("migration_slice") in migrationSlices,
                 "$method has an unknown migration slice",
+            )
+            assertTrue(
+                row.requiredString("production_first_route") in productionFirstRoutes,
+                "$method has an unknown production_first_route",
+            )
+            assertTrue(
+                row.requiredString("post_shim_owner") in owners,
+                "$method has an unknown post_shim_owner",
+            )
+            assertTrue(
+                row.requiredString("post_shim_fallback") in postShimFallbacks,
+                "$method has an unknown post_shim_fallback",
+            )
+            assertTrue(
+                row.requiredString("post_shim_fallback") != "shim_until_cutover",
+                "$method post_shim_fallback must not retain shim_until_cutover",
             )
         }
     }
@@ -141,7 +159,38 @@ class IrohAdminOwnershipMatrixTest {
 
         val conversationDelete = methodsByName.getValue("conversation.delete")
         assertEquals("capability_gated_unsupported", conversationDelete.requiredString("owner"))
-        assertEquals("deny_fail_closed", conversationDelete.requiredString("fallback"))
+        assertEquals("capability_gated_unsupported", conversationDelete.requiredString("post_shim_owner"))
+        assertEquals("deny_fail_closed", conversationDelete.requiredString("post_shim_fallback"))
+        assertEquals("shim_until_cutover", conversationDelete.requiredString("fallback"))
+        assertEquals("shim_http", conversationDelete.requiredString("production_first_route"))
+    }
+
+    @Test
+    fun vibesyncProjectMethodsHaveNoShimFallback() {
+        operations.filter { it.requiredString("method").startsWith("project.") }.forEach { row ->
+            val method = row.requiredString("method")
+            assertEquals("vibesync_service", row.requiredString("owner"), method)
+            assertEquals("none", row.requiredString("fallback"), method)
+            assertEquals("vibesync_http", row.requiredString("production_first_route"), method)
+            assertEquals("none", row.requiredString("post_shim_fallback"), method)
+        }
+    }
+
+    @Test
+    fun postShimCutoverHasZeroShimUntilCutoverFallbacks() {
+        operations.forEach { row ->
+            assertTrue(
+                row.requiredString("post_shim_fallback") in setOf("none", "deny_fail_closed"),
+                "${row.requiredString("method")} must declare a shim-free post_shim_fallback",
+            )
+        }
+        val remainingMigrationFallbacks = operations.count {
+            it.requiredString("fallback") == "shim_until_cutover"
+        }
+        assertTrue(
+            remainingMigrationFallbacks > 0,
+            "Phase 1 still expects migration-time shim_until_cutover rows; update this when cutover completes",
+        )
     }
 
     @Test

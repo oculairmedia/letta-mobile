@@ -73,6 +73,8 @@ feature branch and one PR unless the owning issue explicitly divides it.
 
 ### Phase 1: Freeze contracts and establish gates
 
+Status: in progress on PR #1036 / `letta-mobile-lgns8.10.1`
+
 1. Run the protocol and documentation verifiers.
 2. Update `iroh-admin-ownership-matrix.json` to describe actual execution order,
    not historical shim-first behavior.
@@ -92,6 +94,17 @@ feature branch and one PR unless the owning issue explicitly divides it.
    - a native-to-shim `AdminProxyClient` fallback.
 6. Add route telemetry that records the selected owner without logging request
    bodies, tokens, prompts, memory, or provider credentials.
+
+Landed in Phase 1 so far:
+
+- matrix synced with `production_first_route`, `post_shim_owner`, and
+  `post_shim_fallback` on all 89 methods;
+- migration fallbacks corrected to 20 `shim_until_cutover` / 69 `none`;
+- `ShimRetirementArchitectureGateTest` freezes the known violation inventory
+  and keeps the hard shim-free assert behind `SHIM_FREE_ARCHITECTURE_GATE=1`
+  (that assert fails against today's tree when enabled);
+- `AdminRouteTelemetry` records native success and shim fallback selection;
+- `ShimOffParityGateTest` asserts native successes do not dial the proxy.
 
 Do not proceed until the new tests fail against the old implementation for the
 expected reasons.
