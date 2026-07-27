@@ -8,6 +8,7 @@ import com.letta.mobile.ui.markdown.renderMarkdownSource
 import com.letta.mobile.ui.markdown.supportsPlainTextHeightPrediction
 
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -28,6 +29,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -36,15 +38,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.text.ChatTextLayoutMode
 import com.letta.mobile.ui.text.rememberChatTextGeometryMeasurer
 import com.letta.mobile.ui.theme.LocalChatFontScale
-import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.LocalChatIsPinching
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
+import com.letta.mobile.ui.theme.scaledBy
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -97,6 +102,7 @@ fun StreamingMarkdownText(
     stabilizeTables: Boolean = false,
     isStreaming: Boolean = true,
     animateSettledSize: Boolean = true,
+    fadeAppendedText: Boolean = false,
 ) {
     if (text.isEmpty()) return
 
@@ -312,6 +318,7 @@ fun StreamingMarkdownText(
             cursorText = cursorText,
             cursorAlpha = cursorAlpha,
             repairIncompleteMarkdown = deferUnstableMarkdown,
+            fadeAppendedText = fadeAppendedText,
         )
     }
 }
@@ -328,7 +335,16 @@ private fun StreamingMarkdownDocumentBlocks(
     cursorText: String?,
     cursorAlpha: Float,
     repairIncompleteMarkdown: Boolean,
+    fadeAppendedText: Boolean = false,
 ) {
+    val fade = rememberAppendedDeltaFade(
+        blocks = blocks,
+        isStreaming = isStreaming,
+        tailTransform = tailTransform,
+        fadeAppendedText = fadeAppendedText,
+    )
+    val activeFadingRange = fade.range
+
     // Each block renders in its own key group. Unchanged blocks keep the same object and key, while
     // the final active block alone receives tail transforms and cursor injection.
     blocks.forEachIndexed { index, block ->
@@ -362,6 +378,9 @@ private fun StreamingMarkdownDocumentBlocks(
             null
         }
 
+        val currentFadeRange = if (isActiveBlock) activeFadingRange else null
+        val currentFadeAlpha = if (isActiveBlock && currentFadeRange != null) fade.alpha else 1f
+
         if (parsedTable != null) {
             key(block.key) {
                 StreamingMarkdownTable(
@@ -371,9 +390,21 @@ private fun StreamingMarkdownDocumentBlocks(
                 )
             }
         } else if (isActiveBlock && block.supportsPlainTextHeightPrediction(renderSource)) {
+            val textToDraw = if (currentFadeRange != null && currentFadeAlpha < 0.999f) {
+                buildFadingAnnotatedString(
+                    text = repairedMarkdown,
+                    textColor = textColor,
+                    deltaStart = currentFadeRange.first,
+                    deltaEnd = minOf(currentFadeRange.last + 1, repairedMarkdown.length),
+                    animAlpha = currentFadeAlpha,
+                )
+            } else {
+                AnnotatedString(repairedMarkdown)
+            }
+
             key(block.key) {
                 Text(
-                    text = repairedMarkdown,
+                    text = textToDraw,
                     color = textColor,
                     style = MaterialTheme.typography.bodyMedium.scaledBy(LocalChatFontScale.current),
                     modifier = Modifier.fillMaxWidth(),
@@ -384,9 +415,211 @@ private fun StreamingMarkdownDocumentBlocks(
                 MarkdownText(
                     text = repairedMarkdown,
                     textColor = textColor,
+                    appendedFadeRange = currentFadeRange,
+                    appendedFadeAlpha = currentFadeAlpha,
                 )
             }
         }
+    }
+}
+
+internal fun StreamingMarkdownDocumentBlock.supportsAppendedDeltaFade(): Boolean =
+    when (kind) {
+        StreamingMarkdownBlockKind.CodeFence,
+        StreamingMarkdownBlockKind.DisplayMath,
+        StreamingMarkdownBlockKind.Table -> false
+        else -> true
+    }
+
+internal fun String.isUnicodeSafeBoundary(index: Int): Boolean {
+    if (index <= 0 || index >= length) return true
+    if (Character.isLowSurrogate(this[index]) && Character.isHighSurrogate(this[index - 1])) {
+        return false
+    }
+    return true
+}
+
+internal fun findSafeUnicodeBoundary(text: String, targetIndex: Int): Int {
+    if (targetIndex <= 0) return 0
+    if (targetIndex >= text.length) return text.length
+    var safe = targetIndex
+    if (Character.isLowSurrogate(text[safe]) && Character.isHighSurrogate(text[safe - 1])) {
+        safe--
+    }
+    return safe
+}
+
+internal fun buildFadingAnnotatedString(
+    text: String,
+    textColor: Color,
+    deltaStart: Int,
+    deltaEnd: Int,
+    animAlpha: Float,
+): AnnotatedString {
+    if (deltaStart >= deltaEnd || animAlpha >= 0.999f || text.isEmpty()) {
+        return AnnotatedString(text)
+    }
+    val safeStart = findSafeUnicodeBoundary(text, deltaStart).coerceIn(0, text.length)
+    val safeEnd = findSafeUnicodeBoundary(text, deltaEnd).coerceIn(safeStart, text.length)
+    if (safeStart >= safeEnd) {
+        return AnnotatedString(text)
+    }
+
+    return AnnotatedString.Builder(text).apply {
+        addStyle(
+            style = SpanStyle(color = textColor.copy(alpha = animAlpha.coerceIn(0f, 1f))),
+            start = safeStart,
+            end = safeEnd,
+        )
+    }.toAnnotatedString()
+}
+
+/**
+ * Resolved appended-delta fade for the active block: the source range to fade, and the
+ * alpha to paint it at. [range] is null whenever nothing should fade, in which case
+ * [alpha] stays at 1f.
+ */
+@Stable
+private class ActiveDeltaFade(
+    val range: IntRange?,
+    val alpha: Float,
+)
+
+/**
+ * Owns the whole appended-delta fade decision (letta-mobile-8kdjm.10) so that
+ * [StreamingMarkdownDocumentBlocks] can stay a per-block rendering loop. Eligibility,
+ * range tracking and the alpha animation all live here.
+ *
+ * The fade engages only for a strict prefix extension of an eligible active block while
+ * streaming; reduced motion, an open code fence, or an ineligible block kind all disable
+ * it, and a replacement resets without replaying settled text.
+ */
+@Composable
+private fun rememberAppendedDeltaFade(
+    blocks: List<StreamingMarkdownDocumentBlock>,
+    isStreaming: Boolean,
+    tailTransform: (String) -> String,
+    fadeAppendedText: Boolean,
+): ActiveDeltaFade {
+    val motionPolicy = rememberChatMotionPolicy()
+    val fadeSpec = motionPolicy.terminalSwap.crossfadeSpec
+
+    val fadeState = remember { StreamingAppendedDeltaFadeState() }
+    val activeBlock = blocks.lastOrNull()
+    val activeBlockId = activeBlock?.id
+    val activeRenderSource = if (activeBlock != null) tailTransform(activeBlock.source) else ""
+
+    val isFadeEligible = fadeAppendedText &&
+        isStreaming &&
+        !motionPolicy.isReducedMotionEnabled &&
+        activeBlock != null &&
+        activeBlock.supportsAppendedDeltaFade() &&
+        !tailHasOpenBlockFence(activeRenderSource)
+
+    val hasDeltaToAnimate = remember(activeBlockId, activeRenderSource, isFadeEligible) {
+        if (isFadeEligible && activeBlockId != null) {
+            fadeState.update(
+                activeBlockId = activeBlockId,
+                activeSource = activeRenderSource,
+                isStreaming = true,
+                isReducedMotion = false,
+                isEligibleBlockKind = true,
+            )
+        } else {
+            fadeState.reset()
+            false
+        }
+    }
+
+    val range = if (isFadeEligible && fadeState.fadingBlockId == activeBlockId) {
+        fadeState.fadingDeltaRange
+    } else {
+        null
+    }
+
+    val fadingRangeKey = remember(activeBlockId, range, hasDeltaToAnimate) {
+        if (range != null && activeBlockId != null) "$activeBlockId:${range.first}:${range.last}" else null
+    }
+
+    val animatableAlpha = remember { Animatable(1f) }
+    LaunchedEffect(fadingRangeKey) {
+        if (fadingRangeKey != null) {
+            animatableAlpha.snapTo(0f)
+            animatableAlpha.animateTo(1f, animationSpec = fadeSpec)
+        } else {
+            animatableAlpha.snapTo(1f)
+        }
+    }
+
+    return ActiveDeltaFade(range = range, alpha = animatableAlpha.value)
+}
+
+internal class StreamingAppendedDeltaFadeState {
+    var lastActiveBlockId: Long? = null
+        private set
+    var lastActiveSource: String = ""
+        private set
+    var fadingDeltaRange: IntRange? = null
+        private set
+    var fadingBlockId: Long? = null
+        private set
+
+    fun update(
+        activeBlockId: Long?,
+        activeSource: String,
+        isStreaming: Boolean,
+        isReducedMotion: Boolean,
+        isEligibleBlockKind: Boolean,
+    ): Boolean {
+        if (!isStreaming || isReducedMotion || !isEligibleBlockKind || activeBlockId == null || activeSource.isEmpty()) {
+            reset(activeBlockId, activeSource)
+            return false
+        }
+
+        return if (activeBlockId == lastActiveBlockId) {
+            extendCurrentBlock(activeBlockId, activeSource)
+        } else {
+            beginBlock(activeBlockId, activeSource)
+        }
+    }
+
+    /**
+     * Same block as last time: fade only a strict prefix EXTENSION. Identical text is a
+     * repaint with nothing new, and any non-prefix change is a replacement, which resets
+     * rather than replaying already-settled text.
+     */
+    private fun extendCurrentBlock(blockId: Long, source: String): Boolean {
+        if (source == lastActiveSource) return false
+
+        if (source.startsWith(lastActiveSource) && source.length > lastActiveSource.length) {
+            val safeStart = findSafeUnicodeBoundary(source, lastActiveSource.length)
+            if (safeStart < source.length) {
+                fadingDeltaRange = safeStart until source.length
+                fadingBlockId = blockId
+                lastActiveSource = source
+                return true
+            }
+        }
+
+        reset(blockId, source)
+        return false
+    }
+
+    /** First sighting of a block: the whole body is the appended range. */
+    private fun beginBlock(blockId: Long, source: String): Boolean {
+        // No empty-source branch here: update()'s guard already returned for that case.
+        fadingDeltaRange = 0 until source.length
+        fadingBlockId = blockId
+        lastActiveBlockId = blockId
+        lastActiveSource = source
+        return true
+    }
+
+    fun reset(blockId: Long? = null, source: String = "") {
+        lastActiveBlockId = blockId
+        lastActiveSource = source
+        fadingDeltaRange = null
+        fadingBlockId = null
     }
 }
 

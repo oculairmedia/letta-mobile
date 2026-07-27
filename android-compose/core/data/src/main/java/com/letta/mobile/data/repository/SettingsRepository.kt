@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import com.letta.mobile.data.model.AppTheme
+import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.session.BackendSwitchClearResult
@@ -99,6 +100,12 @@ class SettingsRepository internal constructor(
     private val _huggingFaceToken = MutableStateFlow<String?>(null)
     override val huggingFaceToken: StateFlow<String?> = _huggingFaceToken.asStateFlow()
 
+    private val defaultChatTimelineMode: ChatTimelineMode
+        get() = if (BuildConfig.DEBUG) ChatTimelineMode.TIMELINE_V1 else ChatTimelineMode.LEGACY
+
+    private val _chatTimelineMode = MutableStateFlow<ChatTimelineMode>(defaultChatTimelineMode)
+    override val chatTimelineMode: StateFlow<ChatTimelineMode> = _chatTimelineMode.asStateFlow()
+
     private object Keys {
         val CONFIGS = stringPreferencesKey("configs")
         val ACTIVE_CONFIG_ID = stringPreferencesKey("active_config_id")
@@ -145,6 +152,7 @@ class SettingsRepository internal constructor(
         // (streaming + tool-call pattern cues). Default-on; absence of the key
         // reads as enabled so existing installs feel the new haptics.
         val HAPTICS_ENABLED = booleanPreferencesKey("haptics_enabled")
+        val CHAT_TIMELINE_MODE = stringPreferencesKey("chat_timeline_mode")
     }
 
     init {
@@ -311,6 +319,7 @@ class SettingsRepository internal constructor(
         _adminAgentId.update { null }
         _lastChatSelection.update { null }
         _huggingFaceToken.update { null }
+        _chatTimelineMode.update { defaultChatTimelineMode }
     }
 
     override suspend fun setHuggingFaceToken(token: String?) = withContext(Dispatchers.IO) {
@@ -589,6 +598,28 @@ class SettingsRepository internal constructor(
     override suspend fun setEnableProjects(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[Keys.ENABLE_PROJECTS] = enabled
+        }
+    }
+
+    override fun getChatTimelineMode(): Flow<ChatTimelineMode> = dataStore.data.map { prefs ->
+        val modeName = prefs[Keys.CHAT_TIMELINE_MODE]
+        val mode = if (modeName != null) {
+            try {
+                ChatTimelineMode.valueOf(modeName)
+            } catch (_: IllegalArgumentException) {
+                defaultChatTimelineMode
+            }
+        } else {
+            defaultChatTimelineMode
+        }
+        _chatTimelineMode.value = mode
+        mode
+    }
+
+    override suspend fun setChatTimelineMode(mode: ChatTimelineMode) {
+        _chatTimelineMode.value = mode
+        dataStore.edit { prefs ->
+            prefs[Keys.CHAT_TIMELINE_MODE] = mode.name
         }
     }
 

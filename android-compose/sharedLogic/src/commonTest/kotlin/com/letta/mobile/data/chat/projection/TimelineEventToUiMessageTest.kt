@@ -7,11 +7,13 @@ import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.TimelineEvent
 import com.letta.mobile.data.timeline.TimelineMessageType
+import com.letta.mobile.data.timeline.ToolReturnTruncation
 import com.letta.mobile.data.timeline.parseTimelineInstant
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.Test
@@ -554,5 +556,60 @@ class TimelineEventToUiMessageTest {
     fun `user message with only orphan tags and no content is dropped`() {
         val ev = confirmed(TimelineMessageType.USER, content = "</system-reminder>\n<system-reminder>")
         assertNull(timelineEventToUiMessage(ev))
+    }
+
+    @Test
+    fun runningToolCallProjectsWithNullResultAndStatus() {
+        val tc = ToolCall(id = "call-run-1", name = "read_file", arguments = """{"path":"a.txt"}""")
+        val ev = confirmed(TimelineMessageType.TOOL_CALL, toolCalls = listOf(tc), approvalDecided = false)
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertEquals("assistant", ui.role)
+        assertEquals(1, ui.toolCalls!!.size)
+        assertEquals("read_file", ui.toolCalls!![0].name)
+        assertNull(ui.toolCalls!![0].result)
+        assertNull(ui.toolCalls!![0].status)
+    }
+
+    @Test
+    fun explicitErrorToolCallProjectsWithErrorStatus() {
+        val tc = ToolCall(id = "call-err-1", name = "exec", arguments = "{}")
+        val ev = confirmed(
+            TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(tc),
+            toolReturnContentByCallId = mapOf("call-err-1" to "failed"),
+            toolReturnIsErrorByCallId = mapOf("call-err-1" to true),
+        )
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertEquals("error", ui.toolCalls!![0].status)
+        assertEquals("failed", ui.toolCalls!![0].result)
+    }
+
+    @Test
+    fun truncatedToolResultProjectsWithTruncationMetadata() {
+        val tc = ToolCall(id = "call-trunc-1", name = "cat", arguments = "{}")
+        val ev = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "server-trunc-1",
+            content = "",
+            serverId = "msg-trunc-1",
+            messageType = TimelineMessageType.TOOL_CALL,
+            runId = null,
+            stepId = null,
+            date = parseTimelineInstant("2026-04-19T06:00:00Z"),
+            toolCalls = listOf(tc).toPersistentList(),
+            toolReturnContentByCallId = mapOf("call-trunc-1" to "preview text").toPersistentMap(),
+            toolReturnTruncationByCallId = mapOf(
+                "call-trunc-1" to ToolReturnTruncation(
+                    messageId = "msg-trunc-1",
+                    byteLen = 120000L,
+                )
+            ).toPersistentMap(),
+        )
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertNotNull(ui.toolCalls!![0].resultTruncation)
+        assertEquals(120000L, ui.toolCalls!![0].resultTruncation!!.byteLen)
     }
 }

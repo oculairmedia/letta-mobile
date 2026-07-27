@@ -46,6 +46,12 @@ internal fun AssistantResponseText(props: AssistantResponseTextProps) {
         stabilizeTables = streamingState.hasStreamed || streamingState.hasTable,
         isStreaming = effectivelyStreaming,
         animateSettledSize = effectivelyStreaming,
+        // letta-mobile-8kdjm.10's appended-delta fade stays OFF here. Enabling it made the
+        // streaming tail visibly flicker on device: every delta starts a new fade range,
+        // snapping the freshly appended text to alpha 0, and deltas arrive faster than a
+        // fade completes, so the tail pulses instead of easing in. The fade needs to
+        // coalesce across deltas (or run once per settled block) before it can ship —
+        // tracked on the bead rather than left on in a worse state than dormant.
         modifier = props.modifier,
     )
 }

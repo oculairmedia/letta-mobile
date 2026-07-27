@@ -342,7 +342,7 @@ internal fun SubagentNotificationCard(
 }
 
 @Composable
-private fun SubagentDispatchCard(
+internal fun SubagentDispatchCard(
     dispatch: UiSubagentDispatch,
     status: String?,
     executionTimeMs: Long?,
@@ -466,7 +466,7 @@ private fun SubagentMetaChip(text: String) {
  * of truth — if it changes, update BOTH this function and
  * `MessageMapper.extractSubagentNotification`. (CodeRabbit #343.)
  */
-private fun parseTaskNotificationForToolCard(raw: String): UiSubagentNotification? {
+internal fun parseTaskNotificationForToolCard(raw: String): UiSubagentNotification? {
     if (raw.indexOf("<task-notification", ignoreCase = true) < 0) return null
     fun tag(name: String): String? {
         return Regex("<$name(?:\\s[^>]*)?>([\\s\\S]*?)</$name>", RegexOption.IGNORE_CASE)
@@ -768,7 +768,7 @@ internal fun ToolCallCard(
 }
 
 @Composable
-private fun GeneratedImageToolCard(
+internal fun GeneratedImageToolCard(
     toolCall: UiToolCall,
     modifier: Modifier = Modifier,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
@@ -1844,7 +1844,7 @@ private class RecentStringSet(
  * once it lands), so this fires at most once per messageId per expansion.
  */
 @Composable
-private fun RequestFullToolResultOnExpand(toolCall: UiToolCall, expanded: Boolean) {
+internal fun RequestFullToolResultOnExpand(toolCall: UiToolCall, expanded: Boolean) {
     val truncation = toolCall.resultTruncation ?: return
     val resolver = LocalTruncatedToolResultResolver.current ?: return
     LaunchedEffect(expanded, truncation.messageId, resolver) {

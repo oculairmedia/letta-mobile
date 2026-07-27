@@ -3,6 +3,7 @@ import com.letta.mobile.feature.chat.render.*
 import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.ConversationId
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowSizeClass
@@ -114,6 +115,10 @@ class AgentScaffoldHiltTest {
         every { viewModel.agentId } returns AgentId("agent-hilt-1")
         every { viewModel.conversationId } returns null
         every { viewModel.projectContext } returns null
+        // letta-mobile-8kdjm.14: a relaxed mock hands back a bare Object for this
+        // StateFlow, which fails to cast to ChatTimelineMode. These scaffold tests are
+        // not about the timeline, so pin them to the legacy presentation.
+        every { viewModel.chatTimelineMode } returns MutableStateFlow(ChatTimelineMode.LEGACY)
         every { conversationRepository.getConversations(any<AgentId>()) } returns flowOf(emptyList())
         coEvery { conversationRepository.refreshConversations(any<AgentId>()) } returns Unit
         coEvery { conversationRepository.refreshConversationsIfStale(any<AgentId>(), any()) } returns false

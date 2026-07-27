@@ -20,6 +20,10 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+
 /** Per-index stagger delay. Single source of truth for the entrance cadence. */
 const val StaggerDelayPerIndexMs: Long = 30L
 
@@ -35,11 +39,12 @@ const val StaggerViewportIndexLimit: Int = 8
  * `LazyColumn { itemsIndexed(...) { index, item -> StaggeredListItem(index) { ... } } }`.
  *
  * - First-viewport items (index < [StaggerViewportIndexLimit]) animate with a
- *   45 ms × index delay; later items skip the stagger and appear immediately.
+ *   30 ms × index delay; later items skip the stagger and appear immediately.
  * - Slide is proportional ([height / 4]) so cards rise from below rather than
  *   teleport across the full row height.
  * - `rememberSaveable` records whether the entrance has already played, so
  *   back-nav restores instantly without re-marching the list.
+ * - Under reduced motion, stagger delays and entrance transitions are skipped.
  * - The inner [Box] calls [LazyItemScope.animateItem] so reorders / additions
  *   animate naturally once the entrance is complete.
  */
@@ -49,13 +54,14 @@ fun LazyItemScope.StaggeredListItem(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val reducedMotion = rememberReducedMotionEnabled()
     var entranceCompleted by rememberSaveable { mutableStateOf(false) }
     val withinViewport = index < StaggerViewportIndexLimit
-    var isVisible by remember { mutableStateOf(entranceCompleted) }
+    var isVisible by remember { mutableStateOf(entranceCompleted || reducedMotion) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(reducedMotion) {
         if (!entranceCompleted) {
-            if (withinViewport) {
+            if (!reducedMotion && withinViewport) {
                 delay((index * StaggerDelayPerIndexMs).milliseconds)
             }
             isVisible = true
@@ -65,12 +71,12 @@ fun LazyItemScope.StaggeredListItem(
 
     AnimatedVisibility(
         visible = isVisible,
-        enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
+        enter = if (reducedMotion) EnterTransition.None else fadeIn(animationSpec = spring(stiffness = Spring.StiffnessLow)) +
             slideInVertically(
                 animationSpec = spring(stiffness = Spring.StiffnessLow),
                 initialOffsetY = { it / 4 },
             ),
-        exit = fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)),
+        exit = if (reducedMotion) ExitTransition.None else fadeOut(animationSpec = spring(stiffness = Spring.StiffnessLow)),
     ) {
         Box(
             modifier = modifier
