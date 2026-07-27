@@ -181,8 +181,15 @@ class AppServerTurnEngine(
     private val userInputApprovalIdsRef = atomic<Map<String, String>>(emptyMap())
 
     /**
-     * Consume the recorded real approval id for [toolCallId] (removing it), or
+     * READ the recorded real approval id for [toolCallId] without removing it, or
      * null if none was recorded (non-interactive tool, or already consumed).
+     *
+     * Deliberately not consume-on-read. If `client.input` fails on a transient
+     * disconnect, the id must survive so the user's retry still targets the real
+     * gate; dropping it here would fall back to `perm-<toolCallId>`, which is
+     * invalid for providers whose ids look like `toolu_…`, leaving the question
+     * permanently unanswerable. [clearUserInputApprovalId] removes it only after
+     * the response is actually sent.
      */
     fun userInputApprovalId(toolCallId: String): String? = userInputApprovalIdsRef.value[toolCallId]
 
