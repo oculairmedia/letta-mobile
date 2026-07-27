@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnContextRecovery
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -51,6 +52,12 @@ class DefaultAppServerController(
      * and tool-call turns never hang. Null = no controller tools.
      */
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    /**
+     * Optional pre-turn repair for backend-owned active context. The production
+     * wrapper supplies the local-store implementation when its backend path is
+     * explicitly configured.
+     */
+    private val turnContextRecovery: TurnContextRecovery = TurnContextRecovery.None,
     private val clock: Clock = Clock.System,
 ) : AppServerController {
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
@@ -78,6 +85,7 @@ class DefaultAppServerController(
             },
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
+            turnContextRecovery = turnContextRecovery,
         )
     }
 

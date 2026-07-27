@@ -16,6 +16,7 @@ import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
+import com.letta.mobile.data.controller.node.iroh.LocalBackendEmptyAssistantRecovery
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
@@ -382,6 +383,12 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val controller = DefaultAppServerController(
                 client = reconnectingClient,
                 runtimeRegistry = runtimeRegistry,
+                turnContextRecovery = System.getenv("LETTA_LOCAL_BACKEND_DIR")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { java.io.File(it) }
+                    ?.takeIf { it.isDirectory }
+                    ?.let(::LocalBackendEmptyAssistantRecovery)
+                    ?: com.letta.mobile.data.runtime.TurnContextRecovery.None,
                 // lgns8.17: give the turn engine a registry so it can execute
                 // controller-owned tools; independently, the engine GUARANTEES a
                 // matched external_tool_call_response for every request (a
