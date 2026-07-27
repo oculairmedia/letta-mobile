@@ -1,5 +1,9 @@
 # App Server Controller Deployment Guide
 
+For the complete upstream protocol inventory, Iroh admin extension, state
+ownership, persistence, fallback, and cache-invalidation contract, see
+[App Server v2 and Meridian State Audit Specification](app-server-v2-audit-spec.md).
+
 ## Overview
 
 The App Server controller architecture supports two deployment paths:

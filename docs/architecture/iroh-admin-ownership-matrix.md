@@ -4,6 +4,12 @@ Date: 2026-07-22
 
 Beads: `letta-mobile-lgns8.13`
 
+> Historical migration decision. For the current end-to-end protocol, routing,
+> state ownership, cache invalidation, and audit procedure, start with
+> [App Server v2 and Meridian State Audit Specification](app-server-v2-audit-spec.md).
+> The machine-readable ownership matrix remains authoritative for the currently
+> registered method set.
+
 ## What this decides
 
 Every admin_rpc method the Iroh node registers today (73 methods, all but three
