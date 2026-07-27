@@ -9,6 +9,8 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -95,6 +97,26 @@ class IrohAdminRpcTimelineTransport(
         return decodeMessageListBody(result)
     }
 
+    /**
+     * letta-mobile-f0ixs: older-history fetch that KEEPS the guard's `has_more`.
+     *
+     * Same request as [listOlderConversationMessages]; the only difference is that the
+     * continuation signal survives, so the pager does not have to guess from page size.
+     */
+    suspend fun listOlderConversationMessagesPage(
+        conversationId: String,
+        beforeMessageId: String,
+        limit: Int,
+    ): MessageListPage {
+        val path = "/v1/conversations/$conversationId/messages?limit=$limit&before=$beforeMessageId&order=desc"
+        val response = channelTransport.adminRpc(method = "message.list", path = path, body = null)
+        if (!response.success) {
+            throw TimelineTransportHttpException(502, response.error ?: "Iroh admin_rpc message.list (before) failed")
+        }
+        val result = response.result ?: return MessageListPage(emptyList(), hasMore = null)
+        return decodeMessageListPage(result)
+    }
+
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
@@ -160,6 +182,32 @@ class IrohAdminRpcTimelineTransport(
             messages,
         )
     }
+
+    /**
+     * letta-mobile-f0ixs: a message.list page plus the guard's explicit continuation signal.
+     *
+     * [hasMore] is null when the response carried no signal (a bare array, i.e. the guard did
+     * not trim), so callers keep their existing page-size heuristic for that case.
+     */
+    data class MessageListPage(
+        val messages: List<LettaMessage>,
+        val hasMore: Boolean?,
+    )
+
+    /**
+     * letta-mobile-f0ixs: like [decodeMessageListBody] but preserves `has_more`.
+     *
+     * MessageListPageGuard wraps a TRIMMED page as { messages, has_more, next_before }. Decoding
+     * that to a bare list throws the signal away, and ChatHistoryPager then infers "no more
+     * history" from a short page — so a trimmed page reads as the start of the conversation and
+     * scroll-back stops early. Long conversations with large messages are both where the guard
+     * trims and where scroll-back matters.
+     */
+    private fun decodeMessageListPage(result: JsonElement): MessageListPage = MessageListPage(
+        messages = decodeMessageListBody(result),
+        hasMore = ((result as? JsonObject)?.get("has_more") as? JsonPrimitive)
+            ?.booleanOrNull,
+    )
 
     private companion object {
         val gatedTelemetryPaths: MutableSet<String> = ConcurrentHashMap.newKeySet()

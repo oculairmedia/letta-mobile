@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat
 import com.letta.mobile.ui.chat.render.*
+import com.letta.mobile.data.repository.api.OlderMessagesPage
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
@@ -18,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Assert.assertFalse
 import org.junit.Test
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
@@ -30,7 +32,9 @@ class ChatHistoryPagerTest {
     fun `load older messages merges page through timeline observer prefix`() = runTest {
         val harness = Harness(scope = this)
         val older = appMessage(id = "older-1", content = "old")
-        coEvery { harness.messageRepository.fetchOlderMessages(AgentId("agent-1"), ConversationId("conv-1"), "live-1") } returns listOf(older)
+        coEvery {
+            harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), "live-1")
+        } returns OlderMessagesPage(listOf(older), hasMore = null)
         every {
             harness.chatTimelineObserver.mergeOlderPage("conv-1", any(), any())
         } answers {
@@ -42,7 +46,9 @@ class ChatHistoryPagerTest {
 
         assertEquals(listOf("older-1", "live-1"), harness.uiState.value.messages.map { it.id })
         assertFalse(harness.uiState.value.isLoadingOlderMessages)
-        coVerify(exactly = 1) { harness.messageRepository.fetchOlderMessages(AgentId("agent-1"), ConversationId("conv-1"), "live-1") }
+        coVerify(exactly = 1) {
+            harness.messageRepository.fetchOlderMessagesPage(AgentId("agent-1"), ConversationId("conv-1"), "live-1")
+        }
     }
 
     @Test
@@ -53,22 +59,63 @@ class ChatHistoryPagerTest {
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         advanceUntilIdle()
 
-        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) }
+        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) }
     }
 
     @Test
     fun `stale older page result does not mutate messages`() = runTest {
         val harness = Harness(scope = this)
         harness.activeConversationId = "conv-1"
-        coEvery { harness.messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) } answers {
+        coEvery { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) } answers {
             harness.activeConversationId = "conv-2"
-            listOf(appMessage(id = "older-1", content = "old"))
+            OlderMessagesPage(listOf(appMessage(id = "older-1", content = "old")), hasMore = null)
         }
 
         harness.pager.loadOlderMessages(clientModeEnabled = false)
         advanceUntilIdle()
 
         assertEquals(listOf("live-1"), harness.uiState.value.messages.map { it.id })
+    }
+
+    /**
+     * letta-mobile-f0ixs: a SHORT page does not mean "start of conversation".
+     *
+     * MessageListPageGuard trims an oversized window to fit its byte budget, so a page with
+     * older history still behind it can come back shorter than the requested size. The pager
+     * used to infer end-of-history from page size alone, which silently truncated scroll-back
+     * on exactly the long conversations where scroll-back matters.
+     */
+    @Test
+    fun `trimmed short page with hasMore true keeps pagination open`() = runTest {
+        val harness = Harness(scope = this)
+        val older = appMessage(id = "older-1", content = "old")
+        // One message, far below OLDER_MESSAGES_PAGE_SIZE, but the guard says more remains.
+        coEvery {
+            harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any())
+        } returns OlderMessagesPage(listOf(older), hasMore = true)
+
+        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        advanceUntilIdle()
+
+        assertTrue(
+            "a trimmed page must not be read as the beginning of the conversation",
+            harness.uiState.value.hasMoreOlderMessages,
+        )
+    }
+
+    /** With no signal (HTTP path), the page-size heuristic still decides. */
+    @Test
+    fun `short page with no hasMore signal still ends pagination`() = runTest {
+        val harness = Harness(scope = this)
+        val older = appMessage(id = "older-1", content = "old")
+        coEvery {
+            harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any())
+        } returns OlderMessagesPage(listOf(older), hasMore = null)
+
+        harness.pager.loadOlderMessages(clientModeEnabled = false)
+        advanceUntilIdle()
+
+        assertFalse(harness.uiState.value.hasMoreOlderMessages)
     }
 
     @Test
@@ -81,7 +128,7 @@ class ChatHistoryPagerTest {
         advanceUntilIdle()
 
         assertEquals(trimmed.map { it.id }, harness.uiState.value.messages.map { it.id })
-        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) }
+        coVerify(exactly = 0) { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) }
     }
 
     @Test
@@ -120,6 +167,10 @@ class ChatHistoryPagerTest {
 
         init {
             coEvery { messageRepository.fetchOlderMessages(any<AgentId>(), any<ConversationId>(), any()) } returns emptyList()
+            // letta-mobile-f0ixs: the pager reads the page variant now. mockk intercepts the
+            // interface default, so stubbing only fetchOlderMessages leaves this unstubbed.
+            coEvery { messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) } returns
+                OlderMessagesPage(emptyList(), hasMore = null)
             every { chatTimelineObserver.mergeOlderPage(any(), any(), any()) } answers {
                 secondArg<List<UiMessage>>() + thirdArg<List<UiMessage>>()
             }

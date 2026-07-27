@@ -54,6 +54,31 @@ interface IMessageRepository : IConversationInspectorMessageRepository {
     suspend fun fetchOlderMessages(agentId: String, conversationId: String, beforeMessageId: String): List<AppMessage> =
         fetchOlderMessages(AgentId(agentId), ConversationId(conversationId), beforeMessageId)
 
+    /**
+     * letta-mobile-f0ixs: older-page backfill that also reports whether MORE history exists.
+     *
+     * Callers previously inferred "reached the beginning of the conversation" from a page
+     * shorter than the requested size. That inference is wrong whenever MessageListPageGuard
+     * trims an oversized window to fit its byte budget: the page comes back short even though
+     * older history remains, so scroll-back stopped early and silently. Long conversations with
+     * large messages are both where the guard trims and where scroll-back matters.
+     *
+     * [OlderMessagesPage.hasMore] is null when the transport gives no explicit signal (the HTTP
+     * path, and untrimmed Iroh pages), so callers fall back to the page-size heuristic and
+     * behaviour there is unchanged.
+     *
+     * Defaulted rather than abstract on purpose: every existing implementor and test fake keeps
+     * compiling, and only the repository that can actually answer overrides it.
+     */
+    suspend fun fetchOlderMessagesPage(
+        agentId: AgentId,
+        conversationId: ConversationId,
+        beforeMessageId: String,
+    ): OlderMessagesPage = OlderMessagesPage(
+        messages = fetchOlderMessages(agentId, conversationId, beforeMessageId),
+        hasMore = null,
+    )
+
     suspend fun cancelMessage(agentId: AgentId, runIds: List<String>? = null): Map<String, String>
     suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> = cancelMessage(AgentId(agentId), runIds)
     suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult>

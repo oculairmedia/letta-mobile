@@ -13,6 +13,7 @@ import com.letta.mobile.data.model.Job
 import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.MessageSearchResult
 import com.letta.mobile.data.paging.MessagePagingSource
+import com.letta.mobile.data.repository.api.OlderMessagesPage
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.IMessageRepository
 import kotlinx.coroutines.flow.Flow
@@ -91,6 +92,20 @@ open class MessageRepository @Inject constructor(
         conversationId: ConversationId,
         beforeMessageId: String,
     ): List<AppMessage> = MessageRepositoryFetch.fetchOlderMessages(
+        messageApi = messageApi,
+        irohTimelineTransport = irohTimelineTransport,
+        agentId = agentId,
+        conversationId = conversationId,
+        beforeMessageId = beforeMessageId,
+        olderMessagesPageSize = OLDER_MESSAGES_PAGE_SIZE,
+    )
+
+    /** letta-mobile-f0ixs: same fetch, but the guard's `has_more` survives to the pager. */
+    override suspend fun fetchOlderMessagesPage(
+        agentId: AgentId,
+        conversationId: ConversationId,
+        beforeMessageId: String,
+    ): OlderMessagesPage = MessageRepositoryFetch.fetchOlderMessagesPage(
         messageApi = messageApi,
         irohTimelineTransport = irohTimelineTransport,
         agentId = agentId,

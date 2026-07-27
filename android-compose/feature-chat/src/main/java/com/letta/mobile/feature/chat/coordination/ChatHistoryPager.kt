@@ -115,11 +115,12 @@ internal class ChatHistoryPager(
         scope.launch {
             uiState.value = uiState.value.copy(isLoadingOlderMessages = true)
             try {
-                val olderMessages = messageRepository.fetchOlderMessages(
+                val olderPage = messageRepository.fetchOlderMessagesPage(
                     agentId = AgentId(agentId),
                     conversationId = ConversationId(conversationId),
                     beforeMessageId = oldestLoadedMessageId,
                 )
+                val olderMessages = olderPage.messages
                 if (conversationId != activeConversationId()) {
                     Telemetry.event(
                         "ChatHistoryPager", "loadAbandoned",
@@ -143,8 +144,14 @@ internal class ChatHistoryPager(
                 // spinner-then-clear loop. The user can still pull-to-
                 // refresh to retry.
                 val mergeAddedMessages = mergedMessages.size > previousCount
+                // letta-mobile-f0ixs: prefer the transport's explicit answer. Page SIZE is not a
+                // reliable end-of-history signal — MessageListPageGuard trims an oversized window
+                // to fit its byte budget, so a page with older history still behind it can arrive
+                // SHORT. Reading that as "reached the beginning" truncated scroll-back silently.
+                // hasMore is null when the transport said nothing (HTTP path, untrimmed pages),
+                // and only then do we fall back to the size heuristic.
                 val newHasMore = mergeAddedMessages &&
-                    olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE
+                    (olderPage.hasMore ?: (olderMessages.size >= MessageRepository.OLDER_MESSAGES_PAGE_SIZE))
                 uiState.value = uiState.value.copy(
                     messages = mergedMessages.toImmutableList(),
                     messageListChange = ChatMessageListChange.Full,
