@@ -1,5 +1,9 @@
 package com.letta.mobile.desktop
 
+import com.letta.mobile.data.chat.runtime.ChatConnectionState
+import com.letta.mobile.desktop.chat.ChatStatePanel
+import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -103,6 +107,7 @@ private data class DestinationAgentsActions(
 internal data class DestinationContentInputs(
     val state: DesktopBootstrapState,
     val home: DesktopHomeState,
+    val chat: DesktopChatSurfaceState,
     val memoryState: DesktopMemorySurfaceState,
     val schedule: DestinationScheduleInputs,
     val channelLibraryState: DesktopChannelLibraryState,
@@ -124,6 +129,7 @@ internal data class DestinationNucleusActions(
 
 internal data class DestinationContentActions(
     val home: DesktopHomeActions,
+    val onRetryConnection: () -> Unit,
     val memory: DestinationMemoryActions,
     val schedules: DestinationScheduleActions,
     val onChannelsRefresh: () -> Unit,
@@ -170,11 +176,26 @@ internal fun DestinationContent(
     when (destination) {
         // The fleet dashboard. Rendered natively today; see DesktopHomeSurface's
         // KDoc for the Letta Code mod / A2UI document seam.
-        DesktopDestination.Home -> DesktopHomeSurface(
-            state = inputs.home,
-            actions = actions.home,
-            modifier = modifier,
-        )
+        DesktopDestination.Home -> {
+            if (inputs.chat.connectionState in setOf(
+                    ChatConnectionState.Loading,
+                    ChatConnectionState.ConfigNeeded,
+                    ChatConnectionState.Offline,
+                )
+            ) {
+                ChatStatePanel(
+                    state = inputs.chat,
+                    onRetryConnection = actions.onRetryConnection,
+                    modifier = modifier,
+                )
+            } else {
+                DesktopHomeSurface(
+                    state = inputs.home,
+                    actions = actions.home,
+                    modifier = modifier,
+                )
+            }
+        }
         DesktopDestination.Memory -> MemoryDestinationContent(
             memoryState = inputs.memoryState,
             blockApi = inputs.blockApi,

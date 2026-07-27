@@ -101,11 +101,9 @@ class DesktopHybridAppServerChatGateway internal constructor(
         // engine captured when it surfaced the approval (correct across providers:
         // call_… vs toolu_…); the display id and the string heuristic don't match
         // Claude's toolu_ ids. Heuristic remains only as a last-resort fallback.
-        val effectiveRequestId = when {
-            answerUpdatedInput == null || submission.toolCallId == null -> submission.requestId
-            else -> (turnEngine as? AppServerTurnEngine)?.consumeUserInputApprovalId(submission.toolCallId)
-                ?: ("perm-" + submission.toolCallId)
-        }
+        val appServerEngine = turnEngine as? AppServerTurnEngine
+        val capturedRequestId = submission.toolCallId?.let { appServerEngine?.userInputApprovalId(it) }
+        val effectiveRequestId = capturedRequestId ?: submission.requestId
         val decision = AppServerApprovalDecisions.decide(
             approve = submission.approve,
             updatedInput = answerUpdatedInput,
@@ -122,6 +120,9 @@ class DesktopHybridAppServerChatGateway internal constructor(
                 ),
             ),
         )
+        submission.toolCallId?.let { toolCallId ->
+            capturedRequestId?.let { appServerEngine?.clearUserInputApprovalId(toolCallId, it) }
+        }
     }
 
     /** conversationId -> agentId, learned on first send/stream per conversation. */

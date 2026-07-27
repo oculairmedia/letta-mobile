@@ -388,7 +388,14 @@ internal fun LettaDesktopApp(
         if (target != null) {
             chatController.replyFromNotification(target, prompt)
         } else {
-            chatController.updateComposerText(prompt)
+            val targetAgentId = selectedAgentId ?: rosterAgents.firstOrNull()?.id?.value
+            if (targetAgentId != null) {
+                chatController.createConversationForAgent(targetAgentId) { conversationId ->
+                    chatController.replyFromNotification(conversationId, prompt)
+                }
+            } else {
+                chatController.updateComposerText(prompt)
+            }
         }
         selectedDestination = DesktopDestination.Conversations
     }
@@ -681,6 +688,7 @@ internal fun LettaDesktopApp(
                             inputs = DestinationContentInputs(
                                 state = bootstrapState,
                                 home = homeState,
+                                chat = chatState,
                                 memoryState = memoryState,
                                 schedule = DestinationScheduleInputs(
                                     scheduleLibraryState = scheduleLibraryState,
@@ -706,6 +714,7 @@ internal fun LettaDesktopApp(
                                 nucleus = nucleusState,
                             ),
                             actions = DestinationContentActions(
+                                onRetryConnection = chatController::retryConnection,
                                 home = DesktopHomeActions(
                                     onSortKeySelected = { homeSort = homeSort.toggled(it) },
                                     // Reuse the shell's single "open this agent"

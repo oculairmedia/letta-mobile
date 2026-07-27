@@ -174,7 +174,7 @@ class AppServerTurnEngine(
      * letta-mobile-vilsn: tool_call_id -> real approval id (the can_use_tool
      * control-request request_id, e.g. `perm-call_…`) for surfaced runtime
      * user-input approvals. Populated when the approval is emitted; consumed by
-     * [consumeUserInputApprovalId] when the client submits the answer, so the
+     * [userInputApprovalId] when the client submits the answer, so the
      * ApprovalResponse targets the gate letta-code actually parked on (the id is
      * NOT derivable from the tool_call_id — `call_…` vs `toolu_…`).
      */
@@ -184,8 +184,13 @@ class AppServerTurnEngine(
      * Consume the recorded real approval id for [toolCallId] (removing it), or
      * null if none was recorded (non-interactive tool, or already consumed).
      */
-    fun consumeUserInputApprovalId(toolCallId: String): String? =
-        userInputApprovalIdsRef.getAndUpdate { it - toolCallId }[toolCallId]
+    fun userInputApprovalId(toolCallId: String): String? = userInputApprovalIdsRef.value[toolCallId]
+
+    fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
+        userInputApprovalIdsRef.update { current ->
+            if (current[toolCallId] == requestId) current - toolCallId else current
+        }
+    }
 
     /**
      * Pure read accessor for the current active-turn owner (telemetry only).
@@ -510,7 +515,7 @@ class AppServerTurnEngine(
         // keys of [userInputApprovalIdsRef] (keyed by tool_call_id): a gate is
         // ADDED when the approval is surfaced (below) and cleared ONLY when THAT
         // specific gate is genuinely resolved — the submit path consumes it via
-        // [consumeUserInputApprovalId], a matching tool_return is observed, or a
+        // [clearUserInputApprovalId], a matching tool_return is observed, or a
         // terminal/settle path clears everything. Crucially it is NOT lifted by an
         // arbitrary inbound frame: a side-channel status frame (UpdateDeviceStatus /
         // UpdateQueue / UpdateSubagentState) that merely passes matches(scope) must
@@ -740,7 +745,7 @@ class AppServerTurnEngine(
                                 // (the can_use_tool control-request request_id, e.g.
                                 // perm-call_...) keyed by tool_call_id. This map is
                                 // BOTH the submit path's source (submitApproval
-                                // consumes it via consumeUserInputApprovalId) AND the
+                                // clears it after a successful response) AND the
                                 // watchdog's outstanding-gate set (vilsn.6): a non-empty
                                 // map pauses the idle watchdog. Interactive answers must
                                 // close the gate against THIS id, which is not derivable
@@ -780,7 +785,7 @@ class AppServerTurnEngine(
                             // never added to userInputApprovalIdsRef: the idle watchdog
                             // was not paused (vilsn.6) and the submit path could not
                             // recover the real can_use_tool request id via
-                            // consumeUserInputApprovalId. Register it here exactly like
+                            // userInputApprovalId. Register it here exactly like
                             // the ApprovalRequested branch does.
                             if (payload.messageType == "approval_request_message") {
                                 val approval = draft.toApprovalAutoAllowRequest()

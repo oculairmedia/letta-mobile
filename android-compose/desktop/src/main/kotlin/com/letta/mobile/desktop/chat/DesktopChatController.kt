@@ -373,7 +373,7 @@ class DesktopChatController(
      * rail selects an agent that has no conversations yet (e.g. bulk-imported
      * fleets), where selection can't go through an existing conversation.
      */
-    fun createConversationForAgent(agentId: String) {
+    fun createConversationForAgent(agentId: String, onCreated: (String) -> Unit = {}) {
         if (closed) return
         if (agentId.isBlank()) return
         // Serialize: clicking through several roster agents quickly must not
@@ -392,6 +392,7 @@ class DesktopChatController(
                 val created = gatewayExtras?.createConversation(agentId) ?: return@launch
                 unsentConversationId = created.id.value
                 reloadConversationsAndSelect(preferConversationId = created.id.value)
+                onCreated(created.id.value)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {

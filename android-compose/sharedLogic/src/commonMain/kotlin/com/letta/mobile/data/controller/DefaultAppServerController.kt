@@ -224,11 +224,8 @@ class DefaultAppServerController(
         // (`call_…` vs `toolu_…`). Answer against the REAL id the engine captured
         // when it surfaced the approval; fall back to the historical heuristic
         // only if nothing was captured.
-        val effectiveRequestId = when {
-            answerUpdatedInput == null || toolCallId == null -> approvalRequestId
-            else -> turnEngine.consumeUserInputApprovalId(toolCallId)
-                ?: ("perm-" + toolCallId)
-        }
+        val capturedRequestId = toolCallId?.let(turnEngine::userInputApprovalId)
+        val effectiveRequestId = capturedRequestId ?: approvalRequestId
 
         val decision = AppServerApprovalDecisions.decide(
             approve = approve,
@@ -246,6 +243,9 @@ class DefaultAppServerController(
                 ),
             ),
         )
+        if (toolCallId != null && capturedRequestId != null) {
+            turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
+        }
     }
 
     override suspend fun sync(
