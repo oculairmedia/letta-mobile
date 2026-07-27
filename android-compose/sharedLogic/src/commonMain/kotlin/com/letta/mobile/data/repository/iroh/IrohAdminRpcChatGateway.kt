@@ -139,6 +139,20 @@ class IrohAdminRpcChatGateway(
             put("order_by", "last_message_at")
         }.toString()
         val result = rpc(AdminRpcCall("conversation.list", "/v1/conversations", body)) ?: return emptyList()
+        // letta-mobile-w9k3f: unlike message.list this decode has NO object-unwrapping,
+        // so any object shape throws "Expected JsonArray, but had JsonObject" and the
+        // caller sees a decode error rather than a transport problem. scopeConversationList
+        // on the serve side likewise returns a non-array unchanged (`if (result !is
+        // JsonArray) return result`), so an odd shape travels the whole way silently.
+        // Log the shape (keys only — conversation metadata is content) before decoding.
+        if (result is kotlinx.serialization.json.JsonObject) {
+            Telemetry.event(
+                "IrohGate", "conversation_list.unexpected_object_shape",
+                "keyCount" to result.size,
+                "keys" to result.keys.sorted().take(12).joinToString(","),
+                level = Telemetry.Level.WARN,
+            )
+        }
         return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
             .also { conversations ->
                 conversations.forEach { agentIdByConversation[it.id] = it.agentId }
