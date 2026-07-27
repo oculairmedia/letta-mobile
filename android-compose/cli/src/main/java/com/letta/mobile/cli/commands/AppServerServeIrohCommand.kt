@@ -64,13 +64,10 @@ internal fun buildProductionAdminRouter(
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
-    // lgns8.9: opt-in on-disk backend store for ported admin reads (agent.list).
-    // Off unless LETTA_LOCAL_BACKEND_DIR points at a real lc-local-backend dir.
-    localBackendDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
 ): AdminRpcRouter = AdminRpcRegistry.buildRouter(
     adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient,
     vibesyncBaseUrl = vibesyncBaseUrl,
-    localBackendDir = localBackendDir,
+    shimRetired = true,
 )
 
 internal class AppServerServeIrohCommand : CliktCommand(

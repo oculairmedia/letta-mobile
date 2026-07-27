@@ -470,14 +470,14 @@ the next turn starts a fresh runtime.
 
 The ownership-matrix fallback totals are:
 
-- 20 as `shim_until_cutover`
-- 69 as `none`
+- 5 as `shim_until_cutover`
+- 83 as `none`
+- 1 as `deny_fail_closed`
 
-`deny_fail_closed` moved to `post_shim_fallback` for cutover targets
-(conversation delete plus the 40 admin REST domains that must not keep a
-generic shim proxy after retirement). Phase 1 also records
-`production_first_route` and `post_shim_owner` on every method so gates can
-compare observed production routing against the shim-free end state.
+Phase 2 moved runtime-owned agent/conversation/message/model/approval/cron
+operations to fail-closed native routes (`fallback: none`). Remaining
+`shim_until_cutover` rows are health (controller-null branch), agent-scoped
+skill install/uninstall, and shim-backed subagent discovery.
 
 ### Current dependency classes
 

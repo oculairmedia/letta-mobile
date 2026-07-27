@@ -3,13 +3,11 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 
 /**
- * The native read tiers admin handlers try before falling back to the shim proxy:
- * the App Server client (native v2 command), and (lgns8.9) the on-disk backend store
- * for ported reads. Bundled so handler register(...) signatures stay small.
+ * Native App Server client for runtime-owned admin handlers.
+ * Phase 2 removed the optional on-disk backend read tier from production routing.
  */
 data class NativeReadTiers(
     val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
-    val localStore: LocalBackendAdminStore? = null,
 )
 
 object AdminRpcRegistry {
@@ -59,8 +57,8 @@ object AdminRpcRegistry {
         subagentRegistrySource: SubagentRegistrySource? = null,
         pairingService: IrohPairingService? = null,
         nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
-        /** lgns8.8/.11 cutover lever: capability-gated ops deny instead of using the shim. */
-        shimRetired: Boolean = false,
+        /** Phase 2: conversation.delete is always fail-closed; parameter retained for call-site compatibility. */
+        @Suppress("UNUSED_PARAMETER") shimRetired: Boolean = true,
         /**
          * lgns8.9: VibeSync product service base URL for project.* methods. When
          * null the project methods return capability-unavailable instead of
@@ -77,30 +75,21 @@ object AdminRpcRegistry {
          */
         adminRestBaseUrl: String? = adminBaseUrl,
         /**
-         * lgns8.9: absolute path to the letta-code on-disk backend store
-         * (`.../lc-local-backend`). When set, admin reads that have been ported
-         * (currently agent.list) serve directly from disk, retiring the shim
-         * proxy for them; on any read error they fall back to the proxy. Null =
-         * disabled = pre-lgns8.9 proxy behavior, so production is unaffected
-         * until a deployment opts in (LETTA_LOCAL_BACKEND_DIR).
+         * Ignored since Phase 2. Direct Letta backend reads are not an accepted
+         * production route; retained only so older call sites compile.
          */
-        localBackendDir: String? = null,
+        @Suppress("UNUSED_PARAMETER") localBackendDir: String? = null,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val adminRestBase = adminRestBaseUrl?.trimEnd('/')
         val router = AdminRpcRouter()
 
-        val localStore = localBackendDir
-            ?.takeIf { it.isNotBlank() }
-            ?.let { java.io.File(it) }
-            ?.takeIf { it.isDirectory }
-            ?.let { LocalBackendAdminStore(it) }
-        val tiers = NativeReadTiers(nativeClient, localStore)
+        val tiers = NativeReadTiers(nativeClient)
 
         HealthAdminHandlers.register(router, rpcBase, controller)
         AgentAdminHandlers.register(router, rpcBase, controller, tiers)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired)
+        ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired = true)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, adminRestBase)
         ArchiveAdminHandlers.register(router, adminRestBase)

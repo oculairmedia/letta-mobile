@@ -2,7 +2,7 @@
   "meta": {
     "issue": "letta-mobile-lgns8.13",
     "decided_at": "2026-07-22",
-    "review_status": "phase1-synced; production execution order + post-shim decisions (letta-mobile-lgns8.10.1 / PR #1036)",
+    "review_status": "phase2-partial; runtime-owned ops fail-closed native (letta-mobile-lgns8.10.2 / PR #1036)",
     "sources": [
       "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.28.8, lgns8.1)",
       "app-server-v2-contract-matrix.json (lgns8.1)",
@@ -16,7 +16,8 @@
       "capability_gated_unsupported rows fail closed with an explicit capability error after cutover; they must never silently proxy.",
       "production_first_route and current_backend describe observed production execution order; post_shim_owner/post_shim_fallback are cutover targets and must never be shim_until_cutover."
     ],
-    "phase1_synced_at": "2026-07-27"
+    "phase1_synced_at": "2026-07-27",
+    "phase2_synced_at": "2026-07-27"
   },
   "enums": {
     "owners": [
@@ -83,7 +84,7 @@
     {
       "method": "agent.list",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 \u2192 local_backend_store (LETTA_LOCAL_BACKEND_DIR) \u2192 shim_http GET /v1/agents",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_list",
       "native_contract": [
@@ -92,7 +93,7 @@
       ],
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -101,7 +102,7 @@
     {
       "method": "agent.get",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http GET /v1/agents/{id}",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_retrieve",
       "native_contract": [
@@ -110,7 +111,7 @@
       ],
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -119,7 +120,7 @@
     {
       "method": "agent.create",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http POST /v1/agents",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_create",
       "native_contract": [
@@ -128,7 +129,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -137,7 +138,7 @@
     {
       "method": "agent.update",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http PATCH /v1/agents/{id} + controller.stopRuntime on model change",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_update",
       "native_contract": [
@@ -146,7 +147,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "notes": "Runtime-binding eviction on model change remains controller-owned; it is not part of the upstream contract.",
       "production_first_route": "app_server_v2",
@@ -156,7 +157,7 @@
     {
       "method": "agent.delete",
       "handler": "AgentAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http DELETE /v1/agents/{id}",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "agent_delete",
       "native_contract": [
@@ -165,7 +166,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -189,7 +190,7 @@
     {
       "method": "conversation.list",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 \u2192 local_backend_store (LETTA_LOCAL_BACKEND_DIR) \u2192 shim_http GET /v1/conversations | /v1/agents/{id}/conversations",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_list",
       "native_contract": [
@@ -198,7 +199,7 @@
       ],
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -207,7 +208,7 @@
     {
       "method": "conversation.get",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http GET /v1/conversations/{id}",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_retrieve",
       "native_contract": [
@@ -216,7 +217,7 @@
       ],
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -225,7 +226,7 @@
     {
       "method": "conversation.create",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http POST /v1/conversations",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_create",
       "native_contract": [
@@ -234,7 +235,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "notes": "Preserves the explicit-conversation-identity rule: clients never send blank placeholder conversation IDs.",
       "production_first_route": "app_server_v2",
@@ -244,7 +245,7 @@
     {
       "method": "conversation.update",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http PATCH /v1/conversations/{id}",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_update",
       "native_contract": [
@@ -253,7 +254,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -262,7 +263,7 @@
     {
       "method": "conversation.archive",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http PATCH /v1/conversations/{id} {archived:true}",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_update",
       "native_contract": [
@@ -271,7 +272,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -280,7 +281,7 @@
     {
       "method": "conversation.restore",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 first \u2192 shim_http PATCH /v1/conversations/{id} {archived:false}",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_update",
       "native_contract": [
@@ -289,7 +290,7 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
@@ -298,22 +299,22 @@
     {
       "method": "conversation.delete",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "shim_http DELETE /v1/conversations/{id} when shimRetired=false; capability_unavailable when shimRetired=true",
+      "current_backend": "capability_unavailable (fail closed; prefer archive)",
       "owner": "capability_gated_unsupported",
       "public_contract": "explicit capability error: conversation_delete absent from pinned v2 inventory",
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "deny_fail_closed",
       "migration_slice": "lgns8.8",
-      "notes": "Production defaults shimRetired=false so DELETE still hits shim. post_shim_fallback deny_fail_closed is the required cutover behavior; prefer archive.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 2: conversation.delete always returns capability_unavailable regardless of shimRetired.",
+      "production_first_route": "capability_unavailable",
       "post_shim_owner": "capability_gated_unsupported",
       "post_shim_fallback": "deny_fail_closed"
     },
     {
       "method": "message.list",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "app_server_v2 \u2192 local_backend_store (LETTA_LOCAL_BACKEND_DIR) \u2192 shim_http GET /v1/conversations/{id}/messages (MessageListWireProjection + MessageListPageGuard)",
+      "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native\u2192shim)",
       "owner": "app_server_v2",
       "public_contract": "conversation_messages_list",
       "native_contract": [
@@ -322,7 +323,7 @@
       ],
       "authorization_class": "conversation_scoped",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.7",
       "notes": "Wire projection and page-size bounding remain controller-owned regardless of backend.",
       "production_first_route": "app_server_v2",
@@ -332,7 +333,7 @@
     {
       "method": "message.get",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "shim_http GET /v1/conversations/{cid}/messages/{mid} (shim-only; no native attempt)",
+      "current_backend": "app_server_v2 conversation_messages_list projection (bounded newest window; fail closed if missing)",
       "owner": "app_server_v2",
       "public_contract": "conversation_messages_list",
       "native_contract": [
@@ -343,15 +344,15 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.7",
-      "notes": "Single-message retrieval is a controller-side projection over the native list contract.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 2: single-message fetch projected from conversation_messages_list; no shim HTTP.",
+      "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
     },
     {
       "method": "tool_return.get",
       "handler": "ConversationAdminHandlers.kt",
-      "current_backend": "shim_http GET /v1/conversations/{cid}/messages/{mid} (shim-only; no native attempt)",
+      "current_backend": "app_server_v2 conversation_messages_list projection (bounded newest window; fail closed if missing)",
       "owner": "app_server_v2",
       "public_contract": "conversation_messages_list",
       "native_contract": [
@@ -362,8 +363,8 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.7",
-      "notes": "On-demand full tool-return hydration for previously projected rows; controller-side projection over the native list contract.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 2: single-message fetch projected from conversation_messages_list; no shim HTTP.",
+      "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
     },
@@ -661,7 +662,7 @@
     {
       "method": "model.list",
       "handler": "ModelAdminHandlers.kt",
-      "current_backend": "shim_http GET /v1/models by default; app_server_v2 list_models only when params.native=true (then native\u2192shim)",
+      "current_backend": "app_server_v2 list_models (native-only; no shim catalog default)",
       "owner": "app_server_v2",
       "public_contract": "list_models",
       "native_contract": [
@@ -670,11 +671,12 @@
       ],
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.8",
-      "production_first_route": "shim_http",
+      "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
-      "post_shim_fallback": "none"
+      "post_shim_fallback": "none",
+      "notes": "Phase 2: native list_models is the only Letta-owned model catalog source."
     },
     {
       "method": "model.list.embedding",
@@ -1156,7 +1158,7 @@
     {
       "method": "approval.submit",
       "handler": "ApprovalAdminHandlers.kt",
-      "current_backend": "controller.submitApproval first \u2192 shim_http pending-approval REST on failure/no controller",
+      "current_backend": "controller.submitApproval only (no shim pending-approval REST)",
       "owner": "app_server_v2",
       "public_contract": "control_request approval response via live control session",
       "native_contract": [
@@ -1164,9 +1166,9 @@
       ],
       "authorization_class": "runtime_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.11",
-      "notes": "Already native when a live runtime exists; lgns8.11 removes the shim fallback at cutover. Approval decisions are non-idempotent: never blind-replay after an ambiguous disconnect (lgns8.5 reconciliation rules).",
+      "notes": "Phase 2: fail closed when no live controller or controller submit fails.",
       "production_first_route": "controller_native",
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"

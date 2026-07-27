@@ -13,12 +13,13 @@ import kotlin.test.assertTrue
 
 class AdminProxyRequestTest {
     @Test
-    fun messageListBuildsQueryWithQuestionMarkBeforeLimit() {
+    fun runtimeOwnedMessageListDoesNotDialProxyWithoutNativeClient() = runTest {
+        NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router, "http://admin.local")
 
-        runTest {
+        val response = Json.parseToJsonElement(
             router.dispatch(
                 requestId = "req-1",
                 method = "message.list",
@@ -27,59 +28,35 @@ class AdminProxyRequestTest {
                     put("limit", "250")
                     put("order", "desc")
                 },
-            )
-        }
+            ),
+        ).jsonObject
 
-        assertEquals("GET", recording.calls.single().method)
-        assertEquals("http://admin.local/v1/conversations/conversation-1/messages?limit=250&order=desc", recording.calls.single().url)
+        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
+        assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        assertTrue(recording.calls.isEmpty())
     }
 
     @Test
-    fun conversationListBuildsAgentScopedUrlWithQueryParams() {
+    fun runtimeOwnedConversationListDoesNotDialProxyWithoutNativeClient() = runTest {
+        NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router, "http://admin.local/")
 
-        runTest {
+        val response = Json.parseToJsonElement(
             router.dispatch(
                 requestId = "req-1",
                 method = "conversation.list",
                 params = buildJsonObject {
                     put("agent_id", "agent-1")
                     put("limit", "25")
-                    put("after", "cursor-2")
-                    put("archive_status", "active")
-                    put("summary_search", "needle")
-                    put("order", "desc")
-                    put("order_by", "created_at")
                 },
-            )
-        }
+            ),
+        ).jsonObject
 
-        assertEquals(
-            "http://admin.local/v1/conversations?agent_id=agent-1&limit=25&after=cursor-2&archive_status=active&summary_search=needle&order=desc&order_by=created_at",
-            recording.calls.single().url,
-        )
-    }
-
-    @Test
-    fun conversationListBuildsRootUrlWithQueryParams() {
-        val recording = installRecordingTransport()
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
-        runTest {
-            router.dispatch(
-                requestId = "req-1",
-                method = "conversation.list",
-                params = buildJsonObject {
-                    put("limit", "10")
-                    put("order", "asc")
-                },
-            )
-        }
-
-        assertEquals("http://admin.local/v1/conversations?limit=10&order=asc", recording.calls.single().url)
+        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
+        assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        assertTrue(recording.calls.isEmpty())
     }
 
     @Test
@@ -106,101 +83,53 @@ class AdminProxyRequestTest {
     }
 
     @Test
-    fun archivePatchesBaseConversationResourceWithArchivedTrue() = runTest {
+    fun runtimeOwnedArchiveDoesNotDialProxyWithoutNativeClient() = runTest {
+        NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(router, "http://admin.local")
 
-        router.dispatch(
-            requestId = "req-1",
-            method = "conversation.archive",
-            params = buildJsonObject { put("conversation_id", "conv-1") },
-        )
+        val response = Json.parseToJsonElement(
+            router.dispatch(
+                requestId = "req-1",
+                method = "conversation.archive",
+                params = buildJsonObject { put("conversation_id", "conv-1") },
+            ),
+        ).jsonObject
 
-        val call = recording.calls.single()
-        assertEquals("PATCH", call.method)
-        // Letta has no /archive sub-resource; archive is a field toggled via
-        // PATCH /v1/conversations/{id}. A phantom /archive path would 404.
-        assertEquals("http://admin.local/v1/conversations/conv-1", call.url)
-        assertEquals("""{"archived":true}""", call.body)
-    }
-
-    @Test
-    fun conversationUpdatePatchesSummaryOnBaseResource() = runTest {
-        val recording = installRecordingTransport()
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
-        router.dispatch(
-            requestId = "req-1",
-            method = "conversation.update",
-            params = buildJsonObject {
-                put("conversation_id", "conv-1")
-                put("summary", "Plan the release")
-            },
-        )
-
-        val call = recording.calls.single()
-        assertEquals("PATCH", call.method)
-        assertEquals("http://admin.local/v1/conversations/conv-1", call.url)
-        val body = Json.parseToJsonElement(call.body!!).jsonObject
-        assertEquals("Plan the release", body["summary"]?.jsonPrimitive?.content)
-        assertEquals(false, "conversation_id" in body)
-    }
-
-    @Test
-    fun restorePatchesBaseConversationResourceWithArchivedFalse() = runTest {
-        val recording = installRecordingTransport()
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
-        router.dispatch(
-            requestId = "req-1",
-            method = "conversation.restore",
-            params = buildJsonObject { put("conversation_id", "conv-1") },
-        )
-
-        val call = recording.calls.single()
-        assertEquals("PATCH", call.method)
-        assertEquals("http://admin.local/v1/conversations/conv-1", call.url)
-        assertEquals("""{"archived":false}""", call.body)
+        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
+        assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        assertTrue(recording.calls.isEmpty())
     }
 
     @Test
     fun queryParamValuesArePercentEncoded() {
-        val recording = installRecordingTransport()
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
-        runTest {
-            router.dispatch(
-                requestId = "req-1",
-                method = "conversation.list",
-                params = buildJsonObject {
-                    put("summary_search", "space & hash #")
-                },
-            )
-        }
-
-        assertEquals("http://admin.local/v1/conversations?summary_search=space%20%26%20hash%20%23", recording.calls.single().url)
+        val request = AdminPath.v1("conversations").builder()
+            .query("summary_search", "space & hash #")
+            .build()
+        assertEquals(
+            "http://admin.local/v1/conversations?summary_search=space%20%26%20hash%20%23",
+            request.url("http://admin.local"),
+        )
     }
 
     @Test
     fun non2xxUpstreamResponseDispatchesAsFailure() = runTest {
         val recording = installRecordingTransport(AdminProxyTransportResponse(404, """{"error":"missing"}"""))
         val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
+        ArchiveAdminHandlers.register(router, "http://admin.local")
 
         val response = Json.parseToJsonElement(
             router.dispatch(
                 requestId = "req-404",
-                method = "conversation.get",
-                params = buildJsonObject { put("conversation_id", "missing") },
+                method = "archive.list",
+                params = null,
             ),
         ).jsonObject
 
         assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
         assertTrue(response.getValue("error").jsonPrimitive.content.contains("404"))
+        assertEquals(1, recording.calls.size)
     }
 
     @Test
@@ -212,14 +141,14 @@ class AdminProxyRequestTest {
 and newline"
             }
         """.trimIndent()
-        val recording = installRecordingTransport(AdminProxyTransportResponse(500, upstreamBody))
+        installRecordingTransport(AdminProxyTransportResponse(500, upstreamBody))
         val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
+        ArchiveAdminHandlers.register(router, "http://admin.local")
 
         val responseText = router.dispatch(
             requestId = "req-500",
-            method = "conversation.get",
-            params = buildJsonObject { put("conversation_id", "broken") },
+            method = "archive.list",
+            params = null,
         )
         val response = Json.parseToJsonElement(responseText).jsonObject
 

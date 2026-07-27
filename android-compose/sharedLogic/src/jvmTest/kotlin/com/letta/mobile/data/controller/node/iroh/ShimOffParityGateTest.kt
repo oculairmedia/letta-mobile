@@ -171,8 +171,7 @@ class ShimOffParityGateTest {
         put("name", "demo")
         put("cron", "0 0 * * *")
         put("prompt", "hi")
-        // native opt-ins
-        if (method == "model.list") put("native", "true")
+        // native opt-ins / skill path installs
         if (method == "skill.install") put("skill_path", "/skills/demo")
     }
 
@@ -200,12 +199,7 @@ class ShimOffParityGateTest {
     @Test
     fun runtimeOwnedOpsSucceedNativelyWithShimOff() = runTest {
         val router = productionRouter()
-        // Runtime-owned ops that ARE wired native-first today. Note the honest
-        // gaps: message.get/tool_return.get are still shim-backed single-message
-        // fetches (lgns8.7 made only message.list native — the single-message
-        // projection over conversation_messages_list is a follow-up), and
-        // skill.uninstall is native only when NOT agent-scoped. Those degrade
-        // gracefully shim-off (asserted elsewhere), they do not serve natively.
+        // Runtime-owned ops that serve natively with no shim fallback (Phase 2).
         val nativeOk = listOf(
             "agent.list", "agent.get", "agent.create", "agent.update", "agent.delete",
             "conversation.list", "conversation.get", "conversation.create",
@@ -241,7 +235,7 @@ class ShimOffParityGateTest {
     @Test
     fun capabilityGatedAndUnroutedOpsDenyCleanlyWithoutCrashing() = runTest {
         val router = productionRouter()
-        // conversation.delete: capability_unavailable (shimRetired, absent upstream)
+        // conversation.delete: capability_unavailable unconditionally (Phase 2)
         val del = Json.parseToJsonElement(
             router.dispatch(AdminRpcInvocation("g", "conversation.delete", params("conversation.delete"), AdminRpcRequestContext.Authenticated)),
         ).jsonObject

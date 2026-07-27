@@ -140,15 +140,11 @@ class ControlCapabilityHandlersTest {
     }
 
     @Test
-    fun modelListNativePathIsOptInAndServesWithShimDown() = runTest {
+    fun modelListServesNativelyByDefaultWithShimDown() = runTest {
         val client = FakeControlClient()
         val r = router(client = client)
 
-        val default = dispatch(r, "model.list", emptyMap())
-        assertTrue(default.contains("\"success\":false"), "default path uses the (unreachable) shim catalog")
-        assertTrue(client.calls.isEmpty())
-
-        val native = dispatch(r, "model.list", mapOf("native" to "true"))
+        val native = dispatch(r, "model.list", emptyMap())
         assertTrue(native.contains("\"success\":true") && native.contains("anthropic/claude"))
         assertTrue("list_models" in client.calls)
     }
@@ -168,14 +164,13 @@ class ControlCapabilityHandlersTest {
     }
 
     @Test
-    fun conversationDeleteDeniesFailClosedAfterCutover() = runTest {
+    fun conversationDeleteDeniesFailClosedUnconditionally() = runTest {
         val retired = dispatch(router(shimRetired = true), "conversation.delete", mapOf("conversation_id" to "conv-1"))
         assertTrue(retired.contains("\"success\":false"))
         assertTrue(retired.contains("capability_unavailable"))
         assertFalse(retired.contains("conv-1"), "denial must not echo the resource")
 
-        // Before cutover the shim path is still attempted (unreachable here).
         val active = dispatch(router(shimRetired = false), "conversation.delete", mapOf("conversation_id" to "conv-1"))
-        assertFalse(active.contains("capability_unavailable"))
+        assertTrue(active.contains("capability_unavailable"))
     }
 }

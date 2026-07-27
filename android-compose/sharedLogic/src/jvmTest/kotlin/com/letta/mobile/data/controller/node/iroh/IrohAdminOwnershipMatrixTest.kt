@@ -161,8 +161,8 @@ class IrohAdminOwnershipMatrixTest {
         assertEquals("capability_gated_unsupported", conversationDelete.requiredString("owner"))
         assertEquals("capability_gated_unsupported", conversationDelete.requiredString("post_shim_owner"))
         assertEquals("deny_fail_closed", conversationDelete.requiredString("post_shim_fallback"))
-        assertEquals("shim_until_cutover", conversationDelete.requiredString("fallback"))
-        assertEquals("shim_http", conversationDelete.requiredString("production_first_route"))
+        assertEquals("deny_fail_closed", conversationDelete.requiredString("fallback"))
+        assertEquals("capability_unavailable", conversationDelete.requiredString("production_first_route"))
     }
 
     @Test

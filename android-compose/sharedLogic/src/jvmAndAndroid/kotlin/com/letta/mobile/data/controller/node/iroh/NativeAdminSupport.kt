@@ -7,13 +7,13 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 /**
- * Native-first execution for runtime-native admin operations (lgns8.7).
+ * Native App Server v2 execution for runtime-owned admin operations.
  *
- * Operations classified `app_server_v2` in the lgns8.13 ownership matrix try
- * the documented native command over the App Server client first and fall
- * back to the shim HTTP proxy (`shim_until_cutover`) when no client is wired,
- * the connection is down, or the native call fails. Fallbacks are audited so
- * cutover readiness (lgns8.10/.11) can measure native coverage.
+ * Phase 2 (runbook): [require] is fail-closed. Native timeout, missing client,
+ * unsuccessful response, or open circuit returns a typed capability/error and
+ * does **not** fall through to LettaShim. [attempt] remains only for legacy
+ * characterization tests that still exercise the pre-cutover null-on-failure
+ * contract.
  */
 internal object NativeAdmin {
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
@@ -21,23 +21,14 @@ internal object NativeAdmin {
     /**
      * Upper bound on a single native attempt. A native App-Server-v2 command that
      * the wrapped server actually implements answers in milliseconds on localhost;
-     * this bound only matters when the command goes UNANSWERED (e.g. the deployed
-     * letta.js doesn't implement admin queries yet — lgns8.10/.11). Without it the
-     * attempt would ride the client's full request timeout (120s) before the proxy
-     * fallback, and the remote admin_rpc client gives up at 30s first, so the read
-     * surfaces as "admin_rpc timed out" even though the proxy fallback is fast.
+     * this bound only matters when the command goes UNANSWERED.
      */
     private const val NATIVE_ATTEMPT_TIMEOUT_MS = 2_000L
 
     /**
-     * Circuit breaker. When the native path proves unavailable (timeout or error —
-     * the wrapped App Server doesn't implement these admin commands), skip it and
-     * go straight to the proxy for a cooldown instead of paying the probe on EVERY
-     * op. A page-heavy read (agent.list across ~20 offsets, conversation/message
-     * lists, …) otherwise multiplies the probe into many seconds of dead wait.
-     * Re-probed once per cooldown so native lights up automatically the moment
-     * letta.js gains the commands. Global (all ops) because the gap is per-server,
-     * not per-op. A native SUCCESS clears the breaker immediately.
+     * Per-process cooldown after native timeout/error. Phase 2 uses this to fail
+     * closed quickly (`capability_unavailable`) instead of probing a dead App
+     * Server on every admin_rpc. A native SUCCESS clears the breaker immediately.
      */
     private val COOLDOWN = 60.seconds
     private val monotonic = kotlin.time.TimeSource.Monotonic
@@ -61,18 +52,97 @@ internal object NativeAdmin {
         nativeDownSince = null
     }
 
+    /**
+     * Fail-closed native execution. Never returns null for "try shim next".
+     */
+    suspend fun <T : Any> require(
+        client: AppServerClient?,
+        op: String,
+        block: suspend (AppServerClient) -> T?,
+    ): T {
+        if (client == null) {
+            AdminRouteTelemetry.selected(
+                method = op,
+                owner = "app_server_v2",
+                route = "app_server_v2",
+                outcome = "unavailable",
+                reason = "no_client",
+            )
+            adminError("capability_unavailable: $op requires App Server v2")
+        }
+        if (circuitOpen()) {
+            AdminRouteTelemetry.selected(
+                method = op,
+                owner = "app_server_v2",
+                route = "app_server_v2",
+                outcome = "unavailable",
+                reason = "circuit_open",
+            )
+            adminError("capability_unavailable: $op App Server v2 temporarily unavailable")
+        }
+        return try {
+            val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
+            if (result == null) {
+                AdminRouteTelemetry.selected(
+                    method = op,
+                    owner = "app_server_v2",
+                    route = "app_server_v2",
+                    outcome = "error",
+                    reason = "native_unsuccessful",
+                )
+                adminError("app_server_error: $op native command unsuccessful")
+            }
+            nativeDownSince = null
+            AdminRouteTelemetry.selected(
+                method = op,
+                owner = "app_server_v2",
+                route = "app_server_v2",
+                outcome = "success",
+            )
+            result
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            tripBreaker()
+            AdminRouteTelemetry.selected(
+                method = op,
+                owner = "app_server_v2",
+                route = "app_server_v2",
+                outcome = "unavailable",
+                reason = "native_timeout",
+            )
+            adminError("capability_unavailable: $op App Server v2 timed out")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: IllegalArgumentException) {
+            // adminError / param validation — do not trip the breaker.
+            throw e
+        } catch (e: Exception) {
+            tripBreaker()
+            AdminRouteTelemetry.selected(
+                method = op,
+                owner = "app_server_v2",
+                route = "app_server_v2",
+                outcome = "error",
+                reason = e.message ?: e::class.simpleName ?: "error",
+            )
+            adminError("app_server_error: $op ${e.message ?: e::class.simpleName}")
+        }
+    }
+
+    /**
+     * Legacy null-on-failure helper retained for characterization tests.
+     * Production handlers must use [require].
+     */
     suspend fun <T : Any> attempt(
         client: AppServerClient?,
         op: String,
         block: suspend (AppServerClient) -> T?,
     ): T? {
         if (client == null) return null
-        // Native known-unavailable: don't probe, go straight to the proxy.
         if (circuitOpen()) {
             AdminRouteTelemetry.fallback(
                 method = op,
                 fromRoute = "app_server_v2",
-                toRoute = "shim_http",
+                toRoute = "legacy_null",
                 reason = "circuit_open",
             )
             return null
@@ -80,7 +150,7 @@ internal object NativeAdmin {
         return try {
             val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
             if (result != null) {
-                nativeDownSince = null // native answered — prefer it again
+                nativeDownSince = null
                 AdminRouteTelemetry.selected(
                     method = op,
                     owner = "app_server_v2",
@@ -91,22 +161,17 @@ internal object NativeAdmin {
                 AdminRouteTelemetry.fallback(
                     method = op,
                     fromRoute = "app_server_v2",
-                    toRoute = "shim_http",
+                    toRoute = "legacy_null",
                     reason = "native_unsuccessful",
                 )
             }
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            // A native attempt that outran its own bound is a fast fallback to the
-            // proxy — NOT a propagated cancellation of the whole admin_rpc request.
-            // (TimeoutCancellationException is a CancellationException subtype, so
-            // it must be caught BEFORE the generic rethrow below.) Trip the breaker
-            // so sibling/subsequent ops skip the dead native path.
             tripBreaker()
             AdminRouteTelemetry.fallback(
                 method = op,
                 fromRoute = "app_server_v2",
-                toRoute = "shim_http",
+                toRoute = "legacy_null",
                 reason = "native_timeout",
             )
             null
@@ -117,7 +182,7 @@ internal object NativeAdmin {
             AdminRouteTelemetry.fallback(
                 method = op,
                 fromRoute = "app_server_v2",
-                toRoute = "shim_http",
+                toRoute = "legacy_null",
                 reason = e.message ?: e::class.simpleName ?: "error",
             )
             null

@@ -30,10 +30,7 @@ class ShimRetirementArchitectureGateTest {
     private val expectedViolationIds = setOf(
         "cli.default_admin_base_8291",
         "cli.admin_base_env",
-        "cli.local_backend_dir_env",
         "cli.http_subagent_registry_discover",
-        "native.admin_proxy_fallback",
-        "registry.local_backend_store",
         "handlers.http_subagent_registry_source",
         "matrix.shim_until_cutover_rows",
     )
@@ -84,29 +81,12 @@ class ShimRetirementArchitectureGateTest {
         if (cliText.contains("LETTA_IROH_ADMIN_BASE_URL")) {
             findings += Violation("cli.admin_base_env", rel(cli), "generic admin base env still accepted")
         }
-        if (cliText.contains("LETTA_LOCAL_BACKEND_DIR")) {
-            findings += Violation("cli.local_backend_dir_env", rel(cli), "direct-disk backend env still wired")
-        }
         if (cliText.contains("HttpSubagentRegistrySource.discover")) {
             findings += Violation(
                 "cli.http_subagent_registry_discover",
                 rel(cli),
                 "production still discovers subagents from shim HTTP",
             )
-        }
-
-        val native = repoRoot.resolve(
-            "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/NativeAdminSupport.kt",
-        )
-        if (native.readText().contains("toRoute = \"shim_http\"")) {
-            findings += Violation("native.admin_proxy_fallback", rel(native), "NativeAdmin still falls back to shim_http")
-        }
-
-        val registry = repoRoot.resolve(
-            "android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/AdminRpcRegistry.kt",
-        )
-        if (registry.readText().contains("LocalBackendAdminStore")) {
-            findings += Violation("registry.local_backend_store", rel(registry), "optional LocalBackendAdminStore still constructed")
         }
 
         val subagentSource = repoRoot.resolve(

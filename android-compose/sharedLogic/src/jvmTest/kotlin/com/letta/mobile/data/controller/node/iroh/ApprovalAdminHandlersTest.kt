@@ -54,20 +54,8 @@ class ApprovalAdminHandlersTest {
     }
 
     @Test
-    fun approvalSubmitResolvesPendingApprovalThroughShimDecisionEndpoint() = runTest {
-        val recording = installRecordingTransport { method, url, _ ->
-            when {
-                method == "GET" && url.contains("/shim/v1/approvals/pending") -> AdminProxyTransportResponse(
-                    200,
-                    """{"pending":[{"run_id":"run-1","agent_id":"agent-1","tool_call_id":"tool-a","status":"pending"}]}""",
-                )
-                method == "POST" && url.endsWith("/shim/v1/approvals/run-1/decision") -> AdminProxyTransportResponse(
-                    200,
-                    """{"status":"approved"}""",
-                )
-                else -> AdminProxyTransportResponse(404, "{}")
-            }
-        }
+    fun approvalSubmitWithoutControllerFailsClosed() = runTest {
+        val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         ApprovalAdminHandlers.register(router, "http://admin.local")
 
@@ -79,13 +67,9 @@ class ApprovalAdminHandlersTest {
             ),
         ).jsonObject
 
-        assertTrue(response.getValue("success").jsonPrimitive.boolean)
-        assertEquals(2, recording.calls.size)
-        assertEquals("GET", recording.calls[0].method)
-        assertEquals("http://admin.local/shim/v1/approvals/pending?agent_id=agent-1", recording.calls[0].url)
-        assertEquals("POST", recording.calls[1].method)
-        assertEquals("http://admin.local/shim/v1/approvals/run-1/decision", recording.calls[1].url)
-        assertTrue(recording.calls[1].body.orEmpty().contains("\"decision\":\"approve\""))
+        assertFalse(response.getValue("success").jsonPrimitive.boolean)
+        assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        assertEquals(0, recording.calls.size)
     }
 
     @Test

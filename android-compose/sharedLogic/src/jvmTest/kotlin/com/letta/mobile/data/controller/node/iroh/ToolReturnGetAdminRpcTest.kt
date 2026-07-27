@@ -1,8 +1,16 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -15,24 +23,49 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * letta-mobile-fe51r (P2b pointer diet): round-trip coverage for the
- * `tool_return.get` admin_rpc method and for the message.list projection as
- * dispatched through the real router + handler stack.
+ * letta-mobile-fe51r (P2b pointer diet) + Phase 2 native projection:
+ * `tool_return.get` / `message.list` through the real router with App Server v2.
  */
 class ToolReturnGetAdminRpcTest {
     private val bigBody = "x".repeat(MessageListWireProjection.TOOL_RETURN_PROJECTION_THRESHOLD_BYTES * 2)
 
-    private fun fullMessageJson(id: String = "msg-1") =
-        """{"id":"$id","message_type":"tool_return_message","tool_call_id":"call-1","status":"success","tool_return":"$bigBody"}"""
+    private fun fullMessage(id: String = "msg-1") = buildJsonObject {
+        put("id", id)
+        put("message_type", "tool_return_message")
+        put("tool_call_id", "call-1")
+        put("status", "success")
+        put("tool_return", bigBody)
+    }
+
+    private class FakeMessagesClient(
+        private val messages: JsonArray,
+    ) : AppServerClient {
+        override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
+        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")
+        override suspend fun input(command: AppServerCommand.Input) = error("unused")
+        override suspend fun sync(command: AppServerCommand.Sync) = error("unused")
+        override suspend fun abort(command: AppServerCommand.AbortMessage) = error("unused")
+        override suspend fun adminRpc(command: AppServerCommand.AdminRpc) = error("unused")
+        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = error("unused")
+        override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
+            AppServerInboundFrame.ConversationMessagesListResponse(command.requestId, true, messages)
+    }
+
+    private fun router(messages: JsonArray): AdminRpcRouter {
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(
+            router,
+            adminBaseUrl = "http://admin.local",
+            tiers = NativeReadTiers(nativeClient = FakeMessagesClient(messages)),
+        )
+        return router
+    }
 
     @Test
     fun toolReturnGetReturnsFullUnprojectedBody() = runTest {
-        val recording = installRecordingTransport(AdminProxyTransportResponse(200, fullMessageJson()))
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
+        NativeAdmin.resetCircuitForTest()
         val response = Json.parseToJsonElement(
-            router.dispatch(
+            router(buildJsonArray { add(fullMessage()) }).dispatch(
                 requestId = "req-trg",
                 method = "tool_return.get",
                 params = buildJsonObject {
@@ -42,11 +75,8 @@ class ToolReturnGetAdminRpcTest {
             ),
         ).jsonObject
 
-        assertEquals("GET", recording.calls.single().method)
-        assertEquals("http://admin.local/v1/conversations/conv-1/messages/msg-1", recording.calls.single().url)
         assertTrue(response.getValue("success").jsonPrimitive.boolean)
         val result = response.getValue("result").jsonObject
-        // Full body — no projection markers on the on-demand fetch path.
         assertEquals(bigBody, result.getValue("tool_return").jsonPrimitive.content)
         assertNull(result["tool_return_truncated"])
         assertNull(result["tool_return_pointer"])
@@ -54,14 +84,9 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun toolReturnGetMissingParamsDispatchesAsFailureEnvelope() = runTest {
-        // letta-mobile-8vplf regression guard: parameter errors must encode
-        // success=false (not a `{_error}` object inside success=true).
-        installRecordingTransport()
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
+        NativeAdmin.resetCircuitForTest()
         val response = Json.parseToJsonElement(
-            router.dispatch(
+            router(JsonArray(emptyList())).dispatch(
                 requestId = "req-missing",
                 method = "tool_return.get",
                 params = buildJsonObject { put("conversation_id", "conv-1") },
@@ -75,12 +100,9 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun messageListMissingConversationIdDispatchesAsFailureEnvelope() = runTest {
-        installRecordingTransport()
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
+        NativeAdmin.resetCircuitForTest()
         val response = Json.parseToJsonElement(
-            router.dispatch(requestId = "req-ml", method = "message.list", params = null),
+            router(JsonArray(emptyList())).dispatch(requestId = "req-ml", method = "message.list", params = null),
         ).jsonObject
 
         assertFalse(response.getValue("success").jsonPrimitive.boolean)
@@ -89,13 +111,17 @@ class ToolReturnGetAdminRpcTest {
 
     @Test
     fun messageListDispatchProjectsHeavyToolReturnBodies() = runTest {
-        val page = """[${fullMessageJson()},{"id":"msg-user","message_type":"user_message","content":"hi"}]"""
-        installRecordingTransport(AdminProxyTransportResponse(200, page))
-        val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
-
+        NativeAdmin.resetCircuitForTest()
+        val page = buildJsonArray {
+            add(fullMessage())
+            add(buildJsonObject {
+                put("id", "msg-user")
+                put("message_type", "user_message")
+                put("content", "hi")
+            })
+        }
         val response = Json.parseToJsonElement(
-            router.dispatch(
+            router(page).dispatch(
                 requestId = "req-list",
                 method = "message.list",
                 params = buildJsonObject { put("conversation_id", "conv-1") },
@@ -111,28 +137,6 @@ class ToolReturnGetAdminRpcTest {
         assertEquals("tool_return.get", pointer.getValue("method").jsonPrimitive.content)
         assertEquals("conv-1", pointer.getValue("conversation_id").jsonPrimitive.content)
         assertEquals("msg-1", pointer.getValue("message_id").jsonPrimitive.content)
-        // Untouched sibling in the same page.
         assertEquals("hi", messages[1].jsonObject.getValue("content").jsonPrimitive.content)
-    }
-
-    private fun installRecordingTransport(
-        response: AdminProxyTransportResponse = AdminProxyTransportResponse(200, """{"ok":true}"""),
-    ): RecordingTransport {
-        val recording = RecordingTransport(response)
-        AdminProxyClient.defaultTransportFactory = { recording }
-        return recording
-    }
-
-    private class RecordingTransport(
-        private val response: AdminProxyTransportResponse,
-    ) : AdminProxyTransport {
-        val calls: MutableList<Call> = mutableListOf()
-
-        override fun execute(method: String, url: String, body: String?): AdminProxyTransportResponse {
-            calls += Call(method, url, body)
-            return response
-        }
-
-        data class Call(val method: String, val url: String, val body: String?)
     }
 }
