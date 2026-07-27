@@ -327,13 +327,24 @@ fun projectToolTimelineGroups(
     previousGroups: List<ToolTimelineGroup> = emptyList(),
 ): List<ToolTimelineGroup> {
     if (messages.isEmpty()) return emptyList()
+    val result = messages.projectEachToolCallGroup(previousGroups.associateBy { it.key })
+    return if (result.matchesByIdentity(previousGroups)) previousGroups else result
+}
 
-    val previousGroupByKey = previousGroups.associateBy { it.key }
+/**
+ * Projects every tool-call-bearing message into a group, assigning collision-safe keys and
+ * reusing the matching [previousByKey] entry when nothing about the call changed.
+ *
+ * Split from [projectToolTimelineGroups] so that function states only the outer decision —
+ * project, then reuse the previous LIST or not — and the per-message walk lives on its own.
+ */
+private fun List<UiMessage>.projectEachToolCallGroup(
+    previousByKey: Map<String, ToolTimelineGroup>,
+): List<ToolTimelineGroup> {
     val seenGroupKeys = HashSet<String>()
     val result = ArrayList<ToolTimelineGroup>()
-
     var groupIndex = 0
-    for (message in messages) {
+    for (message in this) {
         if (message.toolCalls.isNullOrEmpty()) continue
 
         val baseKey = if (message.id.isNotBlank()) "group:${message.id}" else "group::$groupIndex"
@@ -342,14 +353,13 @@ fun projectToolTimelineGroups(
             message = message,
             groupKeyOverride = key,
             fallbackIndex = groupIndex,
-            previousGroup = previousGroupByKey[key],
+            previousGroup = previousByKey[key],
         ) ?: continue
 
         result.add(group)
         groupIndex++
     }
-
-    return if (result.matchesByIdentity(previousGroups)) previousGroups else result
+    return result
 }
 
 /** Claims [base], or the first `base#n` not already taken, and records it as seen. */

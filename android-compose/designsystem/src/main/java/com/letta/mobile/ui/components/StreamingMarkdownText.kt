@@ -576,39 +576,43 @@ internal class StreamingAppendedDeltaFadeState {
             return false
         }
 
-        if (activeBlockId == lastActiveBlockId) {
-            if (activeSource == lastActiveSource) {
-                return false
-            }
-
-            if (activeSource.startsWith(lastActiveSource) && activeSource.length > lastActiveSource.length) {
-                val rawStart = lastActiveSource.length
-                val safeStart = findSafeUnicodeBoundary(activeSource, rawStart)
-                val safeEnd = activeSource.length
-
-                if (safeStart < safeEnd) {
-                    fadingDeltaRange = safeStart until safeEnd
-                    fadingBlockId = activeBlockId
-                    lastActiveSource = activeSource
-                    return true
-                }
-            }
-
-            reset(activeBlockId, activeSource)
-            return false
+        return if (activeBlockId == lastActiveBlockId) {
+            extendCurrentBlock(activeBlockId, activeSource)
         } else {
-            if (activeSource.isNotEmpty()) {
-                val safeEnd = activeSource.length
-                fadingDeltaRange = 0 until safeEnd
-                fadingBlockId = activeBlockId
-                lastActiveBlockId = activeBlockId
-                lastActiveSource = activeSource
+            beginBlock(activeBlockId, activeSource)
+        }
+    }
+
+    /**
+     * Same block as last time: fade only a strict prefix EXTENSION. Identical text is a
+     * repaint with nothing new, and any non-prefix change is a replacement, which resets
+     * rather than replaying already-settled text.
+     */
+    private fun extendCurrentBlock(blockId: Long, source: String): Boolean {
+        if (source == lastActiveSource) return false
+
+        if (source.startsWith(lastActiveSource) && source.length > lastActiveSource.length) {
+            val safeStart = findSafeUnicodeBoundary(source, lastActiveSource.length)
+            if (safeStart < source.length) {
+                fadingDeltaRange = safeStart until source.length
+                fadingBlockId = blockId
+                lastActiveSource = source
                 return true
             }
-
-            reset(activeBlockId, activeSource)
-            return false
         }
+
+        reset(blockId, source)
+        return false
+    }
+
+    /** First sighting of a block: the whole body is the appended range. */
+    private fun beginBlock(blockId: Long, source: String): Boolean {
+        // No empty-source branch here: update()'s guard already returned for that case.
+        fadingDeltaRange = 0 until source.length
+        fadingBlockId = blockId
+        lastActiveBlockId = blockId
+        lastActiveSource = source
+        return true
     }
 
     fun reset(blockId: Long? = null, source: String = "") {
