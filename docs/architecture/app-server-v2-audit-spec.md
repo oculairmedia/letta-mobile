@@ -24,6 +24,45 @@ The machine-readable inventories remain authoritative for exact discriminants
 and registered methods. This document explains how those inventories compose
 into the running system and records known consistency risks.
 
+## Required End State: No LettaShim
+
+LettaShim is a migration dependency, not a permanent architecture component.
+The target production path is:
+
+```text
+Mobile/Desktop
+  -> Iroh QUIC
+  -> Kotlin wrapper
+      -> stock Letta App Server v2 WS for Letta-owned operations
+      -> explicitly owned bounded service for operations absent from v2
+      -> VibeSync directly for project operations
+      -> wrapper-owned state for pairing and transport health
+```
+
+The target has no route to port 8291, no legacy mobile WS dependency, no
+native-to-shim fallback, and no direct reads or writes of Letta backend files.
+An operation that has no approved post-shim owner must return a typed
+`capability_unavailable` result. It must not silently regain behavior through a
+generic proxy.
+
+Shim retirement is complete only when all of the following are true:
+
+1. `LETTA_IROH_ADMIN_BASE_URL` and the default `http://127.0.0.1:8291` are
+   removed from production wrapper wiring.
+2. No production handler constructs an `AdminProxyClient` for LettaShim.
+3. `NativeAdmin` does not fall back to LettaShim after timeout, protocol error,
+   or unsuccessful response.
+4. Every `shim_until_cutover` matrix row has moved to `none`, a named bounded
+   service, or `deny_fail_closed`.
+5. Subagent state comes from controller/runtime state, not
+   `HttpSubagentRegistrySource`.
+6. The legacy mobile WS send, approval, cron, and timeline paths are either
+   removed or isolated as an unsupported legacy connector outside the Iroh
+   product path.
+7. A full mobile parity suite passes with nothing listening on port 8291.
+8. No replacement component reads Letta storage directly to recreate shim
+   behavior.
+
 ## Normative Sources
 
 Audit in this order:
@@ -424,6 +463,103 @@ the next turn starts a fresh runtime.
 - Health, subagent state, and peer pairing are wrapper-owned.
 - Secrets are not exposed by generic Iroh admin routing.
 
+## LettaShim Retirement Ledger
+
+The ownership-matrix fallback totals are:
+
+- 70 as `shim_until_cutover`
+- 18 as `none`
+- 1 as `deny_fail_closed`
+
+Those declarations are not a complete picture of runtime dependence because some
+handlers have already moved to direct services while other supposedly
+controller-native paths still source data from the shim.
+
+### Current dependency classes
+
+| Class | Current behavior | Required correction |
+| --- | --- | --- |
+| 40 `admin_rest_service` methods | Production injects the same port-8291 base used by LettaShim | Provide a separately deployed, bounded, versioned service for each approved domain, adopt an upstream v2 command, or fail closed |
+| Native-first agent/conversation/message routes | Try App Server v2, then optional direct disk, then LettaShim | Prove native parity, remove disk and HTTP fallback, and return typed native failures |
+| Model catalog | `model.list` defaults to shim REST shape; native shape is opt-in | Define one canonical mobile model projection from `list_models`; make native the only Letta-owned source |
+| Skills | Lists and agent-scoped install/uninstall use shim semantics; native v2 exposes filesystem enable/disable | Choose and document one semantic model; adapt the UI/API or provide a bounded non-shim owner |
+| Approval submission | Live approval uses the controller; failure/no controller falls back to shim pending-approval REST | Recover approvals through v2 `sync` and fail closed when no matching live/recovered request exists |
+| Conversation delete | Matrix says fail closed, but production uses shim delete because `shimRetired` defaults false | Remove delete or map product behavior to archive; enable fail-closed behavior unconditionally |
+| Subagents | Matrix calls the methods controller-native, but production discovers `HttpSubagentRegistrySource` from port 8291 | Build the registry from runtime events/controller state and remove HTTP discovery |
+| Health | Controller health is native in production; shim is used only when no controller is wired | Require a controller in production and remove the shim branch |
+| Projects | Matrix still says `shim_until_cutover`, but production calls VibeSync directly on port 3099 | Update the matrix to `none` and retain typed capability-unavailable behavior when VibeSync is absent |
+| Native circuit breaker | One timeout/error opens a global 60-second breaker, sending unrelated operations to fallback | Remove shim fallback; make capability state per command/domain and expose typed unavailable/degraded results |
+| Optional local backend tier | Selected agent/conversation/message reads may bypass both v2 and shim by reading files | Remove it from production; it is not an acceptable shim replacement |
+| Legacy client WS | Non-Iroh clients can still use `WsChatBridge`, shim detection, cron WS, approval, and timeline subscription code | Establish an explicit support boundary, migrate required behavior to Iroh/v2, then delete the shim connector |
+
+### Port-8291 removal work by domain
+
+The following `admin_rest_service` surfaces need an approved owner before the
+port can be removed:
+
+- Agent context: `agent.context`.
+- Runs and steps: `run.list`, `run.get`, `step.list`.
+- Archives and memory administration: `archive.list`, `folder.list`,
+  `passage.list/create/delete`, `group.list`.
+- Identities: `identity.list`, `identity.get`.
+- Model/provider administration: `model.list.embedding`, `provider.list`.
+- Schedules and jobs: `schedule.list/get/create/delete`, `job.list/get`.
+- Tools: `tool.list/get/create/update/delete/attach/detach`.
+- Blocks: `block.list/get/create/update/delete/attach/detach/update_agent`.
+- MCP: `mcp.list`.
+- Goals: `goal.get`, `goal.command`.
+- Slash commands: `slash_command.list`, `slash_command.list_agent`.
+
+For each domain, the decision must be one of:
+
+1. Adopt an existing upstream App Server v2 command and add a typed Kotlin
+   projection.
+2. Propose and pin a new upstream v2 contract.
+3. Route to a separately owned bounded service with its own health,
+   authorization, version, schema, and tests.
+4. Remove the feature and return `capability_unavailable`.
+
+Growing a generic REST mirror inside the Kotlin wrapper or reading the Letta
+backend files directly are not valid choices.
+
+### Native-first fallback removal work
+
+Before deleting each native-to-shim fallback:
+
+1. Verify request and response semantic parity, not just matching names.
+2. Add projection tests for pagination, filtering, ordering, nullability, and
+   error shape.
+3. Add mutation tests for persistence and runtime invalidation.
+4. Add ambiguous-disconnect reconciliation tests.
+5. Run the route with port 8291 closed.
+6. Change fallback to a typed failure.
+7. Remove the dead proxy branch and update the ownership matrix.
+
+Native App Server success must be the normal route. Native timeout must be a
+visible v2 availability failure, not a trigger that changes the state authority
+for the request.
+
+### Shim-free release gates
+
+| Gate | Required evidence |
+| --- | --- |
+| Static dependency gate | Production source has no LettaShim base URL, `/shim/` path, or shim `AdminProxyClient` construction |
+| Ownership gate | Zero `shim_until_cutover` rows in the machine matrix |
+| Network gate | Wrapper and complete mobile parity probes pass while port 8291 is closed/rejected |
+| State-authority gate | Every mutation is retrieved from the same authority that accepted it |
+| Runtime gate | Every runtime-captured field has a tested invalidation rule |
+| Approval gate | Ask User and tool approvals survive reconnect without shim pending-approval REST |
+| Subagent gate | Subagent list/todos hydrate from controller/runtime state only |
+| Projection gate | Native model, skill, message, conversation, and agent shapes satisfy mobile contracts |
+| Deployment gate | Systemd/container definitions do not order, require, configure, or health-check LettaShim |
+| Observability gate | Soak telemetry records zero shim fallback attempts; native route and typed failures are distinguishable |
+| Storage gate | No direct Letta backend reader/writer is enabled in production |
+| Legacy removal gate | Mobile WS shim detector/bridge and shim-only repositories are removed or moved outside supported builds |
+
+The final cutover should deliberately stop LettaShim first, execute these gates,
+and only then remove its deployment. A successful test while the shim is still
+reachable does not prove independence.
+
 ## State Ownership and Persistence
 
 File-backed storage does not mean live configuration files are a reactive API.
@@ -555,6 +691,23 @@ These are known inconsistencies, not accepted architecture:
 10. **Runtime persistence semantics are not schema-classified.** There is no
     single registry stating which agent/conversation fields are read live and
     which are captured when a runtime starts.
+11. **Seventy ownership rows still declare shim fallback.** The cutover cannot
+    be audited as complete while `shim_until_cutover` remains an allowed
+    production fallback.
+12. **Subagent ownership is incorrectly described.** The methods are labelled
+    controller-native, but production builds their source by probing LettaShim.
+13. **Conversation delete does not currently fail closed.** The ownership
+    matrix says it should, but production leaves `shimRetired=false` and calls
+    the shim delete route.
+14. **Model and skill parity is semantic, not mechanical.** Upstream model and
+    skill operations have different wire shapes/scopes from the shim APIs, so
+    merely switching route names would change product behavior.
+15. **The native circuit breaker changes authority globally.** One native
+    failure causes unrelated operations to skip App Server and use fallback for
+    60 seconds.
+16. **Port 8291 is overloaded as an ownership boundary.** Forty bounded-admin
+    methods, native fallbacks, subagent discovery, and legacy behavior share the
+    same base URL, making dependency removal difficult to prove.
 
 ## Audit Procedure
 
@@ -597,6 +750,10 @@ For each row in `iroh-admin-ownership-matrix.json`, verify:
 - route telemetry;
 - whether the shim can be removed or must remain an explicit owner.
 
+The audit target is always shim removal. "Must remain in LettaShim" is not a
+valid final decision; use an upstream contract, named bounded service, product
+removal, or typed denial.
+
 ### 4. Audit every mutable state field
 
 Create a row for every agent and conversation configuration field:
@@ -635,6 +792,21 @@ Audit findings should update:
 - the upstream baseline fixtures for protocol changes;
 - `bd` issues for implementation work;
 - tests that fail when a resolved invariant regresses.
+
+### 8. Prove shim independence
+
+Run the wrapper and all parity probes with port 8291 unavailable. Capture:
+
+- registered capabilities;
+- every `admin_rpc` method result;
+- native command and response types;
+- typed unavailable results;
+- runtime invalidations;
+- reconnect/approval recovery;
+- any attempted connection to port 8291.
+
+Any attempted connection to port 8291 is a failed shim-retirement audit, even
+when the operation later succeeds through another route.
 
 ## Change Control
 

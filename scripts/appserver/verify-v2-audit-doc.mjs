@@ -38,11 +38,27 @@ for (const [owner, count] of ownerCounts) {
   assertContains(`| \`${owner}\` | ${count} |`, `admin owner count ${owner}`);
 }
 
+const fallbackCounts = new Map();
+for (const operation of ownership.operations) {
+  fallbackCounts.set(
+    operation.fallback,
+    (fallbackCounts.get(operation.fallback) ?? 0) + 1,
+  );
+}
+for (const [fallback, count] of fallbackCounts) {
+  assertContains(
+    `${count} as \`${fallback}\``,
+    `admin fallback count ${fallback}`,
+  );
+}
+
 for (const heading of [
+  "## Required End State: No LettaShim",
   "## Normative Sources",
   "## Complete Upstream Capability Inventory",
   "## Kotlin Typed Protocol Surface",
   "## Iroh Admin RPC Contract",
+  "## LettaShim Retirement Ledger",
   "## State Ownership and Persistence",
   "## Cache Invalidation Matrix",
   "## Known Audit Findings",
