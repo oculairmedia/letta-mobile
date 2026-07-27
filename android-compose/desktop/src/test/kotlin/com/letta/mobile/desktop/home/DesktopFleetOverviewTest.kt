@@ -154,6 +154,37 @@ class DesktopFleetOverviewTest {
         assertEquals(Instant.parse("2026-07-26T11:00:00Z"), top.updatedAt)
     }
 
+    /**
+     * Home keys its LazyColumn by conversationId, and Compose throws "Key already used" on a
+     * duplicate — which would crash the DEFAULT destination. The conversation endpoint does
+     * repeat rows during an active run, so this pins the guarantee that Home never receives
+     * a duplicate key.
+     *
+     * buildFleetOverview already dedups by id up front, so this test documents that contract
+     * rather than adding a second one. It keeps the FIRST occurrence, so the surviving row can
+     * carry a staler timestamp and preview than the newest copy — cosmetic, and asserted below
+     * so a change to that rule is a deliberate decision rather than a silent one.
+     */
+    @Test
+    fun `duplicate conversation rows are collapsed to one`() {
+        val result = overview(
+            conversations = listOf(
+                conversation("dupe", "a-1", updatedAt = "2026-07-26T08:00:00Z"),
+                conversation("other", "a-1", updatedAt = "2026-07-26T09:00:00Z"),
+                conversation("dupe", "a-1", updatedAt = "2026-07-26T10:00:00Z"),
+            ),
+            agents = listOf(agent("a-1", "Scout")),
+        )
+        val ids = result.recent.map { it.conversationId }
+        assertEquals(ids.size, ids.toSet().size, "Home would crash on a duplicate LazyColumn key")
+        assertEquals(listOf("other", "dupe"), ids)
+        assertEquals(
+            Instant.parse("2026-07-26T08:00:00Z"),
+            result.recent.first { it.conversationId == "dupe" }.updatedAt,
+            "dedup keeps the first occurrence, not the freshest",
+        )
+    }
+
     @Test
     fun `recent conversations prefer the resolved roster name over a raw id`() {
         val result = overview(
