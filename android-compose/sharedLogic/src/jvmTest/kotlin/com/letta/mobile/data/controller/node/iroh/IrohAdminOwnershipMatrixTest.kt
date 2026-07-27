@@ -62,6 +62,7 @@ class IrohAdminOwnershipMatrixTest {
         val migrationSlices = enums.stringSet("migration_slices")
         val productionFirstRoutes = enums.stringSet("production_first_routes")
         val postShimFallbacks = enums.stringSet("post_shim_fallbacks")
+        val phase3Decisions = enums.stringSet("phase3_decisions")
 
         operations.forEach { row ->
             val method = row.requiredString("method")
@@ -95,7 +96,44 @@ class IrohAdminOwnershipMatrixTest {
                 row.requiredString("post_shim_fallback") != "shim_until_cutover",
                 "$method post_shim_fallback must not retain shim_until_cutover",
             )
+            val decision = row["phase3_decision"]?.jsonPrimitive?.content
+            if (decision != null) {
+                assertTrue(decision in phase3Decisions, "$method has an unknown phase3_decision")
+            }
         }
+    }
+
+    @Test
+    fun adminRestDomainsHavePhase3Decisions() {
+        val phase3Decisions = enums.stringSet("phase3_decisions")
+        operations
+            .filter {
+                it.requiredString("owner") in setOf("admin_rest_service", "capability_gated_unsupported") &&
+                    it.requiredString("method").let { m ->
+                        m == "agent.context" ||
+                            m.startsWith("run.") ||
+                            m.startsWith("step.") ||
+                            m.startsWith("archive.") ||
+                            m.startsWith("folder.") ||
+                            m.startsWith("passage.") ||
+                            m.startsWith("group.") ||
+                            m.startsWith("identity.") ||
+                            m.startsWith("model.list.embedding") ||
+                            m.startsWith("provider.") ||
+                            m.startsWith("schedule.") ||
+                            m.startsWith("job.") ||
+                            m.startsWith("tool.") ||
+                            m.startsWith("block.") ||
+                            m.startsWith("mcp.") ||
+                            m.startsWith("goal.") ||
+                            m.startsWith("slash_command.")
+                    }
+            }
+            .forEach { row ->
+                val method = row.requiredString("method")
+                val decision = row.requiredString("phase3_decision")
+                assertTrue(decision in phase3Decisions, "$method missing phase3_decision")
+            }
     }
 
     @Test

@@ -64,9 +64,13 @@ internal fun buildProductionAdminRouter(
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
+    // Phase 3: bounded admin REST must be an explicit service URL — never the
+    // LettaShim :8291 default. Unset => capability_unavailable for those methods.
+    adminRestBaseUrl: String? = System.getenv("LETTA_IROH_ADMIN_REST_BASE_URL"),
 ): AdminRpcRouter = AdminRpcRegistry.buildRouter(
     adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient,
     vibesyncBaseUrl = vibesyncBaseUrl,
+    adminRestBaseUrl = adminRestBaseUrl,
     shimRetired = true,
 )
 

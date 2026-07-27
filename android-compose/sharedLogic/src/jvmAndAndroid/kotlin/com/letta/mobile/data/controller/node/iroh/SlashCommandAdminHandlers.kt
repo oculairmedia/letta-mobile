@@ -1,26 +1,15 @@
 package com.letta.mobile.data.controller.node.iroh
 
+/**
+ * Phase 3: shim-era slash_command.* surfaces are product-removed. Always return
+ * a typed capability denial — never dial LettaShim or a generic admin REST base.
+ * Composer slash autocomplete must use a non-shim owner when reintroduced.
+ */
 object SlashCommandAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
-        // lgns8.9: no admin-rest service injected -> capability-unavailable
-        // (never a shim dial). Bounded admin adapter degrades gracefully.
-        if (adminBaseUrl == null) {
-            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
-            return
-        }
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        // Global builtins (e.g. /goal). GET /v1/slash-commands.
-        router.register("slash_command.list") {
-            api.get(AdminPath.v1("slash-commands"))
-        }
-        // Per-agent list (builtins + installed skills). GET
-        // /v1/agents/{id}/slash-commands. Routed over admin_rpc so the composer's
-        // slash-command autocomplete populates in iroh:// mode.
-        router.register("slash_command.list_agent") { params ->
-            val agentId = params.requireParam(AdminParamKey("agent_id"))
-            api.get(AdminPath.v1("agents", agentId, "slash-commands"))
-        }
+    fun register(router: AdminRpcRouter, @Suppress("UNUSED_PARAMETER") adminBaseUrl: String? = null) {
+        CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
     }
+
     val METHODS: Set<String> = setOf(
         "slash_command.list",
         "slash_command.list_agent",

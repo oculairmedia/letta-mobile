@@ -60,12 +60,31 @@ class AdminProxyRequestTest {
     }
 
     @Test
-    fun goalCommandBuildsPostPath() {
+    fun archiveListBuildsGetPath() {
+        val recording = installRecordingTransport()
+        val router = AdminRpcRouter()
+        ArchiveAdminHandlers.register(router, "http://admin.local")
+
+        runTest {
+            router.dispatch(
+                requestId = "req-1",
+                method = "archive.list",
+                params = null,
+            )
+        }
+
+        val call = recording.calls.single()
+        assertEquals("GET", call.method)
+        assertEquals("http://admin.local/v1/archives", call.url)
+    }
+
+    @Test
+    fun deprecatedGoalCommandIsCapabilityUnavailable() = runTest {
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
         GoalAdminHandlers.register(router, "http://admin.local")
 
-        runTest {
+        val response = Json.parseToJsonElement(
             router.dispatch(
                 requestId = "req-1",
                 method = "goal.command",
@@ -73,13 +92,12 @@ class AdminProxyRequestTest {
                     put("agent_id", "agent-1")
                     put("command", "pause")
                 },
-            )
-        }
+            ),
+        ).jsonObject
 
-        val call = recording.calls.single()
-        assertEquals("POST", call.method)
-        assertEquals("http://admin.local/v1/agents/agent-1/goal/command", call.url)
-        assertEquals("""{"command":"pause"}""", call.body)
+        assertEquals(false, response.getValue("success").jsonPrimitive.boolean)
+        assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        assertTrue(recording.calls.isEmpty())
     }
 
     @Test

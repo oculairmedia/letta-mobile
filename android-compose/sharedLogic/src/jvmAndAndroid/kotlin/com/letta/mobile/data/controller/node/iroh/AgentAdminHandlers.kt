@@ -19,13 +19,11 @@ import kotlinx.serialization.json.put
 object AgentAdminHandlers {
     fun register(
         router: AdminRpcRouter,
-        adminBaseUrl: String,
         controller: AppServerController? = null,
         tiers: NativeReadTiers = NativeReadTiers(),
+        adminRestBaseUrl: String? = null,
     ) {
         val nativeClient = tiers.nativeClient
-        // adminBaseUrl retained only for agent.context (admin_rest / Phase 3).
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
         router.register("agent.list") { params ->
             val limit = param(params, AdminParamKey("limit"))
             val offset = param(params, AdminParamKey("offset"))
@@ -76,8 +74,6 @@ object AgentAdminHandlers {
                 )
                 if (response.success) response.agent else null
             }
-            // Evict cached runtime when model or context-window inputs change so
-            // the next turn reseeds from the updated agent record.
             if (shouldInvalidateRuntime(params)) {
                 controller?.stopRuntime(AgentId(id))
             }
@@ -92,24 +88,21 @@ object AgentAdminHandlers {
                 if (response.success) buildJsonObject { put("deleted", true) } as JsonObject else null
             }
         }
-        router.register("agent.context") { params ->
-            val id = params.requireParam(AdminParamKey("agent_id"))
-            // letta-mobile-c4igq.9: agent.context is normally KBs (counts + short
-            // memory strings), but a memory-heavy agent can carry large system_prompt/
-            // core_memory blocks that push a full response over the frame cap. Bound
-            // oversized string fields so context always hydrates.
-            //
-            // Additionally, /context inlines the ENTIRE in-context `messages` array
-            // which the client's ContextWindowOverview never reads. Drop it before
-            // bounding the remaining strings.
-            MessageListPageGuard.boundObjectStringFields(
-                MessageListPageGuard.dropField(
-                    api.get(AdminPath.v1("agents", id, "context")) {
-                        query("conversation_id", param(params, AdminParamKey("conversation_id")))
-                    },
-                    "messages",
-                ),
-            )
+        if (adminRestBaseUrl == null) {
+            CapabilityUnavailable.register(router, setOf("agent.context"), service = "admin_rest")
+        } else {
+            val api = AdminHandlerSupport(AdminProxyClient(adminRestBaseUrl))
+            router.register("agent.context") { params ->
+                val id = params.requireParam(AdminParamKey("agent_id"))
+                MessageListPageGuard.boundObjectStringFields(
+                    MessageListPageGuard.dropField(
+                        api.get(AdminPath.v1("agents", id, "context")) {
+                            query("conversation_id", param(params, AdminParamKey("conversation_id")))
+                        },
+                        "messages",
+                    ),
+                )
+            }
         }
     }
 

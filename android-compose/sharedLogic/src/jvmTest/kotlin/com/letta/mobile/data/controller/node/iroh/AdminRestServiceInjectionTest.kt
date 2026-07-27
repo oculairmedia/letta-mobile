@@ -10,10 +10,10 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * lgns8.9: the bounded admin_rest_service adapters are injected. With no
- * admin-rest service configured (adminRestBaseUrl = null) every one of the 40
- * bounded methods returns capability-unavailable and NEVER dials lettashim — a
- * shim-less deployment degrades gracefully without failing chat.
+ * lgns8.9 / Phase 3: bounded admin_rest_service adapters are injected. With no
+ * admin-rest service configured (adminRestBaseUrl = null) those methods return
+ * capability-unavailable and NEVER dial lettashim — a shim-less deployment
+ * degrades gracefully without failing chat. Goal/slash methods are always denied.
  */
 class AdminRestServiceInjectionTest {
     private var savedFactory: (() -> AdminProxyTransport)? = null
@@ -39,14 +39,19 @@ class AdminRestServiceInjectionTest {
         override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? = null
     }
 
-    private val adminRestMethods = RunAdminHandlers.METHODS + ArchiveAdminHandlers.METHODS +
-        IdentityAdminHandlers.METHODS + ModelAdminHandlers.METHODS + ScheduleAdminHandlers.METHODS +
-        ToolAdminHandlers.METHODS + McpAdminHandlers.METHODS + GoalAdminHandlers.METHODS +
-        SlashCommandAdminHandlers.METHODS
+    private val adminRestMethods = (
+        RunAdminHandlers.METHODS + ArchiveAdminHandlers.METHODS +
+            IdentityAdminHandlers.METHODS +
+            setOf("model.list.embedding", "provider.list") +
+            ScheduleAdminHandlers.METHODS +
+            ToolAdminHandlers.METHODS + McpAdminHandlers.METHODS + GoalAdminHandlers.METHODS +
+            SlashCommandAdminHandlers.METHODS +
+            setOf("agent.context")
+        )
 
     @Test
     fun theBoundedAdminRestMethodsAreEnumerated() {
-        assertTrue(adminRestMethods.size == 40, "expected 40 admin_rest methods, got ${adminRestMethods.size}")
+        assertTrue(adminRestMethods.size == 40, "expected 40 admin_rest/denied methods, got ${adminRestMethods.size}")
     }
 
     @Test

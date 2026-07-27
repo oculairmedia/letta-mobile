@@ -60,20 +60,18 @@ object AdminRpcRegistry {
         /** Phase 2: conversation.delete is always fail-closed; parameter retained for call-site compatibility. */
         @Suppress("UNUSED_PARAMETER") shimRetired: Boolean = true,
         /**
-         * lgns8.9: VibeSync product service base URL for project.* methods. When
-         * null the project methods return capability-unavailable instead of
-         * dialing lettashim. Defaults to [adminBaseUrl] only for backward
-         * compatibility in tests; production injects VibeSync directly.
+         * VibeSync product service base URL for project.* methods. When null the
+         * project methods return capability-unavailable. Production must inject
+         * VibeSync explicitly — never fall back to the LettaShim admin base.
          */
-        vibesyncBaseUrl: String? = adminBaseUrl,
+        vibesyncBaseUrl: String? = null,
         /**
-         * lgns8.9: base URL for the bounded admin_rest_service adapters (runs,
-         * archives, identities, models, schedules, tools, blocks, mcp, goals,
-         * slash-commands). When null those methods return capability-unavailable
-         * instead of dialing lettashim. Defaults to [adminBaseUrl] for backward
-         * compatibility; a shim-less deployment passes null.
+         * Bounded admin_rest_service adapters (runs, archives, identities,
+         * embedding models, schedules, tools, blocks, mcp). When null those
+         * methods return capability-unavailable. Must be an explicitly owned
+         * service URL — never implicitly the LettaShim :8291 base.
          */
-        adminRestBaseUrl: String? = adminBaseUrl,
+        adminRestBaseUrl: String? = null,
         /**
          * Ignored since Phase 2. Direct Letta backend reads are not an accepted
          * production route; retained only so older call sites compile.
@@ -87,7 +85,7 @@ object AdminRpcRegistry {
         val tiers = NativeReadTiers(nativeClient)
 
         HealthAdminHandlers.register(router, rpcBase, controller)
-        AgentAdminHandlers.register(router, rpcBase, controller, tiers)
+        AgentAdminHandlers.register(router, controller, tiers, adminRestBase)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
         ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired = true)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
@@ -98,8 +96,9 @@ object AdminRpcRegistry {
         ScheduleAdminHandlers.register(router, adminRestBase)
         ToolAdminHandlers.register(router, adminRestBase)
         McpAdminHandlers.register(router, adminRestBase)
-        GoalAdminHandlers.register(router, adminRestBase)
-        SlashCommandAdminHandlers.register(router, adminRestBase)
+        // Phase 3: shim-era goal/slash surfaces are product-removed.
+        GoalAdminHandlers.register(router, adminBaseUrl = null)
+        SlashCommandAdminHandlers.register(router, adminBaseUrl = null)
         SkillAdminHandlers.register(router, rpcBase, nativeClient)
         ApprovalAdminHandlers.register(router, rpcBase, controller)
         PairingAdminHandlers.register(router, pairingService)

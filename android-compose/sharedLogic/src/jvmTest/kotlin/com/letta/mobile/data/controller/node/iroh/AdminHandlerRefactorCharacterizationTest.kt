@@ -47,7 +47,10 @@ class AdminHandlerRefactorCharacterizationTest {
         val transport = FakeTransport()
         AdminProxyClient.defaultTransportFactory = { transport }
 
-        val router = AdminRpcRegistry.buildRouter("http://test")
+        val router = AdminRpcRegistry.buildRouter(
+            adminBaseUrl = "http://test",
+            adminRestBaseUrl = "http://test",
+        )
 
         suspend fun check(method: String, params: kotlinx.serialization.json.JsonObject?, expectedMethod: String, expectedUrl: String) {
             transport.lastMethod = null
@@ -84,9 +87,10 @@ class AdminHandlerRefactorCharacterizationTest {
         })
         checkNativeFailClosed("conversation.create", buildJsonObject { put("agent_id", "ag-1") })
         checkNativeFailClosed("model.list", null)
+        checkNativeFailClosed("goal.get", buildJsonObject { put("agent_id", "ag-1") })
+        checkNativeFailClosed("slash_command.list", null)
 
         check("archive.list", null, "GET", "http://test/v1/archives")
-        check("goal.get", buildJsonObject { put("agent_id", "ag-1") }, "GET", "http://test/v1/agents/ag-1/goal")
         check("identity.list", null, "GET", "http://test/v1/identities")
         check("mcp.list", null, "GET", "http://test/v1/mcp/servers")
         check("run.list", null, "GET", "http://test/v1/runs")

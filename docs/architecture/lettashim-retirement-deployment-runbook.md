@@ -154,6 +154,8 @@ Still open inside Phase 2:
 
 ### Phase 3: Replace non-v2 admin domains
 
+Status: partial on PR #1036 / `letta-mobile-lgns8.10.3`
+
 For each of the 40 `admin_rest_service` methods, choose exactly one:
 
 1. Existing upstream App Server v2 command.
@@ -163,6 +165,24 @@ For each of the 40 `admin_rest_service` methods, choose exactly one:
 4. Product removal with `capability_unavailable`.
 
 Do not keep one generic `adminBaseUrl`.
+
+Landed in this Phase 3 slice:
+
+- `phase3_decision` recorded for all former admin REST domains
+  (`bounded_service` × 36, `deny_fail_closed` × 4);
+- `adminRestBaseUrl` defaults to **null** (no implicit LettaShim `:8291`);
+- production injects only `LETTA_IROH_ADMIN_REST_BASE_URL` when a bounded
+  adapter is deliberately deployed;
+- `agent.context` routes through that same optional admin REST injection;
+- `goal.*` and `slash_command.*` are product-removed (always
+  `capability_unavailable`);
+- VibeSync remains an explicit `vibesyncBaseUrl` (default null in the registry).
+
+Still open inside Phase 3:
+
+- stand up real non-shim bounded services for the 36 `bounded_service` domains
+  (or adopt/propose upstream v2 commands);
+- remove remaining skill/health/subagent dependence on `adminBaseUrl` (Phase 4).
 
 Domains requiring decisions:
 

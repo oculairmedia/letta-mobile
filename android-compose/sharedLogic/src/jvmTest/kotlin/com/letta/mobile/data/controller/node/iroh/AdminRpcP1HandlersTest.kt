@@ -33,7 +33,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `block handlers proxy PATCH method and expected core memory paths`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("block.attach", params("agent_id" to "agent-1", "block_id" to "block-1"))
         router.dispatchResult("block.detach", params("agent_id" to "agent-1", "block_id" to "block-1"))
@@ -51,7 +51,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `tool handlers proxy PATCH method and expected attach detach paths`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("tool.attach", params("agent_id" to "agent-1", "tool_id" to "tool-1"))
         router.dispatchResult("tool.detach", params("agent_id" to "agent-1", "tool_id" to "tool-1"))
@@ -67,7 +67,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `passage handlers proxy POST DELETE and expected archival memory paths`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("passage.create", params("agent_id" to "agent-1", "text" to "remember this"))
         router.dispatchResult("passage.delete", params("agent_id" to "agent-1", "passage_id" to "passage-1"))
@@ -83,7 +83,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `agent context handler proxies GET with conversation id query`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         val result = router.dispatchResult("agent.context", params("agent_id" to "agent-1", "conversation_id" to "conversation-1"))
 
@@ -96,7 +96,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `project handlers accept project_id alias and prefer identifier`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("project.get", params("project_id" to "legacy-proj"))
         router.dispatchResult(
@@ -120,7 +120,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `project handlers proxy existing api project endpoints`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("project.list", params("limit" to "1"))
         router.dispatchResult("project.get", params("identifier" to "vibesync"))

@@ -425,10 +425,10 @@ The current machine matrix contains 89 registered methods:
 | Declared owner | Count | Execution class |
 | --- | ---: | --- |
 | `app_server_v2` | 30 | Native App Server v2 contract, usually native-first with a bounded fallback |
-| `admin_rest_service` | 40 | Server-local HTTP adapter, currently port 8291 in production |
+| `admin_rest_service` | 36 | Explicitly injected bounded admin REST adapter (`LETTA_IROH_ADMIN_REST_BASE_URL`) |
 | `controller_native` | 9 | Wrapper process memory and pairing store |
 | `vibesync_service` | 9 | Server-local VibeSync API, currently port 3099 |
-| `capability_gated_unsupported` | 1 | Typed fail-closed response |
+| `capability_gated_unsupported` | 5 | Typed fail-closed response |
 
 Exact method rows, authorization classes, data stores, native discriminants,
 fallbacks, production first routes, post-shim owners, and migration slices are
@@ -471,11 +471,12 @@ the next turn starts a fresh runtime.
 The ownership-matrix fallback totals are:
 
 - 5 as `shim_until_cutover`
-- 83 as `none`
-- 1 as `deny_fail_closed`
+- 79 as `none`
+- 5 as `deny_fail_closed`
 
-Phase 2 moved runtime-owned agent/conversation/message/model/approval/cron
-operations to fail-closed native routes (`fallback: none`). Remaining
+Phase 3 stopped defaulting admin REST to LettaShim `:8291`. Bounded admin
+domains require an explicit `LETTA_IROH_ADMIN_REST_BASE_URL`; goal and slash
+command methods are product-removed (`deny_fail_closed`). Remaining
 `shim_until_cutover` rows are health (controller-null branch), agent-scoped
 skill install/uninstall, and shim-backed subagent discovery.
 
