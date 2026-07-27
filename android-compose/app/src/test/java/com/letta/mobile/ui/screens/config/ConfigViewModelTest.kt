@@ -104,6 +104,24 @@ class ConfigViewModelTest {
     }
 
     @Test
+    fun loadConfig_doesNotReplaceUnsavedEdits() = runTest {
+        fakeRepository.activeConfigState.value = LettaConfig(
+            id = "config-1",
+            mode = LettaConfig.Mode.CLOUD,
+            serverUrl = "https://cloud.letta.ai",
+            accessToken = "persisted-token",
+        )
+        viewModel.loadConfig()
+        viewModel.updateApiToken("unsaved-token")
+
+        viewModel.loadConfig()
+
+        val state = (viewModel.uiState.value as UiState.Success).data
+        assertEquals("unsaved-token", state.apiToken)
+        assertTrue(state.hasUnsavedChanges)
+    }
+
+    @Test
     fun loadConfig_withExistingCloudConfig_mapsModeUrlTokenCorrectly() = runTest {
         val config = LettaConfig(
             id = "config-1",

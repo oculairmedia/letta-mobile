@@ -67,6 +67,7 @@ data class ConfigUiState(
     ),
     val isRefreshing: Boolean = false,
     val refreshError: String? = null,
+    val hasUnsavedChanges: Boolean = false,
     val isSaving: Boolean = false,
 )
 
@@ -109,6 +110,9 @@ class ConfigViewModel @Inject constructor(
     fun loadConfig() {
         viewModelScope.launch {
             val retainedState = (_uiState.value as? UiState.Success)?.data
+            // A refresh reconstructs the form from persisted state. Never let it
+            // replace edits that have not gone through saveConfig yet.
+            if (retainedState?.hasUnsavedChanges == true) return@launch
             _uiState.value = retainedState
                 ?.copy(isRefreshing = true, refreshError = null)
                 ?.let { UiState.Success(it) }
@@ -203,28 +207,28 @@ class ConfigViewModel @Inject constructor(
                 }
         }
         _uiState.value = UiState.Success(
-            currentState.copy(mode = mode, serverUrl = updatedUrl)
+            currentState.copy(hasUnsavedChanges = true, mode = mode, serverUrl = updatedUrl)
         )
     }
 
     fun updateServerUrl(url: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(serverUrl = url))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, serverUrl = url))
         }
     }
 
     fun updateApiToken(token: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(apiToken = token))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, apiToken = token))
         }
     }
 
     fun updateTheme(theme: AppTheme) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(theme = theme))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, theme = theme))
             viewModelScope.launch {
                 settingsRepository.setTheme(theme)
             }
@@ -237,6 +241,7 @@ class ConfigViewModel @Inject constructor(
             val dynamicColor = if (themePreset == ThemePreset.DEFAULT) currentState.dynamicColor else false
             _uiState.value = UiState.Success(
                 currentState.copy(
+                    hasUnsavedChanges = true,
                     themePreset = themePreset,
                     dynamicColor = dynamicColor,
                 )
@@ -251,7 +256,7 @@ class ConfigViewModel @Inject constructor(
     fun updateDynamicColor(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(dynamicColor = enabled))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, dynamicColor = enabled))
             viewModelScope.launch {
                 settingsRepository.setDynamicColor(enabled)
             }
@@ -261,7 +266,7 @@ class ConfigViewModel @Inject constructor(
     fun updateEnableProjects(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(enableProjects = enabled))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, enableProjects = enabled))
             viewModelScope.launch {
                 settingsRepository.setEnableProjects(enabled)
             }
@@ -271,7 +276,7 @@ class ConfigViewModel @Inject constructor(
     fun updateHapticsEnabled(enabled: Boolean) {
         val currentState = (_uiState.value as? UiState.Success)?.data
         if (currentState != null) {
-            _uiState.value = UiState.Success(currentState.copy(hapticsEnabled = enabled))
+            _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, hapticsEnabled = enabled))
             viewModelScope.launch {
                 settingsRepository.setHapticsEnabled(enabled)
             }
@@ -280,13 +285,14 @@ class ConfigViewModel @Inject constructor(
 
     fun updateLocalModelPath(path: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelPath = path))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localModelPath = path))
     }
 
     fun updateLocalModelHandle(handle: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(
             currentState.copy(
+                hasUnsavedChanges = true,
                 localModelHandle = handle,
                 localProviderBaseUrl = "",
                 localProviderApiKey = "",
@@ -297,32 +303,32 @@ class ConfigViewModel @Inject constructor(
 
     fun updateLocalModelAccelerator(accelerator: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelAccelerator = accelerator))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localModelAccelerator = accelerator))
     }
 
     fun updateLocalModelMaxTokens(maxTokens: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localModelMaxTokens = maxTokens))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localModelMaxTokens = maxTokens))
     }
 
     fun updateLocalProviderBaseUrl(baseUrl: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localProviderBaseUrl = baseUrl))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localProviderBaseUrl = baseUrl))
     }
 
     fun updateLocalProviderApiKey(apiKey: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localProviderApiKey = apiKey))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localProviderApiKey = apiKey))
     }
 
     fun updateLocalProviderModel(model: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(localProviderModel = model))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, localProviderModel = model))
     }
 
     fun updateHuggingFaceToken(token: String) {
         val currentState = (_uiState.value as? UiState.Success)?.data ?: return
-        _uiState.value = UiState.Success(currentState.copy(huggingFaceToken = token))
+        _uiState.value = UiState.Success(currentState.copy(hasUnsavedChanges = true, huggingFaceToken = token))
     }
 
     fun downloadEmbeddedModel(item: EmbeddedModelCatalogItem) {
@@ -349,6 +355,7 @@ class ConfigViewModel @Inject constructor(
         val downloaded = item.state as? EmbeddedModelDownloadState.Downloaded ?: return
         _uiState.value = UiState.Success(
             currentState.copy(
+                hasUnsavedChanges = true,
                 mode = ServerMode.LOCAL,
                 serverUrl = LOCAL_RUNTIME_URL,
                 localModelPath = downloaded.localPath,
@@ -546,7 +553,12 @@ class ConfigViewModel @Inject constructor(
                 // (selectEmbeddedModel/importLocalModel) keep the screen open,
                 // and a stuck flag short-circuits every subsequent save.
                 val latest = (_uiState.value as? UiState.Success)?.data ?: state
-                _uiState.value = UiState.Success(latest.copy(isSaving = false))
+                _uiState.value = UiState.Success(
+                    latest.copy(
+                        hasUnsavedChanges = false,
+                        isSaving = false,
+                    )
+                )
                 onSuccess()
             } catch (e: Exception) {
                 _uiState.value = UiState.Success(state.copy(isSaving = false))
