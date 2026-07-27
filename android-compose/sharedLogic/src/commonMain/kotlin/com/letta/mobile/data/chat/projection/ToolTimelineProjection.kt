@@ -41,7 +41,12 @@ data class ToolTimelineCall(
     val resultTruncation: UiToolResultTruncation? = null,
 ) {
     val isTerminal: Boolean
+        // Warning IS terminal: the call finished, it just finished with a caveat. The
+        // legacy tool cards already treat it as complete. Omitting it here left the .8
+        // auto-expand opening the row after its delay while the terminal auto-collapse
+        // never ran, so a warning row stayed stuck open.
         get() = state == ToolTimelineState.Succeeded ||
+            state == ToolTimelineState.Warning ||
             state == ToolTimelineState.Failed ||
             state == ToolTimelineState.Rejected
 }
@@ -97,8 +102,14 @@ fun classifyToolCallState(
 private fun UiToolCall.isAwaitingApproval(request: UiApprovalRequest?): Boolean {
     if (request == null) return false
     if (approvalDecision != null || result != null || status != null) return false
-    if (toolCallId == null) return true
-    return request.toolCalls.any { it.toolCallId == toolCallId || it.name == name }
+    // Match on ID whenever IDs are available on BOTH sides. Falling back to the name
+    // marked sibling calls pending too: parallel same-name calls where the request lists
+    // only one id had every sibling reported as AwaitingApproval. Name matching is only
+    // safe when the request carries no usable ids at all.
+    if (toolCallId != null && request.toolCalls.any { it.toolCallId != null }) {
+        return request.toolCalls.any { it.toolCallId == toolCallId }
+    }
+    return request.toolCalls.any { it.name == name }
 }
 
 /** Maps a recognised status string to its terminal state, or null when unrecognised. */
@@ -124,13 +135,27 @@ fun deriveToolCallSummary(name: String, arguments: String): String {
 
     val primaryArg = extractPrimaryJsonArg(trimmed)
     if (primaryArg != null) {
-        return "$cleanName($primaryArg)"
+        // Cap it like the fallback below. A large `prompt`/`query`/`command` was embedded
+        // whole, so a streaming update re-allocated and re-shaped an arbitrarily long
+        // single-line title every frame — Text.maxLines only clips AFTER shaping.
+        return "$cleanName(${primaryArg.boundedSummaryValue()})"
     }
 
     val singleLine = trimmed.replace(WHITESPACE_RUN, " ")
-    val preview = if (singleLine.length > 50) singleLine.take(47) + "..." else singleLine
-    return "$cleanName($preview)"
+    return "$cleanName(${singleLine.boundedSummaryValue()})"
 }
+
+/** Single-line, length-capped value for a summary title. */
+private fun String.boundedSummaryValue(): String {
+    val singleLine = replace(WHITESPACE_RUN, " ")
+    return if (singleLine.length > SUMMARY_VALUE_MAX_CHARS) {
+        singleLine.take(SUMMARY_VALUE_MAX_CHARS - 3) + "..."
+    } else {
+        singleLine
+    }
+}
+
+private const val SUMMARY_VALUE_MAX_CHARS = 50
 
 // Compiled once at class-init rather than per call: this projection re-runs on every
 // stream frame over every visible tool call, so building these inside the loop would
@@ -260,14 +285,37 @@ fun projectToolTimelineGroup(
     }
 }
 
-private fun aggregateGroupState(calls: List<ToolTimelineCall>): ToolTimelineState = when {
-    calls.isEmpty() -> ToolTimelineState.Running
-    calls.any { it.state == ToolTimelineState.Failed } -> ToolTimelineState.Failed
-    calls.any { it.state == ToolTimelineState.Rejected } -> ToolTimelineState.Rejected
-    calls.any { it.state == ToolTimelineState.AwaitingApproval } -> ToolTimelineState.AwaitingApproval
-    calls.any { it.state == ToolTimelineState.Warning } -> ToolTimelineState.Warning
-    calls.any { it.state == ToolTimelineState.Running } -> ToolTimelineState.Running
+/** Precedence for rolling child states up to a parent. One definition, two callers. */
+private fun aggregateStates(states: List<ToolTimelineState>): ToolTimelineState = when {
+    states.isEmpty() -> ToolTimelineState.Running
+    states.any { it == ToolTimelineState.Failed } -> ToolTimelineState.Failed
+    states.any { it == ToolTimelineState.Rejected } -> ToolTimelineState.Rejected
+    states.any { it == ToolTimelineState.AwaitingApproval } -> ToolTimelineState.AwaitingApproval
+    states.any { it == ToolTimelineState.Warning } -> ToolTimelineState.Warning
+    states.any { it == ToolTimelineState.Running } -> ToolTimelineState.Running
     else -> ToolTimelineState.Succeeded
+}
+
+private fun aggregateGroupState(calls: List<ToolTimelineCall>): ToolTimelineState =
+    aggregateStates(calls.map { it.state })
+
+/**
+ * Rolls a step's groups up to a single state, using the same precedence as the calls
+ * within one group — so a run-gutter indicator cannot show "normal" while a later group
+ * is running, awaiting approval, or failed.
+ */
+fun List<ToolTimelineGroup>.aggregateState(): ToolTimelineState =
+    aggregateStates(map { it.state })
+
+/**
+ * Wire status for a projected state, so a fallback card that derives its own error/complete
+ * styling from `status` (rather than from the projection) still reflects reality.
+ */
+fun ToolTimelineState.toWireStatus(): String? = when (this) {
+    ToolTimelineState.Failed, ToolTimelineState.Rejected -> ToolReturnStatus.ERROR
+    ToolTimelineState.Succeeded -> ToolReturnStatus.SUCCESS
+    ToolTimelineState.Warning -> "warning"
+    ToolTimelineState.Running, ToolTimelineState.AwaitingApproval -> null
 }
 
 /**
@@ -313,7 +361,13 @@ fun projectToolTimelineGroups(
         }
     }
 
-    if (reusedAll && result.size == previousGroups.size) {
+    // Reuse the OUTER list only when every group was reused AND they appear in the same
+    // order. Key-matching alone is not enough: hydration or reconcile can hand back the
+    // same unchanged groups reordered, and returning previousGroups then pins the timeline
+    // to a stale chronological order.
+    val sameOrder = result.size == previousGroups.size &&
+        result.indices.all { result[it] === previousGroups[it] }
+    if (reusedAll && sameOrder) {
         return previousGroups
     }
 

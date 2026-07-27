@@ -21,6 +21,8 @@ import com.letta.mobile.data.chat.projection.ToolTimelineCall
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.data.chat.projection.ToolTimelineProjector
 import com.letta.mobile.data.chat.projection.ToolTimelineState
+import com.letta.mobile.data.chat.projection.aggregateState
+import com.letta.mobile.data.chat.projection.toWireStatus
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiToolApprovalDecision
@@ -92,8 +94,10 @@ internal fun ProjectedToolTimelineGroupStepRow(
         }
     }
 
-    // Determine dot color for outer run gutter from overall aggregated group state
-    val overallState = groups.firstOrNull()?.state ?: ToolTimelineState.Running
+    // Aggregate across EVERY group, not just the first. A compacted step can hold several
+    // message-backed groups; taking groups.first() meant an earlier succeeded group hid a
+    // later running / awaiting-approval / failed one behind the normal primary dot.
+    val overallState = groups.aggregateState()
     val dotColor = when (overallState) {
         ToolTimelineState.AwaitingApproval -> MaterialTheme.colorScheme.secondary
         ToolTimelineState.Failed, ToolTimelineState.Rejected -> MaterialTheme.colorScheme.error
@@ -291,6 +295,11 @@ private fun ProjectedToolTimelineCallRow(
                         name = call.name,
                         arguments = call.arguments,
                         result = call.result,
+                        // GeneratedImageToolCard derives isError from status ALONE. Dropping
+                        // it meant a failed generate_image with no attachment rendered an
+                        // endless "Generating image" shimmer and hid the error, even though
+                        // the projected state was Failed. Carry the projected state through.
+                        status = call.state.toWireStatus(),
                         toolCallId = call.toolCallId,
                         generatedImageAttachments = call.generatedImageAttachments,
                         executionTimeMs = call.executionTimeMs,

@@ -1,6 +1,7 @@
 package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 
@@ -347,11 +348,15 @@ object RenderDiagnostics {
         val start = System.nanoTime()
         val result = block()
         val durationNs = System.nanoTime() - start
+        val groups = result as? List<*>
         onProjectionCompleted(
             conversationId = conversationId,
             durationNs = durationNs,
-            groupCount = (result as? List<*>)?.size ?: 0,
-            callCount = 0,
+            groupCount = groups?.size ?: 0,
+            // Derived, not a constant 0. This is the only production projection
+            // measurement, so hardcoding it made per-call and call-count analysis
+            // meaningless — the instrumentation reported every projection as zero calls.
+            callCount = groups?.sumOf { (it as? ToolTimelineGroup)?.calls?.size ?: 0 } ?: 0,
         )
         return result
     }
