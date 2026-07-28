@@ -5,6 +5,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -21,18 +22,25 @@ class AppServerRuntimeEventRouter(
 ) {
     private val collectorJob = atomic<Job?>(null)
 
-    /** Re-attach when the upstream events flow changes (transport reconnect). */
     /**
      * Attach a sole collector. No-op when an active collector is already running
      * against the same stable inbound pipe (reconnect must not tear it down —
      * SharedFlow has zero replay and frames in the cancel→resubscribe gap are lost).
+     *
+     * Uses [CoroutineStart.UNDISPATCHED] so `inbound.collect` subscribes before
+     * this method returns, closing the race where a turn starts before the
+     * collector is listening. Concurrent attach is CAS-guarded so two callers
+     * cannot leak duplicate collectors.
      */
     fun attach(scope: CoroutineScope, inbound: Flow<AppServerReceivedFrame>) {
-        val existing = collectorJob.value
-        if (existing != null && existing.isActive) return
-        collectorJob.value?.cancel()
-        collectorJob.value = scope.launch {
-            inbound.collect { received -> fanout.route(received) }
+        while (true) {
+            val existing = collectorJob.value
+            if (existing != null && existing.isActive) return
+            val newJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
+                inbound.collect { received -> fanout.route(received) }
+            }
+            if (collectorJob.compareAndSet(existing, newJob)) return
+            newJob.cancel()
         }
     }
 

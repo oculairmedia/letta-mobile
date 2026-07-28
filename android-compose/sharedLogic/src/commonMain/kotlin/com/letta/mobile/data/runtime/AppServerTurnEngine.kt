@@ -124,6 +124,12 @@ class AppServerTurnEngine(
      * mutating context preflight) so controllers can drop their matching cache.
      */
     private val onRuntimeInvalidated: suspend () -> Unit = {},
+    /**
+     * Invoked after [ensureRuntime] issues a fresh `runtime_start` so controllers
+     * can refill their cache (needed for [DefaultAppServerController.submitApproval]
+     * after preflight-driven restart).
+     */
+    private val onRuntimeEnsured: suspend (TurnCommand, AppServerRuntimeScope) -> Unit = { _, _ -> },
 ) : TurnEngine {
     /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
     private val activeLeaseRef = atomic<TurnLease?>(null)
@@ -1223,6 +1229,7 @@ class AppServerTurnEngine(
         }
         val returnedRuntime = response.runtime ?: error("App Server runtime_start returned no runtime.")
         runtime = returnedRuntime
+        onRuntimeEnsured(command, returnedRuntime)
         return returnedRuntime
     }
 

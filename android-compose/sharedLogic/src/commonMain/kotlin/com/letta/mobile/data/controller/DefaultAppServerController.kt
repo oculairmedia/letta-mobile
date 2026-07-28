@@ -115,6 +115,12 @@ class DefaultAppServerController(
             onRuntimeInvalidated = {
                 runtimeMutex.withLock { runtimeCache.clear() }
             },
+            onRuntimeEnsured = { command, scope ->
+                runtimeMutex.withLock {
+                    val key = RuntimeKey(command.agentId.value, command.conversationId.value)
+                    runtimeCache[key] = CanonicalRuntime(scope = scope)
+                }
+            },
         )
     }
 
@@ -128,10 +134,18 @@ class DefaultAppServerController(
     ): CanonicalRuntime = runtimeMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val effectiveMode = mode ?: AppServerPermissionMode.Standard
-        runtimePermissionModes[key] = effectiveMode
 
-        // Return cached runtime if already started for this agent+conversation
-        runtimeCache[key]?.let { return it }
+        // Return cached runtime only when the permission mode still matches.
+        // Overwriting runtimePermissionModes while reusing a differently-moded
+        // scope leaves the server on the old mode (e.g. Unrestricted) while the
+        // engine believes Standard approvals apply.
+        runtimeCache[key]?.let { cached ->
+            if (runtimePermissionModes[key] == effectiveMode) {
+                return cached
+            }
+            runtimeCache.remove(key)
+        }
+        runtimePermissionModes[key] = effectiveMode
 
         // Issue runtime_start
         val response = try {

@@ -86,6 +86,31 @@ class AppServerControllerTest {
     }
 
     @Test
+    fun startRuntimeRestartsWhenPermissionModeChanges() = runTest {
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+        )
+
+        controller.startRuntime(
+            agentId = AgentId("agent-1"),
+            conversationId = ConversationId("conv-1"),
+            mode = AppServerPermissionMode.Unrestricted,
+        )
+        assertEquals(1, client.runtimeStartCommands.size)
+        assertEquals(AppServerPermissionMode.Unrestricted, client.runtimeStartCommands.single().mode)
+
+        controller.startRuntime(
+            agentId = AgentId("agent-1"),
+            conversationId = ConversationId("conv-1"),
+            mode = AppServerPermissionMode.Standard,
+        )
+        assertEquals(2, client.runtimeStartCommands.size)
+        assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.last().mode)
+    }
+
+    @Test
     fun stopRuntimeEvictsCacheSoNextStartReseeds() = runTest {
         // letta-mobile-eeu5p: a model switch calls stopRuntime; the next turn's
         // startRuntime must issue a FRESH runtime_start (reseeding the model)
