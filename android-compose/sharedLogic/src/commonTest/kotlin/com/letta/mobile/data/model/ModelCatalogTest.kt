@@ -156,4 +156,26 @@ class ModelCatalogTest {
         val filteredNothing = ModelCatalog.filter(groups, "llama")
         assertEquals(0, filteredNothing.size)
     }
+
+    @Test
+    fun groupRetainsSelectedAliasDroppedByDedup() {
+        val models = listOf(
+            LlmModel(
+                id = "1",
+                name = "MiniMax",
+                handle = "lc-openai/MiniMax-M3",
+                providerType = "lc-openai",
+                contextWindow = 200_000,
+            ),
+            LlmModel(
+                id = "2",
+                name = "MiniMax",
+                handle = "lmstudio/MiniMax-M3",
+                providerType = "lmstudio",
+            ),
+        )
+        val groups = ModelCatalog.group(models, selectedValue = "lmstudio/MiniMax-M3")
+        val values = groups.flatMap { g -> g.models.map { it.value } }
+        assertTrue(values.contains("lmstudio/MiniMax-M3"))
+    }
 }

@@ -2,10 +2,10 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.runtime.DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -111,23 +111,3 @@ object AgentAdminHandlers {
 
 }
 
-private fun JsonObject?.withDefaultContextWindow(): JsonObject =
-    buildJsonObject {
-        this@withDefaultContextWindow?.forEach { (key, value) -> put(key, value) }
-        val modelSettings = this@withDefaultContextWindow?.get("model_settings") as? JsonObject
-            ?: this@withDefaultContextWindow?.get("modelSettings") as? JsonObject
-        val llmConfig = this@withDefaultContextWindow?.get("llm_config") as? JsonObject
-            ?: this@withDefaultContextWindow?.get("llmConfig") as? JsonObject
-        val hasExplicitLimit =
-            this@withDefaultContextWindow?.get("context_window_limit") != null ||
-                this@withDefaultContextWindow?.get("contextWindowLimit") != null ||
-                modelSettings?.get("context_window_limit") != null ||
-                modelSettings?.get("contextWindowLimit") != null ||
-                llmConfig?.get("context_window") != null ||
-                llmConfig?.get("context_window_limit") != null ||
-                llmConfig?.get("contextWindow") != null ||
-                llmConfig?.get("contextWindowLimit") != null
-        if (!hasExplicitLimit) {
-            put("context_window_limit", DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT)
-        }
-    }

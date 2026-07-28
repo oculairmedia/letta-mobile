@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -952,15 +953,12 @@ class AppServerTurnEngine(
                         // letta-mobile-kyqdt: telemetry-only. Record the terminal
                         // status carried by this lifecycle draft. This frame was
                         // accepted by matches(scope), so the scope decision passed.
-                        (draft.payload as? RuntimeEventPayload.RunLifecycleChanged)?.let {
-                            noteOwnerTerminal(
-                                it.status,
-                                source = "terminal_lifecycle",
-                                seq = frameSeq,
-                                scopeMatched = true,
-                                leaseToken = leaseToken,
-                            )
-                        }
+                        recordTerminalLifecycle(
+                            draft = draft,
+                            command = command,
+                            frameSeq = frameSeq,
+                            leaseToken = leaseToken,
+                        )
                         emitDraft(draft)
                         throw TurnCompleted
                     }
@@ -1570,6 +1568,81 @@ class AppServerTurnEngine(
             lastTerminalAtMs = currentTimeMs(),
             lastTerminalSeq = seq ?: current.lastTerminalSeq,
         )
+    }
+
+    /**
+     * letta-mobile-kyqdt / o0atv: telemetry for a matched terminal lifecycle draft.
+     * Kept out of [collectTurnWithIdleWatchdog] to avoid Complex Method regressions.
+     */
+    private fun recordTerminalLifecycle(
+        draft: RuntimeEventDraft,
+        command: TurnCommand,
+        frameSeq: Long?,
+        leaseToken: Long,
+    ) {
+        val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
+        noteOwnerTerminal(
+            lifecycle.status,
+            source = "terminal_lifecycle",
+            seq = frameSeq,
+            scopeMatched = true,
+            leaseToken = leaseToken,
+        )
+        if (lifecycle.status == RuntimeRunStatus.Failed ||
+            lifecycle.status == RuntimeRunStatus.Cancelled
+        ) {
+            logSanitizedTerminalFailure(
+                status = lifecycle.status,
+                reason = lifecycle.reason,
+                runId = draft.runId?.value,
+                agentId = command.agentId.value,
+                conversationId = command.conversationId.value,
+                modelHandle = command.metadata["model"]
+                    ?: command.metadata["handle"]
+                    ?: command.metadata["model_handle"],
+            )
+        }
+    }
+
+    /**
+     * letta-mobile-o0atv: sanitized terminal failure breadcrumb. Captures status,
+     * exception token, run/agent/conversation ids, and optional model handle —
+     * never the raw provider reason text (may contain secrets / prompt content).
+     */
+    private fun logSanitizedTerminalFailure(
+        status: RuntimeRunStatus,
+        reason: String?,
+        runId: String?,
+        agentId: String,
+        conversationId: String,
+        modelHandle: String? = null,
+    ) {
+        val owner = activeTurnOwnerRef.value
+        val handle = modelHandle?.takeIf { it.isNotBlank() }
+        val provider = handle?.let { ModelCatalogNormalizer.providerPrefix(it) }?.ifBlank { null }
+        Telemetry.event(
+            "AppServerTurnEngine",
+            "terminal.failure",
+            "status" to status.name,
+            "hasReason" to !reason.isNullOrBlank(),
+            "exceptionType" to (exceptionTypeToken(reason) ?: "<none>"),
+            "provider" to (provider ?: "<none>"),
+            "handle" to (handle ?: "<none>"),
+            "runId" to (runId ?: owner?.runId ?: "<none>"),
+            "agentId" to agentId,
+            "conversationId" to conversationId,
+            "processRole" to (owner?.processRole ?: "<none>"),
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    /** Best-effort exception class name from a terminal reason string. */
+    private fun exceptionTypeToken(reason: String?): String? {
+        if (reason.isNullOrBlank()) return null
+        // Common shapes: "FooException: …", "java.lang.FooException: …", "Error: FooException …"
+        val match = Regex("""([A-Za-z_][\w.$]*?(?:Exception|Error|Failure))\b""")
+            .find(reason)
+        return match?.groupValues?.getOrNull(1)?.take(120)
     }
 
     private fun currentTimeMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()

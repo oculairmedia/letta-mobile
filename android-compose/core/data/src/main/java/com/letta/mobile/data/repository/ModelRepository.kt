@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ModelApi
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
@@ -41,10 +42,10 @@ open class ModelRepository(
         }
         val irohSource = irohModelSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            _llmModels.update { irohSource.listLlmModels() }
+            _llmModels.update { ModelCatalogNormalizer.normalize(irohSource.listLlmModels()) }
             return
         }
-        _llmModels.update { modelApi.listLlmModels() }
+        _llmModels.update { ModelCatalogNormalizer.normalize(modelApi.listLlmModels()) }
     }
 
     override suspend fun refreshEmbeddingModels() {

@@ -32,10 +32,20 @@ object ModelCatalog {
     fun valueOf(model: LlmModel): String =
         model.handle?.takeIf { it.isNotBlank() } ?: model.name.ifBlank { model.id }
 
-    /** Group [models] by provider, preserving a stable provider order. */
-    fun group(models: List<LlmModel>): List<ModelGroup> {
+    /** Group [models] by provider, preserving a stable provider order.
+     *
+     * When [selectedValue] is set and would be dropped by LLMux alias dedupe,
+     * keep that exact alias in the options so pickers still show a selected row
+     * and do not silently rewrite the stored route.
+     */
+    fun group(models: List<LlmModel>, selectedValue: String? = null): List<ModelGroup> {
+        val normalized = ModelCatalogNormalizer.normalize(models).toMutableList()
+        val selected = selectedValue?.takeIf { it.isNotBlank() }
+        if (selected != null && normalized.none { valueOf(it) == selected }) {
+            models.firstOrNull { valueOf(it) == selected }?.let { normalized.add(it) }
+        }
         val ordered = LinkedHashMap<String, MutableList<ModelOption>>()
-        models.forEach { model ->
+        normalized.forEach { model ->
             val provider = providerLabel(model)
             ordered.getOrPut(provider) { mutableListOf() }.add(toOption(model))
         }
