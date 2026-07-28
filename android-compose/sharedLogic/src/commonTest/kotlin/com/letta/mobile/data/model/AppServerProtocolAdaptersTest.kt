@@ -96,6 +96,7 @@ class AppServerListModelsAdapterTest {
         val adapted = AppServerListModelsAdapter.toLlmModelArray(entries).single().jsonObject
         assertEquals("Claude Fable 5", adapted["display_name"]!!.jsonPrimitive.content)
         assertEquals("anthropic/claude-fable-5", adapted["selection_handle"]!!.jsonPrimitive.content)
+        assertEquals("presentation only", adapted["description"]!!.jsonPrimitive.content)
         assertTrue(adapted["updateArgs"] != null)
         assertNull(adapted["context_window"])
 
@@ -105,5 +106,29 @@ class AppServerListModelsAdapterTest {
         assertEquals("anthropic", roundTrip.providerType)
         assertNull(roundTrip.contextWindow)
         assertNull(roundTrip.enableReasoner)
+    }
+
+    @Test
+    fun consumesSelectionHandleWhenPresentationAliasDiffers() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "model-1")
+                    put("handle", "display-alias")
+                    put("label", "Display Alias")
+                    put("selection_handle", "openai/target-model")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/target-model")
+                        },
+                    )
+                },
+            ),
+        )
+        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
+        assertEquals("openai/target-model", model.handle)
+        assertEquals("Display Alias", model.displayName)
+        assertEquals("openai", model.providerType)
     }
 }

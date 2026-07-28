@@ -9,9 +9,11 @@ package com.letta.mobile.data.model
  * - LLMux omits context/output limits for some models (Grok, MiniMax) that still need
  *   dependable bounds for Letta full-context + tool turns.
  *
- * Dedupes only within the known LLMux alias provider set (never collapses distinct
- * routes such as `openai/gpt-4o` vs `azure/gpt-4o`), prefers a canonical routing
- * handle, and fills known limits when the upstream catalog leaves them blank.
+ * Dedupes only within the known LLMux alias provider set when routing provenance
+ * confirms a shared endpoint (never collapses distinct BYOK/custom routes such as
+ * two `openai/...` entries with different `modelEndpoint` / `providerName`),
+ * prefers a canonical routing handle, and fills known limits when the upstream
+ * catalog leaves them blank.
  */
 object ModelCatalogNormalizer {
     data class KnownLimits(
@@ -46,11 +48,15 @@ object ModelCatalogNormalizer {
         "lm_studio",
     )
 
-    /** Explicit limits for models whose LLMux catalog entries omit token metadata. */
+    /**
+     * Explicit limits for models whose LLMux catalog entries omit token metadata.
+     * Match only verified IDs / known LLMux aliases — never an entire evolving family
+     * (e.g. `grok-code-fast-1` is 256K and must not inherit 131K defaults).
+     */
     private val KNOWN_LIMITS: List<Pair<Regex, KnownLimits>> = listOf(
         Regex("""(?i)^minimax[-_]?m3$""") to KnownLimits(contextWindow = 200_000, maxOutputTokens = 16_384),
+        // Verified LLMux Cursor Grok aliases (e.g. cursor-grok-4.5-high-fast).
         Regex("""(?i)^cursor-grok""") to KnownLimits(contextWindow = 131_072, maxOutputTokens = 8_192),
-        Regex("""(?i)^grok-""") to KnownLimits(contextWindow = 131_072, maxOutputTokens = 8_192),
     )
 
     fun underlyingModelId(handleOrId: String): String {
@@ -89,28 +95,40 @@ object ModelCatalogNormalizer {
     }
 
     /**
-     * Collapse LLMux-alias duplicates for the same underlying model.
-     * Distinct provider routes (e.g. openai vs azure) are preserved.
+     * Collapse LLMux-alias duplicates for the same underlying model + routing identity.
+     * Distinct provider routes and distinct endpoints are preserved.
      */
-    fun dedupeByUnderlyingModel(models: List<LlmModel>): List<LlmModel> {
-        if (models.size <= 1) return models
-        val winners = LinkedHashMap<String, LlmModel>()
+    fun dedupeByUnderlyingModel(models: List<LlmModel>): List<LlmModel> =
+        normalizePaired(models.map { Unit to it }).map { it.second }
+
+    /**
+     * Like [normalize], but keeps an associated source payload paired with the
+     * winning model so callers do not re-associate by handle alone.
+     */
+    fun <T> normalizePaired(items: List<Pair<T, LlmModel>>): List<Pair<T, LlmModel>> {
+        if (items.isEmpty()) return emptyList()
+        if (items.size == 1) {
+            val (meta, model) = items.single()
+            return listOf(meta to enrichLimits(model))
+        }
+        val winners = LinkedHashMap<String, Pair<T, LlmModel>>()
         val order = ArrayList<String>()
-        for (model in models) {
+        for ((meta, rawModel) in items) {
+            val model = enrichLimits(rawModel)
             val key = dedupeKey(model)
             val existing = winners[key]
             if (existing == null) {
-                winners[key] = model
+                winners[key] = meta to model
                 order.add(key)
-            } else if (prefer(model, existing)) {
-                winners[key] = model
+            } else if (prefer(model, existing.second)) {
+                winners[key] = meta to model
             }
         }
         return order.mapNotNull { winners[it] }
     }
 
     fun normalize(models: List<LlmModel>): List<LlmModel> =
-        dedupeByUnderlyingModel(models.map(::enrichLimits))
+        normalizePaired(models.map { Unit to it }).map { it.second }
 
     private fun dedupeKey(model: LlmModel): String {
         val handle = model.handle?.takeIf { it.isNotBlank() }
@@ -118,11 +136,33 @@ object ModelCatalogNormalizer {
         val prefix = providerPrefix(handle).ifBlank { model.providerType.lowercase() }
         val underlying = underlyingModelId(handle).lowercase()
         return if (prefix in LLMUX_ALIAS_PROVIDERS && underlying.isNotEmpty()) {
-            "llmux-alias:$underlying"
+            // Only collapse when routing provenance agrees (shared / identical endpoint).
+            "llmux-alias:$underlying:${routingIdentity(model)}"
         } else {
             // Preserve distinct routes (azure vs openai, openrouter, custom, …).
             "route:${handle.ifBlank { "unkeyed-${model.id}" }.lowercase()}"
         }
+    }
+
+    /**
+     * Routing provenance used to decide whether two LLMux-alias handles share an
+     * endpoint. Distinct `modelEndpoint` / `providerName` values stay separate;
+     * rows with no endpoint identity (typical App Server presentation) share the
+     * `shared` bucket so openai/lmstudio/anthropic aliases still collapse.
+     */
+    private fun routingIdentity(model: LlmModel): String {
+        val endpoint = model.modelEndpoint
+            ?.trim()
+            ?.trimEnd('/')
+            ?.lowercase()
+            ?.takeIf { it.isNotEmpty() }
+        if (endpoint != null) return "ep:$endpoint"
+        val providerName = model.providerName
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotEmpty() }
+        if (providerName != null) return "pn:$providerName"
+        return "shared"
     }
 
     /** Provider rank wins first; richness is only a same-rank tiebreaker. */

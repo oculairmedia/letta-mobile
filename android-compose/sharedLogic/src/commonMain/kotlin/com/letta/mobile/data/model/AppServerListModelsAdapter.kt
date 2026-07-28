@@ -64,10 +64,12 @@ object AppServerListModelsAdapter {
         }
 
     fun toLlmModel(entry: AppServerListModelEntry, raw: JsonObject? = null): LlmModel {
-        val handle = entry.handle?.takeIf { it.isNotBlank() }
-            ?: selectionHandle(entry)
-            ?: entry.id.takeIf { it.isNotBlank() }
+        // Prefer selection target (updateArgs / selection_handle) over presentation alias.
+        val selection = selectionHandle(entry, raw)
+        val presentation = entry.handle?.takeIf { it.isNotBlank() }
+        val handle = selection ?: presentation ?: entry.id.takeIf { it.isNotBlank() }
         val display = entry.label?.takeIf { it.isNotBlank() }
+            ?: presentation?.takeIf { it != handle }
         val name = display ?: handle ?: entry.id
         val limits = extractLimits(entry, raw)
         val model = LlmModel(
@@ -86,20 +88,17 @@ object AppServerListModelsAdapter {
 
     /** Prefer this over deserializing presentation JSON as [LlmModel] directly. */
     fun toLlmModels(entries: JsonArray): List<LlmModel> =
-        ModelCatalogNormalizer.normalize(
-            decodeEntriesWithRaw(entries).map { (entry, raw) -> toLlmModel(entry, raw) },
-        )
+        ModelCatalogNormalizer.normalizePaired(
+            decodeEntriesWithRaw(entries).map { (entry, raw) -> entry to toLlmModel(entry, raw) },
+        ).map { it.second }
 
     fun toLlmModelArray(entries: JsonArray): JsonArray {
-        val decoded = decodeEntriesWithRaw(entries).map { (entry, raw) ->
+        val pairs = decodeEntriesWithRaw(entries).map { (entry, raw) ->
             entry to toLlmModel(entry, raw)
         }
-        val byHandle = decoded.associate { (entry, model) ->
-            (model.handle ?: model.id) to entry
-        }
         return buildJsonArray {
-            ModelCatalogNormalizer.normalize(decoded.map { it.second }).forEach { model ->
-                val sourceEntry = byHandle[model.handle ?: model.id]
+            // Keep each winning model paired with its own source entry (not last-wins by handle).
+            ModelCatalogNormalizer.normalizePaired(pairs).forEach { (sourceEntry, model) ->
                 add(toLlmModelObject(model, sourceEntry))
             }
         }
@@ -116,18 +115,22 @@ object AppServerListModelsAdapter {
             model.handle?.let { put("handle", it) }
             model.displayNameOverride?.let { put("display_name", it) }
             put("provider_type", model.providerType)
+            sourceEntry?.description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
             model.contextWindow?.takeIf { it > 0 }?.let { put("context_window", it) }
             model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
             model.maxTokens?.takeIf { it > 0 }?.let { put("max_tokens", it) }
             selection?.let { put("selection_handle", it) }
             // Merge normalized limits into the server-provided updateArgs so extra
             // selection fields (model / model_handle / id) survive adaptation.
+            // Explicit updateArgs caps are never overwritten by catalog defaults.
             put("updateArgs", mergeUpdateArgs(sourceEntry?.updateArgs, selection, model))
         }
     }
 
     /** Handle / model id to send on agent/conversation model update. */
-    fun selectionHandle(entry: AppServerListModelEntry): String? {
+    fun selectionHandle(entry: AppServerListModelEntry, raw: JsonObject? = null): String? {
+        // Already-adapted Iroh payloads carry selection_handle explicitly.
+        raw?.let { firstString(it, "selection_handle", "selectionHandle") }?.let { return it }
         val fromArgs = entry.updateArgs?.let { args ->
             firstString(args, "handle", "model", "model_handle", "id")
         }
@@ -143,15 +146,20 @@ object AppServerListModelsAdapter {
     ): JsonObject = buildJsonObject {
         original?.forEach { (key, value) -> put(key, value) }
         selection?.let { put("handle", it) }
-        model.contextWindow?.takeIf { it > 0 }?.let { put("context_window_limit", it) }
-        model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
+        if (!hasExplicitLimit(original, "context_window_limit", "contextWindowLimit", "context_window", "contextWindow")) {
+            model.contextWindow?.takeIf { it > 0 }?.let { put("context_window_limit", it) }
+        }
+        if (!hasExplicitLimit(original, "max_output_tokens", "maxOutputTokens", "max_tokens", "maxTokens")) {
+            model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
+        }
     }
 
     private fun extractLimits(
         entry: AppServerListModelEntry,
         raw: JsonObject?,
     ): Pair<Int?, Int?> {
-        val scopes = listOfNotNull(raw, entry.flags, entry.updateArgs)
+        // Prefer selection-specific updateArgs caps over catalog flags / top-level capacity.
+        val scopes = listOfNotNull(entry.updateArgs, entry.flags, raw)
         val context = scopes.firstNotNullOfOrNull { scope ->
             firstInt(
                 scope,
@@ -173,6 +181,11 @@ object AppServerListModelsAdapter {
             )
         }
         return context to output
+    }
+
+    private fun hasExplicitLimit(original: JsonObject?, vararg keys: String): Boolean {
+        if (original == null) return false
+        return keys.any { key -> firstInt(original, key) != null }
     }
 
     private fun providerFromHandle(handle: String): String {

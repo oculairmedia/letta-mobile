@@ -41,6 +41,77 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
+    fun doesNotCollapseOpenaiAliasesWithDistinctModelEndpoints() {
+        val models = listOf(
+            LlmModel(
+                id = "a",
+                name = "gpt-4o",
+                handle = "openai/gpt-4o",
+                providerType = "openai",
+                modelEndpoint = "https://llmux.example/v1",
+            ),
+            LlmModel(
+                id = "b",
+                name = "gpt-4o",
+                handle = "openai/gpt-4o",
+                providerType = "openai",
+                modelEndpoint = "https://byok.example/v1",
+            ),
+        )
+        val normalized = ModelCatalogNormalizer.normalize(models)
+        assertEquals(2, normalized.size)
+        assertEquals(
+            setOf("https://llmux.example/v1", "https://byok.example/v1"),
+            normalized.map { it.modelEndpoint }.toSet(),
+        )
+    }
+
+    @Test
+    fun doesNotCollapseOpenaiAliasesWithDistinctProviderNames() {
+        val models = listOf(
+            LlmModel(
+                id = "a",
+                name = "gpt-4o",
+                handle = "openai/gpt-4o",
+                providerType = "openai",
+                providerName = "llmux-openai",
+            ),
+            LlmModel(
+                id = "b",
+                name = "gpt-4o",
+                handle = "lc-openai/gpt-4o",
+                providerType = "lc-openai",
+                providerName = "byok-openai",
+            ),
+        )
+        val normalized = ModelCatalogNormalizer.normalize(models)
+        assertEquals(2, normalized.size)
+    }
+
+    @Test
+    fun collapsesLlMuxAliasesThatShareEndpointProvenance() {
+        val models = listOf(
+            LlmModel(
+                id = "a",
+                name = "MiniMax-M3",
+                handle = "lmstudio/MiniMax-M3",
+                providerType = "lmstudio",
+                modelEndpoint = "https://llmux.example/v1",
+            ),
+            LlmModel(
+                id = "b",
+                name = "MiniMax-M3",
+                handle = "openai/MiniMax-M3",
+                providerType = "openai",
+                modelEndpoint = "https://llmux.example/v1",
+            ),
+        )
+        val normalized = ModelCatalogNormalizer.normalize(models)
+        assertEquals(1, normalized.size)
+        assertEquals("openai/MiniMax-M3", normalized.single().handle)
+    }
+
+    @Test
     fun enrichesGrokLimitsWhenCatalogOmitsThem() {
         val model = LlmModel(
             id = "cursor-grok-4.5-high-fast",
@@ -51,6 +122,19 @@ class ModelCatalogNormalizerTest {
         val enriched = ModelCatalogNormalizer.enrichLimits(model)
         assertEquals(131_072, enriched.contextWindow)
         assertEquals(8_192, enriched.maxOutputTokens)
+    }
+
+    @Test
+    fun doesNotApplyCursorGrokDefaultsToUnrelatedGrokFamilyIds() {
+        val model = LlmModel(
+            id = "grok-code-fast-1",
+            name = "grok-code-fast-1",
+            handle = "openai/grok-code-fast-1",
+            providerType = "openai",
+        )
+        val enriched = ModelCatalogNormalizer.enrichLimits(model)
+        assertNull(enriched.contextWindow)
+        assertNull(enriched.maxOutputTokens)
     }
 
     @Test
@@ -209,5 +293,122 @@ class AppServerListModelsAdapterNormalizationTest {
         assertNull(model.maxOutputTokens)
         assertNotNull(model.handle)
         assertTrue(model.displayName.contains("Fable"))
+    }
+
+    @Test
+    fun preservesPresentationDescriptionOnAdaptedModelObject() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "model-1")
+                    put("handle", "anthropic/claude-fable-5")
+                    put("label", "Claude Fable 5")
+                    put("description", "presentation only")
+                },
+            ),
+        )
+        val adapted = AppServerListModelsAdapter.toLlmModelArray(entries).single().jsonObject
+        assertEquals("presentation only", adapted["description"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun prefersSelectionHandleOverPresentationAliasWhenDecoding() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "presentation-1")
+                    put("handle", "Friendly Alias")
+                    put("label", "Friendly")
+                    put("selection_handle", "openai/real-model")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/real-model")
+                        },
+                    )
+                },
+            ),
+        )
+        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
+        assertEquals("openai/real-model", model.handle)
+        assertEquals("Friendly", model.displayName)
+        assertEquals("openai", model.providerType)
+    }
+
+    @Test
+    fun preservesExplicitUpdateArgsCapsOverLargerCatalogFlags() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "model-1")
+                    put("handle", "openai/deepseek-v4-flash")
+                    put("label", "DeepSeek Flash")
+                    put(
+                        "flags",
+                        buildJsonObject {
+                            put("context_window", 200_000)
+                        },
+                    )
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/deepseek-v4-flash")
+                            put("context_window_limit", 128_000)
+                            put("max_output_tokens", 4_096)
+                        },
+                    )
+                },
+            ),
+        )
+        val adapted = AppServerListModelsAdapter.toLlmModelArray(entries).single().jsonObject
+        val updateArgs = adapted["updateArgs"]!!.jsonObject
+        assertEquals("128000", updateArgs["context_window_limit"]!!.jsonPrimitive.content)
+        assertEquals("4096", updateArgs["max_output_tokens"]!!.jsonPrimitive.content)
+        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
+        assertEquals(128_000, model.contextWindow)
+        assertEquals(4_096, model.maxOutputTokens)
+    }
+
+    @Test
+    fun keepsWinningModelPairedWithItsSourceUpdateArgs() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "rich-first")
+                    put("handle", "openai/same-model")
+                    put("label", "Same")
+                    put("description", "richer row")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/same-model")
+                            put("model", "from-rich")
+                            put("id", "rich-catalog")
+                        },
+                    )
+                    put("context_window", 200_000)
+                },
+                buildJsonObject {
+                    put("id", "poor-last")
+                    put("handle", "openai/same-model")
+                    put("label", "Same")
+                    put("description", "poorer row")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/same-model")
+                            put("model", "from-poor")
+                            put("id", "poor-catalog")
+                        },
+                    )
+                },
+            ),
+        )
+        val adapted = AppServerListModelsAdapter.toLlmModelArray(entries).single().jsonObject
+        assertEquals("richer row", adapted["description"]!!.jsonPrimitive.content)
+        val updateArgs = adapted["updateArgs"]!!.jsonObject
+        assertEquals("from-rich", updateArgs["model"]!!.jsonPrimitive.content)
+        assertEquals("rich-catalog", updateArgs["id"]!!.jsonPrimitive.content)
+        assertEquals("200000", adapted["context_window"]!!.jsonPrimitive.content)
     }
 }
