@@ -9,14 +9,41 @@ fail() { echo "FAIL: $*" >&2; exit 1; }
 assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'"; }
 assert_contains() { [[ "$1" == *"$2"* ]] || fail "expected output to contain '$2': $1"; }
 
+# Keep the required Android jobs fanned out. Reintroducing a dependency from
+# build-apk to test adds the full test duration to the workflow critical path.
+android_workflow="$SOURCE_ROOT/.github/workflows/android.yml"
+build_apk_job="$(
+  awk '
+    /^  build-apk:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+assert_contains "$build_apk_job" 'strategy:'
+if grep -Eq '^    needs:' <<<"$build_apk_job"; then
+  fail "build-apk must stay independent so APK assembly fans out with tests"
+fi
+
+build_apk_pass_job="$(
+  awk '
+    /^  build-apk-pass:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+assert_contains "$build_apk_pass_job" 'needs: build-apk'
+
 new_repo() {
   local repo="$1"
   mkdir -p "$repo/scripts/ci" "$repo/android-compose"
   cp "$SOURCE_ROOT/scripts/ci/changed-gradle-modules.sh" "$repo/scripts/ci/"
   cp "$SOURCE_ROOT/scripts/ci/agents-policy-check.sh" "$repo/scripts/ci/"
+  cp "$SOURCE_ROOT/scripts/ci/stateful-mock-gate.sh" "$repo/scripts/ci/"
   git -C "$repo" init -q
   git -C "$repo" config user.name Test
   git -C "$repo" config user.email test@example.com
+  # Keep fixture bytes stable when this Bash suite runs under Git for Windows.
+  git -C "$repo" config core.autocrlf false
   touch "$repo/.keep"
   git -C "$repo" add .
   git -C "$repo" commit -qm base
@@ -95,7 +122,31 @@ if bash "$repo/scripts/ci/agents-policy-check.sh" --diff-base refs/heads/missing
   fail "policy scan accepted a missing base"
 fi
 
+# Stateful repository mocks must fail before Gradle starts. Interface mocks are
+# allowed, and a narrowly documented exception can use mockk-gate-allow.
+repo="$TMP/stateful-mock"
+new_repo "$repo"
+mkdir -p "$repo/android-compose/feature/src/test"
+printf '%s\n' \
+  'val safe = mockk<IMessageRepository>()' \
+  'val unsafe = mockk<MessageRepository>()' \
+  >"$repo/android-compose/feature/src/test/RepositoryTest.kt"
+if output="$(bash "$repo/scripts/ci/stateful-mock-gate.sh" 2>&1)"; then
+  fail "stateful mock gate accepted a concrete MessageRepository mock"
+fi
+assert_contains "$output" 'RepositoryTest.kt:2'
+assert_contains "$output" 'stateful-mock-gate: 1 violation(s)'
+
+printf '%s\n' \
+  'val safe = mockk<IMessageRepository>()' \
+  '// mockk-gate-allow: concrete repository edge-case contract' \
+  'val allowed = mockk<MessageRepository>()' \
+  >"$repo/android-compose/feature/src/test/RepositoryTest.kt"
+output="$(bash "$repo/scripts/ci/stateful-mock-gate.sh")"
+assert_contains "$output" 'stateful-mock-gate: PASS'
+
 # commonTest JVM API scan: adding a JVM-only API in commonTest should be reported
+repo="$TMP/policy"
 git -C "$repo" checkout "$base" -q
 mkdir -p "$repo/android-compose/sharedLogic/src/commonTest/kotlin"
 printf '%s\n' 'val safe = "ok"' >"$repo/android-compose/sharedLogic/src/commonTest/kotlin/TestUtil.kt"

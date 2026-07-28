@@ -63,11 +63,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Let same-repo PRs write Gradle User Home caches so the build-apk
-          # jobs can restore task outputs produced by the test job. Fork PRs
-          # stay read-only to avoid untrusted Gradle User Home cache writes.
-          # Project-local state is handled by the separate same-repo-only cache
-          # step below.
+          # Let same-repo PRs refresh Gradle User Home caches for later workflow
+          # runs. Fork PRs stay read-only to avoid untrusted Gradle User Home
+          # cache writes. Project-local state is handled by the separate
+          # same-repo-only cache step below.
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Cache project-local Gradle state
@@ -90,6 +89,10 @@ jobs:
       - name: Test CI policy scripts
         working-directory: ${{ github.workspace }}
         run: bash scripts/tests/ci-policy-scripts-test.sh
+
+      - name: Enforce stateful mock isolation
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/ci/stateful-mock-gate.sh
 
       - name: Compile all debug variants
         run: ./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :core:testutil:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
@@ -228,7 +231,11 @@ jobs:
 
   build-apk:
     runs-on: ubuntu-latest
-    needs: test
+    # Deliberately independent of `test`: GitHub can fan out test, shared KMP
+    # verification, and both APK variants as soon as the workflow starts. The
+    # jobs restore warm state from prior trusted runs instead of serializing the
+    # entire matrix for a same-run cache handoff. Keep build-apk-pass as the
+    # stable required-check aggregator.
     strategy:
       fail-fast: false
       matrix:
@@ -263,17 +270,19 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Restore the Gradle User Home entry written by the test job; keep
-          # fork PRs read-only and leave project-local state to the separate
-          # same-repo-only cache below.
+          # Restore Gradle User Home state from prior trusted workflow runs;
+          # keep fork PRs read-only and leave project-local state to the
+          # separate same-repo-only cache below.
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Cache project-local Gradle state
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: actions/cache@v4
         with:
-          # Same key as the test job: build-apk can restore the project-local
-          # state produced by test after the dependency edge completes.
+          # The exact key supports reruns of this commit; the restore prefix
+          # supplies warm project state from earlier trusted commits. Parallel
+          # jobs may race to save the exact key, which is safe because GitHub
+          # cache entries are immutable and every job can rebuild on a miss.
           path: |
             android-compose/.gradle
             android-compose/.kotlin
