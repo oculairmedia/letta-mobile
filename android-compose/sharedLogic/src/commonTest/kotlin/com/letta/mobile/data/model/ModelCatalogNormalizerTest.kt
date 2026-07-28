@@ -41,32 +41,19 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
-    fun doesNotCollapseNonAliasRoutesWithSameHandleAndDistinctEndpoints() {
-        val normalized = ModelCatalogNormalizer.normalize(
-            modelsSharingHandleWithEndpoints(
-                "azure/gpt-4o" to "https://azure-east.example/v1",
-                "azure/gpt-4o" to "https://azure-west.example/v1",
-            ),
+    fun doesNotCollapseSameHandleAcrossDistinctModelEndpoints() {
+        fun assertKeptApart(vararg pairs: Pair<String, String>) {
+            val normalized = ModelCatalogNormalizer.normalize(modelsSharingHandleWithEndpoints(*pairs))
+            assertEquals(pairs.size, normalized.size)
+            assertEquals(pairs.map { it.second }.toSet(), normalized.map { it.modelEndpoint }.toSet())
+        }
+        assertKeptApart(
+            "azure/gpt-4o" to "https://azure-east.example/v1",
+            "azure/gpt-4o" to "https://azure-west.example/v1",
         )
-        assertEquals(2, normalized.size)
-        assertEquals(
-            setOf("https://azure-east.example/v1", "https://azure-west.example/v1"),
-            normalized.map { it.modelEndpoint }.toSet(),
-        )
-    }
-
-    @Test
-    fun doesNotCollapseOpenaiAliasesWithDistinctModelEndpoints() {
-        val normalized = ModelCatalogNormalizer.normalize(
-            modelsSharingHandleWithEndpoints(
-                "openai/gpt-4o" to "https://llmux.example/v1",
-                "openai/gpt-4o" to "https://byok.example/v1",
-            ),
-        )
-        assertEquals(2, normalized.size)
-        assertEquals(
-            setOf("https://llmux.example/v1", "https://byok.example/v1"),
-            normalized.map { it.modelEndpoint }.toSet(),
+        assertKeptApart(
+            "openai/gpt-4o" to "https://llmux.example/v1",
+            "openai/gpt-4o" to "https://byok.example/v1",
         )
     }
 
