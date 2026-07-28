@@ -369,34 +369,27 @@ class AppServerListModelsAdapterNormalizationTest {
     }
 
     @Test
-    fun preservesRawProviderTypeForBareSelectionTarget() {
-        val entries = JsonArray(
-            listOf(
-                buildJsonObject {
-                    put("id", "presentation-1")
-                    put("handle", "openai/gpt-4o")
-                    put("provider_type", "llmux-openai")
-                    put(
-                        "updateArgs",
-                        buildJsonObject {
-                            put("model", "gpt-4o")
-                        },
-                    )
-                },
-            ),
-        )
-        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
-        assertEquals("gpt-4o", model.handle)
-        assertEquals("llmux-openai", model.providerType)
+    fun bareSelectionTargetProviderTypeUsesExplicitOrHandleDialect() {
+        val explicit = AppServerListModelsAdapter.toLlmModels(
+            bareSelectionTargetEntries(providerType = "llmux-openai"),
+        ).single()
+        assertEquals("gpt-4o", explicit.handle)
+        assertEquals("llmux-openai", explicit.providerType)
+
+        val derived = AppServerListModelsAdapter.toLlmModels(
+            bareSelectionTargetEntries(),
+        ).single()
+        assertEquals("gpt-4o", derived.handle)
+        assertEquals("openai", derived.providerType)
     }
 
-    @Test
-    fun derivesProviderFromPresentationHandleForBareSelectionTarget() {
-        val entries = JsonArray(
+    private fun bareSelectionTargetEntries(providerType: String? = null): JsonArray =
+        JsonArray(
             listOf(
                 buildJsonObject {
                     put("id", "presentation-1")
                     put("handle", "openai/gpt-4o")
+                    providerType?.let { put("provider_type", it) }
                     put(
                         "updateArgs",
                         buildJsonObject {
@@ -406,10 +399,6 @@ class AppServerListModelsAdapterNormalizationTest {
                 },
             ),
         )
-        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
-        assertEquals("gpt-4o", model.handle)
-        assertEquals("openai", model.providerType)
-    }
 
     @Test
     fun preservesExplicitUpdateArgsCapsOverLargerCatalogFlags() {
