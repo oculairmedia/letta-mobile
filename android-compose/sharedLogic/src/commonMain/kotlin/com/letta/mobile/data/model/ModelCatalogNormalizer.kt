@@ -140,7 +140,7 @@ object ModelCatalogNormalizer {
             "llmux-alias:$underlying:${routingIdentity(model)}"
         } else {
             // Preserve distinct routes (azure vs openai, openrouter, custom, …).
-            "route:${handle.ifBlank { "unkeyed-${model.id}" }.lowercase()}"
+            "route:${handle.ifBlank { "unkeyed-${model.id}" }.lowercase()}:${routingIdentity(model)}"
         }
     }
 

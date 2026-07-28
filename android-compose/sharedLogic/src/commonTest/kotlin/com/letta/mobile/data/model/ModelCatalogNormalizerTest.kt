@@ -41,6 +41,21 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
+    fun doesNotCollapseNonAliasRoutesWithSameHandleAndDistinctEndpoints() {
+        val normalized = ModelCatalogNormalizer.normalize(
+            modelsSharingHandleWithEndpoints(
+                "azure/gpt-4o" to "https://azure-east.example/v1",
+                "azure/gpt-4o" to "https://azure-west.example/v1",
+            ),
+        )
+        assertEquals(2, normalized.size)
+        assertEquals(
+            setOf("https://azure-east.example/v1", "https://azure-west.example/v1"),
+            normalized.map { it.modelEndpoint }.toSet(),
+        )
+    }
+
+    @Test
     fun doesNotCollapseOpenaiAliasesWithDistinctModelEndpoints() {
         val normalized = ModelCatalogNormalizer.normalize(
             modelsSharingHandleWithEndpoints(
@@ -350,6 +365,49 @@ class AppServerListModelsAdapterNormalizationTest {
         val model = AppServerListModelsAdapter.toLlmModels(entries).single()
         assertEquals("openai/real-model", model.handle)
         assertEquals("Friendly", model.displayName)
+        assertEquals("openai", model.providerType)
+    }
+
+    @Test
+    fun preservesRawProviderTypeForBareSelectionTarget() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "presentation-1")
+                    put("handle", "openai/gpt-4o")
+                    put("provider_type", "llmux-openai")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("model", "gpt-4o")
+                        },
+                    )
+                },
+            ),
+        )
+        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
+        assertEquals("gpt-4o", model.handle)
+        assertEquals("llmux-openai", model.providerType)
+    }
+
+    @Test
+    fun derivesProviderFromPresentationHandleForBareSelectionTarget() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "presentation-1")
+                    put("handle", "openai/gpt-4o")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("model", "gpt-4o")
+                        },
+                    )
+                },
+            ),
+        )
+        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
+        assertEquals("gpt-4o", model.handle)
         assertEquals("openai", model.providerType)
     }
 
