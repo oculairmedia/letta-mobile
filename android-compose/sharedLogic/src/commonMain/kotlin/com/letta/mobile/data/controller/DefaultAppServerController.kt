@@ -19,7 +19,6 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
@@ -29,7 +28,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.atomicfu.atomic
-
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 /**
  * Default implementation of [AppServerController].
  *
@@ -63,8 +63,14 @@ class DefaultAppServerController(
      */
     private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     private val clock: Clock = Clock.System,
+    /**
+     * Extra context for the controller-owned router collector. Tests pass
+     * [kotlinx.coroutines.Dispatchers.Unconfined] so SharedFlow emissions are
+     * observed synchronously (avoids Default-dispatcher races under runTest).
+     */
+    private val parentCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : AppServerController {
-    private val controllerScope = CoroutineScope(SupervisorJob())
+    private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     private val eventRouter = AppServerRuntimeEventRouter()
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)

@@ -16,6 +16,7 @@ import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,10 +51,17 @@ import kotlinx.serialization.json.put
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerControllerCrossDeviceBusyTest {
 
+    private fun controller(client: FakeWireClient) = DefaultAppServerController(
+        client = client,
+        // Router must observe SharedFlow emits on the calling thread under runTest;
+        // the production Default dispatcher races with advanceUntilIdle/join.
+        parentCoroutineContext = Dispatchers.Unconfined,
+    )
+
     @Test
     fun secondDeviceSendAfterCompletedTerminalIsAccepted() = runTest {
         val client = FakeWireClient()
-        val controller = DefaultAppServerController(client = client)
+        val controller = controller(client)
         try {
             // Device A runs a turn to a completed terminal.
             val deviceA = launch { controller.runTurn(commandA).collect() }
@@ -84,7 +92,7 @@ class AppServerControllerCrossDeviceBusyTest {
     @Test
     fun postTerminalFrameTrickleDoesNotBlockCrossDeviceSend() = runTest {
         val client = FakeWireClient()
-        val controller = DefaultAppServerController(client = client)
+        val controller = controller(client)
         try {
             val deviceA = launch { controller.runTurn(commandA).collect() }
             runCurrent()
@@ -120,7 +128,7 @@ class AppServerControllerCrossDeviceBusyTest {
     @Test
     fun reconnectResendAfterCompletedTerminalPreservesOtidExactlyOnce() = runTest {
         val client = FakeWireClient()
-        val controller = DefaultAppServerController(client = client)
+        val controller = controller(client)
         try {
             // Original connection: runTurn to completed terminal.
             val original = launch { controller.runTurn(commandA).collect() }
