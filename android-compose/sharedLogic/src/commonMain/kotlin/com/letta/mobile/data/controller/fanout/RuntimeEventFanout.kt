@@ -1,10 +1,10 @@
 package com.letta.mobile.data.controller.fanout
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -53,7 +53,9 @@ class RuntimeEventFanout {
      * Per-subscriber buffered channels. Buffering starts at [subscribe], not at
      * collect, so frames cannot be lost in the subscribe→collect handoff window.
      * There is no shared replay cache (lgns8.22.3): a new subscriber never sees
-     * a prior turn's terminal.
+     * a prior turn's terminal. Production turn subscribers need lossless delivery
+     * (lgns8.22.3 review): unbounded channels with suspending send apply
+     * backpressure instead of silently dropping deltas/terminals.
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
@@ -82,8 +84,7 @@ class RuntimeEventFanout {
     ): Pair<String, Flow<AppServerReceivedFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val channel = Channel<AppServerReceivedFrame>(
-            capacity = SUBSCRIBER_BUFFER_CAPACITY,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+            capacity = Channel.UNLIMITED,
         )
         subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
         subscriberId to channel.receiveAsFlow()
@@ -106,17 +107,33 @@ class RuntimeEventFanout {
     /**
      * Routes a received frame to subscribers for its runtime scope.
      *
-     * Only events with a runtime scope are routed. If no subscribers exist for
-     * a runtime, the event is dropped (not buffered).
+     * Runtime-scoped events go to exact (agent, conversation) subscribers.
+     * Terminal-bearing stream deltas also reach same-conversation subscribers
+     * (different agent) so TurnEngine can apply authoritative-terminal release.
+     * Unscoped external-tool / control requests are broadcast to every active
+     * subscriber — TurnEngine must answer them to avoid wedging the server.
      */
     suspend fun route(received: AppServerReceivedFrame) {
-        val runtime = received.frame.runtime ?: return
-        val key = RuntimeKey(runtime.agentId, runtime.conversationId)
         val channels = stateMutex.withLock {
-            subscribers.values.filter { it.key == key }.map { it.channel }
+            val runtime = received.frame.runtime
+            when {
+                runtime == null -> {
+                    if (!received.frame.isUnscopedTurnControl()) emptyList()
+                    else subscribers.values.map { it.channel }
+                }
+                received.isTerminalBearingStreamDelta() -> {
+                    subscribers.values.filter {
+                        it.key.conversationId == runtime.conversationId
+                    }.map { it.channel }
+                }
+                else -> {
+                    val key = RuntimeKey(runtime.agentId, runtime.conversationId)
+                    subscribers.values.filter { it.key == key }.map { it.channel }
+                }
+            }
         }
         for (channel in channels) {
-            channel.trySend(received)
+            channel.send(received)
         }
     }
 
@@ -196,10 +213,23 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
-        private const val SUBSCRIBER_BUFFER_CAPACITY = 64
         private val nextSubscriberId = atomic(0)
 
         private fun generateSubscriberId(): String =
             "subscriber-${nextSubscriberId.incrementAndGet()}"
     }
+}
+
+private fun AppServerInboundFrame.isUnscopedTurnControl(): Boolean =
+    this is AppServerInboundFrame.ExternalToolCallRequest ||
+        this is AppServerInboundFrame.ControlRequest
+
+private fun AppServerReceivedFrame.isTerminalBearingStreamDelta(): Boolean {
+    val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return false
+    val messageType = runCatching {
+        (streamDelta.delta as? kotlinx.serialization.json.JsonObject)
+            ?.get("message_type")
+            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+    }.getOrNull()
+    return messageType == "stop_reason" || messageType == "error_message"
 }

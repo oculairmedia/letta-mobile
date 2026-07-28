@@ -119,6 +119,11 @@ class AppServerTurnEngine(
      * mutate a successor lease.
      */
     private val connectionGenerationProvider: () -> Long = { 0L },
+    /**
+     * Invoked when [invalidateRuntime] clears the engine cache (e.g. after a
+     * mutating context preflight) so controllers can drop their matching cache.
+     */
+    private val onRuntimeInvalidated: suspend () -> Unit = {},
 ) : TurnEngine {
     /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
     private val activeLeaseRef = atomic<TurnLease?>(null)
@@ -129,9 +134,14 @@ class AppServerTurnEngine(
      * Drops the cached runtime scope so the next turn re-issues runtime_start.
      * Called on transport disconnect/generation rollover (lgns8.5): a scope
      * minted by a dead generation must never be reused against the next one.
+     *
+     * @param notifyHost when true, also invokes [onRuntimeInvalidated] so a
+     *   controller cache cannot undo a mutating preflight. Hosts that already
+     *   cleared their own cache (stop/disconnect) pass false.
      */
-    fun invalidateRuntime() {
+    suspend fun invalidateRuntime(notifyHost: Boolean = true) {
         runtime = null
+        if (notifyHost) onRuntimeInvalidated()
     }
 
     /**
@@ -580,7 +590,7 @@ class AppServerTurnEngine(
         }
     }
 
-    private fun recordPreflightFailure(command: TurnCommand, errorClass: String) {
+    private suspend fun recordPreflightFailure(command: TurnCommand, errorClass: String) {
         invalidateRuntime()
         Telemetry.event(
             "AppServerTurnEngine",
@@ -996,7 +1006,9 @@ class AppServerTurnEngine(
             // watchdog wrongly paused.
             userInputApprovalIdsRef.update { emptyMap() }
             fanoutSubscriberId?.let { subId ->
-                eventRouter?.unsubscribe(subId)
+                withContext(NonCancellable) {
+                    eventRouter?.unsubscribe(subId)
+                }
             }
         }
     }

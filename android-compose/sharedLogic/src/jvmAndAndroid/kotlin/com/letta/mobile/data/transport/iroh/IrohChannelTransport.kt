@@ -717,12 +717,12 @@ class IrohChannelTransport(
             // App Server). Client-side preflight would send agent_retrieve /
             // conversation_messages_list as typed control frames; the node only
             // accepts auth/runtime_start/input/admin_rpc/sync/abort.
+            transport!!.awaitConnectionReady()
             val (engine, eventRouter) = buildIrohTurnEngine(
                 client = appServerClient,
                 clientVersion = config.clientVersion,
                 routerScope = scope,
             )
-            transport!!.awaitConnectionReady()
             IrohConnectionHandle(
                 config = config,
                 ticket = ticket,

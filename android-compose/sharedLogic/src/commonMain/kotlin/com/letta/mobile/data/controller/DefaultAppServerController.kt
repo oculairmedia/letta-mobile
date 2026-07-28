@@ -104,6 +104,9 @@ class DefaultAppServerController(
                 }
             },
             connectionGenerationProvider = { connectionGeneration.value },
+            onRuntimeInvalidated = {
+                runtimeMutex.withLock { runtimeCache.clear() }
+            },
         )
     }
 
@@ -189,7 +192,9 @@ class DefaultAppServerController(
     }
 
     override suspend fun onTransportDisconnected(reason: String?) {
-        eventRouter.detach()
+        // Do not detach the router here: ReconnectingAppServerClient.events is a
+        // stable pipe across generations. Detaching would drop recovery
+        // runtime_start/sync terminals before markConnected() re-attaches.
         connectionGeneration.incrementAndGet()
         runtimeMutex.withLock {
             // Canonical runtime scopes are generation-local: every cached scope
@@ -198,7 +203,7 @@ class DefaultAppServerController(
             // the durable registry survive — they are intent, not server state.
             runtimeCache.clear()
         }
-        turnEngine.invalidateRuntime()
+        turnEngine.invalidateRuntime(notifyHost = false)
         _state.value = AppServerControllerState.Disconnected(reason)
     }
 
@@ -221,7 +226,7 @@ class DefaultAppServerController(
         }
         // Drop in-flight turn state so the next turn cannot reuse a runtime that
         // was started with the pre-update agent configuration.
-        turnEngine.invalidateRuntime()
+        turnEngine.invalidateRuntime(notifyHost = false)
     }
 
     override suspend fun stopAllRuntimes() {
@@ -229,7 +234,7 @@ class DefaultAppServerController(
             runtimeCache.clear()
             runtimePermissionModes.clear()
         }
-        turnEngine.invalidateRuntime()
+        turnEngine.invalidateRuntime(notifyHost = false)
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =
