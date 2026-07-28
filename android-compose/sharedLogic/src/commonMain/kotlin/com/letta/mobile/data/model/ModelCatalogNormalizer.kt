@@ -115,29 +115,15 @@ object ModelCatalogNormalizer {
      * winning model so callers do not re-associate by handle alone.
      */
     fun <T> normalizePaired(items: List<Pair<T, LlmModel>>): List<Pair<T, LlmModel>> {
-        if (items.isEmpty()) return emptyList()
-        if (items.size == 1) {
-            val (meta, model) = items.single()
-            return listOf(meta to enrichLimits(model))
-        }
         val winners = LinkedHashMap<String, Pair<T, LlmModel>>()
-        val order = ArrayList<String>()
-        for ((meta, rawModel) in items) {
-            val key = dedupeKey(rawModel)
-            val existing = winners[key]
-            if (existing == null) {
-                winners[key] = meta to rawModel
-                order.add(key)
-            } else {
-                val candidateWins = prefer(rawModel, existing.second)
-                val winnerMeta = if (candidateWins) meta else existing.first
-                val winnerModel = if (candidateWins) rawModel else existing.second
-                val alternate = if (candidateWins) existing.second else rawModel
-                winners[key] = winnerMeta to mergeMissingMetadata(winnerModel, alternate)
-            }
+        for (candidate in items) {
+            val key = dedupeKey(candidate.second)
+            winners[key] = winners[key]
+                ?.let { incumbent -> mergeCandidates(incumbent, candidate) }
+                ?: candidate
         }
-        return order.mapNotNull { key ->
-            winners[key]?.let { (meta, model) -> meta to enrichLimits(model) }
+        return winners.values.map { (meta, model) ->
+            meta to enrichLimits(model)
         }
     }
 
@@ -193,36 +179,62 @@ object ModelCatalogNormalizer {
         }
     }
 
+    private fun <T> mergeCandidates(
+        incumbent: Pair<T, LlmModel>,
+        candidate: Pair<T, LlmModel>,
+    ): Pair<T, LlmModel> {
+        val (preferred, alternate) = if (prefer(candidate.second, incumbent.second)) {
+            candidate to incumbent
+        } else {
+            incumbent to candidate
+        }
+        return preferred.first to mergeMissingMetadata(preferred.second, alternate.second)
+    }
+
     private fun mergeMissingMetadata(preferred: LlmModel, alternate: LlmModel): LlmModel =
-        preferred.copy(
-            id = preferred.id.ifBlank { alternate.id },
-            name = preferred.name.ifBlank { alternate.name },
-            displayNameOverride = preferred.displayNameOverride.takeUnless { it.isNullOrBlank() }
-                ?: alternate.displayNameOverride,
-            providerType = preferred.providerType.ifBlank { alternate.providerType },
-            providerName = preferred.providerName.takeUnless { it.isNullOrBlank() } ?: alternate.providerName,
-            providerCategory = preferred.providerCategory.takeUnless { it.isNullOrBlank() }
-                ?: alternate.providerCategory,
-            modelEndpointType = preferred.modelEndpointType.takeUnless { it.isNullOrBlank() }
-                ?: alternate.modelEndpointType,
-            modelEndpoint = preferred.modelEndpoint.takeUnless { it.isNullOrBlank() } ?: alternate.modelEndpoint,
-            modelWrapper = preferred.modelWrapper.takeUnless { it.isNullOrBlank() } ?: alternate.modelWrapper,
-            contextWindow = preferred.contextWindow?.takeIf { it > 0 } ?: alternate.contextWindow,
-            maxOutputTokens = preferred.maxOutputTokens?.takeIf { it > 0 } ?: alternate.maxOutputTokens,
-            temperature = preferred.temperature ?: alternate.temperature,
-            maxTokens = preferred.maxTokens?.takeIf { it > 0 } ?: alternate.maxTokens,
-            enableReasoner = preferred.enableReasoner ?: alternate.enableReasoner,
-            reasoningEffort = preferred.reasoningEffort.takeUnless { it.isNullOrBlank() }
-                ?: alternate.reasoningEffort,
-            maxReasoningTokens = preferred.maxReasoningTokens?.takeIf { it > 0 }
-                ?: alternate.maxReasoningTokens,
-            frequencyPenalty = preferred.frequencyPenalty ?: alternate.frequencyPenalty,
-            compatibilityType = preferred.compatibilityType.takeUnless { it.isNullOrBlank() }
-                ?: alternate.compatibilityType,
-            verbosity = preferred.verbosity.takeUnless { it.isNullOrBlank() } ?: alternate.verbosity,
-            tier = preferred.tier.takeUnless { it.isNullOrBlank() } ?: alternate.tier,
-            parallelToolCalls = preferred.parallelToolCalls ?: alternate.parallelToolCalls,
+        preferred
+            .mergeIdentityMetadata(alternate)
+            .mergeLimitMetadata(alternate)
+            .mergeGenerationMetadata(alternate)
+
+    private fun LlmModel.mergeIdentityMetadata(alternate: LlmModel): LlmModel =
+        copy(
+            id = id.ifBlank { alternate.id },
+            name = name.ifBlank { alternate.name },
+            displayNameOverride = displayNameOverride.orNonBlank(alternate.displayNameOverride),
+            providerType = providerType.ifBlank { alternate.providerType },
+            providerName = providerName.orNonBlank(alternate.providerName),
+            providerCategory = providerCategory.orNonBlank(alternate.providerCategory),
+            modelEndpointType = modelEndpointType.orNonBlank(alternate.modelEndpointType),
+            modelEndpoint = modelEndpoint.orNonBlank(alternate.modelEndpoint),
+            modelWrapper = modelWrapper.orNonBlank(alternate.modelWrapper),
         )
+
+    private fun LlmModel.mergeLimitMetadata(alternate: LlmModel): LlmModel =
+        copy(
+            contextWindow = contextWindow.orPositive(alternate.contextWindow),
+            maxOutputTokens = maxOutputTokens.orPositive(alternate.maxOutputTokens),
+            temperature = temperature ?: alternate.temperature,
+            maxTokens = maxTokens.orPositive(alternate.maxTokens),
+            maxReasoningTokens = maxReasoningTokens.orPositive(alternate.maxReasoningTokens),
+            frequencyPenalty = frequencyPenalty ?: alternate.frequencyPenalty,
+        )
+
+    private fun LlmModel.mergeGenerationMetadata(alternate: LlmModel): LlmModel =
+        copy(
+            enableReasoner = enableReasoner ?: alternate.enableReasoner,
+            reasoningEffort = reasoningEffort.orNonBlank(alternate.reasoningEffort),
+            compatibilityType = compatibilityType.orNonBlank(alternate.compatibilityType),
+            verbosity = verbosity.orNonBlank(alternate.verbosity),
+            tier = tier.orNonBlank(alternate.tier),
+            parallelToolCalls = parallelToolCalls ?: alternate.parallelToolCalls,
+        )
+
+    private fun String?.orNonBlank(alternate: String?): String? =
+        takeUnless { it.isNullOrBlank() } ?: alternate
+
+    private fun Int?.orPositive(alternate: Int?): Int? =
+        takeIf { (it ?: 0) > 0 } ?: alternate
 
     /** Provider rank wins first; richness is only a same-rank tiebreaker. */
     private fun prefer(candidate: LlmModel, incumbent: LlmModel): Boolean {
