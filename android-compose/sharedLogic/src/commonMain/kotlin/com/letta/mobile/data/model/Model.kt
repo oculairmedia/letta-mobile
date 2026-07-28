@@ -2,6 +2,7 @@ package com.letta.mobile.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @Serializable
 data class LlmModel(
@@ -27,6 +28,7 @@ data class LlmModel(
     val verbosity: String? = null,
     val tier: String? = null,
     @SerialName("parallel_tool_calls") val parallelToolCalls: Boolean? = null,
+    @Transient val selectionAliases: Set<String> = emptySet(),
 ) {
     val displayName: String get() = displayNameOverride ?: handle ?: name.ifBlank { id }
 }

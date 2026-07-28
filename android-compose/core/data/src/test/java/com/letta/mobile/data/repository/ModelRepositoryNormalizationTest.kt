@@ -21,6 +21,7 @@ class ModelRepositoryNormalizationTest {
         assertEquals("openai/MiniMax-M3", model.handle)
         assertEquals(200_000, model.contextWindow)
         assertEquals(16_384, model.maxOutputTokens)
+        assertEquals(setOf("lmstudio/MiniMax-M3"), model.selectionAliases)
     }
 
     private fun model(handle: String): LlmModel {

@@ -21,6 +21,7 @@ class AgentCreateModelDefaultsTest {
         )
 
         val independent = listOf(
+            request("openai/MiniMax-M3"),
             request(
                 "openai/MiniMax-M3",
                 providerName = "customer-openai",

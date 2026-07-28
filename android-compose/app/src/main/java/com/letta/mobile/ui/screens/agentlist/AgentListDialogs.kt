@@ -29,9 +29,11 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.model.toAgentCreateLlmConfig
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.MultiFieldInputDialog
@@ -140,7 +142,7 @@ internal fun CreateAgentDialog(
         confirmEnabled = resources.validation.enabled,
         onConfirm = {
             onCreate(
-                buildAgentCreateParams(formState),
+                buildAgentCreateParams(formState, resources.llmModels),
                 formState.runtimeOption,
             )
         },
@@ -193,19 +195,30 @@ fun validateCreateAgentForm(
     return CreateAgentValidation(enabled = true, disabledReason = null)
 }
 
-internal fun buildAgentCreateParams(formState: CreateAgentFormState): AgentCreateParams {
+internal fun buildAgentCreateParams(
+    formState: CreateAgentFormState,
+    availableModels: List<LlmModel> = emptyList(),
+): AgentCreateParams {
     val isLocal = formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE
+    val selectedModel = availableModels
+        .firstOrNull { ModelCatalog.isSelected(it, formState.model) }
+        ?.takeUnless { isLocal }
     return AgentCreateParams(
         name = formState.name,
         description = formState.description.ifBlank { null },
         model = formState.model.ifBlank { null },
         embedding = formState.embedding.ifBlank { null },
         modelSettings = ModelSettings(
-            providerType = formState.providerType.ifBlank { null },
+            providerType = formState.providerType
+                .ifBlank { selectedModel?.providerType.orEmpty() }
+                .ifBlank { null },
+            providerName = selectedModel?.providerName,
+            providerCategory = selectedModel?.providerCategory,
             temperature = formState.temperature.toDoubleOrNull(),
             maxOutputTokens = formState.maxOutputTokens.toIntOrNull(),
             parallelToolCalls = formState.parallelToolCalls,
         ),
+        llmConfig = selectedModel?.toAgentCreateLlmConfig(),
         toolIds = if (isLocal) {
             null
         } else {

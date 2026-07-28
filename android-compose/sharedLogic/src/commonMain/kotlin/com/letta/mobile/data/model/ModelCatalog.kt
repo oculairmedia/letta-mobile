@@ -32,6 +32,12 @@ object ModelCatalog {
     fun valueOf(model: LlmModel): String =
         model.handle?.takeIf { it.isNotBlank() } ?: model.name.ifBlank { model.id }
 
+    /** Whether [selectedValue] is this model or an alias removed during normalization. */
+    fun isSelected(model: LlmModel, selectedValue: String?): Boolean {
+        val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return false
+        return valueOf(model) == selected || selected in model.selectionAliases
+    }
+
     /** Group [models] by provider, preserving a stable provider order.
      *
      * When [selectedValue] is set and would be dropped by LLMux alias dedupe,

@@ -21,6 +21,21 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun selectedAliasMatchesNormalizedWinner() {
+        val model = LlmModel(
+            id = "openai/MiniMax-M3",
+            name = "MiniMax-M3",
+            handle = "openai/MiniMax-M3",
+            providerType = "openai",
+            selectionAliases = setOf("lmstudio/MiniMax-M3"),
+        )
+
+        assertTrue(ModelCatalog.isSelected(model, "openai/MiniMax-M3"))
+        assertTrue(ModelCatalog.isSelected(model, "lmstudio/MiniMax-M3"))
+        assertFalse(ModelCatalog.isSelected(model, "anthropic/MiniMax-M3"))
+    }
+
+    @Test
     fun testGroup() {
         val models = listOf(
             LlmModel(id = "1", name = "Claude", handle = "claude-3", providerType = "anthropic"),

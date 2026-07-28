@@ -24,6 +24,10 @@ class ModelCatalogNormalizerTest {
         assertEquals("lc-openai/MiniMax-M3", normalized.single().handle)
         assertEquals(200_000, normalized.single().contextWindow)
         assertEquals(16_384, normalized.single().maxOutputTokens)
+        assertEquals(
+            setOf("lmstudio/MiniMax-M3", "lc-anthropic/MiniMax-M3"),
+            normalized.single().selectionAliases,
+        )
     }
 
     @Test
@@ -91,6 +95,37 @@ class ModelCatalogNormalizerTest {
         assertEquals(2, models.size)
         assertEquals(
             setOf("https://llmux.example/v1", "https://byok.example/v1"),
+            models.map { it.modelEndpoint }.toSet(),
+        )
+    }
+
+    @Test
+    fun adapterPrefersSelectionRoutingOverPresentationRouting() {
+        val entries = JsonArray(
+            listOf("east", "west").map { route ->
+                buildJsonObject {
+                    put("id", route)
+                    put("handle", "openai/gpt-4o")
+                    put("provider_name", "presentation-shared")
+                    put("model_endpoint", "https://presentation.example/v1")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/gpt-4o")
+                            put("provider_name", "byok-$route")
+                            put("model_endpoint", "https://$route.example/v1")
+                        },
+                    )
+                }
+            },
+        )
+
+        val models = AppServerListModelsAdapter.toLlmModels(entries)
+
+        assertEquals(2, models.size)
+        assertEquals(setOf("byok-east", "byok-west"), models.map { it.providerName }.toSet())
+        assertEquals(
+            setOf("https://east.example/v1", "https://west.example/v1"),
             models.map { it.modelEndpoint }.toSet(),
         )
     }
@@ -255,6 +290,22 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
+    fun preservesLegacyMaxTokensAsAuthoritativeOutputLimit() {
+        val model = LlmModel(
+            id = "MiniMax-M3",
+            handle = "openai/MiniMax-M3",
+            name = "MiniMax-M3",
+            providerType = "openai",
+            maxTokens = 4_096,
+        )
+
+        val enriched = ModelCatalogNormalizer.enrichLimits(model)
+
+        assertEquals(4_096, enriched.maxOutputTokens)
+        assertEquals(4_096, enriched.maxTokens)
+    }
+
+    @Test
     fun prefersHigherProviderRankEvenWhenLowerRankHasRicherMetadata() {
         val bareOpenai = LlmModel(
             id = "x",
@@ -322,12 +373,16 @@ class AppServerListModelsAdapterNormalizationTest {
         assertEquals(1, models.size)
         assertEquals("openai/MiniMax-M3", models.single().handle)
         assertEquals(200_000, models.single().contextWindow)
+        assertEquals(setOf("lmstudio/MiniMax-M3"), models.single().selectionAliases)
 
         val adapted = AppServerListModelsAdapter.toLlmModelArray(entries).single().jsonObject
         assertEquals("200000", adapted["context_window"]!!.jsonPrimitive.content)
         val updateArgs = adapted["updateArgs"]!!.jsonObject
         assertEquals("200000", updateArgs["context_window_limit"]!!.jsonPrimitive.content)
         assertEquals("16384", updateArgs["max_output_tokens"]!!.jsonPrimitive.content)
+
+        val roundTrip = AppServerListModelsAdapter.toLlmModels(JsonArray(listOf(adapted))).single()
+        assertEquals(setOf("lmstudio/MiniMax-M3"), roundTrip.selectionAliases)
     }
 
     @Test

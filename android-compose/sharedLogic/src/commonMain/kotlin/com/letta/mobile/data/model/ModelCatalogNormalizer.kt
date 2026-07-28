@@ -89,17 +89,20 @@ object ModelCatalogNormalizer {
     fun knownLimitsForModel(model: LlmModel): KnownLimits? {
         val handle = model.handle?.takeIf { it.isNotBlank() } ?: model.id
         val prefix = providerPrefix(handle).ifBlank { model.providerType.trim().lowercase() }
-        if (prefix !in LLMUX_ALIAS_PROVIDERS || !hasLlmuxProvenance(model)) return null
+        if (prefix !in LLMUX_ALIAS_PROVIDERS || !hasPositiveLlmuxProvenance(model)) return null
         return knownLimitsForUnderlyingId(underlyingModelId(handle))
     }
 
     /** Fill missing context/output from known tables; never overwrite authoritative values. */
     fun enrichLimits(model: LlmModel): LlmModel {
-        val known = knownLimitsForModel(model) ?: return model
+        val known = knownLimitsForCatalogModel(model) ?: return model
+        val outputDefault = model.maxOutputTokens?.takeIf { it > 0 }
+            ?: model.maxTokens?.takeIf { it > 0 }
+            ?: known.maxOutputTokens
         return model.copy(
             contextWindow = model.contextWindow?.takeIf { it > 0 } ?: known.contextWindow,
-            maxOutputTokens = model.maxOutputTokens?.takeIf { it > 0 } ?: known.maxOutputTokens,
-            maxTokens = model.maxTokens?.takeIf { it > 0 } ?: known.maxOutputTokens,
+            maxOutputTokens = model.maxOutputTokens?.takeIf { it > 0 } ?: outputDefault,
+            maxTokens = model.maxTokens?.takeIf { it > 0 } ?: outputDefault,
         )
     }
 
@@ -165,19 +168,35 @@ object ModelCatalogNormalizer {
         }
     }
 
-    private fun hasLlmuxProvenance(model: LlmModel): Boolean {
+    private fun knownLimitsForCatalogModel(model: LlmModel): KnownLimits? {
+        val handle = model.handle?.takeIf { it.isNotBlank() } ?: model.id
+        val prefix = providerPrefix(handle).ifBlank { model.providerType.trim().lowercase() }
+        if (prefix !in LLMUX_ALIAS_PROVIDERS || !isEligibleLlmuxCatalogRow(model)) return null
+        return knownLimitsForUnderlyingId(underlyingModelId(handle))
+    }
+
+    private fun isEligibleLlmuxCatalogRow(model: LlmModel): Boolean {
         if (model.providerCategory.equals("byok", ignoreCase = true)) return false
-        val routeMetadata = listOfNotNull(
+        val routeMetadata = routeMetadata(model)
+        return routeMetadata.isEmpty() || containsLlmuxRouteHint(routeMetadata)
+    }
+
+    private fun hasPositiveLlmuxProvenance(model: LlmModel): Boolean =
+        !model.providerCategory.equals("byok", ignoreCase = true) &&
+            containsLlmuxRouteHint(routeMetadata(model))
+
+    private fun routeMetadata(model: LlmModel): List<String> =
+        listOfNotNull(
             model.providerName,
             model.modelEndpoint,
             model.modelEndpointType,
-        )
-        if (routeMetadata.isEmpty()) return true
-        return routeMetadata.any { value ->
+        ).mapNotNull { it.trim().takeIf(String::isNotEmpty) }
+
+    private fun containsLlmuxRouteHint(routeMetadata: List<String>): Boolean =
+        routeMetadata.any { value ->
             val normalized = value.lowercase()
             LLMUX_ROUTE_HINTS.any { it in normalized }
         }
-    }
 
     private fun <T> mergeCandidates(
         incumbent: Pair<T, LlmModel>,
@@ -196,6 +215,7 @@ object ModelCatalogNormalizer {
             .mergeIdentityMetadata(alternate)
             .mergeLimitMetadata(alternate)
             .mergeGenerationMetadata(alternate)
+            .mergeSelectionAliases(alternate)
 
     private fun LlmModel.mergeIdentityMetadata(alternate: LlmModel): LlmModel =
         copy(
@@ -229,6 +249,18 @@ object ModelCatalogNormalizer {
             tier = tier.orNonBlank(alternate.tier),
             parallelToolCalls = parallelToolCalls ?: alternate.parallelToolCalls,
         )
+
+    private fun LlmModel.mergeSelectionAliases(alternate: LlmModel): LlmModel =
+        copy(
+            selectionAliases = buildSet {
+                addAll(selectionAliases)
+                addAll(alternate.selectionAliases)
+                alternate.selectionValue().takeIf { it.isNotBlank() }?.let(::add)
+            },
+        )
+
+    private fun LlmModel.selectionValue(): String =
+        handle?.takeIf { it.isNotBlank() } ?: name.ifBlank { id }
 
     private fun String?.orNonBlank(alternate: String?): String? =
         takeUnless { it.isNullOrBlank() } ?: alternate
