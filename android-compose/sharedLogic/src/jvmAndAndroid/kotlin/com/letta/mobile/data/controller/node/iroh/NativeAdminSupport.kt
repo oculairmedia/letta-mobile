@@ -17,7 +17,14 @@ import kotlinx.serialization.json.buildJsonObject
  */
 internal object NativeAdmin {
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
+    /** Fail-fast budget for native reads / idempotent probes. */
     private const val NATIVE_ATTEMPT_TIMEOUT_MS = 2_000L
+    /**
+     * Longer budget for mutations that may already have been accepted server-side.
+     * Timing out the wait after send and inviting a retry risks duplicate creates
+     * or conflicting updates.
+     */
+    private const val NATIVE_MUTATION_TIMEOUT_MS = 30_000L
     private val COOLDOWN = 60.seconds
     private val monotonic = kotlin.time.TimeSource.Monotonic
     private val downSinceByOp =
@@ -87,13 +94,30 @@ internal object NativeAdmin {
         return executeRequire(client, op, block)
     }
 
+    private fun timeoutMsFor(op: String): Long =
+        if (isMutationOp(op)) NATIVE_MUTATION_TIMEOUT_MS else NATIVE_ATTEMPT_TIMEOUT_MS
+
+    /** True for ops that may already have mutated durable App Server state when a wait times out. */
+    internal fun isMutationOp(op: String): Boolean {
+        val name = op.lowercase()
+        return name.endsWith(".create") ||
+            name.endsWith(".update") ||
+            name.endsWith(".delete") ||
+            name.endsWith(".delete_all") ||
+            name.endsWith(".archive") ||
+            name == "skill_enable" ||
+            name == "skill_disable" ||
+            name == "approval.submit"
+    }
+
     private suspend fun <T : Any> executeRequire(
         client: AppServerClient,
         op: String,
         block: suspend (AppServerClient) -> T?,
     ): T {
+        val timeoutMs = timeoutMsFor(op)
         return try {
-            val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
+            val result = kotlinx.coroutines.withTimeout(timeoutMs) { block(client) }
             if (result == null) {
                 markSelected(op, "error", "native_unsuccessful")
                 adminError("app_server_error: $op native command unsuccessful")
@@ -102,7 +126,9 @@ internal object NativeAdmin {
             markSelected(op, "success")
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            tripBreaker(op)
+            // Mutations: report timeout but do not trip the breaker — a late success
+            // on the server must not black-hole subsequent reads/writes for 60s.
+            if (!isMutationOp(op)) tripBreaker(op)
             markSelected(op, "unavailable", "native_timeout")
             adminError("capability_unavailable: $op App Server v2 timed out")
         } catch (e: kotlinx.coroutines.CancellationException) {

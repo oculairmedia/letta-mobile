@@ -1544,7 +1544,9 @@ internal fun String.deferredToolResultPreview(): String {
 }
 
 internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean =
-    toolCalls.size > 1
+    // Use the compact group card from the first tool call so the UI does not
+    // flash the legacy single ToolCallCard and then morph when a second call lands.
+    toolCalls.isNotEmpty()
 
 internal fun shouldRunToolCallEntranceAnimation(
     animateEntrance: Boolean,

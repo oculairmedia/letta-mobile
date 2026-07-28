@@ -33,9 +33,9 @@ class MessageContentFactoryTest {
     }
 
     @Test
-    fun `multiple tool calls use compact group renderer`() {
+    fun `tool calls use compact group renderer from the first call`() {
         assertFalse(shouldUseCompactToolCallGroup(emptyList()))
-        assertFalse(
+        assertTrue(
             shouldUseCompactToolCallGroup(
                 listOf(UiToolCall(name = "Bash", arguments = "{}", result = null))
             )

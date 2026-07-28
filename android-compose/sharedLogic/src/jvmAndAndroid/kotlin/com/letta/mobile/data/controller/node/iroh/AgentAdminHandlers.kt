@@ -63,7 +63,10 @@ object AgentAdminHandlers {
         }
         router.register("agent.update") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
-            val body = if (params?.get("model") != null) params.withDefaultContextWindow() else params
+            // Never inject a default context_window_limit on update — model-only
+            // patches (Desktop / AdminChatModelCoordinator) must keep the agent's
+            // existing limit. Defaults apply on create only.
+            val body = params
             val result = NativeAdmin.require(nativeClient, "agent.update") { c ->
                 val response = c.agentUpdate(
                     AppServerCommand.AgentUpdate(

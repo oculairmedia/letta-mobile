@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -906,18 +907,33 @@ class IrohNodeConnection(
                     fanout.onDraft(payload)
                 }
             }.onFailure { error ->
+                val errorText = error.message ?: error.toString()
+                // Concurrent send while a turn is live: do NOT fan out error_message.
+                // Viewers of the live turn map error_message → TurnDone(failed) and
+                // would kill the in-progress UI turn. The rejected initiator already
+                // learns via its own send path / local busy rejection.
+                if (isTurnAlreadyActiveMessage(errorText)) {
+                    Telemetry.event(
+                        "IrohNode", "stream.busy_rejected_no_terminal",
+                        "remoteEndpointId" to remoteEndpointId,
+                        "error" to errorText,
+                        "class" to error::class.simpleName,
+                        level = Telemetry.Level.WARN,
+                    )
+                    return@onFailure
+                }
                 val wroteTerminal = runCatching {
                     withContext(NonCancellable) {
                         // Same dangling-tool_call guarantee on the exception path.
                         fanout.flushOpenToolCalls()
-                        fanout.emitErrorTerminal(error.message ?: error.toString())
+                        fanout.emitErrorTerminal(errorText)
                     }
                 }.isSuccess
                 if (!wroteTerminal) {
                     Telemetry.event(
                         "IrohNode", "stream.closed_before_terminal",
                         "remoteEndpointId" to remoteEndpointId,
-                        "error" to (error.message ?: error.toString()),
+                        "error" to errorText,
                         "class" to error::class.simpleName,
                         level = Telemetry.Level.WARN,
                     )

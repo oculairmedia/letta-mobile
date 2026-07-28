@@ -34,6 +34,7 @@ import kotlinx.atomicfu.update
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
@@ -42,7 +43,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.Job
+import kotlin.time.Duration.Companion.milliseconds
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -244,31 +247,48 @@ class AppServerTurnEngine(
         val owner = activeTurnOwnerRef.value ?: return false
         val runId = owner.runId?.takeIf { it.isNotBlank() }
         val dead = try {
-            if (runId != null) {
-                val resp = client.adminRpc(
-                    AppServerCommand.AdminRpc(
-                        requestId = requestIdFactory(),
-                        method = "run.get",
-                        params = buildJsonObject { put("run_id", runId) },
-                    ),
-                )
-                when {
-                    // The server reports success with a run body: dead iff terminal.
-                    resp.success -> runResultIsDead(resp.result)
-                    // A failed run.get whose error indicates the run is gone/not-found
-                    // is also proof of death.
-                    resp.error?.let { it.contains("not found", ignoreCase = true) || it.contains("no such run", ignoreCase = true) } == true -> true
-                    else -> false
+            // Cap liveness probes well below the App Server client request timeout
+            // (often 120s). A hung run.get/list must not serialize concurrent busy
+            // reconciles for minutes while a live turn keeps streaming.
+            withTimeout(LIVENESS_PROBE_TIMEOUT_MS.milliseconds) {
+                if (runId != null) {
+                    val resp = client.adminRpc(
+                        AppServerCommand.AdminRpc(
+                            requestId = requestIdFactory(),
+                            method = "run.get",
+                            params = buildJsonObject { put("run_id", runId) },
+                        ),
+                    )
+                    when {
+                        // The server reports success with a run body: dead iff terminal.
+                        resp.success -> runResultIsDead(resp.result)
+                        // A failed run.get whose error indicates the run is gone/not-found
+                        // is also proof of death.
+                        resp.error?.let {
+                            it.contains("not found", ignoreCase = true) ||
+                                it.contains("no such run", ignoreCase = true)
+                        } == true -> true
+                        else -> false
+                    }
+                } else {
+                    // turn-engine-busy heal: the owner never had a run_id promoted (the
+                    // completed_settle terminal was never fanned to THIS initiator's
+                    // stream, so isBusy stuck until the external watchdog). Fall back to
+                    // a conversation-scoped run.list liveness probe — dead ONLY when the
+                    // server reports no non-terminal run for this agent+conversation, so
+                    // a genuinely live turn is still never interrupted.
+                    conversationHasNoActiveRun(owner.agentId, owner.conversationId)
                 }
-            } else {
-                // turn-engine-busy heal: the owner never had a run_id promoted (the
-                // completed_settle terminal was never fanned to THIS initiator's
-                // stream, so isBusy stuck until the external watchdog). Fall back to
-                // a conversation-scoped run.list liveness probe — dead ONLY when the
-                // server reports no non-terminal run for this agent+conversation, so
-                // a genuinely live turn is still never interrupted.
-                conversationHasNoActiveRun(owner.agentId, owner.conversationId)
             }
+        } catch (t: TimeoutCancellationException) {
+            Telemetry.event(
+                "AppServerTurnEngine",
+                "activeTurn.reconcileLivenessTimedOut",
+                "runId" to (runId ?: "<none>"),
+                "timeoutMs" to LIVENESS_PROBE_TIMEOUT_MS,
+                level = Telemetry.Level.WARN,
+            )
+            return false
         } catch (t: Throwable) {
             // Never clear the lock on an inconclusive/errored liveness check — that
             // could interrupt a live run. Only server-CONFIRMED death releases.
@@ -501,10 +521,14 @@ class AppServerTurnEngine(
     private suspend fun prepareContextIfNeeded(command: TurnCommand) {
         if (command.input !is TurnInput.UserMessage) return
         val result = try {
-            turnContextPreflight.prepare(
-                agentId = command.agentId.value,
-                conversationId = command.conversationId.value,
-            )
+            // Bound the whole preflight while activeTurn is held — individual
+            // RPCs have their own timeouts, but the sum must not wedge the engine.
+            withTimeout(PREFLIGHT_TIMEOUT_MS.milliseconds) {
+                turnContextPreflight.prepare(
+                    agentId = command.agentId.value,
+                    conversationId = command.conversationId.value,
+                )
+            }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -1522,6 +1546,10 @@ class AppServerTurnEngine(
         // turn never trips. Tunable via the ctor param.
         const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
         const val DEFAULT_TERMINAL_SETTLE_QUIET_MS: Long = 1_500L
+        /** Fail-fast budget for busy-path run.get / run.list liveness probes. */
+        const val LIVENESS_PROBE_TIMEOUT_MS: Long = 3_000L
+        /** Aggregate budget for turn-context preflight while activeTurn is held. */
+        const val PREFLIGHT_TIMEOUT_MS: Long = 15_000L
 
         // letta-mobile-vilsn.6: while the watchdog is paused on an outstanding
         // user-input gate it re-checks on this cadence (capped at the idle window)

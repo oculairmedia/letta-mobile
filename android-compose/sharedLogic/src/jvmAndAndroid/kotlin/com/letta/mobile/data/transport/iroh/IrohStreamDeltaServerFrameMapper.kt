@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -145,25 +146,39 @@ internal object IrohStreamDeltaServerFrameMapper {
             )
 
             "loop_error",
-            "error_message" -> listOf(
-                ServerFrame.Error(
+            "error_message" -> {
+                val message = delta.errorText()
+                val errorFrame = ServerFrame.Error(
                     id = meta.frameId,
                     ts = meta.timestamp,
-                    code = "app_server_error",
-                    message = delta.errorText(),
+                    code = if (isTurnAlreadyActiveMessage(message)) {
+                        "iroh_turn_engine_busy"
+                    } else {
+                        "app_server_error"
+                    },
+                    message = message,
                     conversationId = meta.conversationId,
                     turnId = meta.turnId,
                     runId = meta.runId,
-                ),
-                ServerFrame.TurnDone(
-                    id = meta.frameId,
-                    ts = meta.timestamp,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                    status = "failed",
-                    seq = meta.eventSeq,
-                ),
-            )
+                )
+                // Busy rejections must not synthesize TurnDone — that would finalize
+                // the live turn's UI while the owning run is still in progress.
+                if (isTurnAlreadyActiveMessage(message)) {
+                    listOf(errorFrame)
+                } else {
+                    listOf(
+                        errorFrame,
+                        ServerFrame.TurnDone(
+                            id = meta.frameId,
+                            ts = meta.timestamp,
+                            turnId = meta.turnId,
+                            runId = meta.runId,
+                            status = "failed",
+                            seq = meta.eventSeq,
+                        ),
+                    )
+                }
+            }
 
             else -> emptyList()
         }

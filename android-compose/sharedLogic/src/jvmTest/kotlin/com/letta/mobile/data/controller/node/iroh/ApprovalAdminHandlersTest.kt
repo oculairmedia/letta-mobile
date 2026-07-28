@@ -39,6 +39,9 @@ class ApprovalAdminHandlersTest {
 
         assertTrue(response.getValue("success").jsonPrimitive.boolean)
         assertEquals(0, recording.calls.size)
+        assertEquals("agent-1", controller.startedAgentId)
+        assertEquals("conv-1", controller.startedConversationId)
+        assertEquals(true, controller.startedRecoverApprovals)
         assertEquals("agent-1", controller.submittedAgentId)
         assertEquals("approval-1", controller.submittedApprovalRequestId)
         assertEquals(true, controller.submittedApprove)
@@ -138,7 +141,18 @@ class ApprovalAdminHandlersTest {
             mode: AppServerPermissionMode?,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = error("not used")
+        ): CanonicalRuntime {
+            startedAgentId = agentId.value
+            startedConversationId = conversationId.value
+            startedRecoverApprovals = recoverApprovals
+            return CanonicalRuntime(
+                scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value),
+            )
+        }
+
+        var startedAgentId: String? = null
+        var startedConversationId: String? = null
+        var startedRecoverApprovals: Boolean? = null
 
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = emptyFlow()
 

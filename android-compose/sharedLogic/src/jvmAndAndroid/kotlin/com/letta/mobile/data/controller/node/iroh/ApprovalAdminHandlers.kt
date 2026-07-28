@@ -65,10 +65,19 @@ object ApprovalAdminHandlers {
             adminError("capability_unavailable: approval.submit requires a live App Server controller")
         }
 
+        val convId = conversationId?.let(::ConversationId)
+            ?: throw IllegalArgumentException("conversation_id required")
         runCatching {
+            // After wrapper restart the in-memory runtime cache is empty even though
+            // App Server still owns the parked approval. Reattach before submit.
+            controller.startRuntime(
+                agentId = AgentId(agentId),
+                conversationId = convId,
+                recoverApprovals = true,
+            )
             controller.submitApproval(
                 agentId = AgentId(agentId),
-                conversationId = conversationId?.let(::ConversationId),
+                conversationId = convId,
                 approvalRequestId = approvalRequestId,
                 approve = approve,
                 reason = reason,
@@ -86,6 +95,7 @@ object ApprovalAdminHandlers {
             )
             return buildJsonObject { put("status", if (approve) "approved" else "denied") }
         }.onFailure { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
             AdminRouteTelemetry.selected(
                 AdminRouteTelemetry.Selection(
                     method = "approval.submit",
@@ -95,7 +105,7 @@ object ApprovalAdminHandlers {
                     reason = error.message ?: error::class.simpleName ?: "error",
                 ),
             )
-            adminError("app_server_error: approval.submit ${error.message ?: error::class.simpleName}")
+            adminError("app_server_error: approval.submit failed")
         }
         error("unreachable")
     }
