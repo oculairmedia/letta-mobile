@@ -44,7 +44,7 @@ object SkillAdminHandlers {
                     "capability_unavailable: skill.install requires skill_path " +
                         "(or name) for App Server v2 skill_enable; agent-scoped shim install is retired",
                 )
-            val result = NativeAdmin.require(nativeClient, "skill.install") { c ->
+            val result = NativeAdmin.require(nativeClient, NativeAdminOp.SkillInstall) { c ->
                 val response = c.skillEnable(
                     AppServerCommand.SkillEnable(
                         requestId = NativeAdmin.requestId(),
@@ -65,7 +65,7 @@ object SkillAdminHandlers {
         }
         router.register("skill.uninstall") { params ->
             val skillName = params.requireParam(AdminParamKey("name"))
-            val result = NativeAdmin.require(nativeClient, "skill.uninstall") { c ->
+            val result = NativeAdmin.require(nativeClient, NativeAdminOp.SkillUninstall) { c ->
                 val response = c.skillDisable(
                     AppServerCommand.SkillDisable(
                         requestId = NativeAdmin.requestId(),

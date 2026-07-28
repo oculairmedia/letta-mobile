@@ -27,7 +27,7 @@ object AgentAdminHandlers {
         router.register("agent.list") { params ->
             val limit = param(params, AdminParamKey("limit"))
             val offset = param(params, AdminParamKey("offset"))
-            NativeAdmin.require(nativeClient, "agent.list") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.AgentList) { c ->
                 val response = c.agentList(
                     AppServerCommand.AgentList(
                         requestId = NativeAdmin.requestId(),
@@ -42,7 +42,7 @@ object AgentAdminHandlers {
         }
         router.register("agent.get") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
-            NativeAdmin.require(nativeClient, "agent.get") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.AgentGet) { c ->
                 val response = c.agentRetrieve(
                     AppServerCommand.AgentRetrieve(requestId = NativeAdmin.requestId(), agentId = id),
                 )
@@ -51,7 +51,7 @@ object AgentAdminHandlers {
         }
         router.register("agent.create") { params ->
             val body = params.withDefaultContextWindow()
-            NativeAdmin.require(nativeClient, "agent.create") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.AgentCreate) { c ->
                 val response = c.agentCreate(
                     AppServerCommand.AgentCreate(
                         requestId = NativeAdmin.requestId(),
@@ -67,7 +67,7 @@ object AgentAdminHandlers {
             // patches (Desktop / AdminChatModelCoordinator) must keep the agent's
             // existing limit. Defaults apply on create only.
             val body = params
-            val result = NativeAdmin.require(nativeClient, "agent.update") { c ->
+            val result = NativeAdmin.require(nativeClient, NativeAdminOp.AgentUpdate) { c ->
                 val response = c.agentUpdate(
                     AppServerCommand.AgentUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -84,7 +84,7 @@ object AgentAdminHandlers {
         }
         router.register("agent.delete") { params ->
             val id = params.requireParam(AdminParamKey("agent_id"))
-            NativeAdmin.require(nativeClient, "agent.delete") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.AgentDelete) { c ->
                 val response = c.agentDelete(
                     AppServerCommand.AgentDelete(requestId = NativeAdmin.requestId(), agentId = id),
                 )

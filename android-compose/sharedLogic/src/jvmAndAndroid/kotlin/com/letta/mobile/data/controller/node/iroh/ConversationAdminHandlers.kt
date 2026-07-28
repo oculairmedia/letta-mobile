@@ -55,7 +55,7 @@ object ConversationAdminHandlers {
     ) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            val conversations = NativeAdmin.require(nativeClient, "conversation.list") { c ->
+            val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
                 val response = c.conversationList(
                     AppServerCommand.ConversationList(
                         requestId = NativeAdmin.requestId(),
@@ -77,7 +77,7 @@ object ConversationAdminHandlers {
         router.registerScoped("conversation.get") { params, context ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, id)
-            NativeAdmin.require(nativeClient, "conversation.get") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationGet) { c ->
                 val response = c.conversationRetrieve(
                     AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = id),
                 )
@@ -117,7 +117,7 @@ object ConversationAdminHandlers {
         router.register("conversation.create") { params ->
             params.requireParam(AdminParamKey("agent_id"))
             val createBody = checkNotNull(params)
-            NativeAdmin.require(nativeClient, "conversation.create") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
                 val response = c.conversationCreate(
                     AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
                 )
@@ -136,7 +136,7 @@ object ConversationAdminHandlers {
                     if (key != "conversation_id") put(key, value)
                 }
             }
-            val result = NativeAdmin.require(nativeClient, "conversation.update") { c ->
+            val result = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationUpdate) { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -157,7 +157,7 @@ object ConversationAdminHandlers {
         }
         router.register("conversation.archive") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
-            NativeAdmin.require(nativeClient, "conversation.archive") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationArchive) { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -172,7 +172,7 @@ object ConversationAdminHandlers {
         }
         router.register("conversation.restore") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
-            NativeAdmin.require(nativeClient, "conversation.restore") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationRestore) { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -195,7 +195,7 @@ object ConversationAdminHandlers {
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
             val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
-            val response = NativeAdmin.require(nativeClient, "message.list") { c ->
+            val response = NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(
                         requestId = NativeAdmin.requestId(),
@@ -218,13 +218,13 @@ object ConversationAdminHandlers {
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
             val msgId = params.requireParam(AdminParamKey("message_id"))
-            retrieveMessageNative(nativeClient, convId, msgId, op = "message.get")
+            retrieveMessageNative(nativeClient, convId, msgId, op = NativeAdminOp.MessageGet)
         }
         router.registerScoped("tool_return.get") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
             val msgId = params.requireParam(AdminParamKey("message_id"))
-            retrieveMessageNative(nativeClient, convId, msgId, op = "tool_return.get")
+            retrieveMessageNative(nativeClient, convId, msgId, op = NativeAdminOp.ToolReturnGet)
         }
     }
 
@@ -240,7 +240,7 @@ object ConversationAdminHandlers {
         nativeClient: AppServerClient?,
         conversationId: String,
         messageId: String,
-        op: String,
+        op: NativeAdminOp,
     ): JsonElement {
         return try {
             kotlinx.coroutines.withTimeout(messageGetBudgetMs) {
@@ -257,7 +257,7 @@ object ConversationAdminHandlers {
         nativeClient: AppServerClient?,
         conversationId: String,
         messageId: String,
-        op: String,
+        op: NativeAdminOp,
     ): JsonElement {
         var before: String? = null
         val pageLimit = messageGetPageLimit

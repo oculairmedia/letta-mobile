@@ -12,7 +12,7 @@ object ModelAdminHandlers {
             // Phase 2: native list_models is the only Letta-owned source. Legacy
             // shim catalog shape is no longer the default; callers that still need
             // the old REST catalog must wait for a bounded non-shim owner (Phase 3).
-            NativeAdmin.require(nativeClient, "model.list") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ModelList) { c ->
                 val response = c.listModels(
                     AppServerCommand.ListModels(
                         requestId = NativeAdmin.requestId(),

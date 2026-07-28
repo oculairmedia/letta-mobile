@@ -77,70 +77,55 @@ internal object NativeAdmin {
 
     /**
      * Fail-closed native execution. Never returns null for "try shim next".
+     * [op] supplies both the telemetry method name and the explicit
+     * [NativeAdminOperationPolicy] — no name-suffix heuristics.
      */
     suspend fun <T : Any> require(
         client: AppServerClient?,
-        op: String,
+        op: NativeAdminOp,
         block: suspend (AppServerClient) -> T?,
     ): T {
+        val method = op.method
         if (client == null) {
-            markSelected(op, "unavailable", "no_client")
-            adminError("capability_unavailable: $op requires App Server v2")
+            markSelected(method, "unavailable", "no_client")
+            adminError("capability_unavailable: $method requires App Server v2")
         }
-        if (circuitOpen(op)) {
-            markSelected(op, "unavailable", "circuit_open")
-            adminError("capability_unavailable: $op App Server v2 temporarily unavailable")
+        if (circuitOpen(method)) {
+            markSelected(method, "unavailable", "circuit_open")
+            adminError("capability_unavailable: $method App Server v2 temporarily unavailable")
         }
         return executeRequire(client, op, block)
     }
 
-    private fun timeoutMsFor(op: String): Long =
-        if (isMutationOp(op)) NATIVE_MUTATION_TIMEOUT_MS else NATIVE_ATTEMPT_TIMEOUT_MS
+    private fun timeoutMsFor(policy: NativeAdminOperationPolicy): Long =
+        when (policy) {
+            NativeAdminOperationPolicy.MutationAmbiguous -> NATIVE_MUTATION_TIMEOUT_MS
+            NativeAdminOperationPolicy.Read -> NATIVE_ATTEMPT_TIMEOUT_MS
+        }
 
-    /** True for ops that may already have mutated durable App Server state when a wait times out. */
-    internal fun isMutationOp(op: String): Boolean {
-        val name = op.lowercase()
-        if (name in MUTATION_EXACT_OPS) return true
-        return MUTATION_SUFFIXES.any { name.endsWith(it) }
-    }
-
-    private val MUTATION_EXACT_OPS = setOf(
-        "skill_enable",
-        "skill_disable",
-        "skill.install",
-        "skill.uninstall",
-        "approval.submit",
-        // Heuristic suffixes miss "restore"; the handler issues conversation_update.
-        "conversation.restore",
-    )
-
-    private val MUTATION_SUFFIXES = listOf(
-        ".create",
-        ".update",
-        ".delete",
-        ".delete_all",
-        ".archive",
-        ".restore",
-    )
+    /** Test hook: policy for a known method, or null if unregistered. */
+    internal fun policyForMethod(method: String): NativeAdminOperationPolicy? =
+        NativeAdminOp.byMethod(method)?.policy
 
     private suspend fun <T : Any> executeRequire(
         client: AppServerClient,
-        op: String,
+        op: NativeAdminOp,
         block: suspend (AppServerClient) -> T?,
     ): T {
-        val timeoutMs = timeoutMsFor(op)
+        val method = op.method
+        val timeoutMs = timeoutMsFor(op.policy)
         return try {
-            completeRequire(op, kotlinx.coroutines.withTimeout(timeoutMs) { block(client) })
+            completeRequire(method, kotlinx.coroutines.withTimeout(timeoutMs) { block(client) })
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            onRequireTimeout(op)
+            onRequireTimeout(method, op.policy)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: IllegalArgumentException) {
             throw e
         } catch (e: Exception) {
-            tripBreaker(op)
-            markSelected(op, "error", e.message ?: e::class.simpleName ?: "error")
-            adminError("app_server_error: $op native command failed")
+            tripBreaker(method)
+            markSelected(method, "error", e.message ?: e::class.simpleName ?: "error")
+            adminError("app_server_error: $method native command failed")
         }
     }
 
@@ -154,10 +139,10 @@ internal object NativeAdmin {
         return result
     }
 
-    private fun onRequireTimeout(op: String): Nothing {
+    private fun onRequireTimeout(op: String, policy: NativeAdminOperationPolicy): Nothing {
         // Mutations: report timeout but do not trip the breaker — a late success
         // on the server must not black-hole subsequent reads/writes for 60s.
-        if (!isMutationOp(op)) tripBreaker(op)
+        if (policy == NativeAdminOperationPolicy.Read) tripBreaker(op)
         markSelected(op, "unavailable", "native_timeout")
         adminError("capability_unavailable: $op App Server v2 timed out")
     }

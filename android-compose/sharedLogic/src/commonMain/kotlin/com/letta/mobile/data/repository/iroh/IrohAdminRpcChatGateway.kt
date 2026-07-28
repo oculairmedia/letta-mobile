@@ -22,6 +22,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
@@ -264,7 +265,9 @@ class IrohAdminRpcChatGateway(
 
     override suspend fun listLlmModels(): List<LlmModel> {
         val result = rpc(AdminRpcCall("model.list", "/v1/models", "{}")) ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(LlmModel.serializer()), result)
+        val array = result as? kotlinx.serialization.json.JsonArray ?: return emptyList()
+        // Never decode presentation entries as LlmModel — adapt explicitly.
+        return AppServerListModelsAdapter.toLlmModels(array)
     }
 
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {

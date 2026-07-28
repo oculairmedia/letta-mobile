@@ -100,4 +100,40 @@ class ControllerSubagentRegistrySourceTest {
         val failed = all.single { it.toolCallId == "tool/err" }
         assertEquals(SubagentStatus.FAILED, failed.status)
     }
+
+    @Test
+    fun laterUpdateSubagentStateReplacesPriorSnapshotIdentities() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-a"),
+                eventSeq = 1,
+                emittedAt = "t1",
+                idempotencyKey = "k1",
+                subagents = listOf(
+                    buildJsonObject {
+                        put("subagent_id", "sa-old")
+                        put("status", "pending")
+                    },
+                ),
+            ),
+        )
+        source.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-a"),
+                eventSeq = 2,
+                emittedAt = "t2",
+                idempotencyKey = "k2",
+                subagents = listOf(
+                    buildJsonObject {
+                        put("tool_call_id", "tool/new")
+                        put("subagent_id", "sa-new")
+                        put("status", "running")
+                    },
+                ),
+            ),
+        )
+        val entries = source.list("conv-a", includeTerminal = true)
+        assertEquals(listOf("tool/new"), entries.map { it.toolCallId })
+    }
 }

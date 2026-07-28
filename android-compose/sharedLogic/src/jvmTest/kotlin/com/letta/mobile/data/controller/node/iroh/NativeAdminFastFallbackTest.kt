@@ -88,10 +88,23 @@ class NativeAdminFastFallbackTest {
 
     @Test
     fun conversationRestoreIsClassifiedAsMutation() {
-        assertTrue(NativeAdmin.isMutationOp("conversation.restore"))
-        assertTrue(NativeAdmin.isMutationOp("conversation.archive"))
-        assertFalse(NativeAdmin.isMutationOp("conversation.list"))
-        assertFalse(NativeAdmin.isMutationOp("message.get"))
+        assertEquals(
+            NativeAdminOperationPolicy.MutationAmbiguous,
+            NativeAdmin.policyForMethod("conversation.restore"),
+        )
+        assertEquals(
+            NativeAdminOperationPolicy.MutationAmbiguous,
+            NativeAdmin.policyForMethod("conversation.archive"),
+        )
+        assertEquals(
+            NativeAdminOperationPolicy.Read,
+            NativeAdmin.policyForMethod("conversation.list"),
+        )
+        assertEquals(
+            NativeAdminOperationPolicy.Read,
+            NativeAdmin.policyForMethod("message.get"),
+        )
+        assertNull(NativeAdmin.policyForMethod("not.a.registered.op"))
     }
 
     private object FakeClient : AppServerClient {

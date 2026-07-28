@@ -1,11 +1,13 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 
 /**
  * Model-catalog reads over the Iroh admin RPC control channel.
@@ -39,7 +41,9 @@ class IrohAdminRpcModelSource(
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc model.list failed")
         val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(LlmModel.serializer()), result)
+        val array = result as? JsonArray ?: return emptyList()
+        // Shared adapter — never deserialize presentation entries as LlmModel.
+        return AppServerListModelsAdapter.toLlmModels(array)
     }
 
     suspend fun listEmbeddingModels(): List<EmbeddingModel> {
