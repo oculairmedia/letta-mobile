@@ -134,24 +134,44 @@ class DefaultAppServerController(
     ): CanonicalRuntime = runtimeMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val effectiveMode = mode ?: AppServerPermissionMode.Standard
-
-        // Return cached runtime only when the permission mode still matches.
-        // Overwriting runtimePermissionModes while reusing a differently-moded
-        // scope leaves the server on the old mode (e.g. Unrestricted) while the
-        // engine believes Standard approvals apply.
-        runtimeCache[key]?.let { cached ->
-            if (runtimePermissionModes[key] == effectiveMode) {
-                return cached
-            }
-            runtimeCache.remove(key)
-            // Drop the engine's cached scope too — otherwise a failed replacement
-            // start leaves ensureRuntime() reusing the prior mode's scope while
-            // permissionModeProvider already reports the new mode.
-            turnEngine.invalidateRuntime(notifyHost = false)
-        }
+        evictCachedRuntimeIfModeMismatch(key, effectiveMode)?.let { return it }
         runtimePermissionModes[key] = effectiveMode
+        val response = startRuntimeRemote(
+            key = key,
+            agentId = agentId,
+            conversationId = conversationId,
+            cwd = cwd,
+            effectiveMode = effectiveMode,
+            recoverApprovals = recoverApprovals,
+            forceDeviceStatus = forceDeviceStatus,
+        )
+        cacheStartedRuntime(key, agentId, conversationId, cwd, response)
+    }
 
-        // Issue runtime_start
+    /**
+     * Returns a matching cached runtime, or null when a fresh start is required.
+     * Evicts and invalidates the engine when the cached permission mode differs.
+     */
+    private suspend fun evictCachedRuntimeIfModeMismatch(
+        key: RuntimeKey,
+        effectiveMode: AppServerPermissionMode,
+    ): CanonicalRuntime? {
+        val cached = runtimeCache[key] ?: return null
+        if (runtimePermissionModes[key] == effectiveMode) return cached
+        runtimeCache.remove(key)
+        turnEngine.invalidateRuntime(notifyHost = false)
+        return null
+    }
+
+    private suspend fun startRuntimeRemote(
+        key: RuntimeKey,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        effectiveMode: AppServerPermissionMode,
+        recoverApprovals: Boolean,
+        forceDeviceStatus: Boolean,
+    ): AppServerInboundFrame.RuntimeStartResponse {
         val response = try {
             client.runtimeStart(
                 AppServerCommand.RuntimeStart(
@@ -166,8 +186,6 @@ class DefaultAppServerController(
                 ),
             )
         } catch (e: Exception) {
-            // Mode-change already cleared the engine cache; keep it empty on failure
-            // so we never resume the prior Unrestricted scope under Standard.
             turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
                 message = "Failed to start runtime: ${e.message}",
@@ -175,7 +193,6 @@ class DefaultAppServerController(
             )
             throw AppServerControllerException("Failed to start runtime for $key", e)
         }
-
         if (!response.success) {
             turnEngine.invalidateRuntime(notifyHost = false)
             val errorMsg = response.error ?: "Unknown error"
@@ -184,24 +201,30 @@ class DefaultAppServerController(
             )
             throw AppServerControllerException("Runtime start failed for $key: $errorMsg")
         }
+        return response
+    }
 
+    private suspend fun cacheStartedRuntime(
+        key: RuntimeKey,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        response: AppServerInboundFrame.RuntimeStartResponse,
+    ): CanonicalRuntime {
         val scope = response.runtime
             ?: run {
                 turnEngine.invalidateRuntime(notifyHost = false)
                 throw AppServerControllerException("Runtime start succeeded but returned no runtime scope")
             }
-
-        // Store canonical runtime
         val canonical = CanonicalRuntime(
             scope = scope,
             agent = response.agent,
             conversation = response.conversation,
             created = response.created,
         )
-
         runtimeCache[key] = canonical
         recordStartedRuntime(agentId, conversationId, cwd, canonical)
-        canonical
+        return canonical
     }
 
     private suspend fun recordStartedRuntime(
