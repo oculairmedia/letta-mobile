@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -133,6 +134,10 @@ class DesktopAppServerControllerGatewayFactory(
  * (parity with the Android iroh engine). Baking the mode into the engine lets
  * ensureRuntime's single runtime_start carry it — no eager
  * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
+ *
+ * Context-window preflight matches the Iroh wrapper path so direct Desktop
+ * App Server connections also persist a default limit and compact poisoned
+ * empty-assistant transcripts before the turn starts.
  */
 internal fun buildDesktopAppServerTurnEngine(client: AppServerClient): AppServerTurnEngine =
     AppServerTurnEngine(
@@ -143,6 +148,7 @@ internal fun buildDesktopAppServerTurnEngine(client: AppServerClient): AppServer
             version = "0.2.0",
         ),
         permissionMode = AppServerPermissionMode.Unrestricted,
+        turnContextPreflight = AppServerContextWindowPreflight(client),
     )
 
 /**

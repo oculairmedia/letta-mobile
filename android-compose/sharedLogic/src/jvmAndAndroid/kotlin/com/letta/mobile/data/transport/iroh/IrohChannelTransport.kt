@@ -15,6 +15,7 @@ import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
+import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -718,6 +719,7 @@ class IrohChannelTransport(
                     version = config.clientVersion,
                 ),
                 permissionMode = AppServerPermissionMode.Unrestricted,
+                turnContextPreflight = AppServerContextWindowPreflight(appServerClient),
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(

@@ -500,13 +500,30 @@ class AppServerTurnEngine(
 
     private suspend fun prepareContextIfNeeded(command: TurnCommand) {
         if (command.input !is TurnInput.UserMessage) return
-        val result = turnContextPreflight.prepare(
-            agentId = command.agentId.value,
-            conversationId = command.conversationId.value,
-        )
+        val result = try {
+            turnContextPreflight.prepare(
+                agentId = command.agentId.value,
+                conversationId = command.conversationId.value,
+            )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Preflight may have already mutated agent/conversation state (e.g.
+            // persisted a context limit) before failing on message list/compact.
+            // Drop any cached runtime so the next turn reseeds from the update.
+            invalidateRuntime()
+            Telemetry.event(
+                "AppServerTurnEngine",
+                "context.preflightFailed",
+                "agentId" to command.agentId.value,
+                "conversationId" to command.conversationId.value,
+                "errorClass" to (e::class.simpleName ?: "Exception"),
+            )
+            throw e
+        }
         if (!result.configuredContextLimit && !result.compacted) return
 
-        runtime = null
+        invalidateRuntime()
         Telemetry.event(
             "AppServerTurnEngine",
             "context.preflightApplied",

@@ -115,6 +115,48 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun contextPreflightFailureInvalidatesCachedRuntimeForRetry() = runTest {
+        var failPreflight = false
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            turnContextPreflight = TurnContextPreflight { _, _ ->
+                if (failPreflight) error("conversation_messages_list failed")
+                TurnContextPreflightResult()
+            },
+        )
+
+        engine.runTurn(command).test {
+            awaitItem()
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            awaitItem()
+            awaitItem()
+            awaitComplete()
+        }
+        assertEquals(1, client.runtimeStartCommands.size)
+
+        failPreflight = true
+        engine.runTurn(command).test {
+            val error = awaitError()
+            assertTrue(error.message.orEmpty().contains("conversation_messages_list failed"))
+        }
+
+        failPreflight = false
+        engine.runTurn(command).test {
+            awaitItem()
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-2"))
+            awaitItem()
+            awaitItem()
+            awaitComplete()
+        }
+        assertEquals(
+            2,
+            client.runtimeStartCommands.size,
+            "failed preflight must drop the cached runtime so the retry reseeds",
+        )
+    }
+
+    @Test
     fun runTurnStartsRuntimeSendsInputAndCompletesOnStopReason() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(

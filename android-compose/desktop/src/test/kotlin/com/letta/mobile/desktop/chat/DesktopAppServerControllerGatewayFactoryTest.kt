@@ -109,6 +109,7 @@ class DesktopAppServerControllerGatewayFactoryTest {
         val start = client.runtimeStarts.single()
         assertEquals(AppServerPermissionMode.Unrestricted, start.mode)
         assertEquals("conv-1", start.conversationId)
+        assertEquals(2, client.agentRetrieveCount, "context-window preflight must run on each user turn")
     }
 
     private suspend fun TestScope.runConversationTurnToCompletion(
@@ -158,6 +159,8 @@ class DesktopAppServerControllerGatewayFactoryTest {
      */
     private class RecordingAppServerClient : AppServerClient {
         val runtimeStarts = mutableListOf<AppServerCommand.RuntimeStart>()
+        var agentRetrieveCount = 0
+            private set
         val eventsFlow = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 16)
         override val events: Flow<AppServerReceivedFrame> = eventsFlow
 
@@ -185,6 +188,37 @@ class DesktopAppServerControllerGatewayFactoryTest {
             TODO("not needed")
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
+
+        // Healthy context so AppServerContextWindowPreflight does not mutate or
+        // invalidate the cached runtime between the two turns under test.
+        override suspend fun agentRetrieve(
+            command: AppServerCommand.AgentRetrieve,
+        ): AppServerInboundFrame.AgentRetrieveResponse {
+            agentRetrieveCount += 1
+            return AppServerInboundFrame.AgentRetrieveResponse(
+                requestId = command.requestId,
+                success = true,
+                agent = buildJsonObject { put("context_window_limit", 200_000) },
+            )
+        }
+
+        override suspend fun conversationRetrieve(
+            command: AppServerCommand.ConversationRetrieve,
+        ): AppServerInboundFrame.ConversationRetrieveResponse =
+            AppServerInboundFrame.ConversationRetrieveResponse(
+                requestId = command.requestId,
+                success = true,
+                conversation = buildJsonObject {},
+            )
+
+        override suspend fun conversationMessagesList(
+            command: AppServerCommand.ConversationMessagesList,
+        ): AppServerInboundFrame.ConversationMessagesListResponse =
+            AppServerInboundFrame.ConversationMessagesListResponse(
+                requestId = command.requestId,
+                success = true,
+                messages = kotlinx.serialization.json.JsonArray(emptyList()),
+            )
     }
 
     private class FakeAppServerClient(
