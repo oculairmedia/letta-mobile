@@ -1158,7 +1158,7 @@
     {
       "method": "skill.list",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "controller projection from device_status / skills_updated (NativeSkillsCatalog); capability_unavailable until hydrated",
+      "current_backend": "controller projection from device_status / skills_updated (NativeSkillsCatalog); empty skills + hydrated=false until first event",
       "owner": "app_server_v2",
       "public_contract": "sync snapshot + skills_updated projection",
       "native_contract": [
@@ -1169,7 +1169,7 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "Phase 2: skill_list_command absent; listings derived from update_device_status.current_available_skills and skills_updated. Returns capability_unavailable until first hydration event.",
+      "notes": "Phase 2: skill_list_command absent; listings derived from update_device_status.current_available_skills and skills_updated. Cold start returns {skills:[], hydrated:false} until first hydration event.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"

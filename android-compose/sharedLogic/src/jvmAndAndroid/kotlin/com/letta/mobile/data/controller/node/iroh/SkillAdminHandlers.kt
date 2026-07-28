@@ -80,13 +80,20 @@ object SkillAdminHandlers {
     }
 
     private fun listSkills(skillsListing: SkillsListingSource?): JsonObjectEnvelope {
-        if (skillsListing != null && !skillsListing.isHydrated()) {
-            adminError(
-                "capability_unavailable: skill.list awaiting device-status / skills_updated hydration",
-            )
+        val hydrated = skillsListing?.isHydrated() != false
+        // Cold start: return an empty listing with hydrated=false so UI can wait
+        // without treating the absence of the first device-status frame as an error.
+        if (!hydrated) {
+            return buildJsonObject {
+                put("skills", JsonArray(emptyList()))
+                put("hydrated", false)
+            }
         }
         val skills = skillsListing?.currentSkills() ?: JsonArray(emptyList())
-        return buildJsonObject { put("skills", skills) }
+        return buildJsonObject {
+            put("skills", skills)
+            put("hydrated", true)
+        }
     }
 
     private fun resolveSkillPath(params: kotlinx.serialization.json.JsonObject?): String? {

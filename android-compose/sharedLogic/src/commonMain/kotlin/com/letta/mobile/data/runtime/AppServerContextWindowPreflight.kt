@@ -24,9 +24,11 @@ private val nextContextPreflightRequestId = atomic(0)
  * Letta Code cannot calculate context usage for custom providers when neither
  * the agent nor conversation has an explicit context window. This preflight
  * persists the wrapper default when that setting is absent, then checks a
- * bounded newest message page for an already-recorded provider overflow
- * (`stop_reason=length` is treated as authoritative). An overflow is repaired
- * through Letta Code's own conversation_compact command.
+ * bounded newest message page for poisoned/overflow evidence. Empty assistant
+ * rows and input at/beyond the configured limit always compact. A provider
+ * `stop_reason=length` only counts when paired with near-capacity input on the
+ * newest active assistant (avoids max_tokens truncation storms). Overflow is
+ * repaired through Letta Code's own conversation_compact command.
  */
 class AppServerContextWindowPreflight(
     private val client: AppServerClient,
@@ -108,9 +110,12 @@ class AppServerContextWindowPreflight(
         check(messages.success && messages.messages != null) {
             "conversation_messages_list failed: ${messages.error ?: "missing messages"}"
         }
-        return messages.messages.any { message ->
-            message.isActive(activeMessageIds) && message.recordsProviderOverflow(effectiveLimit)
-        }
+        val active = messages.messages.filter { it.isActive(activeMessageIds) }
+        if (active.any { it.recordsPoisonedOrTokenOverflow(effectiveLimit) }) return true
+        // Length-stop is only consulted on the newest active assistant so an
+        // older max_tokens/context stop cannot re-trigger compaction every turn.
+        val newestAssistant = active.firstOrNull { it.isAssistantMessage() } ?: return false
+        return newestAssistant.recordsLengthStopNearCapacity(effectiveLimit)
     }
 
     private suspend fun compactConversation(agentId: String, conversationId: String) {
@@ -158,13 +163,25 @@ private fun JsonElement.isActive(activeMessageIds: Set<String>?): Boolean {
     }
 }
 
-private fun JsonElement.recordsProviderOverflow(contextWindowLimit: Int): Boolean {
+private fun JsonElement.isAssistantMessage(): Boolean =
+    allObjects().any { it.string("role") == "assistant" }
+
+private fun JsonElement.recordsPoisonedOrTokenOverflow(contextWindowLimit: Int): Boolean {
     val objects = allObjects()
-    // A provider `length` stop is authoritative overflow evidence. Do not require
-    // input tokens to meet our configured limit — that limit may be an oversized
-    // wrapper default (e.g. 200k) while the provider actually capped at 32k/128k.
-    if (objects.hasLengthStop()) return true
-    return objects.hasInputAtOrBeyond(contextWindowLimit) || objects.hasEmptyAssistant()
+    return objects.hasEmptyAssistant() || objects.hasInputAtOrBeyond(contextWindowLimit)
+}
+
+/**
+ * `stop_reason=length` alone is not overflow: providers also emit it when output
+ * hits `max_tokens`. Require near-capacity input (half the configured window) so
+ * a real 128k provider stop under a 200k wrapper default still compacts, while a
+ * low-input max_tokens truncation does not.
+ */
+private fun JsonElement.recordsLengthStopNearCapacity(contextWindowLimit: Int): Boolean {
+    val objects = allObjects()
+    if (!objects.hasLengthStop()) return false
+    val nearCapacity = (contextWindowLimit / 2).coerceAtLeast(1)
+    return objects.hasInputAtOrBeyond(nearCapacity)
 }
 
 private fun List<JsonObject>.hasLengthStop(): Boolean =

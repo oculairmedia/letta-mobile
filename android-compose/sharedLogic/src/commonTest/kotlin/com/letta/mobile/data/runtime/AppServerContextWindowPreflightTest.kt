@@ -106,7 +106,8 @@ class AppServerContextWindowPreflightTest {
     @Test
     fun lengthStopBelowConfiguredDefaultStillCompacts() = runTest {
         // Provider hit its real 128k boundary with non-empty content while the
-        // wrapper default (200k) is persisted — length stop alone must compact.
+        // wrapper default (200k) is persisted — length + near-capacity input
+        // (half of configured limit) must still compact.
         val client = PreflightClient(
             agent = buildJsonObject { put("context_window_limit", 200_000) },
             messages = JsonArray(
@@ -126,6 +127,65 @@ class AppServerContextWindowPreflightTest {
 
         assertTrue(result.compacted)
         assertNotNull(client.compactCommand)
+    }
+
+    @Test
+    fun maxTokensLengthStopWithLowInputDoesNotCompact() = runTest {
+        // Providers emit stop_reason=length for output max_tokens caps even when
+        // input context is tiny — that must not start a compaction storm.
+        val client = PreflightClient(
+            agent = buildJsonObject { put("context_window_limit", 200_000) },
+            messages = JsonArray(
+                listOf(
+                    providerMessage(
+                        ProviderMessageFixture(
+                            stopReason = "length",
+                            input = 2_000,
+                            output = 1_000,
+                            contentEmpty = false,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertFalse(result.compacted)
+        assertEquals(null, client.compactCommand)
+    }
+
+    @Test
+    fun olderActiveLengthStopIsIgnoredWhenNewestAssistantIsHealthy() = runTest {
+        val client = PreflightClient(
+            agent = buildJsonObject { put("context_window_limit", 200_000) },
+            messages = JsonArray(
+                listOf(
+                    providerMessage(
+                        ProviderMessageFixture(
+                            id = "newest-ok",
+                            stopReason = "stop",
+                            input = 40_000,
+                            contentEmpty = false,
+                        ),
+                    ),
+                    providerMessage(
+                        ProviderMessageFixture(
+                            id = "older-length",
+                            stopReason = "length",
+                            input = 128_000,
+                            contentEmpty = false,
+                        ),
+                    ),
+                ),
+            ),
+            activeMessageIds = listOf("newest-ok", "older-length"),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertFalse(result.compacted)
+        assertEquals(null, client.compactCommand)
     }
 
     @Test

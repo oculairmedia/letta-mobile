@@ -194,7 +194,7 @@ class ControlCapabilityHandlersTest {
     }
 
     @Test
-    fun skillListDeniesUntilCatalogHydrated() = runTest {
+    fun skillListReturnsEmptyUntilCatalogHydrated() = runTest {
         val catalog = NativeSkillsCatalog()
         val r = AdminRpcRouter()
         SkillAdminHandlers.register(
@@ -205,9 +205,9 @@ class ControlCapabilityHandlersTest {
             },
         )
         val listed = dispatch(r, "skill.list", emptyMap())
-        assertTrue(listed.contains("\"success\":false"))
-        assertTrue(listed.contains("capability_unavailable"))
-        assertTrue(listed.contains("hydration"))
+        assertTrue(listed.contains("\"success\":true"))
+        assertTrue(listed.contains("\"hydrated\":false"))
+        assertTrue(listed.contains("\"skills\":[]"))
     }
 
     @Test

@@ -248,7 +248,7 @@ object ConversationAdminHandlers {
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             adminError(
-                "not_found: message $messageId not found within searchable window budget",
+                "deadline_exceeded: message $messageId lookup exceeded searchable window budget",
             )
         }
     }
