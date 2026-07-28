@@ -151,26 +151,25 @@ private fun JsonObject?.hasExplicitContextWindowLimit(): Boolean {
 /** Returns updated `model_settings` when max_output is missing; null if already set. */
 private fun JsonObject?.withKnownMaxOutputTokens(maxOutputTokens: Int): JsonObject? {
     val modelSettings = this?.nestedObject("model_settings", "modelSettings")
-    val llmConfig = this?.nestedObject("llm_config", "llmConfig")
-    val hasExplicitOutput =
-        modelSettings?.containsKey("max_output_tokens") == true ||
-            modelSettings?.containsKey("maxOutputTokens") == true ||
-            modelSettings?.containsKey("max_tokens") == true ||
-            modelSettings?.containsKey("maxTokens") == true ||
-            this?.containsKey("max_output_tokens") == true ||
-            this?.containsKey("max_tokens") == true ||
-            this?.containsKey("maxTokens") == true ||
-            // Legacy create payloads may only cap output via llm_config.max_tokens.
-            llmConfig?.containsKey("max_tokens") == true ||
-            llmConfig?.containsKey("maxTokens") == true ||
-            llmConfig?.containsKey("max_output_tokens") == true ||
-            llmConfig?.containsKey("maxOutputTokens") == true
-    if (hasExplicitOutput) return null
+    if (hasExplicitMaxOutput(modelSettings)) return null
     return buildJsonObject {
         modelSettings?.forEach { (k, v) -> put(k, v) }
         put("max_output_tokens", maxOutputTokens)
     }
 }
+
+private fun JsonObject?.hasExplicitMaxOutput(modelSettings: JsonObject?): Boolean {
+    val llmConfig = this?.nestedObject("llm_config", "llmConfig")
+    return modelSettings.hasAnyKey(
+        "max_output_tokens", "maxOutputTokens", "max_tokens", "maxTokens",
+    ) || this.hasAnyKey("max_output_tokens", "max_tokens", "maxTokens") ||
+        llmConfig.hasAnyKey(
+            "max_tokens", "maxTokens", "max_output_tokens", "maxOutputTokens",
+        )
+}
+
+private fun JsonObject?.hasAnyKey(vararg keys: String): Boolean =
+    this != null && keys.any { containsKey(it) }
 
 private fun JsonObject.nestedObject(vararg keys: String): JsonObject? =
     keys.firstNotNullOfOrNull { key -> this[key] as? JsonObject }
