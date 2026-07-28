@@ -22,7 +22,14 @@ class AppServerRuntimeEventRouter(
     private val collectorJob = atomic<Job?>(null)
 
     /** Re-attach when the upstream events flow changes (transport reconnect). */
+    /**
+     * Attach a sole collector. No-op when an active collector is already running
+     * against the same stable inbound pipe (reconnect must not tear it down —
+     * SharedFlow has zero replay and frames in the cancel→resubscribe gap are lost).
+     */
     fun attach(scope: CoroutineScope, inbound: Flow<AppServerReceivedFrame>) {
+        val existing = collectorJob.value
+        if (existing != null && existing.isActive) return
         collectorJob.value?.cancel()
         collectorJob.value = scope.launch {
             inbound.collect { received -> fanout.route(received) }
@@ -32,6 +39,8 @@ class AppServerRuntimeEventRouter(
     fun detach() {
         collectorJob.getAndSet(null)?.cancel()
     }
+
+    fun isAttached(): Boolean = collectorJob.value?.isActive == true
 
     suspend fun subscribe(
         agentId: AgentId,

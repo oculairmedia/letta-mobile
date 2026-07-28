@@ -208,7 +208,12 @@ class DefaultAppServerController(
     }
 
     override fun markConnected() {
-        eventRouter.attach(controllerScope, client.events)
+        // Collector is retained across disconnect (see onTransportDisconnected);
+        // only attach if it died. Re-attaching would cancel the stable pipe and
+        // drop zero-replay SharedFlow frames during the gap.
+        if (!eventRouter.isAttached()) {
+            eventRouter.attach(controllerScope, client.events)
+        }
         _state.value = AppServerControllerState.Connected
     }
 

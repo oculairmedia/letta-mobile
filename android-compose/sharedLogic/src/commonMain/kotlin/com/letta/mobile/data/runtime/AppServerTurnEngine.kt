@@ -1381,7 +1381,10 @@ class AppServerTurnEngine(
             // wildcards — they must not reset the idle watchdog or become turn
             // output. External tool requests are answered on the turn path and
             // may arrive without a runtime envelope.
-            return frame is AppServerInboundFrame.ExternalToolCallRequest
+            // Fanout broadcasts unscoped ExternalToolCallRequest and ControlRequest;
+            // both must reach the turn mapper/auto-approver or the server stays blocked.
+            return frame is AppServerInboundFrame.ExternalToolCallRequest ||
+                frame is AppServerInboundFrame.ControlRequest
         }
         return eventRuntime.agentId == scope.agentId &&
             eventRuntime.conversationId == scope.conversationId
