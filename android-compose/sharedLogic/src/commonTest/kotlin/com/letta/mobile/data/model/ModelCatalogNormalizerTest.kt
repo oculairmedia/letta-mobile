@@ -31,11 +31,13 @@ class ModelCatalogNormalizerTest {
         val models = listOf(
             LlmModel(id = "openai/gpt-4o", name = "gpt-4o", handle = "openai/gpt-4o", providerType = "openai"),
             LlmModel(id = "azure/gpt-4o", name = "gpt-4o", handle = "azure/gpt-4o", providerType = "azure"),
+            LlmModel(id = "upper", name = "Model-A", handle = "google/Model-A", providerType = "google"),
+            LlmModel(id = "lower", name = "model-a", handle = "google/model-a", providerType = "google"),
         )
         val normalized = ModelCatalogNormalizer.normalize(models)
-        assertEquals(2, normalized.size)
+        assertEquals(4, normalized.size)
         assertEquals(
-            setOf("openai/gpt-4o", "azure/gpt-4o"),
+            setOf("openai/gpt-4o", "azure/gpt-4o", "google/Model-A", "google/model-a"),
             normalized.map { it.handle }.toSet(),
         )
     }
@@ -55,6 +57,18 @@ class ModelCatalogNormalizerTest {
             "openai/gpt-4o" to "https://llmux.example/v1",
             "openai/gpt-4o" to "https://byok.example/v1",
         )
+
+        val providerRoutes = listOf("byok-east", "byok-west").map { providerName ->
+            LlmModel(
+                id = providerName,
+                name = "gpt-4o",
+                handle = "openai/gpt-4o",
+                providerType = "openai",
+                providerName = providerName,
+                modelEndpoint = "https://shared.example/v1",
+            )
+        }
+        assertEquals(2, ModelCatalogNormalizer.normalize(providerRoutes).size)
     }
 
     @Test
@@ -79,6 +93,31 @@ class ModelCatalogNormalizerTest {
             setOf("https://llmux.example/v1", "https://byok.example/v1"),
             models.map { it.modelEndpoint }.toSet(),
         )
+    }
+
+    @Test
+    fun adapterRoundTripPreservesProviderSpecificRoutes() {
+        val entries = JsonArray(
+            listOf("byok-east", "byok-west").map { providerName ->
+                buildJsonObject {
+                    put("id", providerName)
+                    put("handle", "openai/gpt-4o")
+                    put("provider_name", providerName)
+                    put("provider_category", "byok")
+                    put("model_endpoint_type", "openai")
+                    put("model_endpoint", "https://shared.example/v1")
+                }
+            },
+        )
+
+        val adapted = AppServerListModelsAdapter.toLlmModelArray(entries)
+        val roundTrip = AppServerListModelsAdapter.toLlmModels(adapted)
+
+        assertEquals(2, roundTrip.size)
+        assertEquals(setOf("byok-east", "byok-west"), roundTrip.map { it.providerName }.toSet())
+        assertTrue(roundTrip.all { it.providerCategory == "byok" })
+        assertTrue(roundTrip.all { it.modelEndpointType == "openai" })
+        assertTrue(roundTrip.all { it.modelEndpoint == "https://shared.example/v1" })
     }
 
     @Test
@@ -158,6 +197,49 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
+    fun doesNotApplyLlmuxLimitsToIndependentRoutes() {
+        val customOpenAi = LlmModel(
+            id = "custom-minimax",
+            name = "MiniMax-M3",
+            handle = "openai/MiniMax-M3",
+            providerType = "openai",
+            providerCategory = "byok",
+            modelEndpoint = "https://custom.example/v1",
+        )
+        val azure = customOpenAi.copy(
+            id = "azure-minimax",
+            handle = "azure/MiniMax-M3",
+            providerType = "azure",
+            providerCategory = null,
+            modelEndpoint = null,
+        )
+        listOf(customOpenAi, azure).forEach { model ->
+            val enriched = ModelCatalogNormalizer.enrichLimits(model)
+            assertNull(enriched.contextWindow)
+            assertNull(enriched.maxOutputTokens)
+        }
+    }
+
+    @Test
+    fun adapterDoesNotApplyLlmuxLimitsToByokRouteWithoutEndpointMetadata() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "custom-minimax")
+                    put("handle", "openai/MiniMax-M3")
+                    put("provider_category", "byok")
+                },
+            ),
+        )
+
+        val model = AppServerListModelsAdapter.toLlmModels(entries).single()
+
+        assertEquals("byok", model.providerCategory)
+        assertNull(model.contextWindow)
+        assertNull(model.maxOutputTokens)
+    }
+
+    @Test
     fun preservesAuthoritativeContextWindowOverKnownDefaults() {
         val model = LlmModel(
             id = "MiniMax-M3",
@@ -176,20 +258,24 @@ class ModelCatalogNormalizerTest {
     fun prefersHigherProviderRankEvenWhenLowerRankHasRicherMetadata() {
         val bareOpenai = LlmModel(
             id = "x",
-            handle = "openai/deepseek-v4-pro",
-            name = "deepseek",
+            handle = "openai/MiniMax-M3",
+            name = "MiniMax-M3",
             providerType = "openai",
         )
         val richLcOpenai = LlmModel(
             id = "y",
-            handle = "lc-openai/deepseek-v4-pro",
-            name = "deepseek",
+            handle = "lc-openai/MiniMax-M3",
+            name = "MiniMax-M3",
             providerType = "lc-openai",
             contextWindow = 1_000_000,
             maxOutputTokens = 8_192,
+            displayNameOverride = "MiniMax M3 Extended",
         )
         val winner = ModelCatalogNormalizer.normalize(listOf(bareOpenai, richLcOpenai)).single()
-        assertEquals("openai/deepseek-v4-pro", winner.handle)
+        assertEquals("openai/MiniMax-M3", winner.handle)
+        assertEquals(1_000_000, winner.contextWindow)
+        assertEquals(8_192, winner.maxOutputTokens)
+        assertEquals("MiniMax M3 Extended", winner.displayNameOverride)
     }
 
     @Test

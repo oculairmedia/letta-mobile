@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.runtime.DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
 import kotlinx.serialization.json.JsonObject
@@ -14,7 +15,15 @@ import kotlinx.serialization.json.put
  */
 internal fun JsonObject?.withDefaultContextWindow(): JsonObject {
     val body = this
-    val known = ModelCatalogNormalizer.knownLimitsForHandle(firstModelHandle(body))
+    val requestModel = requestModel(body)
+    val known = requestModel?.let(ModelCatalogNormalizer::knownLimitsForModel)
+    val recognizedId = requestModel?.let {
+        ModelCatalogNormalizer.knownLimitsForUnderlyingId(
+            ModelCatalogNormalizer.underlyingModelId(it.handle.orEmpty()),
+        )
+    }
+    val contextDefault = known?.contextWindow
+        ?: DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT.takeIf { recognizedId == null }
     val modelSettingsKey = when {
         body?.containsKey("model_settings") == true -> "model_settings"
         body?.containsKey("modelSettings") == true -> "modelSettings"
@@ -23,10 +32,7 @@ internal fun JsonObject?.withDefaultContextWindow(): JsonObject {
     return buildJsonObject {
         body?.forEach { (key, value) -> put(key, value) }
         if (!body.hasExplicitContextWindowLimit()) {
-            put(
-                "context_window_limit",
-                known?.contextWindow ?: DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT,
-            )
+            contextDefault?.let { put("context_window_limit", it) }
         }
         known?.let { limits ->
             body.withKnownMaxOutputTokens(limits.maxOutputTokens)?.let { put(modelSettingsKey, it) }
@@ -74,6 +80,28 @@ private fun firstModelHandle(body: JsonObject?): String? {
     stringField(body, "model", "handle")?.let { return it }
     stringField(body.nestedObject("model_settings", "modelSettings"), "handle", "model")?.let { return it }
     return stringField(body.nestedObject("llm_config", "llmConfig"), "handle", "model")
+}
+
+private fun requestModel(body: JsonObject?): LlmModel? {
+    val handle = firstModelHandle(body) ?: return null
+    return LlmModel(
+        id = handle,
+        name = handle,
+        handle = handle,
+        providerType = body.modelField("provider_type", "providerType")
+            ?: ModelCatalogNormalizer.providerPrefix(handle),
+        providerName = body.modelField("provider_name", "providerName"),
+        providerCategory = body.modelField("provider_category", "providerCategory"),
+        modelEndpointType = body.modelField("model_endpoint_type", "modelEndpointType"),
+        modelEndpoint = body.modelField("model_endpoint", "modelEndpoint"),
+    )
+}
+
+private fun JsonObject?.modelField(vararg keys: String): String? {
+    if (this == null) return null
+    stringField(this, *keys)?.let { return it }
+    stringField(nestedObject("model_settings", "modelSettings"), *keys)?.let { return it }
+    return stringField(nestedObject("llm_config", "llmConfig"), *keys)
 }
 
 private fun stringField(obj: JsonObject?, vararg keys: String): String? {

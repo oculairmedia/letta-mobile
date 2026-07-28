@@ -87,6 +87,12 @@ object AppServerListModelsAdapter {
             providerName = routingScopes.firstNotNullOfOrNull {
                 firstString(it, "provider_name", "providerName")
             },
+            providerCategory = routingScopes.firstNotNullOfOrNull {
+                firstString(it, "provider_category", "providerCategory")
+            },
+            modelEndpointType = routingScopes.firstNotNullOfOrNull {
+                firstString(it, "model_endpoint_type", "modelEndpointType")
+            },
             modelEndpoint = routingScopes.firstNotNullOfOrNull {
                 firstString(it, "model_endpoint", "modelEndpoint")
             },
@@ -127,6 +133,10 @@ object AppServerListModelsAdapter {
             model.handle?.let { put("handle", it) }
             model.displayNameOverride?.let { put("display_name", it) }
             put("provider_type", model.providerType)
+            model.providerName?.let { put("provider_name", it) }
+            model.providerCategory?.let { put("provider_category", it) }
+            model.modelEndpointType?.let { put("model_endpoint_type", it) }
+            model.modelEndpoint?.let { put("model_endpoint", it) }
             sourceEntry?.description?.takeIf { it.isNotBlank() }?.let { put("description", it) }
             model.contextWindow?.takeIf { it > 0 }?.let { put("context_window", it) }
             model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }

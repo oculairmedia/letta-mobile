@@ -48,6 +48,8 @@ object ModelCatalogNormalizer {
         "lm_studio",
     )
 
+    private val LLMUX_ROUTE_HINTS = listOf("llmux", "litellm", "lmstudio", "lm_studio")
+
     /**
      * Explicit limits for models whose LLMux catalog entries omit token metadata.
      * Match only verified IDs / known LLMux aliases — never an entire evolving family
@@ -80,13 +82,20 @@ object ModelCatalogNormalizer {
 
     fun knownLimitsForHandle(handleOrId: String?): KnownLimits? {
         if (handleOrId.isNullOrBlank()) return null
+        if (providerPrefix(handleOrId) !in LLMUX_ALIAS_PROVIDERS) return null
         return knownLimitsForUnderlyingId(underlyingModelId(handleOrId))
+    }
+
+    fun knownLimitsForModel(model: LlmModel): KnownLimits? {
+        val handle = model.handle?.takeIf { it.isNotBlank() } ?: model.id
+        val prefix = providerPrefix(handle).ifBlank { model.providerType.trim().lowercase() }
+        if (prefix !in LLMUX_ALIAS_PROVIDERS || !hasLlmuxProvenance(model)) return null
+        return knownLimitsForUnderlyingId(underlyingModelId(handle))
     }
 
     /** Fill missing context/output from known tables; never overwrite authoritative values. */
     fun enrichLimits(model: LlmModel): LlmModel {
-        val handle = model.handle?.takeIf { it.isNotBlank() } ?: model.id
-        val known = knownLimitsForHandle(handle) ?: return model
+        val known = knownLimitsForModel(model) ?: return model
         return model.copy(
             contextWindow = model.contextWindow?.takeIf { it > 0 } ?: known.contextWindow,
             maxOutputTokens = model.maxOutputTokens?.takeIf { it > 0 } ?: known.maxOutputTokens,
@@ -114,17 +123,22 @@ object ModelCatalogNormalizer {
         val winners = LinkedHashMap<String, Pair<T, LlmModel>>()
         val order = ArrayList<String>()
         for ((meta, rawModel) in items) {
-            val model = enrichLimits(rawModel)
-            val key = dedupeKey(model)
+            val key = dedupeKey(rawModel)
             val existing = winners[key]
             if (existing == null) {
-                winners[key] = meta to model
+                winners[key] = meta to rawModel
                 order.add(key)
-            } else if (prefer(model, existing.second)) {
-                winners[key] = meta to model
+            } else {
+                val candidateWins = prefer(rawModel, existing.second)
+                val winnerMeta = if (candidateWins) meta else existing.first
+                val winnerModel = if (candidateWins) rawModel else existing.second
+                val alternate = if (candidateWins) existing.second else rawModel
+                winners[key] = winnerMeta to mergeMissingMetadata(winnerModel, alternate)
             }
         }
-        return order.mapNotNull { winners[it] }
+        return order.mapNotNull { key ->
+            winners[key]?.let { (meta, model) -> meta to enrichLimits(model) }
+        }
     }
 
     fun normalize(models: List<LlmModel>): List<LlmModel> =
@@ -134,19 +148,19 @@ object ModelCatalogNormalizer {
         val handle = model.handle?.takeIf { it.isNotBlank() }
             ?: model.id.ifBlank { model.name }
         val prefix = providerPrefix(handle).ifBlank { model.providerType.lowercase() }
-        val underlying = underlyingModelId(handle).lowercase()
+        val underlying = underlyingModelId(handle)
         return if (prefix in LLMUX_ALIAS_PROVIDERS && underlying.isNotEmpty()) {
             // Only collapse when routing provenance agrees (shared / identical endpoint).
             "llmux-alias:$underlying:${routingIdentity(model)}"
         } else {
             // Preserve distinct routes (azure vs openai, openrouter, custom, …).
-            "route:${handle.ifBlank { "unkeyed-${model.id}" }.lowercase()}:${routingIdentity(model)}"
+            "route:${handle.ifBlank { "unkeyed-${model.id}" }}:${routingIdentity(model)}"
         }
     }
 
     /**
      * Routing provenance used to decide whether two LLMux-alias handles share an
-     * endpoint. Distinct `modelEndpoint` / `providerName` values stay separate;
+     * endpoint. Distinct `modelEndpoint` / `providerName` combinations stay separate;
      * rows with no endpoint identity (typical App Server presentation) share the
      * `shared` bucket so openai/lmstudio/anthropic aliases still collapse.
      */
@@ -154,16 +168,61 @@ object ModelCatalogNormalizer {
         val endpoint = model.modelEndpoint
             ?.trim()
             ?.trimEnd('/')
-            ?.lowercase()
             ?.takeIf { it.isNotEmpty() }
-        if (endpoint != null) return "ep:$endpoint"
         val providerName = model.providerName
             ?.trim()
-            ?.lowercase()
             ?.takeIf { it.isNotEmpty() }
-        if (providerName != null) return "pn:$providerName"
-        return "shared"
+        return if (endpoint != null || providerName != null) {
+            "ep:${endpoint.orEmpty()}|pn:${providerName.orEmpty()}"
+        } else {
+            "shared"
+        }
     }
+
+    private fun hasLlmuxProvenance(model: LlmModel): Boolean {
+        if (model.providerCategory.equals("byok", ignoreCase = true)) return false
+        val routeMetadata = listOfNotNull(
+            model.providerName,
+            model.modelEndpoint,
+            model.modelEndpointType,
+        )
+        if (routeMetadata.isEmpty()) return true
+        return routeMetadata.any { value ->
+            val normalized = value.lowercase()
+            LLMUX_ROUTE_HINTS.any { it in normalized }
+        }
+    }
+
+    private fun mergeMissingMetadata(preferred: LlmModel, alternate: LlmModel): LlmModel =
+        preferred.copy(
+            id = preferred.id.ifBlank { alternate.id },
+            name = preferred.name.ifBlank { alternate.name },
+            displayNameOverride = preferred.displayNameOverride.takeUnless { it.isNullOrBlank() }
+                ?: alternate.displayNameOverride,
+            providerType = preferred.providerType.ifBlank { alternate.providerType },
+            providerName = preferred.providerName.takeUnless { it.isNullOrBlank() } ?: alternate.providerName,
+            providerCategory = preferred.providerCategory.takeUnless { it.isNullOrBlank() }
+                ?: alternate.providerCategory,
+            modelEndpointType = preferred.modelEndpointType.takeUnless { it.isNullOrBlank() }
+                ?: alternate.modelEndpointType,
+            modelEndpoint = preferred.modelEndpoint.takeUnless { it.isNullOrBlank() } ?: alternate.modelEndpoint,
+            modelWrapper = preferred.modelWrapper.takeUnless { it.isNullOrBlank() } ?: alternate.modelWrapper,
+            contextWindow = preferred.contextWindow?.takeIf { it > 0 } ?: alternate.contextWindow,
+            maxOutputTokens = preferred.maxOutputTokens?.takeIf { it > 0 } ?: alternate.maxOutputTokens,
+            temperature = preferred.temperature ?: alternate.temperature,
+            maxTokens = preferred.maxTokens?.takeIf { it > 0 } ?: alternate.maxTokens,
+            enableReasoner = preferred.enableReasoner ?: alternate.enableReasoner,
+            reasoningEffort = preferred.reasoningEffort.takeUnless { it.isNullOrBlank() }
+                ?: alternate.reasoningEffort,
+            maxReasoningTokens = preferred.maxReasoningTokens?.takeIf { it > 0 }
+                ?: alternate.maxReasoningTokens,
+            frequencyPenalty = preferred.frequencyPenalty ?: alternate.frequencyPenalty,
+            compatibilityType = preferred.compatibilityType.takeUnless { it.isNullOrBlank() }
+                ?: alternate.compatibilityType,
+            verbosity = preferred.verbosity.takeUnless { it.isNullOrBlank() } ?: alternate.verbosity,
+            tier = preferred.tier.takeUnless { it.isNullOrBlank() } ?: alternate.tier,
+            parallelToolCalls = preferred.parallelToolCalls ?: alternate.parallelToolCalls,
+        )
 
     /** Provider rank wins first; richness is only a same-rank tiebreaker. */
     private fun prefer(candidate: LlmModel, incumbent: LlmModel): Boolean {
