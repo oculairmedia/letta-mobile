@@ -204,6 +204,7 @@ class AppServerTurnEngine(
      * Derived from [activeLeaseRef] — never force-unlocks exclusion.
      */
     private val activeTurnOwnerRef = atomic<ActiveTurnOwner?>(null)
+    private val runIdGate = TurnRunIdGate(activeLeaseRef, activeTurnOwnerRef)
 
     /**
      * letta-mobile-vilsn: tool_call_id -> real approval id (the can_use_tool
@@ -758,7 +759,6 @@ class AppServerTurnEngine(
         var turnEndReason: String? = null
         // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
         // prior ids are superseded and must not complete/mutate this lease.
-        val supersededRunIds = mutableSetOf<String>()
         val (fanoutSubscriberId, inboundEvents) = subscribeTurnInbound(scope)
         try {
             collectorReady.complete(Unit)
@@ -777,7 +777,7 @@ class AppServerTurnEngine(
                     }
                     return@collect
                 }
-                if (!received.matchesActiveRun(leaseToken, supersededRunIds)) {
+                if (!runIdGate.accepts(received, leaseToken)) {
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
@@ -808,7 +808,7 @@ class AppServerTurnEngine(
                 val frameSeq = received.eventSeqOrNull()
                 val drafts = mapper.map(command, received)
                 drafts.firstOrNull { it.runId != null }?.runId?.value?.let { newRunId ->
-                    promoteOwnerRunId(newRunId, leaseToken, supersededRunIds)
+                    runIdGate.promote(newRunId, leaseToken)
                 }
                 drafts.forEach { draft ->
                     val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
@@ -1405,29 +1405,6 @@ class AppServerTurnEngine(
     }
 
     /**
-     * After run-id promotion, frames advertising a superseded run id must not
-     * mutate the active lease (lgns8.22.4). Mid-turn run reassignment (tool
-     * continuation) is allowed and marks the prior id superseded. Frames without
-     * a run id still pass.
-     */
-    private fun AppServerReceivedFrame.matchesActiveRun(
-        leaseToken: Long,
-        supersededRunIds: Set<String>,
-    ): Boolean {
-        val lease = activeLeaseRef.value ?: return true
-        if (lease.token != leaseToken) return false
-        val frameRunId = frameRunIdOrNull() ?: return true
-        return frameRunId !in supersededRunIds
-    }
-
-    private fun AppServerReceivedFrame.frameRunIdOrNull(): String? {
-        val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return null
-        return runCatching {
-            streamDelta.delta.jsonObject.string("run_id")
-        }.getOrNull()?.takeIf { it.isNotBlank() }
-    }
-
-    /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort event_seq for a received
      * frame, if the concrete frame type carries one. Pure read; null otherwise.
      */
@@ -1650,28 +1627,6 @@ class AppServerTurnEngine(
                 lastTerminalSeq = seq ?: lease.lastTerminalSeq,
                 lastTerminalScopeMatched = scopeMatched ?: lease.lastTerminalScopeMatched,
             )
-        }
-    }
-
-    /**
-     * Promotes the server-assigned run id into the active-turn owner. When the
-     * run id changes mid-turn, the previous id is recorded as superseded so
-     * late frames from that run cannot complete the lease (lgns8.22.4).
-     * Token-gated so a stale owner cannot promote into a successor lease (lgns8.22.2).
-     */
-    private fun promoteOwnerRunId(
-        runId: String,
-        leaseToken: Long,
-        supersededRunIds: MutableSet<String>,
-    ) {
-        if (activeLeaseRef.value?.token != leaseToken) return
-        val current = activeTurnOwnerRef.value ?: return
-        if (current.runId == runId) return
-        current.runId?.takeIf { it.isNotBlank() }?.let { supersededRunIds.add(it) }
-        activeTurnOwnerRef.value = current.copy(runId = runId)
-        activeLeaseRef.update { lease ->
-            if (lease == null || lease.token != leaseToken || lease.runId == runId) lease
-            else lease.copy(runId = runId)
         }
     }
 
