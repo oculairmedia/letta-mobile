@@ -31,18 +31,15 @@ internal fun JsonObject?.withDefaultContextWindow(): JsonObject {
 
 private fun JsonObject?.hasExplicitContextWindowLimit(): Boolean {
     if (this == null) return false
-    if (containsKey("context_window_limit") || containsKey("contextWindowLimit")) return true
-    val modelSettings = nestedObject("model_settings", "modelSettings")
-    if (modelSettings?.containsKey("context_window_limit") == true ||
-        modelSettings?.containsKey("contextWindowLimit") == true
+    if (hasAnyKey("context_window_limit", "contextWindowLimit")) return true
+    if (nestedObject("model_settings", "modelSettings")
+            .hasAnyKey("context_window_limit", "contextWindowLimit")
     ) {
         return true
     }
-    val llmConfig = nestedObject("llm_config", "llmConfig") ?: return false
-    return llmConfig.containsKey("context_window") ||
-        llmConfig.containsKey("context_window_limit") ||
-        llmConfig.containsKey("contextWindow") ||
-        llmConfig.containsKey("contextWindowLimit")
+    return nestedObject("llm_config", "llmConfig").hasAnyKey(
+        "context_window", "context_window_limit", "contextWindow", "contextWindowLimit",
+    )
 }
 
 /** Returns updated `model_settings` when max_output is missing; null if already set. */
@@ -55,15 +52,11 @@ private fun JsonObject?.withKnownMaxOutputTokens(maxOutputTokens: Int): JsonObje
     }
 }
 
-private fun JsonObject?.hasExplicitMaxOutput(modelSettings: JsonObject?): Boolean {
-    val llmConfig = this?.nestedObject("llm_config", "llmConfig")
-    return modelSettings.hasAnyKey(
-        "max_output_tokens", "maxOutputTokens", "max_tokens", "maxTokens",
-    ) || this.hasAnyKey("max_output_tokens", "max_tokens", "maxTokens") ||
-        llmConfig.hasAnyKey(
-            "max_tokens", "maxTokens", "max_output_tokens", "maxOutputTokens",
-        )
-}
+private fun JsonObject?.hasExplicitMaxOutput(modelSettings: JsonObject?): Boolean =
+    modelSettings.hasAnyKey("max_output_tokens", "maxOutputTokens", "max_tokens", "maxTokens") ||
+        this.hasAnyKey("max_output_tokens", "max_tokens", "maxTokens") ||
+        this?.nestedObject("llm_config", "llmConfig")
+            .hasAnyKey("max_tokens", "maxTokens", "max_output_tokens", "maxOutputTokens")
 
 private fun JsonObject?.hasAnyKey(vararg keys: String): Boolean =
     this != null && keys.any { containsKey(it) }
@@ -73,14 +66,16 @@ private fun JsonObject.nestedObject(vararg keys: String): JsonObject? =
 
 private fun firstModelHandle(body: JsonObject?): String? {
     if (body == null) return null
-    val direct = (body["model"] as? JsonPrimitive)?.contentOrNull
-        ?: (body["handle"] as? JsonPrimitive)?.contentOrNull
-    if (!direct.isNullOrBlank()) return direct
-    val settings = body.nestedObject("model_settings", "modelSettings")
-    val fromSettings = (settings?.get("handle") as? JsonPrimitive)?.contentOrNull
-        ?: (settings?.get("model") as? JsonPrimitive)?.contentOrNull
-    if (!fromSettings.isNullOrBlank()) return fromSettings
-    val llmConfig = body.nestedObject("llm_config", "llmConfig")
-    return (llmConfig?.get("handle") as? JsonPrimitive)?.contentOrNull
-        ?: (llmConfig?.get("model") as? JsonPrimitive)?.contentOrNull
+    stringField(body, "model", "handle")?.let { return it }
+    stringField(body.nestedObject("model_settings", "modelSettings"), "handle", "model")?.let { return it }
+    return stringField(body.nestedObject("llm_config", "llmConfig"), "handle", "model")
+}
+
+private fun stringField(obj: JsonObject?, vararg keys: String): String? {
+    if (obj == null) return null
+    for (key in keys) {
+        val value = (obj[key] as? JsonPrimitive)?.contentOrNull
+        if (!value.isNullOrBlank()) return value
+    }
+    return null
 }
