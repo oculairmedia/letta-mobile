@@ -8,15 +8,6 @@ on:
       - "android-compose/**"
   pull_request:
     branches: [main]
-    paths:
-      # Broadened to all workflow files so a CI-only PR still triggers the
-      # required perf-gate check (see android.yml for the deadlock rationale).
-      - ".github/workflows/**"
-      - "android-compose/**"
-      - "scripts/tests/**"
-      - "scripts/mcp/**"
-      - "scripts/scip/**"
-      - "tools/architecture_query/**"
   workflow_dispatch:
     inputs:
       rebaseline:
@@ -31,6 +22,7 @@ concurrency:
 
 jobs:
   perf-gate:
+    name: perf-gate
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,26 +39,59 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Classify performance impact
+        id: classify
+        working-directory: ${{ github.workspace }}
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          run_benchmark=true
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            changed_files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+            {
+              echo "## Performance scope"
+              echo
+              echo '```text'
+              printf '%s\n' "$changed_files"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            if ! grep -Eq '^android-compose/|^\.github/workflows/android-perf\.yml$' <<<"$changed_files"; then
+              run_benchmark=false
+            fi
+          fi
+          echo "run_benchmark=$run_benchmark" >> "$GITHUB_OUTPUT"
+          echo "Macrobenchmark required: $run_benchmark" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Setup Java 26
+        if: steps.classify.outputs.run_benchmark == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
 
       - name: Setup Gradle
+        if: steps.classify.outputs.run_benchmark == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           # Android `test` is the sole PR cache writer.
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Enable KVM group perms
+        if: steps.classify.outputs.run_benchmark == 'true'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
       - name: Run macrobenchmarks on API 33 emulator (attempt 1)
+        if: steps.classify.outputs.run_benchmark == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -85,6 +110,7 @@ jobs:
             FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
       - name: Check perf baselines (attempt 1)
+        if: steps.classify.outputs.run_benchmark == 'true'
         id: check_perf_attempt_1
         run: |
           set -euo pipefail
@@ -106,7 +132,7 @@ jobs:
           fi
 
       - name: Rerun macrobenchmarks after retryable cold-start failure (attempt 2)
-        if: steps.check_perf_attempt_1.outputs.retry == 'true'
+        if: steps.classify.outputs.run_benchmark == 'true' && steps.check_perf_attempt_1.outputs.retry == 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
@@ -125,13 +151,13 @@ jobs:
             FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
       - name: Check perf baselines after retry (attempt 2)
-        if: steps.check_perf_attempt_1.outputs.retry == 'true'
+        if: steps.classify.outputs.run_benchmark == 'true' && steps.check_perf_attempt_1.outputs.retry == 'true'
         run: |
           set -euo pipefail
           python3 perf/check_baselines.py "$PERF_OUTPUT_DIR" --summary-json "$PERF_SUMMARY_DIR/attempt-2/perf-summary.json" --summary-md "$PERF_SUMMARY_DIR/attempt-2/perf-summary.md"
 
       - name: Upload perf benchmark results
-        if: always()
+        if: always() && steps.classify.outputs.run_benchmark == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: android-perf-results-${{ github.run_number }}
@@ -143,7 +169,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Upload rebaselined perf baselines
-        if: always() && (inputs.rebaseline || contains(github.event.pull_request.title || '', '[perf:rebaseline]'))
+        if: always() && steps.classify.outputs.run_benchmark == 'true' && (inputs.rebaseline || contains(github.event.pull_request.title || '', '[perf:rebaseline]'))
         uses: actions/upload-artifact@v4
         with:
           name: android-perf-baselines-${{ github.run_number }}

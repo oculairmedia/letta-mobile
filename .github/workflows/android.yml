@@ -145,6 +145,9 @@ jobs:
     # Advisory static analysis. Wired with continue-on-error so existing debt
     # does not block merges; findings still show on the PR checks list.
     name: detekt (advisory)
+    # Keep advisory work out of the initial runner queue so required checks
+    # acquire capacity first.
+    needs: [test, shared-multiplatform, build-apk-pass]
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
@@ -222,18 +225,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
 
-      - name: Compile and test sharedLogic across all KMP targets
+      - name: Run shared multiplatform verification task graph
         # :sharedLogic:allTests runs the jvm + android-unit + host-native test
         # suites, which forces compilation of commonMain/commonTest for every
         # configured target. This is the gate that would have caught the
-        # native-only break fixed in b97bcf48.
-        run: ./gradlew :sharedLogic:allTests
-
-      - name: Build and test desktop module
-        run: ./gradlew :desktop:test
-
-      - name: Build App Server CLI distribution
-        run: ./gradlew :appserver-cli:test :appserver-cli:distZip
+        # native-only break fixed in b97bcf48. One invocation also avoids two
+        # extra configuration phases and exposes the full graph to Gradle.
+        run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip
 
   build-apk:
     runs-on: ubuntu-latest

@@ -41,13 +41,33 @@ assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
 gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
 assert_eq "$gradle_invocations" '1'
 
-architecture_workflow="$(<"$SOURCE_ROOT/.github/workflows/architecture-graph.yml")"
-assert_not_contains "$architecture_workflow" 'Run advisory architecture gates'
-assert_not_contains "$architecture_workflow" 'advisoryDetekt'
-assert_contains "$architecture_workflow" 'cache-read-only: ${{ github.event_name =='
-
 perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
 assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
+assert_contains "$perf_workflow" '  perf-gate:'
+assert_contains "$perf_workflow" 'Classify performance impact'
+assert_contains "$perf_workflow" "if: steps.classify.outputs.run_benchmark == 'true'"
+assert_not_contains "$perf_workflow" '  macrobenchmark:'
+
+shared_job="$(
+  awk '
+    /^  shared-multiplatform:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+assert_contains "$shared_job" 'Run shared multiplatform verification task graph'
+assert_contains "$shared_job" ':sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip'
+shared_gradle_invocations="$(grep -Ec '^[[:space:]]*run: ./gradlew ' <<<"$shared_job")"
+assert_eq "$shared_gradle_invocations" '1'
+
+detekt_job="$(
+  awk '
+    /^  detekt:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+assert_contains "$detekt_job" 'needs: [test, shared-multiplatform, build-apk-pass]'
 
 build_apk_pass_job="$(
   awk '
