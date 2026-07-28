@@ -8,6 +8,7 @@ trap 'rm -rf "$TMP"' EXIT
 fail() { echo "FAIL: $*" >&2; exit 1; }
 assert_eq() { [[ "$1" == "$2" ]] || fail "expected '$2', got '$1'"; }
 assert_contains() { [[ "$1" == *"$2"* ]] || fail "expected output to contain '$2': $1"; }
+assert_not_contains() { [[ "$1" != *"$2"* ]] || fail "expected output not to contain '$2': $1"; }
 
 # Keep the required Android jobs fanned out. Reintroducing a dependency from
 # build-apk to test adds the full test duration to the workflow critical path.
@@ -20,9 +21,33 @@ build_apk_job="$(
   ' "$android_workflow"
 )"
 assert_contains "$build_apk_job" 'strategy:'
+assert_contains "$build_apk_job" 'uses: actions/cache/restore@v4'
+assert_contains "$build_apk_job" 'cache-read-only: ${{ github.event_name =='
 if grep -Eq '^    needs:' <<<"$build_apk_job"; then
   fail "build-apk must stay independent so APK assembly fans out with tests"
 fi
+
+test_job="$(
+  awk '
+    /^  test:$/ { in_job = 1; next }
+    in_job && /^  [[:alnum:]_-]+:$/ { exit }
+    in_job { print }
+  ' "$android_workflow"
+)"
+assert_contains "$test_job" 'Run Android verification task graph'
+assert_contains "$test_job" ':app:compileSideloadDebugKotlin'
+assert_not_contains "$test_job" ':app:compileRootDebugKotlin'
+assert_not_contains "$test_job" ':app:compilePlayDebugKotlin'
+gradle_invocations="$(grep -Ec '^[[:space:]]*\./gradlew ' <<<"$test_job")"
+assert_eq "$gradle_invocations" '1'
+
+architecture_workflow="$(<"$SOURCE_ROOT/.github/workflows/architecture-graph.yml")"
+assert_not_contains "$architecture_workflow" 'Run advisory architecture gates'
+assert_not_contains "$architecture_workflow" 'advisoryDetekt'
+assert_contains "$architecture_workflow" 'cache-read-only: ${{ github.event_name =='
+
+perf_workflow="$(<"$SOURCE_ROOT/.github/workflows/android-perf.yml")"
+assert_contains "$perf_workflow" 'cache-read-only: ${{ github.event_name =='
 
 build_apk_pass_job="$(
   awk '

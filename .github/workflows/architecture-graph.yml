@@ -71,6 +71,9 @@ jobs:
           java-version: 21
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@0b6dd653ba04f4f93bf581ec31e66cbd7dcb644d # v4
+        with:
+          # Android `test` is the sole PR cache writer.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
       - name: Test exporter and write authoritative graph
         run: ./gradlew :build-logic:test exportArchitectureGraph --configuration-cache
       - name: Install tooling smoke dependency
@@ -87,8 +90,6 @@ jobs:
         run: |
           python3 -m unittest discover -s tools/architecture_query/tests -v
           scripts/tests/tooling-smoke.sh
-      - name: Run advisory architecture gates
-        run: ./gradlew :architecture-tests:architectureTest advisoryDetekt
       - name: Probe dependency analysis support
         continue-on-error: true
         run: ./gradlew buildHealth -PdependencyAnalysisAdvisory=true

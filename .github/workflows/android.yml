@@ -94,22 +94,6 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: bash scripts/ci/stateful-mock-gate.sh
 
-      - name: Compile all debug variants
-        run: ./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :core:testutil:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
-
-      - name: Run unit tests
-        run: |
-          ./gradlew :core:data:testDebugUnitTest :app:testRootDebugUnitTest
-          ./gradlew :app:testScreenshot
-
-      # Architecture guardrails (audit P3.6 / gn7kr.24). `:architecture-tests:test`
-      # enforces the Konsist/ArchUnit rules (minus the advisory *RepositoryArchitectureTest
-      # set, which its own filter excludes); `:architecture-tests:architectureTest` runs
-      # those advisory repository checks. Runs inside the required `test` job so a
-      # regression blocks the merge instead of silently never executing.
-      - name: Run architecture tests
-        run: ./gradlew :architecture-tests:test :architecture-tests:architectureTest
-
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.
       # Never used to skip :sharedLogic:allTests — that stays in shared-multiplatform.
@@ -134,9 +118,28 @@ jobs:
             echo "No additive module tests for this diff"
           fi
 
-      - name: Run additive module unit tests
-        if: github.event_name == 'pull_request' && steps.additive_modules.outputs.tasks != ''
-        run: ./gradlew ${{ steps.additive_modules.outputs.tasks }}
+      # One Gradle invocation gives project parallelism the complete task graph,
+      # avoids repeated configuration, and reuses compiled outputs immediately.
+      # Root debug is compiled by testRootDebugUnitTest; Play is compiled by the
+      # required play-release APK job. Sideload is the only unique flavor compile.
+      # Architecture guardrails stay inside the required `test` job.
+      - name: Run Android verification task graph
+        env:
+          ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}
+        run: |
+          tasks=(
+            :app:compileSideloadDebugKotlin
+            :core:data:testDebugUnitTest
+            :app:testRootDebugUnitTest
+            :app:testScreenshot
+            :architecture-tests:test
+            :architecture-tests:architectureTest
+          )
+          if [[ -n "${ADDITIVE_TASKS}" ]]; then
+            read -r -a additive_tasks <<< "${ADDITIVE_TASKS}"
+            tasks+=("${additive_tasks[@]}")
+          fi
+          ./gradlew "${tasks[@]}"
 
   detekt:
     # Advisory static analysis. Wired with continue-on-error so existing debt
@@ -161,7 +164,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # The required test job is the sole PR cache writer. Advisory jobs
+          # restore shared entries without uploading competing snapshots.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Run detekt
         run: ./gradlew detekt --continue
@@ -206,7 +211,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # The required test job is the sole PR cache writer.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Cache Konan (Kotlin/Native) toolchain
         uses: actions/cache@v4
@@ -271,18 +277,17 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           # Restore Gradle User Home state from prior trusted workflow runs;
-          # keep fork PRs read-only and leave project-local state to the
+          # keep all PR matrix consumers read-only and leave project-local state to the
           # separate same-repo-only cache below.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Cache project-local Gradle state
+      - name: Restore project-local Gradle state
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           # The exact key supports reruns of this commit; the restore prefix
-          # supplies warm project state from earlier trusted commits. Parallel
-          # jobs may race to save the exact key, which is safe because GitHub
-          # cache entries are immutable and every job can rebuild on a miss.
+          # supplies warm project state from earlier trusted commits. APK jobs
+          # consume but never upload this state; the required test job owns saves.
           path: |
             android-compose/.gradle
             android-compose/.kotlin
