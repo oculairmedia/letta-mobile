@@ -6,6 +6,14 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.parseSkillEnvelope
 import com.letta.mobile.ui.common.GroupPosition
 
+/** LazyColumn-stable identity: prefer client otid across Pending → Confirmed. */
+internal fun UiMessage.stableListKey(): String {
+    val base = clientMessageId?.takeIf { it.isNotBlank() } ?: id
+    // Reasoning and assistant events can share an otid without a runId; keep
+    // LazyColumn keys distinct so both rows survive.
+    return if (isReasoning) "reasoning:$base" else base
+}
+
 
 /**
  * A renderable item in the chat list. The chat used to be a flat
@@ -91,11 +99,11 @@ sealed interface ChatRenderItem {
          */
         val keyOverride: String? = null,
     ) : ChatRenderItem {
-        override val key: String = keyOverride ?: (stableRunKey ?: "msg-${message.id}")
+        override val key: String = keyOverride ?: (stableRunKey ?: "msg-${message.stableListKey()}")
         override val boundaryTimestamp: String = message.timestamp
-        override val stableItemDiscriminator: String = message.id
+        override val stableItemDiscriminator: String = message.stableListKey()
         override fun containsMessageId(messageId: String): Boolean =
-            message.id == messageId
+            message.id == messageId || message.clientMessageId == messageId
     }
 
     /**

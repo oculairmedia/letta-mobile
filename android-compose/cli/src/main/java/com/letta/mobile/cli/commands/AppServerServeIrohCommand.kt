@@ -12,13 +12,15 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
-import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
-import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.SkillsListingSource
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
+import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
@@ -57,20 +59,39 @@ import kotlin.time.Duration.Companion.seconds
  * ```
  */
 internal fun buildProductionAdminRouter(
-    adminBaseUrl: String,
     controller: DefaultAppServerController,
-    subagentRegistrySource: SubagentRegistrySource?,
+    subagentRegistrySource: SubagentRegistrySource? = null,
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
-    // lgns8.9: opt-in on-disk backend store for ported admin reads (agent.list).
-    // Off unless LETTA_LOCAL_BACKEND_DIR points at a real lc-local-backend dir.
-    localBackendDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
-): AdminRpcRouter = AdminRpcRegistry.buildRouter(
-    adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient,
-    vibesyncBaseUrl = vibesyncBaseUrl,
-    localBackendDir = localBackendDir,
-)
+    // Phase 3: bounded admin REST must be an explicit service URL — never the
+    // LettaShim :8291 default. Unset => capability_unavailable for those methods.
+    adminRestBaseUrl: String? = System.getenv("LETTA_IROH_ADMIN_REST_BASE_URL"),
+    eventScope: CoroutineScope? = null,
+): AdminRpcRouter {
+    val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
+    val subagentSource = subagentRegistrySource
+        ?: com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource().also { source ->
+            if (nativeClient != null && eventScope != null) {
+                source.start(eventScope, nativeClient.events)
+            }
+        }
+    if (nativeClient != null && eventScope != null) {
+        skillsCatalog.start(eventScope, nativeClient.events)
+    }
+    return AdminRpcRegistry.buildRouter(
+        controller = controller,
+        subagentRegistrySource = subagentSource,
+        pairingService = pairingService,
+        nativeClient = nativeClient,
+        vibesyncBaseUrl = vibesyncBaseUrl,
+        adminRestBaseUrl = adminRestBaseUrl,
+        skillsListing = object : SkillsListingSource {
+            override fun currentSkills() = skillsCatalog.snapshot()
+            override fun isHydrated() = skillsCatalog.isHydrated()
+        },
+    )
+}
 
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
@@ -119,14 +140,6 @@ internal class AppServerServeIrohCommand : CliktCommand(
             "DIRECTLY (lgns8.9), bypassing the lettashim /api reverse-proxy splice. " +
             "Server-side localhost only.",
     ).default("http://127.0.0.1:3099")
-
-    private val adminBaseUrl by option(
-        "--admin-base-url",
-        envvar = "LETTA_IROH_ADMIN_BASE_URL",
-        help = "Base URL of the server-local HTTP API that admin_rpc methods proxy to " +
-            "(conversation/message/agent reads). Server-side localhost only; clients " +
-            "never dial it directly.",
-    ).default("http://127.0.0.1:8291")
 
     private val pairingStoreFile by option(
         "--pairing-store-file",
@@ -220,17 +233,20 @@ internal class AppServerServeIrohCommand : CliktCommand(
 
             // Register admin_rpc handlers so clients on an iroh:// backend can
             // read conversations/messages/agents WITHOUT any direct HTTP route
-            // to this host (Iroh purity: letta-mobile-qfa81). The handlers
-            // proxy to the server-local HTTP API; only this process dials it.
-            val rpcBase = adminBaseUrl.trimEnd('/')
-            val subagentRegistrySource =
-                com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
-            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService, nativeAdminClient, vibesyncBaseUrl)
+            // to this host (Iroh purity: letta-mobile-qfa81). Phase 4: no
+            // LettaShim admin base / HTTP subagent discovery.
+            val adminRpcRouter = buildProductionAdminRouter(
+                controller = controller,
+                pairingService = pairingService,
+                nativeClient = nativeAdminClient,
+                vibesyncBaseUrl = vibesyncBaseUrl,
+                eventScope = scope,
+            )
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
-                    "(proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount}, " +
-                    "subagent_registry_v1: ${subagentRegistrySource != null})",
+                    "(methods: ${adminRpcRouter.methodCount}, " +
+                    "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
             )
 
             // Start accepting connections
@@ -312,107 +328,100 @@ internal class AppServerServeIrohCommand : CliktCommand(
         requestTimeoutMs: Long,
         scope: CoroutineScope,
     ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
-        // If an app server URL is provided, create a client that wraps it
-        // Otherwise, create a stub controller for testing
         return if (appServerUrl != null) {
-            val httpClient = HttpClient(OkHttp) {
-                install(WebSockets)
-                install(HttpTimeout) {
-                    this.requestTimeoutMillis = requestTimeoutMs
-                    this.connectTimeoutMillis = 30_000
-                    this.socketTimeoutMillis = requestTimeoutMs
-                }
-            }
-
-            // lgns8.5: the controller holds ONE stable client; underneath, each
-            // socket loss or App Server restart mints a fresh transport
-            // generation with bounded full-jitter backoff. On loss the
-            // controller's runtime caches are invalidated; on recovery every
-            // registered runtime is reattached (runtime_start), external tools
-            // re-registered, and sync issued with approval/device recovery
-            // before the client reports Ready again.
-            val runtimeRegistry = InMemoryRuntimeRegistry()
-            var controllerRef: DefaultAppServerController? = null
-            var coordinatorRef: ReconnectCoordinator? = null
-            val reconnectingClient = ReconnectingAppServerClient(
-                connect = {
-                    val generationJob = Job(scope.coroutineContext.job)
-                    val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
-                    val transport = KtorAppServerWebSocketTransport(
-                        httpClient = httpClient,
-                        baseUrl = appServerUrl,
-                        scope = generationScope,
-                        bearerToken = null,
-                    )
-                    AppServerClientGeneration(
-                        client = DefaultAppServerClient(
-                            transport,
-                            requestTimeoutMs = requestTimeoutMs,
-                            parentScope = generationScope,
-                        ),
-                        connectionState = transport.connectionState,
-                        close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
-                    )
-                },
-                listener = object : ReconnectingClientListener {
-                    override suspend fun onDisconnected(reason: String?) {
-                        println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
-                        controllerRef?.onTransportDisconnected(reason)
-                    }
-
-                    override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
-                        val result = coordinatorRef?.reconnect()
-                        if (result != null && result.errors.isNotEmpty()) {
-                            result.errors.forEach {
-                                System.err.println("[iroh-app-server] reattach failed: ${it.message}")
-                            }
-                        }
-                        controllerRef?.markConnected()
-                        println(
-                            "[iroh-app-server] App Server connection recovered " +
-                                "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
-                        )
-                    }
-
-                    override suspend fun onGaveUp(reason: String?) {
-                        System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
-                    }
-                },
-            )
-            val controller = DefaultAppServerController(
-                client = reconnectingClient,
-                runtimeRegistry = runtimeRegistry,
-                // lgns8.17: give the turn engine a registry so it can execute
-                // controller-owned tools; independently, the engine GUARANTEES a
-                // matched external_tool_call_response for every request (a
-                // synthesized is_error when a tool isn't handled here) so a
-                // tool-call turn over the App Server WS route never hangs.
-                externalToolRegistry = ExternalToolRegistry.factoryDefault(),
-            )
-            controllerRef = controller
-            coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
-            reconnectingClient.start(scope)
-            // lgns8.7: the reconnecting client doubles as the native admin
-            // command channel for runtime-native admin_rpc handlers.
-            controller to reconnectingClient
+            createLiveController(appServerUrl, requestTimeoutMs, scope)
         } else {
-            // Stub controller - the server side will return errors for now
-            // This allows testing the Iroh transport layer without a full app server
-            val httpClient = HttpClient(OkHttp) {
-                install(WebSockets)
-            }
-            
-            // Use a dummy WebSocket URL that won't be reached
-            // The Iroh transport will handle the actual communication
-            val transport = KtorAppServerWebSocketTransport(
-                httpClient = httpClient,
-                baseUrl = "ws://127.0.0.1:0",
-                scope = scope,
-                bearerToken = null,
-            )
-            
-            val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-            DefaultAppServerController(client) to null
+            createStubController(requestTimeoutMs, scope)
         }
+    }
+
+    private fun createLiveController(
+        appServerUrl: String,
+        requestTimeoutMs: Long,
+        scope: CoroutineScope,
+    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient> {
+        val httpClient = HttpClient(OkHttp) {
+            install(WebSockets)
+            install(HttpTimeout) {
+                this.requestTimeoutMillis = requestTimeoutMs
+                this.connectTimeoutMillis = 30_000
+                this.socketTimeoutMillis = requestTimeoutMs
+            }
+        }
+        val runtimeRegistry = InMemoryRuntimeRegistry()
+        var controllerRef: DefaultAppServerController? = null
+        var coordinatorRef: ReconnectCoordinator? = null
+        val reconnectingClient = ReconnectingAppServerClient(
+            connect = {
+                val generationJob = Job(scope.coroutineContext.job)
+                val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
+                val transport = KtorAppServerWebSocketTransport(
+                    httpClient = httpClient,
+                    baseUrl = appServerUrl,
+                    scope = generationScope,
+                    bearerToken = null,
+                )
+                AppServerClientGeneration(
+                    client = DefaultAppServerClient(
+                        transport,
+                        requestTimeoutMs = requestTimeoutMs,
+                        parentScope = generationScope,
+                    ),
+                    connectionState = transport.connectionState,
+                    close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
+                )
+            },
+            listener = object : ReconnectingClientListener {
+                override suspend fun onDisconnected(reason: String?) {
+                    println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
+                    controllerRef?.onTransportDisconnected(reason)
+                }
+
+                override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+                    val result = coordinatorRef?.reconnect()
+                    if (result != null && result.errors.isNotEmpty()) {
+                        result.errors.forEach {
+                            System.err.println("[iroh-app-server] reattach failed: ${it.message}")
+                        }
+                    }
+                    controllerRef?.markConnected()
+                    println(
+                        "[iroh-app-server] App Server connection recovered " +
+                            "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
+                    )
+                }
+
+                override suspend fun onGaveUp(reason: String?) {
+                    System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
+                }
+            },
+        )
+        val controller = DefaultAppServerController(
+            client = reconnectingClient,
+            runtimeRegistry = runtimeRegistry,
+            turnContextPreflight = AppServerContextWindowPreflight(reconnectingClient),
+            externalToolRegistry = ExternalToolRegistry.factoryDefault(),
+        )
+        controllerRef = controller
+        coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
+        reconnectingClient.start(scope)
+        return controller to reconnectingClient
+    }
+
+    private fun createStubController(
+        requestTimeoutMs: Long,
+        scope: CoroutineScope,
+    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
+        val httpClient = HttpClient(OkHttp) {
+            install(WebSockets)
+        }
+        val transport = KtorAppServerWebSocketTransport(
+            httpClient = httpClient,
+            baseUrl = "ws://127.0.0.1:0",
+            scope = scope,
+            bearerToken = null,
+        )
+        val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
+        return DefaultAppServerController(client) to null
     }
 }

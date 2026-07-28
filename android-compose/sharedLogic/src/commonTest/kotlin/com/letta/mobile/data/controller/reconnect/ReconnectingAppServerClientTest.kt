@@ -290,6 +290,50 @@ class ReconnectingAppServerClientTest {
     }
 
     @Test
+    fun recoverySnapshotsReachCollectorsStartedBeforeReconnect() = runTest {
+        val gen = FakeGeneration()
+        val received = mutableListOf<AppServerReceivedFrame>()
+        val client = ReconnectingAppServerClient(
+            connect = { gen.handle() },
+            listener = object : ReconnectingClientListener {
+                override suspend fun onRecovered(generationClient: AppServerClient) {
+                    // Let the event pipe subscribe before recovery snapshots emit.
+                    kotlinx.coroutines.yield()
+                    val raw = kotlinx.serialization.json.buildJsonObject {
+                        put("type", kotlinx.serialization.json.JsonPrimitive("skills_updated"))
+                        put(
+                            "skills",
+                            kotlinx.serialization.json.JsonArray(
+                                listOf(
+                                    kotlinx.serialization.json.buildJsonObject {
+                                        put("name", kotlinx.serialization.json.JsonPrimitive("demo"))
+                                    },
+                                ),
+                            ),
+                        )
+                    }
+                    (generationClient as FakeGenerationClient).emitted.tryEmit(
+                        AppServerReceivedFrame(
+                            channel = AppServerChannel.Stream,
+                            frame = AppServerInboundFrame.Unknown(type = "skills_updated", raw = raw),
+                            raw = raw,
+                        ),
+                    )
+                }
+            },
+            backoff = backoff(),
+            sleep = { },
+        )
+        client.start(backgroundScope)
+        backgroundScope.launch { client.events.collect { received += it } }
+        runCurrent()
+        gen.ready()
+        runCurrent()
+
+        assertTrue(received.any { it.frame.type == "skills_updated" })
+    }
+
+    @Test
     fun callsAreAdmittedDuringRecovery() = runTest {
         val gen = FakeGeneration()
         lateinit var client: ReconnectingAppServerClient

@@ -16,6 +16,7 @@ import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -711,6 +712,10 @@ class IrohChannelTransport(
                 "success" to auth.success,
                 "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
             )
+            // Preflight stays on the Iroh *node* / wrapper turn engine (WS to
+            // App Server). Client-side preflight would send agent_retrieve /
+            // conversation_messages_list as typed control frames; the node only
+            // accepts auth/runtime_start/input/admin_rpc/sync/abort.
             val engine = AppServerTurnEngine(
                 client = appServerClient,
                 clientInfo = AppServerRuntimeStartClientInfo(
@@ -718,6 +723,7 @@ class IrohChannelTransport(
                     version = config.clientVersion,
                 ),
                 permissionMode = AppServerPermissionMode.Unrestricted,
+                turnContextPreflight = TurnContextPreflight.None,
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(

@@ -226,6 +226,54 @@ class IrohStreamDeltaServerFrameMapperTest {
     }
 
     @Test
+    fun mapsBusyErrorMessageWithoutSynthesizingTurnDone() {
+        val frames = map(
+            """
+            {
+              "type": "stream_delta",
+              "event_seq": 5,
+              "emitted_at": "2026-07-02T00:00:05Z",
+              "idempotency_key": "evt-busy",
+              "delta": {
+                "message_type": "error_message",
+                "message": "An App Server turn is already active for runtime-1."
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(1, frames.size)
+        val error = assertIs<ServerFrame.Error>(frames[0])
+        assertEquals("iroh_turn_engine_busy", error.code)
+        assertTrue(frames.none { it is ServerFrame.TurnDone })
+    }
+
+    @Test
+    fun mapsInitiatorBusyRejectionToErrorAndFailedTurnDone() {
+        val frames = map(
+            """
+            {
+              "type": "stream_delta",
+              "event_seq": 5,
+              "emitted_at": "2026-07-02T00:00:05Z",
+              "idempotency_key": "evt-busy-init",
+              "delta": {
+                "message_type": "error_message",
+                "message": "Iroh App Server turn engine is already busy.",
+                "iroh_rejection": "initiator_busy"
+              }
+            }
+            """.trimIndent(),
+        )
+
+        assertEquals(2, frames.size)
+        val error = assertIs<ServerFrame.Error>(frames[0])
+        assertEquals("iroh_turn_engine_busy", error.code)
+        val done = assertIs<ServerFrame.TurnDone>(frames[1])
+        assertEquals("failed", done.status)
+    }
+
+    @Test
     fun doesNotConvertUnknownDeltasToAssistantMessages() {
         val frames = map(
             """

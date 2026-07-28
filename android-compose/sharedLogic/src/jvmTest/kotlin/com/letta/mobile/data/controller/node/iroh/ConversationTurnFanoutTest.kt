@@ -28,6 +28,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -433,6 +434,104 @@ class ConversationTurnFanoutTest {
         assertEquals(5, parked.size, "parking must be initiator-scoped, once per delta")
         // The tracked terminal is the stop_reason delta.
         assertTrue(parked.last().contains("stop_reason"))
+    }
+
+    @Test
+    fun busyRejectionReachesInitiatorOnlyWithoutParkingOrTerminalFlag() = runTest {
+        val registry = ConnectionRegistry()
+        val parked = mutableListOf<String>()
+        val sinkInit = CapturingSink()
+        val sinkObs = CapturingSink()
+        val initiator = viewer("conn-init", sinkInit)
+        val observer = viewer("conn-obs", sinkObs)
+        registry.register(conversationId, initiator)
+        registry.register(conversationId, observer)
+
+        val fanout = fanoutFor(registry, initiator, parked)
+        fanout.emitInitiatorOnlyBusyRejection("Iroh App Server turn engine is already busy.")
+
+        assertEquals(1, sinkInit.frames().size)
+        assertEquals(0, sinkObs.frames().size)
+        assertEquals(0, parked.size)
+        assertFalse(fanout.anyTerminalWritten)
+        val delta = json.parseToJsonElement(sinkInit.frames().single()).jsonObject["delta"]!!.jsonObject
+        assertEquals("error_message", delta["message_type"]!!.jsonPrimitive.content)
+        assertEquals("initiator_busy", delta["iroh_rejection"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun twoPeerBusyRejectionTerminatesRejectedPeerWhileOwnerTurnContinues() = runTest {
+        // Peer A owns the live turn fanout. Peer B is a concurrent submitter whose
+        // initiator-only busy rejection must map to Error + failed TurnDone so the
+        // client clears Thinking, without delivering that busy path to A.
+        val registry = ConnectionRegistry()
+        val sinkA = CapturingSink()
+        val sinkB = CapturingSink()
+        val peerA = viewer("conn-A", sinkA)
+        val peerB = viewer("conn-B", sinkB)
+        registry.register(conversationId, peerA)
+        registry.register(conversationId, peerB)
+
+        val ownerFanout = fanoutFor(registry, initiator = peerA)
+        ownerFanout.onDraft(
+            RuntimeEventPayload.RemoteStreamFrame(
+                frameId = "a-asst",
+                messageId = "msg-a",
+                messageType = null,
+                body = rawStreamDeltaBody(
+                    1,
+                    buildJsonObject {
+                        put("message_type", "assistant_message")
+                        put("content", "owner still streaming")
+                    },
+                ),
+            ),
+        )
+
+        val rejectedFanout = fanoutFor(registry, initiator = peerB)
+        rejectedFanout.emitInitiatorOnlyBusyRejection("Iroh App Server turn engine is already busy.")
+
+        val aBodies = sinkA.frames().map { json.parseToJsonElement(it).jsonObject }
+        val bBodies = sinkB.frames().map { json.parseToJsonElement(it).jsonObject }
+        assertTrue(
+            aBodies.any { it["delta"]?.jsonObject?.get("message_type")?.jsonPrimitive?.content == "assistant_message" },
+            "peer A must keep receiving the live turn",
+        )
+        assertTrue(
+            aBodies.none {
+                it["delta"]?.jsonObject?.get("iroh_rejection")?.jsonPrimitive?.content == "initiator_busy"
+            },
+            "peer A must not receive the busy rejection",
+        )
+        val busyWire = sinkB.frames().single {
+            json.parseToJsonElement(it).jsonObject["delta"]?.jsonObject
+                ?.get("iroh_rejection")?.jsonPrimitive?.content == "initiator_busy"
+        }
+
+        val mapped = com.letta.mobile.data.transport.iroh.IrohStreamDeltaServerFrameMapper.map(
+            RuntimeEventPayload.RemoteStreamFrame(
+                frameId = "busy-b",
+                messageId = null,
+                messageType = null,
+                body = busyWire,
+            ),
+            com.letta.mobile.data.transport.iroh.IrohStreamDeltaServerFrameMapper.Context(
+                agentId = "agent-1",
+                conversationId = conversationId,
+                turnId = "turn-b",
+                runId = "run-b",
+                timestamp = "2026-07-28T00:00:00Z",
+            ),
+        )
+        assertEquals(2, mapped.size)
+        assertTrue(mapped[0] is com.letta.mobile.data.transport.ServerFrame.Error)
+        assertEquals(
+            "iroh_turn_engine_busy",
+            (mapped[0] as com.letta.mobile.data.transport.ServerFrame.Error).code,
+        )
+        val done = mapped[1] as com.letta.mobile.data.transport.ServerFrame.TurnDone
+        assertEquals("failed", done.status)
+        assertEquals("turn-b", done.turnId)
     }
 
     @Test

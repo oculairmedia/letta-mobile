@@ -5,6 +5,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnContextPreflight
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
@@ -51,6 +52,10 @@ class DefaultAppServerController(
      * and tool-call turns never hang. Null = no controller tools.
      */
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    /**
+     * Optional safety check for backend-owned active context.
+     */
+    private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     private val clock: Clock = Clock.System,
 ) : AppServerController {
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
@@ -78,6 +83,7 @@ class DefaultAppServerController(
             },
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
+            turnContextPreflight = turnContextPreflight,
         )
     }
 
@@ -190,6 +196,17 @@ class DefaultAppServerController(
                 runtimePermissionModes.remove(it)
             }
         }
+        // Drop in-flight turn state so the next turn cannot reuse a runtime that
+        // was started with the pre-update agent configuration.
+        turnEngine.invalidateRuntime()
+    }
+
+    override suspend fun stopAllRuntimes() {
+        runtimeMutex.withLock {
+            runtimeCache.clear()
+            runtimePermissionModes.clear()
+        }
+        turnEngine.invalidateRuntime()
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =

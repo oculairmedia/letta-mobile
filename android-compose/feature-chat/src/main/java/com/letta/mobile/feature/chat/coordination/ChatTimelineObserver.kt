@@ -65,6 +65,8 @@ internal class ChatTimelineObserver(
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
+    /** True after Hydrated reported events while the UI still has no rows. */
+    private var awaitingProjectionAfterHydrate: Boolean = false
 
     /** Shared presentation core: projection (cache + incremental tail) + presence. */
     private val presenter = ChatTimelinePresenter()
@@ -78,6 +80,7 @@ internal class ChatTimelineObserver(
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
         observerBinding = null
+        awaitingProjectionAfterHydrate = false
         presenter.reset()
     }
 
@@ -91,14 +94,32 @@ internal class ChatTimelineObserver(
 
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
-        presenter.reset()
+        if (!bindingSame) {
+            // Binding change (conversation and/or agent): drop projection cache
+            // and clear stale rows so we never flash the previous agent's
+            // messages when both share conversation id "default", then hold the
+            // skeleton until hydrate/projection completes.
+            presenter.reset()
+            uiState.value = uiState.value.copy(
+                messages = kotlinx.collections.immutable.persistentListOf(),
+                messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
+                isLoadingMessages = true,
+            )
+        } else {
+            // Same binding rebind (job died / restart): keep projection
+            // cache + visible messages so Compose retains item identity.
+            uiState.value = uiState.value.copy(isLoadingMessages = true)
+        }
         observerBinding = binding
         observerJob = scope.launch {
             val flow = try {
                 timelineRepository.observe(agentId, conversationId)
             } catch (e: Exception) {
                 android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
-                uiState.value = uiState.value.copy(error = "Timeline init failed: ${e.message}")
+                uiState.value = uiState.value.copy(
+                    error = "Timeline init failed: ${e.message}",
+                    isLoadingMessages = false,
+                )
                 return@launch
             }
 
@@ -112,9 +133,19 @@ internal class ChatTimelineObserver(
                                 "AdminChatViewModel",
                                 "Timeline ready conv=$conversationId count=${ev.messageCount}",
                             )
-                            uiState.value = uiState.value.copy(isLoadingMessages = false)
+                            val prev = uiState.value
+                            // Keep the skeleton until projection has actually
+                            // produced rows when hydrate reports a nonempty page.
+                            // If projection later yields zero UI rows (system-only
+                            // history), the first collect still clears loading.
+                            awaitingProjectionAfterHydrate =
+                                ev.messageCount > 0 && prev.messages.isEmpty()
+                            uiState.value = prev.copy(
+                                isLoadingMessages = awaitingProjectionAfterHydrate,
+                            )
                         }
                         is TimelineSyncEvent.HydrateFailed -> {
+                            awaitingProjectionAfterHydrate = false
                             uiState.value = uiState.value.copy(isLoadingMessages = false)
                         }
                         is TimelineSyncEvent.ReconcileError -> {
@@ -125,7 +156,7 @@ internal class ChatTimelineObserver(
                             uiState.value = collapseCompletedRunsIfStreamingFinished(
                                 prevState,
                                 prevState.copy(
-                                    error = "Couldn't sync agent reply â€” pull to refresh",
+                                    error = "Couldn't sync agent reply — pull to refresh",
                                     isStreaming = false,
                                     isAgentTyping = false,
                                 ),
@@ -211,7 +242,8 @@ internal class ChatTimelineObserver(
                     val ui = projection.ui
                     val a2uiSurfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
                     val tailIsAssistant = projection.tailIsAssistant
-                    val clearLoading = ui.isNotEmpty()
+                    val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
+                    if (clearLoading) awaitingProjectionAfterHydrate = false
                     val newHasMoreOlder = if (projection.anyConfirmed) true else uiState.value.hasMoreOlderMessages
 
                     if (isFollowingDuplicateInitialMessageInFlight() && tailIsAssistant) {

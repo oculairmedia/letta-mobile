@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.runtime.isTurnAlreadyActiveMessage
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -145,29 +146,45 @@ internal object IrohStreamDeltaServerFrameMapper {
             )
 
             "loop_error",
-            "error_message" -> listOf(
-                ServerFrame.Error(
-                    id = meta.frameId,
-                    ts = meta.timestamp,
-                    code = "app_server_error",
-                    message = delta.errorText(),
-                    conversationId = meta.conversationId,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                ),
-                ServerFrame.TurnDone(
-                    id = meta.frameId,
-                    ts = meta.timestamp,
-                    turnId = meta.turnId,
-                    runId = meta.runId,
-                    status = "failed",
-                    seq = meta.eventSeq,
-                ),
-            )
+            "error_message" -> mapErrorMessage(delta, meta)
 
             else -> emptyList()
         }
     }
+
+    private fun mapErrorMessage(delta: JsonObject, meta: Metadata): List<ServerFrame> {
+        val message = delta.errorText()
+        val busy = isTurnAlreadyActiveMessage(message)
+        val initiatorBusy =
+            busy && delta.string("iroh_rejection") == INITIATOR_BUSY_REJECTION
+        val errorFrame = ServerFrame.Error(
+            id = meta.frameId,
+            ts = meta.timestamp,
+            code = if (busy) "iroh_turn_engine_busy" else "app_server_error",
+            message = message,
+            conversationId = meta.conversationId,
+            turnId = meta.turnId,
+            runId = meta.runId,
+        )
+        // Untagged busy frames stay Error-only: a broadcast busy must not
+        // synthesize TurnDone onto the owning peer's live turn. Initiator-only
+        // rejections are tagged and get a failed TurnDone so peer B leaves
+        // Thinking while peer A continues unaffected.
+        if (busy && !initiatorBusy) return listOf(errorFrame)
+        return listOf(
+            errorFrame,
+            ServerFrame.TurnDone(
+                id = meta.frameId,
+                ts = meta.timestamp,
+                turnId = meta.turnId,
+                runId = meta.runId,
+                status = "failed",
+                seq = meta.eventSeq,
+            ),
+        )
+    }
+
+    private const val INITIATOR_BUSY_REJECTION = "initiator_busy"
 
     private fun mapPlainBody(
         payload: RuntimeEventPayload.RemoteStreamFrame,

@@ -83,6 +83,21 @@ object AppServerProtocol {
             "list_models_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(raw) }
             "skill_enable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(raw) }
             "skill_disable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(raw) }
+            "skills_updated" -> {
+                // Nested payloads decode to SkillsUpdated(skills=null) because
+                // unknown keys are ignored. Preserve those as Unknown so
+                // NativeSkillsCatalog can still read skills from the raw envelope.
+                // Always go through decodeKnown so a hostile/non-array shape cannot
+                // throw out of the receive loop and tear down the WS session.
+                decodeKnown(type, raw) {
+                    val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw)
+                    if (decoded.skills != null) {
+                        decoded
+                    } else {
+                        AppServerInboundFrame.Unknown(type = type, raw = raw)
+                    }
+                }
+            }
             "cron_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(raw) }
             "cron_add_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(raw) }
             "cron_get_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(raw) }
@@ -103,6 +118,7 @@ object AppServerProtocol {
             "conversation_create_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCreateResponse>(raw) }
             "conversation_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationUpdateResponse>(raw) }
             "conversation_messages_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationMessagesListResponse>(raw) }
+            "conversation_compact_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCompactResponse>(raw) }
             else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
         }
         return AppServerReceivedFrame(channel = channel, frame = frame, raw = raw)
@@ -380,6 +396,14 @@ sealed interface AppServerCommand {
         @SerialName("request_id") val requestId: String,
         @SerialName("conversation_id") val conversationId: String,
         val query: JsonObject? = null,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("conversation_compact")
+    data class ConversationCompact(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("conversation_id") val conversationId: String,
+        val body: JsonObject? = null,
     ) : AppServerCommand
 
     // Policy-gated control capabilities (lgns8.8).
@@ -818,6 +842,25 @@ sealed interface AppServerInboundFrame {
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
+    /**
+     * Push update for available skills. Shape is partially specified upstream;
+     * [skills] may be absent when the payload nests under another key — callers
+     * should also inspect [raw] via unknown-key-tolerant decode.
+     */
+    @Serializable
+    @SerialName("skills_updated")
+    data class SkillsUpdated(
+        override val runtime: AppServerRuntimeScope? = null,
+        @SerialName("event_seq") val eventSeq: Long? = null,
+        @SerialName("emitted_at") val emittedAt: String? = null,
+        @SerialName("idempotency_key") val idempotencyKey: String? = null,
+        val skills: JsonArray? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "skills_updated"
+
+        @Transient override val requestId: String? = null
+    }
+
     @Serializable
     @SerialName("cron_list_response")
     data class CronListResponse(
@@ -1073,6 +1116,19 @@ sealed interface AppServerInboundFrame {
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "conversation_messages_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("conversation_compact_response")
+    data class ConversationCompactResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val compaction: JsonObject? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "conversation_compact_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }

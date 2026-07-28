@@ -17,7 +17,7 @@ import kotlinx.serialization.json.put
 class AdminRpcScopeEnforcementTest {
     private fun router(): AdminRpcRouter {
         val r = AdminRpcRouter()
-        ConversationAdminHandlers.register(r, "http://127.0.0.1:9")
+        ConversationAdminHandlers.register(r)
         return r
     }
 

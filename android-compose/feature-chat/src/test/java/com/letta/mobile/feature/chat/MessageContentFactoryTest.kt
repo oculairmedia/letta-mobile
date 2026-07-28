@@ -33,9 +33,9 @@ class MessageContentFactoryTest {
     }
 
     @Test
-    fun `multiple tool calls use compact group renderer`() {
+    fun `tool calls use compact group renderer from the first call`() {
         assertFalse(shouldUseCompactToolCallGroup(emptyList()))
-        assertFalse(
+        assertTrue(
             shouldUseCompactToolCallGroup(
                 listOf(UiToolCall(name = "Bash", arguments = "{}", result = null))
             )
@@ -47,6 +47,31 @@ class MessageContentFactoryTest {
                     UiToolCall(name = "Bash", arguments = "{\"command\":\"b\"}", result = null),
                 )
             )
+        )
+    }
+
+    @Test
+    fun `single Agent subagent call keeps specialized ToolCallCard path`() {
+        val agentCall = UiToolCall(
+            name = "Agent",
+            arguments = "{\"description\":\"Investigate\"}",
+            result = null,
+            subagentDispatch = com.letta.mobile.data.model.UiSubagentDispatch(
+                toolCallId = "tool-1",
+                description = "Investigate",
+                subagentType = "researcher",
+                runInBackground = true,
+                prompt = "do the thing",
+            ),
+        )
+        assertFalse(shouldUseCompactToolCallGroup(listOf(agentCall)))
+        assertTrue(
+            shouldUseCompactToolCallGroup(
+                listOf(
+                    agentCall,
+                    UiToolCall(name = "Bash", arguments = "{}", result = null),
+                ),
+            ),
         )
     }
 

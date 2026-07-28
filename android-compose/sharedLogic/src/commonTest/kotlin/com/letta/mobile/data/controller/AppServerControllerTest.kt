@@ -129,6 +129,25 @@ class AppServerControllerTest {
     }
 
     @Test
+    fun stopAllRuntimesEvictsEveryCachedAgent() = runTest {
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+        )
+
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+        controller.startRuntime(AgentId("agent-2"), ConversationId("conv-2"))
+        assertEquals(2, client.runtimeStartCommands.size)
+
+        controller.stopAllRuntimes()
+
+        controller.startRuntime(AgentId("agent-1"), ConversationId("conv-1"))
+        controller.startRuntime(AgentId("agent-2"), ConversationId("conv-2"))
+        assertEquals(4, client.runtimeStartCommands.size)
+    }
+
+    @Test
     fun startRuntimeStartsNewRuntimeForDifferentAgentOrConversation() = runTest {
         val client = FakeAppServerClient()
         val controller = DefaultAppServerController(

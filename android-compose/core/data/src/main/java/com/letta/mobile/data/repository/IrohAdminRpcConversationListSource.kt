@@ -80,12 +80,8 @@ class IrohAdminRpcConversationListSource(
     }
 
     suspend fun deleteConversation(id: ConversationId) {
-        val response = channelTransport.adminRpc(
-            method = "conversation.delete",
-            path = "/v1/conversations/${id.value}",
-            body = null,
-        )
-        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.delete failed")
+        // App Server v2 has no conversation_delete; archive is the supported lifecycle.
+        setConversationArchived(id, archived = true)
     }
 
     /**

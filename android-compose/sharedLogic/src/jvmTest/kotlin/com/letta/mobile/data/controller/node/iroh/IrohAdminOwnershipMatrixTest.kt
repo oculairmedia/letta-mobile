@@ -60,6 +60,9 @@ class IrohAdminOwnershipMatrixTest {
         val dataStores = enums.stringSet("data_stores")
         val fallbacks = enums.stringSet("fallbacks")
         val migrationSlices = enums.stringSet("migration_slices")
+        val productionFirstRoutes = enums.stringSet("production_first_routes")
+        val postShimFallbacks = enums.stringSet("post_shim_fallbacks")
+        val phase3Decisions = enums.stringSet("phase3_decisions")
 
         operations.forEach { row ->
             val method = row.requiredString("method")
@@ -77,7 +80,57 @@ class IrohAdminOwnershipMatrixTest {
                 row.requiredString("migration_slice") in migrationSlices,
                 "$method has an unknown migration slice",
             )
+            assertTrue(
+                row.requiredString("production_first_route") in productionFirstRoutes,
+                "$method has an unknown production_first_route",
+            )
+            assertTrue(
+                row.requiredString("post_shim_owner") in owners,
+                "$method has an unknown post_shim_owner",
+            )
+            assertTrue(
+                row.requiredString("post_shim_fallback") in postShimFallbacks,
+                "$method has an unknown post_shim_fallback",
+            )
+            assertTrue(
+                row.requiredString("post_shim_fallback") != "shim_until_cutover",
+                "$method post_shim_fallback must not retain shim_until_cutover",
+            )
+            val decision = row["phase3_decision"]?.jsonPrimitive?.content
+            if (decision != null) {
+                assertTrue(decision in phase3Decisions, "$method has an unknown phase3_decision")
+            }
         }
+    }
+
+    @Test
+    fun adminRestDomainsHavePhase3Decisions() {
+        val phase3Decisions = enums.stringSet("phase3_decisions")
+        operations
+            .filter { isPhase3AdminRestDomain(it) }
+            .forEach { row ->
+                val method = row.requiredString("method")
+                val decision = row.requiredString("phase3_decision")
+                assertTrue(decision in phase3Decisions, "$method missing phase3_decision")
+            }
+    }
+
+    private fun isPhase3AdminRestDomain(row: JsonObject): Boolean {
+        if (row.requiredString("owner") !in setOf("admin_rest_service", "capability_gated_unsupported")) {
+            return false
+        }
+        val method = row.requiredString("method")
+        return method == "agent.context" ||
+            method == "model.list.embedding" ||
+            ADMIN_REST_PREFIXES.any { method.startsWith(it) }
+    }
+
+    private companion object {
+        val ADMIN_REST_PREFIXES = listOf(
+            "run.", "step.", "archive.", "folder.", "passage.", "group.",
+            "identity.", "provider.", "schedule.", "job.", "tool.", "block.",
+            "mcp.", "goal.", "slash_command.",
+        )
     }
 
     @Test
@@ -141,7 +194,39 @@ class IrohAdminOwnershipMatrixTest {
 
         val conversationDelete = methodsByName.getValue("conversation.delete")
         assertEquals("capability_gated_unsupported", conversationDelete.requiredString("owner"))
+        assertEquals("capability_gated_unsupported", conversationDelete.requiredString("post_shim_owner"))
+        assertEquals("deny_fail_closed", conversationDelete.requiredString("post_shim_fallback"))
         assertEquals("deny_fail_closed", conversationDelete.requiredString("fallback"))
+        assertEquals("capability_unavailable", conversationDelete.requiredString("production_first_route"))
+    }
+
+    @Test
+    fun vibesyncProjectMethodsHaveNoShimFallback() {
+        operations.filter { it.requiredString("method").startsWith("project.") }.forEach { row ->
+            val method = row.requiredString("method")
+            assertEquals("vibesync_service", row.requiredString("owner"), method)
+            assertEquals("none", row.requiredString("fallback"), method)
+            assertEquals("vibesync_http", row.requiredString("production_first_route"), method)
+            assertEquals("none", row.requiredString("post_shim_fallback"), method)
+        }
+    }
+
+    @Test
+    fun postShimCutoverHasZeroShimUntilCutoverFallbacks() {
+        operations.forEach { row ->
+            assertTrue(
+                row.requiredString("post_shim_fallback") in setOf("none", "deny_fail_closed"),
+                "${row.requiredString("method")} must declare a shim-free post_shim_fallback",
+            )
+        }
+        val remainingMigrationFallbacks = operations.count {
+            it.requiredString("fallback") == "shim_until_cutover"
+        }
+        assertEquals(
+            0,
+            remainingMigrationFallbacks,
+            "Phase 4 requires zero shim_until_cutover migration fallbacks",
+        )
     }
 
     @Test

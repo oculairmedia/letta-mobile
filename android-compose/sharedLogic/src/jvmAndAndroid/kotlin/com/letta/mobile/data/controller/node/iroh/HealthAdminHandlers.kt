@@ -6,13 +6,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/**
+ * Phase 4: health reports only the controller's readiness. There is no
+ * LettaShim `/v1/health` fallback — missing controller is a native degraded
+ * result so production never dials port 8291 for health.
+ */
 object HealthAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String, controller: AppServerController? = null) {
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl, HttpUrlConnectionAdminProxyTransport(connectTimeoutMs = 5_000, readTimeoutMs = 5_000)))
+    fun register(router: AdminRpcRouter, controller: AppServerController? = null) {
         router.register("health.check") {
-            // lgns8.8: health reports the CONTROLLER's own truthful readiness
-            // (matrix: controller_native) rather than proxying a shim endpoint.
-            // Falls back to the shim probe only when no controller is wired.
             val state = (controller?.state as? StateFlow<AppServerControllerState>)?.value
             if (state != null) {
                 buildJsonObject {
@@ -28,7 +29,20 @@ object HealthAdminHandlers {
                     put("native", true)
                 }
             } else {
-                api.get(AdminPath.v1("health"))
+                AdminRouteTelemetry.selected(
+                    AdminRouteTelemetry.Selection(
+                        method = "health.check",
+                        owner = "controller_native",
+                        route = "controller_native",
+                        outcome = "unavailable",
+                        reason = "no_controller",
+                    ),
+                )
+                buildJsonObject {
+                    put("status", "degraded")
+                    put("controller_state", "unavailable")
+                    put("native", true)
+                }
             }
         }
     }

@@ -1,28 +1,14 @@
 package com.letta.mobile.data.controller.node.iroh
 
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-
+/**
+ * Phase 3: shim-era goal.* surfaces are product-removed. Always return a typed
+ * capability denial — never dial LettaShim or a generic admin REST base.
+ */
 object GoalAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
-        // lgns8.9: no admin-rest service injected -> capability-unavailable
-        // (never a shim dial). Bounded admin adapter degrades gracefully.
-        if (adminBaseUrl == null) {
-            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
-            return
-        }
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        router.register("goal.get") { params ->
-            val agentId = params.requireParam(AdminParamKey("agent_id"))
-            api.get(AdminPath.v1("agents", agentId, "goal"))
-        }
-        router.register("goal.command") { params ->
-            val agentId = params.requireParam(AdminParamKey("agent_id"))
-            val command = params.requireParam(AdminParamKey("command"))
-            val body = buildJsonObject { put("command", command) }.toString()
-            api.post(AdminPath.v1("agents", agentId, "goal", "command"), body = body)
-        }
+    fun register(router: AdminRpcRouter, @Suppress("UNUSED_PARAMETER") adminBaseUrl: String? = null) {
+        CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
     }
+
     val METHODS: Set<String> = setOf(
         "goal.get",
         "goal.command",

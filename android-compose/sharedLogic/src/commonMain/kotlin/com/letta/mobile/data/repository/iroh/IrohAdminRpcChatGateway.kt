@@ -22,6 +22,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduledMessage
@@ -167,7 +168,13 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun deleteConversation(conversationId: String) {
-        rpc(AdminRpcCall("conversation.delete", "/v1/conversations/$conversationId"))
+        // App Server v2 has no conversation_delete; archive is the supported lifecycle.
+        rpc(
+            AdminRpcCall(
+                "conversation.archive",
+                "/v1/conversations/$conversationId",
+            ),
+        )
         agentIdByConversation.remove(ConversationId(conversationId))
     }
 
@@ -258,7 +265,9 @@ class IrohAdminRpcChatGateway(
 
     override suspend fun listLlmModels(): List<LlmModel> {
         val result = rpc(AdminRpcCall("model.list", "/v1/models", "{}")) ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(LlmModel.serializer()), result)
+        val array = result as? kotlinx.serialization.json.JsonArray ?: return emptyList()
+        // Never decode presentation entries as LlmModel — adapt explicitly.
+        return AppServerListModelsAdapter.toLlmModels(array)
     }
 
     override suspend fun setConversationSummary(update: ConversationSummaryUpdate): Conversation {
@@ -622,6 +631,8 @@ class IrohAdminRpcAgentDirectory(
         val body = buildJsonObject {
             put("agent_id", agentId)
             put("name", skillName)
+            // Phase 2: native skill_enable is path-based; pass name as skill_path.
+            put("skill_path", skillName)
         }.toString()
         adminRpcResult("skill.install", "/v1/agents/$agentId/skills", body)
     }

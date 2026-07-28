@@ -170,8 +170,10 @@ private fun rememberActiveStreamingGeometryBuckets(
 }
 
 private fun shouldDeferHeavyToolCards(params: ChatMessageListBodyParams): Boolean {
-    return params.state.isLoadingMessages ||
-        params.state.isLoadingOlderMessages ||
+    // Do not key deferred tool cards on initial hydrate (`isLoadingMessages`):
+    // that flips false on Hydrated and morphs every visible card in one frame.
+    // Defer only under scroll-pressure paths that already own layout instability.
+    return params.state.isLoadingOlderMessages ||
         params.suppressPinchLayoutAnimations
 }
 

@@ -24,6 +24,12 @@ data class UiMessage(
      * Null for user messages and older history that predates step tracking.
      */
     val stepId: String? = null,
+    /**
+     * Client transaction / otid that survives Pending → Confirmed so LazyColumn
+     * item keys stay stable across optimistic local rows and server ack.
+     * Null when the event has no client-scoped identity (pure hydrated history).
+     */
+    val clientMessageId: String? = null,
     val isPending: Boolean = false,
     val isReasoning: Boolean = false,
     /**

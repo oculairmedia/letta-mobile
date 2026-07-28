@@ -545,7 +545,8 @@ internal fun ToolCallCard(
     val showDetails = keepExpanded || expanded
     RequestFullToolResultOnExpand(toolCall = toolCall, expanded = showDetails)
     val parentVisible = LocalToolCardBodyParentVisible.current
-    val canRenderFullOutput = showDetails && parentVisible
+    val deferHeavyCards = LocalChatShouldDeferHeavyToolCards.current
+    val canRenderFullOutput = showDetails && parentVisible && !deferHeavyCards
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
     val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
@@ -1316,7 +1317,8 @@ internal fun CompactToolCallRow(
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
     RequestFullToolResultOnExpand(toolCall = toolCall, expanded = expanded)
     val parentVisible = LocalToolCardBodyParentVisible.current
-    val canRenderFullOutput = expanded && parentVisible
+    val deferHeavyCards = LocalChatShouldDeferHeavyToolCards.current
+    val canRenderFullOutput = expanded && parentVisible && !deferHeavyCards
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
     val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
@@ -1543,8 +1545,21 @@ internal fun String.deferredToolResultPreview(): String {
     return if (length > preview.length) "$preview…" else preview
 }
 
-internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean =
-    toolCalls.size > 1
+internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean {
+    if (toolCalls.isEmpty()) return false
+    // Single specialized Agent/image cards keep ToolCallCard (subagent dispatch /
+    // notification chrome). Ordinary singles and all multi-tool groups stay on
+    // the compact group path so layout does not flash when a second call lands.
+    if (toolCalls.size == 1 && usesSpecializedToolCallCard(toolCalls.first())) {
+        return false
+    }
+    return true
+}
+
+internal fun usesSpecializedToolCallCard(toolCall: UiToolCall): Boolean =
+    toolCall.name == "generate_image" ||
+        toolCall.subagentDispatch != null ||
+        toolCall.result?.let(::parseTaskNotificationForToolCard) != null
 
 internal fun shouldRunToolCallEntranceAnimation(
     animateEntrance: Boolean,

@@ -231,8 +231,8 @@ fun projectToolTimelineGroup(
     val callsSource = message.toolCalls
     if (callsSource.isNullOrEmpty()) return null
 
-    val groupKey = groupKeyOverride ?: if (message.id.isNotBlank()) {
-        "group:${message.id}"
+    val groupKey = groupKeyOverride ?: if (message.stableListKey().isNotBlank()) {
+        "group:${message.stableListKey()}"
     } else {
         "group::$fallbackIndex"
     }
@@ -347,7 +347,11 @@ private fun List<UiMessage>.projectEachToolCallGroup(
     for (message in this) {
         if (message.toolCalls.isNullOrEmpty()) continue
 
-        val baseKey = if (message.id.isNotBlank()) "group:${message.id}" else "group::$groupIndex"
+        val baseKey = if (message.stableListKey().isNotBlank()) {
+            "group:${message.stableListKey()}"
+        } else {
+            "group::$groupIndex"
+        }
         val key = seenGroupKeys.claimUnique(baseKey)
         val group = projectToolTimelineGroup(
             message = message,

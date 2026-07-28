@@ -10,20 +10,19 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class AppServerServeIrohProductionWiringTest {
     @Test
-    fun `production router registers subagent routes only with discovered source`() {
+    fun `production router always registers controller-native subagent routes`() {
         val controller = DefaultAppServerController(EmptyClient)
 
-        val unavailable = buildProductionAdminRouter("http://127.0.0.1:8291", controller, null)
-        val available = buildProductionAdminRouter("http://127.0.0.1:8291", controller, EmptySource)
+        val defaultRouter = buildProductionAdminRouter(controller = controller)
+        val explicit = buildProductionAdminRouter(controller = controller, subagentRegistrySource = EmptySource)
 
-        assertFalse(unavailable.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
-        assertTrue(available.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
+        assertTrue(defaultRouter.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
+        assertTrue(explicit.registeredMethods.containsAll(AdminRpcRegistry.subagentMethods))
     }
 
     private object EmptySource : SubagentRegistrySource {

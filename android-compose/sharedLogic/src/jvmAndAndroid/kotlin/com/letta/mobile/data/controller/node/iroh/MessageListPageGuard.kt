@@ -53,18 +53,25 @@ object MessageListPageGuard {
         newestLast: Boolean = true,
     ): JsonElement {
         val messages = extractMessages(projected) ?: return projected.alsoLogUnboundableShape()
-        // P3.1: sum per-element byte lengths (each already needed below) instead of
-        // re-serializing the whole array into a throwaway string just to size it.
-        if (!isWrapped(projected) && totalByteLen(messages) <= maxPageBytes) {
+        // Measure each element once — both the fit check and the trim loop reuse
+        // these lengths so we do not re-serialize UTF-8 for every pass.
+        val lengths = IntArray(messages.size) { index -> byteLen(messages[index]) }
+        val totalBytes = totalByteLen(lengths)
+        if (!isWrapped(projected) && totalBytes <= maxPageBytes) {
             return projected
         }
         // Keep the newest rows that fit under the budget.
         val kept = ArrayDeque<JsonElement>()
         var bytes = 2 // "[]"
-        val ordered = if (newestLast) messages.asReversed() else messages
-        for (msg in ordered) {
-            val add = byteLen(msg) + 1
+        val orderedIndices = if (newestLast) {
+            messages.indices.reversed()
+        } else {
+            messages.indices
+        }
+        for (index in orderedIndices) {
+            val add = lengths[index] + 1
             if (kept.isNotEmpty() && bytes + add > maxPageBytes) break
+            val msg = messages[index]
             if (newestLast) kept.addFirst(msg) else kept.addLast(msg)
             bytes += add
         }
@@ -129,13 +136,41 @@ object MessageListPageGuard {
     private fun idOf(el: JsonElement?): String? =
         (el as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
 
-    private fun byteLen(el: JsonElement): Int = el.toString().encodeToByteArray().size
+    private fun byteLen(el: JsonElement): Int = utf8ByteLength(el.toString())
 
-    /** UTF-8 size of the elements as a JSON array ("[]" + elements + commas), without materializing the array. */
-    private fun totalByteLen(messages: List<JsonElement>): Int {
-        if (messages.isEmpty()) return 2 // "[]"
-        var bytes = 2 + (messages.size - 1) // brackets + inter-element commas
-        for (m in messages) bytes += byteLen(m)
+    /** UTF-8 size without allocating an intermediate ByteArray. */
+    private fun utf8ByteLength(text: String): Int {
+        var bytes = 0
+        var i = 0
+        while (i < text.length) {
+            val c = text[i].code
+            when {
+                c <= 0x7F -> {
+                    bytes += 1
+                    i += 1
+                }
+                c <= 0x7FF -> {
+                    bytes += 2
+                    i += 1
+                }
+                c in 0xD800..0xDBFF && i + 1 < text.length && text[i + 1].code in 0xDC00..0xDFFF -> {
+                    bytes += 4
+                    i += 2
+                }
+                else -> {
+                    bytes += 3
+                    i += 1
+                }
+            }
+        }
+        return bytes
+    }
+
+    /** UTF-8 size of the elements as a JSON array ("[]" + elements + commas). */
+    private fun totalByteLen(lengths: IntArray): Int {
+        if (lengths.isEmpty()) return 2 // "[]"
+        var bytes = 2 + (lengths.size - 1) // brackets + inter-element commas
+        for (len in lengths) bytes += len
         return bytes
     }
 

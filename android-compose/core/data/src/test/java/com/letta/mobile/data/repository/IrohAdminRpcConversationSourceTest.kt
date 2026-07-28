@@ -64,14 +64,14 @@ class IrohAdminRpcConversationSourceTest {
     }
 
     @Test
-    fun `deleteConversation routes to conversation_delete`() = runTest {
+    fun `deleteConversation archives because conversation_delete is unavailable`() = runTest {
         val transport = FakeChannelTransport().apply {
-            adminRpcHandler = { _, _, _ -> AppServerInboundFrame.AdminRpcResponse("req", success = true) }
+            adminRpcHandler = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"a","archived":true}""") }
         }
         source(transport).deleteConversation(ConversationId("conv-1"))
 
         val call = transport.adminRpcCalls.single()
-        assertEquals("conversation.delete", call.method)
+        assertEquals("conversation.archive", call.method)
         assertEquals("/v1/conversations/conv-1", call.path)
     }
 

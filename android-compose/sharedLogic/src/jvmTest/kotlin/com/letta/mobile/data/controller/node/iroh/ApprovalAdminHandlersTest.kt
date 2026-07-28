@@ -35,77 +35,57 @@ class ApprovalAdminHandlersTest {
     fun approvalSubmitRoutesLiveRuntimeApprovalThroughController() = runTest {
         val recording = installRecordingTransport()
         val controller = RecordingController()
-        val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, "http://admin.local", controller)
-
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-approval",
-                method = "approval.submit",
-                params = approvalParams(),
-            ),
-        ).jsonObject
+        val response = dispatchApproval(controller = controller, params = approvalParams())
 
         assertTrue(response.getValue("success").jsonPrimitive.boolean)
         assertEquals(0, recording.calls.size)
+        assertEquals("agent-1", controller.startedAgentId)
+        assertEquals("conv-1", controller.startedConversationId)
+        assertEquals(true, controller.startedRecoverApprovals)
         assertEquals("agent-1", controller.submittedAgentId)
         assertEquals("approval-1", controller.submittedApprovalRequestId)
         assertEquals(true, controller.submittedApprove)
     }
 
     @Test
-    fun approvalSubmitResolvesPendingApprovalThroughShimDecisionEndpoint() = runTest {
-        val recording = installRecordingTransport { method, url, _ ->
-            when {
-                method == "GET" && url.contains("/shim/v1/approvals/pending") -> AdminProxyTransportResponse(
-                    200,
-                    """{"pending":[{"run_id":"run-1","agent_id":"agent-1","tool_call_id":"tool-a","status":"pending"}]}""",
-                )
-                method == "POST" && url.endsWith("/shim/v1/approvals/run-1/decision") -> AdminProxyTransportResponse(
-                    200,
-                    """{"status":"approved"}""",
-                )
-                else -> AdminProxyTransportResponse(404, "{}")
-            }
-        }
-        val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, "http://admin.local")
+    fun approvalSubmitWithoutControllerFailsClosed() = runTest {
+        val recording = installRecordingTransport()
+        val response = dispatchApproval(controller = null, params = approvalParams())
 
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-approval",
-                method = "approval.submit",
-                params = approvalParams(),
-            ),
-        ).jsonObject
-
-        assertTrue(response.getValue("success").jsonPrimitive.boolean)
-        assertEquals(2, recording.calls.size)
-        assertEquals("GET", recording.calls[0].method)
-        assertEquals("http://admin.local/shim/v1/approvals/pending?agent_id=agent-1", recording.calls[0].url)
-        assertEquals("POST", recording.calls[1].method)
-        assertEquals("http://admin.local/shim/v1/approvals/run-1/decision", recording.calls[1].url)
-        assertTrue(recording.calls[1].body.orEmpty().contains("\"decision\":\"approve\""))
+        assertFalse(response.getValue("success").jsonPrimitive.boolean)
+        assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
+        assertEquals(0, recording.calls.size)
     }
 
     @Test
     fun approvalSubmitMissingAgentIdDispatchesFailureEnvelope() = runTest {
         installRecordingTransport()
-        val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, "http://admin.local")
-
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-missing",
-                method = "approval.submit",
-                params = buildJsonObject {
-                    put("payload", buildJsonObject { put("streaming", false) })
-                },
-            ),
-        ).jsonObject
+        val response = dispatchApproval(
+            controller = null,
+            params = buildJsonObject {
+                put("payload", buildJsonObject { put("streaming", false) })
+            },
+            requestId = "req-missing",
+        )
 
         assertFalse(response.getValue("success").jsonPrimitive.boolean)
         assertTrue(response.getValue("error").jsonPrimitive.content.contains("agent_id"))
+    }
+
+    private suspend fun dispatchApproval(
+        controller: AppServerController?,
+        params: JsonObject,
+        requestId: String = "req-approval",
+    ): JsonObject {
+        val router = AdminRpcRouter()
+        ApprovalAdminHandlers.register(router, controller)
+        return Json.parseToJsonElement(
+            router.dispatch(
+                requestId = requestId,
+                method = "approval.submit",
+                params = params,
+            ),
+        ).jsonObject
     }
 
     private fun approvalParams() = buildJsonObject {
@@ -161,7 +141,18 @@ class ApprovalAdminHandlersTest {
             mode: AppServerPermissionMode?,
             recoverApprovals: Boolean,
             forceDeviceStatus: Boolean,
-        ): CanonicalRuntime = error("not used")
+        ): CanonicalRuntime {
+            startedAgentId = agentId.value
+            startedConversationId = conversationId.value
+            startedRecoverApprovals = recoverApprovals
+            return CanonicalRuntime(
+                scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value),
+            )
+        }
+
+        var startedAgentId: String? = null
+        var startedConversationId: String? = null
+        var startedRecoverApprovals: Boolean? = null
 
         override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = emptyFlow()
 

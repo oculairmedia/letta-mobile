@@ -8,146 +8,89 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 object ConversationAdminHandlers {
+    /** Newest-window page size for single-message projection. */
+    internal const val MESSAGE_GET_PAGE_LIMIT = 500
+
+    /** Max pages walked oldest-ward for message.get / tool_return.get. */
+    internal const val MESSAGE_GET_MAX_PAGES = 20
+
+    /**
+     * Wall-clock budget for the whole multi-page walk. Per-page NativeAdmin
+     * attempts are still 2s each; without an overall budget a deep miss can
+     * block for up to ~40s (20 × 2s).
+     */
+    internal const val MESSAGE_GET_BUDGET_MS = 8_000L
+
+    /** Test-only page-size override (null = production [MESSAGE_GET_PAGE_LIMIT]). */
+    @Volatile
+    internal var messageGetPageLimitForTest: Int? = null
+
+    /** Test-only budget override (null = production [MESSAGE_GET_BUDGET_MS]). */
+    @Volatile
+    internal var messageGetBudgetMsForTest: Long? = null
+
+    private val messageGetPageLimit: Int
+        get() = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
+
+    private val messageGetBudgetMs: Long
+        get() = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
+
     fun register(
         router: AdminRpcRouter,
-        adminBaseUrl: String,
-        // The native read tiers reads try before the shim proxy: the App Server
-        // client, and (lgns8.9) the on-disk backend store for ported reads.
         tiers: NativeReadTiers = NativeReadTiers(),
-        shimRetired: Boolean = false,
+        controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
-        val localStore = tiers.localStore
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        registerConversationReadRoutes(router, api, nativeClient, localStore)
-        registerConversationWriteRoutes(router, api, nativeClient, shimRetired)
-        registerMessageRoutes(router, api, nativeClient, localStore)
+        registerConversationReadRoutes(router, nativeClient)
+        registerConversationWriteRoutes(router, nativeClient, controller)
+        registerMessageRoutes(router, nativeClient)
     }
 
     private fun registerConversationReadRoutes(
         router: AdminRpcRouter,
-        api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
-        localStore: LocalBackendAdminStore?,
     ) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
-            val conversations =
-                conversationListNative(nativeClient, agentId, params)
-                    ?: conversationListLocal(localStore, agentId, params)
-                    ?: conversationListProxy(api, agentId, params)
-            // P3.4 (gn7kr.23): conversation.list previously trusted the capability
-            // tier alone, letting a lesser (non-conversation-manage) peer enumerate
-            // cross-conversation metadata (id, agent_id, last_message_at, summary,
-            // archived) for a whole agent. Mirror the message.list scope mechanism:
-            // conversation.manage/admin.full peers (authorizedConversationIds == null)
-            // stay unrestricted; a scoped peer sees only the conversation(s) it is
-            // authorized for (its viewed conversation, or nothing).
+            val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
+                val response = c.conversationList(
+                    AppServerCommand.ConversationList(
+                        requestId = NativeAdmin.requestId(),
+                        query = NativeAdmin.queryOf(
+                            "agent_id" to agentId,
+                            "limit" to param(params, AdminParamKey("limit")),
+                            "after" to param(params, AdminParamKey("after")),
+                            "archive_status" to param(params, AdminParamKey("archive_status")),
+                            "summary_search" to param(params, AdminParamKey("summary_search")),
+                            "order" to param(params, AdminParamKey("order")),
+                            "order_by" to param(params, AdminParamKey("order_by")),
+                        ),
+                    ),
+                )
+                if (response.success) response.conversations ?: JsonArray(emptyList()) else null
+            }
             scopeConversationList(conversations, context)
         }
         router.registerScoped("conversation.get") { params, context ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
-            // P3.4 (gn7kr.23): scope-check before any read/proxy side effect, exactly
-            // as message.get does — a lesser peer can only read the conversation it is
-            // actively viewing; conversation.manage/admin.full read any.
             requireConversationAccess(context, id)
-            NativeAdmin.attempt(nativeClient, "conversation.get") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationGet) { c ->
                 val response = c.conversationRetrieve(
                     AppServerCommand.ConversationRetrieve(requestId = NativeAdmin.requestId(), conversationId = id),
                 )
                 if (response.success) response.conversation else null
-            } ?: api.get(AdminPath.v1("conversations", id))
+            }
         }
     }
-
-    /**
-     * lgns8.9 native tier: fetch the conversation list from the App Server client.
-     * Returns null on any error so the caller falls through to the local/proxy tiers.
-     */
-    private suspend fun conversationListNative(
-        nativeClient: AppServerClient?,
-        agentId: String?,
-        params: JsonObject?,
-    ): JsonElement? =
-        NativeAdmin.attempt(nativeClient, "conversation.list") { c ->
-            val response = c.conversationList(
-                AppServerCommand.ConversationList(
-                    requestId = NativeAdmin.requestId(),
-                    query = NativeAdmin.queryOf(
-                        "agent_id" to agentId,
-                        "limit" to param(params, AdminParamKey("limit")),
-                        "after" to param(params, AdminParamKey("after")),
-                        "archive_status" to param(params, AdminParamKey("archive_status")),
-                        "summary_search" to param(params, AdminParamKey("summary_search")),
-                        "order" to param(params, AdminParamKey("order")),
-                        "order_by" to param(params, AdminParamKey("order_by")),
-                    ),
-                ),
-            )
-            if (response.success) response.conversations ?: JsonArray(emptyList()) else null
-        }
-
-    /**
-     * lgns8.9 native-store tier: serve from disk (null on any error), else fall
-     * through to the shim proxy. Verified to match the shim's withRealTimes ordering
-     * byte-for-byte on the live store.
-     *
-     * The local store only implements the shim's default shape (agent scope +
-     * archive_status filter, last_message_at desc, offset/limit). If the caller
-     * supplies a query shape it cannot honor — a cursor (`after`), text search
-     * (`summary_search`), or a custom `order`/`order_by` — DON'T serve a
-     * wrong-ordered/wrong-page result from disk; bypass the local tier so the
-     * native/proxy path (which forwards those params) handles it. (CodeRabbit #998.)
-     */
-    private suspend fun conversationListLocal(
-        localStore: LocalBackendAdminStore?,
-        agentId: String?,
-        params: JsonObject?,
-    ): JsonElement? {
-        if (!conversationListLocallyServable(params)) return null
-        return localStore?.listConversationsProjected(
-            agentId = agentId,
-            archiveStatus = param(params, AdminParamKey("archive_status")),
-            limit = param(params, AdminParamKey("limit"))?.toIntOrNull(),
-            offset = param(params, AdminParamKey("offset"))?.toIntOrNull(),
-        )
-    }
-
-    /**
-     * Shim proxy tier for conversation.list. #962: the App Server only serves the flat
-     * GET /v1/conversations route, filtering by an agent_id query param; the
-     * agent-scoped /v1/agents/{id}/conversations route is not registered and 404s.
-     */
-    private suspend fun conversationListProxy(
-        api: AdminHandlerSupport,
-        agentId: String?,
-        params: JsonObject?,
-    ): JsonElement =
-        api.get(AdminPath.v1("conversations")) {
-            query("agent_id", agentId)
-            query("limit", param(params, AdminParamKey("limit")))
-            query("after", param(params, AdminParamKey("after")))
-            query("archive_status", param(params, AdminParamKey("archive_status")))
-            query("summary_search", param(params, AdminParamKey("summary_search")))
-            query("order", param(params, AdminParamKey("order")))
-            query("order_by", param(params, AdminParamKey("order_by")))
-        }
 
     /**
      * P3.4 (gn7kr.23): restricts a conversation-list result to the peer's authorized
-     * conversation scope. Unrestricted peers (conversation.manage / admin.full, i.e.
-     * [AdminRpcRequestContext.authorizedConversationIds] == null) get the list
-     * unchanged; scoped peers get only the entries whose `id` is in their authorized
-     * set (empty when they are viewing no conversation). Non-array results (e.g. a
-     * proxy error object) pass through untouched — filtering only ever narrows.
+     * conversation scope.
      */
     private fun scopeConversationList(result: JsonElement, context: AdminRpcRequestContext): JsonElement {
-        // letta-mobile-w9k3f: a non-array conversation.list body is passed through here
-        // and then decoded client-side straight into a List, throwing "Expected JsonArray,
-        // but had JsonObject". Log the shape (keys only, never values) so the producing
-        // tier — native / local store / shim proxy — is identifiable.
         if (result !is JsonArray) {
             Telemetry.event(
                 "IrohNode", "conversation_list.non_array_shape",
@@ -168,35 +111,23 @@ object ConversationAdminHandlers {
 
     private fun registerConversationWriteRoutes(
         router: AdminRpcRouter,
-        api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
-        shimRetired: Boolean,
+        controller: com.letta.mobile.data.controller.AppServerController?,
     ) {
         router.register("conversation.create") { params ->
-            // Current App Server exposes the canonical create route at
-            // POST /v1/conversations with agent_id in the JSON body. The
-            // legacy agent-scoped route is not registered and returns 404.
             params.requireParam(AdminParamKey("agent_id"))
             val createBody = checkNotNull(params)
-            NativeAdmin.attempt(nativeClient, "conversation.create") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationCreate) { c ->
                 val response = c.conversationCreate(
                     AppServerCommand.ConversationCreate(requestId = NativeAdmin.requestId(), body = createBody),
                 )
                 if (response.success) response.conversation else null
-            } ?: api.post(AdminPath.v1("conversations"), body = params.toString())
+            }
         }
         router.register("conversation.delete") { params ->
             params.requireParam(AdminParamKey("conversation_id"))
-            // lgns8.8 (matrix: capability_gated_unsupported, deny_fail_closed):
-            // conversation_delete is absent from the pinned v2 inventory. Once
-            // the shim is retired there is no backend for it — return a typed
-            // capability denial instead of pretending. Until cutover the shim
-            // DELETE keeps product behavior.
-            if (shimRetired) {
-                adminError("capability_unavailable: conversation_delete is not in the pinned App Server v2 contract; archive instead")
-            }
-            val id = params.requireParam(AdminParamKey("conversation_id"))
-            api.delete(AdminPath.v1("conversations", id))
+            // Phase 2: fail closed unconditionally. Prefer conversation.archive.
+            adminError("capability_unavailable: conversation_delete is not in the pinned App Server v2 contract; archive instead")
         }
         router.register("conversation.update") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
@@ -205,7 +136,7 @@ object ConversationAdminHandlers {
                     if (key != "conversation_id") put(key, value)
                 }
             }
-            NativeAdmin.attempt(nativeClient, "conversation.update") { c ->
+            val result = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationUpdate) { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -214,61 +145,57 @@ object ConversationAdminHandlers {
                     ),
                 )
                 if (response.success) response.conversation else null
-            } ?: api.patch(AdminPath.v1("conversations", id), body = body.toString())
+            }
+            if (RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(body)) {
+                val agentId = param(params, AdminParamKey("agent_id"))
+                    ?: (result as? JsonObject)?.get("agent_id")?.jsonPrimitive?.contentOrNull
+                if (agentId != null) {
+                    controller?.stopRuntime(com.letta.mobile.data.model.AgentId(agentId))
+                }
+            }
+            result
         }
         router.register("conversation.archive") { params ->
-            // Letta has no /conversations/{id}/archive|/unarchive sub-resource; archive
-            // state is a field on the conversation, toggled via PATCH /v1/conversations/{id}
-            // with {"archived": bool} (same route + response the HTTP client uses in
-            // ConversationApi.updateConversation). That PATCH returns the updated
-            // Conversation, which IrohAdminRpcConversationListSource decodes. Hitting a
-            // phantom /archive sub-route would 404 and break iroh-mode archive/restore.
             val id = params.requireParam(AdminParamKey("conversation_id"))
-            NativeAdmin.attempt(nativeClient, "conversation.archive") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationArchive) { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
                         conversationId = id,
-                        body = kotlinx.serialization.json.buildJsonObject { put("archived", kotlinx.serialization.json.JsonPrimitive(true)) },
+                        body = kotlinx.serialization.json.buildJsonObject {
+                            put("archived", JsonPrimitive(true))
+                        },
                     ),
                 )
                 if (response.success) response.conversation else null
-            } ?: api.patch(AdminPath.v1("conversations", id), body = """{"archived":true}""")
+            }
         }
         router.register("conversation.restore") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
-            NativeAdmin.attempt(nativeClient, "conversation.restore") { c ->
+            NativeAdmin.require(nativeClient, NativeAdminOp.ConversationRestore) { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
                         conversationId = id,
-                        body = kotlinx.serialization.json.buildJsonObject { put("archived", kotlinx.serialization.json.JsonPrimitive(false)) },
+                        body = kotlinx.serialization.json.buildJsonObject {
+                            put("archived", JsonPrimitive(false))
+                        },
                     ),
                 )
                 if (response.success) response.conversation else null
-            } ?: api.patch(AdminPath.v1("conversations", id), body = """{"archived":false}""")
+            }
         }
     }
 
     private fun registerMessageRoutes(
         router: AdminRpcRouter,
-        api: AdminHandlerSupport,
         nativeClient: AppServerClient?,
-        // lgns8.9 slice 3: on-disk backend store; when set, message.list serves
-        // already-projected wire messages from disk ahead of the shim proxy.
-        localStore: LocalBackendAdminStore? = null,
     ) {
         router.registerScoped("message.list") { params, context ->
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
-            // letta-mobile-c4igq.9: enforce a bounded newest-window even when the
-            // client sends no limit. An unbounded message.list on a ~60MB transcript
-            // built one giant admin_rpc response the frame layer rejects
-            // (response_too_large). Default to MessageListPageGuard.DEFAULT_PAGE_LIMIT
-            // so hydration always requests a bounded window; the guard below then
-            // shrinks-not-rejects if a page is still oversized.
             val effectiveLimit = param(params, AdminParamKey("limit")) ?: MessageListPageGuard.DEFAULT_PAGE_LIMIT.toString()
-            val response = NativeAdmin.attempt(nativeClient, "message.list") { c ->
+            val response = NativeAdmin.require(nativeClient, NativeAdminOp.MessageList) { c ->
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(
                         requestId = NativeAdmin.requestId(),
@@ -283,42 +210,6 @@ object ConversationAdminHandlers {
                 )
                 if (native.success) native.messages else null
             }
-            // lgns8.9 slice 3 native-store tier: serve already-projected wire
-            // messages from disk (null on any error → fall through to the shim
-            // proxy). Mirrors the shim /messages route (limit/before/order;
-            // `after` and in-flight filtering intentionally omitted — see
-            // LocalBackendAdminStore.listMessagesProjected).
-                ?: localStore?.listMessagesProjected(
-                    convId,
-                    param(params, AdminParamKey("agent_id")),
-                    MessagePage(
-                        limit = effectiveLimit.toIntOrNull(),
-                        before = param(params, AdminParamKey("before")),
-                        after = param(params, AdminParamKey("after")),
-                        order = param(params, AdminParamKey("order")),
-                    ),
-                )
-                ?: api.get(
-                AdminPath.v1("conversations", convId, "messages").builder()
-                    .query("limit", effectiveLimit)
-                    .query("after", param(params, AdminParamKey("after")))
-                    // letta-mobile-71orq: backward pagination (scroll up for
-                    // history) cursors on `before`; the raw HTTP path
-                    // (MessageApi.fetchRecentMessages) hits the same endpoint
-                    // with a `before` query param, so pass it through so
-                    // iroh:// older-message loads mirror HTTP.
-                    .query("before", param(params, AdminParamKey("before")))
-                    .query("order", param(params, AdminParamKey("order")))
-                    .build(),
-            )
-            // letta-mobile-fe51r (P2b pointer diet): list responses ship
-            // previews for heavy tool-return bodies; full bodies come via
-            // tool_return.get on demand. Inline attachments ship unmodified
-            // (clients have no refetch path for omitted attachment data).
-            // letta-mobile-c4igq.9: final page-size guard — never emit a response
-            // over the frame cap. If the projected page is still too large, trim
-            // to the newest rows that fit + a continuation cursor (has_more,
-            // next_before) the existing -cursor pager can follow.
             MessageListPageGuard.bound(
                 MessageListWireProjection.projectMessageList(response, convId),
             )
@@ -327,53 +218,92 @@ object ConversationAdminHandlers {
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
             val msgId = params.requireParam(AdminParamKey("message_id"))
-            api.get(AdminPath.v1("conversations", convId, "messages", msgId))
+            retrieveMessageNative(nativeClient, convId, msgId, op = NativeAdminOp.MessageGet)
         }
         router.registerScoped("tool_return.get") { params, context ->
-            /**
-             * letta-mobile-fe51r: on-demand full-body fetch for a projected
-             * tool-return message. Returns the complete, unprojected message.
-             */
             val convId = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, convId)
             val msgId = params.requireParam(AdminParamKey("message_id"))
-            api.get(AdminPath.v1("conversations", convId, "messages", msgId))
+            retrieveMessageNative(nativeClient, convId, msgId, op = NativeAdminOp.ToolReturnGet)
         }
     }
 
     /**
-     * lgns8.12: conversation-content reads reject cross-scope access BEFORE
-     * any proxy call. Uniform denial without leaking whether the target
-     * conversation exists.
+     * Phase 2: project a single message from conversation_messages_list.
+     * Walks newest-first pages (up to [MESSAGE_GET_MAX_PAGES] × [MESSAGE_GET_PAGE_LIMIT])
+     * via the `before` cursor; missing ids fail closed (no shim).
+     *
+     * Each page uses its own [NativeAdmin.require] timeout, and the whole walk
+     * is capped by [MESSAGE_GET_BUDGET_MS] so deep misses cannot block ~40s.
      */
+    private suspend fun retrieveMessageNative(
+        nativeClient: AppServerClient?,
+        conversationId: String,
+        messageId: String,
+        op: NativeAdminOp,
+    ): JsonElement {
+        return try {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs) {
+                walkMessagePages(nativeClient, conversationId, messageId, op)
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            adminError(
+                "deadline_exceeded: message $messageId lookup exceeded searchable window budget",
+            )
+        }
+    }
+
+    private suspend fun walkMessagePages(
+        nativeClient: AppServerClient?,
+        conversationId: String,
+        messageId: String,
+        op: NativeAdminOp,
+    ): JsonElement {
+        var before: String? = null
+        val pageLimit = messageGetPageLimit
+        repeat(MESSAGE_GET_MAX_PAGES) {
+            val messages = NativeAdmin.require(nativeClient, op) { c ->
+                val native = c.conversationMessagesList(
+                    AppServerCommand.ConversationMessagesList(
+                        requestId = NativeAdmin.requestId(),
+                        conversationId = conversationId,
+                        query = NativeAdmin.queryOf(
+                            "limit" to pageLimit.toString(),
+                            "order" to "desc",
+                            "before" to before,
+                        ),
+                    ),
+                )
+                if (!native.success) null else native.messages as? JsonArray
+            }
+            if (messages.isEmpty()) {
+                adminError("not_found: message $messageId not in conversation history")
+            }
+            messages.firstOrNull { element ->
+                (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == messageId
+            }?.let { return it }
+            val oldestId = messageIdOf(messages.lastOrNull())
+            if (shouldStopPaging(oldestId, before, messages.size, pageLimit)) {
+                adminError("not_found: message $messageId not in conversation history")
+            }
+            before = oldestId
+        }
+        adminError("not_found: message $messageId not in searchable conversation window")
+    }
+
+    private fun messageIdOf(element: JsonElement?): String? =
+        (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
+
+    private fun shouldStopPaging(
+        oldestId: String?,
+        previousBefore: String?,
+        pageSize: Int,
+        pageLimit: Int,
+    ): Boolean = oldestId == null || oldestId == previousBefore || pageSize < pageLimit
+
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
         if (!context.canAccessConversation(conversationId)) {
             adminError("forbidden: conversation out of authorized scope")
         }
     }
-
-    /**
-     * lgns8.9 (CodeRabbit #998): the on-disk conversation.list tier only implements
-     * the shim's default shape — agent scope + archive_status filter, last_message_at
-     * DESC, offset/limit. It cannot honor a cursor (`after`), text search
-     * (`summary_search`), or a caller-chosen `order`/`order_by`. When any of those is
-     * supplied, decline the local tier so the native/proxy path (which forwards them)
-     * serves the request, rather than returning a wrong-ordered/wrong-page result.
-     */
-    private fun conversationListLocallyServable(params: kotlinx.serialization.json.JsonObject?): Boolean =
-        param(params, AdminParamKey("after")).isNullOrBlank() &&
-            param(params, AdminParamKey("summary_search")).isNullOrBlank() &&
-            param(params, AdminParamKey("order")).isNullOrBlank() &&
-            param(params, AdminParamKey("order_by")).isNullOrBlank()
-
-    /**
-     * letta-mobile-8vplf: handler-level parameter errors previously returned a
-     * `{_error: ...}` object that the router wrapped in a `success: true`
-     * envelope, so clients decoded an error as a successful result. Throwing
-     * here routes the failure through [AdminRpcRouter.dispatch]'s catch path,
-     * which encodes a proper `success: false` + `error` envelope. Other
-     * handler files still carry private `{_error}` helpers — tracked by bead
-     * letta-mobile-8vplf.
-     */
-
 }
