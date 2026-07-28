@@ -113,6 +113,12 @@ class AppServerTurnEngine(
      * canonical scope instead of issuing a duplicate runtime_start from the engine.
      */
     private val runtimeScopeResolver: suspend (TurnCommand) -> AppServerRuntimeScope? = { null },
+    /**
+     * lgns8.22.4: connection generation stamped onto each lease. Incremented by
+     * the controller on transport disconnect so old-generation frames cannot
+     * mutate a successor lease.
+     */
+    private val connectionGenerationProvider: () -> Long = { 0L },
 ) : TurnEngine {
     /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
     private val activeLeaseRef = atomic<TurnLease?>(null)
@@ -411,6 +417,7 @@ class AppServerTurnEngine(
             phase = TurnLeasePhase.Preparing,
             ownerJob = coroutineContext[Job],
             processRole = ownerProcessRole,
+            connectionGeneration = connectionGenerationProvider(),
             settleDeadlineMs = terminalSettleQuietMs,
             watchdogDeadlineMs = turnIdleTimeoutMs,
         )
@@ -733,12 +740,18 @@ class AppServerTurnEngine(
         }
 
         var turnEndReason: String? = null
+        // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
+        // prior ids are superseded and must not complete/mutate this lease.
+        val supersededRunIds = mutableSetOf<String>()
         val (fanoutSubscriberId, inboundEvents) = subscribeTurnInbound(scope)
         try {
             collectorReady.complete(Unit)
             inboundEvents.collect { received ->
                 if (!received.matches(scope)) {
                     handleScopeRejectedFrame(received, scope, leaseToken)?.let { marker -> throw marker }
+                    return@collect
+                }
+                if (!received.matchesActiveRun(leaseToken, supersededRunIds)) {
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
@@ -768,7 +781,9 @@ class AppServerTurnEngine(
                 // run_id → draft.runId); we do not alter that promotion flow.
                 val frameSeq = received.eventSeqOrNull()
                 val drafts = mapper.map(command, received)
-                drafts.firstOrNull { it.runId != null }?.runId?.value?.let { promoteOwnerRunId(it, leaseToken) }
+                drafts.firstOrNull { it.runId != null }?.runId?.value?.let { newRunId ->
+                    promoteOwnerRunId(newRunId, leaseToken, supersededRunIds)
+                }
                 drafts.forEach { draft ->
                     val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
                     if (autoApproved != null) {
@@ -1357,6 +1372,29 @@ class AppServerTurnEngine(
     }
 
     /**
+     * After run-id promotion, frames advertising a superseded run id must not
+     * mutate the active lease (lgns8.22.4). Mid-turn run reassignment (tool
+     * continuation) is allowed and marks the prior id superseded. Frames without
+     * a run id still pass.
+     */
+    private fun AppServerReceivedFrame.matchesActiveRun(
+        leaseToken: Long,
+        supersededRunIds: Set<String>,
+    ): Boolean {
+        val lease = activeLeaseRef.value ?: return true
+        if (lease.token != leaseToken) return false
+        val frameRunId = frameRunIdOrNull() ?: return true
+        return frameRunId !in supersededRunIds
+    }
+
+    private fun AppServerReceivedFrame.frameRunIdOrNull(): String? {
+        val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return null
+        return runCatching {
+            streamDelta.delta.jsonObject.string("run_id")
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
+    /**
      * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort event_seq for a received
      * frame, if the concrete frame type carries one. Pure read; null otherwise.
      */
@@ -1583,16 +1621,20 @@ class AppServerTurnEngine(
     }
 
     /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY. Promotes the server-assigned/promoted
-     * run id into the active-turn owner (if one is set and not yet stamped with
-     * a run id). Pure `copy(runId=…)` metadata write — no control-flow, no lock
-     * interaction, no effect on emitted drafts or the run-id promotion path.
+     * Promotes the server-assigned run id into the active-turn owner. When the
+     * run id changes mid-turn, the previous id is recorded as superseded so
+     * late frames from that run cannot complete the lease (lgns8.22.4).
      * Token-gated so a stale owner cannot promote into a successor lease (lgns8.22.2).
      */
-    private fun promoteOwnerRunId(runId: String, leaseToken: Long) {
+    private fun promoteOwnerRunId(
+        runId: String,
+        leaseToken: Long,
+        supersededRunIds: MutableSet<String>,
+    ) {
         if (activeLeaseRef.value?.token != leaseToken) return
         val current = activeTurnOwnerRef.value ?: return
         if (current.runId == runId) return
+        current.runId?.takeIf { it.isNotBlank() }?.let { supersededRunIds.add(it) }
         activeTurnOwnerRef.value = current.copy(runId = runId)
         activeLeaseRef.update { lease ->
             if (lease == null || lease.token != leaseToken || lease.runId == runId) lease

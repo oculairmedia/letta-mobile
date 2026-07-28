@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.atomicfu.atomic
 
 /**
  * Default implementation of [AppServerController].
@@ -63,6 +64,8 @@ class DefaultAppServerController(
 ) : AppServerController {
     private val controllerScope = CoroutineScope(SupervisorJob())
     private val eventRouter = AppServerRuntimeEventRouter()
+    /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
+    private val connectionGeneration = atomic(0L)
 
     init {
         eventRouter.attach(controllerScope, client.events)
@@ -100,6 +103,7 @@ class DefaultAppServerController(
                     runtimeCache[RuntimeKey(command.agentId.value, command.conversationId.value)]?.scope
                 }
             },
+            connectionGenerationProvider = { connectionGeneration.value },
         )
     }
 
@@ -186,6 +190,7 @@ class DefaultAppServerController(
 
     override suspend fun onTransportDisconnected(reason: String?) {
         eventRouter.detach()
+        connectionGeneration.incrementAndGet()
         runtimeMutex.withLock {
             // Canonical runtime scopes are generation-local: every cached scope
             // was minted by the generation that just died and must be re-fetched
