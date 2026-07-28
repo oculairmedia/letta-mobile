@@ -74,7 +74,7 @@ object AgentAdminHandlers {
                 )
                 if (response.success) response.agent else null
             }
-            if (shouldInvalidateRuntime(params)) {
+            if (RuntimeInvalidationPolicy.agentUpdateRequiresRestart(params)) {
                 controller?.stopRuntime(AgentId(id))
             }
             result
@@ -106,14 +106,6 @@ object AgentAdminHandlers {
         }
     }
 
-    private fun shouldInvalidateRuntime(params: JsonObject?): Boolean {
-        if (params == null) return false
-        if (params["model"] != null) return true
-        if (params["context_window_limit"] != null || params["contextWindowLimit"] != null) return true
-        val modelSettings = params["model_settings"]?.jsonObject
-        return modelSettings?.containsKey("context_window_limit") == true ||
-            modelSettings?.containsKey("contextWindowLimit") == true
-    }
 }
 
 private fun JsonObject?.withDefaultContextWindow(): JsonObject =

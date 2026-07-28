@@ -622,6 +622,8 @@ class IrohAdminRpcAgentDirectory(
         val body = buildJsonObject {
             put("agent_id", agentId)
             put("name", skillName)
+            // Phase 2: native skill_enable is path-based; pass name as skill_path.
+            put("skill_path", skillName)
         }.toString()
         adminRpcResult("skill.install", "/v1/agents/$agentId/skills", body)
     }

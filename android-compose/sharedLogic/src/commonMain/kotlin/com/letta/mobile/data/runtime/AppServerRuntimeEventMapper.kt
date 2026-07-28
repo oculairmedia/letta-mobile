@@ -40,6 +40,7 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.ListModelsResponse,
             is AppServerInboundFrame.SkillEnableResponse,
             is AppServerInboundFrame.SkillDisableResponse,
+            is AppServerInboundFrame.SkillsUpdated,
             is AppServerInboundFrame.CronListResponse,
             is AppServerInboundFrame.CronAddResponse,
             is AppServerInboundFrame.CronGetResponse,

@@ -111,7 +111,7 @@ expected reasons.
 
 ### Phase 2: Port native-owned operations
 
-Status: partial on PR #1036 / `letta-mobile-lgns8.10.2`
+Status: complete on PR #1036 / `letta-mobile-lgns8.10.2`
 
 For agent, conversation, message, model, skill, approval, cron, and reflection
 operations:
@@ -136,21 +136,20 @@ Landed in this Phase 2 slice:
 - `NativeAdmin.require` fail-closed path for runtime-owned ops (no shim
   fallback);
 - agent/conversation/message CRUD+list native-only;
-- `message.get` / `tool_return.get` projected from `conversation_messages_list`;
+- `message.get` / `tool_return.get` projected from `conversation_messages_list`
+  with multi-page `before` walks (up to 20 × 500);
 - `model.list` native-only by default;
 - `approval.submit` controller-only (no shim pending-approval REST);
 - `conversation.delete` always `capability_unavailable`;
 - production CLI no longer wires `LETTA_LOCAL_BACKEND_DIR`;
-- agent.update also invalidates runtime on context-window changes;
-- ownership matrix fallbacks reduced to 5 `shim_until_cutover` rows.
+- `RuntimeInvalidationPolicy` centralizes restart fields for agent update,
+  conversation overrides, and skill mutations;
+- skills use filesystem `skill_enable` / `skill_disable` only; listings come
+  from `NativeSkillsCatalog` (device-status / `skills_updated`);
+- native circuit breaker is per-command (not process-wide).
 
-Still open inside Phase 2:
-
-- agent-scoped skill list/install/uninstall still on shim semantics;
-- global native circuit breaker is still process-wide (now fail-closed, not
-  shim-diverting);
-- deeper single-message fetch than a bounded newest window;
-- full per-field runtime invalidation registry.
+Phase 2 complete for runbook scope. Remaining shim rows (`health` controller-
+null branch, `subagent.*` HTTP discovery) are Phase 4.
 
 ### Phase 3: Replace non-v2 admin domains
 

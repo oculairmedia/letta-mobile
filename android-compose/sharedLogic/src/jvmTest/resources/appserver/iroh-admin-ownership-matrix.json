@@ -1157,7 +1157,7 @@
     {
       "method": "skill.list",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "shim_http GET /v1/skills (shim-only; no native attempt)",
+      "current_backend": "controller projection from device_status / skills_updated (NativeSkillsCatalog); empty until hydrated",
       "owner": "app_server_v2",
       "public_contract": "sync snapshot + skills_updated projection",
       "native_contract": [
@@ -1168,15 +1168,15 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "skill_list_command is absent from the pinned inventory (skills capability is partial); the controller derives listings from the sync snapshot and skills_updated events.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 2: skill_list_command absent; listings derived from update_device_status.current_available_skills and skills_updated. No shim HTTP.",
+      "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
     },
     {
       "method": "skill.list_agent",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "shim_http GET /v1/agents/{id}/skills (shim-only; no native attempt)",
+      "current_backend": "same global NativeSkillsCatalog projection (agent_id accepted, not filtered)",
       "owner": "app_server_v2",
       "public_contract": "sync snapshot + skills_updated projection",
       "native_contract": [
@@ -1187,15 +1187,15 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "Same absent-list-command gap as skill.list; per-agent filtering is a controller projection.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 2: native skills are process-global; agent_id retained for API compatibility.",
+      "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
     },
     {
       "method": "skill.install",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "app_server_v2 skill_enable when skill_path set (no shim); else shim_http POST",
+      "current_backend": "app_server_v2 skill_enable only (skill_path or name; no shim)",
       "owner": "app_server_v2",
       "public_contract": "skill_enable",
       "native_contract": [
@@ -1204,9 +1204,9 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "lgns8.8 must verify install-vs-enable semantic parity against a live App Server before cutover.",
+      "notes": "Phase 2: filesystem enable semantic; agent-scoped shim install retired. Optional agent_id invalidates runtime.",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"
@@ -1214,7 +1214,7 @@
     {
       "method": "skill.uninstall",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "app_server_v2 skill_disable when agent_id absent; else shim_http DELETE",
+      "current_backend": "app_server_v2 skill_disable only (no shim)",
       "owner": "app_server_v2",
       "public_contract": "skill_disable",
       "native_contract": [
@@ -1223,9 +1223,9 @@
       ],
       "authorization_class": "admin_write",
       "data_store": "letta_local_backend",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "Same semantic-parity verification as skill.install.",
+      "notes": "Phase 2: always skill_disable by name; optional agent_id invalidates runtime.",
       "production_first_route": "app_server_v2",
       "post_shim_owner": "app_server_v2",
       "post_shim_fallback": "none"

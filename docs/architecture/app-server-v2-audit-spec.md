@@ -470,15 +470,17 @@ the next turn starts a fresh runtime.
 
 The ownership-matrix fallback totals are:
 
-- 5 as `shim_until_cutover`
-- 79 as `none`
+- 3 as `shim_until_cutover`
+- 81 as `none`
 - 5 as `deny_fail_closed`
 
-Phase 3 stopped defaulting admin REST to LettaShim `:8291`. Bounded admin
-domains require an explicit `LETTA_IROH_ADMIN_REST_BASE_URL`; goal and slash
-command methods are product-removed (`deny_fail_closed`). Remaining
-`shim_until_cutover` rows are health (controller-null branch), agent-scoped
-skill install/uninstall, and shim-backed subagent discovery.
+Phase 2 finished native-only skills (`skill_enable` / `skill_disable` +
+catalog projection) and cleared their shim fallbacks. Phase 3 stopped
+defaulting admin REST to LettaShim `:8291`. Bounded admin domains require an
+explicit `LETTA_IROH_ADMIN_REST_BASE_URL`; goal and slash command methods are
+product-removed (`deny_fail_closed`). Remaining `shim_until_cutover` rows are
+health (controller-null branch) and shim-backed subagent discovery
+(`subagent.list` / `subagent.todos`) — Phase 4.
 
 ### Current dependency classes
 
@@ -653,10 +655,11 @@ update, or compaction operations fail, the user turn is not started.
 | Agent model changed through Iroh admin | App Server | Explicit `stopRuntime(agentId)` |
 | Missing context limit repaired by preflight | App Server | Current turn runtime discarded |
 | Conversation compacted by preflight | App Server | Current turn runtime discarded |
-| Manual context limit changed through Iroh admin | App Server | No explicit handler invalidation yet |
-| Other agent fields changed | App Server | Depends on App Server runtime behavior; not centrally classified |
+| Manual context limit changed through Iroh admin | App Server | `RuntimeInvalidationPolicy` → `stopRuntime(agentId)` |
+| Other agent fields changed | App Server | Classified in `RuntimeInvalidationPolicy.AGENT_RESTART_FIELDS` (model, tools, skills, memory, system, embeddings, …) |
 | Transport generation changes | None | All cached canonical scopes invalidated and reattached |
-| Conversation override changed | App Server | No dedicated wrapper invalidation rule documented |
+| Conversation override changed | App Server | `RuntimeInvalidationPolicy.CONVERSATION_RESTART_FIELDS` → `stopRuntime(agentId)` when agent id known |
+| Skill enable/disable | App Server | Optional `agent_id` → `stopRuntime(agentId)` |
 
 An audit must classify every mutable agent/conversation field as either
 live-read, runtime-captured, or restart-required. The current implementation

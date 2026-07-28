@@ -10,10 +10,10 @@ import kotlinx.serialization.json.buildJsonObject
  * Native App Server v2 execution for runtime-owned admin operations.
  *
  * Phase 2 (runbook): [require] is fail-closed. Native timeout, missing client,
- * unsuccessful response, or open circuit returns a typed capability/error and
- * does **not** fall through to LettaShim. [attempt] remains only for legacy
- * characterization tests that still exercise the pre-cutover null-on-failure
- * contract.
+ * unsuccessful response, or open **per-command** circuit returns a typed
+ * capability/error and does **not** fall through to LettaShim. [attempt]
+ * remains only for legacy characterization tests that still exercise the
+ * pre-cutover null-on-failure contract.
  */
 internal object NativeAdmin {
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
@@ -26,30 +26,38 @@ internal object NativeAdmin {
     private const val NATIVE_ATTEMPT_TIMEOUT_MS = 2_000L
 
     /**
-     * Per-process cooldown after native timeout/error. Phase 2 uses this to fail
-     * closed quickly (`capability_unavailable`) instead of probing a dead App
-     * Server on every admin_rpc. A native SUCCESS clears the breaker immediately.
+     * Per-command cooldown after native timeout/error. Phase 2 scopes the breaker
+     * to the failing [op] so one hung `agent.list` cannot mark unrelated domains
+     * (conversation/message/skill/…) unavailable.
      */
     private val COOLDOWN = 60.seconds
     private val monotonic = kotlin.time.TimeSource.Monotonic
-
-    @Volatile
-    private var nativeDownSince: kotlin.time.TimeSource.Monotonic.ValueTimeMark? = null
+    private val downSinceByOp =
+        java.util.concurrent.ConcurrentHashMap<String, kotlin.time.TimeSource.Monotonic.ValueTimeMark>()
 
     fun requestId(): String = "native-admin-${counter.incrementAndGet()}"
 
-    private fun circuitOpen(): Boolean {
-        val down = nativeDownSince ?: return false
-        return if (down.elapsedNow() < COOLDOWN) true else { nativeDownSince = null; false }
+    private fun circuitOpen(op: String): Boolean {
+        val down = downSinceByOp[op] ?: return false
+        return if (down.elapsedNow() < COOLDOWN) {
+            true
+        } else {
+            downSinceByOp.remove(op, down)
+            false
+        }
     }
 
-    private fun tripBreaker() {
-        nativeDownSince = monotonic.markNow()
+    private fun tripBreaker(op: String) {
+        downSinceByOp[op] = monotonic.markNow()
     }
 
-    /** Test hook: clear the circuit breaker so cases don't leak state across each other. */
+    private fun clearBreaker(op: String) {
+        downSinceByOp.remove(op)
+    }
+
+    /** Test hook: clear all per-command breakers so cases don't leak state. */
     internal fun resetCircuitForTest() {
-        nativeDownSince = null
+        downSinceByOp.clear()
     }
 
     /**
@@ -70,7 +78,7 @@ internal object NativeAdmin {
             )
             adminError("capability_unavailable: $op requires App Server v2")
         }
-        if (circuitOpen()) {
+        if (circuitOpen(op)) {
             AdminRouteTelemetry.selected(
                 method = op,
                 owner = "app_server_v2",
@@ -92,7 +100,7 @@ internal object NativeAdmin {
                 )
                 adminError("app_server_error: $op native command unsuccessful")
             }
-            nativeDownSince = null
+            clearBreaker(op)
             AdminRouteTelemetry.selected(
                 method = op,
                 owner = "app_server_v2",
@@ -101,7 +109,7 @@ internal object NativeAdmin {
             )
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            tripBreaker()
+            tripBreaker(op)
             AdminRouteTelemetry.selected(
                 method = op,
                 owner = "app_server_v2",
@@ -116,7 +124,7 @@ internal object NativeAdmin {
             // adminError / param validation — do not trip the breaker.
             throw e
         } catch (e: Exception) {
-            tripBreaker()
+            tripBreaker(op)
             AdminRouteTelemetry.selected(
                 method = op,
                 owner = "app_server_v2",
@@ -138,7 +146,7 @@ internal object NativeAdmin {
         block: suspend (AppServerClient) -> T?,
     ): T? {
         if (client == null) return null
-        if (circuitOpen()) {
+        if (circuitOpen(op)) {
             AdminRouteTelemetry.fallback(
                 method = op,
                 fromRoute = "app_server_v2",
@@ -150,7 +158,7 @@ internal object NativeAdmin {
         return try {
             val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
             if (result != null) {
-                nativeDownSince = null
+                clearBreaker(op)
                 AdminRouteTelemetry.selected(
                     method = op,
                     owner = "app_server_v2",
@@ -167,7 +175,7 @@ internal object NativeAdmin {
             }
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            tripBreaker()
+            tripBreaker(op)
             AdminRouteTelemetry.fallback(
                 method = op,
                 fromRoute = "app_server_v2",
@@ -178,7 +186,7 @@ internal object NativeAdmin {
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
-            tripBreaker()
+            tripBreaker(op)
             AdminRouteTelemetry.fallback(
                 method = op,
                 fromRoute = "app_server_v2",

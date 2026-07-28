@@ -83,6 +83,7 @@ object AppServerProtocol {
             "list_models_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(raw) }
             "skill_enable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(raw) }
             "skill_disable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(raw) }
+            "skills_updated" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw) }
             "cron_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(raw) }
             "cron_add_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(raw) }
             "cron_get_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(raw) }
@@ -825,6 +826,25 @@ sealed interface AppServerInboundFrame {
         @Transient override val type: String = "skill_disable_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    /**
+     * Push update for available skills. Shape is partially specified upstream;
+     * [skills] may be absent when the payload nests under another key — callers
+     * should also inspect [raw] via unknown-key-tolerant decode.
+     */
+    @Serializable
+    @SerialName("skills_updated")
+    data class SkillsUpdated(
+        override val runtime: AppServerRuntimeScope? = null,
+        @SerialName("event_seq") val eventSeq: Long? = null,
+        @SerialName("emitted_at") val emittedAt: String? = null,
+        @SerialName("idempotency_key") val idempotencyKey: String? = null,
+        val skills: JsonArray? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "skills_updated"
+
+        @Transient override val requestId: String? = null
     }
 
     @Serializable

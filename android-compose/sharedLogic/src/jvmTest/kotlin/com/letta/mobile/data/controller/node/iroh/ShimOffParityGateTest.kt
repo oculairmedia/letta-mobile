@@ -205,7 +205,7 @@ class ShimOffParityGateTest {
             "conversation.list", "conversation.get", "conversation.create",
             "conversation.update", "conversation.archive", "conversation.restore",
             "message.list",
-            "model.list", "skill.install",
+            "model.list", "skill.install", "skill.uninstall", "skill.list",
             "cron.list", "cron.add", "cron.get", "cron.trigger",
         )
         val dialsBefore = proxyDialCount.get()

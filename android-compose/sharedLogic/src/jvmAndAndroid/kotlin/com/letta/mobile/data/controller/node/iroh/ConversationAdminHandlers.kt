@@ -12,15 +12,29 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 object ConversationAdminHandlers {
+    /** Newest-window page size for single-message projection. */
+    internal const val MESSAGE_GET_PAGE_LIMIT = 500
+
+    /** Max pages walked oldest-ward for message.get / tool_return.get. */
+    internal const val MESSAGE_GET_MAX_PAGES = 20
+
+    /** Test-only page-size override (null = production [MESSAGE_GET_PAGE_LIMIT]). */
+    @Volatile
+    internal var messageGetPageLimitForTest: Int? = null
+
+    private val messageGetPageLimit: Int
+        get() = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
+
     fun register(
         router: AdminRpcRouter,
         @Suppress("UNUSED_PARAMETER") adminBaseUrl: String,
         tiers: NativeReadTiers = NativeReadTiers(),
         @Suppress("UNUSED_PARAMETER") shimRetired: Boolean = true,
+        controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
         registerConversationReadRoutes(router, nativeClient)
-        registerConversationWriteRoutes(router, nativeClient)
+        registerConversationWriteRoutes(router, nativeClient, controller)
         registerMessageRoutes(router, nativeClient)
     }
 
@@ -87,6 +101,7 @@ object ConversationAdminHandlers {
     private fun registerConversationWriteRoutes(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        controller: com.letta.mobile.data.controller.AppServerController?,
     ) {
         router.register("conversation.create") { params ->
             params.requireParam(AdminParamKey("agent_id"))
@@ -110,7 +125,7 @@ object ConversationAdminHandlers {
                     if (key != "conversation_id") put(key, value)
                 }
             }
-            NativeAdmin.require(nativeClient, "conversation.update") { c ->
+            val result = NativeAdmin.require(nativeClient, "conversation.update") { c ->
                 val response = c.conversationUpdate(
                     AppServerCommand.ConversationUpdate(
                         requestId = NativeAdmin.requestId(),
@@ -120,6 +135,14 @@ object ConversationAdminHandlers {
                 )
                 if (response.success) response.conversation else null
             }
+            if (RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(body)) {
+                val agentId = param(params, AdminParamKey("agent_id"))
+                    ?: (result as? JsonObject)?.get("agent_id")?.jsonPrimitive?.contentOrNull
+                if (agentId != null) {
+                    controller?.stopRuntime(com.letta.mobile.data.model.AgentId(agentId))
+                }
+            }
+            result
         }
         router.register("conversation.archive") { params ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
@@ -196,7 +219,8 @@ object ConversationAdminHandlers {
 
     /**
      * Phase 2: project a single message from conversation_messages_list.
-     * Searches a bounded newest window; missing ids fail closed (no shim).
+     * Walks newest-first pages (up to [MESSAGE_GET_MAX_PAGES] × [MESSAGE_GET_PAGE_LIMIT])
+     * via the `before` cursor; missing ids fail closed (no shim).
      */
     private suspend fun retrieveMessageNative(
         nativeClient: AppServerClient?,
@@ -205,21 +229,36 @@ object ConversationAdminHandlers {
         op: String,
     ): JsonElement =
         NativeAdmin.require(nativeClient, op) { c ->
-            val native = c.conversationMessagesList(
-                AppServerCommand.ConversationMessagesList(
-                    requestId = NativeAdmin.requestId(),
-                    conversationId = conversationId,
-                    query = NativeAdmin.queryOf(
-                        "limit" to "500",
-                        "order" to "desc",
+            var before: String? = null
+            val pageLimit = messageGetPageLimit
+            repeat(MESSAGE_GET_MAX_PAGES) {
+                val native = c.conversationMessagesList(
+                    AppServerCommand.ConversationMessagesList(
+                        requestId = NativeAdmin.requestId(),
+                        conversationId = conversationId,
+                        query = NativeAdmin.queryOf(
+                            "limit" to pageLimit.toString(),
+                            "order" to "desc",
+                            "before" to before,
+                        ),
                     ),
-                ),
-            )
-            if (!native.success) return@require null
-            val messages = native.messages as? JsonArray ?: return@require null
-            messages.firstOrNull { element ->
-                element.jsonObject["id"]?.jsonPrimitive?.contentOrNull == messageId
-            } ?: adminError("not_found: message $messageId not in active conversation window")
+                )
+                if (!native.success) return@require null
+                val messages = native.messages as? JsonArray ?: return@require null
+                if (messages.isEmpty()) {
+                    adminError("not_found: message $messageId not in conversation history")
+                }
+                messages.firstOrNull { element ->
+                    element.jsonObject["id"]?.jsonPrimitive?.contentOrNull == messageId
+                }?.let { return@require it }
+                val oldestId = messages.lastOrNull()
+                    ?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
+                if (oldestId == null || oldestId == before || messages.size < pageLimit) {
+                    adminError("not_found: message $messageId not in conversation history")
+                }
+                before = oldestId
+            }
+            adminError("not_found: message $messageId not in searchable conversation window")
         }
 
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {

@@ -12,14 +12,15 @@ import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
+import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
-import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
-import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
-import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.controller.node.iroh.SkillsListingSource
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
+import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
+import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import io.ktor.client.HttpClient
@@ -67,12 +68,20 @@ internal fun buildProductionAdminRouter(
     // Phase 3: bounded admin REST must be an explicit service URL — never the
     // LettaShim :8291 default. Unset => capability_unavailable for those methods.
     adminRestBaseUrl: String? = System.getenv("LETTA_IROH_ADMIN_REST_BASE_URL"),
-): AdminRpcRouter = AdminRpcRegistry.buildRouter(
-    adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient,
-    vibesyncBaseUrl = vibesyncBaseUrl,
-    adminRestBaseUrl = adminRestBaseUrl,
-    shimRetired = true,
-)
+    skillsCatalogScope: CoroutineScope? = null,
+): AdminRpcRouter {
+    val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
+    if (nativeClient != null && skillsCatalogScope != null) {
+        skillsCatalog.start(skillsCatalogScope, nativeClient.events)
+    }
+    return AdminRpcRegistry.buildRouter(
+        adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient,
+        vibesyncBaseUrl = vibesyncBaseUrl,
+        adminRestBaseUrl = adminRestBaseUrl,
+        shimRetired = true,
+        skillsListing = SkillsListingSource { skillsCatalog.snapshot() },
+    )
+}
 
 internal class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
@@ -227,7 +236,15 @@ internal class AppServerServeIrohCommand : CliktCommand(
             val rpcBase = adminBaseUrl.trimEnd('/')
             val subagentRegistrySource =
                 com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
-            val adminRpcRouter = buildProductionAdminRouter(rpcBase, controller, subagentRegistrySource, pairingService, nativeAdminClient, vibesyncBaseUrl)
+            val adminRpcRouter = buildProductionAdminRouter(
+                rpcBase,
+                controller,
+                subagentRegistrySource,
+                pairingService,
+                nativeAdminClient,
+                vibesyncBaseUrl,
+                skillsCatalogScope = scope,
+            )
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +

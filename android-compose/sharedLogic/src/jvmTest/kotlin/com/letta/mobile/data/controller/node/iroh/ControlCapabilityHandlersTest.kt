@@ -111,7 +111,7 @@ class ControlCapabilityHandlersTest {
         val r = AdminRpcRouter()
         HealthAdminHandlers.register(r, "http://127.0.0.1:9", controller)
         ModelAdminHandlers.register(r, "http://127.0.0.1:9", client)
-        SkillAdminHandlers.register(r, "http://127.0.0.1:9", client)
+        SkillAdminHandlers.register(r, adminBaseUrl = null, nativeClient = client)
         ConversationAdminHandlers.register(r, "http://127.0.0.1:9", NativeReadTiers(nativeClient = client), shimRetired)
         return r
     }
@@ -150,7 +150,7 @@ class ControlCapabilityHandlersTest {
     }
 
     @Test
-    fun skillInstallAndUninstallRouteNativelyOnNativeParams() = runTest {
+    fun skillInstallAndUninstallAreNativeOnlyIncludingNameFallback() = runTest {
         val client = FakeControlClient()
         val r = router(client = client)
 
@@ -158,9 +158,34 @@ class ControlCapabilityHandlersTest {
         assertTrue(enable.contains("\"success\":true") && enable.contains("\"enabled\":true"))
         assertTrue("skill_enable:/skills/demo" in client.calls)
 
-        val disable = dispatch(r, "skill.uninstall", mapOf("name" to "demo"))
+        val enableByName = dispatch(r, "skill.install", mapOf("name" to "/skills/by-name", "agent_id" to "agent-1"))
+        assertTrue(enableByName.contains("\"enabled\":true"))
+        assertTrue("skill_enable:/skills/by-name" in client.calls)
+
+        val disable = dispatch(r, "skill.uninstall", mapOf("name" to "demo", "agent_id" to "agent-1"))
         assertTrue(disable.contains("\"success\":true") && disable.contains("\"disabled\":true"))
         assertTrue("skill_disable:demo" in client.calls)
+    }
+
+    @Test
+    fun skillListProjectsFromInjectedCatalogWithoutShim() = runTest {
+        val catalog = NativeSkillsCatalog()
+        catalog.replace(
+            buildJsonArray {
+                add(buildJsonObject { put("name", "demo") })
+            },
+        )
+        val r = AdminRpcRouter()
+        SkillAdminHandlers.register(
+            r,
+            adminBaseUrl = null,
+            nativeClient = FakeControlClient(),
+            skillsListing = SkillsListingSource { catalog.snapshot() },
+        )
+        val listed = dispatch(r, "skill.list", emptyMap())
+        assertTrue(listed.contains("\"success\":true") && listed.contains("demo"))
+        val agentListed = dispatch(r, "skill.list_agent", mapOf("agent_id" to "agent-1"))
+        assertTrue(agentListed.contains("demo"))
     }
 
     @Test

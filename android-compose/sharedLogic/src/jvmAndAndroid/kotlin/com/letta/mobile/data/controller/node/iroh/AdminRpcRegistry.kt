@@ -77,6 +77,11 @@ object AdminRpcRegistry {
          * production route; retained only so older call sites compile.
          */
         @Suppress("UNUSED_PARAMETER") localBackendDir: String? = null,
+        /**
+         * Optional skills listing projection (device-status / skills_updated).
+         * When null, skill.list returns an empty skills array until a catalog is wired.
+         */
+        skillsListing: SkillsListingSource? = null,
     ): AdminRpcRouter {
         val rpcBase = adminBaseUrl.trimEnd('/')
         val adminRestBase = adminRestBaseUrl?.trimEnd('/')
@@ -87,7 +92,7 @@ object AdminRpcRegistry {
         HealthAdminHandlers.register(router, rpcBase, controller)
         AgentAdminHandlers.register(router, controller, tiers, adminRestBase)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired = true)
+        ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired = true, controller = controller)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, adminRestBase)
         ArchiveAdminHandlers.register(router, adminRestBase)
@@ -99,7 +104,13 @@ object AdminRpcRegistry {
         // Phase 3: shim-era goal/slash surfaces are product-removed.
         GoalAdminHandlers.register(router, adminBaseUrl = null)
         SlashCommandAdminHandlers.register(router, adminBaseUrl = null)
-        SkillAdminHandlers.register(router, rpcBase, nativeClient)
+        SkillAdminHandlers.register(
+            router,
+            adminBaseUrl = null,
+            nativeClient = nativeClient,
+            controller = controller,
+            skillsListing = skillsListing,
+        )
         ApprovalAdminHandlers.register(router, rpcBase, controller)
         PairingAdminHandlers.register(router, pairingService)
         CronAdminHandlers.register(router, nativeClient)

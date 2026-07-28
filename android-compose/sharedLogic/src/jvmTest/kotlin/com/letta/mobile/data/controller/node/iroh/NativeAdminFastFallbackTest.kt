@@ -61,22 +61,29 @@ class NativeAdminFastFallbackTest {
     }
 
     @Test
-    fun afterANativeTimeoutTheBreakerSkipsNativeForSubsequentOpsInsteadOfProbingAgain() = runTest {
-        // First op hangs → trips the breaker (this one still pays the ~2s probe).
+    fun afterANativeTimeoutTheBreakerSkipsOnlyThatCommand() = runTest {
+        // First op hangs → trips the breaker for agent.list only.
         var firstProbed = false
         assertNull(
             NativeAdmin.attempt(FakeClient, "agent.list") { firstProbed = true; delay(120_000); "x" },
         )
         assertTrue(firstProbed, "the first op probes native")
 
-        // Subsequent ops must NOT probe native — straight to the proxy (null),
-        // so a page-heavy read doesn't multiply the probe into seconds of wait.
-        var secondProbed = false
+        // Same command must NOT probe while its breaker is open.
+        var sameOpProbed = false
         assertNull(
-            NativeAdmin.attempt(FakeClient, "conversation.list") { secondProbed = true; "y" },
-            "breaker open → skip native → proxy fallback",
+            NativeAdmin.attempt(FakeClient, "agent.list") { sameOpProbed = true; "y" },
+            "breaker open for agent.list → skip native",
         )
-        assertFalse(secondProbed, "native must be skipped while the breaker is open")
+        assertFalse(sameOpProbed, "native must be skipped for the tripped command")
+
+        // Unrelated command still probes — Phase 2 per-command circuit.
+        var otherProbed = false
+        assertEquals(
+            "ok",
+            NativeAdmin.attempt(FakeClient, "conversation.list") { otherProbed = true; "ok" },
+        )
+        assertTrue(otherProbed, "unrelated commands must not inherit another op's breaker")
     }
 
     private object FakeClient : AppServerClient {
