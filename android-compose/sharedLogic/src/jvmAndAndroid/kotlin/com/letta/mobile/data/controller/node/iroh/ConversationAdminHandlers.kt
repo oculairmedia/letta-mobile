@@ -251,15 +251,24 @@ object ConversationAdminHandlers {
             messages.firstOrNull { element ->
                 (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == messageId
             }?.let { return it }
-            val oldestId = (messages.lastOrNull() as? JsonObject)
-                ?.get("id")?.jsonPrimitive?.contentOrNull
-            if (oldestId == null || oldestId == before || messages.size < pageLimit) {
+            val oldestId = messageIdOf(messages.lastOrNull())
+            if (shouldStopPaging(oldestId, before, messages.size, pageLimit)) {
                 adminError("not_found: message $messageId not in conversation history")
             }
             before = oldestId
         }
         adminError("not_found: message $messageId not in searchable conversation window")
     }
+
+    private fun messageIdOf(element: JsonElement?): String? =
+        (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull
+
+    private fun shouldStopPaging(
+        oldestId: String?,
+        previousBefore: String?,
+        pageSize: Int,
+        pageLimit: Int,
+    ): Boolean = oldestId == null || oldestId == previousBefore || pageSize < pageLimit
 
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
         if (!context.canAccessConversation(conversationId)) {

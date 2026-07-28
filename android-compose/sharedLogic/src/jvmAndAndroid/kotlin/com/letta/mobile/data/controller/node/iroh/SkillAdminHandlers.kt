@@ -21,7 +21,6 @@ import kotlinx.serialization.json.put
 object SkillAdminHandlers {
     fun register(
         router: AdminRpcRouter,
-        @Suppress("UNUSED_PARAMETER") adminBaseUrl: String? = null,
         nativeClient: AppServerClient? = null,
         controller: AppServerController? = null,
         skillsListing: SkillsListingSource? = null,

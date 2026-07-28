@@ -28,16 +28,11 @@ class ControllerSubagentRegistrySource : SubagentRegistrySource {
 
     override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> {
         val entries = byConversation[conversationId]?.values?.toList().orEmpty()
-        return if (includeTerminal) {
-            entries
-        } else {
-            entries.filter { it.status == SubagentStatus.RUNNING }
-        }
+        return if (includeTerminal) entries else entries.filter { it.status == SubagentStatus.RUNNING }
     }
 
     override suspend fun todos(conversationId: String, toolCallId: String): SubagentTodosSnapshot? {
         // Todo snapshots are not yet projected from App Server events (m6oa1).
-        // Return the live entry when known so callers can still resolve identity.
         val entry = byConversation[conversationId]?.get(toolCallId) ?: return null
         return SubagentTodosSnapshot(subagent = entry, todos = emptyList(), todosFound = false)
     }
@@ -48,15 +43,11 @@ class ControllerSubagentRegistrySource : SubagentRegistrySource {
         val bucket = byConversation.getOrPut(conversationId) { ConcurrentHashMap() }
         val seen = linkedSetOf<String>()
         for (raw in frame.subagents) {
-            val entry = decodeEntry(raw, conversationId, frame.runtime.agentId) ?: continue
+            val entry = decodeEntry(raw, ParentIds(conversationId, frame.runtime.agentId)) ?: continue
             bucket[entry.toolCallId] = entry
             seen += entry.toolCallId
         }
-        // Frame is authoritative for the conversation snapshot: drop entries
-        // that disappeared from the update (completed ones may linger client-side
-        // via includeTerminal=true until the next full sync).
-        val stale = bucket.keys.filter { it !in seen }
-        stale.forEach { bucket.remove(it) }
+        bucket.keys.filter { it !in seen }.forEach { bucket.remove(it) }
         if (bucket.isEmpty()) byConversation.remove(conversationId, bucket)
     }
 
@@ -76,43 +67,42 @@ class ControllerSubagentRegistrySource : SubagentRegistrySource {
         byConversation[conversationId] = bucket
     }
 
-    private fun decodeEntry(
-        raw: JsonObject,
-        conversationId: String,
-        runtimeAgentId: String?,
-    ): SubagentEntry? {
-        val toolCallId = raw.string("toolCallId") ?: raw.string("tool_call_id") ?: return null
-        return runCatching {
-            AppServerProtocol.json.decodeFromJsonElement(SubagentEntry.serializer(), raw)
-        }.getOrElse {
-            SubagentEntry(
-                toolCallId = toolCallId,
-                description = raw.string("description").orEmpty(),
-                subagentType = raw.string("subagentType") ?: raw.string("subagent_type").orEmpty(),
-                status = raw.string("status") ?: SubagentStatus.RUNNING,
-                taskId = raw.string("taskId") ?: raw.string("task_id"),
-                subagentAgentId = raw.string("subagentAgentId") ?: raw.string("subagent_agent_id"),
-                subagentConversationId = raw.string("subagentConversationId")
-                    ?: raw.string("subagent_conversation_id"),
-                parentRunId = raw.string("parentRunId") ?: raw.string("parent_run_id"),
-                parentAgentId = raw.string("parentAgentId")
-                    ?: raw.string("parent_agent_id")
-                    ?: runtimeAgentId,
-                parentConversationId = raw.string("parentConversationId")
-                    ?: raw.string("parent_conversation_id")
-                    ?: conversationId,
-                startedAt = raw.string("startedAt") ?: raw.string("started_at"),
-            )
-        }.let { decoded ->
-            decoded.copy(
-                parentConversationId = decoded.parentConversationId ?: conversationId,
-                parentAgentId = decoded.parentAgentId ?: runtimeAgentId,
-            )
-        }
+    private data class ParentIds(val conversationId: String, val agentId: String?)
+
+    private fun decodeEntry(raw: JsonObject, parents: ParentIds): SubagentEntry? {
+        val toolCallId = raw.firstString("toolCallId", "tool_call_id") ?: return null
+        val decoded = decodeViaSerializer(raw) ?: manualEntry(raw, toolCallId, parents)
+        return decoded.copy(
+            parentConversationId = decoded.parentConversationId ?: parents.conversationId,
+            parentAgentId = decoded.parentAgentId ?: parents.agentId,
+        )
     }
 
-    private fun JsonObject.string(key: String): String? =
-        this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+    private fun decodeViaSerializer(raw: JsonObject): SubagentEntry? =
+        runCatching {
+            AppServerProtocol.json.decodeFromJsonElement(SubagentEntry.serializer(), raw)
+        }.getOrNull()
+
+    private fun manualEntry(raw: JsonObject, toolCallId: String, parents: ParentIds): SubagentEntry =
+        SubagentEntry(
+            toolCallId = toolCallId,
+            description = raw.firstString("description").orEmpty(),
+            subagentType = raw.firstString("subagentType", "subagent_type").orEmpty(),
+            status = raw.firstString("status") ?: SubagentStatus.RUNNING,
+            taskId = raw.firstString("taskId", "task_id"),
+            subagentAgentId = raw.firstString("subagentAgentId", "subagent_agent_id"),
+            subagentConversationId = raw.firstString("subagentConversationId", "subagent_conversation_id"),
+            parentRunId = raw.firstString("parentRunId", "parent_run_id"),
+            parentAgentId = raw.firstString("parentAgentId", "parent_agent_id") ?: parents.agentId,
+            parentConversationId = raw.firstString("parentConversationId", "parent_conversation_id")
+                ?: parents.conversationId,
+            startedAt = raw.firstString("startedAt", "started_at"),
+        )
+
+    private fun JsonObject.firstString(vararg keys: String): String? =
+        keys.firstNotNullOfOrNull { key ->
+            this[key]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
+        }
 
     companion object {
         const val CAPABILITY = "subagent_registry_v1"

@@ -17,19 +17,7 @@ import kotlinx.serialization.json.buildJsonObject
  */
 internal object NativeAdmin {
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
-
-    /**
-     * Upper bound on a single native attempt. A native App-Server-v2 command that
-     * the wrapped server actually implements answers in milliseconds on localhost;
-     * this bound only matters when the command goes UNANSWERED.
-     */
     private const val NATIVE_ATTEMPT_TIMEOUT_MS = 2_000L
-
-    /**
-     * Per-command cooldown after native timeout/error. Phase 2 scopes the breaker
-     * to the failing [op] so one hung `agent.list` cannot mark unrelated domains
-     * (conversation/message/skill/…) unavailable.
-     */
     private val COOLDOWN = 60.seconds
     private val monotonic = kotlin.time.TimeSource.Monotonic
     private val downSinceByOp =
@@ -39,12 +27,9 @@ internal object NativeAdmin {
 
     private fun circuitOpen(op: String): Boolean {
         val down = downSinceByOp[op] ?: return false
-        return if (down.elapsedNow() < COOLDOWN) {
-            true
-        } else {
-            downSinceByOp.remove(op, down)
-            false
-        }
+        if (down.elapsedNow() < COOLDOWN) return true
+        downSinceByOp.remove(op, down)
+        return false
     }
 
     private fun tripBreaker(op: String) {
@@ -60,6 +45,29 @@ internal object NativeAdmin {
         downSinceByOp.clear()
     }
 
+    private fun markSelected(op: String, outcome: String, reason: String? = null) {
+        AdminRouteTelemetry.selected(
+            AdminRouteTelemetry.Selection(
+                method = op,
+                owner = "app_server_v2",
+                route = "app_server_v2",
+                outcome = outcome,
+                reason = reason,
+            ),
+        )
+    }
+
+    private fun markLegacyNull(op: String, reason: String) {
+        AdminRouteTelemetry.fallback(
+            AdminRouteTelemetry.Fallback(
+                method = op,
+                fromRoute = "app_server_v2",
+                toRoute = "legacy_null",
+                reason = reason,
+            ),
+        )
+    }
+
     /**
      * Fail-closed native execution. Never returns null for "try shim next".
      */
@@ -69,70 +77,41 @@ internal object NativeAdmin {
         block: suspend (AppServerClient) -> T?,
     ): T {
         if (client == null) {
-            AdminRouteTelemetry.selected(
-                method = op,
-                owner = "app_server_v2",
-                route = "app_server_v2",
-                outcome = "unavailable",
-                reason = "no_client",
-            )
+            markSelected(op, "unavailable", "no_client")
             adminError("capability_unavailable: $op requires App Server v2")
         }
         if (circuitOpen(op)) {
-            AdminRouteTelemetry.selected(
-                method = op,
-                owner = "app_server_v2",
-                route = "app_server_v2",
-                outcome = "unavailable",
-                reason = "circuit_open",
-            )
+            markSelected(op, "unavailable", "circuit_open")
             adminError("capability_unavailable: $op App Server v2 temporarily unavailable")
         }
+        return executeRequire(client, op, block)
+    }
+
+    private suspend fun <T : Any> executeRequire(
+        client: AppServerClient,
+        op: String,
+        block: suspend (AppServerClient) -> T?,
+    ): T {
         return try {
             val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
             if (result == null) {
-                AdminRouteTelemetry.selected(
-                    method = op,
-                    owner = "app_server_v2",
-                    route = "app_server_v2",
-                    outcome = "error",
-                    reason = "native_unsuccessful",
-                )
+                markSelected(op, "error", "native_unsuccessful")
                 adminError("app_server_error: $op native command unsuccessful")
             }
             clearBreaker(op)
-            AdminRouteTelemetry.selected(
-                method = op,
-                owner = "app_server_v2",
-                route = "app_server_v2",
-                outcome = "success",
-            )
+            markSelected(op, "success")
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             tripBreaker(op)
-            AdminRouteTelemetry.selected(
-                method = op,
-                owner = "app_server_v2",
-                route = "app_server_v2",
-                outcome = "unavailable",
-                reason = "native_timeout",
-            )
+            markSelected(op, "unavailable", "native_timeout")
             adminError("capability_unavailable: $op App Server v2 timed out")
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: IllegalArgumentException) {
-            // adminError / param validation — do not trip the breaker.
             throw e
         } catch (e: Exception) {
             tripBreaker(op)
-            AdminRouteTelemetry.selected(
-                method = op,
-                owner = "app_server_v2",
-                route = "app_server_v2",
-                outcome = "error",
-                reason = e.message ?: e::class.simpleName ?: "error",
-            )
-            // Denial hygiene: do not echo internal exception text to the peer.
+            markSelected(op, "error", e.message ?: e::class.simpleName ?: "error")
             adminError("app_server_error: $op native command failed")
         }
     }
@@ -148,52 +127,27 @@ internal object NativeAdmin {
     ): T? {
         if (client == null) return null
         if (circuitOpen(op)) {
-            AdminRouteTelemetry.fallback(
-                method = op,
-                fromRoute = "app_server_v2",
-                toRoute = "legacy_null",
-                reason = "circuit_open",
-            )
+            markLegacyNull(op, "circuit_open")
             return null
         }
         return try {
             val result = kotlinx.coroutines.withTimeout(NATIVE_ATTEMPT_TIMEOUT_MS) { block(client) }
             if (result != null) {
                 clearBreaker(op)
-                AdminRouteTelemetry.selected(
-                    method = op,
-                    owner = "app_server_v2",
-                    route = "app_server_v2",
-                    outcome = "success",
-                )
+                markSelected(op, "success")
             } else {
-                AdminRouteTelemetry.fallback(
-                    method = op,
-                    fromRoute = "app_server_v2",
-                    toRoute = "legacy_null",
-                    reason = "native_unsuccessful",
-                )
+                markLegacyNull(op, "native_unsuccessful")
             }
             result
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             tripBreaker(op)
-            AdminRouteTelemetry.fallback(
-                method = op,
-                fromRoute = "app_server_v2",
-                toRoute = "legacy_null",
-                reason = "native_timeout",
-            )
+            markLegacyNull(op, "native_timeout")
             null
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             tripBreaker(op)
-            AdminRouteTelemetry.fallback(
-                method = op,
-                fromRoute = "app_server_v2",
-                toRoute = "legacy_null",
-                reason = e.message ?: e::class.simpleName ?: "error",
-            )
+            markLegacyNull(op, e.message ?: e::class.simpleName ?: "error")
             null
         }
     }

@@ -112,17 +112,26 @@ class ShimRetirementArchitectureGateTest {
             Path.of("../..").toAbsolutePath(),
         )
         for (start in starts) {
-            var cur: Path? = start
-            while (cur != null) {
-                if (Files.isRegularFile(cur.resolve("android-compose/settings.gradle.kts")) ||
-                    Files.isRegularFile(cur.resolve("settings.gradle.kts")) &&
-                    Files.isDirectory(cur.resolve("android-compose"))
-                ) {
-                    return if (Files.isDirectory(cur.resolve("android-compose"))) cur else cur.parent
-                }
-                cur = cur.parent
-            }
+            findRepoRootFrom(start)?.let { return it }
         }
         error("Could not locate repository root from ${Path.of("").toAbsolutePath()}")
+    }
+
+    private fun findRepoRootFrom(start: Path): Path? {
+        var cur: Path? = start
+        while (cur != null) {
+            if (isRepoRoot(cur)) {
+                return if (Files.isDirectory(cur.resolve("android-compose"))) cur else cur.parent
+            }
+            cur = cur.parent
+        }
+        return null
+    }
+
+    private fun isRepoRoot(path: Path): Boolean {
+        val nestedCompose = path.resolve("android-compose")
+        if (Files.isRegularFile(path.resolve("android-compose/settings.gradle.kts"))) return true
+        return Files.isRegularFile(path.resolve("settings.gradle.kts")) &&
+            Files.isDirectory(nestedCompose)
     }
 }

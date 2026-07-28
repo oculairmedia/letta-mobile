@@ -35,16 +35,7 @@ class ApprovalAdminHandlersTest {
     fun approvalSubmitRoutesLiveRuntimeApprovalThroughController() = runTest {
         val recording = installRecordingTransport()
         val controller = RecordingController()
-        val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, controller)
-
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-approval",
-                method = "approval.submit",
-                params = approvalParams(),
-            ),
-        ).jsonObject
+        val response = dispatchApproval(controller = controller, params = approvalParams())
 
         assertTrue(response.getValue("success").jsonPrimitive.boolean)
         assertEquals(0, recording.calls.size)
@@ -56,16 +47,7 @@ class ApprovalAdminHandlersTest {
     @Test
     fun approvalSubmitWithoutControllerFailsClosed() = runTest {
         val recording = installRecordingTransport()
-        val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router)
-
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-approval",
-                method = "approval.submit",
-                params = approvalParams(),
-            ),
-        ).jsonObject
+        val response = dispatchApproval(controller = null, params = approvalParams())
 
         assertFalse(response.getValue("success").jsonPrimitive.boolean)
         assertTrue(response.getValue("error").jsonPrimitive.content.contains("capability_unavailable"))
@@ -75,21 +57,32 @@ class ApprovalAdminHandlersTest {
     @Test
     fun approvalSubmitMissingAgentIdDispatchesFailureEnvelope() = runTest {
         installRecordingTransport()
-        val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router)
-
-        val response = Json.parseToJsonElement(
-            router.dispatch(
-                requestId = "req-missing",
-                method = "approval.submit",
-                params = buildJsonObject {
-                    put("payload", buildJsonObject { put("streaming", false) })
-                },
-            ),
-        ).jsonObject
+        val response = dispatchApproval(
+            controller = null,
+            params = buildJsonObject {
+                put("payload", buildJsonObject { put("streaming", false) })
+            },
+            requestId = "req-missing",
+        )
 
         assertFalse(response.getValue("success").jsonPrimitive.boolean)
         assertTrue(response.getValue("error").jsonPrimitive.content.contains("agent_id"))
+    }
+
+    private suspend fun dispatchApproval(
+        controller: AppServerController?,
+        params: JsonObject,
+        requestId: String = "req-approval",
+    ): JsonObject {
+        val router = AdminRpcRouter()
+        ApprovalAdminHandlers.register(router, controller)
+        return Json.parseToJsonElement(
+            router.dispatch(
+                requestId = requestId,
+                method = "approval.submit",
+                params = params,
+            ),
+        ).jsonObject
     }
 
     private fun approvalParams() = buildJsonObject {

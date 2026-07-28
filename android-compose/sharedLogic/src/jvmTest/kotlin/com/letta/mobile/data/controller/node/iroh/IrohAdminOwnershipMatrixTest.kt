@@ -107,33 +107,30 @@ class IrohAdminOwnershipMatrixTest {
     fun adminRestDomainsHavePhase3Decisions() {
         val phase3Decisions = enums.stringSet("phase3_decisions")
         operations
-            .filter {
-                it.requiredString("owner") in setOf("admin_rest_service", "capability_gated_unsupported") &&
-                    it.requiredString("method").let { m ->
-                        m == "agent.context" ||
-                            m.startsWith("run.") ||
-                            m.startsWith("step.") ||
-                            m.startsWith("archive.") ||
-                            m.startsWith("folder.") ||
-                            m.startsWith("passage.") ||
-                            m.startsWith("group.") ||
-                            m.startsWith("identity.") ||
-                            m.startsWith("model.list.embedding") ||
-                            m.startsWith("provider.") ||
-                            m.startsWith("schedule.") ||
-                            m.startsWith("job.") ||
-                            m.startsWith("tool.") ||
-                            m.startsWith("block.") ||
-                            m.startsWith("mcp.") ||
-                            m.startsWith("goal.") ||
-                            m.startsWith("slash_command.")
-                    }
-            }
+            .filter { isPhase3AdminRestDomain(it) }
             .forEach { row ->
                 val method = row.requiredString("method")
                 val decision = row.requiredString("phase3_decision")
                 assertTrue(decision in phase3Decisions, "$method missing phase3_decision")
             }
+    }
+
+    private fun isPhase3AdminRestDomain(row: JsonObject): Boolean {
+        if (row.requiredString("owner") !in setOf("admin_rest_service", "capability_gated_unsupported")) {
+            return false
+        }
+        val method = row.requiredString("method")
+        return method == "agent.context" ||
+            method == "model.list.embedding" ||
+            ADMIN_REST_PREFIXES.any { method.startsWith(it) }
+    }
+
+    private companion object {
+        val ADMIN_REST_PREFIXES = listOf(
+            "run.", "step.", "archive.", "folder.", "passage.", "group.",
+            "identity.", "provider.", "schedule.", "job.", "tool.", "block.",
+            "mcp.", "goal.", "slash_command.",
+        )
     }
 
     @Test

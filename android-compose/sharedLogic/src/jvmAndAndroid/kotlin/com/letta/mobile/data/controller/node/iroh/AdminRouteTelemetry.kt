@@ -12,48 +12,40 @@ import com.letta.mobile.util.Telemetry
 internal object AdminRouteTelemetry {
     const val CATEGORY = "IrohAdminRoute"
 
-    fun selected(
-        method: String,
-        owner: String,
-        route: String,
-        outcome: String,
-        reason: String? = null,
-    ) {
-        if (reason == null) {
-            Telemetry.event(
-                CATEGORY,
-                "selected",
-                "method" to method,
-                "owner" to owner,
-                "route" to route,
-                "outcome" to outcome,
-            )
-        } else {
-            Telemetry.event(
-                CATEGORY,
-                "selected",
-                "method" to method,
-                "owner" to owner,
-                "route" to route,
-                "outcome" to outcome,
-                "reason" to reason,
-            )
-        }
+    data class Selection(
+        val method: String,
+        val owner: String,
+        val route: String,
+        val outcome: String,
+        val reason: String? = null,
+    )
+
+    data class Fallback(
+        val method: String,
+        val fromRoute: String,
+        val toRoute: String,
+        val reason: String,
+    )
+
+    fun selected(selection: Selection) {
+        val fields = mutableListOf(
+            "method" to selection.method,
+            "owner" to selection.owner,
+            "route" to selection.route,
+            "outcome" to selection.outcome,
+        )
+        selection.reason?.let { fields += "reason" to it }
+        Telemetry.event(CATEGORY, "selected", *fields.toTypedArray())
     }
 
-    fun fallback(
-        method: String,
-        fromRoute: String,
-        toRoute: String,
-        reason: String,
-    ) {
+    fun fallback(fallback: Fallback) {
         Telemetry.event(
             CATEGORY,
             "fallback",
-            "method" to method,
-            "from" to fromRoute,
-            "to" to toRoute,
-            "reason" to reason,
+            "method" to fallback.method,
+            "from" to fallback.fromRoute,
+            "to" to fallback.toRoute,
+            "reason" to fallback.reason,
         )
     }
 }

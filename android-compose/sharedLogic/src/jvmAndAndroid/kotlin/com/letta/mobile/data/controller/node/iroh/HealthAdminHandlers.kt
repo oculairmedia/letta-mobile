@@ -30,11 +30,13 @@ object HealthAdminHandlers {
                 }
             } else {
                 AdminRouteTelemetry.selected(
-                    method = "health.check",
-                    owner = "controller_native",
-                    route = "controller_native",
-                    outcome = "unavailable",
-                    reason = "no_controller",
+                    AdminRouteTelemetry.Selection(
+                        method = "health.check",
+                        owner = "controller_native",
+                        route = "controller_native",
+                        outcome = "unavailable",
+                        reason = "no_controller",
+                    ),
                 )
                 buildJsonObject {
                     put("status", "degraded")

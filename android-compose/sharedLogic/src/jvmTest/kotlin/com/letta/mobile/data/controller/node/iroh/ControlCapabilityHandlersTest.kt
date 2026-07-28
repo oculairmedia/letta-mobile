@@ -112,7 +112,7 @@ class ControlCapabilityHandlersTest {
         val r = AdminRpcRouter()
         HealthAdminHandlers.register(r, controller)
         ModelAdminHandlers.register(r, "http://127.0.0.1:9", client)
-        SkillAdminHandlers.register(r, adminBaseUrl = null, nativeClient = client)
+        SkillAdminHandlers.register(r, nativeClient = client)
         ConversationAdminHandlers.register(r, NativeReadTiers(nativeClient = client))
         return r
     }
@@ -179,7 +179,6 @@ class ControlCapabilityHandlersTest {
         val r = AdminRpcRouter()
         SkillAdminHandlers.register(
             r,
-            adminBaseUrl = null,
             nativeClient = FakeControlClient(),
             skillsListing = SkillsListingSource { catalog.snapshot() },
         )

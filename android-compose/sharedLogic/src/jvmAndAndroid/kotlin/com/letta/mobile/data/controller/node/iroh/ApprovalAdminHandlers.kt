@@ -54,11 +54,13 @@ object ApprovalAdminHandlers {
 
         if (controller == null) {
             AdminRouteTelemetry.selected(
-                method = "approval.submit",
-                owner = "controller_native",
-                route = "controller_native",
-                outcome = "unavailable",
-                reason = "no_controller",
+                AdminRouteTelemetry.Selection(
+                    method = "approval.submit",
+                    owner = "controller_native",
+                    route = "controller_native",
+                    outcome = "unavailable",
+                    reason = "no_controller",
+                ),
             )
             adminError("capability_unavailable: approval.submit requires a live App Server controller")
         }
@@ -75,19 +77,23 @@ object ApprovalAdminHandlers {
             )
         }.onSuccess {
             AdminRouteTelemetry.selected(
-                method = "approval.submit",
-                owner = "controller_native",
-                route = "controller_native",
-                outcome = "success",
+                AdminRouteTelemetry.Selection(
+                    method = "approval.submit",
+                    owner = "controller_native",
+                    route = "controller_native",
+                    outcome = "success",
+                ),
             )
             return buildJsonObject { put("status", if (approve) "approved" else "denied") }
         }.onFailure { error ->
             AdminRouteTelemetry.selected(
-                method = "approval.submit",
-                owner = "controller_native",
-                route = "controller_native",
-                outcome = "error",
-                reason = error.message ?: error::class.simpleName ?: "error",
+                AdminRouteTelemetry.Selection(
+                    method = "approval.submit",
+                    owner = "controller_native",
+                    route = "controller_native",
+                    outcome = "error",
+                    reason = error.message ?: error::class.simpleName ?: "error",
+                ),
             )
             adminError("app_server_error: approval.submit ${error.message ?: error::class.simpleName}")
         }

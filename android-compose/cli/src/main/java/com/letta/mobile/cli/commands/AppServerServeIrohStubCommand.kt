@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.probe.ProbeStubAdminServer
 import com.letta.mobile.cli.probe.ProbeStubBehavior
 import com.letta.mobile.cli.probe.ProbeStubController
+import com.letta.mobile.cli.probe.ProbeStubNativeClient
 import com.letta.mobile.cli.probe.ProbeStubStore
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
@@ -20,8 +21,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-
 import kotlin.time.Duration.Companion.seconds
+
 /**
  * Hermetic stub app-server over Iroh for the probe CI gate (letta-mobile-q5iiv).
  *
@@ -93,99 +94,129 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
     override fun run() = runBlocking {
         val scope = CoroutineScope(Dispatchers.IO)
         try {
-            val store = ProbeStubStore()
-            val behavior = ProbeStubBehavior.fromEnv().copy(suppressTerminal = suppressTerminal || System.getProperty("letta.probe.stub.suppressTerminal") == "true",
-                assistantDeltas = assistantDeltas,
-                deltaDelayMs = deltaDelayMs.toLong(),
-            )
-            if (behavior.suppressTerminal) {
-                println("[iroh-stub-server] REGRESSION INJECTED: suppress-terminal")
-            }
-            if (behavior.untypedFrames) {
-                println("[iroh-stub-server] REGRESSION INJECTED: untyped-frames")
-            }
-
-            // The wrapper script kills this JVM directly by PID: with the Gradle
-            // daemon in play, this process is a child of the daemon — NOT of the
-            // backgrounded `./gradlew` client whose process tree the script walks.
-            println("[iroh-stub-server] PID: ${ProcessHandle.current().pid()}")
-
-            val adminServer = ProbeStubAdminServer(store, adminPort)
-            println("[iroh-stub-server] Admin base: ${adminServer.baseUrl}")
-
-            println("[iroh-stub-server] Starting Iroh endpoint...")
-            // d6e8g.2: same fail-closed resolution as the production wrapper —
-            // hermetic scripts always pass a token; anonymous stub runs need
-            // the explicit test/dev flag.
-            val authPolicy = when (
-                val resolution = IrohAuthPolicy.resolve(
-                    authToken = authToken,
-                    allowedPeerIds = emptySet(),
-                    allowInsecureAnonymous = allowInsecureAnonymousIroh,
-                )
-            ) {
-                is IrohAuthPolicyResolution.Secure -> resolution.policy
-                is IrohAuthPolicyResolution.InsecureAccepted -> {
-                    System.err.println("[iroh-stub-server] ${resolution.warning}")
-                    resolution.policy
-                }
-                is IrohAuthPolicyResolution.Refused -> {
-                    System.err.println("[iroh-stub-server] ${resolution.error}")
-                    exitProcess(78)
-                }
-            }
-            val irohEndpoint = IrohNodeEndpoint(
-                scope = scope,
-                bindAddr = "0.0.0.0:$irohPort",
-                secretKeyPath = irohSecretKeyPath,
-                authPolicy = authPolicy,
-            )
-            irohEndpoint.create()
-
-            println("[iroh-stub-server] Node ID: ${irohEndpoint.nodeIdHex()}")
-            println("[iroh-stub-server] Ticket: ${irohEndpoint.ticketString()}")
-
-            // Phase 2+ conversation/message admin_rpc is fail-closed native.
-            // Wire ProbeStubStore through AppServerClient so hermetic probes can
-            // hydrate without a live Letta App Server or LettaShim.
-            val nativeClient = com.letta.mobile.cli.probe.ProbeStubNativeClient(store)
-            val controller = ProbeStubController(store, behavior)
-            val adminRpcRouter = AdminRpcRegistry.buildRouter(
-                adminBaseUrl = adminServer.baseUrl,
-                controller = controller,
-                nativeClient = nativeClient,
-            )
-            irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
-            println(
-                "[iroh-stub-server] admin_rpc handlers registered " +
-                    "(stub-native + seed HTTP ${adminServer.baseUrl}, methods: ${adminRpcRouter.methodCount})",
-            )
-
-            irohEndpoint.start(controller)
-            println("[iroh-stub-server] Listening on Iroh... (Ctrl+C to stop)")
-
-            Runtime.getRuntime().addShutdownHook(
-                Thread {
-                    runBlocking {
-                        println("\n[iroh-stub-server] Shutting down...")
-                        runCatching { irohEndpoint.shutdown() }
-                        runCatching { adminServer.close() }
-                        scope.cancel()
-                    }
-                },
-            )
-
-            val deadline = if (maxLifetimeMs > 0) System.currentTimeMillis() + maxLifetimeMs else Long.MAX_VALUE
-            while (System.currentTimeMillis() < deadline) {
-                delay(1.seconds)
-            }
-            println("[iroh-stub-server] max lifetime ${maxLifetimeMs}ms reached; shutting down")
-            exitProcess(0)
+            serve(scope)
         } catch (e: Exception) {
             System.err.println("[iroh-stub-server] Error: ${e.message}")
             e.printStackTrace()
             scope.cancel()
             exitProcess(1)
         }
+    }
+
+    private suspend fun serve(scope: CoroutineScope) {
+        val store = ProbeStubStore()
+        val behavior = stubBehavior()
+        logInjectedRegressions(behavior)
+        println("[iroh-stub-server] PID: ${ProcessHandle.current().pid()}")
+
+        val adminServer = ProbeStubAdminServer(store, adminPort)
+        println("[iroh-stub-server] Admin base: ${adminServer.baseUrl}")
+
+        println("[iroh-stub-server] Starting Iroh endpoint...")
+        val irohEndpoint = createEndpoint(scope)
+        irohEndpoint.create()
+        println("[iroh-stub-server] Node ID: ${irohEndpoint.nodeIdHex()}")
+        println("[iroh-stub-server] Ticket: ${irohEndpoint.ticketString()}")
+
+        val controller = wireAdminRpc(irohEndpoint, store, behavior, adminServer.baseUrl)
+        irohEndpoint.start(controller)
+        println("[iroh-stub-server] Listening on Iroh... (Ctrl+C to stop)")
+        installShutdownHook(scope, irohEndpoint, adminServer)
+        awaitLifetimeOrExit()
+    }
+
+    private fun stubBehavior(): ProbeStubBehavior =
+        ProbeStubBehavior.fromEnv().copy(
+            suppressTerminal = suppressTerminal ||
+                System.getProperty("letta.probe.stub.suppressTerminal") == "true",
+            assistantDeltas = assistantDeltas,
+            deltaDelayMs = deltaDelayMs.toLong(),
+        )
+
+    private fun logInjectedRegressions(behavior: ProbeStubBehavior) {
+        if (behavior.suppressTerminal) {
+            println("[iroh-stub-server] REGRESSION INJECTED: suppress-terminal")
+        }
+        if (behavior.untypedFrames) {
+            println("[iroh-stub-server] REGRESSION INJECTED: untyped-frames")
+        }
+    }
+
+    private fun createEndpoint(scope: CoroutineScope): IrohNodeEndpoint {
+        val authPolicy = when (
+            val resolution = IrohAuthPolicy.resolve(
+                authToken = authToken,
+                allowedPeerIds = emptySet(),
+                allowInsecureAnonymous = allowInsecureAnonymousIroh,
+            )
+        ) {
+            is IrohAuthPolicyResolution.Secure -> resolution.policy
+            is IrohAuthPolicyResolution.InsecureAccepted -> {
+                System.err.println("[iroh-stub-server] ${resolution.warning}")
+                resolution.policy
+            }
+            is IrohAuthPolicyResolution.Refused -> {
+                System.err.println("[iroh-stub-server] ${resolution.error}")
+                exitProcess(78)
+            }
+        }
+        return IrohNodeEndpoint(
+            scope = scope,
+            bindAddr = "0.0.0.0:$irohPort",
+            secretKeyPath = irohSecretKeyPath,
+            authPolicy = authPolicy,
+        )
+    }
+
+    private fun wireAdminRpc(
+        irohEndpoint: IrohNodeEndpoint,
+        store: ProbeStubStore,
+        behavior: ProbeStubBehavior,
+        adminBaseUrl: String,
+    ): ProbeStubController {
+        // Phase 2+ conversation/message admin_rpc is fail-closed native.
+        val nativeClient = ProbeStubNativeClient(store)
+        val controller = ProbeStubController(store, behavior)
+        val adminRpcRouter = AdminRpcRegistry.buildRouter(
+            adminBaseUrl = adminBaseUrl,
+            controller = controller,
+            nativeClient = nativeClient,
+        )
+        irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
+        println(
+            "[iroh-stub-server] admin_rpc handlers registered " +
+                "(stub-native + seed HTTP $adminBaseUrl, methods: ${adminRpcRouter.methodCount})",
+        )
+        return controller
+    }
+
+    private fun installShutdownHook(
+        scope: CoroutineScope,
+        irohEndpoint: IrohNodeEndpoint,
+        adminServer: ProbeStubAdminServer,
+    ) {
+        Runtime.getRuntime().addShutdownHook(
+            Thread {
+                runBlocking {
+                    println("\n[iroh-stub-server] Shutting down...")
+                    runCatching { irohEndpoint.shutdown() }
+                    runCatching { adminServer.close() }
+                    scope.cancel()
+                }
+            },
+        )
+    }
+
+    private suspend fun awaitLifetimeOrExit() {
+        val deadline = if (maxLifetimeMs > 0) {
+            System.currentTimeMillis() + maxLifetimeMs
+        } else {
+            Long.MAX_VALUE
+        }
+        while (System.currentTimeMillis() < deadline) {
+            delay(1.seconds)
+        }
+        println("[iroh-stub-server] max lifetime ${maxLifetimeMs}ms reached; shutting down")
+        exitProcess(0)
     }
 }

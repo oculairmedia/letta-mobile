@@ -41,36 +41,59 @@ class AppServerContextWindowPreflight(
     }
 
     override suspend fun prepare(agentId: String, conversationId: String): TurnContextPreflightResult {
-        val retrieve = client.agentRetrieve(
-            AppServerCommand.AgentRetrieve(requestIdFactory(), agentId),
+        val agent = retrieveAgent(agentId)
+        val conversation = retrieveConversation(conversationId)
+        val existingLimit = agent.contextWindowLimit()
+        val configured = existingLimit == null
+        val agentLimit = existingLimit ?: persistDefaultContextLimit(agentId)
+        val effectiveLimit = conversation.contextWindowLimit() ?: agentLimit
+        val activeMessageIds = conversation.activeMessageIds()
+        val shouldCompact = recentMessagesOverflow(conversationId, effectiveLimit, activeMessageIds)
+        if (shouldCompact) compactConversation(agentId, conversationId)
+        return TurnContextPreflightResult(
+            configuredContextLimit = configured,
+            compacted = shouldCompact,
         )
+    }
+
+    private suspend fun retrieveAgent(agentId: String): JsonObject {
+        val retrieve = client.agentRetrieve(AppServerCommand.AgentRetrieve(requestIdFactory(), agentId))
         check(retrieve.success && retrieve.agent != null) {
             "agent_retrieve failed: ${retrieve.error ?: "missing agent"}"
         }
+        return retrieve.agent
+    }
+
+    private suspend fun retrieveConversation(conversationId: String): JsonObject {
         val conversation = client.conversationRetrieve(
             AppServerCommand.ConversationRetrieve(requestIdFactory(), conversationId),
         )
         check(conversation.success && conversation.conversation != null) {
             "conversation_retrieve failed: ${conversation.error ?: "missing conversation"}"
         }
+        return conversation.conversation
+    }
 
-        val existingLimit = retrieve.agent.contextWindowLimit()
-        val configured = existingLimit == null
-        val agentLimit = existingLimit ?: defaultContextWindowLimit.also { limit ->
-            val update = client.agentUpdate(
-                AppServerCommand.AgentUpdate(
-                    requestId = requestIdFactory(),
-                    agentId = agentId,
-                    body = buildJsonObject { put("context_window_limit", limit) },
-                ),
-            )
-            check(update.success) {
-                "agent_update context window failed: ${update.error ?: "unknown error"}"
-            }
+    private suspend fun persistDefaultContextLimit(agentId: String): Int {
+        val limit = defaultContextWindowLimit
+        val update = client.agentUpdate(
+            AppServerCommand.AgentUpdate(
+                requestId = requestIdFactory(),
+                agentId = agentId,
+                body = buildJsonObject { put("context_window_limit", limit) },
+            ),
+        )
+        check(update.success) {
+            "agent_update context window failed: ${update.error ?: "unknown error"}"
         }
-        val effectiveLimit = conversation.conversation.contextWindowLimit() ?: agentLimit
-        val activeMessageIds = conversation.conversation.activeMessageIds()
+        return limit
+    }
 
+    private suspend fun recentMessagesOverflow(
+        conversationId: String,
+        effectiveLimit: Int,
+        activeMessageIds: Set<String>?,
+    ): Boolean {
         val messages = client.conversationMessagesList(
             AppServerCommand.ConversationMessagesList(
                 requestId = requestIdFactory(),
@@ -84,36 +107,31 @@ class AppServerContextWindowPreflight(
         check(messages.success && messages.messages != null) {
             "conversation_messages_list failed: ${messages.error ?: "missing messages"}"
         }
-
-        val shouldCompact = messages.messages.any { message ->
+        return messages.messages.any { message ->
             message.isActive(activeMessageIds) && message.recordsProviderOverflow(effectiveLimit)
         }
-        if (shouldCompact) {
-            val compact = client.conversationCompact(
-                AppServerCommand.ConversationCompact(
-                    requestId = requestIdFactory(),
-                    conversationId = conversationId,
-                    body = buildJsonObject {
-                        put("agent_id", agentId)
-                        put(
-                            "compaction_settings",
-                            buildJsonObject {
-                                put("mode", "sliding_window")
-                                put("sliding_window_percentage", 0.3)
-                            },
-                        )
-                    },
-                ),
-            )
-            check(compact.success) {
-                "conversation_compact failed: ${compact.error ?: "unknown error"}"
-            }
-        }
+    }
 
-        return TurnContextPreflightResult(
-            configuredContextLimit = configured,
-            compacted = shouldCompact,
+    private suspend fun compactConversation(agentId: String, conversationId: String) {
+        val compact = client.conversationCompact(
+            AppServerCommand.ConversationCompact(
+                requestId = requestIdFactory(),
+                conversationId = conversationId,
+                body = buildJsonObject {
+                    put("agent_id", agentId)
+                    put(
+                        "compaction_settings",
+                        buildJsonObject {
+                            put("mode", "sliding_window")
+                            put("sliding_window_percentage", 0.3)
+                        },
+                    )
+                },
+            ),
         )
+        check(compact.success) {
+            "conversation_compact failed: ${compact.error ?: "unknown error"}"
+        }
     }
 }
 

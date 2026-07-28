@@ -325,108 +325,100 @@ internal class AppServerServeIrohCommand : CliktCommand(
         requestTimeoutMs: Long,
         scope: CoroutineScope,
     ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
-        // If an app server URL is provided, create a client that wraps it
-        // Otherwise, create a stub controller for testing
         return if (appServerUrl != null) {
-            val httpClient = HttpClient(OkHttp) {
-                install(WebSockets)
-                install(HttpTimeout) {
-                    this.requestTimeoutMillis = requestTimeoutMs
-                    this.connectTimeoutMillis = 30_000
-                    this.socketTimeoutMillis = requestTimeoutMs
-                }
-            }
-
-            // lgns8.5: the controller holds ONE stable client; underneath, each
-            // socket loss or App Server restart mints a fresh transport
-            // generation with bounded full-jitter backoff. On loss the
-            // controller's runtime caches are invalidated; on recovery every
-            // registered runtime is reattached (runtime_start), external tools
-            // re-registered, and sync issued with approval/device recovery
-            // before the client reports Ready again.
-            val runtimeRegistry = InMemoryRuntimeRegistry()
-            var controllerRef: DefaultAppServerController? = null
-            var coordinatorRef: ReconnectCoordinator? = null
-            val reconnectingClient = ReconnectingAppServerClient(
-                connect = {
-                    val generationJob = Job(scope.coroutineContext.job)
-                    val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
-                    val transport = KtorAppServerWebSocketTransport(
-                        httpClient = httpClient,
-                        baseUrl = appServerUrl,
-                        scope = generationScope,
-                        bearerToken = null,
-                    )
-                    AppServerClientGeneration(
-                        client = DefaultAppServerClient(
-                            transport,
-                            requestTimeoutMs = requestTimeoutMs,
-                            parentScope = generationScope,
-                        ),
-                        connectionState = transport.connectionState,
-                        close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
-                    )
-                },
-                listener = object : ReconnectingClientListener {
-                    override suspend fun onDisconnected(reason: String?) {
-                        println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
-                        controllerRef?.onTransportDisconnected(reason)
-                    }
-
-                    override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
-                        val result = coordinatorRef?.reconnect()
-                        if (result != null && result.errors.isNotEmpty()) {
-                            result.errors.forEach {
-                                System.err.println("[iroh-app-server] reattach failed: ${it.message}")
-                            }
-                        }
-                        controllerRef?.markConnected()
-                        println(
-                            "[iroh-app-server] App Server connection recovered " +
-                                "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
-                        )
-                    }
-
-                    override suspend fun onGaveUp(reason: String?) {
-                        System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
-                    }
-                },
-            )
-            val controller = DefaultAppServerController(
-                client = reconnectingClient,
-                runtimeRegistry = runtimeRegistry,
-                turnContextPreflight = AppServerContextWindowPreflight(reconnectingClient),
-                // lgns8.17: give the turn engine a registry so it can execute
-                // controller-owned tools; independently, the engine GUARANTEES a
-                // matched external_tool_call_response for every request (a
-                // synthesized is_error when a tool isn't handled here) so a
-                // tool-call turn over the App Server WS route never hangs.
-                externalToolRegistry = ExternalToolRegistry.factoryDefault(),
-            )
-            controllerRef = controller
-            coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
-            reconnectingClient.start(scope)
-            // lgns8.7: the reconnecting client doubles as the native admin
-            // command channel for runtime-native admin_rpc handlers.
-            controller to reconnectingClient
+            createLiveController(appServerUrl, requestTimeoutMs, scope)
         } else {
-            // Stub controller - the server side will return errors for now
-            // This allows testing the Iroh transport layer without a full app server
-            val httpClient = HttpClient(OkHttp) {
-                install(WebSockets)
-            }
-            
-            // Use a dummy WebSocket URL that won't be reached
-            // The Iroh transport will handle the actual communication
-            val transport = KtorAppServerWebSocketTransport(
-                httpClient = httpClient,
-                baseUrl = "ws://127.0.0.1:0",
-                scope = scope,
-                bearerToken = null,
-            )
-            
-            val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
-            DefaultAppServerController(client) to null
+            createStubController(requestTimeoutMs, scope)
         }
+    }
+
+    private fun createLiveController(
+        appServerUrl: String,
+        requestTimeoutMs: Long,
+        scope: CoroutineScope,
+    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient> {
+        val httpClient = HttpClient(OkHttp) {
+            install(WebSockets)
+            install(HttpTimeout) {
+                this.requestTimeoutMillis = requestTimeoutMs
+                this.connectTimeoutMillis = 30_000
+                this.socketTimeoutMillis = requestTimeoutMs
+            }
+        }
+        val runtimeRegistry = InMemoryRuntimeRegistry()
+        var controllerRef: DefaultAppServerController? = null
+        var coordinatorRef: ReconnectCoordinator? = null
+        val reconnectingClient = ReconnectingAppServerClient(
+            connect = {
+                val generationJob = Job(scope.coroutineContext.job)
+                val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
+                val transport = KtorAppServerWebSocketTransport(
+                    httpClient = httpClient,
+                    baseUrl = appServerUrl,
+                    scope = generationScope,
+                    bearerToken = null,
+                )
+                AppServerClientGeneration(
+                    client = DefaultAppServerClient(
+                        transport,
+                        requestTimeoutMs = requestTimeoutMs,
+                        parentScope = generationScope,
+                    ),
+                    connectionState = transport.connectionState,
+                    close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
+                )
+            },
+            listener = object : ReconnectingClientListener {
+                override suspend fun onDisconnected(reason: String?) {
+                    println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
+                    controllerRef?.onTransportDisconnected(reason)
+                }
+
+                override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+                    val result = coordinatorRef?.reconnect()
+                    if (result != null && result.errors.isNotEmpty()) {
+                        result.errors.forEach {
+                            System.err.println("[iroh-app-server] reattach failed: ${it.message}")
+                        }
+                    }
+                    controllerRef?.markConnected()
+                    println(
+                        "[iroh-app-server] App Server connection recovered " +
+                            "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
+                    )
+                }
+
+                override suspend fun onGaveUp(reason: String?) {
+                    System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
+                }
+            },
+        )
+        val controller = DefaultAppServerController(
+            client = reconnectingClient,
+            runtimeRegistry = runtimeRegistry,
+            turnContextPreflight = AppServerContextWindowPreflight(reconnectingClient),
+            externalToolRegistry = ExternalToolRegistry.factoryDefault(),
+        )
+        controllerRef = controller
+        coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
+        reconnectingClient.start(scope)
+        return controller to reconnectingClient
+    }
+
+    private fun createStubController(
+        requestTimeoutMs: Long,
+        scope: CoroutineScope,
+    ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
+        val httpClient = HttpClient(OkHttp) {
+            install(WebSockets)
+        }
+        val transport = KtorAppServerWebSocketTransport(
+            httpClient = httpClient,
+            baseUrl = "ws://127.0.0.1:0",
+            scope = scope,
+            bearerToken = null,
+        )
+        val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
+        return DefaultAppServerController(client) to null
     }
 }

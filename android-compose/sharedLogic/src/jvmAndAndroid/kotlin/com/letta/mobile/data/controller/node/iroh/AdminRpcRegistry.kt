@@ -109,7 +109,6 @@ object AdminRpcRegistry {
         SlashCommandAdminHandlers.register(router, adminBaseUrl = null)
         SkillAdminHandlers.register(
             router,
-            adminBaseUrl = null,
             nativeClient = nativeClient,
             controller = controller,
             skillsListing = skillsListing,
