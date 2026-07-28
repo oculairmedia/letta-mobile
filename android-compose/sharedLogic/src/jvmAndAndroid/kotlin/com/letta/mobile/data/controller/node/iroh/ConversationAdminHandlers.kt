@@ -17,12 +17,26 @@ object ConversationAdminHandlers {
     /** Max pages walked oldest-ward for message.get / tool_return.get. */
     internal const val MESSAGE_GET_MAX_PAGES = 20
 
+    /**
+     * Wall-clock budget for the whole multi-page walk. Per-page NativeAdmin
+     * attempts are still 2s each; without an overall budget a deep miss can
+     * block for up to ~40s (20 × 2s).
+     */
+    internal const val MESSAGE_GET_BUDGET_MS = 8_000L
+
     /** Test-only page-size override (null = production [MESSAGE_GET_PAGE_LIMIT]). */
     @Volatile
     internal var messageGetPageLimitForTest: Int? = null
 
+    /** Test-only budget override (null = production [MESSAGE_GET_BUDGET_MS]). */
+    @Volatile
+    internal var messageGetBudgetMsForTest: Long? = null
+
     private val messageGetPageLimit: Int
         get() = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
+
+    private val messageGetBudgetMs: Long
+        get() = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
 
     fun register(
         router: AdminRpcRouter,
@@ -219,10 +233,27 @@ object ConversationAdminHandlers {
      * Walks newest-first pages (up to [MESSAGE_GET_MAX_PAGES] × [MESSAGE_GET_PAGE_LIMIT])
      * via the `before` cursor; missing ids fail closed (no shim).
      *
-     * Each page uses its own [NativeAdmin.require] timeout so a long walk cannot
-     * burn the 2s budget (and trip the breaker) on page 1 of a deep conversation.
+     * Each page uses its own [NativeAdmin.require] timeout, and the whole walk
+     * is capped by [MESSAGE_GET_BUDGET_MS] so deep misses cannot block ~40s.
      */
     private suspend fun retrieveMessageNative(
+        nativeClient: AppServerClient?,
+        conversationId: String,
+        messageId: String,
+        op: String,
+    ): JsonElement {
+        return try {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs) {
+                walkMessagePages(nativeClient, conversationId, messageId, op)
+            }
+        } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            adminError(
+                "not_found: message $messageId not found within searchable window budget",
+            )
+        }
+    }
+
+    private suspend fun walkMessagePages(
         nativeClient: AppServerClient?,
         conversationId: String,
         messageId: String,

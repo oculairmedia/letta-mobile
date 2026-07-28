@@ -23,14 +23,15 @@ private val nextContextPreflightRequestId = atomic(0)
  *
  * Letta Code cannot calculate context usage for custom providers when neither
  * the agent nor conversation has an explicit context window. This preflight
- * persists the wrapper default when that setting is absent, then checks only a
- * bounded newest message page for an already-recorded provider overflow. An
- * overflow is repaired through Letta Code's own conversation_compact command.
+ * persists the wrapper default when that setting is absent, then checks a
+ * bounded newest message page for an already-recorded provider overflow
+ * (`stop_reason=length` is treated as authoritative). An overflow is repaired
+ * through Letta Code's own conversation_compact command.
  */
 class AppServerContextWindowPreflight(
     private val client: AppServerClient,
     private val defaultContextWindowLimit: Int = DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT,
-    private val recentMessageLimit: Int = 20,
+    private val recentMessageLimit: Int = 50,
     private val requestIdFactory: () -> String = {
         "context-preflight-${nextContextPreflightRequestId.incrementAndGet()}"
     },
@@ -159,8 +160,11 @@ private fun JsonElement.isActive(activeMessageIds: Set<String>?): Boolean {
 
 private fun JsonElement.recordsProviderOverflow(contextWindowLimit: Int): Boolean {
     val objects = allObjects()
-    return objects.hasLengthStop() &&
-        (objects.hasInputAtOrBeyond(contextWindowLimit) || objects.hasEmptyAssistant())
+    // A provider `length` stop is authoritative overflow evidence. Do not require
+    // input tokens to meet our configured limit — that limit may be an oversized
+    // wrapper default (e.g. 200k) while the provider actually capped at 32k/128k.
+    if (objects.hasLengthStop()) return true
+    return objects.hasInputAtOrBeyond(contextWindowLimit) || objects.hasEmptyAssistant()
 }
 
 private fun List<JsonObject>.hasLengthStop(): Boolean =

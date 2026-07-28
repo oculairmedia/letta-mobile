@@ -80,6 +80,11 @@ object SkillAdminHandlers {
     }
 
     private fun listSkills(skillsListing: SkillsListingSource?): JsonObjectEnvelope {
+        if (skillsListing != null && !skillsListing.isHydrated()) {
+            adminError(
+                "capability_unavailable: skill.list awaiting device-status / skills_updated hydration",
+            )
+        }
         val skills = skillsListing?.currentSkills() ?: JsonArray(emptyList())
         return buildJsonObject { put("skills", skills) }
     }

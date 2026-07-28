@@ -53,7 +53,7 @@ class AppServerContextWindowPreflightTest {
         assertEquals("sliding_window", settings?.get("mode")?.jsonPrimitive?.content)
         assertEquals("0.3", settings?.get("sliding_window_percentage")?.jsonPrimitive?.content)
         assertEquals("desc", client.messagesCommand?.query?.get("order")?.jsonPrimitive?.content)
-        assertEquals("20", client.messagesCommand?.query?.get("limit")?.jsonPrimitive?.content)
+        assertEquals("50", client.messagesCommand?.query?.get("limit")?.jsonPrimitive?.content)
     }
 
     @Test
@@ -93,6 +93,32 @@ class AppServerContextWindowPreflightTest {
             agent = buildJsonObject { put("context_window_limit", 200_000) },
             messages = JsonArray(
                 listOf(providerMessage(ProviderMessageFixture(stopReason = "length"))),
+            ),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertFalse(result.configuredContextLimit)
+        assertTrue(result.compacted)
+        assertNotNull(client.compactCommand)
+    }
+
+    @Test
+    fun lengthStopBelowConfiguredDefaultStillCompacts() = runTest {
+        // Provider hit its real 128k boundary with non-empty content while the
+        // wrapper default (200k) is persisted — length stop alone must compact.
+        val client = PreflightClient(
+            agent = buildJsonObject { put("context_window_limit", 200_000) },
+            messages = JsonArray(
+                listOf(
+                    providerMessage(
+                        ProviderMessageFixture(
+                            stopReason = "length",
+                            input = 128_000,
+                            contentEmpty = false,
+                        ),
+                    ),
+                ),
             ),
         )
 

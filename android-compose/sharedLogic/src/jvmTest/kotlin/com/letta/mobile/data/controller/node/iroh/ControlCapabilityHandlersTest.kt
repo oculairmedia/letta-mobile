@@ -180,7 +180,10 @@ class ControlCapabilityHandlersTest {
         SkillAdminHandlers.register(
             r,
             nativeClient = FakeControlClient(),
-            skillsListing = SkillsListingSource { catalog.snapshot() },
+            skillsListing = object : SkillsListingSource {
+                override fun currentSkills() = catalog.snapshot()
+                override fun isHydrated() = catalog.isHydrated()
+            },
         )
         val listed = dispatch(r, "skill.list", emptyMap())
         assertTrue(listed.contains("\"success\":true") && listed.contains("demo"))
@@ -188,6 +191,23 @@ class ControlCapabilityHandlersTest {
         assertTrue(agentListed.contains("\"success\":false"))
         assertTrue(agentListed.contains("capability_unavailable"))
         assertFalse(agentListed.contains("demo"), "must not present global catalog as agent installs")
+    }
+
+    @Test
+    fun skillListDeniesUntilCatalogHydrated() = runTest {
+        val catalog = NativeSkillsCatalog()
+        val r = AdminRpcRouter()
+        SkillAdminHandlers.register(
+            r,
+            skillsListing = object : SkillsListingSource {
+                override fun currentSkills() = catalog.snapshot()
+                override fun isHydrated() = catalog.isHydrated()
+            },
+        )
+        val listed = dispatch(r, "skill.list", emptyMap())
+        assertTrue(listed.contains("\"success\":false"))
+        assertTrue(listed.contains("capability_unavailable"))
+        assertTrue(listed.contains("hydration"))
     }
 
     @Test

@@ -167,7 +167,13 @@ class IrohAdminRpcChatGateway(
     }
 
     override suspend fun deleteConversation(conversationId: String) {
-        rpc(AdminRpcCall("conversation.delete", "/v1/conversations/$conversationId"))
+        // App Server v2 has no conversation_delete; archive is the supported lifecycle.
+        rpc(
+            AdminRpcCall(
+                "conversation.archive",
+                "/v1/conversations/$conversationId",
+            ),
+        )
         agentIdByConversation.remove(ConversationId(conversationId))
     }
 

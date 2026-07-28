@@ -90,6 +90,9 @@ class NativeSkillsCatalog {
 }
 
 /** Optional injectable listing source for [SkillAdminHandlers]. */
-fun interface SkillsListingSource {
+interface SkillsListingSource {
     fun currentSkills(): JsonArray?
+
+    /** False until the first device-status / skills_updated snapshot arrives. */
+    fun isHydrated(): Boolean = true
 }

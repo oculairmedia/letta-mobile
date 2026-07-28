@@ -86,7 +86,10 @@ internal fun buildProductionAdminRouter(
         nativeClient = nativeClient,
         vibesyncBaseUrl = vibesyncBaseUrl,
         adminRestBaseUrl = adminRestBaseUrl,
-        skillsListing = SkillsListingSource { skillsCatalog.snapshot() },
+        skillsListing = object : SkillsListingSource {
+            override fun currentSkills() = skillsCatalog.snapshot()
+            override fun isHydrated() = skillsCatalog.isHydrated()
+        },
     )
 }
 
