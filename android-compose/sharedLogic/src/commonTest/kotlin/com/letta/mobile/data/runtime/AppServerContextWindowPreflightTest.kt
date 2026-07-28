@@ -260,6 +260,53 @@ class AppServerContextWindowPreflightTest {
         assertEquals(null, client.updateCommand)
     }
 
+    @Test
+    fun appServerShapedEmptyAssistantWithoutRoleTriggersCompaction() = runTest {
+        val client = PreflightClient(
+            agent = buildJsonObject {
+                put("model_settings", buildJsonObject { put("context_window_limit", 200_000) })
+            },
+            messages = JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("id", "msg-empty-asst")
+                        put("message_type", "assistant_message")
+                        put("content", "")
+                    },
+                ),
+            ),
+            activeMessageIds = listOf("msg-empty-asst"),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertTrue(result.compacted)
+        assertNotNull(client.compactCommand)
+    }
+
+    @Test
+    fun blankStringAssistantContentIsTreatedAsPoisoned() = runTest {
+        val client = PreflightClient(
+            agent = buildJsonObject {
+                put("model_settings", buildJsonObject { put("context_window_limit", 200_000) })
+            },
+            messages = JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("id", "msg-blank")
+                        put("role", "assistant")
+                        put("content", "   ")
+                    },
+                ),
+            ),
+            activeMessageIds = listOf("msg-blank"),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertTrue(result.compacted)
+    }
+
     private fun providerMessage(fixture: ProviderMessageFixture) = buildJsonObject {
         put("id", fixture.id)
         put("role", "assistant")

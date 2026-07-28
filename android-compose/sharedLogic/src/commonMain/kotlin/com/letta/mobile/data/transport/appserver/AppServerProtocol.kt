@@ -87,11 +87,15 @@ object AppServerProtocol {
                 // Nested payloads decode to SkillsUpdated(skills=null) because
                 // unknown keys are ignored. Preserve those as Unknown so
                 // NativeSkillsCatalog can still read skills from the raw envelope.
-                val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw)
-                if (decoded.skills != null) {
-                    decoded
-                } else {
-                    AppServerInboundFrame.Unknown(type = type, raw = raw)
+                // Always go through decodeKnown so a hostile/non-array shape cannot
+                // throw out of the receive loop and tear down the WS session.
+                decodeKnown(type, raw) {
+                    val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw)
+                    if (decoded.skills != null) {
+                        decoded
+                    } else {
+                        AppServerInboundFrame.Unknown(type = type, raw = raw)
+                    }
                 }
             }
             "cron_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(raw) }

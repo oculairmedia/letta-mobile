@@ -211,10 +211,18 @@ private data class MessageProbe(
 private fun JsonElement.inspectMessage(): MessageProbe {
     val root = this as? JsonObject
     val id = root?.string("id")
+    // App Server conversation rows often use message_type=assistant_message
+    // without a role field — treat both shapes as assistant.
+    val messageType = root?.string("message_type") ?: root?.string("messageType")
     val role = root?.string("role")
+        ?: when (messageType) {
+            "assistant_message" -> "assistant"
+            "user_message" -> "user"
+            "system_message" -> "system"
+            else -> null
+        }
     val content = root?.get("content") ?: root?.get("parts")
-    val hasEmptyAssistant =
-        role == "assistant" && (content == JsonNull || content == JsonArray(emptyList()))
+    val hasEmptyAssistant = role == "assistant" && content.isEmptyMessageContent()
     val inputTokens = readInputTokens(root)
     val hasLengthStop = hasProviderLengthStop(this)
     return MessageProbe(
@@ -224,6 +232,14 @@ private fun JsonElement.inspectMessage(): MessageProbe {
         hasLengthStop = hasLengthStop,
         inputTokens = inputTokens,
     )
+}
+
+/** True for missing / null / [] / blank-string content payloads. */
+private fun JsonElement?.isEmptyMessageContent(): Boolean = when (this) {
+    null, JsonNull -> true
+    is JsonArray -> isEmpty()
+    is JsonPrimitive -> contentOrNull.isNullOrBlank()
+    else -> false
 }
 
 private fun readInputTokens(root: JsonObject?): Long? {

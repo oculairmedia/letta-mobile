@@ -92,12 +92,12 @@ internal class ChatTimelineObserver(
         val jobActive = observerJob?.isActive == true
         if (bindingSame && jobActive) return
 
-        val previousConversationId = observerBinding?.conversationId
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
-        if (previousConversationId != conversationId) {
-            // Conversation switch: drop projection cache and clear stale rows so
-            // we never flash the previous conversation's messages, then hold the
+        if (!bindingSame) {
+            // Binding change (conversation and/or agent): drop projection cache
+            // and clear stale rows so we never flash the previous agent's
+            // messages when both share conversation id "default", then hold the
             // skeleton until hydrate/projection completes.
             presenter.reset()
             uiState.value = uiState.value.copy(
@@ -106,7 +106,7 @@ internal class ChatTimelineObserver(
                 isLoadingMessages = true,
             )
         } else {
-            // Same conversation rebind (job died / restart): keep projection
+            // Same binding rebind (job died / restart): keep projection
             // cache + visible messages so Compose retains item identity.
             uiState.value = uiState.value.copy(isLoadingMessages = true)
         }
@@ -116,7 +116,10 @@ internal class ChatTimelineObserver(
                 timelineRepository.observe(agentId, conversationId)
             } catch (e: Exception) {
                 android.util.Log.e("AdminChatViewModel", "Timeline observe failed", e)
-                uiState.value = uiState.value.copy(error = "Timeline init failed: ${e.message}")
+                uiState.value = uiState.value.copy(
+                    error = "Timeline init failed: ${e.message}",
+                    isLoadingMessages = false,
+                )
                 return@launch
             }
 
@@ -153,7 +156,7 @@ internal class ChatTimelineObserver(
                             uiState.value = collapseCompletedRunsIfStreamingFinished(
                                 prevState,
                                 prevState.copy(
-                                    error = "Couldn't sync agent reply â€” pull to refresh",
+                                    error = "Couldn't sync agent reply — pull to refresh",
                                     isStreaming = false,
                                     isAgentTyping = false,
                                 ),

@@ -115,11 +115,18 @@ private fun JsonObject?.withDefaultContextWindow(): JsonObject =
     buildJsonObject {
         this@withDefaultContextWindow?.forEach { (key, value) -> put(key, value) }
         val modelSettings = this@withDefaultContextWindow?.get("model_settings") as? JsonObject
+            ?: this@withDefaultContextWindow?.get("modelSettings") as? JsonObject
+        val llmConfig = this@withDefaultContextWindow?.get("llm_config") as? JsonObject
+            ?: this@withDefaultContextWindow?.get("llmConfig") as? JsonObject
         val hasExplicitLimit =
             this@withDefaultContextWindow?.get("context_window_limit") != null ||
                 this@withDefaultContextWindow?.get("contextWindowLimit") != null ||
                 modelSettings?.get("context_window_limit") != null ||
-                modelSettings?.get("contextWindowLimit") != null
+                modelSettings?.get("contextWindowLimit") != null ||
+                llmConfig?.get("context_window") != null ||
+                llmConfig?.get("context_window_limit") != null ||
+                llmConfig?.get("contextWindow") != null ||
+                llmConfig?.get("contextWindowLimit") != null
         if (!hasExplicitLimit) {
             put("context_window_limit", DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT)
         }
