@@ -1,7 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
 
 /**
  * Central registry of agent/conversation fields that are captured at
@@ -53,6 +52,8 @@ object RuntimeInvalidationPolicy {
     val AGENT_NESTED_RESTART_FIELDS: Set<String> = setOf(
         "context_window_limit",
         "contextWindowLimit",
+        "context_window",
+        "contextWindow",
         "model",
         "handle",
     )
@@ -79,11 +80,13 @@ object RuntimeInvalidationPolicy {
     fun agentUpdateRequiresRestart(params: JsonObject?): Boolean {
         if (params == null) return false
         if (params.keys.any { it in AGENT_RESTART_FIELDS }) return true
-        val modelSettings = params["model_settings"]?.jsonObject ?: params["modelSettings"]?.jsonObject
-        if (modelSettings != null && modelSettings.keys.any { it in AGENT_NESTED_RESTART_FIELDS }) return true
-        val llmConfig = params["llm_config"]?.jsonObject ?: params["llmConfig"]?.jsonObject
-        if (llmConfig != null && llmConfig.keys.any { it in AGENT_NESTED_RESTART_FIELDS }) return true
-        return false
+        return nestedRestartObject(params, "model_settings", "modelSettings") ||
+            nestedRestartObject(params, "llm_config", "llmConfig")
+    }
+
+    private fun nestedRestartObject(params: JsonObject, snake: String, camel: String): Boolean {
+        val nested = (params[snake] as? JsonObject) ?: (params[camel] as? JsonObject) ?: return false
+        return nested.keys.any { it in AGENT_NESTED_RESTART_FIELDS }
     }
 
     fun conversationUpdateRequiresRestart(params: JsonObject?): Boolean {

@@ -424,11 +424,11 @@ The current machine matrix contains 89 registered methods:
 
 | Declared owner | Count | Execution class |
 | --- | ---: | --- |
-| `app_server_v2` | 30 | Native App Server v2 contract, usually native-first with a bounded fallback |
+| `app_server_v2` | 29 | Native App Server v2 contract (fail-closed; no shim fallback) |
 | `admin_rest_service` | 36 | Explicitly injected bounded admin REST adapter (`LETTA_IROH_ADMIN_REST_BASE_URL`) |
 | `controller_native` | 9 | Wrapper process memory and pairing store |
-| `vibesync_service` | 9 | Server-local VibeSync API, currently port 3099 |
-| `capability_gated_unsupported` | 5 | Typed fail-closed response |
+| `vibesync_service` | 9 | Explicitly injected VibeSync product API (`LETTA_IROH_VIBESYNC_BASE_URL`) |
+| `capability_gated_unsupported` | 6 | Typed fail-closed response |
 
 Exact method rows, authorization classes, data stores, native discriminants,
 fallbacks, production first routes, post-shim owners, and migration slices are
@@ -443,13 +443,13 @@ While the mobile app uses Iroh, agent administration follows:
 mobile agent editor
   -> Iroh admin_rpc("agent.update")
   -> AgentAdminHandlers
-  -> agent_update on local App Server v2 WS
+  -> agent_update on local App Server v2
   -> Letta local-backend persistence
-  -> shim HTTP PATCH only when the native attempt is unavailable/fails
 ```
 
-Agent create, retrieve, update, delete, and list use the same native-first
-policy. Model changes additionally call `controller.stopRuntime(agentId)` so
+Agent create, retrieve, update, delete, and list are fail-closed native.
+Model / context-window / tools / skills / memory changes call
+`controller.stopRuntime(agentId)` (which also invalidates the turn engine) so
 the next turn starts a fresh runtime.
 
 ### Other routing classes
@@ -471,8 +471,8 @@ the next turn starts a fresh runtime.
 The ownership-matrix fallback totals are:
 
 - 0 as `shim_until_cutover`
-- 84 as `none`
-- 5 as `deny_fail_closed`
+- 83 as `none`
+- 6 as `deny_fail_closed`
 
 Phase 4 removed the last migration-time shim fallbacks: health is
 controller-native only, and subagent list/todos hydrate from
@@ -666,59 +666,34 @@ only has explicit invalidation for the cases listed above.
 
 ## Known Audit Findings
 
-These are known inconsistencies, not accepted architecture:
+Residual inconsistencies after Phases 1–4 (not accepted end state):
 
-1. **Projected context limit looked persisted.** The UI displayed 200k while
-   `agent_retrieve` returned no context limit. This caused Letta Code's
-   effective limit to remain undefined for the affected provider.
-2. **Manual context-limit invalidation is incomplete.** `agent.update` evicts
-   runtimes for model changes, but not yet for an explicit context-window
-   change.
-3. **Invalidation policy is field-specific and decentralized.** Model update,
-   context repair, transport reconnect, and other configuration changes use
-   different code paths.
-4. **Ownership-matrix execution descriptions lag implementation.** Several
-   matrix rows still describe shim HTTP as `current_backend` even though the
-   handlers are now native-first. The owner decision is CI-enforced; execution
-   order is not.
-5. **Optional direct-disk read tier conflicts with the stated ownership rule.**
-   `LocalBackendAdminStore` can serve selected reads, currently `agent.list`,
-   when `LETTA_LOCAL_BACKEND_DIR` is configured. The matrix test says direct
-   Letta storage access is forbidden but does not detect this implementation.
-6. **Native fallback can obscure failures.** A native App Server mutation may
-   fail and then succeed through the shim HTTP fallback. Without route telemetry
-   the caller cannot prove which authority handled it.
-7. **Two client transport paths remain.** Legacy mobile WS and Iroh can expose
-   similar screens through different backend paths and state projections.
-8. **Admin REST remains broad.** Forty registered methods still depend on the
-   server-local admin REST adapter rather than native App Server v2.
-9. **Upstream exposure exceeds Kotlin support.** The pinned upstream protocol
+1. **Legacy mobile WS still coexists with Iroh.** Similar screens can still be
+   reached through the retired ChannelTransport path. Deletion is tracked as
+   `letta-mobile-lgns8.10.4.1`.
+2. **Bounded admin REST remains broad.** Thirty-six registered methods still
+   depend on an explicitly injected `admin_rest_service` adapter rather than
+   native App Server v2. Those adapters must not default to a LettaShim base.
+3. **Upstream exposure exceeds Kotlin support.** The pinned upstream protocol
    has 90 commands and 99 messages; Kotlin types only the adopted subset.
    Unknown-frame preservation is not equivalent to supported behavior.
-10. **Runtime persistence semantics are not schema-classified.** There is no
-    single registry stating which agent/conversation fields are read live and
-    which are captured when a runtime starts.
-11. **Twenty ownership rows still declare shim fallback.** Phase 1 reduced the
-    migration `shim_until_cutover` count from 70 to 20 by correcting VibeSync
-    and direct admin-REST routes. Cutover still cannot complete while any
-    production fallback remains.
-12. **Subagent ownership is incorrectly described at runtime.** The methods are
-    labelled controller-native, but production builds their source by probing
-    LettaShim. The matrix now records production_first_route=`shim_http` while
-    keeping the post-shim owner as controller-native.
-13. **Conversation delete does not currently fail closed in production.** The
-    matrix now records production_first_route=`shim_http` with migration
-    fallback `shim_until_cutover`, while `post_shim_fallback` remains
-    `deny_fail_closed`. Production still leaves `shimRetired=false`.
-14. **Model and skill parity is semantic, not mechanical.** Upstream model and
-    skill operations have different wire shapes/scopes from the shim APIs, so
-    merely switching route names would change product behavior.
-15. **The native circuit breaker changes authority globally.** One native
-    failure causes unrelated operations to skip App Server and use fallback for
-    60 seconds.
-16. **Port 8291 is overloaded as an ownership boundary.** Forty bounded-admin
-    methods, native fallbacks, subagent discovery, and legacy behavior share the
-    same base URL, making dependency removal difficult to prove.
+4. **`skill.list_agent` is intentionally unavailable.** Process-global
+   availability must not be presented as per-agent install state. Reintroduce
+   only with a real assignment projection.
+5. **Skills catalog hydration is event-driven.** `skill.list` can return an
+   empty success before the first `update_device_status` / `skills_updated`
+   snapshot arrives; clients should treat empty-as-pending or trigger sync.
+6. **Model list wire shape still needs projection.** Native `list_models`
+   entries are not yet fully mapped into the mobile `LlmModel` catalog schema.
+7. **Message get has a searchable window ceiling.** `message.get` /
+   `tool_return.get` walk up to 20 × 500 newest-first pages; older IDs fail
+   closed with `not_found` until a direct retrieve exists upstream.
+8. **Route telemetry coverage is incomplete.** Non-`NativeAdmin` owners
+   (bounded REST, VibeSync, some controller-native paths) do not yet emit
+   `IrohAdminRoute` selection events on every dispatch.
+9. **Wrapper packaging (Phase 5) is not yet the production artifact.** Staging
+   still needs the installable `iroh-wrapper-cli` distribution and host-level
+   proof that the *wrapper* process never dials the retired shim port.
 
 ## Audit Procedure
 
@@ -741,7 +716,7 @@ From `android-compose`:
 
 ```bash
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
-ANDROID_HOME=/opt/android-sdk \
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
 ./gradlew \
   :sharedLogic:jvmTest \
   --tests 'com.letta.mobile.data.transport.appserver.AppServerContractBaselineTest' \

@@ -29,6 +29,7 @@ class ControlCapabilityHandlersTest {
 
     @BeforeTest
     fun pinUnreachableShim() {
+        NativeAdmin.resetCircuitForTest()
         // The shim base points at a discard port, but AdminProxyClient's shared
         // defaultTransportFactory is mutable process-wide and other tests in the
         // suite leave a fake installed. Pin a deterministic always-failing
@@ -41,6 +42,7 @@ class ControlCapabilityHandlersTest {
 
     @AfterTest
     fun restoreShimFactory() {
+        NativeAdmin.resetCircuitForTest()
         savedFactory?.let { AdminProxyClient.defaultTransportFactory = it }
     }
 
@@ -184,7 +186,9 @@ class ControlCapabilityHandlersTest {
         val listed = dispatch(r, "skill.list", emptyMap())
         assertTrue(listed.contains("\"success\":true") && listed.contains("demo"))
         val agentListed = dispatch(r, "skill.list_agent", mapOf("agent_id" to "agent-1"))
-        assertTrue(agentListed.contains("demo"))
+        assertTrue(agentListed.contains("\"success\":false"))
+        assertTrue(agentListed.contains("capability_unavailable"))
+        assertFalse(agentListed.contains("demo"), "must not present global catalog as agent installs")
     }
 
     @Test

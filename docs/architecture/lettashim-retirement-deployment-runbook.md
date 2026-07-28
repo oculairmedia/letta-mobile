@@ -18,8 +18,8 @@ The completed production path is:
 Mobile/Desktop
   -> Iroh QUIC
   -> packaged Kotlin wrapper
-      -> Letta App Server v2 WS on 127.0.0.1:4500
-      -> VibeSync directly for project operations
+      -> Letta App Server v2 (loopback WS; LETTA_APP_SERVER_URL)
+      -> VibeSync directly for project operations (LETTA_IROH_VIBESYNC_BASE_URL)
       -> separately named bounded services only where explicitly approved
       -> controller-owned health, pairing, and runtime-derived subagent state
 ```
@@ -265,7 +265,7 @@ Expected build interface:
 ```bash
 cd android-compose
 JAVA_HOME=/usr/lib/jvm/jdk-26 \
-ANDROID_HOME=/opt/android-sdk \
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
 ./gradlew \
   :iroh-wrapper-cli:test \
   :iroh-wrapper-cli:installDist \
@@ -298,7 +298,7 @@ From `android-compose`:
 
 ```bash
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
-ANDROID_HOME=/opt/android-sdk \
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
 ./gradlew :sharedLogic:jvmTest \
   --tests 'com.letta.mobile.data.transport.appserver.AppServerContractBaselineTest' \
   --tests 'com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrixTest' \
@@ -312,7 +312,7 @@ ANDROID_HOME=/opt/android-sdk \
 ```bash
 cd android-compose
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 \
-ANDROID_HOME=/opt/android-sdk \
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
 ./gradlew \
   :sharedLogic:allTests \
   :desktop:test \
@@ -361,7 +361,7 @@ Build the wrapper distribution:
 ```bash
 cd android-compose
 JAVA_HOME=/usr/lib/jvm/jdk-26 \
-ANDROID_HOME=/opt/android-sdk \
+ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
 ./gradlew \
   :iroh-wrapper-cli:test \
   :iroh-wrapper-cli:distZip

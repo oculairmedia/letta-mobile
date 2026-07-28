@@ -196,6 +196,9 @@ class DefaultAppServerController(
                 runtimePermissionModes.remove(it)
             }
         }
+        // Drop in-flight turn state so the next turn cannot reuse a runtime that
+        // was started with the pre-update agent configuration.
+        turnEngine.invalidateRuntime()
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =

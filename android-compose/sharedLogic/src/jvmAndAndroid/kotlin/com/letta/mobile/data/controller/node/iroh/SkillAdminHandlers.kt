@@ -30,10 +30,14 @@ object SkillAdminHandlers {
             listSkills(skillsListing)
         }
         router.register("skill.list_agent") { params ->
-            // Native skills are process-global; agent_id is accepted for API
-            // compatibility but does not filter until upstream adds agent scope.
+            // Agent-scoped assignment state is not projected yet. Returning the
+            // process-global catalog would mark every available skill as installed
+            // on every agent in Desktop. Fail closed until a real assignment source exists.
             params.requireParam(AdminParamKey("agent_id"))
-            listSkills(skillsListing)
+            adminError(
+                "capability_unavailable: skill.list_agent requires agent-scoped assignment " +
+                    "projection; use skill.list for process-global availability",
+            )
         }
         router.register("skill.install") { params ->
             val skillPath = resolveSkillPath(params)

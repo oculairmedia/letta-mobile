@@ -8,7 +8,6 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 object ConversationAdminHandlers {
@@ -219,17 +218,20 @@ object ConversationAdminHandlers {
      * Phase 2: project a single message from conversation_messages_list.
      * Walks newest-first pages (up to [MESSAGE_GET_MAX_PAGES] × [MESSAGE_GET_PAGE_LIMIT])
      * via the `before` cursor; missing ids fail closed (no shim).
+     *
+     * Each page uses its own [NativeAdmin.require] timeout so a long walk cannot
+     * burn the 2s budget (and trip the breaker) on page 1 of a deep conversation.
      */
     private suspend fun retrieveMessageNative(
         nativeClient: AppServerClient?,
         conversationId: String,
         messageId: String,
         op: String,
-    ): JsonElement =
-        NativeAdmin.require(nativeClient, op) { c ->
-            var before: String? = null
-            val pageLimit = messageGetPageLimit
-            repeat(MESSAGE_GET_MAX_PAGES) {
+    ): JsonElement {
+        var before: String? = null
+        val pageLimit = messageGetPageLimit
+        repeat(MESSAGE_GET_MAX_PAGES) {
+            val messages = NativeAdmin.require(nativeClient, op) { c ->
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(
                         requestId = NativeAdmin.requestId(),
@@ -241,23 +243,23 @@ object ConversationAdminHandlers {
                         ),
                     ),
                 )
-                if (!native.success) return@require null
-                val messages = native.messages as? JsonArray ?: return@require null
-                if (messages.isEmpty()) {
-                    adminError("not_found: message $messageId not in conversation history")
-                }
-                messages.firstOrNull { element ->
-                    element.jsonObject["id"]?.jsonPrimitive?.contentOrNull == messageId
-                }?.let { return@require it }
-                val oldestId = messages.lastOrNull()
-                    ?.jsonObject?.get("id")?.jsonPrimitive?.contentOrNull
-                if (oldestId == null || oldestId == before || messages.size < pageLimit) {
-                    adminError("not_found: message $messageId not in conversation history")
-                }
-                before = oldestId
+                if (!native.success) null else native.messages as? JsonArray
             }
-            adminError("not_found: message $messageId not in searchable conversation window")
+            if (messages.isEmpty()) {
+                adminError("not_found: message $messageId not in conversation history")
+            }
+            messages.firstOrNull { element ->
+                (element as? JsonObject)?.get("id")?.jsonPrimitive?.contentOrNull == messageId
+            }?.let { return it }
+            val oldestId = (messages.lastOrNull() as? JsonObject)
+                ?.get("id")?.jsonPrimitive?.contentOrNull
+            if (oldestId == null || oldestId == before || messages.size < pageLimit) {
+                adminError("not_found: message $messageId not in conversation history")
+            }
+            before = oldestId
         }
+        adminError("not_found: message $messageId not in searchable conversation window")
+    }
 
     private fun requireConversationAccess(context: AdminRpcRequestContext, conversationId: String) {
         if (!context.canAccessConversation(conversationId)) {

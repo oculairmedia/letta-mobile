@@ -122,6 +122,10 @@ private fun JsonObject.contextWindowLimit(): Int? =
         ?: integer("contextWindowLimit")
         ?: objectValue("model_settings")?.integer("context_window_limit")
         ?: objectValue("modelSettings")?.integer("contextWindowLimit")
+        ?: objectValue("llm_config")?.integer("context_window")
+        ?: objectValue("llm_config")?.integer("context_window_limit")
+        ?: objectValue("llmConfig")?.integer("contextWindow")
+        ?: objectValue("llmConfig")?.integer("contextWindowLimit")
 
 private fun JsonObject.activeMessageIds(): Set<String>? {
     val ids = (this["in_context_message_ids"] ?: this["inContextMessageIds"]) as? JsonArray ?: return null

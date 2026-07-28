@@ -132,7 +132,8 @@ internal object NativeAdmin {
                 outcome = "error",
                 reason = e.message ?: e::class.simpleName ?: "error",
             )
-            adminError("app_server_error: $op ${e.message ?: e::class.simpleName}")
+            // Denial hygiene: do not echo internal exception text to the peer.
+            adminError("app_server_error: $op native command failed")
         }
     }
 

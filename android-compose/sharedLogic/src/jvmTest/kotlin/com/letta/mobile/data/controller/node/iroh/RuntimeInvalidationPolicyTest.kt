@@ -17,6 +17,21 @@ class RuntimeInvalidationPolicyTest {
                 },
             ),
         )
+        assertTrue(
+            RuntimeInvalidationPolicy.agentUpdateRequiresRestart(
+                buildJsonObject {
+                    put("llm_config", buildJsonObject { put("context_window_limit", 64000) })
+                },
+            ),
+        )
+        // Non-object nested values must not throw; top-level key still forces restart.
+        assertTrue(
+            RuntimeInvalidationPolicy.agentUpdateRequiresRestart(
+                buildJsonObject {
+                    put("model_settings", "not-an-object")
+                },
+            ),
+        )
         assertTrue(RuntimeInvalidationPolicy.agentUpdateRequiresRestart(buildJsonObject { put("tools", "[]") }))
         assertTrue(RuntimeInvalidationPolicy.agentUpdateRequiresRestart(buildJsonObject { put("skills", "[]") }))
         assertTrue(RuntimeInvalidationPolicy.agentUpdateRequiresRestart(buildJsonObject { put("memory", "{}") }))

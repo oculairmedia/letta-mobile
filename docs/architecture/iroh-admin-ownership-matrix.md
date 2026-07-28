@@ -8,12 +8,13 @@ Beads: `letta-mobile-lgns8.13`
 > state ownership, cache invalidation, and audit procedure, start with
 > [App Server v2 and Meridian State Audit Specification](app-server-v2-audit-spec.md).
 > The machine-readable ownership matrix remains authoritative for the currently
-> registered method set.
+> registered method set (**89 methods**; owner/fallback counts in that doc and
+> `iroh-admin-ownership-matrix.json`). Counts below are historical (2026-07-22)
+> and must not be treated as current.
 
 ## What this decides
 
-Every admin_rpc method the Iroh node registers today (73 methods, all but three
-pure proxies to the admin-shim on :8291) gets an explicit post-shim owner,
+Every admin_rpc method the Iroh node registers gets an explicit post-shim owner,
 public contract, authorization class, data store, fallback, and migration
 slice. The machine-readable decision is
 `android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json`,

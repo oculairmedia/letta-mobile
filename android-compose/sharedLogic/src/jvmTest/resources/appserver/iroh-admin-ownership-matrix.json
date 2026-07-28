@@ -1177,21 +1177,17 @@
     {
       "method": "skill.list_agent",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "same global NativeSkillsCatalog projection (agent_id accepted, not filtered)",
-      "owner": "app_server_v2",
-      "public_contract": "sync snapshot + skills_updated projection",
-      "native_contract": [
-        "sync",
-        "skills_updated"
-      ],
+      "current_backend": "capability_unavailable until agent-scoped assignment projection exists",
+      "owner": "capability_gated_unsupported",
+      "public_contract": "typed denial: global availability is not agent assignment state",
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "none",
+      "fallback": "deny_fail_closed",
       "migration_slice": "lgns8.8",
-      "notes": "Phase 2: native skills are process-global; agent_id retained for API compatibility.",
-      "production_first_route": "controller_native",
-      "post_shim_owner": "controller_native",
-      "post_shim_fallback": "none"
+      "notes": "Fail closed so Desktop does not treat process-global skill.list as per-agent installs. Use skill.list for availability.",
+      "production_first_route": "capability_unavailable",
+      "post_shim_owner": "capability_gated_unsupported",
+      "post_shim_fallback": "deny_fail_closed"
     },
     {
       "method": "skill.install",
@@ -1571,7 +1567,7 @@
         "skill.list",
         "skill.list_agent"
       ],
-      "policy": "controller derives listings from sync snapshot and skills_updated events"
+      "policy": "skill.list projects from sync/skills_updated; skill.list_agent denies until agent-scoped assignment exists"
     }
   ],
   "unrouted_domains": [

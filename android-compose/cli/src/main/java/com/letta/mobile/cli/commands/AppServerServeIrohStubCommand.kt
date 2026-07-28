@@ -145,14 +145,23 @@ internal class AppServerServeIrohStubCommand : CliktCommand(
             println("[iroh-stub-server] Node ID: ${irohEndpoint.nodeIdHex()}")
             println("[iroh-stub-server] Ticket: ${irohEndpoint.ticketString()}")
 
-            val adminRpcRouter = AdminRpcRegistry.buildRouter(adminServer.baseUrl)
+            // Phase 2+ conversation/message admin_rpc is fail-closed native.
+            // Wire ProbeStubStore through AppServerClient so hermetic probes can
+            // hydrate without a live Letta App Server or LettaShim.
+            val nativeClient = com.letta.mobile.cli.probe.ProbeStubNativeClient(store)
+            val controller = ProbeStubController(store, behavior)
+            val adminRpcRouter = AdminRpcRegistry.buildRouter(
+                adminBaseUrl = adminServer.baseUrl,
+                controller = controller,
+                nativeClient = nativeClient,
+            )
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-stub-server] admin_rpc handlers registered " +
-                    "(proxy base: ${adminServer.baseUrl}, methods: ${adminRpcRouter.methodCount})",
+                    "(stub-native + seed HTTP ${adminServer.baseUrl}, methods: ${adminRpcRouter.methodCount})",
             )
 
-            irohEndpoint.start(ProbeStubController(store, behavior))
+            irohEndpoint.start(controller)
             println("[iroh-stub-server] Listening on Iroh... (Ctrl+C to stop)")
 
             Runtime.getRuntime().addShutdownHook(
