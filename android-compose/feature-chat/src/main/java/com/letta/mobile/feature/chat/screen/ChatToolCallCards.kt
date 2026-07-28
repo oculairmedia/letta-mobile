@@ -545,7 +545,8 @@ internal fun ToolCallCard(
     val showDetails = keepExpanded || expanded
     RequestFullToolResultOnExpand(toolCall = toolCall, expanded = showDetails)
     val parentVisible = LocalToolCardBodyParentVisible.current
-    val canRenderFullOutput = showDetails && parentVisible
+    val deferHeavyCards = LocalChatShouldDeferHeavyToolCards.current
+    val canRenderFullOutput = showDetails && parentVisible && !deferHeavyCards
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
     val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {
@@ -1316,7 +1317,8 @@ internal fun CompactToolCallRow(
     var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
     RequestFullToolResultOnExpand(toolCall = toolCall, expanded = expanded)
     val parentVisible = LocalToolCardBodyParentVisible.current
-    val canRenderFullOutput = expanded && parentVisible
+    val deferHeavyCards = LocalChatShouldDeferHeavyToolCards.current
+    val canRenderFullOutput = expanded && parentVisible && !deferHeavyCards
     val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
     val renderStartedAtMs = System.currentTimeMillis()
     val display = remember(toolCall.name, toolCall.arguments) {

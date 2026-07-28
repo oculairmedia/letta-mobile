@@ -514,7 +514,22 @@ class AppServerTurnEngine(
 
     private suspend fun prepareContextIfNeeded(command: TurnCommand) {
         if (command.input !is TurnInput.UserMessage) return
-        val result = try {
+        val result = runPreflightOrInvalidate(command) ?: return
+        if (!result.configuredContextLimit && !result.compacted) return
+
+        invalidateRuntime()
+        Telemetry.event(
+            "AppServerTurnEngine",
+            "context.preflightApplied",
+            "agentId" to command.agentId.value,
+            "conversationId" to command.conversationId.value,
+            "configuredContextLimit" to result.configuredContextLimit.toString(),
+            "compacted" to result.compacted.toString(),
+        )
+    }
+
+    private suspend fun runPreflightOrInvalidate(command: TurnCommand): TurnContextPreflightResult? {
+        return try {
             // Bound the whole preflight while activeTurn is held — individual
             // RPCs have their own timeouts, but the sum must not wedge the engine.
             withTimeout(PREFLIGHT_TIMEOUT_MS.milliseconds) {
@@ -528,14 +543,7 @@ class AppServerTurnEngine(
             // CancellationException subclass). Treat it as a failed preflight —
             // partial mutations (e.g. persisted context limit) must not leave a
             // stale runtime cached — while still propagating genuine parent cancel.
-            invalidateRuntime()
-            Telemetry.event(
-                "AppServerTurnEngine",
-                "context.preflightFailed",
-                "agentId" to command.agentId.value,
-                "conversationId" to command.conversationId.value,
-                "errorClass" to "TimeoutCancellationException",
-            )
+            recordPreflightFailure(command, "TimeoutCancellationException")
             throw e
         } catch (e: CancellationException) {
             throw e
@@ -543,26 +551,19 @@ class AppServerTurnEngine(
             // Preflight may have already mutated agent/conversation state (e.g.
             // persisted a context limit) before failing on message list/compact.
             // Drop any cached runtime so the next turn reseeds from the update.
-            invalidateRuntime()
-            Telemetry.event(
-                "AppServerTurnEngine",
-                "context.preflightFailed",
-                "agentId" to command.agentId.value,
-                "conversationId" to command.conversationId.value,
-                "errorClass" to (e::class.simpleName ?: "Exception"),
-            )
+            recordPreflightFailure(command, e::class.simpleName ?: "Exception")
             throw e
         }
-        if (!result.configuredContextLimit && !result.compacted) return
+    }
 
+    private fun recordPreflightFailure(command: TurnCommand, errorClass: String) {
         invalidateRuntime()
         Telemetry.event(
             "AppServerTurnEngine",
-            "context.preflightApplied",
+            "context.preflightFailed",
             "agentId" to command.agentId.value,
             "conversationId" to command.conversationId.value,
-            "configuredContextLimit" to result.configuredContextLimit.toString(),
-            "compacted" to result.compacted.toString(),
+            "errorClass" to errorClass,
         )
     }
 

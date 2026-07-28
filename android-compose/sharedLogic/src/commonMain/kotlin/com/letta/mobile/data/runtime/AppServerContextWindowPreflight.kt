@@ -210,6 +210,18 @@ private fun JsonElement.inspectMessage(): MessageProbe {
     val content = root?.get("content") ?: root?.get("parts")
     val hasEmptyAssistant =
         role == "assistant" && (content == JsonNull || content == JsonArray(emptyList()))
+    val inputTokens = readInputTokens(root)
+    val hasLengthStop = hasProviderLengthStop(this)
+    return MessageProbe(
+        id = id,
+        role = role,
+        hasEmptyAssistant = hasEmptyAssistant,
+        hasLengthStop = hasLengthStop,
+        inputTokens = inputTokens,
+    )
+}
+
+private fun readInputTokens(root: JsonObject?): Long? {
     val providerResult = root?.objectValue("provider_result")
     val usage = root?.objectValue("usage")
         ?: providerResult?.objectValue("usage")
@@ -217,17 +229,11 @@ private fun JsonElement.inspectMessage(): MessageProbe {
     val input = usage?.long("input")
         ?: usage?.long("input_tokens")
         ?: usage?.long("inputTokens")
+        ?: return null
     val cacheRead = usage?.long("cache_read")
         ?: usage?.long("cacheRead")
         ?: 0L
-    val hasLengthStop = hasProviderLengthStop(this)
-    return MessageProbe(
-        id = id,
-        role = role,
-        hasEmptyAssistant = hasEmptyAssistant,
-        hasLengthStop = hasLengthStop,
-        inputTokens = input?.plus(cacheRead),
-    )
+    return input + cacheRead
 }
 
 private fun hasProviderLengthStop(element: JsonElement): Boolean {
@@ -235,25 +241,25 @@ private fun hasProviderLengthStop(element: JsonElement): Boolean {
         is JsonObject -> {
             val stop = element.string("stop_reason") ?: element.string("stopReason")
             if (stop == "length") return true
-            // Only descend into nested objects that look like provider/message metadata.
             for ((key, value) in element) {
-                if (value !is JsonObject && value !is JsonArray) continue
-                val looksLikeProviderMeta =
-                    key == "message" || key == "stop" || key == "metadata" ||
-                        key == "provider" || key == "provider_result" || key == "response" ||
-                        (value is JsonObject && (
-                            "stop_reason" in value ||
-                                "stopReason" in value ||
-                                "role" in value ||
-                                "usage" in value
-                            ))
-                if (looksLikeProviderMeta && hasProviderLengthStop(value)) return true
+                if (shouldWalkForLengthStop(key, value) && hasProviderLengthStop(value)) return true
             }
         }
         is JsonArray -> element.forEach { if (hasProviderLengthStop(it)) return true }
         else -> Unit
     }
     return false
+}
+
+private fun shouldWalkForLengthStop(key: String, value: JsonElement): Boolean {
+    if (value !is JsonObject && value !is JsonArray) return false
+    if (key == "message" || key == "stop" || key == "metadata" ||
+        key == "provider" || key == "provider_result" || key == "response"
+    ) {
+        return true
+    }
+    val obj = value as? JsonObject ?: return false
+    return "stop_reason" in obj || "stopReason" in obj || "role" in obj || "usage" in obj
 }
 
 private fun JsonObject.objectValue(key: String): JsonObject? = this[key] as? JsonObject

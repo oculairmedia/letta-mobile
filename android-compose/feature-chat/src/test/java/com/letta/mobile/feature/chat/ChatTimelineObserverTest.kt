@@ -66,6 +66,43 @@ class ChatTimelineObserverTest {
     }
 
     @Test
+    fun `switching conversations clears stale messages and marks loading`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline(
+            "conv-1",
+            listOf(confirmed("assistant-1", "from-1", TimelineMessageType.ASSISTANT)),
+        )
+        harness.seedTimeline("conv-2")
+
+        harness.observer.start("conv-1")
+        runCurrent()
+        assertEquals(listOf("assistant-1"), harness.uiState.value.messages.map { it.id })
+
+        harness.observer.start("conv-2")
+        runCurrent()
+
+        assertTrue(harness.uiState.value.messages.isEmpty())
+        assertTrue(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
+    fun `hydrated with pending projection keeps loading until messages arrive`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline("conv-1")
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        harness.emitSyncEvent(TimelineSyncEvent.Hydrated(messageCount = 3))
+        runCurrent()
+        assertTrue(harness.uiState.value.isLoadingMessages)
+
+        harness.emitSyncEvent(TimelineSyncEvent.Hydrated(messageCount = 0))
+        runCurrent()
+        assertFalse(harness.uiState.value.isLoadingMessages)
+    }
+
+    @Test
     fun `switching conversations rebinds observer and tracker`() = runTest {
         val harness = Harness(backgroundScope)
         harness.seedTimeline("conv-1")
@@ -650,7 +687,7 @@ class ChatTimelineObserverTest {
         val activeReplyStreams = MutableStateFlow(activeReplyConversationIds)
         val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf()))
         val timelineFlows = mutableMapOf<TimelineHarnessKey, MutableStateFlow<Timeline>>()
-        private val syncEvents = MutableSharedFlow<TimelineSyncEvent>()
+        private val syncEvents = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 16)
         private val loop: TimelineSyncLoop = mockk {
             every { events } returns syncEvents
         }
@@ -705,6 +742,10 @@ class ChatTimelineObserverTest {
             val flow = MutableStateFlow(timeline)
             timelineFlows[TimelineHarnessKey(agentId, timeline.conversationId)] = flow
             return flow
+        }
+
+        suspend fun emitSyncEvent(event: TimelineSyncEvent) {
+            syncEvents.emit(event)
         }
     }
 

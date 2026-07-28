@@ -89,9 +89,24 @@ internal class ChatTimelineObserver(
         val jobActive = observerJob?.isActive == true
         if (bindingSame && jobActive) return
 
+        val previousConversationId = observerBinding?.conversationId
         observerJob?.cancel()
         hydrateSignalJob?.cancel()
-        presenter.reset()
+        if (previousConversationId != conversationId) {
+            // Conversation switch: drop projection cache and clear stale rows so
+            // we never flash the previous conversation's messages, then hold the
+            // skeleton until hydrate/projection completes.
+            presenter.reset()
+            uiState.value = uiState.value.copy(
+                messages = kotlinx.collections.immutable.persistentListOf(),
+                messageListChange = com.letta.mobile.data.chat.projection.ChatMessageListChange.Full,
+                isLoadingMessages = true,
+            )
+        } else {
+            // Same conversation rebind (job died / restart): keep projection
+            // cache + visible messages so Compose retains item identity.
+            uiState.value = uiState.value.copy(isLoadingMessages = true)
+        }
         observerBinding = binding
         observerJob = scope.launch {
             val flow = try {
@@ -112,7 +127,12 @@ internal class ChatTimelineObserver(
                                 "AdminChatViewModel",
                                 "Timeline ready conv=$conversationId count=${ev.messageCount}",
                             )
-                            uiState.value = uiState.value.copy(isLoadingMessages = false)
+                            val prev = uiState.value
+                            // Keep the skeleton until projection has actually
+                            // produced rows when hydrate reports a nonempty page.
+                            val waitingForProjection =
+                                ev.messageCount > 0 && prev.messages.isEmpty()
+                            uiState.value = prev.copy(isLoadingMessages = waitingForProjection)
                         }
                         is TimelineSyncEvent.HydrateFailed -> {
                             uiState.value = uiState.value.copy(isLoadingMessages = false)

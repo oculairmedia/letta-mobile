@@ -100,17 +100,25 @@ internal object NativeAdmin {
     /** True for ops that may already have mutated durable App Server state when a wait times out. */
     internal fun isMutationOp(op: String): Boolean {
         val name = op.lowercase()
-        return name.endsWith(".create") ||
-            name.endsWith(".update") ||
-            name.endsWith(".delete") ||
-            name.endsWith(".delete_all") ||
-            name.endsWith(".archive") ||
-            name == "skill_enable" ||
-            name == "skill_disable" ||
-            name == "skill.install" ||
-            name == "skill.uninstall" ||
-            name == "approval.submit"
+        if (name in MUTATION_EXACT_OPS) return true
+        return MUTATION_SUFFIXES.any { name.endsWith(it) }
     }
+
+    private val MUTATION_EXACT_OPS = setOf(
+        "skill_enable",
+        "skill_disable",
+        "skill.install",
+        "skill.uninstall",
+        "approval.submit",
+    )
+
+    private val MUTATION_SUFFIXES = listOf(
+        ".create",
+        ".update",
+        ".delete",
+        ".delete_all",
+        ".archive",
+    )
 
     private suspend fun <T : Any> executeRequire(
         client: AppServerClient,

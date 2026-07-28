@@ -205,6 +205,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 role = role,
                 content = displayContent,
                 timestamp = ev.sentAt.toString(),
+                clientMessageId = ev.otid,
                 isPending = ev.deliveryState == DeliveryState.SENDING,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
                 isError = ev.messageType == TimelineMessageType.ERROR ||
@@ -237,6 +238,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     runId = ev.runId,
                     agentId = ev.agentId,
                     stepId = ev.stepId,
+                    clientMessageId = ev.otid.takeIf { it.isNotBlank() },
                     subagentNotification = projectedSubagentNotification,
                 )
             }
@@ -355,6 +357,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 runId = ev.runId,
                 agentId = ev.agentId,
                 stepId = ev.stepId,
+                clientMessageId = ev.otid.takeIf { it.isNotBlank() },
                 isPending = false,
                 isReasoning = ev.messageType == TimelineMessageType.REASONING,
                 isError = ev.messageType == TimelineMessageType.ERROR,

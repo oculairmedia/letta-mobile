@@ -923,23 +923,8 @@ class IrohNodeConnection(
         parkedTerminals: ParkedTerminalStore,
     ) {
         val errorText = error.message ?: error.toString()
-        // Concurrent send while a turn is live: do NOT fan out error_message to
-        // conversation viewers (they would map it onto the live turn). Still
-        // deliver an initiator-only busy rejection so the submitting peer gets a
-        // failure terminal for its own pending send.
         if (isTurnAlreadyActiveMessage(errorText)) {
-            runCatching {
-                withContext(NonCancellable) {
-                    fanout.emitInitiatorOnlyBusyRejection(errorText)
-                }
-            }
-            Telemetry.event(
-                "IrohNode", "stream.busy_rejected_initiator_only",
-                "remoteEndpointId" to remoteEndpointId,
-                "error" to errorText,
-                "class" to error::class.simpleName,
-                level = Telemetry.Level.WARN,
-            )
+            emitBusyRejectionToInitiator(fanout, errorText, error)
             return
         }
         val wroteTerminal = runCatching {
@@ -949,26 +934,58 @@ class IrohNodeConnection(
             }
         }.isSuccess
         if (!wroteTerminal) {
-            Telemetry.event(
-                "IrohNode", "stream.closed_before_terminal",
-                "remoteEndpointId" to remoteEndpointId,
-                "error" to errorText,
-                "class" to error::class.simpleName,
-                level = Telemetry.Level.WARN,
-            )
-            if (clientMsgId != null && !fanout.anyTerminalWritten) {
-                val tracking = activeTurnTracking.get()
-                tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
-                Telemetry.event(
-                    "IrohNode", "stream.frames_parked",
-                    "remoteEndpointId" to remoteEndpointId,
-                    "clientMessageId" to clientMsgId,
-                    "conversationId" to input.runtime.conversationId,
-                    "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
-                )
-            }
+            parkInterruptedTerminal(error, fanout, clientMsgId, input, parkedTerminals)
         }
         if (error is CancellationException) throw error
+    }
+
+    private suspend fun emitBusyRejectionToInitiator(
+        fanout: ConversationTurnFanout,
+        errorText: String,
+        error: Throwable,
+    ) {
+        // Concurrent send while a turn is live: do NOT fan out error_message to
+        // conversation viewers (they would map it onto the live turn). Still
+        // deliver an initiator-only busy rejection so the submitting peer gets a
+        // failure terminal for its own pending send.
+        runCatching {
+            withContext(NonCancellable) {
+                fanout.emitInitiatorOnlyBusyRejection(errorText)
+            }
+        }
+        Telemetry.event(
+            "IrohNode", "stream.busy_rejected_initiator_only",
+            "remoteEndpointId" to remoteEndpointId,
+            "error" to errorText,
+            "class" to error::class.simpleName,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    private fun parkInterruptedTerminal(
+        error: Throwable,
+        fanout: ConversationTurnFanout,
+        clientMsgId: String?,
+        input: AppServerCommand.Input,
+        parkedTerminals: ParkedTerminalStore,
+    ) {
+        Telemetry.event(
+            "IrohNode", "stream.closed_before_terminal",
+            "remoteEndpointId" to remoteEndpointId,
+            "error" to (error.message ?: error.toString()),
+            "class" to error::class.simpleName,
+            level = Telemetry.Level.WARN,
+        )
+        if (clientMsgId == null || fanout.anyTerminalWritten) return
+        val tracking = activeTurnTracking.get()
+        tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
+        Telemetry.event(
+            "IrohNode", "stream.frames_parked",
+            "remoteEndpointId" to remoteEndpointId,
+            "clientMessageId" to clientMsgId,
+            "conversationId" to input.runtime.conversationId,
+            "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
+        )
     }
 
     private fun interruptedTerminalDelta(): JsonObject = buildJsonObject {
