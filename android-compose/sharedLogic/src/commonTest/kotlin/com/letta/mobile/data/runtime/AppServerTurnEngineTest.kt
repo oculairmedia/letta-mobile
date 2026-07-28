@@ -855,6 +855,35 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun authoritativeSameConversationErrorMessageRecordsFailedNotCompleted() = runTest {
+        // lgns8.22.4: same-conversation scope-mismatched error_message must
+        // record Failed on the owner, never Completed.
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+        val wrongAgentSameConv = AppServerRuntimeScope("agent-OTHER", "conv-1")
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            client.emit(
+                streamDelta(
+                    messageType = "error_message",
+                    runId = "run-1",
+                    runtime = wrongAgentSameConv,
+                ),
+            )
+            awaitComplete()
+        }
+
+        val released = com.letta.mobile.util.Telemetry.snapshot().first {
+            it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
+        }
+        assertEquals(RuntimeRunStatus.Failed.name, released.attrs["lastTerminal"])
+        assertEquals(false, released.attrs["lastTerminalScopeMatched"])
+        assertEquals("authoritative_terminal_scope_mismatched", released.attrs["lastTerminalSource"])
+    }
+
+    @Test
     fun activeTurnOwnerRecordsScopeRejectedTerminalWhenTerminalFailsScopeMatch() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)

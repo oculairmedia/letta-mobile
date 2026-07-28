@@ -733,60 +733,12 @@ class AppServerTurnEngine(
         }
 
         var turnEndReason: String? = null
-        var fanoutSubscriberId: String? = null
-        val inboundEvents: Flow<AppServerReceivedFrame> = when (val router = eventRouter) {
-            null -> client.events
-            else -> {
-                val (subId, flow) = router.subscribe(
-                    AgentId(scope.agentId),
-                    ConversationId(scope.conversationId),
-                )
-                fanoutSubscriberId = subId
-                flow
-            }
-        }
+        val (fanoutSubscriberId, inboundEvents) = subscribeTurnInbound(scope)
         try {
             collectorReady.complete(Unit)
             inboundEvents.collect { received ->
                 if (!received.matches(scope)) {
-                    // letta-mobile-kyqdt: P1c KEY PROBE (TELEMETRY-ONLY). A frame
-                    // was rejected by the scope filter. If it CARRIED a terminal
-                    // (stop_reason / terminal lifecycle), record the rejected
-                    // scope decision so the owner metadata proves the leading
-                    // hypothesis: "a terminal arrived but failed matches(scope)".
-                    // Pure read/write — the control-flow return below is
-                    // unchanged; we do NOT gate on this record.
-                    if (received.carriesTerminal()) {
-                        noteOwnerScopeDecision(
-                            scopeMatched = false,
-                            source = "scope_rejected_terminal",
-                            seq = received.eventSeqOrNull(),
-                            leaseToken = leaseToken,
-                        )
-                        Telemetry.event(
-                            "AppServerTurnEngine", "terminal.scope_rejected",
-                            "expectedAgent" to scope.agentId,
-                            "expectedConv" to scope.conversationId,
-                            "frameAgent" to received.frame.runtime?.agentId,
-                            "frameConv" to received.frame.runtime?.conversationId,
-                            "eventSeq" to received.eventSeqOrNull(),
-                        )
-                        // letta-mobile-kyqdt STEP 2: AUTHORITATIVE TERMINAL RELEASE.
-                        // If the rejected terminal-bearing frame is for the SAME
-                        // conversation, release the engine on the authoritative
-                        // terminal — no settle-window, no scope-match requirement.
-                        // Closes the passive-observer stuck-for-5-min gap.
-                        if (received.frame.runtime?.conversationId == scope.conversationId) {
-                            noteOwnerTerminal(
-                                RuntimeRunStatus.Completed,
-                                source = "authoritative_terminal_scope_mismatched",
-                                seq = received.eventSeqOrNull(),
-                                scopeMatched = false,
-                                leaseToken = leaseToken,
-                            )
-                            throw TurnCompleted
-                        }
-                    }
+                    handleScopeRejectedFrame(received, scope, leaseToken)?.let { marker -> throw marker }
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
@@ -1032,6 +984,60 @@ class AppServerTurnEngine(
                 eventRouter?.unsubscribe(subId)
             }
         }
+    }
+
+    private suspend fun subscribeTurnInbound(
+        scope: AppServerRuntimeScope,
+    ): Pair<String?, Flow<AppServerReceivedFrame>> {
+        val router = eventRouter ?: return null to client.events
+        val (subId, flow) = router.subscribe(
+            AgentId(scope.agentId),
+            ConversationId(scope.conversationId),
+        )
+        return subId to flow
+    }
+
+    /**
+     * Handles a frame rejected by [matches]. Records telemetry for terminal-
+     * bearing rejects and, for same-conversation terminals, returns the marker
+     * that should end the turn (lgns8.22.4: error_message → Failed).
+     */
+    private fun handleScopeRejectedFrame(
+        received: AppServerReceivedFrame,
+        scope: AppServerRuntimeScope,
+        leaseToken: Long,
+    ): TurnCompletedMarker? {
+        if (!received.carriesTerminal()) return null
+        noteOwnerScopeDecision(
+            scopeMatched = false,
+            source = "scope_rejected_terminal",
+            seq = received.eventSeqOrNull(),
+            leaseToken = leaseToken,
+        )
+        Telemetry.event(
+            "AppServerTurnEngine", "terminal.scope_rejected",
+            "expectedAgent" to scope.agentId,
+            "expectedConv" to scope.conversationId,
+            "frameAgent" to received.frame.runtime?.agentId,
+            "frameConv" to received.frame.runtime?.conversationId,
+            "eventSeq" to received.eventSeqOrNull(),
+        )
+        // Authoritative terminal release for the SAME conversation closes the
+        // passive-observer stuck-for-5-min gap (letta-mobile-kyqdt STEP 2).
+        if (received.frame.runtime?.conversationId != scope.conversationId) return null
+        val status = if (received.isErrorMessageTerminal()) {
+            RuntimeRunStatus.Failed
+        } else {
+            RuntimeRunStatus.Completed
+        }
+        noteOwnerTerminal(
+            status,
+            source = "authoritative_terminal_scope_mismatched",
+            seq = received.eventSeqOrNull(),
+            scopeMatched = false,
+            leaseToken = leaseToken,
+        )
+        return TurnCompleted
     }
 
     /**
@@ -1331,9 +1337,23 @@ class AppServerTurnEngine(
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
     ): Boolean {
-        val eventRuntime = frame.runtime ?: return true
+        val eventRuntime = frame.runtime
+        if (eventRuntime == null) {
+            // lgns8.22.4: runtime-less auth/admin/unknown frames are not turn
+            // wildcards — they must not reset the idle watchdog or become turn
+            // output. External tool requests are answered on the turn path and
+            // may arrive without a runtime envelope.
+            return frame is AppServerInboundFrame.ExternalToolCallRequest
+        }
         return eventRuntime.agentId == scope.agentId &&
             eventRuntime.conversationId == scope.conversationId
+    }
+
+    private fun AppServerReceivedFrame.isErrorMessageTerminal(): Boolean {
+        val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return false
+        return runCatching {
+            streamDelta.delta.jsonObject.string("message_type")
+        }.getOrNull() == "error_message"
     }
 
     /**

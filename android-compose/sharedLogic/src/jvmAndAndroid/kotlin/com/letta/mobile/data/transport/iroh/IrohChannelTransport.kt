@@ -717,19 +717,10 @@ class IrohChannelTransport(
             // App Server). Client-side preflight would send agent_retrieve /
             // conversation_messages_list as typed control frames; the node only
             // accepts auth/runtime_start/input/admin_rpc/sync/abort.
-            // lgns8.22.3: one inbound collector per dial generation; turns
-            // subscribe via fanout instead of collecting client.events directly.
-            val eventRouter = AppServerRuntimeEventRouter()
-            eventRouter.attach(scope, appServerClient.events)
-            val engine = AppServerTurnEngine(
+            val (engine, eventRouter) = buildIrohTurnEngine(
                 client = appServerClient,
-                clientInfo = AppServerRuntimeStartClientInfo(
-                    name = "letta-mobile-android-iroh",
-                    version = config.clientVersion,
-                ),
-                permissionMode = AppServerPermissionMode.Unrestricted,
-                turnContextPreflight = TurnContextPreflight.None,
-                eventRouter = eventRouter,
+                clientVersion = config.clientVersion,
+                routerScope = scope,
             )
             transport!!.awaitConnectionReady()
             IrohConnectionHandle(
@@ -1271,6 +1262,30 @@ class IrohChannelTransport(
         runCatching { transport?.close() }
         runCatching { endpoint?.shutdown() }
         runCatching { endpoint?.close() }
+    }
+
+    /**
+     * lgns8.22.3: one inbound collector per dial generation; turns subscribe via
+     * fanout instead of collecting [AppServerClient.events] directly.
+     */
+    private fun buildIrohTurnEngine(
+        client: DefaultAppServerClient,
+        clientVersion: String,
+        routerScope: CoroutineScope,
+    ): Pair<AppServerTurnEngine, AppServerRuntimeEventRouter> {
+        val eventRouter = AppServerRuntimeEventRouter()
+        eventRouter.attach(routerScope, client.events)
+        val engine = AppServerTurnEngine(
+            client = client,
+            clientInfo = AppServerRuntimeStartClientInfo(
+                name = "letta-mobile-android-iroh",
+                version = clientVersion,
+            ),
+            permissionMode = AppServerPermissionMode.Unrestricted,
+            turnContextPreflight = TurnContextPreflight.None,
+            eventRouter = eventRouter,
+        )
+        return engine to eventRouter
     }
 
     private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
