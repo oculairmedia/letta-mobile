@@ -151,10 +151,16 @@ private fun JsonObject?.hasExplicitContextWindowLimit(): Boolean {
 /** Returns updated `model_settings` when max_output is missing; null if already set. */
 private fun JsonObject?.withKnownMaxOutputTokens(maxOutputTokens: Int): JsonObject? {
     val modelSettings = this?.nestedObject("model_settings", "modelSettings")
+    val llmConfig = this?.nestedObject("llm_config", "llmConfig")
     val hasExplicitOutput =
         modelSettings?.containsKey("max_output_tokens") == true ||
             modelSettings?.containsKey("maxOutputTokens") == true ||
-            this?.containsKey("max_output_tokens") == true
+            this?.containsKey("max_output_tokens") == true ||
+            // Legacy create payloads may only cap output via llm_config.max_tokens.
+            llmConfig?.containsKey("max_tokens") == true ||
+            llmConfig?.containsKey("maxTokens") == true ||
+            llmConfig?.containsKey("max_output_tokens") == true ||
+            llmConfig?.containsKey("maxOutputTokens") == true
     if (hasExplicitOutput) return null
     return buildJsonObject {
         modelSettings?.forEach { (k, v) -> put(k, v) }
@@ -171,6 +177,10 @@ private fun firstModelHandle(body: JsonObject?): String? {
         ?: (body["handle"] as? JsonPrimitive)?.contentOrNull
     if (!direct.isNullOrBlank()) return direct
     val settings = body.nestedObject("model_settings", "modelSettings")
-    return (settings?.get("handle") as? JsonPrimitive)?.contentOrNull
+    val fromSettings = (settings?.get("handle") as? JsonPrimitive)?.contentOrNull
         ?: (settings?.get("model") as? JsonPrimitive)?.contentOrNull
+    if (!fromSettings.isNullOrBlank()) return fromSettings
+    val llmConfig = body.nestedObject("llm_config", "llmConfig")
+    return (llmConfig?.get("handle") as? JsonPrimitive)?.contentOrNull
+        ?: (llmConfig?.get("model") as? JsonPrimitive)?.contentOrNull
 }

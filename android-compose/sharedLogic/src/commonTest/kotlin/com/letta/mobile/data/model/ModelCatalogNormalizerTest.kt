@@ -6,7 +6,6 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -25,6 +24,20 @@ class ModelCatalogNormalizerTest {
         assertEquals("lc-openai/MiniMax-M3", normalized.single().handle)
         assertEquals(200_000, normalized.single().contextWindow)
         assertEquals(16_384, normalized.single().maxOutputTokens)
+    }
+
+    @Test
+    fun doesNotCollapseDistinctProviderRoutesWithSameModelSuffix() {
+        val models = listOf(
+            LlmModel(id = "openai/gpt-4o", name = "gpt-4o", handle = "openai/gpt-4o", providerType = "openai"),
+            LlmModel(id = "azure/gpt-4o", name = "gpt-4o", handle = "azure/gpt-4o", providerType = "azure"),
+        )
+        val normalized = ModelCatalogNormalizer.normalize(models)
+        assertEquals(2, normalized.size)
+        assertEquals(
+            setOf("openai/gpt-4o", "azure/gpt-4o"),
+            normalized.map { it.handle }.toSet(),
+        )
     }
 
     @Test
@@ -56,9 +69,14 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
-    fun prefersEntryWithMetadataWhenProviderRanksTie() {
-        val bare = LlmModel(id = "x", handle = "openai/deepseek-v4-pro", name = "deepseek", providerType = "openai")
-        val rich = LlmModel(
+    fun prefersHigherProviderRankEvenWhenLowerRankHasRicherMetadata() {
+        val bareOpenai = LlmModel(
+            id = "x",
+            handle = "openai/deepseek-v4-pro",
+            name = "deepseek",
+            providerType = "openai",
+        )
+        val richLcOpenai = LlmModel(
             id = "y",
             handle = "lc-openai/deepseek-v4-pro",
             name = "deepseek",
@@ -66,9 +84,30 @@ class ModelCatalogNormalizerTest {
             contextWindow = 1_000_000,
             maxOutputTokens = 8_192,
         )
+        val winner = ModelCatalogNormalizer.normalize(listOf(bareOpenai, richLcOpenai)).single()
+        assertEquals("openai/deepseek-v4-pro", winner.handle)
+    }
+
+    @Test
+    fun prefersRicherMetadataWhenProviderRanksTie() {
+        val bare = LlmModel(
+            id = "x",
+            handle = "lc-openai/deepseek-v4-pro",
+            name = "deepseek",
+            providerType = "lc-openai",
+        )
+        val rich = LlmModel(
+            id = "y",
+            handle = "lc-openai/deepseek-v4-pro",
+            name = "deepseek",
+            providerType = "lc-openai",
+            contextWindow = 1_000_000,
+            maxOutputTokens = 8_192,
+            displayNameOverride = "DeepSeek Pro",
+        )
         val winner = ModelCatalogNormalizer.normalize(listOf(bare, rich)).single()
-        assertEquals("lc-openai/deepseek-v4-pro", winner.handle)
         assertEquals(1_000_000, winner.contextWindow)
+        assertEquals("DeepSeek Pro", winner.displayNameOverride)
     }
 }
 
@@ -99,6 +138,35 @@ class AppServerListModelsAdapterNormalizationTest {
         val updateArgs = adapted["updateArgs"]!!.jsonObject
         assertEquals("200000", updateArgs["context_window_limit"]!!.jsonPrimitive.content)
         assertEquals("16384", updateArgs["max_output_tokens"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun preservesServerUpdateArgsFieldsBeyondHandleAndLimits() {
+        val entries = JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "presentation-1")
+                    put("handle", "openai/MiniMax-M3")
+                    put("label", "MiniMax M3")
+                    put(
+                        "updateArgs",
+                        buildJsonObject {
+                            put("handle", "openai/MiniMax-M3")
+                            put("model", "MiniMax-M3")
+                            put("model_handle", "openai/MiniMax-M3")
+                            put("id", "catalog-row-9")
+                        },
+                    )
+                },
+            ),
+        )
+        val adapted = AppServerListModelsAdapter.toLlmModelArray(entries).single().jsonObject
+        val updateArgs = adapted["updateArgs"]!!.jsonObject
+        assertEquals("MiniMax-M3", updateArgs["model"]!!.jsonPrimitive.content)
+        assertEquals("catalog-row-9", updateArgs["id"]!!.jsonPrimitive.content)
+        assertEquals("openai/MiniMax-M3", updateArgs["handle"]!!.jsonPrimitive.content)
+        assertEquals("200000", updateArgs["context_window_limit"]!!.jsonPrimitive.content)
+        assertEquals("openai/MiniMax-M3", adapted["selection_handle"]!!.jsonPrimitive.content)
     }
 
     @Test

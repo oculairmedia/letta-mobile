@@ -1606,8 +1606,8 @@ class AppServerTurnEngine(
 
     /**
      * letta-mobile-o0atv: sanitized terminal failure breadcrumb. Captures status,
-     * reason, run/agent/conversation ids, optional model handle, and a best-effort
-     * exception class token — without raw provider payloads.
+     * exception token, run/agent/conversation ids, and optional model handle —
+     * never the raw provider reason text (may contain secrets / prompt content).
      */
     private fun logSanitizedTerminalFailure(
         status: RuntimeRunStatus,
@@ -1624,7 +1624,7 @@ class AppServerTurnEngine(
             "AppServerTurnEngine",
             "terminal.failure",
             "status" to status.name,
-            "reason" to (reason?.take(240) ?: "<none>"),
+            "hasReason" to !reason.isNullOrBlank(),
             "exceptionType" to (exceptionTypeToken(reason) ?: "<none>"),
             "provider" to (provider ?: "<none>"),
             "handle" to (handle ?: "<none>"),

@@ -9,7 +9,8 @@ package com.letta.mobile.data.model
  * - LLMux omits context/output limits for some models (Grok, MiniMax) that still need
  *   dependable bounds for Letta full-context + tool turns.
  *
- * Dedupes by underlying model ID (handle suffix), prefers a canonical routing
+ * Dedupes only within the known LLMux alias provider set (never collapses distinct
+ * routes such as `openai/gpt-4o` vs `azure/gpt-4o`), prefers a canonical routing
  * handle, and fills known limits when the upstream catalog leaves them blank.
  */
 object ModelCatalogNormalizer {
@@ -19,9 +20,22 @@ object ModelCatalogNormalizer {
     )
 
     /**
-     * Provider-prefix preference when several handles share one underlying model.
-     * Prefer OpenAI-compatible LLMux dialects over Anthropic-shaped aliases and
-     * over bare `lmstudio/` when all resolve to the same upstream model.
+     * Providers that commonly alias the same LLMux upstream catalog entry.
+     * Only entries whose prefixes are all in this set may collapse together.
+     */
+    private val LLMUX_ALIAS_PROVIDERS = setOf(
+        "openai",
+        "lc-openai",
+        "anthropic",
+        "lc-anthropic",
+        "lmstudio",
+        "lm_studio",
+    )
+
+    /**
+     * Provider-prefix preference when several LLMux aliases share one underlying model.
+     * Prefer OpenAI-compatible dialects over Anthropic-shaped aliases and over bare
+     * `lmstudio/` when all resolve to the same upstream model.
      */
     private val PROVIDER_RANK = listOf(
         "openai",
@@ -30,10 +44,6 @@ object ModelCatalogNormalizer {
         "lc-anthropic",
         "lmstudio",
         "lm_studio",
-        "openrouter",
-        "minimax",
-        "xai",
-        "groq",
     )
 
     /** Explicit limits for models whose LLMux catalog entries omit token metadata. */
@@ -79,24 +89,15 @@ object ModelCatalogNormalizer {
     }
 
     /**
-     * Collapse duplicate provider-prefixed handles for the same underlying model.
-     * Keeps the highest-ranked provider (or the entry with richer metadata).
+     * Collapse LLMux-alias duplicates for the same underlying model.
+     * Distinct provider routes (e.g. openai vs azure) are preserved.
      */
     fun dedupeByUnderlyingModel(models: List<LlmModel>): List<LlmModel> {
         if (models.size <= 1) return models
         val winners = LinkedHashMap<String, LlmModel>()
         val order = ArrayList<String>()
         for (model in models) {
-            val key = underlyingModelId(
-                model.handle?.takeIf { it.isNotBlank() } ?: model.id.ifBlank { model.name },
-            ).lowercase()
-            if (key.isEmpty()) {
-                // Unkeyable — keep as-is under a unique slot.
-                val unique = "unkeyed-${order.size}-${model.id}"
-                winners[unique] = model
-                order.add(unique)
-                continue
-            }
+            val key = dedupeKey(model)
             val existing = winners[key]
             if (existing == null) {
                 winners[key] = model
@@ -111,10 +112,27 @@ object ModelCatalogNormalizer {
     fun normalize(models: List<LlmModel>): List<LlmModel> =
         dedupeByUnderlyingModel(models.map(::enrichLimits))
 
+    private fun dedupeKey(model: LlmModel): String {
+        val handle = model.handle?.takeIf { it.isNotBlank() }
+            ?: model.id.ifBlank { model.name }
+        val prefix = providerPrefix(handle).ifBlank { model.providerType.lowercase() }
+        val underlying = underlyingModelId(handle).lowercase()
+        return if (prefix in LLMUX_ALIAS_PROVIDERS && underlying.isNotEmpty()) {
+            "llmux-alias:$underlying"
+        } else {
+            // Preserve distinct routes (azure vs openai, openrouter, custom, …).
+            "route:${handle.ifBlank { "unkeyed-${model.id}" }.lowercase()}"
+        }
+    }
+
+    /** Provider rank wins first; richness is only a same-rank tiebreaker. */
     private fun prefer(candidate: LlmModel, incumbent: LlmModel): Boolean {
-        val candidateScore = richness(candidate) * 100 + providerScore(candidate)
-        val incumbentScore = richness(incumbent) * 100 + providerScore(incumbent)
-        return candidateScore > incumbentScore
+        val candidateProvider = providerScore(candidate)
+        val incumbentProvider = providerScore(incumbent)
+        if (candidateProvider != incumbentProvider) {
+            return candidateProvider > incumbentProvider
+        }
+        return richness(candidate) > richness(incumbent)
     }
 
     private fun richness(model: LlmModel): Int {

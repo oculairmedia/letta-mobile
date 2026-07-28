@@ -90,32 +90,40 @@ object AppServerListModelsAdapter {
             decodeEntriesWithRaw(entries).map { (entry, raw) -> toLlmModel(entry, raw) },
         )
 
-    fun toLlmModelArray(entries: JsonArray): JsonArray = buildJsonArray {
-        toLlmModels(entries).forEach { model ->
-            add(toLlmModelObject(model))
+    fun toLlmModelArray(entries: JsonArray): JsonArray {
+        val decoded = decodeEntriesWithRaw(entries).map { (entry, raw) ->
+            entry to toLlmModel(entry, raw)
+        }
+        val byHandle = decoded.associate { (entry, model) ->
+            (model.handle ?: model.id) to entry
+        }
+        return buildJsonArray {
+            ModelCatalogNormalizer.normalize(decoded.map { it.second }).forEach { model ->
+                val sourceEntry = byHandle[model.handle ?: model.id]
+                add(toLlmModelObject(model, sourceEntry))
+            }
         }
     }
 
     fun toLlmModelObject(entry: AppServerListModelEntry): JsonObject =
-        toLlmModelObject(toLlmModel(entry))
+        toLlmModelObject(toLlmModel(entry), entry)
 
-    fun toLlmModelObject(model: LlmModel): JsonObject = buildJsonObject {
-        put("id", model.id)
-        put("name", model.name)
-        model.handle?.let { put("handle", it) }
-        model.displayNameOverride?.let { put("display_name", it) }
-        put("provider_type", model.providerType)
-        model.contextWindow?.takeIf { it > 0 }?.let { put("context_window", it) }
-        model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
-        model.maxTokens?.takeIf { it > 0 }?.let { put("max_tokens", it) }
-        model.handle?.let { put("selection_handle", it) }
-        // Ensure model switches persist bounds Letta needs for tool/context turns.
-        val updateArgs = buildJsonObject {
+    fun toLlmModelObject(model: LlmModel, sourceEntry: AppServerListModelEntry? = null): JsonObject {
+        val selection = sourceEntry?.let { selectionHandle(it) } ?: model.handle
+        return buildJsonObject {
+            put("id", model.id)
+            put("name", model.name)
             model.handle?.let { put("handle", it) }
-            model.contextWindow?.takeIf { it > 0 }?.let { put("context_window_limit", it) }
+            model.displayNameOverride?.let { put("display_name", it) }
+            put("provider_type", model.providerType)
+            model.contextWindow?.takeIf { it > 0 }?.let { put("context_window", it) }
             model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
+            model.maxTokens?.takeIf { it > 0 }?.let { put("max_tokens", it) }
+            selection?.let { put("selection_handle", it) }
+            // Merge normalized limits into the server-provided updateArgs so extra
+            // selection fields (model / model_handle / id) survive adaptation.
+            put("updateArgs", mergeUpdateArgs(sourceEntry?.updateArgs, selection, model))
         }
-        put("updateArgs", updateArgs)
     }
 
     /** Handle / model id to send on agent/conversation model update. */
@@ -126,6 +134,17 @@ object AppServerListModelsAdapter {
         return fromArgs
             ?: entry.handle?.takeIf { it.isNotBlank() }
             ?: entry.id.takeIf { it.isNotBlank() }
+    }
+
+    private fun mergeUpdateArgs(
+        original: JsonObject?,
+        selection: String?,
+        model: LlmModel,
+    ): JsonObject = buildJsonObject {
+        original?.forEach { (key, value) -> put(key, value) }
+        selection?.let { put("handle", it) }
+        model.contextWindow?.takeIf { it > 0 }?.let { put("context_window_limit", it) }
+        model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
     }
 
     private fun extractLimits(
