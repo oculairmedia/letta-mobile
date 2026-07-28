@@ -47,7 +47,11 @@ class NativeSkillsCatalog {
             }
             is AppServerInboundFrame.Unknown -> {
                 if (frame.type == "skills_updated") {
-                    extractSkills(frame.raw["skills"])?.let(::replace)
+                    // Flat `skills` array, or nested `{ skills: [...] }` / payload wrappers.
+                    extractSkills(frame.raw["skills"])
+                        ?: extractSkills(frame.raw["payload"])
+                        ?: extractSkills(frame.raw)
+                        ?.let(::replace)
                 }
             }
             else -> Unit

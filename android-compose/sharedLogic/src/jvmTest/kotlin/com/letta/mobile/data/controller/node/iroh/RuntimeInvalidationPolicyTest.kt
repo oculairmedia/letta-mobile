@@ -44,6 +44,20 @@ class RuntimeInvalidationPolicyTest {
     fun conversationUpdateRestartsOnCapturedOverridesOnly() {
         assertTrue(RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(buildJsonObject { put("model", "x") }))
         assertTrue(RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(buildJsonObject { put("system", "x") }))
+        assertTrue(
+            RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(
+                buildJsonObject {
+                    put("model_settings", buildJsonObject { put("model", "x") })
+                },
+            ),
+        )
+        assertTrue(
+            RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(
+                buildJsonObject {
+                    put("modelSettings", buildJsonObject { put("context_window_limit", 128000) })
+                },
+            ),
+        )
         assertFalse(RuntimeInvalidationPolicy.conversationUpdateRequiresRestart(buildJsonObject { put("title", "t") }))
     }
 }

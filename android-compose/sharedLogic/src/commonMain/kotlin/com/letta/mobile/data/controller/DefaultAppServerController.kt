@@ -201,6 +201,14 @@ class DefaultAppServerController(
         turnEngine.invalidateRuntime()
     }
 
+    override suspend fun stopAllRuntimes() {
+        runtimeMutex.withLock {
+            runtimeCache.clear()
+            runtimePermissionModes.clear()
+        }
+        turnEngine.invalidateRuntime()
+    }
+
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =
         turnEngine.runTurn(command)
 

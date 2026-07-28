@@ -107,6 +107,8 @@ internal object NativeAdmin {
             name.endsWith(".archive") ||
             name == "skill_enable" ||
             name == "skill_disable" ||
+            name == "skill.install" ||
+            name == "skill.uninstall" ||
             name == "approval.submit"
     }
 
@@ -117,20 +119,9 @@ internal object NativeAdmin {
     ): T {
         val timeoutMs = timeoutMsFor(op)
         return try {
-            val result = kotlinx.coroutines.withTimeout(timeoutMs) { block(client) }
-            if (result == null) {
-                markSelected(op, "error", "native_unsuccessful")
-                adminError("app_server_error: $op native command unsuccessful")
-            }
-            clearBreaker(op)
-            markSelected(op, "success")
-            result
+            completeRequire(op, kotlinx.coroutines.withTimeout(timeoutMs) { block(client) })
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
-            // Mutations: report timeout but do not trip the breaker — a late success
-            // on the server must not black-hole subsequent reads/writes for 60s.
-            if (!isMutationOp(op)) tripBreaker(op)
-            markSelected(op, "unavailable", "native_timeout")
-            adminError("capability_unavailable: $op App Server v2 timed out")
+            onRequireTimeout(op)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: IllegalArgumentException) {
@@ -140,6 +131,24 @@ internal object NativeAdmin {
             markSelected(op, "error", e.message ?: e::class.simpleName ?: "error")
             adminError("app_server_error: $op native command failed")
         }
+    }
+
+    private fun <T : Any> completeRequire(op: String, result: T?): T {
+        if (result == null) {
+            markSelected(op, "error", "native_unsuccessful")
+            adminError("app_server_error: $op native command unsuccessful")
+        }
+        clearBreaker(op)
+        markSelected(op, "success")
+        return result
+    }
+
+    private fun onRequireTimeout(op: String): Nothing {
+        // Mutations: report timeout but do not trip the breaker — a late success
+        // on the server must not black-hole subsequent reads/writes for 60s.
+        if (!isMutationOp(op)) tripBreaker(op)
+        markSelected(op, "unavailable", "native_timeout")
+        adminError("capability_unavailable: $op App Server v2 timed out")
     }
 
     /**

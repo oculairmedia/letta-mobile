@@ -3,6 +3,8 @@ package com.letta.mobile.data.runtime
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -44,8 +46,11 @@ class AppServerContextWindowPreflight(
     }
 
     override suspend fun prepare(agentId: String, conversationId: String): TurnContextPreflightResult {
-        val agent = retrieveAgent(agentId)
-        val conversation = retrieveConversation(conversationId)
+        val (agent, conversation) = coroutineScope {
+            val agentDeferred = async { retrieveAgent(agentId) }
+            val conversationDeferred = async { retrieveConversation(conversationId) }
+            agentDeferred.await() to conversationDeferred.await()
+        }
         val existingLimit = agent.contextWindowLimit()
         val configured = existingLimit == null
         val agentLimit = existingLimit ?: persistDefaultContextLimit(agentId)
@@ -158,17 +163,16 @@ private fun JsonObject.activeMessageIds(): Set<String>? {
 
 private fun JsonElement.isActive(activeMessageIds: Set<String>?): Boolean {
     if (activeMessageIds == null) return true
-    return allObjects().any { objectValue ->
-        objectValue.string("id")?.let(activeMessageIds::contains) == true
-    }
+    return inspectMessage().id?.let(activeMessageIds::contains) == true
 }
 
 private fun JsonElement.isAssistantMessage(): Boolean =
-    allObjects().any { it.string("role") == "assistant" }
+    inspectMessage().role == "assistant"
 
 private fun JsonElement.recordsPoisonedOrTokenOverflow(contextWindowLimit: Int): Boolean {
-    val objects = allObjects()
-    return objects.hasEmptyAssistant() || objects.hasInputAtOrBeyond(contextWindowLimit)
+    val probe = inspectMessage()
+    val tokens = probe.inputTokens
+    return probe.hasEmptyAssistant || (tokens != null && tokens >= contextWindowLimit.toLong())
 }
 
 /**
@@ -178,53 +182,82 @@ private fun JsonElement.recordsPoisonedOrTokenOverflow(contextWindowLimit: Int):
  * low-input max_tokens truncation does not.
  */
 private fun JsonElement.recordsLengthStopNearCapacity(contextWindowLimit: Int): Boolean {
-    val objects = allObjects()
-    if (!objects.hasLengthStop()) return false
+    val probe = inspectMessage()
+    if (!probe.hasLengthStop) return false
     val nearCapacity = (contextWindowLimit / 2).coerceAtLeast(1)
-    return objects.hasInputAtOrBeyond(nearCapacity)
+    val tokens = probe.inputTokens ?: return false
+    return tokens >= nearCapacity.toLong()
 }
 
-private fun List<JsonObject>.hasLengthStop(): Boolean =
-    any {
-        it.string("stop_reason") == "length" || it.string("stopReason") == "length"
-    }
+/**
+ * Single-pass envelope probe for preflight checks. Prefer top-level / usage
+ * fields on the message object; only DFS nested objects when scanning for
+ * provider stop metadata that may live under a nested assistant payload.
+ */
+private data class MessageProbe(
+    val id: String?,
+    val role: String?,
+    val hasEmptyAssistant: Boolean,
+    val hasLengthStop: Boolean,
+    /** Null when the message carries no input token count. */
+    val inputTokens: Long?,
+)
 
-private fun List<JsonObject>.hasInputAtOrBeyond(contextWindowLimit: Int): Boolean =
-    any { objectValue ->
-        val usage = objectValue.objectValue("usage") ?: objectValue
-        val input = usage.long("input")
-            ?: usage.long("input_tokens")
-            ?: usage.long("inputTokens")
-        val cacheRead = usage.long("cache_read")
-            ?: usage.long("cacheRead")
-            ?: 0L
-        input != null && input + cacheRead >= contextWindowLimit.toLong()
-    }
-
-private fun List<JsonObject>.hasEmptyAssistant(): Boolean =
-    any { objectValue ->
-        val role = objectValue.string("role")
-        val content = objectValue["content"] ?: objectValue["parts"]
+private fun JsonElement.inspectMessage(): MessageProbe {
+    val root = this as? JsonObject
+    val id = root?.string("id")
+    val role = root?.string("role")
+    val content = root?.get("content") ?: root?.get("parts")
+    val hasEmptyAssistant =
         role == "assistant" && (content == JsonNull || content == JsonArray(emptyList()))
-    }
+    val providerResult = root?.objectValue("provider_result")
+    val usage = root?.objectValue("usage")
+        ?: providerResult?.objectValue("usage")
+        ?: root
+    val input = usage?.long("input")
+        ?: usage?.long("input_tokens")
+        ?: usage?.long("inputTokens")
+    val cacheRead = usage?.long("cache_read")
+        ?: usage?.long("cacheRead")
+        ?: 0L
+    val hasLengthStop = hasProviderLengthStop(this)
+    return MessageProbe(
+        id = id,
+        role = role,
+        hasEmptyAssistant = hasEmptyAssistant,
+        hasLengthStop = hasLengthStop,
+        inputTokens = input?.plus(cacheRead),
+    )
+}
 
-private fun JsonElement.allObjects(): List<JsonObject> {
-    val found = mutableListOf<JsonObject>()
-    fun visit(element: JsonElement) {
-        when (element) {
-            is JsonObject -> {
-                found += element
-                element.values.forEach(::visit)
+private fun hasProviderLengthStop(element: JsonElement): Boolean {
+    when (element) {
+        is JsonObject -> {
+            val stop = element.string("stop_reason") ?: element.string("stopReason")
+            if (stop == "length") return true
+            // Only descend into nested objects that look like provider/message metadata.
+            for ((key, value) in element) {
+                if (value !is JsonObject && value !is JsonArray) continue
+                val looksLikeProviderMeta =
+                    key == "message" || key == "stop" || key == "metadata" ||
+                        key == "provider" || key == "provider_result" || key == "response" ||
+                        (value is JsonObject && (
+                            "stop_reason" in value ||
+                                "stopReason" in value ||
+                                "role" in value ||
+                                "usage" in value
+                            ))
+                if (looksLikeProviderMeta && hasProviderLengthStop(value)) return true
             }
-            is JsonArray -> element.forEach(::visit)
-            else -> Unit
         }
+        is JsonArray -> element.forEach { if (hasProviderLengthStop(it)) return true }
+        else -> Unit
     }
-    visit(this)
-    return found
+    return false
 }
 
 private fun JsonObject.objectValue(key: String): JsonObject? = this[key] as? JsonObject
 private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 private fun JsonObject.long(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
 private fun JsonObject.integer(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
+

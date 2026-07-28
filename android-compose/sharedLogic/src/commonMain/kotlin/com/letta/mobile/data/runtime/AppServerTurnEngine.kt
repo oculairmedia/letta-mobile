@@ -247,36 +247,11 @@ class AppServerTurnEngine(
         val owner = activeTurnOwnerRef.value ?: return false
         val runId = owner.runId?.takeIf { it.isNotBlank() }
         val dead = try {
-            // Cap liveness probes well below the App Server client request timeout
-            // (often 120s). A hung run.get/list must not serialize concurrent busy
-            // reconciles for minutes while a live turn keeps streaming.
             withTimeout(LIVENESS_PROBE_TIMEOUT_MS.milliseconds) {
                 if (runId != null) {
-                    val resp = client.adminRpc(
-                        AppServerCommand.AdminRpc(
-                            requestId = requestIdFactory(),
-                            method = "run.get",
-                            params = buildJsonObject { put("run_id", runId) },
-                        ),
-                    )
-                    when {
-                        // The server reports success with a run body: dead iff terminal.
-                        resp.success -> runResultIsDead(resp.result)
-                        // A failed run.get whose error indicates the run is gone/not-found
-                        // is also proof of death.
-                        resp.error?.let {
-                            it.contains("not found", ignoreCase = true) ||
-                                it.contains("no such run", ignoreCase = true)
-                        } == true -> true
-                        else -> false
-                    }
+                    probeRunDead(runId)
                 } else {
-                    // turn-engine-busy heal: the owner never had a run_id promoted (the
-                    // completed_settle terminal was never fanned to THIS initiator's
-                    // stream, so isBusy stuck until the external watchdog). Fall back to
-                    // a conversation-scoped run.list liveness probe — dead ONLY when the
-                    // server reports no non-terminal run for this agent+conversation, so
-                    // a genuinely live turn is still never interrupted.
+                    // Owner never had a run_id promoted — conversation-scoped probe.
                     conversationHasNoActiveRun(owner.agentId, owner.conversationId)
                 }
             }
@@ -290,8 +265,6 @@ class AppServerTurnEngine(
             )
             return false
         } catch (t: Throwable) {
-            // Never clear the lock on an inconclusive/errored liveness check — that
-            // could interrupt a live run. Only server-CONFIRMED death releases.
             Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to (runId ?: "<none>"))
             return false
         }
@@ -299,13 +272,34 @@ class AppServerTurnEngine(
             Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to (runId ?: "<none>"))
             return false
         }
-        // Confirmed dead: release the stale lock so the pending send can proceed.
+        return releaseDeadOwnerLock(runId)
+    }
+
+    private suspend fun probeRunDead(runId: String): Boolean {
+        val resp = client.adminRpc(
+            AppServerCommand.AdminRpc(
+                requestId = requestIdFactory(),
+                method = "run.get",
+                params = buildJsonObject { put("run_id", runId) },
+            ),
+        )
+        return when {
+            resp.success -> runResultIsDead(resp.result)
+            resp.error?.let {
+                it.contains("not found", ignoreCase = true) ||
+                    it.contains("no such run", ignoreCase = true)
+            } == true -> true
+            else -> false
+        }
+    }
+
+    private fun releaseDeadOwnerLock(runId: String?): Boolean {
         val released = activeTurnOwnerRef.value
         activeTurnOwnerRef.value = null
         try {
             activeTurn.unlock()
-        } catch (t: Throwable) {
-            // If it was already unlocked concurrently, treat as released.
+        } catch (_: Throwable) {
+            // Already unlocked concurrently — treat as released.
         }
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.reconciledDead",
@@ -529,7 +523,21 @@ class AppServerTurnEngine(
                     conversationId = command.conversationId.value,
                 )
             }
-        } catch (e: kotlinx.coroutines.CancellationException) {
+        } catch (e: TimeoutCancellationException) {
+            // withTimeout wraps expiry as TimeoutCancellationException (a
+            // CancellationException subclass). Treat it as a failed preflight —
+            // partial mutations (e.g. persisted context limit) must not leave a
+            // stale runtime cached — while still propagating genuine parent cancel.
+            invalidateRuntime()
+            Telemetry.event(
+                "AppServerTurnEngine",
+                "context.preflightFailed",
+                "agentId" to command.agentId.value,
+                "conversationId" to command.conversationId.value,
+                "errorClass" to "TimeoutCancellationException",
+            )
+            throw e
+        } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             // Preflight may have already mutated agent/conversation state (e.g.

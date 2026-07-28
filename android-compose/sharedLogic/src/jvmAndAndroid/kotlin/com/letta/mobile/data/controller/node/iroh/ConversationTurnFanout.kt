@@ -270,6 +270,24 @@ internal class ConversationTurnFanout(
     }
 
     /**
+     * Busy-rejection path for a concurrent submit: notify ONLY the initiator so
+     * their pending send fails closed, without fanning an error_message to
+     * observers of the live in-progress turn (who would otherwise treat it as
+     * a failure terminal for that turn).
+     *
+     * Does not set [terminalWritten] — this rejection is not the live turn's
+     * terminal, and parking must not capture it for redial of the owning turn.
+     */
+    suspend fun emitInitiatorOnlyBusyRejection(message: String) {
+        val viewer = initiatorViewer ?: return
+        val delta = buildJsonObject {
+            put("message_type", "error_message")
+            put("message", message)
+        }
+        writeToViewerIsolated(viewer, delta, isInitiator = true)
+    }
+
+    /**
      * eaczz.5 — live user-echo fanout. Synthesize a `user_message` wire delta for
      * the sender's prompt and fan it out to EVERY viewer at turn start, BEFORE
      * any assistant stream. Observers render it as a fresh user row so the prompt

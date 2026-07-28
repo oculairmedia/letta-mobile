@@ -65,6 +65,10 @@ object RuntimeInvalidationPolicy {
         "model",
         "context_window_limit",
         "contextWindowLimit",
+        "model_settings",
+        "modelSettings",
+        "llm_config",
+        "llmConfig",
         "system",
         "system_prompt",
         "systemPrompt",
@@ -91,7 +95,9 @@ object RuntimeInvalidationPolicy {
 
     fun conversationUpdateRequiresRestart(params: JsonObject?): Boolean {
         if (params == null) return false
-        return params.keys.any { it in CONVERSATION_RESTART_FIELDS }
+        if (params.keys.any { it in CONVERSATION_RESTART_FIELDS }) return true
+        return nestedRestartObject(params, "model_settings", "modelSettings") ||
+            nestedRestartObject(params, "llm_config", "llmConfig")
     }
 
     /** Skill enable/disable changes the toolset captured at runtime start. */

@@ -907,58 +907,68 @@ class IrohNodeConnection(
                     fanout.onDraft(payload)
                 }
             }.onFailure { error ->
-                val errorText = error.message ?: error.toString()
-                // Concurrent send while a turn is live: do NOT fan out error_message.
-                // Viewers of the live turn map error_message → TurnDone(failed) and
-                // would kill the in-progress UI turn. The rejected initiator already
-                // learns via its own send path / local busy rejection.
-                if (isTurnAlreadyActiveMessage(errorText)) {
-                    Telemetry.event(
-                        "IrohNode", "stream.busy_rejected_no_terminal",
-                        "remoteEndpointId" to remoteEndpointId,
-                        "error" to errorText,
-                        "class" to error::class.simpleName,
-                        level = Telemetry.Level.WARN,
-                    )
-                    return@onFailure
-                }
-                val wroteTerminal = runCatching {
-                    withContext(NonCancellable) {
-                        // Same dangling-tool_call guarantee on the exception path.
-                        fanout.flushOpenToolCalls()
-                        fanout.emitErrorTerminal(errorText)
-                    }
-                }.isSuccess
-                if (!wroteTerminal) {
-                    Telemetry.event(
-                        "IrohNode", "stream.closed_before_terminal",
-                        "remoteEndpointId" to remoteEndpointId,
-                        "error" to errorText,
-                        "class" to error::class.simpleName,
-                        level = Telemetry.Level.WARN,
-                    )
-                    // Channel died before any terminal reached the client. Park the
-                    // frames we've sent so far + a synthetic terminal, keyed by
-                    // client_message_id so a redial re-send replays them instead of
-                    // the client hanging on "Thinking…" (q71yi + mid-turn redial fix).
-                    if (clientMsgId != null && !fanout.anyTerminalWritten) {
-                        val tracking = activeTurnTracking.get()
-                        tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
-                        Telemetry.event(
-                            "IrohNode", "stream.frames_parked",
-                            "remoteEndpointId" to remoteEndpointId,
-                            "clientMessageId" to clientMsgId,
-                            "conversationId" to input.runtime.conversationId,
-                            "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
-                        )
-                    }
-                }
-                if (error is CancellationException) throw error
+                handleInputFailure(error, fanout, clientMsgId, input, parkedTerminals)
             }
         } finally {
             // Clear thread-local tracking when the turn completes or fails
             activeTurnTracking.remove()
         }
+    }
+
+    private suspend fun handleInputFailure(
+        error: Throwable,
+        fanout: ConversationTurnFanout,
+        clientMsgId: String?,
+        input: AppServerCommand.Input,
+        parkedTerminals: ParkedTerminalStore,
+    ) {
+        val errorText = error.message ?: error.toString()
+        // Concurrent send while a turn is live: do NOT fan out error_message to
+        // conversation viewers (they would map it onto the live turn). Still
+        // deliver an initiator-only busy rejection so the submitting peer gets a
+        // failure terminal for its own pending send.
+        if (isTurnAlreadyActiveMessage(errorText)) {
+            runCatching {
+                withContext(NonCancellable) {
+                    fanout.emitInitiatorOnlyBusyRejection(errorText)
+                }
+            }
+            Telemetry.event(
+                "IrohNode", "stream.busy_rejected_initiator_only",
+                "remoteEndpointId" to remoteEndpointId,
+                "error" to errorText,
+                "class" to error::class.simpleName,
+                level = Telemetry.Level.WARN,
+            )
+            return
+        }
+        val wroteTerminal = runCatching {
+            withContext(NonCancellable) {
+                fanout.flushOpenToolCalls()
+                fanout.emitErrorTerminal(errorText)
+            }
+        }.isSuccess
+        if (!wroteTerminal) {
+            Telemetry.event(
+                "IrohNode", "stream.closed_before_terminal",
+                "remoteEndpointId" to remoteEndpointId,
+                "error" to errorText,
+                "class" to error::class.simpleName,
+                level = Telemetry.Level.WARN,
+            )
+            if (clientMsgId != null && !fanout.anyTerminalWritten) {
+                val tracking = activeTurnTracking.get()
+                tracking?.tracker?.parkFrames(parkedTerminals, clientMsgId, interruptedTerminalDelta().toString())
+                Telemetry.event(
+                    "IrohNode", "stream.frames_parked",
+                    "remoteEndpointId" to remoteEndpointId,
+                    "clientMessageId" to clientMsgId,
+                    "conversationId" to input.runtime.conversationId,
+                    "frameCount" to (tracking?.tracker?.frameCount() ?: 0),
+                )
+            }
+        }
+        if (error is CancellationException) throw error
     }
 
     private fun interruptedTerminalDelta(): JsonObject = buildJsonObject {

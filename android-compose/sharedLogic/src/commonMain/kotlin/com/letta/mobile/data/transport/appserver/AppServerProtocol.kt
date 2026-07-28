@@ -83,7 +83,17 @@ object AppServerProtocol {
             "list_models_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(raw) }
             "skill_enable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(raw) }
             "skill_disable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(raw) }
-            "skills_updated" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw) }
+            "skills_updated" -> {
+                // Nested payloads decode to SkillsUpdated(skills=null) because
+                // unknown keys are ignored. Preserve those as Unknown so
+                // NativeSkillsCatalog can still read skills from the raw envelope.
+                val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw)
+                if (decoded.skills != null) {
+                    decoded
+                } else {
+                    AppServerInboundFrame.Unknown(type = type, raw = raw)
+                }
+            }
             "cron_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(raw) }
             "cron_add_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(raw) }
             "cron_get_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(raw) }

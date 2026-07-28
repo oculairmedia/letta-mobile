@@ -194,6 +194,13 @@ class ReconnectingAppServerClient(
             }
         }
 
+        // Pipe generation events BEFORE recovery so collectors (skills catalog,
+        // subagent registry) observe runtime_start / sync / skills_updated
+        // snapshots emitted during onRecovered. Starting the pipe after recovery
+        // drops those frames and leaves skill.list / subagents empty until an
+        // unrelated later event.
+        val pipe = scope.launch { generation.client.events.collect { _events.emit(it) } }
+
         // Reattach runtimes / re-register tools / sync BEFORE reporting Ready,
         // so external callers never observe a half-recovered generation. The
         // recovery flow's own calls are admitted via the Recovering state.
@@ -202,14 +209,15 @@ class ReconnectingAppServerClient(
         try {
             listener.onRecovered(generation.client)
         } catch (e: kotlinx.coroutines.CancellationException) {
+            pipe.cancel()
             throw e
         } catch (e: Exception) {
+            pipe.cancel()
             current = null
             generation.close("recovery failed")
             return GenerationOutcome.NeverReady("recovery failed: ${e.message}")
         }
 
-        val pipe = scope.launch { generation.client.events.collect { _events.emit(it) } }
         _state.value = ReconnectingClientState.Ready
         Telemetry.event("AppServerReconnect", "generation.ready", "attempt" to attempt)
 

@@ -3,7 +3,6 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
@@ -71,17 +70,10 @@ class ControllerSubagentRegistrySource : SubagentRegistrySource {
 
     private fun decodeEntry(raw: JsonObject, parents: ParentIds): SubagentEntry? {
         val toolCallId = raw.firstString("toolCallId", "tool_call_id") ?: return null
-        val decoded = decodeViaSerializer(raw) ?: manualEntry(raw, toolCallId, parents)
-        return decoded.copy(
-            parentConversationId = decoded.parentConversationId ?: parents.conversationId,
-            parentAgentId = decoded.parentAgentId ?: parents.agentId,
-        )
+        // Manual decode only — kotlinx serializer throws on partial/nonstandard
+        // keys and that exception cost shows up on every update_subagent_state.
+        return manualEntry(raw, toolCallId, parents)
     }
-
-    private fun decodeViaSerializer(raw: JsonObject): SubagentEntry? =
-        runCatching {
-            AppServerProtocol.json.decodeFromJsonElement(SubagentEntry.serializer(), raw)
-        }.getOrNull()
 
     private fun manualEntry(raw: JsonObject, toolCallId: String, parents: ParentIds): SubagentEntry =
         SubagentEntry(

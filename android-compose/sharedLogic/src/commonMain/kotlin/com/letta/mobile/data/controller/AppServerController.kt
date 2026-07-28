@@ -139,6 +139,15 @@ interface AppServerController {
     }
 
     /**
+     * Evict every cached runtime so the next turn for any agent reseeds via
+     * `runtime_start`. Used after process-global mutations (e.g. skill
+     * enable/disable) that change the toolset captured at runtime start.
+     */
+    suspend fun stopAllRuntimes() {
+        // Default no-op: controllers without a runtime cache have nothing to evict.
+    }
+
+    /**
      * Signals that the underlying transport generation failed (lgns8.5).
      * Implementations must drop every cached canonical runtime scope — scopes
      * are generation-local and must be re-fetched via runtime_start on the next

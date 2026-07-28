@@ -1,7 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
@@ -16,7 +15,8 @@ import kotlinx.serialization.json.put
  *   the retired shim agent-scoped install REST.
  * - Listings are projections from [skillsListing] (device-status /
  *   `skills_updated`); there is no upstream `skill_list` command.
- * - Optional `agent_id` only drives runtime invalidation after mutation.
+ * - Skill enable/disable is process-global; after mutation every cached runtime
+ *   is evicted so agents reseed their toolset on the next turn.
  */
 object SkillAdminHandlers {
     fun register(
@@ -60,7 +60,7 @@ object SkillAdminHandlers {
                     null
                 }
             }
-            maybeInvalidateAfterSkillMutation(controller, params)
+            invalidateRuntimesAfterSkillMutation(controller)
             result
         }
         router.register("skill.uninstall") { params ->
@@ -74,7 +74,7 @@ object SkillAdminHandlers {
                 )
                 if (response.success) buildJsonObject { put("disabled", true) } else null
             }
-            maybeInvalidateAfterSkillMutation(controller, params)
+            invalidateRuntimesAfterSkillMutation(controller)
             result
         }
     }
@@ -101,13 +101,13 @@ object SkillAdminHandlers {
         return param(params, AdminParamKey("name"))?.takeIf { it.isNotBlank() }
     }
 
-    private suspend fun maybeInvalidateAfterSkillMutation(
+    private suspend fun invalidateRuntimesAfterSkillMutation(
         controller: AppServerController?,
-        params: kotlinx.serialization.json.JsonObject?,
     ) {
         if (!RuntimeInvalidationPolicy.skillMutationRequiresRestart()) return
-        val agentId = param(params, AdminParamKey("agent_id")) ?: return
-        controller?.stopRuntime(AgentId(agentId))
+        // Filesystem skill availability is process-global; every cached runtime
+        // captured the prior toolset and must reseed.
+        controller?.stopAllRuntimes()
     }
 }
 

@@ -28,6 +28,7 @@ import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -433,6 +434,28 @@ class ConversationTurnFanoutTest {
         assertEquals(5, parked.size, "parking must be initiator-scoped, once per delta")
         // The tracked terminal is the stop_reason delta.
         assertTrue(parked.last().contains("stop_reason"))
+    }
+
+    @Test
+    fun busyRejectionReachesInitiatorOnlyWithoutParkingOrTerminalFlag() = runTest {
+        val registry = ConnectionRegistry()
+        val parked = mutableListOf<String>()
+        val sinkInit = CapturingSink()
+        val sinkObs = CapturingSink()
+        val initiator = viewer("conn-init", sinkInit)
+        val observer = viewer("conn-obs", sinkObs)
+        registry.register(conversationId, initiator)
+        registry.register(conversationId, observer)
+
+        val fanout = fanoutFor(registry, initiator, parked)
+        fanout.emitInitiatorOnlyBusyRejection("Iroh App Server turn engine is already busy.")
+
+        assertEquals(1, sinkInit.frames().size)
+        assertEquals(0, sinkObs.frames().size)
+        assertEquals(0, parked.size)
+        assertFalse(fanout.anyTerminalWritten)
+        val delta = json.parseToJsonElement(sinkInit.frames().single()).jsonObject["delta"]!!.jsonObject
+        assertEquals("error_message", delta["message_type"]!!.jsonPrimitive.content)
     }
 
     @Test
