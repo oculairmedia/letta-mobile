@@ -953,27 +953,12 @@ class AppServerTurnEngine(
                         // letta-mobile-kyqdt: telemetry-only. Record the terminal
                         // status carried by this lifecycle draft. This frame was
                         // accepted by matches(scope), so the scope decision passed.
-                        (draft.payload as? RuntimeEventPayload.RunLifecycleChanged)?.let {
-                            noteOwnerTerminal(
-                                it.status,
-                                source = "terminal_lifecycle",
-                                seq = frameSeq,
-                                scopeMatched = true,
-                                leaseToken = leaseToken,
-                            )
-                            if (it.status == RuntimeRunStatus.Failed || it.status == RuntimeRunStatus.Cancelled) {
-                                logSanitizedTerminalFailure(
-                                    status = it.status,
-                                    reason = it.reason,
-                                    runId = draft.runId?.value,
-                                    agentId = command.agentId.value,
-                                    conversationId = command.conversationId.value,
-                                    modelHandle = command.metadata["model"]
-                                        ?: command.metadata["handle"]
-                                        ?: command.metadata["model_handle"],
-                                )
-                            }
-                        }
+                        recordTerminalLifecycle(
+                            draft = draft,
+                            command = command,
+                            frameSeq = frameSeq,
+                            leaseToken = leaseToken,
+                        )
                         emitDraft(draft)
                         throw TurnCompleted
                     }
@@ -1583,6 +1568,40 @@ class AppServerTurnEngine(
             lastTerminalAtMs = currentTimeMs(),
             lastTerminalSeq = seq ?: current.lastTerminalSeq,
         )
+    }
+
+    /**
+     * letta-mobile-kyqdt / o0atv: telemetry for a matched terminal lifecycle draft.
+     * Kept out of [collectTurnWithIdleWatchdog] to avoid Complex Method regressions.
+     */
+    private fun recordTerminalLifecycle(
+        draft: RuntimeEventDraft,
+        command: TurnCommand,
+        frameSeq: Long?,
+        leaseToken: Long,
+    ) {
+        val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
+        noteOwnerTerminal(
+            lifecycle.status,
+            source = "terminal_lifecycle",
+            seq = frameSeq,
+            scopeMatched = true,
+            leaseToken = leaseToken,
+        )
+        if (lifecycle.status == RuntimeRunStatus.Failed ||
+            lifecycle.status == RuntimeRunStatus.Cancelled
+        ) {
+            logSanitizedTerminalFailure(
+                status = lifecycle.status,
+                reason = lifecycle.reason,
+                runId = draft.runId?.value,
+                agentId = command.agentId.value,
+                conversationId = command.conversationId.value,
+                modelHandle = command.metadata["model"]
+                    ?: command.metadata["handle"]
+                    ?: command.metadata["model_handle"],
+            )
+        }
     }
 
     /**

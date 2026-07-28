@@ -114,52 +114,63 @@ object AgentAdminHandlers {
 
 }
 
-private fun JsonObject?.withDefaultContextWindow(): JsonObject =
-    buildJsonObject {
-        this@withDefaultContextWindow?.forEach { (key, value) -> put(key, value) }
-        val modelHandle = firstModelHandle(this@withDefaultContextWindow)
-        val known = ModelCatalogNormalizer.knownLimitsForHandle(modelHandle)
-        val defaultLimit = known?.contextWindow ?: DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
-        val modelSettings = this@withDefaultContextWindow?.get("model_settings") as? JsonObject
-            ?: this@withDefaultContextWindow?.get("modelSettings") as? JsonObject
-        val llmConfig = this@withDefaultContextWindow?.get("llm_config") as? JsonObject
-            ?: this@withDefaultContextWindow?.get("llmConfig") as? JsonObject
-        val hasExplicitLimit =
-            this@withDefaultContextWindow?.get("context_window_limit") != null ||
-                this@withDefaultContextWindow?.get("contextWindowLimit") != null ||
-                modelSettings?.get("context_window_limit") != null ||
-                modelSettings?.get("contextWindowLimit") != null ||
-                llmConfig?.get("context_window") != null ||
-                llmConfig?.get("context_window_limit") != null ||
-                llmConfig?.get("contextWindow") != null ||
-                llmConfig?.get("contextWindowLimit") != null
-        if (!hasExplicitLimit) {
-            put("context_window_limit", defaultLimit)
-        }
-        // Persist max_output when known and absent so tool/context turns stay bounded.
-        val hasExplicitOutput =
-            modelSettings?.get("max_output_tokens") != null ||
-                modelSettings?.get("maxOutputTokens") != null ||
-                this@withDefaultContextWindow?.get("max_output_tokens") != null
-        if (!hasExplicitOutput && known != null) {
-            val existingSettings = modelSettings ?: buildJsonObject { }
+private fun JsonObject?.withDefaultContextWindow(): JsonObject {
+    val body = this
+    val known = ModelCatalogNormalizer.knownLimitsForHandle(firstModelHandle(body))
+    return buildJsonObject {
+        body?.forEach { (key, value) -> put(key, value) }
+        if (!body.hasExplicitContextWindowLimit()) {
             put(
-                "model_settings",
-                buildJsonObject {
-                    existingSettings.forEach { (k, v) -> put(k, v) }
-                    put("max_output_tokens", known.maxOutputTokens)
-                },
+                "context_window_limit",
+                known?.contextWindow ?: DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT,
             )
         }
+        // Persist max_output when known and absent so tool/context turns stay bounded.
+        known?.let { limits ->
+            body.withKnownMaxOutputTokens(limits.maxOutputTokens)?.let { put("model_settings", it) }
+        }
     }
+}
+
+private fun JsonObject?.hasExplicitContextWindowLimit(): Boolean {
+    if (this == null) return false
+    if (containsKey("context_window_limit") || containsKey("contextWindowLimit")) return true
+    val modelSettings = nestedObject("model_settings", "modelSettings")
+    if (modelSettings?.containsKey("context_window_limit") == true ||
+        modelSettings?.containsKey("contextWindowLimit") == true
+    ) {
+        return true
+    }
+    val llmConfig = nestedObject("llm_config", "llmConfig") ?: return false
+    return llmConfig.containsKey("context_window") ||
+        llmConfig.containsKey("context_window_limit") ||
+        llmConfig.containsKey("contextWindow") ||
+        llmConfig.containsKey("contextWindowLimit")
+}
+
+/** Returns updated `model_settings` when max_output is missing; null if already set. */
+private fun JsonObject?.withKnownMaxOutputTokens(maxOutputTokens: Int): JsonObject? {
+    val modelSettings = this?.nestedObject("model_settings", "modelSettings")
+    val hasExplicitOutput =
+        modelSettings?.containsKey("max_output_tokens") == true ||
+            modelSettings?.containsKey("maxOutputTokens") == true ||
+            this?.containsKey("max_output_tokens") == true
+    if (hasExplicitOutput) return null
+    return buildJsonObject {
+        modelSettings?.forEach { (k, v) -> put(k, v) }
+        put("max_output_tokens", maxOutputTokens)
+    }
+}
+
+private fun JsonObject.nestedObject(vararg keys: String): JsonObject? =
+    keys.firstNotNullOfOrNull { key -> this[key] as? JsonObject }
 
 private fun firstModelHandle(body: JsonObject?): String? {
     if (body == null) return null
     val direct = (body["model"] as? JsonPrimitive)?.contentOrNull
         ?: (body["handle"] as? JsonPrimitive)?.contentOrNull
     if (!direct.isNullOrBlank()) return direct
-    val settings = body["model_settings"] as? JsonObject
-        ?: body["modelSettings"] as? JsonObject
+    val settings = body.nestedObject("model_settings", "modelSettings")
     return (settings?.get("handle") as? JsonPrimitive)?.contentOrNull
         ?: (settings?.get("model") as? JsonPrimitive)?.contentOrNull
 }
