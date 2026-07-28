@@ -2,8 +2,10 @@ package com.letta.mobile.data.controller.fanout
 
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerLoopStatus
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.runtime.ConversationId
 import kotlin.test.Test
@@ -50,7 +52,7 @@ class RuntimeEventFanoutTest {
         val streamDelta = buildStreamDelta(agentId.value, conversationId.value, "run-1")
 
         // Test both flows - they share the same underlying flow
-        val results = mutableListOf<AppServerInboundFrame>()
+        val results = mutableListOf<AppServerReceivedFrame>()
         
         val job1 = launch {
             events1.test {
@@ -67,14 +69,14 @@ class RuntimeEventFanoutTest {
         // Give subscribers time to start collecting
         delay(50.milliseconds)
         
-        fanout.route(streamDelta)
+        fanout.route(received(streamDelta))
         
         job1.join()
         job2.join()
 
         assertEquals(2, results.size)
-        assertEquals(streamDelta, results[0])
-        assertEquals(streamDelta, results[1])
+        assertEquals(streamDelta, results[0].frame)
+        assertEquals(streamDelta, results[1].frame)
     }
 
     @Test
@@ -96,8 +98,8 @@ class RuntimeEventFanoutTest {
         // Route event to runtime B
         val eventForB = buildStreamDelta("agent-B", "conv-B", "run-2")
 
-        val receivedA = mutableListOf<AppServerInboundFrame>()
-        val receivedB = mutableListOf<AppServerInboundFrame>()
+        val receivedA = mutableListOf<AppServerReceivedFrame>()
+        val receivedB = mutableListOf<AppServerReceivedFrame>()
 
         val jobA = launch {
             eventsA.test {
@@ -117,20 +119,20 @@ class RuntimeEventFanoutTest {
         delay(50.milliseconds)
 
         // Send event to runtime A
-        fanout.route(eventForA)
+        fanout.route(received(eventForA))
         delay(50.milliseconds)
 
         // Send event to runtime B
-        fanout.route(eventForB)
+        fanout.route(received(eventForB))
         delay(50.milliseconds)
 
         // Only subscriber A should have received eventForA
         assertEquals(1, receivedA.size)
-        assertEquals(eventForA, receivedA[0])
+        assertEquals(eventForA, receivedA[0].frame)
 
         // Only subscriber B should have received eventForB
         assertEquals(1, receivedB.size)
-        assertEquals(eventForB, receivedB[0])
+        assertEquals(eventForB, receivedB[0].frame)
 
         jobA.cancel()
         jobB.cancel()
@@ -204,7 +206,7 @@ class RuntimeEventFanoutTest {
         )
 
         events.test {
-            fanout.route(frameWithoutRuntime)
+            fanout.route(received(frameWithoutRuntime))
 
             // No events should be received
             expectNoEvents()
@@ -222,7 +224,7 @@ class RuntimeEventFanoutTest {
         val eventForB = buildStreamDelta("agent-B", "conv-B", "run-1")
 
         eventsA.test {
-            fanout.route(eventForB)
+            fanout.route(received(eventForB))
 
             // Subscriber A should not receive event for runtime B
             expectNoEvents()
@@ -351,8 +353,8 @@ class RuntimeEventFanoutTest {
                 idempotencyKey = "evt-1",
                 delta = JsonPrimitive("delta"),
             )
-            fanout.route(streamDelta)
-            assertEquals(streamDelta, awaitItem())
+            fanout.route(received(streamDelta))
+            assertEquals(streamDelta, awaitItem().frame)
 
             // UpdateLoopStatus
             val updateLoopStatus = AppServerInboundFrame.UpdateLoopStatus(
@@ -362,8 +364,8 @@ class RuntimeEventFanoutTest {
                 idempotencyKey = "evt-2",
                 loopStatus = AppServerLoopStatus(status = "active"),
             )
-            fanout.route(updateLoopStatus)
-            assertEquals(updateLoopStatus, awaitItem())
+            fanout.route(received(updateLoopStatus))
+            assertEquals(updateLoopStatus, awaitItem().frame)
 
             // UpdateDeviceStatus
             val updateDeviceStatus = AppServerInboundFrame.UpdateDeviceStatus(
@@ -373,8 +375,8 @@ class RuntimeEventFanoutTest {
                 idempotencyKey = "evt-3",
                 deviceStatus = buildJsonObject {},
             )
-            fanout.route(updateDeviceStatus)
-            assertEquals(updateDeviceStatus, awaitItem())
+            fanout.route(received(updateDeviceStatus))
+            assertEquals(updateDeviceStatus, awaitItem().frame)
 
             // UpdateQueue
             val updateQueue = AppServerInboundFrame.UpdateQueue(
@@ -384,8 +386,8 @@ class RuntimeEventFanoutTest {
                 idempotencyKey = "evt-4",
                 queue = emptyList(),
             )
-            fanout.route(updateQueue)
-            assertEquals(updateQueue, awaitItem())
+            fanout.route(received(updateQueue))
+            assertEquals(updateQueue, awaitItem().frame)
 
             // UpdateSubagentState
             val updateSubagentState = AppServerInboundFrame.UpdateSubagentState(
@@ -395,8 +397,8 @@ class RuntimeEventFanoutTest {
                 idempotencyKey = "evt-5",
                 subagents = emptyList(),
             )
-            fanout.route(updateSubagentState)
-            assertEquals(updateSubagentState, awaitItem())
+            fanout.route(received(updateSubagentState))
+            assertEquals(updateSubagentState, awaitItem().frame)
 
             expectNoEvents()
         }
@@ -440,8 +442,8 @@ class RuntimeEventFanoutTest {
         // Keep the original runtime subscription alive so this asserts against
         // the live shared routing path (not a fresh empty map after unsubscribe).
         events1.test {
-            fanout.route(terminal)
-            assertEquals(terminal, awaitItem())
+            fanout.route(received(terminal))
+            assertEquals(terminal, awaitItem().frame)
 
             val (_, events2) = fanout.subscribe(agentId, conversationId, "sub-2")
             events2.test {
@@ -462,10 +464,10 @@ class RuntimeEventFanoutTest {
         val frame = buildStreamDelta(agentId.value, conversationId.value, "run-early")
 
         // Route before any collector attaches — must not be dropped.
-        fanout.route(frame)
+        fanout.route(received(frame))
 
         events.test {
-            assertEquals(frame, awaitItem())
+            assertEquals(frame, awaitItem().frame)
             cancelAndIgnoreRemainingEvents()
         }
     }
@@ -488,6 +490,13 @@ class RuntimeEventFanoutTest {
         assertEquals(0, fanout.turnLockCount(), "idle lock with no viewers must retire")
     }
 }
+
+private fun received(frame: AppServerInboundFrame): AppServerReceivedFrame =
+    AppServerReceivedFrame(
+        channel = AppServerChannel.Stream,
+        frame = frame,
+        raw = buildJsonObject {},
+    )
 
 /**
  * Helper to build a StreamDelta frame for testing.

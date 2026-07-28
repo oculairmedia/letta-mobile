@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -101,15 +102,24 @@ class DesktopAppServerControllerGatewayFactoryTest {
     @Test
     fun desktopTurnEngine_singleUnrestrictedRuntimeStartPerConversation() = runTest {
         val client = RecordingAppServerClient()
-        val engine = buildDesktopAppServerTurnEngine(client)
+        val eventRouter = AppServerRuntimeEventRouter()
+        val engine = buildDesktopAppServerTurnEngine(
+            client = client,
+            scope = this,
+            eventRouter = eventRouter,
+        )
 
-        runConversationTurnToCompletion(engine, client, "conv-1")
-        runConversationTurnToCompletion(engine, client, "conv-1")
+        try {
+            runConversationTurnToCompletion(engine, client, "conv-1")
+            runConversationTurnToCompletion(engine, client, "conv-1")
 
-        val start = client.runtimeStarts.single()
-        assertEquals(AppServerPermissionMode.Unrestricted, start.mode)
-        assertEquals("conv-1", start.conversationId)
-        assertEquals(2, client.agentRetrieveCount, "context-window preflight must run on each user turn")
+            val start = client.runtimeStarts.single()
+            assertEquals(AppServerPermissionMode.Unrestricted, start.mode)
+            assertEquals("conv-1", start.conversationId)
+            assertEquals(2, client.agentRetrieveCount, "context-window preflight must run on each user turn")
+        } finally {
+            eventRouter.detach()
+        }
     }
 
     private suspend fun TestScope.runConversationTurnToCompletion(

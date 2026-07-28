@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
@@ -17,6 +18,8 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -58,6 +61,13 @@ class DefaultAppServerController(
     private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     private val clock: Clock = Clock.System,
 ) : AppServerController {
+    private val controllerScope = CoroutineScope(SupervisorJob())
+    private val eventRouter = AppServerRuntimeEventRouter()
+
+    init {
+        eventRouter.attach(controllerScope, client.events)
+    }
+
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
     override val state: StateFlow<AppServerControllerState> = _state.asStateFlow()
 
@@ -84,6 +94,12 @@ class DefaultAppServerController(
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
             turnContextPreflight = turnContextPreflight,
+            eventRouter = eventRouter,
+            runtimeScopeResolver = { command ->
+                runtimeMutex.withLock {
+                    runtimeCache[RuntimeKey(command.agentId.value, command.conversationId.value)]?.scope
+                }
+            },
         )
     }
 
@@ -169,6 +185,7 @@ class DefaultAppServerController(
     }
 
     override suspend fun onTransportDisconnected(reason: String?) {
+        eventRouter.detach()
         runtimeMutex.withLock {
             // Canonical runtime scopes are generation-local: every cached scope
             // was minted by the generation that just died and must be re-fetched
@@ -181,6 +198,7 @@ class DefaultAppServerController(
     }
 
     override fun markConnected() {
+        eventRouter.attach(controllerScope, client.events)
         _state.value = AppServerControllerState.Connected
     }
 

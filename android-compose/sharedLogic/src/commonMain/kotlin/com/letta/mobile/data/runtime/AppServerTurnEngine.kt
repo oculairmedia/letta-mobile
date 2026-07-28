@@ -5,6 +5,8 @@ import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecisi
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolResultContent
@@ -15,6 +17,7 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
@@ -100,6 +103,16 @@ class AppServerTurnEngine(
      * no controller tools, so every request still gets a benign error response.
      */
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    /**
+     * lgns8.22.3: when set, turn collection subscribes to the controller-owned
+     * inbound router instead of collecting [AppServerClient.events] directly.
+     */
+    private val eventRouter: AppServerRuntimeEventRouter? = null,
+    /**
+     * lgns8 / qhlo0: when the controller has already started a runtime, reuse its
+     * canonical scope instead of issuing a duplicate runtime_start from the engine.
+     */
+    private val runtimeScopeResolver: suspend (TurnCommand) -> AppServerRuntimeScope? = { null },
 ) : TurnEngine {
     /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
     private val activeLeaseRef = atomic<TurnLease?>(null)
@@ -720,9 +733,21 @@ class AppServerTurnEngine(
         }
 
         var turnEndReason: String? = null
+        var fanoutSubscriberId: String? = null
+        val inboundEvents: Flow<AppServerReceivedFrame> = when (val router = eventRouter) {
+            null -> client.events
+            else -> {
+                val (subId, flow) = router.subscribe(
+                    AgentId(scope.agentId),
+                    ConversationId(scope.conversationId),
+                )
+                fanoutSubscriberId = subId
+                flow
+            }
+        }
         try {
             collectorReady.complete(Unit)
-            client.events.collect { received ->
+            inboundEvents.collect { received ->
                 if (!received.matches(scope)) {
                     // letta-mobile-kyqdt: P1c KEY PROBE (TELEMETRY-ONLY). A frame
                     // was rejected by the scope filter. If it CARRIED a terminal
@@ -1003,6 +1028,9 @@ class AppServerTurnEngine(
             // user-input gate so none leaks into a later turn and keeps a fresh
             // watchdog wrongly paused.
             userInputApprovalIdsRef.update { emptyMap() }
+            fanoutSubscriberId?.let { subId ->
+                eventRouter?.unsubscribe(subId)
+            }
         }
     }
 
@@ -1127,6 +1155,10 @@ class AppServerTurnEngine(
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     private suspend fun ensureRuntime(command: TurnCommand, turnPermissionMode: AppServerPermissionMode): AppServerRuntimeScope {
+        runtimeScopeResolver(command)?.let { resolved ->
+            runtime = resolved
+            return resolved
+        }
         runtime?.let { cached ->
             if (cached.matches(command)) return cached
         }

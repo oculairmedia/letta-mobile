@@ -1,7 +1,7 @@
 package com.letta.mobile.data.controller.fanout
 
 import com.letta.mobile.data.model.AgentId
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.channels.BufferOverflow
@@ -34,11 +34,11 @@ import kotlinx.coroutines.sync.withLock
  * val fanout = RuntimeEventFanout()
  *
  * // Subscribe to a runtime
- * val events: Flow<AppServerInboundFrame> = fanout.subscribe(agentId, conversationId)
+ * val events: Flow<AppServerReceivedFrame> = fanout.subscribe(agentId, conversationId)
  *
  * // Feed events from the controller into the fanout
- * controllerClient.events.collect { receivedFrame ->
- *     fanout.route(receivedFrame.frame)
+ * controllerClient.events.collect { received ->
+ *     fanout.route(received)
  * }
  *
  * // Unsubscribe when done
@@ -71,22 +71,17 @@ class RuntimeEventFanout {
     /**
      * Subscribes to events for a specific runtime.
      *
-     * Returns a Flow of all events (stream_delta, update_loop_status, etc.) for
-     * the given runtime. Multiple subscribers can subscribe to the same runtime;
-     * each receives events on its own buffered channel.
-     *
-     * @param agentId The agent ID for the runtime
-     * @param conversationId The conversation ID for the runtime
-     * @param subscriberId Optional unique ID for this subscriber (auto-generated if not provided)
-     * @return A pair of (subscriberId, event flow) for this subscription
+     * Returns a Flow of all received frames (stream_delta, update_loop_status, etc.)
+     * for the given runtime. Multiple subscribers can subscribe to the same runtime;
+     * each receives events on its own buffered channel with full channel/raw fidelity.
      */
     suspend fun subscribe(
         agentId: AgentId,
         conversationId: ConversationId,
         subscriberId: String = generateSubscriberId(),
-    ): Pair<String, Flow<AppServerInboundFrame>> = stateMutex.withLock {
+    ): Pair<String, Flow<AppServerReceivedFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val channel = Channel<AppServerInboundFrame>(
+        val channel = Channel<AppServerReceivedFrame>(
             capacity = SUBSCRIBER_BUFFER_CAPACITY,
             onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
@@ -101,9 +96,6 @@ class RuntimeEventFanout {
      * **not** removed here — an active turn/lease must survive viewer churn
      * (lgns8.22.3). Idle locks are retired from [releaseTurnLock] once no waiters
      * remain and no viewers are subscribed.
-     *
-     * @param subscriberId The subscriber ID returned by subscribe()
-     * @return true if the subscriber was found and removed, false otherwise
      */
     suspend fun unsubscribe(subscriberId: String): Boolean = stateMutex.withLock {
         val slot = subscribers.remove(subscriberId) ?: return false
@@ -112,40 +104,22 @@ class RuntimeEventFanout {
     }
 
     /**
-     * Routes an event to the appropriate runtime's subscribers.
+     * Routes a received frame to subscribers for its runtime scope.
      *
-     * Only events with a runtime scope are routed (stream_delta, update_loop_status,
-     * update_device_status, update_queue, update_subagent_state). Other events are
-     * ignored.
-     *
-     * Events are routed to ALL subscribers for that runtime. If no subscribers exist
-     * for a runtime, the event is dropped (not buffered).
-     *
-     * @param frame The inbound frame to route
+     * Only events with a runtime scope are routed. If no subscribers exist for
+     * a runtime, the event is dropped (not buffered).
      */
-    suspend fun route(frame: AppServerInboundFrame) {
-        val runtime = frame.runtime ?: return // Only route events with a runtime scope
-
+    suspend fun route(received: AppServerReceivedFrame) {
+        val runtime = received.frame.runtime ?: return
         val key = RuntimeKey(runtime.agentId, runtime.conversationId)
         val channels = stateMutex.withLock {
             subscribers.values.filter { it.key == key }.map { it.channel }
         }
         for (channel in channels) {
-            channel.trySend(frame)
+            channel.trySend(received)
         }
     }
 
-    /**
-     * Acquires the turn lock for a specific runtime.
-     *
-     * This ensures only one turn executes at a time on a given runtime, while
-     * allowing parallel turns on different runtimes.
-     *
-     * The caller MUST call releaseTurnLock when the turn completes.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     */
     suspend fun acquireTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val entry = stateMutex.withLock {
@@ -161,15 +135,6 @@ class RuntimeEventFanout {
         }
     }
 
-    /**
-     * Releases the turn lock for a specific runtime.
-     *
-     * When the last waiter releases and no viewers remain for the runtime, the
-     * lock entry is removed so long-lived fanouts do not retain every RuntimeKey forever.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     */
     suspend fun releaseTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val entry = stateMutex.withLock { runtimeTurnLocks[key] } ?: return
@@ -177,17 +142,6 @@ class RuntimeEventFanout {
         retireTurnLockIfIdle(key, entry)
     }
 
-    /**
-     * Executes a turn with the per-runtime lock.
-     *
-     * This is a convenience wrapper that acquires the lock, executes the block,
-     * and releases the lock even if the block throws.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     * @param block The turn execution block
-     * @return The result of the block
-     */
     suspend fun <T> withTurnLock(
         agentId: AgentId,
         conversationId: ConversationId,
@@ -201,16 +155,10 @@ class RuntimeEventFanout {
         }
     }
 
-    /**
-     * Returns the number of active subscribers.
-     */
     suspend fun subscriberCount(): Int = stateMutex.withLock {
         subscribers.size
     }
 
-    /**
-     * Returns the number of distinct runtimes that currently have subscribers.
-     */
     suspend fun runtimeFlowCount(): Int = stateMutex.withLock {
         subscribers.values.map { it.key }.toSet().size
     }
@@ -220,13 +168,6 @@ class RuntimeEventFanout {
         runtimeTurnLocks.size
     }
 
-    /**
-     * Returns the number of subscribers for a specific runtime.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     * @return The count of subscribers for this runtime
-     */
     suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
         subscribers.values.count { it.key == key }
@@ -244,32 +185,21 @@ class RuntimeEventFanout {
 
     private data class SubscriberSlot(
         val key: RuntimeKey,
-        val channel: Channel<AppServerInboundFrame>,
+        val channel: Channel<AppServerReceivedFrame>,
     )
 
     private class TurnLockEntry(
         val mutex: Mutex = Mutex(),
-        /** Acquire attempts in flight or holding the mutex. */
         val waiters: kotlinx.atomicfu.AtomicInt = atomic(0),
     )
 
-    /**
-     * Internal key for runtime identification.
-     */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
         private const val SUBSCRIBER_BUFFER_CAPACITY = 64
-
-        // Atomic so concurrent subscribe() calls that auto-generate IDs cannot
-        // collide on the same counter value.
         private val nextSubscriberId = atomic(0)
 
-        /**
-         * Generates a unique subscriber ID.
-         */
-        private fun generateSubscriberId(): String {
-            return "subscriber-${nextSubscriberId.incrementAndGet()}"
-        }
+        private fun generateSubscriberId(): String =
+            "subscriber-${nextSubscriberId.incrementAndGet()}"
     }
 }

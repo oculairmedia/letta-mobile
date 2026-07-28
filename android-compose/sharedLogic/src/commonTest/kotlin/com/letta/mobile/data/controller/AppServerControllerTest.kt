@@ -225,6 +225,38 @@ class AppServerControllerTest {
     }
 
     @Test
+    fun runTurnAfterStartRuntimeReusesCachedScopeWithoutSecondRuntimeStart() = runTest {
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(client = client)
+
+        controller.startRuntime(
+            agentId = AgentId("agent-1"),
+            conversationId = ConversationId("conv-1"),
+        )
+        assertEquals(1, client.runtimeStartCommands.size)
+
+        val command = TurnCommand(
+            backendId = BackendId("backend-1"),
+            runtimeId = RuntimeId("runtime-1"),
+            agentId = AgentId("agent-1"),
+            conversationId = ConversationId("conv-1"),
+            input = TurnInput.UserMessage(
+                localMessageId = "local-1",
+                text = "hello",
+            ),
+        )
+
+        controller.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(1, client.runtimeStartCommands.size, "TurnEngine must reuse controller cache")
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            awaitComplete()
+        }
+    }
+
+    @Test
     fun runTurnStartsRuntimeAndCompletesOnStopReason() = runTest {
         val client = FakeAppServerClient()
         val controller = DefaultAppServerController(client = client)
