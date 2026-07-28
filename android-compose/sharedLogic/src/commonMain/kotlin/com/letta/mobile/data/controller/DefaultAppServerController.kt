@@ -132,6 +132,24 @@ class DefaultAppServerController(
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime = runtimeMutex.withLock {
+        startRuntimeLocked(
+            agentId = agentId,
+            conversationId = conversationId,
+            cwd = cwd,
+            mode = mode,
+            recoverApprovals = recoverApprovals,
+            forceDeviceStatus = forceDeviceStatus,
+        )
+    }
+
+    private suspend fun startRuntimeLocked(
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        mode: AppServerPermissionMode?,
+        recoverApprovals: Boolean,
+        forceDeviceStatus: Boolean,
+    ): CanonicalRuntime {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val effectiveMode = mode ?: AppServerPermissionMode.Standard
         evictCachedRuntimeIfModeMismatch(key, effectiveMode)?.let { return it }
@@ -145,7 +163,7 @@ class DefaultAppServerController(
             recoverApprovals = recoverApprovals,
             forceDeviceStatus = forceDeviceStatus,
         )
-        cacheStartedRuntime(key, agentId, conversationId, cwd, response)
+        return cacheStartedRuntime(key, agentId, conversationId, cwd, response)
     }
 
     /**
