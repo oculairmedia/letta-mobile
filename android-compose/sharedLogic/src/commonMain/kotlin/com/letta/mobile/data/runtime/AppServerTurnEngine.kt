@@ -127,12 +127,14 @@ class AppServerTurnEngine(
     /**
      * Invoked after [ensureRuntime] issues a fresh `runtime_start` so controllers
      * can refill their cache (needed for [DefaultAppServerController.submitApproval]
-     * after preflight-driven restart).
+     * after preflight-driven restart). [startedGeneration] is the connection
+     * generation observed before the RPC; hosts must ignore stale completions.
      */
     private val onRuntimeEnsured: suspend (
         TurnCommand,
         AppServerInboundFrame.RuntimeStartResponse,
-    ) -> Unit = { _, _ -> },
+        Long,
+    ) -> Unit = { _, _, _ -> },
 ) : TurnEngine {
     /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
     private val activeLeaseRef = atomic<TurnLease?>(null)
@@ -769,6 +771,15 @@ class AppServerTurnEngine(
             collectorReady.complete(Unit)
             inboundEvents.collect { received ->
                 if (isConnectionGenerationSuperseded(leaseToken)) {
+                    // Settle before TurnCompleted — clean-completion markers skip
+                    // the cancel/finally settlement path intentionally.
+                    settleDanglingToolCalls(
+                        command,
+                        emittedToolCallIds,
+                        returnedToolCallIds,
+                        emitDraft,
+                        "Connection generation superseded during turn",
+                    )
                     flushTail()
                     emitDraft(
                         command.failedDraft("Connection generation superseded during turn"),
@@ -1224,6 +1235,7 @@ class AppServerTurnEngine(
         runtime?.let { cached ->
             if (cached.matches(command)) return cached
         }
+        val generationAtStart = connectionGenerationProvider()
         val response = client.runtimeStart(
             AppServerCommand.RuntimeStart(
                 requestId = requestIdFactory(),
@@ -1240,8 +1252,14 @@ class AppServerTurnEngine(
             error(response.error ?: "App Server runtime_start failed.")
         }
         val returnedRuntime = response.runtime ?: error("App Server runtime_start returned no runtime.")
+        // Disconnect may have rolled the generation while this RPC was in flight —
+        // never keep or publish a dead-generation scope.
+        if (connectionGenerationProvider() != generationAtStart) {
+            runtime = null
+            error("Connection generation superseded during runtime_start")
+        }
         runtime = returnedRuntime
-        onRuntimeEnsured(command, response)
+        onRuntimeEnsured(command, response, generationAtStart)
         return returnedRuntime
     }
 

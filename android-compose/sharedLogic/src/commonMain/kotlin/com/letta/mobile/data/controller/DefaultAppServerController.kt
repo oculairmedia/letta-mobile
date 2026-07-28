@@ -115,18 +115,38 @@ class DefaultAppServerController(
             onRuntimeInvalidated = {
                 runtimeMutex.withLock { runtimeCache.clear() }
             },
-            onRuntimeEnsured = { command, response ->
-                runtimeMutex.withLock {
-                    val scope = response.runtime ?: return@withLock
-                    val key = RuntimeKey(command.agentId.value, command.conversationId.value)
-                    runtimeCache[key] = CanonicalRuntime(
-                        scope = scope,
-                        agent = response.agent,
-                        conversation = response.conversation,
-                        created = response.created,
-                    )
-                }
+            onRuntimeEnsured = { command, response, startedGeneration ->
+                refillEnsuredRuntime(command, response, startedGeneration)
             },
+        )
+    }
+
+    /**
+     * Refill the controller cache (and durable registry) after an engine-issued
+     * `runtime_start`. Ignores completions that raced a generation bump so a
+     * dead-generation scope cannot undo [onTransportDisconnected]'s clear.
+     */
+    private suspend fun refillEnsuredRuntime(
+        command: TurnCommand,
+        response: AppServerInboundFrame.RuntimeStartResponse,
+        startedGeneration: Long,
+    ) {
+        val canonical = runtimeMutex.withLock {
+            if (connectionGeneration.value != startedGeneration) return@withLock null
+            val scope = response.runtime ?: return@withLock null
+            val key = RuntimeKey(command.agentId.value, command.conversationId.value)
+            CanonicalRuntime(
+                scope = scope,
+                agent = response.agent,
+                conversation = response.conversation,
+                created = response.created,
+            ).also { runtimeCache[key] = it }
+        } ?: return
+        recordStartedRuntime(
+            agentId = command.agentId,
+            conversationId = command.conversationId,
+            cwd = null,
+            canonical = canonical,
         )
     }
 
