@@ -421,6 +421,72 @@ class RuntimeEventFanoutTest {
         assertEquals(2, fanout.subscriberCountForRuntime(agentA, convA))
         assertEquals(1, fanout.subscriberCountForRuntime(agentB, convB))
     }
+
+    @Test
+    fun lateSubscriberDoesNotReplayPriorTerminal() = runTest {
+        val fanout = RuntimeEventFanout()
+        val agentId = AgentId("agent-1")
+        val conversationId = ConversationId("conv-1")
+
+        val (_, events1) = fanout.subscribe(agentId, conversationId, "sub-1")
+        val terminal = AppServerInboundFrame.UpdateLoopStatus(
+            runtime = AppServerRuntimeScope(agentId.value, conversationId.value),
+            eventSeq = 9,
+            emittedAt = "2026-06-27T00:00:00Z",
+            idempotencyKey = "terminal-1",
+            loopStatus = AppServerLoopStatus(status = "idle"),
+        )
+
+        // Keep the original runtime subscription alive so this asserts against
+        // the live shared routing path (not a fresh empty map after unsubscribe).
+        events1.test {
+            fanout.route(terminal)
+            assertEquals(terminal, awaitItem())
+
+            val (_, events2) = fanout.subscribe(agentId, conversationId, "sub-2")
+            events2.test {
+                expectNoEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
+            expectNoEvents()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun framesRoutedAfterSubscribeAreBufferedBeforeCollect() = runTest {
+        val fanout = RuntimeEventFanout()
+        val agentId = AgentId("agent-1")
+        val conversationId = ConversationId("conv-1")
+        val (_, events) = fanout.subscribe(agentId, conversationId, "sub-1")
+        val frame = buildStreamDelta(agentId.value, conversationId.value, "run-early")
+
+        // Route before any collector attaches — must not be dropped.
+        fanout.route(frame)
+
+        events.test {
+            assertEquals(frame, awaitItem())
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun lastViewerUnsubscribeKeepsTurnLockUntilReleased() = runTest {
+        val fanout = RuntimeEventFanout()
+        val agentId = AgentId("agent-1")
+        val conversationId = ConversationId("conv-1")
+
+        val (subId, _) = fanout.subscribe(agentId, conversationId, "viewer-1")
+        fanout.acquireTurnLock(agentId, conversationId)
+        assertEquals(1, fanout.turnLockCount())
+
+        fanout.unsubscribe(subId)
+        assertEquals(0, fanout.runtimeFlowCount())
+        assertEquals(1, fanout.turnLockCount(), "turn lock must survive last viewer unsubscribe")
+
+        fanout.releaseTurnLock(agentId, conversationId)
+        assertEquals(0, fanout.turnLockCount(), "idle lock with no viewers must retire")
+    }
 }
 
 /**

@@ -4,9 +4,10 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -49,20 +50,18 @@ import kotlinx.coroutines.sync.withLock
  */
 class RuntimeEventFanout {
     /**
-     * Map of runtime key -> shared flow for that runtime's events.
-     * Each runtime gets its own flow, and multiple subscribers can collect from it.
+     * Per-subscriber buffered channels. Buffering starts at [subscribe], not at
+     * collect, so frames cannot be lost in the subscribe→collect handoff window.
+     * There is no shared replay cache (lgns8.22.3): a new subscriber never sees
+     * a prior turn's terminal.
      */
-    private val runtimeFlows = mutableMapOf<RuntimeKey, MutableSharedFlow<AppServerInboundFrame>>()
-
-    /**
-     * Map of subscriber ID -> runtime key, for tracking active subscriptions.
-     */
-    private val subscribers = mutableMapOf<String, RuntimeKey>()
+    private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
     /**
      * Per-runtime turn locks. Ensures only one turn executes at a time per runtime.
+     * Entries are retained while acquired/queued or while viewers remain, then retired.
      */
-    private val runtimeTurnLocks = mutableMapOf<RuntimeKey, Mutex>()
+    private val runtimeTurnLocks = mutableMapOf<RuntimeKey, TurnLockEntry>()
 
     /**
      * Master lock for protecting internal state.
@@ -74,11 +73,7 @@ class RuntimeEventFanout {
      *
      * Returns a Flow of all events (stream_delta, update_loop_status, etc.) for
      * the given runtime. Multiple subscribers can subscribe to the same runtime;
-     * each will receive all events.
-     *
-     * The flow is hot with a replay of 1: a subscriber that joins after the last
-     * event was emitted immediately receives that most-recent event, so late
-     * subscribers can recover current state rather than waiting for the next one.
+     * each receives events on its own buffered channel.
      *
      * @param agentId The agent ID for the runtime
      * @param conversationId The conversation ID for the runtime
@@ -91,41 +86,28 @@ class RuntimeEventFanout {
         subscriberId: String = generateSubscriberId(),
     ): Pair<String, Flow<AppServerInboundFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
-
-        // Get or create the shared flow for this runtime
-        val flow = runtimeFlows.getOrPut(key) {
-            MutableSharedFlow(
-                replay = 1, // Replay the last event so late subscribers can recover it
-                extraBufferCapacity = 64, // Buffer up to 64 events if no subscriber is ready
-            )
-        }
-
-        // Register the subscriber
-        subscribers[subscriberId] = key
-
-        subscriberId to flow.asSharedFlow()
+        val channel = Channel<AppServerInboundFrame>(
+            capacity = SUBSCRIBER_BUFFER_CAPACITY,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST,
+        )
+        subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
+        subscriberId to channel.receiveAsFlow()
     }
 
     /**
      * Unsubscribes a subscriber by ID.
      *
-     * If this is the last subscriber for a runtime, the runtime's flow is cleaned up.
+     * Closing the subscriber channel drops its buffer. Per-runtime turn locks are
+     * **not** removed here — an active turn/lease must survive viewer churn
+     * (lgns8.22.3). Idle locks are retired from [releaseTurnLock] once no waiters
+     * remain and no viewers are subscribed.
      *
      * @param subscriberId The subscriber ID returned by subscribe()
      * @return true if the subscriber was found and removed, false otherwise
      */
     suspend fun unsubscribe(subscriberId: String): Boolean = stateMutex.withLock {
-        val key = subscribers.remove(subscriberId) ?: return false
-
-        // Check if there are any remaining subscribers for this runtime
-        val hasRemainingSubscribers = subscribers.values.any { it == key }
-
-        if (!hasRemainingSubscribers) {
-            // No more subscribers for this runtime, clean up the flow and lock
-            runtimeFlows.remove(key)
-            runtimeTurnLocks.remove(key)
-        }
-
+        val slot = subscribers.remove(subscriberId) ?: return false
+        slot.channel.close()
         true
     }
 
@@ -145,14 +127,12 @@ class RuntimeEventFanout {
         val runtime = frame.runtime ?: return // Only route events with a runtime scope
 
         val key = RuntimeKey(runtime.agentId, runtime.conversationId)
-
-        // Get the flow for this runtime (non-blocking lookup)
-        val flow = stateMutex.withLock {
-            runtimeFlows[key]
-        } ?: return // No subscribers for this runtime, drop the event
-
-        // Emit to all subscribers
-        flow.emit(frame)
+        val channels = stateMutex.withLock {
+            subscribers.values.filter { it.key == key }.map { it.channel }
+        }
+        for (channel in channels) {
+            channel.trySend(frame)
+        }
     }
 
     /**
@@ -168,28 +148,33 @@ class RuntimeEventFanout {
      */
     suspend fun acquireTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-
-        val mutex = stateMutex.withLock {
-            runtimeTurnLocks.getOrPut(key) { Mutex() }
+        val entry = stateMutex.withLock {
+            runtimeTurnLocks.getOrPut(key) { TurnLockEntry() }.also {
+                it.waiters.incrementAndGet()
+            }
         }
-
-        mutex.lock()
+        try {
+            entry.mutex.lock()
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            retireTurnLockIfIdle(key, entry)
+            throw cancelled
+        }
     }
 
     /**
      * Releases the turn lock for a specific runtime.
+     *
+     * When the last waiter releases and no viewers remain for the runtime, the
+     * lock entry is removed so long-lived fanouts do not retain every RuntimeKey forever.
      *
      * @param agentId The agent ID
      * @param conversationId The conversation ID
      */
     suspend fun releaseTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-
-        val mutex = stateMutex.withLock {
-            runtimeTurnLocks[key]
-        } ?: return // No lock exists, nothing to release
-
-        mutex.unlock()
+        val entry = stateMutex.withLock { runtimeTurnLocks[key] } ?: return
+        entry.mutex.unlock()
+        retireTurnLockIfIdle(key, entry)
     }
 
     /**
@@ -224,10 +209,15 @@ class RuntimeEventFanout {
     }
 
     /**
-     * Returns the number of active runtime flows.
+     * Returns the number of distinct runtimes that currently have subscribers.
      */
     suspend fun runtimeFlowCount(): Int = stateMutex.withLock {
-        runtimeFlows.size
+        subscribers.values.map { it.key }.toSet().size
+    }
+
+    /** Test/telemetry: number of retained per-runtime turn locks. */
+    suspend fun turnLockCount(): Int = stateMutex.withLock {
+        runtimeTurnLocks.size
     }
 
     /**
@@ -239,8 +229,29 @@ class RuntimeEventFanout {
      */
     suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        subscribers.values.count { it == key }
+        subscribers.values.count { it.key == key }
     }
+
+    private suspend fun retireTurnLockIfIdle(key: RuntimeKey, entry: TurnLockEntry) {
+        stateMutex.withLock {
+            if (entry.waiters.decrementAndGet() > 0) return
+            if (subscribers.values.any { it.key == key }) return
+            if (runtimeTurnLocks[key] === entry) {
+                runtimeTurnLocks.remove(key)
+            }
+        }
+    }
+
+    private data class SubscriberSlot(
+        val key: RuntimeKey,
+        val channel: Channel<AppServerInboundFrame>,
+    )
+
+    private class TurnLockEntry(
+        val mutex: Mutex = Mutex(),
+        /** Acquire attempts in flight or holding the mutex. */
+        val waiters: kotlinx.atomicfu.AtomicInt = atomic(0),
+    )
 
     /**
      * Internal key for runtime identification.
@@ -248,6 +259,8 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
+        private const val SUBSCRIBER_BUFFER_CAPACITY = 64
+
         // Atomic so concurrent subscribe() calls that auto-generate IDs cannot
         // collide on the same counter value.
         private val nextSubscriberId = atomic(0)
