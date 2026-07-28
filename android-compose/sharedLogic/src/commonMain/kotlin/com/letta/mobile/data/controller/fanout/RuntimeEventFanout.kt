@@ -5,8 +5,11 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
@@ -56,11 +59,9 @@ class RuntimeEventFanout {
      * no shared replay cache (lgns8.22.3): a new subscriber never sees a prior
      * turn's terminal.
      *
-     * Capacity is [Channel.UNLIMITED] so a stalled subscriber cannot head-of-line
-     * block the sole inbound collector from delivering to other runtimes
-     * (lgns8.22.3 review). Turn subscribers are expected to drain promptly;
-     * unbounded growth of an abandoned subscriber is a host lifecycle bug, not
-     * a reason to freeze routing app-wide.
+     * Capacity is bounded ([SUBSCRIBER_BUFFER_CAPACITY]) for memory safety.
+     * [route] delivers to subscribers concurrently so a full buffer on one
+     * runtime cannot head-of-line block delivery to others.
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
@@ -89,7 +90,7 @@ class RuntimeEventFanout {
     ): Pair<String, Flow<AppServerReceivedFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val channel = Channel<AppServerReceivedFrame>(
-            capacity = Channel.UNLIMITED,
+            capacity = SUBSCRIBER_BUFFER_CAPACITY,
         )
         subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
         subscriberId to channel.receiveAsFlow()
@@ -137,13 +138,30 @@ class RuntimeEventFanout {
                 }
             }
         }
-        for (channel in channels) {
-            try {
-                channel.send(received)
-            } catch (_: ClosedSendChannelException) {
-                // Concurrent unsubscribe closed this channel after the snapshot;
-                // do not let that cancel the router's sole collector job.
-            }
+        // Deliver concurrently so a full buffer on one subscriber cannot HOL-block
+        // unrelated runtimes (bounded channels + isolated sends).
+        coroutineScope {
+            channels.map { channel ->
+                async {
+                    try {
+                        channel.send(received)
+                    } catch (_: ClosedSendChannelException) {
+                        // Concurrent unsubscribe closed this channel after the snapshot.
+                    }
+                }
+            }.awaitAll()
+        }
+    }
+
+    /** Close every subscriber channel (used by [AppServerRuntimeEventRouter.detach]). */
+    fun closeAllSubscribersSync() {
+        if (!stateMutex.tryLock()) return
+        try {
+            val open = subscribers.values.toList()
+            subscribers.clear()
+            open.forEach { it.channel.close() }
+        } finally {
+            stateMutex.unlock()
         }
     }
 
@@ -223,6 +241,13 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
+        /**
+         * Per-subscriber buffer. Large enough for bursty stream deltas; when full,
+         * that subscriber's send suspends while other runtimes continue via
+         * concurrent [route] delivery.
+         */
+        const val SUBSCRIBER_BUFFER_CAPACITY = 256
+
         private val nextSubscriberId = atomic(0)
 
         private fun generateSubscriberId(): String =

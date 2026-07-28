@@ -72,14 +72,15 @@ class AppServerRuntimeEventRouterTest {
         )
 
         events.test {
-            inbound.emit(
-                AppServerReceivedFrame(
-                    channel = AppServerChannel.Stream,
-                    frame = frame,
-                    raw = buildJsonObject {},
-                ),
-            )
-            expectNoEvents()
+            awaitComplete()
         }
+        // Upstream emissions after detach must not reach a closed subscriber.
+        inbound.emit(
+            AppServerReceivedFrame(
+                channel = AppServerChannel.Stream,
+                frame = frame,
+                raw = buildJsonObject {},
+            ),
+        )
     }
 }

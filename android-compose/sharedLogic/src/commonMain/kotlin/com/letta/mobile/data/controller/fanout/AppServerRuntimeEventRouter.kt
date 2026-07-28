@@ -46,6 +46,9 @@ class AppServerRuntimeEventRouter(
 
     fun detach() {
         collectorJob.getAndSet(null)?.cancel()
+        // Closing subscriber channels unblocks turn collectors waiting on fanout
+        // (otherwise they sit until idle watchdog / forever under a user-input gate).
+        fanout.closeAllSubscribersSync()
     }
 
     fun isAttached(): Boolean = collectorJob.value?.isActive == true

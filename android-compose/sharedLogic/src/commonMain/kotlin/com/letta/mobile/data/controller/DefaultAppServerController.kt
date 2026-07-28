@@ -144,6 +144,10 @@ class DefaultAppServerController(
                 return cached
             }
             runtimeCache.remove(key)
+            // Drop the engine's cached scope too — otherwise a failed replacement
+            // start leaves ensureRuntime() reusing the prior mode's scope while
+            // permissionModeProvider already reports the new mode.
+            turnEngine.invalidateRuntime(notifyHost = false)
         }
         runtimePermissionModes[key] = effectiveMode
 
@@ -162,6 +166,9 @@ class DefaultAppServerController(
                 ),
             )
         } catch (e: Exception) {
+            // Mode-change already cleared the engine cache; keep it empty on failure
+            // so we never resume the prior Unrestricted scope under Standard.
+            turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
                 message = "Failed to start runtime: ${e.message}",
                 cause = e,
@@ -170,6 +177,7 @@ class DefaultAppServerController(
         }
 
         if (!response.success) {
+            turnEngine.invalidateRuntime(notifyHost = false)
             val errorMsg = response.error ?: "Unknown error"
             _state.value = AppServerControllerState.Error(
                 message = "Runtime start failed: $errorMsg",
@@ -178,7 +186,10 @@ class DefaultAppServerController(
         }
 
         val scope = response.runtime
-            ?: throw AppServerControllerException("Runtime start succeeded but returned no runtime scope")
+            ?: run {
+                turnEngine.invalidateRuntime(notifyHost = false)
+                throw AppServerControllerException("Runtime start succeeded but returned no runtime scope")
+            }
 
         // Store canonical runtime
         val canonical = CanonicalRuntime(
@@ -362,7 +373,7 @@ class DefaultAppServerController(
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     /** Tear down the inbound router collector and controller scope (tests / shutdown). */
-    fun close() {
+    override fun close() {
         eventRouter.detach()
         controllerScope.cancel()
     }
