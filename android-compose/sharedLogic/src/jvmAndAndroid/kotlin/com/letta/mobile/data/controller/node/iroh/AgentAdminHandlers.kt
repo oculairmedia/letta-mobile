@@ -155,7 +155,11 @@ private fun JsonObject?.withKnownMaxOutputTokens(maxOutputTokens: Int): JsonObje
     val hasExplicitOutput =
         modelSettings?.containsKey("max_output_tokens") == true ||
             modelSettings?.containsKey("maxOutputTokens") == true ||
+            modelSettings?.containsKey("max_tokens") == true ||
+            modelSettings?.containsKey("maxTokens") == true ||
             this?.containsKey("max_output_tokens") == true ||
+            this?.containsKey("max_tokens") == true ||
+            this?.containsKey("maxTokens") == true ||
             // Legacy create payloads may only cap output via llm_config.max_tokens.
             llmConfig?.containsKey("max_tokens") == true ||
             llmConfig?.containsKey("maxTokens") == true ||
