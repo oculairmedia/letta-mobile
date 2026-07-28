@@ -9,6 +9,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 
@@ -28,18 +29,26 @@ data class AppServerListModelEntry(
 
 /**
  * Explicit presentation → mobile model choice / [LlmModel] projection.
- * Context-window and reasoning fields stay unset (unavailable), never invented.
+ *
+ * When the presentation entry (or `updateArgs` / `flags`) carries context or
+ * output limits, those values are preserved. Missing limits may still be filled
+ * by [ModelCatalogNormalizer] for known models (Grok / MiniMax).
  */
 object AppServerListModelsAdapter {
     fun decodeEntries(entries: JsonArray): List<AppServerListModelEntry> =
+        decodeEntriesWithRaw(entries).map { it.first }
+
+    /**
+     * Decode presentation entries while retaining each source [JsonObject] for
+     * limit extraction (top-level / flags / updateArgs / already-adapted keys).
+     */
+    internal fun decodeEntriesWithRaw(entries: JsonArray): List<Pair<AppServerListModelEntry, JsonObject?>> =
         entries.mapNotNull { element ->
             val obj = element as? JsonObject ?: return@mapNotNull null
             val decoded = runCatching {
                 AppServerProtocol.json.decodeFromJsonElement(AppServerListModelEntry.serializer(), obj)
             }.getOrNull()
-            // Always merge presentation + already-adapted LlmModel-shaped keys so
-            // client + server adapter call sites stay idempotent.
-            AppServerListModelEntry(
+            val entry = AppServerListModelEntry(
                 id = decoded?.id?.takeIf { it.isNotBlank() }
                     ?: firstString(obj, "id").orEmpty(),
                 handle = decoded?.handle?.takeIf { it.isNotBlank() }
@@ -51,49 +60,62 @@ object AppServerListModelsAdapter {
                 updateArgs = decoded?.updateArgs
                     ?: (obj["updateArgs"] ?: obj["update_args"]) as? JsonObject,
             )
+            entry to obj
         }
 
-    fun toLlmModel(entry: AppServerListModelEntry): LlmModel {
+    fun toLlmModel(entry: AppServerListModelEntry, raw: JsonObject? = null): LlmModel {
         val handle = entry.handle?.takeIf { it.isNotBlank() }
             ?: selectionHandle(entry)
             ?: entry.id.takeIf { it.isNotBlank() }
         val display = entry.label?.takeIf { it.isNotBlank() }
         val name = display ?: handle ?: entry.id
-        return LlmModel(
+        val limits = extractLimits(entry, raw)
+        val model = LlmModel(
             id = entry.id.ifBlank { handle.orEmpty() },
             name = name,
             handle = handle,
             displayNameOverride = display,
             providerType = providerFromHandle(handle.orEmpty()),
-            // Presentation entries do not carry authoritative catalog metadata.
-            contextWindow = null,
+            contextWindow = limits.first,
+            maxOutputTokens = limits.second,
+            maxTokens = limits.second,
             enableReasoner = null,
         )
+        return ModelCatalogNormalizer.enrichLimits(model)
     }
 
     /** Prefer this over deserializing presentation JSON as [LlmModel] directly. */
     fun toLlmModels(entries: JsonArray): List<LlmModel> =
-        decodeEntries(entries).map(::toLlmModel)
+        ModelCatalogNormalizer.normalize(
+            decodeEntriesWithRaw(entries).map { (entry, raw) -> toLlmModel(entry, raw) },
+        )
 
     fun toLlmModelArray(entries: JsonArray): JsonArray = buildJsonArray {
-        decodeEntries(entries).forEach { entry ->
-            add(toLlmModelObject(entry))
+        toLlmModels(entries).forEach { model ->
+            add(toLlmModelObject(model))
         }
     }
 
-    fun toLlmModelObject(entry: AppServerListModelEntry): JsonObject {
-        val model = toLlmModel(entry)
-        return buildJsonObject {
-            put("id", model.id)
-            put("name", model.name)
+    fun toLlmModelObject(entry: AppServerListModelEntry): JsonObject =
+        toLlmModelObject(toLlmModel(entry))
+
+    fun toLlmModelObject(model: LlmModel): JsonObject = buildJsonObject {
+        put("id", model.id)
+        put("name", model.name)
+        model.handle?.let { put("handle", it) }
+        model.displayNameOverride?.let { put("display_name", it) }
+        put("provider_type", model.providerType)
+        model.contextWindow?.takeIf { it > 0 }?.let { put("context_window", it) }
+        model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
+        model.maxTokens?.takeIf { it > 0 }?.let { put("max_tokens", it) }
+        model.handle?.let { put("selection_handle", it) }
+        // Ensure model switches persist bounds Letta needs for tool/context turns.
+        val updateArgs = buildJsonObject {
             model.handle?.let { put("handle", it) }
-            model.displayNameOverride?.let { put("display_name", it) }
-            put("provider_type", model.providerType)
-            entry.description?.let { put("description", it) }
-            // Selection payload for model switches — exact updateArgs when present.
-            selectionHandle(entry)?.let { put("selection_handle", it) }
-            entry.updateArgs?.let { put("updateArgs", it) }
+            model.contextWindow?.takeIf { it > 0 }?.let { put("context_window_limit", it) }
+            model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
         }
+        put("updateArgs", updateArgs)
     }
 
     /** Handle / model id to send on agent/conversation model update. */
@@ -106,6 +128,34 @@ object AppServerListModelsAdapter {
             ?: entry.id.takeIf { it.isNotBlank() }
     }
 
+    private fun extractLimits(
+        entry: AppServerListModelEntry,
+        raw: JsonObject?,
+    ): Pair<Int?, Int?> {
+        val scopes = listOfNotNull(raw, entry.flags, entry.updateArgs)
+        val context = scopes.firstNotNullOfOrNull { scope ->
+            firstInt(
+                scope,
+                "context_window",
+                "contextWindow",
+                "context_window_limit",
+                "contextWindowLimit",
+                "max_input_tokens",
+                "maxInputTokens",
+            )
+        }
+        val output = scopes.firstNotNullOfOrNull { scope ->
+            firstInt(
+                scope,
+                "max_output_tokens",
+                "maxOutputTokens",
+                "max_tokens",
+                "maxTokens",
+            )
+        }
+        return context to output
+    }
+
     private fun providerFromHandle(handle: String): String {
         val slash = handle.indexOf('/')
         return if (slash > 0) handle.substring(0, slash) else ""
@@ -114,5 +164,12 @@ object AppServerListModelsAdapter {
     private fun firstString(raw: JsonObject, vararg keys: String): String? =
         keys.firstNotNullOfOrNull { key ->
             (raw[key] as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotBlank() }
+        }
+
+    private fun firstInt(raw: JsonObject, vararg keys: String): Int? =
+        keys.firstNotNullOfOrNull { key ->
+            val prim = raw[key] as? JsonPrimitive ?: return@firstNotNullOfOrNull null
+            prim.contentOrNull?.toIntOrNull()?.takeIf { it > 0 }
+                ?: prim.intOrNull?.takeIf { it > 0 }
         }
 }

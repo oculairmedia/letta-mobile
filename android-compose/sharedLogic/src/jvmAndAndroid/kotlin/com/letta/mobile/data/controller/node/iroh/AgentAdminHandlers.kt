@@ -2,11 +2,14 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.runtime.DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
@@ -114,6 +117,9 @@ object AgentAdminHandlers {
 private fun JsonObject?.withDefaultContextWindow(): JsonObject =
     buildJsonObject {
         this@withDefaultContextWindow?.forEach { (key, value) -> put(key, value) }
+        val modelHandle = firstModelHandle(this@withDefaultContextWindow)
+        val known = ModelCatalogNormalizer.knownLimitsForHandle(modelHandle)
+        val defaultLimit = known?.contextWindow ?: DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT
         val modelSettings = this@withDefaultContextWindow?.get("model_settings") as? JsonObject
             ?: this@withDefaultContextWindow?.get("modelSettings") as? JsonObject
         val llmConfig = this@withDefaultContextWindow?.get("llm_config") as? JsonObject
@@ -128,6 +134,32 @@ private fun JsonObject?.withDefaultContextWindow(): JsonObject =
                 llmConfig?.get("contextWindow") != null ||
                 llmConfig?.get("contextWindowLimit") != null
         if (!hasExplicitLimit) {
-            put("context_window_limit", DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT)
+            put("context_window_limit", defaultLimit)
+        }
+        // Persist max_output when known and absent so tool/context turns stay bounded.
+        val hasExplicitOutput =
+            modelSettings?.get("max_output_tokens") != null ||
+                modelSettings?.get("maxOutputTokens") != null ||
+                this@withDefaultContextWindow?.get("max_output_tokens") != null
+        if (!hasExplicitOutput && known != null) {
+            val existingSettings = modelSettings ?: buildJsonObject { }
+            put(
+                "model_settings",
+                buildJsonObject {
+                    existingSettings.forEach { (k, v) -> put(k, v) }
+                    put("max_output_tokens", known.maxOutputTokens)
+                },
+            )
         }
     }
+
+private fun firstModelHandle(body: JsonObject?): String? {
+    if (body == null) return null
+    val direct = (body["model"] as? JsonPrimitive)?.contentOrNull
+        ?: (body["handle"] as? JsonPrimitive)?.contentOrNull
+    if (!direct.isNullOrBlank()) return direct
+    val settings = body["model_settings"] as? JsonObject
+        ?: body["modelSettings"] as? JsonObject
+    return (settings?.get("handle") as? JsonPrimitive)?.contentOrNull
+        ?: (settings?.get("model") as? JsonPrimitive)?.contentOrNull
+}

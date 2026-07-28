@@ -1,5 +1,6 @@
 package com.letta.mobile.data.runtime
 
+import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
@@ -960,6 +961,18 @@ class AppServerTurnEngine(
                                 scopeMatched = true,
                                 leaseToken = leaseToken,
                             )
+                            if (it.status == RuntimeRunStatus.Failed || it.status == RuntimeRunStatus.Cancelled) {
+                                logSanitizedTerminalFailure(
+                                    status = it.status,
+                                    reason = it.reason,
+                                    runId = draft.runId?.value,
+                                    agentId = command.agentId.value,
+                                    conversationId = command.conversationId.value,
+                                    modelHandle = command.metadata["model"]
+                                        ?: command.metadata["handle"]
+                                        ?: command.metadata["model_handle"],
+                                )
+                            }
                         }
                         emitDraft(draft)
                         throw TurnCompleted
@@ -1570,6 +1583,47 @@ class AppServerTurnEngine(
             lastTerminalAtMs = currentTimeMs(),
             lastTerminalSeq = seq ?: current.lastTerminalSeq,
         )
+    }
+
+    /**
+     * letta-mobile-o0atv: sanitized terminal failure breadcrumb. Captures status,
+     * reason, run/agent/conversation ids, optional model handle, and a best-effort
+     * exception class token — without raw provider payloads.
+     */
+    private fun logSanitizedTerminalFailure(
+        status: RuntimeRunStatus,
+        reason: String?,
+        runId: String?,
+        agentId: String,
+        conversationId: String,
+        modelHandle: String? = null,
+    ) {
+        val owner = activeTurnOwnerRef.value
+        val handle = modelHandle?.takeIf { it.isNotBlank() }
+        val provider = handle?.let { ModelCatalogNormalizer.providerPrefix(it) }?.ifBlank { null }
+        Telemetry.event(
+            "AppServerTurnEngine",
+            "terminal.failure",
+            "status" to status.name,
+            "reason" to (reason?.take(240) ?: "<none>"),
+            "exceptionType" to (exceptionTypeToken(reason) ?: "<none>"),
+            "provider" to (provider ?: "<none>"),
+            "handle" to (handle ?: "<none>"),
+            "runId" to (runId ?: owner?.runId ?: "<none>"),
+            "agentId" to agentId,
+            "conversationId" to conversationId,
+            "processRole" to (owner?.processRole ?: "<none>"),
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    /** Best-effort exception class name from a terminal reason string. */
+    private fun exceptionTypeToken(reason: String?): String? {
+        if (reason.isNullOrBlank()) return null
+        // Common shapes: "FooException: …", "java.lang.FooException: …", "Error: FooException …"
+        val match = Regex("""([A-Za-z_][\w.$]*?(?:Exception|Error|Failure))\b""")
+            .find(reason)
+        return match?.groupValues?.getOrNull(1)?.take(120)
     }
 
     private fun currentTimeMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()

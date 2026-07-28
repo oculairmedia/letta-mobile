@@ -35,7 +35,7 @@ object ModelCatalog {
     /** Group [models] by provider, preserving a stable provider order. */
     fun group(models: List<LlmModel>): List<ModelGroup> {
         val ordered = LinkedHashMap<String, MutableList<ModelOption>>()
-        models.forEach { model ->
+        ModelCatalogNormalizer.normalize(models).forEach { model ->
             val provider = providerLabel(model)
             ordered.getOrPut(provider) { mutableListOf() }.add(toOption(model))
         }
