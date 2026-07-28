@@ -758,7 +758,17 @@ class AppServerTurnEngine(
             collectorReady.complete(Unit)
             inboundEvents.collect { received ->
                 if (!received.matches(scope)) {
-                    handleScopeRejectedFrame(received, scope, leaseToken)?.let { marker -> throw marker }
+                    handleScopeRejectedFrame(received, scope, leaseToken)?.let { status ->
+                        flushTail()
+                        val draft = when (status) {
+                            RuntimeRunStatus.Failed -> command.failedDraft(
+                                "Authoritative terminal from same-conversation mismatched agent scope",
+                            )
+                            else -> command.completedDraft(runId = null)
+                        }
+                        emitDraft(draft)
+                        throw TurnCompleted
+                    }
                     return@collect
                 }
                 if (!received.matchesActiveRun(leaseToken, supersededRunIds)) {
@@ -1026,14 +1036,15 @@ class AppServerTurnEngine(
 
     /**
      * Handles a frame rejected by [matches]. Records telemetry for terminal-
-     * bearing rejects and, for same-conversation terminals, returns the marker
-     * that should end the turn (lgns8.22.4: error_message → Failed).
+     * bearing rejects and, for same-conversation terminals, returns the
+     * lifecycle status the collect loop must emit before releasing the lease
+     * (lgns8.22.4: error_message → Failed).
      */
     private fun handleScopeRejectedFrame(
         received: AppServerReceivedFrame,
         scope: AppServerRuntimeScope,
         leaseToken: Long,
-    ): TurnCompletedMarker? {
+    ): RuntimeRunStatus? {
         if (!received.carriesTerminal()) return null
         noteOwnerScopeDecision(
             scopeMatched = false,
@@ -1064,7 +1075,7 @@ class AppServerTurnEngine(
             scopeMatched = false,
             leaseToken = leaseToken,
         )
-        return TurnCompleted
+        return status
     }
 
     /**

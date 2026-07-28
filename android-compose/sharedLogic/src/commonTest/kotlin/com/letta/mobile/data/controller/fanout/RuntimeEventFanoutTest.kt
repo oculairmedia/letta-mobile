@@ -139,6 +139,27 @@ class RuntimeEventFanoutTest {
     }
 
     @Test
+    fun routeContinuesAfterConcurrentStyleClosedSubscriber() = runTest {
+        // After unsubscribe closes a channel, routing to remaining subscribers must
+        // still succeed (ClosedSendChannelException must not escape route()).
+        val fanout = RuntimeEventFanout()
+        val agentId = AgentId("agent-1")
+        val conversationId = ConversationId("conv-1")
+
+        val (closedId, _) = fanout.subscribe(agentId, conversationId, "closed")
+        val (_, liveEvents) = fanout.subscribe(agentId, conversationId, "live")
+        fanout.unsubscribe(closedId)
+
+        liveEvents.test {
+            fanout.route(received(buildStreamDelta(agentId.value, conversationId.value, "run-1")))
+            assertEquals(
+                buildStreamDelta(agentId.value, conversationId.value, "run-1"),
+                awaitItem().frame,
+            )
+        }
+    }
+
+    @Test
     fun unsubscribeRemovesSubscriber() = runTest {
         val fanout = RuntimeEventFanout()
         val agentId = AgentId("agent-1")

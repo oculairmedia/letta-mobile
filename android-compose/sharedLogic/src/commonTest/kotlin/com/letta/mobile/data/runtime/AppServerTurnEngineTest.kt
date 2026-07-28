@@ -901,6 +901,8 @@ class AppServerTurnEngineTest {
                     runtime = wrongAgentSameConv,
                 ),
             )
+            val terminal = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Failed, terminal.status)
             awaitComplete()
         }
 

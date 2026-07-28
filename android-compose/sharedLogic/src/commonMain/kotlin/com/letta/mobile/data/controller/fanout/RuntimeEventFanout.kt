@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
@@ -54,8 +55,9 @@ class RuntimeEventFanout {
      * collect, so frames cannot be lost in the subscribe→collect handoff window.
      * There is no shared replay cache (lgns8.22.3): a new subscriber never sees
      * a prior turn's terminal. Production turn subscribers need lossless delivery
-     * (lgns8.22.3 review): unbounded channels with suspending send apply
-     * backpressure instead of silently dropping deltas/terminals.
+     * (lgns8.22.3 review): bounded channels with suspending [Channel.send] apply
+     * real backpressure instead of silently dropping deltas/terminals or growing
+     * an unbounded queue.
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
@@ -84,7 +86,7 @@ class RuntimeEventFanout {
     ): Pair<String, Flow<AppServerReceivedFrame>> = stateMutex.withLock {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val channel = Channel<AppServerReceivedFrame>(
-            capacity = Channel.UNLIMITED,
+            capacity = SUBSCRIBER_BUFFER_CAPACITY,
         )
         subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
         subscriberId to channel.receiveAsFlow()
@@ -133,7 +135,12 @@ class RuntimeEventFanout {
             }
         }
         for (channel in channels) {
-            channel.send(received)
+            try {
+                channel.send(received)
+            } catch (_: ClosedSendChannelException) {
+                // Concurrent unsubscribe closed this channel after the snapshot;
+                // do not let that cancel the router's sole collector job.
+            }
         }
     }
 
@@ -213,6 +220,12 @@ class RuntimeEventFanout {
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
+        /**
+         * Per-subscriber buffer. Large enough for bursty stream deltas; when full,
+         * [route] suspends so the inbound collector applies transport backpressure.
+         */
+        const val SUBSCRIBER_BUFFER_CAPACITY = 256
+
         private val nextSubscriberId = atomic(0)
 
         private fun generateSubscriberId(): String =
