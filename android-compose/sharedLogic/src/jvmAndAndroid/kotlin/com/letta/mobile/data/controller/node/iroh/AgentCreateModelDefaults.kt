@@ -15,6 +15,11 @@ import kotlinx.serialization.json.put
 internal fun JsonObject?.withDefaultContextWindow(): JsonObject {
     val body = this
     val known = ModelCatalogNormalizer.knownLimitsForHandle(firstModelHandle(body))
+    val modelSettingsKey = when {
+        body?.containsKey("model_settings") == true -> "model_settings"
+        body?.containsKey("modelSettings") == true -> "modelSettings"
+        else -> "model_settings"
+    }
     return buildJsonObject {
         body?.forEach { (key, value) -> put(key, value) }
         if (!body.hasExplicitContextWindowLimit()) {
@@ -24,7 +29,7 @@ internal fun JsonObject?.withDefaultContextWindow(): JsonObject {
             )
         }
         known?.let { limits ->
-            body.withKnownMaxOutputTokens(limits.maxOutputTokens)?.let { put("model_settings", it) }
+            body.withKnownMaxOutputTokens(limits.maxOutputTokens)?.let { put(modelSettingsKey, it) }
         }
     }
 }

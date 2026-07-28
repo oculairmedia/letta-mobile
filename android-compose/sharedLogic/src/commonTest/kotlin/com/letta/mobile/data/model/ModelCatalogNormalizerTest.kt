@@ -42,23 +42,12 @@ class ModelCatalogNormalizerTest {
 
     @Test
     fun doesNotCollapseOpenaiAliasesWithDistinctModelEndpoints() {
-        val models = listOf(
-            LlmModel(
-                id = "a",
-                name = "gpt-4o",
-                handle = "openai/gpt-4o",
-                providerType = "openai",
-                modelEndpoint = "https://llmux.example/v1",
-            ),
-            LlmModel(
-                id = "b",
-                name = "gpt-4o",
-                handle = "openai/gpt-4o",
-                providerType = "openai",
-                modelEndpoint = "https://byok.example/v1",
+        val normalized = ModelCatalogNormalizer.normalize(
+            modelsSharingHandleWithEndpoints(
+                "openai/gpt-4o" to "https://llmux.example/v1",
+                "openai/gpt-4o" to "https://byok.example/v1",
             ),
         )
-        val normalized = ModelCatalogNormalizer.normalize(models)
         assertEquals(2, normalized.size)
         assertEquals(
             setOf("https://llmux.example/v1", "https://byok.example/v1"),
@@ -114,26 +103,31 @@ class ModelCatalogNormalizerTest {
 
     @Test
     fun collapsesLlMuxAliasesThatShareEndpointProvenance() {
-        val models = listOf(
-            LlmModel(
-                id = "a",
-                name = "MiniMax-M3",
-                handle = "lmstudio/MiniMax-M3",
-                providerType = "lmstudio",
-                modelEndpoint = "https://llmux.example/v1",
-            ),
-            LlmModel(
-                id = "b",
-                name = "MiniMax-M3",
-                handle = "openai/MiniMax-M3",
-                providerType = "openai",
-                modelEndpoint = "https://llmux.example/v1",
+        val normalized = ModelCatalogNormalizer.normalize(
+            modelsSharingHandleWithEndpoints(
+                "lmstudio/MiniMax-M3" to "https://llmux.example/v1",
+                "openai/MiniMax-M3" to "https://llmux.example/v1",
             ),
         )
-        val normalized = ModelCatalogNormalizer.normalize(models)
         assertEquals(1, normalized.size)
         assertEquals("openai/MiniMax-M3", normalized.single().handle)
     }
+
+    private fun modelsSharingHandleWithEndpoints(
+        vararg handleToEndpoint: Pair<String, String>,
+    ): List<LlmModel> =
+        handleToEndpoint.mapIndexed { index, (handle, endpoint) ->
+            val slash = handle.indexOf('/')
+            val provider = if (slash > 0) handle.substring(0, slash) else ""
+            val name = if (slash >= 0) handle.substring(slash + 1) else handle
+            LlmModel(
+                id = "row-$index",
+                name = name,
+                handle = handle,
+                providerType = provider,
+                modelEndpoint = endpoint,
+            )
+        }
 
     @Test
     fun enrichesGrokLimitsWhenCatalogOmitsThem() {
