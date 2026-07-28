@@ -202,6 +202,9 @@ fallback to `none`.
 
 ### Phase 4: Remove hidden dependencies
 
+Status: complete on PR #1036 / `letta-mobile-lgns8.10.4` for the Iroh wrapper
+production path. Legacy mobile WS connector deletion remains a follow-up.
+
 1. Replace `HttpSubagentRegistrySource` with runtime/controller-derived state.
 2. Require a real controller for production health and remove health's shim
    branch.
@@ -218,6 +221,19 @@ fallback to `none`.
    - shim timeline subscription/write paths.
 7. Preserve cloud or generic HTTP support only when it is a separately defined
    product connector, not an implicit LettaShim route.
+
+Landed in this Phase 4 slice:
+
+- `ControllerSubagentRegistrySource` replaces HTTP shim discovery;
+- health is controller-native only (no `/v1/health` shim dial);
+- `--admin-base-url` / `LETTA_IROH_ADMIN_BASE_URL` removed from
+  `app-server-serve-iroh`;
+- ownership matrix has **zero** `shim_until_cutover` rows;
+- architecture gate inventory is empty.
+
+Still open inside Phase 4:
+
+- legacy mobile WS shim connector deletion (item 6) — tracked as follow-up.
 
 ### Phase 5: Package the wrapper
 

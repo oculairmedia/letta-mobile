@@ -23,7 +23,6 @@ import kotlinx.serialization.json.put
 object ApprovalAdminHandlers {
     fun register(
         router: AdminRpcRouter,
-        @Suppress("UNUSED_PARAMETER") adminBaseUrl: String,
         controller: AppServerController? = null,
     ) {
         router.register("approval.submit") { params -> submit(params, controller) }

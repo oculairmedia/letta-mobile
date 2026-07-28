@@ -59,26 +59,33 @@ import kotlin.time.Duration.Companion.seconds
  * ```
  */
 internal fun buildProductionAdminRouter(
-    adminBaseUrl: String,
     controller: DefaultAppServerController,
-    subagentRegistrySource: SubagentRegistrySource?,
+    subagentRegistrySource: SubagentRegistrySource? = null,
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
     // Phase 3: bounded admin REST must be an explicit service URL — never the
     // LettaShim :8291 default. Unset => capability_unavailable for those methods.
     adminRestBaseUrl: String? = System.getenv("LETTA_IROH_ADMIN_REST_BASE_URL"),
-    skillsCatalogScope: CoroutineScope? = null,
+    eventScope: CoroutineScope? = null,
 ): AdminRpcRouter {
     val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
-    if (nativeClient != null && skillsCatalogScope != null) {
-        skillsCatalog.start(skillsCatalogScope, nativeClient.events)
+    val subagentSource = subagentRegistrySource
+        ?: com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource().also { source ->
+            if (nativeClient != null && eventScope != null) {
+                source.start(eventScope, nativeClient.events)
+            }
+        }
+    if (nativeClient != null && eventScope != null) {
+        skillsCatalog.start(eventScope, nativeClient.events)
     }
     return AdminRpcRegistry.buildRouter(
-        adminBaseUrl, controller, subagentRegistrySource, pairingService, nativeClient,
+        controller = controller,
+        subagentRegistrySource = subagentSource,
+        pairingService = pairingService,
+        nativeClient = nativeClient,
         vibesyncBaseUrl = vibesyncBaseUrl,
         adminRestBaseUrl = adminRestBaseUrl,
-        shimRetired = true,
         skillsListing = SkillsListingSource { skillsCatalog.snapshot() },
     )
 }
@@ -130,14 +137,6 @@ internal class AppServerServeIrohCommand : CliktCommand(
             "DIRECTLY (lgns8.9), bypassing the lettashim /api reverse-proxy splice. " +
             "Server-side localhost only.",
     ).default("http://127.0.0.1:3099")
-
-    private val adminBaseUrl by option(
-        "--admin-base-url",
-        envvar = "LETTA_IROH_ADMIN_BASE_URL",
-        help = "Base URL of the server-local HTTP API that admin_rpc methods proxy to " +
-            "(conversation/message/agent reads). Server-side localhost only; clients " +
-            "never dial it directly.",
-    ).default("http://127.0.0.1:8291")
 
     private val pairingStoreFile by option(
         "--pairing-store-file",
@@ -231,25 +230,20 @@ internal class AppServerServeIrohCommand : CliktCommand(
 
             // Register admin_rpc handlers so clients on an iroh:// backend can
             // read conversations/messages/agents WITHOUT any direct HTTP route
-            // to this host (Iroh purity: letta-mobile-qfa81). The handlers
-            // proxy to the server-local HTTP API; only this process dials it.
-            val rpcBase = adminBaseUrl.trimEnd('/')
-            val subagentRegistrySource =
-                com.letta.mobile.data.controller.node.iroh.HttpSubagentRegistrySource.discover(rpcBase)
+            // to this host (Iroh purity: letta-mobile-qfa81). Phase 4: no
+            // LettaShim admin base / HTTP subagent discovery.
             val adminRpcRouter = buildProductionAdminRouter(
-                rpcBase,
-                controller,
-                subagentRegistrySource,
-                pairingService,
-                nativeAdminClient,
-                vibesyncBaseUrl,
-                skillsCatalogScope = scope,
+                controller = controller,
+                pairingService = pairingService,
+                nativeClient = nativeAdminClient,
+                vibesyncBaseUrl = vibesyncBaseUrl,
+                eventScope = scope,
             )
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
             println(
                 "[iroh-app-server] admin_rpc handlers registered " +
-                    "(proxy base: $rpcBase, methods: ${adminRpcRouter.methodCount}, " +
-                    "subagent_registry_v1: ${subagentRegistrySource != null})",
+                    "(methods: ${adminRpcRouter.methodCount}, " +
+                    "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
             )
 
             // Start accepting connections

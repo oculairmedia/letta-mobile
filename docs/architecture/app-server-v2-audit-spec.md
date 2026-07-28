@@ -470,17 +470,16 @@ the next turn starts a fresh runtime.
 
 The ownership-matrix fallback totals are:
 
-- 3 as `shim_until_cutover`
-- 81 as `none`
+- 0 as `shim_until_cutover`
+- 84 as `none`
 - 5 as `deny_fail_closed`
 
-Phase 2 finished native-only skills (`skill_enable` / `skill_disable` +
-catalog projection) and cleared their shim fallbacks. Phase 3 stopped
-defaulting admin REST to LettaShim `:8291`. Bounded admin domains require an
-explicit `LETTA_IROH_ADMIN_REST_BASE_URL`; goal and slash command methods are
-product-removed (`deny_fail_closed`). Remaining `shim_until_cutover` rows are
-health (controller-null branch) and shim-backed subagent discovery
-(`subagent.list` / `subagent.todos`) — Phase 4.
+Phase 4 removed the last migration-time shim fallbacks: health is
+controller-native only, and subagent list/todos hydrate from
+`ControllerSubagentRegistrySource` (`update_subagent_state`) instead of
+LettaShim HTTP discovery. Bounded admin REST still requires an explicit
+`LETTA_IROH_ADMIN_REST_BASE_URL`; goal and slash command methods remain
+product-removed (`deny_fail_closed`).
 
 ### Current dependency classes
 

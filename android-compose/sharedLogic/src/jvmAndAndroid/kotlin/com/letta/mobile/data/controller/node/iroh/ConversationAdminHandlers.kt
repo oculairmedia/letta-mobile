@@ -27,9 +27,7 @@ object ConversationAdminHandlers {
 
     fun register(
         router: AdminRpcRouter,
-        @Suppress("UNUSED_PARAMETER") adminBaseUrl: String,
         tiers: NativeReadTiers = NativeReadTiers(),
-        @Suppress("UNUSED_PARAMETER") shimRetired: Boolean = true,
         controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient

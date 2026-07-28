@@ -106,13 +106,12 @@ class ControlCapabilityHandlersTest {
     private fun router(
         client: AppServerClient? = null,
         controller: AppServerController? = null,
-        shimRetired: Boolean = false,
     ): AdminRpcRouter {
         val r = AdminRpcRouter()
-        HealthAdminHandlers.register(r, "http://127.0.0.1:9", controller)
+        HealthAdminHandlers.register(r, controller)
         ModelAdminHandlers.register(r, "http://127.0.0.1:9", client)
         SkillAdminHandlers.register(r, adminBaseUrl = null, nativeClient = client)
-        ConversationAdminHandlers.register(r, "http://127.0.0.1:9", NativeReadTiers(nativeClient = client), shimRetired)
+        ConversationAdminHandlers.register(r, NativeReadTiers(nativeClient = client))
         return r
     }
 
@@ -190,12 +189,9 @@ class ControlCapabilityHandlersTest {
 
     @Test
     fun conversationDeleteDeniesFailClosedUnconditionally() = runTest {
-        val retired = dispatch(router(shimRetired = true), "conversation.delete", mapOf("conversation_id" to "conv-1"))
-        assertTrue(retired.contains("\"success\":false"))
-        assertTrue(retired.contains("capability_unavailable"))
-        assertFalse(retired.contains("conv-1"), "denial must not echo the resource")
-
-        val active = dispatch(router(shimRetired = false), "conversation.delete", mapOf("conversation_id" to "conv-1"))
-        assertTrue(active.contains("capability_unavailable"))
+        val denied = dispatch(router(), "conversation.delete", mapOf("conversation_id" to "conv-1"))
+        assertTrue(denied.contains("\"success\":false"))
+        assertTrue(denied.contains("capability_unavailable"))
+        assertFalse(denied.contains("conv-1"), "denial must not echo the resource")
     }
 }

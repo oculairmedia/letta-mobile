@@ -52,12 +52,16 @@ object AdminRpcRegistry {
     )
 
     fun buildRouter(
-        adminBaseUrl: String,
+        /**
+         * Ignored since Phase 4. Former LettaShim admin base is not an accepted
+         * production route; retained so older call sites compile.
+         */
+        @Suppress("UNUSED_PARAMETER") adminBaseUrl: String = "",
         controller: AppServerController? = null,
         subagentRegistrySource: SubagentRegistrySource? = null,
         pairingService: IrohPairingService? = null,
         nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
-        /** Phase 2: conversation.delete is always fail-closed; parameter retained for call-site compatibility. */
+        /** Ignored since Phase 2/4 — conversation.delete is always fail-closed. */
         @Suppress("UNUSED_PARAMETER") shimRetired: Boolean = true,
         /**
          * VibeSync product service base URL for project.* methods. When null the
@@ -83,16 +87,15 @@ object AdminRpcRegistry {
          */
         skillsListing: SkillsListingSource? = null,
     ): AdminRpcRouter {
-        val rpcBase = adminBaseUrl.trimEnd('/')
         val adminRestBase = adminRestBaseUrl?.trimEnd('/')
         val router = AdminRpcRouter()
 
         val tiers = NativeReadTiers(nativeClient)
 
-        HealthAdminHandlers.register(router, rpcBase, controller)
+        HealthAdminHandlers.register(router, controller)
         AgentAdminHandlers.register(router, controller, tiers, adminRestBase)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
-        ConversationAdminHandlers.register(router, rpcBase, tiers, shimRetired = true, controller = controller)
+        ConversationAdminHandlers.register(router, tiers, controller = controller)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
         RunAdminHandlers.register(router, adminRestBase)
         ArchiveAdminHandlers.register(router, adminRestBase)
@@ -111,7 +114,7 @@ object AdminRpcRegistry {
             controller = controller,
             skillsListing = skillsListing,
         )
-        ApprovalAdminHandlers.register(router, rpcBase, controller)
+        ApprovalAdminHandlers.register(router, controller)
         PairingAdminHandlers.register(router, pairingService)
         CronAdminHandlers.register(router, nativeClient)
         ReflectionAdminHandlers.register(router, nativeClient)

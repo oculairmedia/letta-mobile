@@ -17,7 +17,7 @@ class AdminProxyRequestTest {
         NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
+        ConversationAdminHandlers.register(router)
 
         val response = Json.parseToJsonElement(
             router.dispatch(
@@ -41,7 +41,7 @@ class AdminProxyRequestTest {
         NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local/")
+        ConversationAdminHandlers.register(router)
 
         val response = Json.parseToJsonElement(
             router.dispatch(
@@ -105,7 +105,7 @@ class AdminProxyRequestTest {
         NativeAdmin.resetCircuitForTest()
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
-        ConversationAdminHandlers.register(router, "http://admin.local")
+        ConversationAdminHandlers.register(router)
 
         val response = Json.parseToJsonElement(
             router.dispatch(

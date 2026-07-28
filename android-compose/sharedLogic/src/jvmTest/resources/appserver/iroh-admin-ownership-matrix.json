@@ -2,7 +2,7 @@
   "meta": {
     "issue": "letta-mobile-lgns8.13",
     "decided_at": "2026-07-22",
-    "review_status": "phase3-partial; admin REST no longer defaults to shim; goal/slash denied (letta-mobile-lgns8.10.3)",
+    "review_status": "phase4-complete; zero shim_until_cutover operation fallbacks (letta-mobile-lgns8.10.4)",
     "sources": [
       "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.28.8, lgns8.1)",
       "app-server-v2-contract-matrix.json (lgns8.1)",
@@ -18,7 +18,8 @@
     ],
     "phase1_synced_at": "2026-07-27",
     "phase2_synced_at": "2026-07-27",
-    "phase3_synced_at": "2026-07-27"
+    "phase3_synced_at": "2026-07-27",
+    "phase4_synced_at": "2026-07-27"
   },
   "enums": {
     "owners": [
@@ -76,14 +77,14 @@
     {
       "method": "health.check",
       "handler": "HealthAdminHandlers.kt",
-      "current_backend": "controller_native snapshot \u2192 shim_http GET /v1/health (only when controller null)",
+      "current_backend": "controller_native snapshot only (no shim health probe)",
       "owner": "controller_native",
       "public_contract": "controller readiness/health snapshot (generation state, App Server liveness)",
       "authorization_class": "admin_read",
       "data_store": "controller_memory",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "Health must report the controller's own truthful readiness, not proxy a shim endpoint.",
+      "notes": "Phase 4: health never dials LettaShim; missing controller reports native degraded.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
@@ -1251,30 +1252,30 @@
     {
       "method": "subagent.list",
       "handler": "SubagentAdminHandlers.kt",
-      "current_backend": "shim_http GET /shim/v1/subagents* via HttpSubagentRegistrySource (fail-soft empty/null)",
+      "current_backend": "ControllerSubagentRegistrySource from update_subagent_state (no shim HTTP)",
       "owner": "controller_native",
       "public_contract": "SubagentRegistrySource (m6oa1 provenance registry)",
       "authorization_class": "conversation_scoped",
       "data_store": "controller_memory",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "none",
-      "notes": "Matrix owner remains controller_native (target). Production wires HttpSubagentRegistrySource against shim /shim/v1/subagents*; post-shim must derive from runtime/controller state only.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 4: production wires ControllerSubagentRegistrySource. Todo/lifecycle depth remains m6oa1.",
+      "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
     },
     {
       "method": "subagent.todos",
       "handler": "SubagentAdminHandlers.kt",
-      "current_backend": "shim_http GET /shim/v1/subagents* via HttpSubagentRegistrySource (fail-soft empty/null)",
+      "current_backend": "ControllerSubagentRegistrySource identity lookup (todos projection pending m6oa1)",
       "owner": "controller_native",
       "public_contract": "SubagentRegistrySource (m6oa1 provenance registry)",
       "authorization_class": "conversation_scoped",
       "data_store": "controller_memory",
-      "fallback": "shim_until_cutover",
+      "fallback": "none",
       "migration_slice": "none",
-      "notes": "Matrix owner remains controller_native (target). Production wires HttpSubagentRegistrySource against shim /shim/v1/subagents*; post-shim must derive from runtime/controller state only.",
-      "production_first_route": "shim_http",
+      "notes": "Phase 4: no shim /shim/v1/subagents* HTTP. Full todo snapshots tracked under m6oa1.",
+      "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
     },

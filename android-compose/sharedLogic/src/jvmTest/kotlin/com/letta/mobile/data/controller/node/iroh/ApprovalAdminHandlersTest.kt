@@ -36,7 +36,7 @@ class ApprovalAdminHandlersTest {
         val recording = installRecordingTransport()
         val controller = RecordingController()
         val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, "http://admin.local", controller)
+        ApprovalAdminHandlers.register(router, controller)
 
         val response = Json.parseToJsonElement(
             router.dispatch(
@@ -57,7 +57,7 @@ class ApprovalAdminHandlersTest {
     fun approvalSubmitWithoutControllerFailsClosed() = runTest {
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, "http://admin.local")
+        ApprovalAdminHandlers.register(router)
 
         val response = Json.parseToJsonElement(
             router.dispatch(
@@ -76,7 +76,7 @@ class ApprovalAdminHandlersTest {
     fun approvalSubmitMissingAgentIdDispatchesFailureEnvelope() = runTest {
         installRecordingTransport()
         val router = AdminRpcRouter()
-        ApprovalAdminHandlers.register(router, "http://admin.local")
+        ApprovalAdminHandlers.register(router)
 
         val response = Json.parseToJsonElement(
             router.dispatch(

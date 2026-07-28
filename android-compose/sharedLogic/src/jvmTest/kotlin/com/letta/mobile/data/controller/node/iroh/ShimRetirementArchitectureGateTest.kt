@@ -10,43 +10,30 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * Phase 1 architecture freeze for LettaShim retirement.
+ * LettaShim retirement architecture gate.
  *
- * Inventories known production wiring that still depends on the shim / shared
- * admin base / direct-disk tier. The expected set is intentional debt: new
- * violations fail CI immediately; removing a violation requires updating this
- * inventory in the same change (runbook Phase 4/5 clears it to empty).
+ * Phase 4 cleared the frozen Phase 1 violation inventory. New production
+ * wiring that reintroduces LettaShim admin base / HTTP subagent discovery /
+ * shim_until_cutover matrix rows fails this suite immediately.
  *
- * The end-state gate ([shimFreeProductionWiringHasNoKnownViolations]) stays
- * disabled until `SHIM_FREE_ARCHITECTURE_GATE=1` so Phase 2–4 can land without
- * a permanently red suite, while still proving the desired assertions fail
- * against today's tree when that env var is set.
+ * Set `SHIM_FREE_ARCHITECTURE_GATE=1` to also assert the scan is empty in
+ * environments that want the hard gate enabled explicitly (same as empty
+ * inventory here).
  */
 class ShimRetirementArchitectureGateTest {
     private data class Violation(val id: String, val path: String, val detail: String)
 
     private val repoRoot: Path = locateRepoRoot()
 
-    private val expectedViolationIds = setOf(
-        "cli.default_admin_base_8291",
-        "cli.admin_base_env",
-        "cli.http_subagent_registry_discover",
-        "handlers.http_subagent_registry_source",
-        "matrix.shim_until_cutover_rows",
-    )
-
     @Test
-    fun knownShimRetirementViolationsMatchFrozenInventory() {
-        val found = scanViolations().map { it.id }.toSet()
+    fun knownShimRetirementViolationsAreEmpty() {
+        val remaining = scanViolations()
         assertEquals(
-            expectedViolationIds,
-            found,
+            emptyList(),
+            remaining,
             buildString {
-                appendLine("Shim-retirement architecture inventory drifted.")
-                appendLine("Added: ${found - expectedViolationIds}")
-                appendLine("Removed: ${expectedViolationIds - found}")
-                appendLine("All findings:")
-                scanViolations().forEach { appendLine(" - ${it.id}: ${it.path}: ${it.detail}") }
+                appendLine("Shim-retirement architecture inventory must stay empty after Phase 4.")
+                remaining.forEach { appendLine(" - ${it.id}: ${it.path}: ${it.detail}") }
             },
         )
     }
@@ -56,10 +43,7 @@ class ShimRetirementArchitectureGateTest {
         val enabled = System.getenv("SHIM_FREE_ARCHITECTURE_GATE") == "1"
         val remaining = scanViolations()
         if (!enabled) {
-            assertTrue(
-                remaining.isNotEmpty(),
-                "Expected Phase 1 red-gate debt, but no violations were found",
-            )
+            assertTrue(remaining.isEmpty(), "Phase 4 cleared the inventory; unexpected findings: $remaining")
             return
         }
         assertEquals(
@@ -81,11 +65,11 @@ class ShimRetirementArchitectureGateTest {
         if (cliText.contains("LETTA_IROH_ADMIN_BASE_URL")) {
             findings += Violation("cli.admin_base_env", rel(cli), "generic admin base env still accepted")
         }
-        if (cliText.contains("HttpSubagentRegistrySource.discover")) {
+        if (cliText.contains("HttpSubagentRegistrySource")) {
             findings += Violation(
                 "cli.http_subagent_registry_discover",
                 rel(cli),
-                "production still discovers subagents from shim HTTP",
+                "production still references shim HTTP subagent registry",
             )
         }
 
@@ -103,11 +87,15 @@ class ShimRetirementArchitectureGateTest {
         val matrix = repoRoot.resolve(
             "android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json",
         )
-        if (matrix.readText().contains("\"shim_until_cutover\"")) {
+        val matrixText = matrix.readText()
+        // Count operation rows still on migration-time shim fallback (enum may
+        // still list the historical value for schema compatibility).
+        val shimFallbackRows = Regex(""""fallback"\s*:\s*"shim_until_cutover"""").findAll(matrixText).count()
+        if (shimFallbackRows > 0) {
             findings += Violation(
                 "matrix.shim_until_cutover_rows",
                 rel(matrix),
-                "ownership matrix still declares shim_until_cutover migration fallbacks",
+                "ownership matrix still declares $shimFallbackRows shim_until_cutover migration fallbacks",
             )
         }
 
@@ -119,23 +107,22 @@ class ShimRetirementArchitectureGateTest {
     private fun locateRepoRoot(): Path {
         val starts = listOf(
             Path.of("").toAbsolutePath(),
-            Path.of(System.getProperty("user.dir")).toAbsolutePath(),
+            Path.of("android-compose").toAbsolutePath(),
+            Path.of("..").toAbsolutePath(),
+            Path.of("../..").toAbsolutePath(),
         )
         for (start in starts) {
-            var cursor: Path? = start
-            repeat(8) {
-                val current = cursor ?: return@repeat
-                val matrix = current.resolve(
-                    "android-compose/sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json",
-                )
-                if (matrix.isRegularFile()) return current
-                val nested = current.resolve(
-                    "sharedLogic/src/jvmTest/resources/appserver/iroh-admin-ownership-matrix.json",
-                )
-                if (nested.isRegularFile()) return current.parent
-                cursor = current.parent
+            var cur: Path? = start
+            while (cur != null) {
+                if (Files.isRegularFile(cur.resolve("android-compose/settings.gradle.kts")) ||
+                    Files.isRegularFile(cur.resolve("settings.gradle.kts")) &&
+                    Files.isDirectory(cur.resolve("android-compose"))
+                ) {
+                    return if (Files.isDirectory(cur.resolve("android-compose"))) cur else cur.parent
+                }
+                cur = cur.parent
             }
         }
-        error("Unable to locate repository root from ${System.getProperty("user.dir")}")
+        error("Could not locate repository root from ${Path.of("").toAbsolutePath()}")
     }
 }

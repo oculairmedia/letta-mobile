@@ -225,9 +225,10 @@ class IrohAdminOwnershipMatrixTest {
         val remainingMigrationFallbacks = operations.count {
             it.requiredString("fallback") == "shim_until_cutover"
         }
-        assertTrue(
-            remainingMigrationFallbacks > 0,
-            "Phase 1 still expects migration-time shim_until_cutover rows; update this when cutover completes",
+        assertEquals(
+            0,
+            remainingMigrationFallbacks,
+            "Phase 4 requires zero shim_until_cutover migration fallbacks",
         )
     }
 

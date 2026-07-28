@@ -55,7 +55,6 @@ class ToolReturnGetAdminRpcTest {
         val router = AdminRpcRouter()
         ConversationAdminHandlers.register(
             router,
-            adminBaseUrl = "http://admin.local",
             tiers = NativeReadTiers(nativeClient = FakeMessagesClient(messages)),
         )
         return router
