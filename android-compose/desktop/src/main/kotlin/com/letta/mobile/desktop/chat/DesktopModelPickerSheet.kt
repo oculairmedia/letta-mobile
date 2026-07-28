@@ -63,7 +63,7 @@ internal fun DesktopModelPickerSheet(
     onEditModels: (() -> Unit)? = null,
 ) {
     var query by remember { mutableStateOf(TextFieldValue("")) }
-    val groups = remember(models) { ModelCatalog.group(models) }
+    val groups = remember(models, selectedValue) { ModelCatalog.group(models, selectedValue) }
     val filtered = remember(groups, query.text) { ModelCatalog.filter(groups, query.text) }
 
     Box(

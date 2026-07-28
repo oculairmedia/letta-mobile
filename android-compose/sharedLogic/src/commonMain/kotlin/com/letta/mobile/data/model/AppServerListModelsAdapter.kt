@@ -72,12 +72,21 @@ object AppServerListModelsAdapter {
             ?: presentation?.takeIf { it != handle }
         val name = display ?: handle ?: entry.id
         val limits = extractLimits(entry, raw)
+        val routingScopes = listOfNotNull(raw, entry.updateArgs, entry.flags)
         val model = LlmModel(
             id = entry.id.ifBlank { handle.orEmpty() },
             name = name,
             handle = handle,
             displayNameOverride = display,
             providerType = providerFromHandle(handle.orEmpty()),
+            // Preserve routing provenance so normalizePaired can keep distinct
+            // BYOK / custom endpoints that share an openai/... handle suffix.
+            providerName = routingScopes.firstNotNullOfOrNull {
+                firstString(it, "provider_name", "providerName")
+            },
+            modelEndpoint = routingScopes.firstNotNullOfOrNull {
+                firstString(it, "model_endpoint", "modelEndpoint")
+            },
             contextWindow = limits.first,
             maxOutputTokens = limits.second,
             maxTokens = limits.second,

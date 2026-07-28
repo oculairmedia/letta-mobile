@@ -67,6 +67,30 @@ class ModelCatalogNormalizerTest {
     }
 
     @Test
+    fun adapterPreservesModelEndpointIntoNormalization() {
+        val entries = kotlinx.serialization.json.JsonArray(
+            listOf(
+                buildJsonObject {
+                    put("id", "a")
+                    put("handle", "openai/gpt-4o")
+                    put("model_endpoint", "https://llmux.example/v1")
+                },
+                buildJsonObject {
+                    put("id", "b")
+                    put("handle", "openai/gpt-4o")
+                    put("model_endpoint", "https://byok.example/v1")
+                },
+            ),
+        )
+        val models = AppServerListModelsAdapter.toLlmModels(entries)
+        assertEquals(2, models.size)
+        assertEquals(
+            setOf("https://llmux.example/v1", "https://byok.example/v1"),
+            models.map { it.modelEndpoint }.toSet(),
+        )
+    }
+
+    @Test
     fun doesNotCollapseOpenaiAliasesWithDistinctProviderNames() {
         val models = listOf(
             LlmModel(
