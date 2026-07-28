@@ -19,7 +19,9 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -338,6 +340,12 @@ class DefaultAppServerController(
      * Internal key for runtime cache.
      */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
+
+    /** Tear down the inbound router collector and controller scope (tests / shutdown). */
+    fun close() {
+        eventRouter.detach()
+        controllerScope.cancel()
+    }
 
     companion object {
         private val DEFAULT_CLIENT_INFO = AppServerRuntimeStartClientInfo(
