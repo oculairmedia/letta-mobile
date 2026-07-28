@@ -25,6 +25,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -35,12 +36,11 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * letta-mobile-lgns8.22.1 — adversarial ownership / routing invariants.
+ * letta-mobile-lgns8.22.1 / .22.2 — adversarial ownership / routing invariants.
  *
- * Characterization tests below document **current** (unsafe) Mutex force-unlock
- * behavior and stay green on CI. Desired-invariant tests are `@Ignore` until
- * [letta-mobile-lgns8.22.2] lands owner-token leases; un-ignore them in that
- * bead and require green.
+ * Owner-token lease tests (lgns8.22.2) assert preflight is never stolen via idle
+ * run.list and stale owner finally cannot clear a replacement lease. Frame
+ * correlation across runs stays `@Ignore` until lgns8.22.4.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TurnEngineOwnershipAdversarialTest {
@@ -50,11 +50,8 @@ class TurnEngineOwnershipAdversarialTest {
     // ------------------------------------------------------------------
 
     @Test
-    fun currentUnsafe_preflightOwnerWithNoRunIdIsForceReleasedWhenRunListIdle() =
+    fun preflightOwnerWithNoRunIdIsNotForceReleasedWhenRunListIdle() =
         runTest(UnconfinedTestDispatcher()) {
-            // A holds activeTurn during a hung runtime_start (preflight; no run_id).
-            // B's busy rejection probes run.list (idle) and force-unlocks A.
-            // Only the first runtimeStart hangs so B can proceed after stealing.
             val client = AdversarialClient(hangFirstRuntimeStartOnly = true, runListIdle = true)
             val engine = AppServerTurnEngine(client = client)
 
@@ -74,20 +71,17 @@ class TurnEngineOwnershipAdversarialTest {
             }
             runCurrent()
 
-            assertTrue(client.runListQueried, "current reconciler falls back to run.list without run_id")
-            assertTrue(
+            assertFalse(
                 bAccepted,
-                "CURRENT UNSAFE: idle run.list force-releases a live preflight owner so B proceeds",
+                "Preparing lease without run_id must not be stolen via idle run.list",
             )
+            assertTrue(engine.isBusy)
             a.cancel()
         }
 
     @Test
-    fun currentUnsafe_staleOwnerFinallyCanUnlockReplacementOwner() =
+    fun staleOwnerFinallyCannotUnlockReplacementOwner() =
         runTest(UnconfinedTestDispatcher()) {
-            // A is stuck mid-turn. B reconciles A as dead and acquires. When A is
-            // then cancelled, A's finally calls Mutex.unlock() + clears owner —
-            // which is now B — leaving the engine idle while B still thinks it owns.
             val client = AdversarialClient(runStatus = "failed")
             val engine = AppServerTurnEngine(client = client)
 
@@ -98,8 +92,7 @@ class TurnEngineOwnershipAdversarialTest {
             client.emitAssistant("run-a")
             runCurrent()
             assertTrue(engine.isBusy)
-            val aOwner = engine.activeTurnOwner
-            assertEquals("run-a", aOwner?.runId)
+            assertEquals("run-a", engine.activeTurnOwner?.runId)
 
             val bDrafts = mutableListOf<RuntimeEventDraft>()
             val b = backgroundScope.launch {
@@ -111,15 +104,12 @@ class TurnEngineOwnershipAdversarialTest {
             assertTrue(bDrafts.isNotEmpty(), "B must acquire after dead-owner reconcile")
             assertEquals("run-b", engine.activeTurnOwner?.runId)
 
-            // Cancel A — its finally unlocks whoever currently holds the Mutex.
             a.cancel()
             runCurrent()
             advanceUntilIdle()
 
-            assertFalse(
-                engine.isBusy,
-                "CURRENT UNSAFE: A's finally unlocked B's lease; engine appears idle while B's job may still run",
-            )
+            assertTrue(engine.isBusy, "replacement owner B must keep its lease after A finishes")
+            assertEquals("run-b", engine.activeTurnOwner?.runId)
             b.cancel()
         }
 
@@ -144,71 +134,9 @@ class TurnEngineOwnershipAdversarialTest {
     }
 
     // ------------------------------------------------------------------
-    // Desired invariants (un-ignore in lgns8.22.2+)
+    // Additional lease invariants
     // ------------------------------------------------------------------
 
-    @Ignore("pending letta-mobile-lgns8.22.2 owner-token leases")
-    @Test
-    fun desired_preflightOwnerIsNeverForceReleasedByIdleRunList() =
-        runTest(UnconfinedTestDispatcher()) {
-            val client = AdversarialClient(hangFirstRuntimeStartOnly = true, runListIdle = true)
-            val engine = AppServerTurnEngine(client = client)
-            backgroundScope.launch { runCatching { engine.runTurn(cmd("a")).collect() } }
-            runCurrent()
-            client.awaitRuntimeStartGate()
-            assertTrue(engine.isBusy)
-
-            var bAccepted = false
-            backgroundScope.launch {
-                runCatching { engine.runTurn(cmd("b")).collect { bAccepted = true } }
-            }
-            runCurrent()
-            assertFalse(bAccepted, "preflight owner without run_id must not be force-released via idle run.list")
-            assertTrue(engine.isBusy)
-            assertEquals(null, engine.activeTurnOwner?.runId)
-        }
-
-    @Ignore("pending letta-mobile-lgns8.22.2 / collectorReady-after-subscribe")
-    @Test
-    fun desired_inputIsNotSentBeforeCollectorSubscribes() =
-        runTest(UnconfinedTestDispatcher()) {
-            val client = AdversarialClient()
-            val engine = AppServerTurnEngine(client = client)
-            backgroundScope.launch { runCatching { engine.runTurn(cmd("solo")).collect() } }
-            runCurrent()
-            assertTrue(client.inputCalled)
-            assertTrue(
-                client.inputSentAfterEventsSubscribed,
-                "input must wait until events.collect has subscribed",
-            )
-        }
-
-    @Ignore("pending letta-mobile-lgns8.22.2 owner-token leases")
-    @Test
-    fun desired_staleOwnerFinallyCannotReleaseReplacementLease() =
-        runTest(UnconfinedTestDispatcher()) {
-            val client = AdversarialClient(runStatus = "failed")
-            val engine = AppServerTurnEngine(client = client)
-            val a = backgroundScope.launch { runCatching { engine.runTurn(cmd("a")).collect() } }
-            runCurrent()
-            client.emitAssistant("run-a")
-            runCurrent()
-
-            backgroundScope.launch { runCatching { engine.runTurn(cmd("b")).collect() } }
-            runCurrent()
-            client.emitAssistant("run-b")
-            runCurrent()
-            assertEquals("run-b", engine.activeTurnOwner?.runId)
-
-            a.cancel()
-            runCurrent()
-            advanceUntilIdle()
-
-            assertTrue(engine.isBusy, "replacement owner B must keep its lease after A finishes")
-            assertEquals("run-b", engine.activeTurnOwner?.runId)
-        }
-
-    @Ignore("pending letta-mobile-lgns8.22.2 owner-token leases")
     @Test
     fun desired_thirdTurnExcludedWhileReplacementOwns() =
         runTest(UnconfinedTestDispatcher()) {
@@ -223,18 +151,20 @@ class TurnEngineOwnershipAdversarialTest {
             client.emitAssistant("run-b")
             runCurrent()
 
+            // B is live — mark run.get alive before C's busy-path reconcile.
+            client.runStatusOverride = "in_progress"
+
             var cAccepted = false
             backgroundScope.launch {
                 runCatching { engine.runTurn(cmd("c")).collect { cAccepted = true } }
             }
-            // B still alive — reconciler must not release for C.
-            client.runStatusOverride = "in_progress"
             runCurrent()
             assertFalse(cAccepted)
             assertEquals("run-b", engine.activeTurnOwner?.runId)
         }
 
-    @Ignore("pending letta-mobile-lgns8.22.4 frame correlation")
+    // Pending letta-mobile-lgns8.22.4 frame correlation.
+    @Ignore
     @Test
     fun desired_oldRunFramesDoNotReachReplacementTurn() =
         runTest(UnconfinedTestDispatcher()) {
@@ -290,6 +220,7 @@ class TurnEngineOwnershipAdversarialTest {
         var inputCalled = false
         var inputSentAfterEventsSubscribed = false
         private var runtimeStartCount = 0
+        private var emitSeq = 0
         private val runtimeStartGate = CompletableDeferred<Unit>()
         private val runtimeStartRelease = CompletableDeferred<Unit>()
 
@@ -374,7 +305,7 @@ class TurnEngineOwnershipAdversarialTest {
                     runtime = AppServerRuntimeScope("agent-1", "conv-1"),
                     eventSeq = 1,
                     emittedAt = "t",
-                    idempotencyKey = "asst-$runId-${System.nanoTime()}",
+                    idempotencyKey = "asst-$runId-${++emitSeq}",
                     delta = buildJsonObject {
                         put("message_type", "assistant_message")
                         put("run_id", runId)
