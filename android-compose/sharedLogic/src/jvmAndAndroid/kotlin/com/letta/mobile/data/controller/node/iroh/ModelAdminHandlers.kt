@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import kotlinx.serialization.json.JsonArray
@@ -18,7 +19,13 @@ object ModelAdminHandlers {
                         force = param(params, AdminParamKey("force"))?.toBooleanStrictOrNull(),
                     ),
                 )
-                if (response.success) response.entries ?: JsonArray(emptyList()) else null
+                if (!response.success) {
+                    null
+                } else {
+                    AppServerListModelsAdapter.toLlmModelArray(
+                        response.entries ?: JsonArray(emptyList()),
+                    )
+                }
             }
         }
         if (api == null) {

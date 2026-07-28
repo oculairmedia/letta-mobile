@@ -51,10 +51,15 @@ class AppServerContextWindowPreflight(
             val conversationDeferred = async { retrieveConversation(conversationId) }
             agentDeferred.await() to conversationDeferred.await()
         }
-        val existingLimit = agent.contextWindowLimit()
-        val configured = existingLimit == null
-        val agentLimit = existingLimit ?: persistDefaultContextLimit(agentId)
-        val effectiveLimit = conversation.contextWindowLimit() ?: agentLimit
+        val existingAgentLimit = agent.contextWindowLimit()
+        val conversationLimit = conversation.contextWindowLimit()
+        // Only stamp an agent-wide default when NEITHER scope has an explicit
+        // limit. A conversation override must not mutate sibling inheritance.
+        val configured = existingAgentLimit == null && conversationLimit == null
+        val agentLimit = existingAgentLimit
+            ?: if (configured) persistDefaultContextLimit(agentId) else null
+        val effectiveLimit = conversationLimit ?: agentLimit
+            ?: error("context preflight resolved no limit after configuration")
         val activeMessageIds = conversation.activeMessageIds()
         val shouldCompact = recentMessagesOverflow(conversationId, effectiveLimit, activeMessageIds)
         if (shouldCompact) compactConversation(agentId, conversationId)
@@ -266,4 +271,3 @@ private fun JsonObject.objectValue(key: String): JsonObject? = this[key] as? Jso
 private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
 private fun JsonObject.long(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
 private fun JsonObject.integer(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
-

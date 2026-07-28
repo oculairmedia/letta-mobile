@@ -456,6 +456,7 @@ class ConversationTurnFanoutTest {
         assertFalse(fanout.anyTerminalWritten)
         val delta = json.parseToJsonElement(sinkInit.frames().single()).jsonObject["delta"]!!.jsonObject
         assertEquals("error_message", delta["message_type"]!!.jsonPrimitive.content)
+        assertEquals("initiator_busy", delta["iroh_rejection"]!!.jsonPrimitive.content)
     }
 
     @Test

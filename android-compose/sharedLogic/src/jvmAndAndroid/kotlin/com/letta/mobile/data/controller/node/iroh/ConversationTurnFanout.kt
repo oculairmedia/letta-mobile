@@ -283,6 +283,10 @@ internal class ConversationTurnFanout(
         val delta = buildJsonObject {
             put("message_type", "error_message")
             put("message", message)
+            // Tagged so the client mapper can emit Error + failed TurnDone for
+            // this peer only. Absent the tag, busy errors stay Error-only so a
+            // broadcast path cannot finalize the owning turn's UI.
+            put("iroh_rejection", INITIATOR_BUSY_REJECTION)
         }
         writeToViewerIsolated(viewer, delta, isInitiator = true)
     }
@@ -484,6 +488,8 @@ internal class ConversationTurnFanout(
         }
 
     private companion object {
+        const val INITIATOR_BUSY_REJECTION = "initiator_busy"
+
         // Stable seq for the user echo so a re-delivery is a snapshot, not an
         // append (see [broadcastUserEcho]). Zero cannot collide with an assistant
         // row (distinct serverId + message_type), so the reducer never conflates

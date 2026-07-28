@@ -227,6 +227,39 @@ class AppServerContextWindowPreflightTest {
         assertEquals(null, client.compactCommand)
     }
 
+    @Test
+    fun conversationOverrideDoesNotPersistAgentWideDefault() = runTest {
+        val client = PreflightClient(
+            agent = buildJsonObject { put("model_settings", buildJsonObject { }) },
+            conversation = buildJsonObject {
+                put("id", "conv-1")
+                put("context_window_limit", 128_000)
+                put(
+                    "in_context_message_ids",
+                    JsonArray(listOf(JsonPrimitive("msg-overflow"))),
+                )
+            },
+            messages = JsonArray(
+                listOf(
+                    providerMessage(
+                        ProviderMessageFixture(
+                            stopReason = "stop",
+                            input = 40_000,
+                            output = 300,
+                            contentEmpty = false,
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertFalse(result.configuredContextLimit)
+        assertFalse(result.compacted)
+        assertEquals(null, client.updateCommand)
+    }
+
     private fun providerMessage(fixture: ProviderMessageFixture) = buildJsonObject {
         put("id", fixture.id)
         put("role", "assistant")
@@ -264,6 +297,7 @@ private class PreflightClient(
     private val messages: JsonArray,
     private val retrieveSuccess: Boolean = true,
     private val activeMessageIds: List<String> = listOf("msg-overflow"),
+    private val conversation: kotlinx.serialization.json.JsonObject? = null,
 ) : AppServerClient {
     override val events: Flow<AppServerReceivedFrame> = emptyFlow()
     var updateCommand: AppServerCommand.AgentUpdate? = null
@@ -282,7 +316,7 @@ private class PreflightClient(
         AppServerInboundFrame.ConversationRetrieveResponse(
             requestId = command.requestId,
             success = true,
-            conversation = buildJsonObject {
+            conversation = conversation ?: buildJsonObject {
                 put("id", command.conversationId)
                 put(
                     "in_context_message_ids",

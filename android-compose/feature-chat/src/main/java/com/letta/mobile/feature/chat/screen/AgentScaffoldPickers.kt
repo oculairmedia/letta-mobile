@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AssistChip
@@ -846,7 +847,17 @@ internal fun ModelPickerSheet(
                                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
                             )
                         }
-                        items(providerModels, key = { it.handle ?: it.id }) { model ->
+                        itemsIndexed(
+                            providerModels,
+                            key = { index, model ->
+                                // Catalogs can emit duplicate handles (same model
+                                // listed under more than one provider entry). Index
+                                // keeps LazyColumn keys unique without remounting
+                                // rows that already have a distinct id.
+                                listOfNotNull(model.id, model.handle, model.name, index.toString())
+                                    .joinToString("|")
+                            },
+                        ) { _, model ->
                             val handle = model.handle ?: model.name
                             val isActive = handle == currentModelHandle
                             Card(

@@ -1545,10 +1545,21 @@ internal fun String.deferredToolResultPreview(): String {
     return if (length > preview.length) "$preview…" else preview
 }
 
-internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean =
-    // Use the compact group card from the first tool call so the UI does not
-    // flash the legacy single ToolCallCard and then morph when a second call lands.
-    toolCalls.isNotEmpty()
+internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean {
+    if (toolCalls.isEmpty()) return false
+    // Single specialized Agent/image cards keep ToolCallCard (subagent dispatch /
+    // notification chrome). Ordinary singles and all multi-tool groups stay on
+    // the compact group path so layout does not flash when a second call lands.
+    if (toolCalls.size == 1 && usesSpecializedToolCallCard(toolCalls.first())) {
+        return false
+    }
+    return true
+}
+
+internal fun usesSpecializedToolCallCard(toolCall: UiToolCall): Boolean =
+    toolCall.name == "generate_image" ||
+        toolCall.subagentDispatch != null ||
+        toolCall.result?.let(::parseTaskNotificationForToolCard) != null
 
 internal fun shouldRunToolCallEntranceAnimation(
     animateEntrance: Boolean,

@@ -146,14 +146,17 @@ internal object IrohStreamDeltaServerFrameMapper {
             )
 
             "loop_error",
-            "error_message" -> mapErrorMessage(delta.errorText(), meta)
+            "error_message" -> mapErrorMessage(delta, meta)
 
             else -> emptyList()
         }
     }
 
-    private fun mapErrorMessage(message: String, meta: Metadata): List<ServerFrame> {
+    private fun mapErrorMessage(delta: JsonObject, meta: Metadata): List<ServerFrame> {
+        val message = delta.errorText()
         val busy = isTurnAlreadyActiveMessage(message)
+        val initiatorBusy =
+            busy && delta.string("iroh_rejection") == INITIATOR_BUSY_REJECTION
         val errorFrame = ServerFrame.Error(
             id = meta.frameId,
             ts = meta.timestamp,
@@ -163,9 +166,11 @@ internal object IrohStreamDeltaServerFrameMapper {
             turnId = meta.turnId,
             runId = meta.runId,
         )
-        // Busy rejections must not synthesize TurnDone — that would finalize
-        // the live turn's UI while the owning run is still in progress.
-        if (busy) return listOf(errorFrame)
+        // Untagged busy frames stay Error-only: a broadcast busy must not
+        // synthesize TurnDone onto the owning peer's live turn. Initiator-only
+        // rejections are tagged and get a failed TurnDone so peer B leaves
+        // Thinking while peer A continues unaffected.
+        if (busy && !initiatorBusy) return listOf(errorFrame)
         return listOf(
             errorFrame,
             ServerFrame.TurnDone(
@@ -178,6 +183,8 @@ internal object IrohStreamDeltaServerFrameMapper {
             ),
         )
     }
+
+    private const val INITIATOR_BUSY_REJECTION = "initiator_busy"
 
     private fun mapPlainBody(
         payload: RuntimeEventPayload.RemoteStreamFrame,

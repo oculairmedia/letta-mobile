@@ -7,8 +7,12 @@ import com.letta.mobile.data.model.parseSkillEnvelope
 import com.letta.mobile.ui.common.GroupPosition
 
 /** LazyColumn-stable identity: prefer client otid across Pending → Confirmed. */
-internal fun UiMessage.stableListKey(): String =
-    clientMessageId?.takeIf { it.isNotBlank() } ?: id
+internal fun UiMessage.stableListKey(): String {
+    val base = clientMessageId?.takeIf { it.isNotBlank() } ?: id
+    // Reasoning and assistant events can share an otid without a runId; keep
+    // LazyColumn keys distinct so both rows survive.
+    return if (isReasoning) "reasoning:$base" else base
+}
 
 
 /**

@@ -51,6 +51,31 @@ class MessageContentFactoryTest {
     }
 
     @Test
+    fun `single Agent subagent call keeps specialized ToolCallCard path`() {
+        val agentCall = UiToolCall(
+            name = "Agent",
+            arguments = "{\"description\":\"Investigate\"}",
+            result = null,
+            subagentDispatch = com.letta.mobile.data.model.UiSubagentDispatch(
+                toolCallId = "tool-1",
+                description = "Investigate",
+                subagentType = "researcher",
+                runInBackground = true,
+                prompt = "do the thing",
+            ),
+        )
+        assertFalse(shouldUseCompactToolCallGroup(listOf(agentCall)))
+        assertTrue(
+            shouldUseCompactToolCallGroup(
+                listOf(
+                    agentCall,
+                    UiToolCall(name = "Bash", arguments = "{}", result = null),
+                ),
+            ),
+        )
+    }
+
+    @Test
     fun `copy text preserves exact raw tool result`() {
         val rawResult = """{"ok":true,"count":2}
 [31mraw stderr[0m

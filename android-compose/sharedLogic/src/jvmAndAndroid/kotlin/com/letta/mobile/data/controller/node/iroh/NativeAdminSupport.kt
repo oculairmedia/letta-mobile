@@ -110,6 +110,8 @@ internal object NativeAdmin {
         "skill.install",
         "skill.uninstall",
         "approval.submit",
+        // Heuristic suffixes miss "restore"; the handler issues conversation_update.
+        "conversation.restore",
     )
 
     private val MUTATION_SUFFIXES = listOf(
@@ -118,6 +120,7 @@ internal object NativeAdmin {
         ".delete",
         ".delete_all",
         ".archive",
+        ".restore",
     )
 
     private suspend fun <T : Any> executeRequire(

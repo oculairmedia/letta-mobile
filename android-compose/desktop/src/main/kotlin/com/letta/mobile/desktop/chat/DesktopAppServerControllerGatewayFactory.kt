@@ -3,6 +3,7 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnContextPreflight
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
@@ -54,14 +55,24 @@ class DesktopAppServerControllerGatewayFactory(
                     "${DesktopAppServerRuntimeConfig.SERVER_URL_ENV}.",
             )
 
-        val (transport, transportResources) = if (IrohChannelTransport.isIrohUrl(serverUrl)) {
+        val isIroh = IrohChannelTransport.isIrohUrl(serverUrl)
+        val (transport, transportResources) = if (isIroh) {
             buildIrohTransport(serverUrl, lettaConfig)
         } else {
             buildWebSocketTransport(serverUrl, lettaConfig)
         }
 
         val client = DefaultAppServerClient(transport)
-        val turnEngine = buildDesktopAppServerTurnEngine(client)
+        // Iroh turns run on the wrapper; client-local preflight would be a
+        // duplicate typed-command path (Android dial already uses None).
+        val turnEngine = buildDesktopAppServerTurnEngine(
+            client = client,
+            turnContextPreflight = if (isIroh) {
+                TurnContextPreflight.None
+            } else {
+                AppServerContextWindowPreflight(client)
+            },
+        )
         // The App Server doesn't expose conversation listing, message history,
         // agent CRUD, or the model catalog; those stay on HTTP.
         val httpGateway = DesktopLettaHttpChatGateway(
@@ -136,10 +147,14 @@ class DesktopAppServerControllerGatewayFactory(
  * controller.startRuntime, no double runtime_start on first send (#831 Codex P2).
  *
  * Context-window preflight matches the Iroh wrapper path so direct Desktop
- * App Server connections also persist a default limit and compact poisoned
- * empty-assistant transcripts before the turn starts.
+ * App Server WebSocket connections also persist a default limit and compact
+ * poisoned empty-assistant transcripts before the turn starts. Desktop Iroh
+ * dials inject [TurnContextPreflight.None] — the wrapper owns preflight.
  */
-internal fun buildDesktopAppServerTurnEngine(client: AppServerClient): AppServerTurnEngine =
+internal fun buildDesktopAppServerTurnEngine(
+    client: AppServerClient,
+    turnContextPreflight: TurnContextPreflight = AppServerContextWindowPreflight(client),
+): AppServerTurnEngine =
     AppServerTurnEngine(
         client = client,
         clientInfo = AppServerRuntimeStartClientInfo(
@@ -148,7 +163,7 @@ internal fun buildDesktopAppServerTurnEngine(client: AppServerClient): AppServer
             version = "0.2.0",
         ),
         permissionMode = AppServerPermissionMode.Unrestricted,
-        turnContextPreflight = AppServerContextWindowPreflight(client),
+        turnContextPreflight = turnContextPreflight,
     )
 
 /**

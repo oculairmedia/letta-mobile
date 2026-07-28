@@ -65,6 +65,8 @@ internal class ChatTimelineObserver(
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
+    /** True after Hydrated reported events while the UI still has no rows. */
+    private var awaitingProjectionAfterHydrate: Boolean = false
 
     /** Shared presentation core: projection (cache + incremental tail) + presence. */
     private val presenter = ChatTimelinePresenter()
@@ -78,6 +80,7 @@ internal class ChatTimelineObserver(
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
         observerBinding = null
+        awaitingProjectionAfterHydrate = false
         presenter.reset()
     }
 
@@ -130,11 +133,16 @@ internal class ChatTimelineObserver(
                             val prev = uiState.value
                             // Keep the skeleton until projection has actually
                             // produced rows when hydrate reports a nonempty page.
-                            val waitingForProjection =
+                            // If projection later yields zero UI rows (system-only
+                            // history), the first collect still clears loading.
+                            awaitingProjectionAfterHydrate =
                                 ev.messageCount > 0 && prev.messages.isEmpty()
-                            uiState.value = prev.copy(isLoadingMessages = waitingForProjection)
+                            uiState.value = prev.copy(
+                                isLoadingMessages = awaitingProjectionAfterHydrate,
+                            )
                         }
                         is TimelineSyncEvent.HydrateFailed -> {
+                            awaitingProjectionAfterHydrate = false
                             uiState.value = uiState.value.copy(isLoadingMessages = false)
                         }
                         is TimelineSyncEvent.ReconcileError -> {
@@ -231,7 +239,8 @@ internal class ChatTimelineObserver(
                     val ui = projection.ui
                     val a2uiSurfaces = syncA2uiHistorySnapshot(conversationId, projection.a2uiMessages)
                     val tailIsAssistant = projection.tailIsAssistant
-                    val clearLoading = ui.isNotEmpty()
+                    val clearLoading = ui.isNotEmpty() || awaitingProjectionAfterHydrate
+                    if (clearLoading) awaitingProjectionAfterHydrate = false
                     val newHasMoreOlder = if (projection.anyConfirmed) true else uiState.value.hasMoreOlderMessages
 
                     if (isFollowingDuplicateInitialMessageInFlight() && tailIsAssistant) {

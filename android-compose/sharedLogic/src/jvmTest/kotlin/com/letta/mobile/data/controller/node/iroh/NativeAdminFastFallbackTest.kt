@@ -86,6 +86,14 @@ class NativeAdminFastFallbackTest {
         assertTrue(otherProbed, "unrelated commands must not inherit another op's breaker")
     }
 
+    @Test
+    fun conversationRestoreIsClassifiedAsMutation() {
+        assertTrue(NativeAdmin.isMutationOp("conversation.restore"))
+        assertTrue(NativeAdmin.isMutationOp("conversation.archive"))
+        assertFalse(NativeAdmin.isMutationOp("conversation.list"))
+        assertFalse(NativeAdmin.isMutationOp("message.get"))
+    }
+
     private object FakeClient : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = error("unused")

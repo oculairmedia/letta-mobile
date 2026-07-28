@@ -64,4 +64,40 @@ class ControllerSubagentRegistrySourceTest {
         assertFalse(ControllerSubagentRegistrySource.CAPABILITY in IrohNodeConnection.advertisedCapabilities(withoutSource))
         assertTrue(ControllerSubagentRegistrySource.CAPABILITY in IrohNodeConnection.advertisedCapabilities(withSource))
     }
+
+    @Test
+    fun snakeCaseSnapshotMapsPendingErrorAndNumericStartTime() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-a"),
+                eventSeq = 2,
+                emittedAt = "t",
+                idempotencyKey = "k2",
+                subagents = listOf(
+                    buildJsonObject {
+                        put("subagent_id", "sa-1")
+                        put("status", "pending")
+                        put("conversation_id", "sub-conv")
+                        put("start_time", 1_700_000_000L)
+                    },
+                    buildJsonObject {
+                        put("tool_call_id", "tool/err")
+                        put("status", "running")
+                        put("error", "boom")
+                    },
+                ),
+            ),
+        )
+
+        val running = source.list("conv-a", includeTerminal = false)
+        assertEquals(listOf("sa-1"), running.map { it.toolCallId })
+        assertEquals(SubagentStatus.RUNNING, running.single().status)
+        assertEquals("sub-conv", running.single().subagentConversationId)
+        assertEquals("1700000000000", running.single().startedAt)
+
+        val all = source.list("conv-a", includeTerminal = true)
+        val failed = all.single { it.toolCallId == "tool/err" }
+        assertEquals(SubagentStatus.FAILED, failed.status)
+    }
 }

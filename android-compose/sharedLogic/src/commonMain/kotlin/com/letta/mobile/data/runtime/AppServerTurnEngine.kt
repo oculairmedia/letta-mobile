@@ -295,11 +295,12 @@ class AppServerTurnEngine(
 
     private fun releaseDeadOwnerLock(runId: String?): Boolean {
         val released = activeTurnOwnerRef.value
-        activeTurnOwnerRef.value = null
         try {
             activeTurn.unlock()
         } catch (_: Throwable) {
             // Already unlocked concurrently — treat as released.
+        } finally {
+            activeTurnOwnerRef.compareAndSet(released, null)
         }
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.reconciledDead",
@@ -488,8 +489,10 @@ class AppServerTurnEngine(
                 activeTurn.unlock()
             } finally {
                 // Clear STRICTLY after unlock returns (or throws). While the lock
-                // is still held-observable, the owner is never null.
-                activeTurnOwnerRef.value = null
+                // is still held-observable, the owner is never null. compareAndSet
+                // preserves a newer turn's owner if it acquired between unlock and
+                // this clear.
+                activeTurnOwnerRef.compareAndSet(releasedOwner, null)
                 Telemetry.event(
                     "AppServerTurnEngine", "activeTurn.released",
                     "runtimeId" to command.runtimeId.value,
