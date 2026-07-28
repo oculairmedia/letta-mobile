@@ -115,10 +115,16 @@ class DefaultAppServerController(
             onRuntimeInvalidated = {
                 runtimeMutex.withLock { runtimeCache.clear() }
             },
-            onRuntimeEnsured = { command, scope ->
+            onRuntimeEnsured = { command, response ->
                 runtimeMutex.withLock {
+                    val scope = response.runtime ?: return@withLock
                     val key = RuntimeKey(command.agentId.value, command.conversationId.value)
-                    runtimeCache[key] = CanonicalRuntime(scope = scope)
+                    runtimeCache[key] = CanonicalRuntime(
+                        scope = scope,
+                        agent = response.agent,
+                        conversation = response.conversation,
+                        created = response.created,
+                    )
                 }
             },
         )

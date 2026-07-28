@@ -159,7 +159,12 @@ class RuntimeEventFanout {
         try {
             val open = subscribers.values.toList()
             subscribers.clear()
-            open.forEach { it.channel.close() }
+            // Close with a cause so turn collectors fail the lease instead of
+            // treating detach as a clean end-of-stream completion.
+            val cause = kotlinx.coroutines.CancellationException(
+                "AppServerRuntimeEventRouter detached",
+            )
+            open.forEach { it.channel.close(cause) }
         } finally {
             stateMutex.unlock()
         }
@@ -266,5 +271,7 @@ private fun AppServerReceivedFrame.isTerminalBearingStreamDelta(): Boolean {
             ?.get("message_type")
             ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
     }.getOrNull()
-    return messageType == "stop_reason" || messageType == "error_message"
+    return messageType == "stop_reason" ||
+        messageType == "error_message" ||
+        messageType == "loop_error"
 }

@@ -18,6 +18,15 @@ internal class TurnRunIdGate(
     private val activeTurnOwnerRef: AtomicRef<AppServerTurnEngine.ActiveTurnOwner?>,
 ) {
     private val supersededRunIds = mutableSetOf<String>()
+    private var activeLeaseToken: Long? = null
+
+    /** Clear superseded IDs when a new turn lease begins. */
+    fun beginLease(leaseToken: Long) {
+        if (activeLeaseToken != leaseToken) {
+            supersededRunIds.clear()
+            activeLeaseToken = leaseToken
+        }
+    }
 
     fun accepts(received: AppServerReceivedFrame, leaseToken: Long): Boolean {
         val lease = activeLeaseRef.value ?: return true
@@ -43,9 +52,45 @@ private fun TurnLease?.withPromotedRunId(runId: String, leaseToken: Long): TurnL
     return lease.copy(runId = runId)
 }
 
-private fun AppServerReceivedFrame.frameRunIdOrNull(): String? {
+internal fun AppServerReceivedFrame.frameRunIdOrNull(): String? {
     val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return null
     return runCatching {
         streamDelta.delta.jsonObject["run_id"]?.jsonPrimitive?.contentOrNull
     }.getOrNull()?.takeIf { it.isNotBlank() }
+}
+
+internal fun AppServerReceivedFrame.terminalMessageTypeOrNull(): String? {
+    val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return null
+    return runCatching {
+        streamDelta.delta.jsonObject["message_type"]?.jsonPrimitive?.contentOrNull
+    }.getOrNull()
+}
+
+internal fun AppServerReceivedFrame.stopReasonOrNull(): String? {
+    val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return null
+    return runCatching {
+        val delta = streamDelta.delta.jsonObject
+        delta["stop_reason"]?.jsonPrimitive?.contentOrNull
+            ?: delta["reason"]?.jsonPrimitive?.contentOrNull
+    }.getOrNull()
+}
+
+internal fun AppServerReceivedFrame.carriesLifecycleTerminal(): Boolean {
+    val messageType = terminalMessageTypeOrNull() ?: return false
+    return messageType == "stop_reason" ||
+        messageType == "error_message" ||
+        messageType == "loop_error"
+}
+
+internal fun AppServerReceivedFrame.lifecycleStatusFromTerminal(): com.letta.mobile.runtime.RuntimeRunStatus? {
+    if (!carriesLifecycleTerminal()) return null
+    return when (terminalMessageTypeOrNull()) {
+        "error_message", "loop_error" -> com.letta.mobile.runtime.RuntimeRunStatus.Failed
+        "stop_reason" -> when (stopReasonOrNull()) {
+            "cancelled" -> com.letta.mobile.runtime.RuntimeRunStatus.Cancelled
+            "error" -> com.letta.mobile.runtime.RuntimeRunStatus.Failed
+            else -> com.letta.mobile.runtime.RuntimeRunStatus.Completed
+        }
+        else -> null
+    }
 }

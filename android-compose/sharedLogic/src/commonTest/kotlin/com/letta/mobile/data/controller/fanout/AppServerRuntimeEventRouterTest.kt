@@ -72,7 +72,12 @@ class AppServerRuntimeEventRouterTest {
         )
 
         events.test {
-            awaitComplete()
+            val error = awaitError()
+            assertEquals(
+                true,
+                error is kotlinx.coroutines.CancellationException,
+                "detach must fail active subscribers rather than clean-complete",
+            )
         }
         // Upstream emissions after detach must not reach a closed subscriber.
         inbound.emit(
