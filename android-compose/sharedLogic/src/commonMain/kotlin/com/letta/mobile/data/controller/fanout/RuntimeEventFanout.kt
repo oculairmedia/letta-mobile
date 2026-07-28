@@ -5,6 +5,8 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
@@ -13,7 +15,6 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Fanout layer for routing App Server runtime events to multiple UI clients.
@@ -73,8 +74,12 @@ class RuntimeEventFanout {
 
     /**
      * Master lock for protecting internal state.
+     *
+     * Blocking [SynchronizedObject] (not a suspending [Mutex]) so [closeAllSubscribersSync]
+     * from non-suspend [AppServerRuntimeEventRouter.detach] never skips cleanup when
+     * route/subscribe holds the lock.
      */
-    private val stateMutex = Mutex()
+    private val stateLock = SynchronizedObject()
 
     /**
      * Subscribes to events for a specific runtime.
@@ -87,7 +92,7 @@ class RuntimeEventFanout {
         agentId: AgentId,
         conversationId: ConversationId,
         subscriberId: String = generateSubscriberId(),
-    ): Pair<String, Flow<AppServerReceivedFrame>> = stateMutex.withLock {
+    ): Pair<String, Flow<AppServerReceivedFrame>> = synchronized(stateLock) {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val channel = Channel<AppServerReceivedFrame>(
             capacity = SUBSCRIBER_BUFFER_CAPACITY,
@@ -104,7 +109,7 @@ class RuntimeEventFanout {
      * (lgns8.22.3). Idle locks are retired from [releaseTurnLock] once no waiters
      * remain and no viewers are subscribed.
      */
-    suspend fun unsubscribe(subscriberId: String): Boolean = stateMutex.withLock {
+    suspend fun unsubscribe(subscriberId: String): Boolean = synchronized(stateLock) {
         val slot = subscribers.remove(subscriberId) ?: return false
         slot.channel.close()
         true
@@ -120,7 +125,7 @@ class RuntimeEventFanout {
      * subscriber — TurnEngine must answer them to avoid wedging the server.
      */
     suspend fun route(received: AppServerReceivedFrame) {
-        val channels = stateMutex.withLock {
+        val channels = synchronized(stateLock) {
             val runtime = received.frame.runtime
             when {
                 runtime == null -> {
@@ -154,25 +159,20 @@ class RuntimeEventFanout {
     }
 
     /** Close every subscriber channel (used by [AppServerRuntimeEventRouter.detach]). */
-    fun closeAllSubscribersSync() {
-        if (!stateMutex.tryLock()) return
-        try {
-            val open = subscribers.values.toList()
-            subscribers.clear()
-            // Close with a cause so turn collectors fail the lease instead of
-            // treating detach as a clean end-of-stream completion.
-            val cause = kotlinx.coroutines.CancellationException(
-                "AppServerRuntimeEventRouter detached",
-            )
-            open.forEach { it.channel.close(cause) }
-        } finally {
-            stateMutex.unlock()
-        }
+    fun closeAllSubscribersSync() = synchronized(stateLock) {
+        val open = subscribers.values.toList()
+        subscribers.clear()
+        // Close with a cause so turn collectors fail the lease instead of
+        // treating detach as a clean end-of-stream completion.
+        val cause = kotlinx.coroutines.CancellationException(
+            "AppServerRuntimeEventRouter detached",
+        )
+        open.forEach { it.channel.close(cause) }
     }
 
     suspend fun acquireTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val entry = stateMutex.withLock {
+        val entry = synchronized(stateLock) {
             runtimeTurnLocks.getOrPut(key) { TurnLockEntry() }.also {
                 it.waiters.incrementAndGet()
             }
@@ -187,7 +187,7 @@ class RuntimeEventFanout {
 
     suspend fun releaseTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val entry = stateMutex.withLock { runtimeTurnLocks[key] } ?: return
+        val entry = synchronized(stateLock) { runtimeTurnLocks[key] } ?: return
         entry.mutex.unlock()
         retireTurnLockIfIdle(key, entry)
     }
@@ -205,26 +205,27 @@ class RuntimeEventFanout {
         }
     }
 
-    suspend fun subscriberCount(): Int = stateMutex.withLock {
+    suspend fun subscriberCount(): Int = synchronized(stateLock) {
         subscribers.size
     }
 
-    suspend fun runtimeFlowCount(): Int = stateMutex.withLock {
+    suspend fun runtimeFlowCount(): Int = synchronized(stateLock) {
         subscribers.values.map { it.key }.toSet().size
     }
 
     /** Test/telemetry: number of retained per-runtime turn locks. */
-    suspend fun turnLockCount(): Int = stateMutex.withLock {
+    suspend fun turnLockCount(): Int = synchronized(stateLock) {
         runtimeTurnLocks.size
     }
 
-    suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int = stateMutex.withLock {
-        val key = RuntimeKey(agentId.value, conversationId.value)
-        subscribers.values.count { it.key == key }
-    }
+    suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int =
+        synchronized(stateLock) {
+            val key = RuntimeKey(agentId.value, conversationId.value)
+            subscribers.values.count { it.key == key }
+        }
 
-    private suspend fun retireTurnLockIfIdle(key: RuntimeKey, entry: TurnLockEntry) {
-        stateMutex.withLock {
+    private fun retireTurnLockIfIdle(key: RuntimeKey, entry: TurnLockEntry) {
+        synchronized(stateLock) {
             if (entry.waiters.decrementAndGet() > 0) return
             if (subscribers.values.any { it.key == key }) return
             if (runtimeTurnLocks[key] === entry) {
