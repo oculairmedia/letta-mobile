@@ -32,11 +32,15 @@ internal class TurnRunIdGate(
         if (current.runId == runId) return
         current.runId?.takeIf { it.isNotBlank() }?.let { supersededRunIds.add(it) }
         activeTurnOwnerRef.value = current.copy(runId = runId)
-        activeLeaseRef.update { lease ->
-            if (lease == null || lease.token != leaseToken || lease.runId == runId) lease
-            else lease.copy(runId = runId)
-        }
+        activeLeaseRef.update { lease -> lease.withPromotedRunId(runId, leaseToken) }
     }
+}
+
+private fun TurnLease?.withPromotedRunId(runId: String, leaseToken: Long): TurnLease? {
+    val lease = this ?: return null
+    if (lease.token != leaseToken) return lease
+    if (lease.runId == runId) return lease
+    return lease.copy(runId = runId)
 }
 
 private fun AppServerReceivedFrame.frameRunIdOrNull(): String? {

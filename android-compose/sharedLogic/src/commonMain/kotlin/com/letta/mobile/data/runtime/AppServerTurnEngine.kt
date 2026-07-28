@@ -135,6 +135,7 @@ class AppServerTurnEngine(
     private val activeLeaseRef = atomic<TurnLease?>(null)
     private val leaseTokenSeq = atomic(0L)
     private var runtime: AppServerRuntimeScope? = null
+    private val inboundSource = TurnInboundSource(client, eventRouter)
 
     /**
      * Drops the cached runtime scope so the next turn re-issues runtime_start.
@@ -759,7 +760,7 @@ class AppServerTurnEngine(
         var turnEndReason: String? = null
         // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
         // prior ids are superseded and must not complete/mutate this lease.
-        val (fanoutSubscriberId, inboundEvents) = subscribeTurnInbound(scope)
+        val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
         try {
             collectorReady.complete(Unit)
             inboundEvents.collect { received ->
@@ -1023,21 +1024,10 @@ class AppServerTurnEngine(
             userInputApprovalIdsRef.update { emptyMap() }
             fanoutSubscriberId?.let { subId ->
                 withContext(NonCancellable) {
-                    eventRouter?.unsubscribe(subId)
+                    inboundSource.unsubscribe(subId)
                 }
             }
         }
-    }
-
-    private suspend fun subscribeTurnInbound(
-        scope: AppServerRuntimeScope,
-    ): Pair<String?, Flow<AppServerReceivedFrame>> {
-        val router = eventRouter ?: return null to client.events
-        val (subId, flow) = router.subscribe(
-            AgentId(scope.agentId),
-            ConversationId(scope.conversationId),
-        )
-        return subId to flow
     }
 
     /**
