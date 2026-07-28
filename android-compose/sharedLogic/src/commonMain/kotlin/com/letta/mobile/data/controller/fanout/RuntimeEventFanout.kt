@@ -76,9 +76,9 @@ class RuntimeEventFanout {
      * the given runtime. Multiple subscribers can subscribe to the same runtime;
      * each will receive all events.
      *
-     * The flow is hot with a replay of 1: a subscriber that joins after the last
-     * event was emitted immediately receives that most-recent event, so late
-     * subscribers can recover current state rather than waiting for the next one.
+     * Replay is intentionally 0 (lgns8.22.3): replaying the last frame can
+     * deliver a prior turn's terminal to a new turn consumer. Recovery comes
+     * from sync/message reconciliation, not an untyped last-frame cache.
      *
      * @param agentId The agent ID for the runtime
      * @param conversationId The conversation ID for the runtime
@@ -95,7 +95,7 @@ class RuntimeEventFanout {
         // Get or create the shared flow for this runtime
         val flow = runtimeFlows.getOrPut(key) {
             MutableSharedFlow(
-                replay = 1, // Replay the last event so late subscribers can recover it
+                replay = 0,
                 extraBufferCapacity = 64, // Buffer up to 64 events if no subscriber is ready
             )
         }
@@ -109,7 +109,9 @@ class RuntimeEventFanout {
     /**
      * Unsubscribes a subscriber by ID.
      *
-     * If this is the last subscriber for a runtime, the runtime's flow is cleaned up.
+     * The last viewer leaving removes the hot event flow for that runtime, but
+     * does **not** drop the per-runtime turn lock — an active turn/lease must
+     * survive subscriber churn (lgns8.22.3).
      *
      * @param subscriberId The subscriber ID returned by subscribe()
      * @return true if the subscriber was found and removed, false otherwise
@@ -121,9 +123,8 @@ class RuntimeEventFanout {
         val hasRemainingSubscribers = subscribers.values.any { it == key }
 
         if (!hasRemainingSubscribers) {
-            // No more subscribers for this runtime, clean up the flow and lock
+            // Drop the event flow only — keep turn locks for active coordinators.
             runtimeFlows.remove(key)
-            runtimeTurnLocks.remove(key)
         }
 
         true
@@ -228,6 +229,11 @@ class RuntimeEventFanout {
      */
     suspend fun runtimeFlowCount(): Int = stateMutex.withLock {
         runtimeFlows.size
+    }
+
+    /** Test/telemetry: number of retained per-runtime turn locks. */
+    suspend fun turnLockCount(): Int = stateMutex.withLock {
+        runtimeTurnLocks.size
     }
 
     /**
