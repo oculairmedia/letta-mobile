@@ -39,7 +39,7 @@ git push --force-with-lease                 # safe force-push to your branch
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
 - **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`. Two `Merge branch 'main' into <branch>` commits in a PR's history is a strong signal that this rule was broken.
 - **CI gates merges, not pushes.** Required status checks on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, and `codecov`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
-- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`), `detekt (advisory)`, and CodeScene Code Health Review surface debt without blocking merge. Do not treat them as required gates.
+- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`), `detekt (advisory)`, `qodana`, and CodeScene Code Health Review surface debt without blocking merge. Do not treat them as required gates.
 - **Additive module tests:** on PRs, `scripts/ci/changed-gradle-modules.sh` may also run `:feature-chat` / `:feature-editagent` / `:designsystem` / `:desktop` / `:cli` unit tests when those trees change. This never skips `:sharedLogic:allTests`.
 - **Run the pre-push checklist before opening the PR.** See the next section. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
 
@@ -165,6 +165,7 @@ fi
 #    Advisory (cannot block merge; do not iterate to "fix" them):
 #    - `CodeScene Code Health Review` — advisory, often pre-existing.
 #    - `detekt (advisory)` — `maxIssues: 0` on main, pre-existing.
+#    - `qodana` — runs on `android-compose/**` PRs only; advisory.
 #    - `Advisory AGENTS.md policy` — greppable rules, never blocks.
 #    When any required gate fails, fix it. When only advisory fails,
 #    document the cost in a PR comment and proceed.

@@ -72,7 +72,7 @@ opening a PR.**
 - `perf-gate` — perf-budget benchmarks
 - `codecov` — coverage upload
 
-**Advisory only** (cannot block merge): `detekt`, CodeScene Code Health Review, `Advisory AGENTS.md policy`.
+**Advisory only** (cannot block merge): `detekt`, `qodana`, CodeScene Code Health Review, `Advisory AGENTS.md policy`.
 
 ## Releases
 
