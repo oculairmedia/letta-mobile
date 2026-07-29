@@ -6,7 +6,9 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LlmConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.CompletableDeferred
@@ -46,16 +48,7 @@ class DesktopCreateAgentRoutingTest {
 
     @Test
     fun createAgentRetainsSelectedRouteWhenHandlesCollide() = runTest {
-        val routes = listOf("east", "west").map { route ->
-            LlmModel(
-                id = route,
-                name = "GPT-4o ${route.replaceFirstChar { it.uppercase() }}",
-                handle = "openai/gpt-4o",
-                providerType = "azure",
-                providerName = "byok-$route",
-                modelEndpoint = "https://$route.example/v1",
-            )
-        }
+        val routes = duplicateRoutingModels()
         val gateway = RoutingGateway(routes)
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(),
@@ -67,6 +60,39 @@ class DesktopCreateAgentRoutingTest {
         runCurrent()
         val westSelection = buildModelOptions(routes).single { it.first.endsWith("West") }.second
         controller.createAgent(name = "West agent", model = westSelection, embedding = null)
+        runCurrent()
+
+        assertEquals("openai/gpt-4o", gateway.createdParams?.model)
+        assertEquals("byok-west", gateway.createdParams?.modelSettings?.providerName)
+        assertEquals("https://west.example/v1", gateway.createdParams?.llmConfig?.modelEndpoint)
+        controller.close()
+    }
+
+    @Test
+    fun createAgentResolvesSameAsCurrentRouteFromTemplateConfig() = runTest {
+        val routes = duplicateRoutingModels()
+        val gateway = RoutingGateway(routes)
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(),
+            scope = this,
+            gatewayFactory = { gateway },
+        )
+        val template = Agent(
+            id = AgentId("template"),
+            name = "Template",
+            model = "openai/gpt-4o",
+            modelSettings = ModelSettings(providerType = "azure", providerName = "byok-west"),
+            llmConfig = LlmConfig(modelEndpoint = "https://west.example/v1"),
+        )
+
+        controller.start()
+        runCurrent()
+        controller.createAgent(
+            name = "Cloned west agent",
+            model = template.model,
+            embedding = null,
+            modelRouteTemplate = template,
+        )
         runCurrent()
 
         assertEquals("openai/gpt-4o", gateway.createdParams?.model)
@@ -102,6 +128,17 @@ class DesktopCreateAgentRoutingTest {
         assertEquals(16_384, gateway.createdParams?.modelSettings?.maxOutputTokens)
         controller.close()
     }
+}
+
+private fun duplicateRoutingModels(): List<LlmModel> = listOf("east", "west").map { route ->
+    LlmModel(
+        id = route,
+        name = "GPT-4o ${route.replaceFirstChar { it.uppercase() }}",
+        handle = "openai/gpt-4o",
+        providerType = "azure",
+        providerName = "byok-$route",
+        modelEndpoint = "https://$route.example/v1",
+    )
 }
 
 private class RoutingGateway(

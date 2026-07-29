@@ -18,7 +18,6 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
-import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.avatar.core.AvatarActivity
 import com.letta.mobile.desktop.avatar.DesktopAvatarCompanion
@@ -363,11 +362,9 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
 
 /** Model/embedding defaults for a new agent, copied from the focused agent. */
 internal fun resolveNewAgentDefaults(
-    agentRepository: IAgentRepository,
-    templateAgentId: String?,
+    template: Agent?,
     modelValue: String?,
 ): Pair<String?, String?> {
-    val template = templateAgentId?.let { agentRepository.getCachedAgent(it) }
     return (modelValue ?: template?.model) to template?.embedding
 }
 
@@ -376,4 +373,3 @@ internal fun conversationRecency(label: String): java.time.Instant =
         ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
 
 private const val AVATAR_COMPANION_VRM_PATH_KEY = "avatar.companion.vrm_path"
-

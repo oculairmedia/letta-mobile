@@ -13,6 +13,7 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
@@ -41,6 +42,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 import kotlin.time.Duration.Companion.milliseconds
+
+private data class RequiredCatalogModel(
+    val models: List<LlmModel>,
+    val selectionValue: String,
+)
+
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
@@ -447,6 +454,7 @@ class DesktopChatController(
         name: String,
         model: String?,
         embedding: String?,
+        modelRouteTemplate: Agent? = null,
         onCreated: (String) -> Unit = {},
     ) {
         if (closed) return
@@ -454,18 +462,20 @@ class DesktopChatController(
         scope.launch {
             try {
                 val gw = gatewayExtras ?: return@launch
-                val availableModels = model?.let { requireCatalogModel(gw, it) }.orEmpty()
+                val catalogModel = model?.let {
+                    requireCatalogModel(gw, it, modelRouteTemplate)
+                }
                 val agent = gw.createAgent(
                     AgentCreateParams(
                         name = agentName,
-                        model = model,
+                        model = catalogModel?.selectionValue,
                         embedding = embedding,
                         includeBaseTools = true,
                         memoryBlocks = listOf(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
                             BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
                         ),
-                    ).withCatalogModelRouting(availableModels),
+                    ).withCatalogModelRouting(catalogModel?.models.orEmpty()),
                 )
                 onCreated(agent.id.value)
                 val conversation = gw.createConversation(agent.id.value)
@@ -937,7 +947,8 @@ class DesktopChatController(
     private suspend fun requireCatalogModel(
         extras: ChatGatewayExtras,
         selectedValue: String,
-    ): List<LlmModel> {
+        routeTemplate: Agent?,
+    ): RequiredCatalogModel {
         val cached = _availableModels.value
         val initialResult = if (cached.isNotEmpty()) {
             Result.success(cached)
@@ -952,10 +963,26 @@ class DesktopChatController(
         val models = result.getOrElse { cause ->
             throw IllegalStateException("Model catalog is unavailable; retry agent creation.", cause)
         }
-        requireNotNull(ModelCatalog.selectedModel(models, selectedValue)) {
+        val template = routeTemplate?.takeIf { it.model == selectedValue }
+        val selectedModel = requireNotNull(
+            ModelCatalog.selectedModelForRoute(
+                models = models,
+                selectedValue = selectedValue,
+                providerType = template?.modelSettings?.providerType
+                    ?: template?.llmConfig?.modelEndpointType,
+                providerName = template?.modelSettings?.providerName
+                    ?: template?.llmConfig?.providerName,
+                providerCategory = template?.modelSettings?.providerCategory
+                    ?: template?.llmConfig?.providerCategory,
+                modelEndpoint = template?.llmConfig?.modelEndpoint,
+            ),
+        ) {
             "Selected model is not available in the current catalog; choose a model and retry."
         }
-        return models
+        return RequiredCatalogModel(
+            models = models,
+            selectionValue = ModelCatalog.selectionValue(models, selectedModel),
+        )
     }
 
     /**

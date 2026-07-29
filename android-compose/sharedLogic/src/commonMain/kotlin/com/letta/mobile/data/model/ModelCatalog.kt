@@ -57,6 +57,33 @@ object ModelCatalog {
     }
 
     /**
+     * Resolves an ambiguous stored handle using route metadata retained on an
+     * existing agent. Exact picker tokens and unique handles still win first.
+     */
+    fun selectedModelForRoute(
+        models: List<LlmModel>,
+        selectedValue: String?,
+        providerType: String? = null,
+        providerName: String? = null,
+        providerCategory: String? = null,
+        modelEndpoint: String? = null,
+    ): LlmModel? {
+        selectedModel(models, selectedValue)?.let { return it }
+        val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return null
+        val hasRouteIdentity = listOf(providerType, providerName, providerCategory, modelEndpoint)
+            .any { !it.isNullOrBlank() }
+        if (!hasRouteIdentity) return null
+        return models.filter { valueOf(it) == selected || selected in it.selectionAliases }
+            .filter { model ->
+                routeFieldMatches(model.providerType, providerType) &&
+                    routeFieldMatches(model.providerName, providerName) &&
+                    routeFieldMatches(model.providerCategory, providerCategory) &&
+                    routeFieldMatches(model.modelEndpoint, modelEndpoint, ignoreCase = false)
+            }
+            .singleOrNull()
+    }
+
+    /**
      * Converts a picker token back to the model handle sent to the backend.
      * Stored aliases are preserved because they are not picker tokens for the
      * resolved canonical row.
@@ -124,6 +151,12 @@ object ModelCatalog {
         tokens >= 1_000 -> "${tokens / 1_000}K"
         else -> tokens.toString()
     }
+
+    private fun routeFieldMatches(
+        actual: String?,
+        expected: String?,
+        ignoreCase: Boolean = true,
+    ): Boolean = expected.isNullOrBlank() || actual?.equals(expected, ignoreCase = ignoreCase) == true
 
     private fun badge(model: LlmModel): ModelBadge? = when {
         isLocal(model) -> ModelBadge.Local

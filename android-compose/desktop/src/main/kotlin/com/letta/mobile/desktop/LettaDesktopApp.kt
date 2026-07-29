@@ -797,12 +797,18 @@ internal fun LettaDesktopApp(
                     onOpenAgent = ::openAgent,
                     onNavigate = { selectedDestination = it },
                     onCreateAgent = { name, modelValue ->
+                        val agentRepository = dataBindings.sessionGraphProvider.current.agentRepository
+                        val templateAgent = selectedAgentId?.let { agentRepository.getCachedAgent(it) }
                         val (model, embedding) = resolveNewAgentDefaults(
-                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
-                            templateAgentId = selectedAgentId,
+                            template = templateAgent,
                             modelValue = modelValue,
                         )
-                        chatController.createAgent(name = name, model = model, embedding = embedding)
+                        chatController.createAgent(
+                            name = name,
+                            model = model,
+                            embedding = embedding,
+                            modelRouteTemplate = templateAgent.takeIf { modelValue == null },
+                        )
                         selectedDestination = DesktopDestination.Conversations
                     },
                     onIrohIdentityReset = {

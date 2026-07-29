@@ -76,11 +76,13 @@ class ModelCatalogTest {
             name = "GPT-4o East",
             handle = "openai/gpt-4o",
             providerType = "azure",
+            providerName = "byok-east",
             modelEndpoint = "https://east.example/v1",
         )
         val west = east.copy(
             id = "west",
             name = "GPT-4o West",
+            providerName = "byok-west",
             modelEndpoint = "https://west.example/v1",
         )
         val models = listOf(east, west)
@@ -89,6 +91,16 @@ class ModelCatalogTest {
         assertEquals("west", ModelCatalog.selectionValue(models, west))
         assertEquals(west, ModelCatalog.selectedModel(models, "west"))
         assertNull(ModelCatalog.selectedModel(models, "openai/gpt-4o"))
+        assertEquals(
+            west,
+            ModelCatalog.selectedModelForRoute(
+                models = models,
+                selectedValue = "openai/gpt-4o",
+                providerType = "azure",
+                providerName = "byok-west",
+                modelEndpoint = "https://west.example/v1",
+            ),
+        )
         assertEquals("openai/gpt-4o", ModelCatalog.transportValue(models, "west"))
         assertEquals(
             setOf("east", "west"),

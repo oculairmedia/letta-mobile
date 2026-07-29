@@ -31,6 +31,7 @@ fun ModelDropdown(
     onLoadModels: () -> Unit,
     modifier: Modifier = Modifier,
     label: String = "Model",
+    selectionValue: (LlmModel) -> String = ModelCatalog::valueOf,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var filterText by remember { mutableStateOf("") }
@@ -107,7 +108,7 @@ fun ModelDropdown(
                                 }
                             },
                             onClick = {
-                                onModelSelected(ModelCatalog.selectionValue(models, model))
+                                onModelSelected(selectionValue(model))
                                 filterText = ""
                                 expanded = false
                             },

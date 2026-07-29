@@ -29,6 +29,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
@@ -365,6 +366,7 @@ private fun CreateAgentRuntimeModels(
                 onLoadModels = resources.onLoadModels,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.common_model),
+                selectionValue = { ModelCatalog.selectionValue(resources.llmModels, it) },
             )
         }
         return
@@ -376,6 +378,7 @@ private fun CreateAgentRuntimeModels(
         onLoadModels = resources.onLoadModels,
         modifier = Modifier.fillMaxWidth(),
         label = stringResource(R.string.common_model),
+        selectionValue = { ModelCatalog.selectionValue(resources.llmModels, it) },
     )
     ModelDropdown(
         selectedModel = formState.embedding,
