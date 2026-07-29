@@ -44,6 +44,14 @@ object AppServerProtocol {
     private val redactedPrimitive = JsonPrimitive(REDACTED_PLACEHOLDER)
     private val emptyRaw = JsonObject(emptyMap())
 
+    private class ParsedInboundFrame(
+        val type: JsonPrimitive?,
+        val raw: JsonObject,
+    ) {
+        val typeName: String?
+            get() = type?.contentOrNull
+    }
+
     fun encodeCommand(command: AppServerCommand): String =
         json.encodeToString(AppServerCommand.serializer(), command)
 
@@ -66,95 +74,145 @@ object AppServerProtocol {
         val element = runCatching { json.parseToJsonElement(rawJson) }.getOrNull()
         val raw = element as? JsonObject
         if (raw == null) {
-            val reason = if (element == null) "invalid JSON syntax" else "top-level frame is not a JSON object"
-            return AppServerReceivedFrame(
-                channel = channel ?: AppServerChannel.Control,
-                frame = AppServerInboundFrame.DecodeFailure(
-                    declaredType = null,
-                    raw = null,
-                    diagnostic = boundedDiagnostic("decode_failure: $reason"),
-                ),
-                raw = emptyRaw,
-            )
+            return malformedFrame(element, channel)
         }
-        val type = (raw["type"] as? JsonPrimitive)?.contentOrNull
-        val resolvedChannel = channel ?: if (type in STREAM_CHANNEL_MESSAGE_TYPES) {
+        val parsed = ParsedInboundFrame(type = raw["type"] as? JsonPrimitive, raw = raw)
+        val resolvedChannel = channel ?: if (parsed.typeName in STREAM_CHANNEL_MESSAGE_TYPES) {
             AppServerChannel.Stream
         } else {
             AppServerChannel.Control
         }
-        val frame = when (type) {
-            "auth_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(raw) }
-            "runtime_start_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(raw) }
-            "sync_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(raw) }
-            "abort_message_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AbortMessageResponse>(raw) }
-            "stream_delta" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.StreamDelta>(raw) }
-            "update_loop_status" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateLoopStatus>(raw) }
-            "update_device_status" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateDeviceStatus>(raw) }
-            "update_queue" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateQueue>(raw) }
-            "update_subagent_state" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateSubagentState>(raw) }
-            "external_tool_call_request" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(raw) }
-            "control_request" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(raw) }
-            "admin_rpc_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(raw) }
-            // lgns8.7/.8 native typed responses: defined + correlated on by
-            // client methods but absent from this decode dispatch, so real App
-            // Server replies fell through to Unknown and every native op hung
-            // (e.g. conversation.create timed out at 15s). Decode them here.
-            "list_models_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(raw) }
-            "skill_enable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(raw) }
-            "skill_disable_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(raw) }
-            "skills_updated" -> {
-                // Nested payloads decode to SkillsUpdated(skills=null) because
-                // unknown keys are ignored. Preserve those as Unknown so
-                // NativeSkillsCatalog can still read skills from the raw envelope.
-                // Always go through decodeKnown so a hostile/non-array shape cannot
-                // throw out of the receive loop and tear down the WS session.
-                decodeKnown(type, raw) {
-                    val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(raw)
-                    if (decoded.skills != null) {
-                        decoded
-                    } else {
-                        AppServerInboundFrame.Unknown(type = type, raw = raw)
-                    }
-                }
-            }
-            "cron_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(raw) }
-            "cron_add_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(raw) }
-            "cron_get_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(raw) }
-            "cron_runs_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronRunsResponse>(raw) }
-            "cron_trigger_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronTriggerResponse>(raw) }
-            "cron_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronUpdateResponse>(raw) }
-            "cron_delete_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteResponse>(raw) }
-            "cron_delete_all_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteAllResponse>(raw) }
-            "get_reflection_settings_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.GetReflectionSettingsResponse>(raw) }
-            "set_reflection_settings_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.SetReflectionSettingsResponse>(raw) }
-            "agent_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentListResponse>(raw) }
-            "agent_retrieve_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentRetrieveResponse>(raw) }
-            "agent_create_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentCreateResponse>(raw) }
-            "agent_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentUpdateResponse>(raw) }
-            "agent_delete_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AgentDeleteResponse>(raw) }
-            "conversation_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationListResponse>(raw) }
-            "conversation_retrieve_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationRetrieveResponse>(raw) }
-            "conversation_create_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCreateResponse>(raw) }
-            "conversation_update_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationUpdateResponse>(raw) }
-            "conversation_messages_list_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationMessagesListResponse>(raw) }
-            "conversation_compact_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCompactResponse>(raw) }
-            else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
+        return AppServerReceivedFrame(
+            channel = resolvedChannel,
+            frame = decodeInboundFrame(parsed),
+            raw = raw,
+        )
+    }
+
+    private fun malformedFrame(
+        element: JsonElement?,
+        channel: AppServerChannel?,
+    ): AppServerReceivedFrame {
+        val reason = if (element == null) "invalid JSON syntax" else "top-level frame is not a JSON object"
+        return AppServerReceivedFrame(
+            channel = channel ?: AppServerChannel.Control,
+            frame = AppServerInboundFrame.DecodeFailure(
+                declaredType = null,
+                raw = null,
+                diagnostic = boundedDiagnostic("decode_failure: $reason"),
+            ),
+            raw = emptyRaw,
+        )
+    }
+
+    private fun decodeInboundFrame(parsed: ParsedInboundFrame): AppServerInboundFrame =
+        decodeConnectionFrame(parsed)
+            ?: decodeRuntimeEventFrame(parsed)
+            ?: decodeCatalogFrame(parsed)
+            ?: decodeCronFrame(parsed)
+            ?: decodeAgentFrame(parsed)
+            ?: decodeConversationFrame(parsed)
+            ?: AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
+
+    private fun decodeConnectionFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
+        "auth_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(parsed.raw) }
+        "runtime_start_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(parsed.raw) }
+        "sync_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(parsed.raw) }
+        "abort_message_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AbortMessageResponse>(parsed.raw) }
+        "admin_rpc_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(parsed.raw) }
+        else -> null
+    }
+
+    private fun decodeRuntimeEventFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
+        "stream_delta" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.StreamDelta>(parsed.raw) }
+        "update_loop_status" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateLoopStatus>(parsed.raw) }
+        "update_device_status" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateDeviceStatus>(parsed.raw) }
+        "update_queue" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateQueue>(parsed.raw) }
+        "update_subagent_state" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateSubagentState>(parsed.raw) }
+        "external_tool_call_request" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(parsed.raw)
         }
-        return AppServerReceivedFrame(channel = resolvedChannel, frame = frame, raw = raw)
+        "control_request" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(parsed.raw) }
+        else -> null
+    }
+
+    private fun decodeCatalogFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
+        "list_models_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(parsed.raw) }
+        "skill_enable_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(parsed.raw) }
+        "skill_disable_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(parsed.raw) }
+        "skills_updated" -> decodeSkillsUpdated(parsed)
+        else -> null
+    }
+
+    private fun decodeSkillsUpdated(parsed: ParsedInboundFrame): AppServerInboundFrame =
+        decodeKnown(parsed) {
+            val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(parsed.raw)
+            if (decoded.skills != null) {
+                decoded
+            } else {
+                // Nested payloads decode with skills=null because unknown keys are
+                // ignored. Preserve those for NativeSkillsCatalog's raw fallback.
+                AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
+            }
+        }
+
+    private fun decodeCronFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
+        "cron_list_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(parsed.raw) }
+        "cron_add_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(parsed.raw) }
+        "cron_get_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(parsed.raw) }
+        "cron_runs_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronRunsResponse>(parsed.raw) }
+        "cron_trigger_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronTriggerResponse>(parsed.raw) }
+        "cron_update_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronUpdateResponse>(parsed.raw) }
+        "cron_delete_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteResponse>(parsed.raw) }
+        "cron_delete_all_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteAllResponse>(parsed.raw) }
+        else -> null
+    }
+
+    private fun decodeAgentFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
+        "get_reflection_settings_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.GetReflectionSettingsResponse>(parsed.raw)
+        }
+        "set_reflection_settings_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.SetReflectionSettingsResponse>(parsed.raw)
+        }
+        "agent_list_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentListResponse>(parsed.raw) }
+        "agent_retrieve_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentRetrieveResponse>(parsed.raw) }
+        "agent_create_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentCreateResponse>(parsed.raw) }
+        "agent_update_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentUpdateResponse>(parsed.raw) }
+        "agent_delete_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentDeleteResponse>(parsed.raw) }
+        else -> null
+    }
+
+    private fun decodeConversationFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
+        "conversation_list_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationListResponse>(parsed.raw) }
+        "conversation_retrieve_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.ConversationRetrieveResponse>(parsed.raw)
+        }
+        "conversation_create_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.ConversationCreateResponse>(parsed.raw)
+        }
+        "conversation_update_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.ConversationUpdateResponse>(parsed.raw)
+        }
+        "conversation_messages_list_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.ConversationMessagesListResponse>(parsed.raw)
+        }
+        "conversation_compact_response" -> decodeKnown(parsed) {
+            json.decodeFromJsonElement<AppServerInboundFrame.ConversationCompactResponse>(parsed.raw)
+        }
+        else -> null
     }
 
     private inline fun decodeKnown(
-        type: String,
-        raw: JsonObject,
+        parsed: ParsedInboundFrame,
         decode: () -> AppServerInboundFrame,
     ): AppServerInboundFrame =
         runCatching { decode() }.getOrElse { error ->
             val reason = error.message ?: error::class.simpleName ?: "decode failed"
             AppServerInboundFrame.DecodeFailure(
-                declaredType = type,
-                raw = raw,
-                diagnostic = boundedDiagnostic("decode_failure type=$type: $reason"),
+                declaredType = parsed.typeName,
+                raw = parsed.raw,
+                diagnostic = boundedDiagnostic("decode_failure type=${parsed.typeName}: $reason"),
             )
         }
 
