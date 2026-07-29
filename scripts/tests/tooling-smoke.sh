@@ -49,6 +49,9 @@ assert_contains docs/tooling/serena-scip-pilot.md 'Android Gradle integration as
 assert_contains .github/workflows/architecture-graph.yml "cache-read-only: \${{ github.event_name == 'pull_request' }}"
 assert_not_contains .github/workflows/architecture-graph.yml 'Run advisory architecture gates'
 assert_not_contains .github/workflows/architecture-graph.yml 'advisoryDetekt'
+assert_contains .github/workflows/codecov.yml 'Classify coverage scope'
+assert_contains .github/workflows/codecov.yml "if: steps.coverage-scope.outputs.run == 'true'"
+assert_not_contains .github/workflows/codecov.yml '    paths:'
 
 paths="$($REPO_ROOT/scripts/mcp/serena.sh paths)"
 [[ "$paths" == *"SERENA_HOME=$REPO_ROOT/.local/serena/home"* ]] && pass 'Serena paths are project-local' || fail 'Serena paths are project-local'
