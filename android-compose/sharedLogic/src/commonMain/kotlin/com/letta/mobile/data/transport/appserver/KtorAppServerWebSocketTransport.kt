@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Ktor-backed App Server transport (letta-mobile-lgns8.21.1: one bidirectional
@@ -143,13 +144,25 @@ class KtorAppServerWebSocketTransport(
             sender.cancel()
             controlDeliveryQueue.close()
             streamDeliveryQueue.close()
-            if (reachedEndOfStream) {
-                controlDelivery.join()
-                streamDelivery.join()
-            } else {
-                controlDelivery.cancel()
-                streamDelivery.cancel()
-            }
+            finishDeliveryJobs(reachedEndOfStream, controlDelivery, streamDelivery)
+        }
+    }
+
+    private suspend fun finishDeliveryJobs(
+        reachedEndOfStream: Boolean,
+        vararg jobs: Job,
+    ) {
+        if (!reachedEndOfStream) {
+            jobs.forEach { it.cancel() }
+            return
+        }
+
+        val drained = withTimeoutOrNull(DELIVERY_DRAIN_TIMEOUT_MILLIS) {
+            jobs.forEach { it.join() }
+        } != null
+        if (!drained) {
+            jobs.forEach { it.cancel() }
+            throw AppServerDeliveryDrainTimeoutException(DELIVERY_DRAIN_TIMEOUT_MILLIS)
         }
     }
 
@@ -188,8 +201,15 @@ class KtorAppServerWebSocketTransport(
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
         const val DELIVERY_QUEUE_CAPACITY = 256
+        const val DELIVERY_DRAIN_TIMEOUT_MILLIS = 1_000L
     }
 }
+
+private class AppServerDeliveryDrainTimeoutException(
+    timeoutMillis: Long,
+) : IllegalStateException(
+    "App Server delivery queues did not drain within ${timeoutMillis}ms after socket EOF",
+)
 
 private class AppServerDeliveryOverflowException(
     channelName: String,

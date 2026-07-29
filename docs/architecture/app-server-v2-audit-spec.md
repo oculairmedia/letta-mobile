@@ -154,7 +154,8 @@ at `/ws`. Control responses and runtime events share that socket. The legacy
 | Legacy split-channel URL | Upgrade rejected with HTTP 426 `Upgrade Required` | Treat the actual 426 handshake response as terminal; never construct a channel query |
 | Concurrent client connects | Each client receives an independent bidirectional session | Keep request registries and runtime ownership scoped by connection generation |
 | Session disconnect | Pending requests are rejected; reconnect is a client concern | Stop new sends, rebuild one socket, then reattach and sync affected runtimes |
-| Stream consumer is slow | Upstream continues multiplexing control and event frames | Never block socket reads on stream delivery; preserve the loss-sensitive socket handoff and let `RuntimeEventFanout` own bounded per-subscriber buffering |
+| Stream consumer is slow | Upstream continues multiplexing control and event frames | Route through independent 256-frame control/stream queues; overflow fails the generation instead of blocking or growing heap |
+| Socket closes with queued deliveries | Upstream session is already unavailable | Drain accepted frames for at most 1 second, then cancel stalled delivery and fail the generation so reconnect and runtime sync can proceed |
 
 The reconnect and internal delivery policies are Meridian behavior, not
 upstream protocol requirements.

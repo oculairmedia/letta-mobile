@@ -232,6 +232,43 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
+    fun normalEndOfStreamStopsWaitingForAStalledCollectorAtTheDrainDeadline() = runBlocking {
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) {
+                    repeat(DRAIN_BURST_SIZE) {
+                        send(Frame.Text(STREAM_STATUS_FRAME))
+                    }
+                    close(CloseReason(CloseReason.Codes.NORMAL, "complete"))
+                }
+            }
+        }
+        val transport = transport(port)
+        val releaseStreamCollector = CompletableDeferred<Unit>()
+        val streamCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            transport.streamFrames.collect {
+                releaseStreamCollector.await()
+            }
+        }
+
+        try {
+            withTimeout(TIMEOUT) {
+                transport.connectionState.first { it == AppServerConnectionState.Ready }
+            }
+            transport.sendControl(AppServerCommand.Auth(requestId = "drain-timeout", token = ""))
+
+            val failed = withTimeout(TIMEOUT) {
+                transport.connectionState.first { it is AppServerConnectionState.Failed }
+            } as AppServerConnectionState.Failed
+            assertTrue(failed.reason.orEmpty().contains("did not drain within"))
+        } finally {
+            releaseStreamCollector.complete(Unit)
+            streamCollector.cancel()
+            transport.close()
+        }
+    }
+
+    @Test
     fun terminalCloseCodeIsClassifiedTerminal() = runBlocking {
         val port = startServer {
             close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "unauthorized"))
