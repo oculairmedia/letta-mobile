@@ -3,7 +3,9 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.model.AskUserQuestion
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.controller.AppServerApprovalDecisions
@@ -13,6 +15,7 @@ import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsFrameMapper
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -36,6 +39,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
+import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -175,10 +179,32 @@ class DesktopHybridAppServerChatGateway internal constructor(
         )
         return flow {
             activeSendConversations.add(conversationId)
+            // letta-mobile-br5g0: computed from the turn's OWN observed frames —
+            // did this turn actually put assistant content on screen?
+            var deliveredAssistantContent = false
             try {
                 turnEngine.runTurn(command).collect { draft ->
                     val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
                     if (lifecycle?.status == RuntimeRunStatus.Failed) {
+                        // letta-mobile-br5g0: a Failed terminal AFTER the reply was
+                        // delivered is a trailing aux-step failure (title/summary
+                        // generation), not a dead turn — completing normally keeps
+                        // the delivered content rendered and the prompt un-reddened.
+                        // A turn that delivered nothing emits a visible ERROR row
+                        // (fixed per-family copy, never the raw provider reason)
+                        // before the existing failure signalling runs.
+                        val notice = TurnFailureNotices.forFailedTerminal(
+                            reason = lifecycle.reason,
+                            deliveredAssistantContent = deliveredAssistantContent,
+                        ) ?: return@collect
+                        emit(
+                            ErrorMessage(
+                                id = "turn-failed-${draft.runId?.value ?: turnId}",
+                                contentRaw = JsonPrimitive(notice.message),
+                                code = notice.kind,
+                                runId = draft.runId?.value ?: syntheticRunId,
+                            ),
+                        )
                         throw TimelineTransportHttpException(
                             502,
                             "App Server turn failed: ${lifecycle.reason ?: "unknown"}",
@@ -189,7 +215,12 @@ class DesktopHybridAppServerChatGateway internal constructor(
                         conversationId = conversationId,
                         turnId = turnId,
                         fallbackRunId = syntheticRunId,
-                    ).forEach { emit(it) }
+                    ).forEach { message ->
+                        if (message is AssistantMessage && message.content.isNotBlank()) {
+                            deliveredAssistantContent = true
+                        }
+                        emit(message)
+                    }
                 }
             } finally {
                 activeSendConversations.remove(conversationId)

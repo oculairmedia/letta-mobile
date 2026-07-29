@@ -14,10 +14,12 @@ import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
@@ -33,6 +35,8 @@ import com.letta.mobile.data.commands.AgentSlashCommand
 import com.letta.mobile.data.commands.SlashCommandsResponse
 import com.letta.mobile.data.skills.Skill
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsChatBridge
@@ -49,6 +53,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -399,12 +404,21 @@ class IrohAdminRpcChatGateway(
         private var turnId: String? = null
         private val terminal = CompletableDeferred<Unit>()
 
+        /**
+         * letta-mobile-br5g0: whether this turn actually delivered assistant
+         * content. Read from observed frames, never inferred from timing.
+         */
+        private var deliveredAssistantContent: Boolean = false
+
+        /** Last failure text observed for this turn, used only for classification. */
+        private var failureReason: String? = null
+
         suspend fun route(event: WsTimelineEvent, emit: suspend (LettaMessage) -> Unit) {
             when (event) {
                 is WsTimelineEvent.TurnStarted -> onTurnStarted(event)
                 is WsTimelineEvent.MessageDelta -> onMessageDelta(event, emit)
-                is WsTimelineEvent.TurnDone -> onTurnDone(event)
-                is WsTimelineEvent.Error -> onError(event)
+                is WsTimelineEvent.TurnDone -> onTurnDone(event, emit)
+                is WsTimelineEvent.Error -> onError(event, emit)
                 is WsTimelineEvent.Disconnected -> onDisconnected(event)
                 else -> Unit
             }
@@ -424,28 +438,64 @@ class IrohAdminRpcChatGateway(
         private suspend fun onMessageDelta(event: WsTimelineEvent.MessageDelta, emit: suspend (LettaMessage) -> Unit) {
             val belongsToTurn = turnId != null &&
                 (event.conversationId == null || event.conversationId == conversationId.value)
-            if (belongsToTurn) emit(event.message)
+            if (!belongsToTurn) return
+            val message = event.message
+            if (message is AssistantMessage && message.content.isNotBlank()) {
+                deliveredAssistantContent = true
+            }
+            emit(message)
         }
 
-        private fun onTurnDone(event: WsTimelineEvent.TurnDone) {
+        private suspend fun onTurnDone(event: WsTimelineEvent.TurnDone, emit: suspend (LettaMessage) -> Unit) {
             if (turnId == null || event.turnId != turnId) return
             if (event.status == "failed") {
-                terminal.completeExceptionally(
-                    TimelineTransportHttpException(502, "Iroh turn failed (turnId=$turnId)"),
-                )
+                failTurn(emit, "Iroh turn failed (turnId=$turnId)")
             } else {
                 terminal.complete(Unit)
             }
         }
 
-        private fun onError(event: WsTimelineEvent.Error) {
+        private suspend fun onError(event: WsTimelineEvent.Error, emit: suspend (LettaMessage) -> Unit) {
             val forThisTurn = event.conversationId == conversationId.value ||
                 (turnId != null && event.turnId == turnId)
-            if (forThisTurn) {
-                terminal.completeExceptionally(
-                    TimelineTransportHttpException(502, "Iroh turn error ${event.code}: ${event.message}"),
+            if (!forThisTurn) return
+            failureReason = event.message.ifBlank { event.code }
+            failTurn(emit, "Iroh turn error ${event.code}: ${event.message}")
+        }
+
+        /**
+         * letta-mobile-br5g0: a Failed terminal that lands AFTER assistant
+         * content was delivered is a trailing aux-step failure (title/summary
+         * generation), not a dead turn — the user already has their answer, so
+         * the send completes normally instead of throwing and painting the
+         * prompt red. A turn that delivered nothing gets a visible ERROR row in
+         * the timeline (fixed per-family copy, no raw reason) before the
+         * existing failure signalling runs.
+         */
+        private suspend fun failTurn(emit: suspend (LettaMessage) -> Unit, detail: String) {
+            if (terminal.isCompleted) return
+            val notice = TurnFailureNotices.forFailedTerminal(
+                reason = failureReason,
+                deliveredAssistantContent = deliveredAssistantContent,
+            )
+            if (notice == null) {
+                Telemetry.event(
+                    "IrohChatGateway", "turn.failedAfterDelivery",
+                    "conversationId" to conversationId.value,
+                    "turnId" to (turnId ?: ""),
+                    "reasonKind" to (terminalReasonKind(failureReason) ?: "<none>"),
                 )
+                terminal.complete(Unit)
+                return
             }
+            emit(
+                ErrorMessage(
+                    id = "turn-failed-${turnId ?: conversationId.value}",
+                    contentRaw = JsonPrimitive(notice.message),
+                    code = notice.kind,
+                ),
+            )
+            terminal.completeExceptionally(TimelineTransportHttpException(502, detail))
         }
 
         private fun onDisconnected(event: WsTimelineEvent.Disconnected) {

@@ -46,6 +46,25 @@ class RuntimeEventServerFrameMapperTest {
             RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Failed, reason = "boom"),
             context,
         )
+        // letta-mobile-br5g0: the reason rides an Error frame ahead of the
+        // terminal, otherwise a provider failure reaches the UI as a silent
+        // dead turn with no explanation at all.
+        val error = assertIs<ServerFrame.Error>(frames[0])
+        assertEquals("app_server_turn_failed", error.code)
+        assertEquals("boom", error.message)
+        assertEquals("turn-1", error.turnId)
+        assertEquals("run-1", error.runId)
+        val turnDone = assertIs<ServerFrame.TurnDone>(frames[1])
+        assertEquals("failed", turnDone.status)
+        assertEquals(2, frames.size)
+    }
+
+    @Test
+    fun failedLifecycleWithoutReason_mapsToTurnDoneOnly() {
+        val frames = RuntimeEventServerFrameMapper.map(
+            RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Failed, reason = null),
+            context,
+        )
         val turnDone = assertIs<ServerFrame.TurnDone>(frames.single())
         assertEquals("failed", turnDone.status)
     }

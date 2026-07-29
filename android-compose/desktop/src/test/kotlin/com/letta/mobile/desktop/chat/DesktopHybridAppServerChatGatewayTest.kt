@@ -2,12 +2,15 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ErrorMessage
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.appserver.AppServerChannel
@@ -267,6 +270,55 @@ class DesktopHybridAppServerChatGatewayTest {
         }
         assertEquals(502, error.code)
         assertTrue(error.message.orEmpty().contains("boom"), "message was: ${error.message}")
+    }
+
+    // letta-mobile-br5g0: a dead turn (no assistant content) must leave a
+    // visible error row in the timeline, not just a thrown transport error.
+    @Test
+    fun send_failedLifecycleWithoutContentEmitsErrorRow() = runTest {
+        val turnEngine = FakeTurnEngine {
+            flowOf(
+                draft(
+                    RuntimeEventPayload.RunLifecycleChanged(
+                        status = RuntimeRunStatus.Failed,
+                        reason = "Model provider error: Provider finish_reason: content_filter",
+                    ),
+                ),
+            )
+        }
+        val gw = gateway(turnEngine)
+        val collected = mutableListOf<LettaMessage>()
+
+        assertFailsWith<TimelineTransportHttpException> {
+            gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).collect { collected += it }
+        }
+
+        val errorRow = assertIs<ErrorMessage>(collected.single())
+        assertEquals("content_filter", errorRow.code)
+        assertEquals(TurnFailureNotices.messageFor("content_filter"), errorRow.text)
+    }
+
+    // letta-mobile-br5g0: a Failed terminal that lands AFTER the reply was
+    // delivered is a trailing aux-step failure — the send completes normally.
+    @Test
+    fun send_failedLifecycleAfterDeliveredContentCompletesNormally() = runTest {
+        val turnEngine = FakeTurnEngine {
+            flowOf(
+                draft(RuntimeEventPayload.RemoteStreamFrame(frameId = "f1", body = streamDeltaEnvelope(assistantDelta))),
+                draft(
+                    RuntimeEventPayload.RunLifecycleChanged(
+                        status = RuntimeRunStatus.Failed,
+                        reason = "Model provider error: Provider finish_reason: content_filter",
+                    ),
+                ),
+            )
+        }
+        val gw = gateway(turnEngine)
+
+        val messages = gw.sendConversationMessage("conv-1", userMessageRequest("hi", otid = "otid-1")).toList()
+
+        assertTrue(messages.none { it is ErrorMessage }, "no error row expected: $messages")
+        assertEquals("Hello", assertIs<AssistantMessage>(messages.single { it is AssistantMessage }).content)
     }
 
     @Test

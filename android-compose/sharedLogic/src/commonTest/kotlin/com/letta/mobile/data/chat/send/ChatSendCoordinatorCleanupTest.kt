@@ -5,10 +5,12 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -201,7 +203,9 @@ class ChatSendCoordinatorCleanupTest {
 
         assertEquals(listOf(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"), WsTimelineEvent.TurnDone("turn-1", "run-1", "failed")), recorded)
         assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", active.otid)), timeline.failedLocals)
-        assertEquals("Turn failed", ui.currentError())
+        // letta-mobile-br5g0: a reasonless dead turn now carries the generic
+        // per-family copy instead of the bare "Turn failed".
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, ui.currentError())
         assertFalse(ui.isStreaming())
         assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
         assertEquals(1, transport.sentTexts.count { it == "second" })
@@ -443,6 +447,74 @@ class ChatSendCoordinatorCleanupTest {
 
         assertEquals(listOf(RecordingTimelineWriter.Reconcile("conv-1", "post-send-10", true)), timeline.reconciles)
         ChatSendCoordinator.postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
+    }
+
+    // letta-mobile-br5g0: case 1 — a provider refusal killed the turn before any
+    // assistant content was delivered. The user must see a visible error row
+    // instead of a silently dead turn.
+    @Test
+    fun failedTurnWithoutDeliveredContentRendersErrorRow() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "app_server_turn_failed",
+                message = "Model provider error: Provider finish_reason: content_filter",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        advanceUntilIdle()
+
+        val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
+        assertEquals("content_filter", errorRow.code)
+        assertEquals(TurnFailureNotices.messageFor("content_filter"), errorRow.text)
+        assertEquals("run-1", errorRow.runId)
+        // The raw provider reason never rides the timeline row.
+        assertFalse(errorRow.text.contains("finish_reason"))
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", otid)), timeline.failedLocals)
+    }
+
+    // letta-mobile-br5g0: case 2 — the reply was delivered, then a trailing
+    // aux-step (title/summary generation) failed and the run terminal came back
+    // Failed. That must NOT look like a dead turn: no error row, no red prompt.
+    @Test
+    fun failedTurnAfterDeliveredContentIsNotPresentedAsDeadTurn() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "m1", contentRaw = JsonPrimitive("here is your answer"), runId = "run-1"),
+            ),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "app_server_turn_failed",
+                message = "Model provider error: Provider finish_reason: content_filter",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        advanceUntilIdle()
+
+        assertTrue(timeline.ingestedMessages.filterIsInstance<ErrorMessage>().isEmpty())
+        assertTrue(timeline.failedLocals.isEmpty())
+        assertTrue(timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker("conv-1", otid)))
+        assertNull(ui.currentError())
     }
 
     private fun coordinator(

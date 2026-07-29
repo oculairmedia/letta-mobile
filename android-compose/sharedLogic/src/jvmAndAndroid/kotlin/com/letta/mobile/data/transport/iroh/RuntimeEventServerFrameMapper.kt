@@ -129,7 +129,24 @@ object RuntimeEventServerFrameMapper {
             com.letta.mobile.util.Telemetry.event(
                 "IrohTransport", "turn.lifecycle_failed", "reason" to (payload.reason ?: ""),
             )
-            listOf(turnDone(context, "failed"))
+            // letta-mobile-br5g0: the terminal lifecycle is the ONLY carrier of
+            // the provider failure reason on this path, and dropping it here is
+            // exactly what made a provider refusal render as a silent dead turn.
+            // Emit the reason as an Error frame ahead of TurnDone (the same
+            // error-then-terminal ordering the stream-delta error path uses), so
+            // the coordinator can classify the failure and show it.
+            val failure = payload.reason?.takeIf { it.isNotBlank() }?.let { reason ->
+                ServerFrame.Error(
+                    id = "turn_error-${UUID.randomUUID()}",
+                    ts = nowIso(),
+                    code = "app_server_turn_failed",
+                    message = reason,
+                    conversationId = context.conversationId,
+                    turnId = context.turnId,
+                    runId = context.runId,
+                )
+            }
+            listOfNotNull(failure, turnDone(context, "failed"))
         }
         RuntimeRunStatus.Cancelled -> listOf(turnDone(context, "cancelled"))
         RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()

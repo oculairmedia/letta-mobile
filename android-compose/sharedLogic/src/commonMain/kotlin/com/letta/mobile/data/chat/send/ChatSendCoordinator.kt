@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
@@ -11,6 +12,9 @@ import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.runtime.TurnFailureNotice
+import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -27,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonPrimitive
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -94,6 +99,9 @@ class ChatSendCoordinator(
     // TurnDone arrives, so the "agent typing" indicator clears in sync with
     // the actual end-of-turn signal.
     @Volatile private var bufferedErrorMessage: String? = null
+    // letta-mobile-br5g0: set when this turn ingested assistant content. Drives
+    // the dead-turn vs delivered-then-failed split in [finishActiveTurn].
+    @Volatile private var deliveredAssistantContentThisTurn: Boolean = false
     private val preConversationMessageDeltas = ArrayDeque<LettaMessage>()
     private val pendingSendLock = SynchronizedObject()
     private val pendingSends = ArrayDeque<PendingWsSend>()
@@ -902,8 +910,61 @@ class ChatSendCoordinator(
 
     private fun currentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
+    /**
+     * letta-mobile-br5g0: renders a dead turn as a visible ERROR row in the
+     * chat timeline (the same TimelineMessageType.ERROR surface letta-mobile-5s1n
+     * added for server-emitted error frames) instead of leaving the turn
+     * silently empty. The row carries the fixed per-family copy only; the raw
+     * provider reason stays on the existing error banner path, which is the
+     * only place this codebase already surfaces raw backend error text.
+     *
+     * The id is deterministic per (run, turn) so a replayed/duplicated terminal
+     * cannot stack multiple identical error rows.
+     */
+    private suspend fun appendTurnFailureNotice(
+        conversationId: String,
+        runId: String,
+        turnId: String,
+        notice: TurnFailureNotice,
+    ) {
+        val stableRunId = runId.takeIf { it.isNotBlank() }
+        val id = "turn-failed-${stableRunId ?: turnId.ifBlank { "unknown" }}"
+        runCatching {
+            timelineRepository.ingestExternalTransportMessage(
+                agentId = agentId,
+                conversationId = conversationId,
+                message = ErrorMessage(
+                    id = id,
+                    contentRaw = JsonPrimitive(notice.message),
+                    code = notice.kind,
+                    runId = stableRunId,
+                ),
+                source = "coordinator.turnFailure",
+            )
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            Telemetry.error(
+                "AdminChatVM", "ws.turnFailureNotice.failed", error,
+                "conversationId" to conversationId,
+                "reasonKind" to notice.kind,
+            )
+        }
+        Telemetry.event(
+            "AdminChatVM", "ws.turnFailureNotice.rendered",
+            "conversationId" to conversationId,
+            "turnId" to turnId,
+            "runId" to runId,
+            "reasonKind" to notice.kind,
+        )
+    }
+
     private fun rememberActiveAssistantMessageRunId(message: LettaMessage) {
         if (message !is AssistantMessage) return
+        // letta-mobile-br5g0: "did this turn deliver assistant content" is read
+        // from observed turn state (an assistant delta with non-blank text was
+        // ingested), never inferred from timing. A run id is NOT required — a
+        // delivered reply that carries no run id still counts as delivered.
+        if (message.content.isNotBlank()) deliveredAssistantContentThisTurn = true
         val messageRunId = message.runId?.takeIf { it.isNotBlank() } ?: return
         activeAssistantMessageRunIds += messageRunId
         while (activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
@@ -974,9 +1035,36 @@ class ChatSendCoordinator(
                 )
             }
         }
+        // letta-mobile-br5g0: a Failed terminal has two very different user
+        // meanings. Only a turn that delivered NO assistant content is a dead
+        // turn worth a hard error state; a Failed terminal that lands after the
+        // reply was delivered is a trailing aux-step failure (title/summary
+        // generation inheriting the conversation model) and must not be painted
+        // like a dead turn.
+        val failureNotice = if (status == "failed") {
+            TurnFailureNotices.forFailedTerminal(
+                reason = bufferedErrorMessage,
+                deliveredAssistantContent = deliveredAssistantContentThisTurn,
+            )
+        } else {
+            null
+        }
+        val deadTurn = failureNotice != null
+        if (status == "failed" && failureNotice == null) {
+            Telemetry.event(
+                "AdminChatVM", "ws.turnDone.failedAfterDelivery",
+                "turnId" to turnId,
+                "runId" to runId,
+                // Sanitized family only — never the raw reason (letta-mobile-o0atv).
+                "reasonKind" to (terminalReasonKind(bufferedErrorMessage) ?: "<none>"),
+            )
+        }
+        failureNotice?.let { notice ->
+            appendTurnFailureNotice(conversationId, runId, turnId, notice)
+        }
         activeWsOtid?.let { otid ->
             val localConversationId = activeWsLocalConversationId ?: conversationId
-            if (status == "failed") {
+            if (deadTurn) {
                 timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
             } else {
                 timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
@@ -987,7 +1075,13 @@ class ChatSendCoordinator(
             "completed" -> bufferedErrorMessage
                 ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
             "cancelled" -> ui.currentError()
-            "failed" -> bufferedErrorMessage ?: "Turn failed"
+            // Delivered-then-failed keeps whatever error state was already on
+            // screen (normally none) — the user got their answer.
+            "failed" -> if (deadTurn) {
+                bufferedErrorMessage ?: failureNotice?.message ?: "Turn failed"
+            } else {
+                ui.currentError()
+            }
             else -> bufferedErrorMessage
                 ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly ($status)"
         }
@@ -1036,6 +1130,7 @@ class ChatSendCoordinator(
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
+        deliveredAssistantContentThisTurn = false
     }
 
     private suspend fun failActiveTurnForDisconnect(event: WsTimelineEvent.Disconnected) {
