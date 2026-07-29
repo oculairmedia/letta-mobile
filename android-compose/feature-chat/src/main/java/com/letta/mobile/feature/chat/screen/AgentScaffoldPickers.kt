@@ -778,11 +778,8 @@ internal fun ModelPickerSheet(
         sorted.groupBy { it.providerType.ifBlank { "Other" } }
     }
 
-    val currentModelHandle = remember(currentModel) {
-        currentModel?.takeIf { it.isNotBlank() }
-    }
-    val activeModel = remember(models, currentModelHandle) {
-        ModelCatalog.selectedModel(models, currentModelHandle)
+    val activeModel = remember(models, currentModel) {
+        ModelCatalog.selectedModel(models, currentModel)
     }
 
     ModalBottomSheet(

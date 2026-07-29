@@ -7,14 +7,7 @@ package com.letta.mobile.data.model
  */
 fun LlmModel.toAgentCreateLlmConfig(): LlmConfig? {
     val context = contextWindow?.takeIf { it > 0 }
-    val hasRouteMetadata = listOf(
-        providerName,
-        providerCategory,
-        modelEndpointType,
-        modelEndpoint,
-        modelWrapper,
-    ).any { !it.isNullOrBlank() }
-    if (!hasRouteMetadata && context == null && model.isNullOrBlank()) return null
+    if (!hasAgentCreateConfigMetadata(context)) return null
 
     val selection = ModelCatalog.valueOf(this)
     return LlmConfig(
@@ -37,26 +30,38 @@ fun LlmModel.toAgentCreateLlmConfig(): LlmConfig? {
  */
 fun AgentCreateParams.withCatalogModelRouting(availableModels: List<LlmModel>): AgentCreateParams {
     val selectedModel = ModelCatalog.selectedModel(availableModels, model) ?: return this
-    val selectedProviderType = selectedModel.providerType.takeIf { it.isNotBlank() }
-    val hasProviderMetadata = listOf(
-        selectedProviderType,
-        selectedModel.providerName,
-        selectedModel.providerCategory,
-    ).any { !it.isNullOrBlank() }
-    val routedSettings = if (modelSettings != null || hasProviderMetadata) {
-        (modelSettings ?: ModelSettings()).copy(
-            providerType = modelSettings?.providerType ?: selectedProviderType,
-            providerName = modelSettings?.providerName ?: selectedModel.providerName,
-            providerCategory = modelSettings?.providerCategory ?: selectedModel.providerCategory,
-        )
-    } else {
-        null
-    }
     return copy(
-        modelSettings = routedSettings,
+        modelSettings = modelSettings.withRoutingFrom(selectedModel),
         llmConfig = llmConfig ?: selectedModel.toAgentCreateLlmConfig(),
     )
 }
+
+private fun LlmModel.hasAgentCreateConfigMetadata(context: Int?): Boolean =
+    listOf(
+        model,
+        providerName,
+        providerCategory,
+        modelEndpointType,
+        modelEndpoint,
+        modelWrapper,
+        context?.toString(),
+    ).any { !it.isNullOrBlank() }
+
+private fun ModelSettings?.withRoutingFrom(model: LlmModel): ModelSettings? {
+    val catalogRouting = ModelSettings(
+        providerType = model.providerType.ifBlank { null },
+        providerName = model.providerName,
+        providerCategory = model.providerCategory,
+    )
+    return this?.copy(
+        providerType = providerType ?: catalogRouting.providerType,
+        providerName = providerName ?: catalogRouting.providerName,
+        providerCategory = providerCategory ?: catalogRouting.providerCategory,
+    ) ?: catalogRouting.takeIf(ModelSettings::hasProviderRouting)
+}
+
+private fun ModelSettings.hasProviderRouting(): Boolean =
+    listOf(providerType, providerName, providerCategory).any { !it.isNullOrBlank() }
 
 private fun String.removeRoutingProviderPrefix(): String {
     val slash = indexOf('/')
