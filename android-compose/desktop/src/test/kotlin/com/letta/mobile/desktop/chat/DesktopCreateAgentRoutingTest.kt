@@ -26,7 +26,10 @@ class DesktopCreateAgentRoutingTest {
     fun createAgentAppliesSharedCatalogRouting() = runTest {
         val gateway = RoutingGateway()
         val controller = routingController(gateway)
-        startAndCreate(controller, "Desktop agent", "openai/MiniMax-M3")
+        startAndCreate(
+            controller,
+            AgentCreateParams(name = "Desktop agent", model = "openai/MiniMax-M3"),
+        )
 
         assertEquals("llmux", gateway.createdParams?.modelSettings?.providerName)
         assertEquals(16_384, gateway.createdParams?.modelSettings?.maxOutputTokens)
@@ -41,7 +44,10 @@ class DesktopCreateAgentRoutingTest {
         val gateway = RoutingGateway(routes)
         val controller = routingController(gateway)
         val westSelection = buildModelOptions(routes).single { it.first.endsWith("West") }.second
-        startAndCreate(controller, "West agent", westSelection)
+        startAndCreate(
+            controller,
+            AgentCreateParams(name = "West agent", model = westSelection),
+        )
 
         assertEquals("openai/gpt-4o", gateway.createdParams?.model)
         assertEquals("byok-west", gateway.createdParams?.modelSettings?.providerName)
@@ -62,7 +68,10 @@ class DesktopCreateAgentRoutingTest {
         )
         val controller = routingController(gateway, mapOf(template.id.value to template))
 
-        startAndCreate(controller, "Cloned west agent", template.model)
+        startAndCreate(
+            controller,
+            AgentCreateParams(name = "Cloned west agent", model = template.model),
+        )
 
         assertEquals("openai/gpt-4o", gateway.createdParams?.model)
         assertEquals("byok-west", gateway.createdParams?.modelSettings?.providerName)
@@ -76,7 +85,10 @@ class DesktopCreateAgentRoutingTest {
         val gateway = RoutingGateway(catalogReady = catalogReady)
         val controller = routingController(gateway)
 
-        startAndCreate(controller, "Pending catalog agent", "openai/MiniMax-M3")
+        startAndCreate(
+            controller,
+            AgentCreateParams(name = "Pending catalog agent", model = "openai/MiniMax-M3"),
+        )
         assertNull(gateway.createdParams)
 
         catalogReady.complete(Unit)
@@ -100,12 +112,15 @@ class DesktopCreateAgentRoutingTest {
 
     private fun TestScope.startAndCreate(
         controller: DesktopChatController,
-        name: String,
-        model: String?,
+        params: AgentCreateParams,
     ) {
         controller.start()
         runCurrent()
-        controller.createAgent(name = name, model = model, embedding = null)
+        controller.createAgent(
+            name = params.name.orEmpty(),
+            model = params.model,
+            embedding = params.embedding,
+        )
         runCurrent()
     }
 }
