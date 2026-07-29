@@ -20,7 +20,9 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
@@ -113,6 +115,45 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
+    fun streamBackpressureCannotBlockControlDeliveryOnTheSharedSocket() = runBlocking {
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) {
+                    repeat(STREAM_BURST_SIZE) {
+                        send(Frame.Text(STREAM_STATUS_FRAME))
+                    }
+                    send(Frame.Text(AUTH_RESPONSE_FRAME))
+                }
+            }
+        }
+        val transport = transport(port)
+        val releaseStreamCollector = CompletableDeferred<Unit>()
+        val streamCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            transport.streamFrames.collect {
+                releaseStreamCollector.await()
+            }
+        }
+
+        try {
+            withTimeout(TIMEOUT) {
+                transport.connectionState.first { it == AppServerConnectionState.Ready }
+            }
+            val controlFrame = async(start = CoroutineStart.UNDISPATCHED) {
+                withTimeout(TIMEOUT) { transport.controlFrames.first() }
+            }
+
+            transport.sendControl(AppServerCommand.Auth(requestId = "backpressure", token = ""))
+
+            assertIs<AppServerInboundFrame.AuthResponse>(controlFrame.await().frame)
+            assertEquals(AppServerConnectionState.Ready, transport.connectionState.value)
+        } finally {
+            releaseStreamCollector.complete(Unit)
+            streamCollector.cancel()
+            transport.close()
+        }
+    }
+
+    @Test
     fun terminalCloseCodeIsClassifiedTerminal() = runBlocking {
         val port = startServer {
             close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "unauthorized"))
@@ -180,6 +221,9 @@ class KtorAppServerWebSocketTransportLifecycleTest {
 
     private companion object {
         val TIMEOUT = 5.seconds
+        const val STREAM_BURST_SIZE = 256
+        const val AUTH_RESPONSE_FRAME =
+            """{"type":"auth_response","request_id":"backpressure","success":true}"""
         const val STREAM_STATUS_FRAME =
             """{"type":"update_loop_status","runtime":{"agent_id":"a","conversation_id":"c"},"event_seq":1,"emitted_at":"t","idempotency_key":"k","loop_status":{"status":"WAITING_ON_INPUT"}}"""
     }

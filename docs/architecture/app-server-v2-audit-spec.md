@@ -2,12 +2,12 @@
 
 Status: implemented-system snapshot for audit
 
-Snapshot date: 2026-07-27
+Snapshot date: 2026-07-29
 
 Upstream baseline: `@letta-ai/letta-code@0.29.9`, Node `v24.18.0`
 
 Protocol declaration SHA-256:
-`68ef0a3683f7e57be02638d5973e7211493658dd0d0038e3e0d5f571da3116f4`
+`41874aad00d23d3f63a5aaab86986ac707e1437a0d02625d7ee161d261f0a285`
 
 ## Purpose
 
@@ -73,7 +73,7 @@ Audit in this order:
 | Priority | Source | Authority |
 | --- | --- | --- |
 | 1 | Installed `protocol_v2.d.ts` with the pinned hash above | Exact upstream command/message declarations |
-| 2 | `installed-protocol-v2-inventory.json` | Reviewed inventory of all 90 upstream commands and 99 upstream messages |
+| 2 | `installed-protocol-v2-inventory.json` | Reviewed inventory of all 91 upstream commands and 100 upstream messages |
 | 3 | `app-server-v2-contract-matrix.json` | Captured socket, channel, ownership, reconnect, and idempotency policy |
 | 4 | `AppServerProtocol.kt` | Kotlin's typed wire representation |
 | 5 | `iroh-admin-ownership-matrix.json` | Declared owner for every registered Iroh `admin_rpc` method |
@@ -107,7 +107,7 @@ Android/Desktop client
         v
 Meridian Kotlin Iroh wrapper
         |
-        | two local App Server v2 WebSockets
+        | one bidirectional App Server v2 WebSocket
         | ws://127.0.0.1:4500
         v
 Letta Code App Server
@@ -135,17 +135,20 @@ Iroh/App Server v2 behavior.
 
 ## Upstream Socket Contract
 
-App Server v2 uses a control socket and a stream socket.
+App Server v2 in Letta Code 0.29.9 uses one bidirectional WebSocket per client
+at `/ws`. Control responses and runtime events share that socket. The legacy
+`?channel=control|stream` URLs are rejected during upgrade with HTTP 426.
 
-| Condition | Upstream 0.28.8 behavior | Meridian policy |
+| Condition | Upstream 0.29.9 behavior | Meridian policy |
 | --- | --- | --- |
-| Second control socket | New socket closed with code 1008; active control remains | Do not open a competing control socket |
-| Duplicate stream socket | New socket closed with code 1008; active stream remains | Do not open a competing stream socket |
-| Stream socket disconnect | Control session and runtime remain active; replacement stream may attach | Mark transport degraded and rebuild both sockets |
-| Control socket disconnect | Active control session is cleared; runtime shutdown follows listener behavior | Rebuild both sockets and reattach/sync runtimes |
-| Official client sees either close | Rejects pending requests; does not reconnect or close sibling automatically | Kotlin reconnect supervisor owns recovery |
+| One client connects to `/ws` | Commands, responses, and events share one socket | Decode once and route frames internally by message type |
+| Legacy split-channel URL | Upgrade rejected with HTTP 426 `Upgrade Required` | Treat the actual 426 handshake response as terminal; never construct a channel query |
+| Concurrent client connects | Each client receives an independent bidirectional session | Keep request registries and runtime ownership scoped by connection generation |
+| Session disconnect | Pending requests are rejected; reconnect is a client concern | Stop new sends, rebuild one socket, then reattach and sync affected runtimes |
+| Stream consumer is slow | Upstream continues multiplexing control and event frames | Never block socket reads on stream delivery; preserve the loss-sensitive socket handoff and let `RuntimeEventFanout` own bounded per-subscriber buffering |
 
-The reconnect-both policy is Meridian behavior, not an upstream requirement.
+The reconnect and internal delivery policies are Meridian behavior, not
+upstream protocol requirements.
 
 ### Correlation and event ordering
 
@@ -183,13 +186,14 @@ Classification: exposed
 Commands:
 
 `runtime_start`, `input`, `sync`, `abort_message`,
-`change_device_state`, `remove_queue_item`
+`change_device_state`, `remove_queue_item`, `app_server_info`
 
 Messages:
 
 `runtime_start_response`, `sync_response`, `abort_message_response`,
 `update_device_status`, `update_loop_status`, `update_queue`, `stream_delta`,
-`control_request`, `update_subagent_state`, `remove_queue_item_response`
+`control_request`, `update_subagent_state`, `remove_queue_item_response`,
+`app_server_info_response`
 
 ### 2. Agent CRUD
 
@@ -416,7 +420,7 @@ Meridian transport extensions:
 
 - `auth` and `auth_response` provide wrapper authentication.
 - `admin_rpc` and `admin_rpc_response` expose the Iroh admin router.
-- Neither extension is part of the upstream 90-command/99-message union.
+- Neither extension is part of the upstream 91-command/100-message union.
 
 ## Iroh Admin RPC Contract
 

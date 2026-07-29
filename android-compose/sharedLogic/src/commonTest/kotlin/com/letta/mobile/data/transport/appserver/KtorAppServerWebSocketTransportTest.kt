@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.appserver
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class KtorAppServerWebSocketTransportTest {
     @Test
@@ -32,19 +33,32 @@ class KtorAppServerWebSocketTransportTest {
     fun classifyInboundChannelMatchesUpstreamStreamSet() {
         assertEquals(
             AppServerChannel.Stream,
-            AppServerProtocol.classifyInboundChannel("""{"type":"update_loop_status"}"""),
+            AppServerProtocol.decodeFrame("""{"type":"update_loop_status"}""").channel,
         )
         assertEquals(
             AppServerChannel.Stream,
-            AppServerProtocol.classifyInboundChannel("""{"type":"stream_delta"}"""),
+            AppServerProtocol.decodeFrame("""{"type":"stream_delta"}""").channel,
         )
         assertEquals(
             AppServerChannel.Control,
-            AppServerProtocol.classifyInboundChannel("""{"type":"runtime_start_response","request_id":"r"}"""),
+            AppServerProtocol.decodeFrame(
+                """{"type":"runtime_start_response","request_id":"r"}""",
+            ).channel,
         )
         assertEquals(
             AppServerChannel.Control,
-            AppServerProtocol.classifyInboundChannel("this-is-not-json"),
+            AppServerProtocol.decodeFrame("this-is-not-json").channel,
         )
+    }
+
+    @Test
+    fun terminalHandshakeFailureRequiresAnHttpStatusOrNamedRejection() {
+        assertTrue(
+            RuntimeException("Server returned HTTP response code: 426 Upgrade Required")
+                .isTerminalHandshakeFailure(),
+        )
+        assertTrue(RuntimeException("Handshake failed with status code 403").isTerminalHandshakeFailure())
+        assertFalse(RuntimeException("Failed to connect to /127.0.0.1:4260").isTerminalHandshakeFailure())
+        assertFalse(RuntimeException("Failed to connect to /127.0.0.1:426").isTerminalHandshakeFailure())
     }
 }

@@ -33,7 +33,7 @@ object AppServerProtocol {
      * On one-socket transports these are demuxed into [AppServerChannel.Stream];
      * everything else (including malformed JSON) lands on [AppServerChannel.Control].
      */
-    val STREAM_CHANNEL_MESSAGE_TYPES: Set<String> = setOf(
+    private val STREAM_CHANNEL_MESSAGE_TYPES: Set<String> = setOf(
         "stream_delta",
         "update_device_status",
         "update_loop_status",
@@ -48,26 +48,9 @@ object AppServerProtocol {
         json.encodeToString(AppServerCommand.serializer(), command)
 
     /**
-     * Classify an inbound raw frame for demux on a one-socket transport.
-     * Matches upstream's historical stream-channel set; unparseable frames
-     * default to control (same as the official JS client's single-socket label).
-     */
-    fun classifyInboundChannel(rawJson: String): AppServerChannel {
-        val type = runCatching {
-            (json.parseToJsonElement(rawJson) as? JsonObject)
-                ?.get("type")
-                ?.let { it as? JsonPrimitive }
-                ?.contentOrNull
-        }.getOrNull()
-        return if (type != null && type in STREAM_CHANNEL_MESSAGE_TYPES) {
-            AppServerChannel.Stream
-        } else {
-            AppServerChannel.Control
-        }
-    }
-
-    /**
      * Decode one inbound App Server frame. This is **total** — it never throws.
+     * When [channel] is absent, the one-socket transport channel is inferred from
+     * the parsed top-level message type without parsing the frame a second time.
      *
      * Forward-compatibility contract (letta-mobile-lgns8.4):
      * - Unknown top-level `type` values decode to [AppServerInboundFrame.Unknown]
@@ -79,13 +62,13 @@ object AppServerProtocol {
      *   (when available) plus a bounded, credential-redacted diagnostic — instead of
      *   throwing and killing the receive loop.
      */
-    fun decodeFrame(rawJson: String, channel: AppServerChannel): AppServerReceivedFrame {
+    fun decodeFrame(rawJson: String, channel: AppServerChannel? = null): AppServerReceivedFrame {
         val element = runCatching { json.parseToJsonElement(rawJson) }.getOrNull()
         val raw = element as? JsonObject
         if (raw == null) {
             val reason = if (element == null) "invalid JSON syntax" else "top-level frame is not a JSON object"
             return AppServerReceivedFrame(
-                channel = channel,
+                channel = channel ?: AppServerChannel.Control,
                 frame = AppServerInboundFrame.DecodeFailure(
                     declaredType = null,
                     raw = null,
@@ -95,6 +78,11 @@ object AppServerProtocol {
             )
         }
         val type = (raw["type"] as? JsonPrimitive)?.contentOrNull
+        val resolvedChannel = channel ?: if (type in STREAM_CHANNEL_MESSAGE_TYPES) {
+            AppServerChannel.Stream
+        } else {
+            AppServerChannel.Control
+        }
         val frame = when (type) {
             "auth_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(raw) }
             "runtime_start_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(raw) }
@@ -153,7 +141,7 @@ object AppServerProtocol {
             "conversation_compact_response" -> decodeKnown(type, raw) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationCompactResponse>(raw) }
             else -> AppServerInboundFrame.Unknown(type = type, raw = raw)
         }
-        return AppServerReceivedFrame(channel = channel, frame = frame, raw = raw)
+        return AppServerReceivedFrame(channel = resolvedChannel, frame = frame, raw = raw)
     }
 
     private inline fun decodeKnown(

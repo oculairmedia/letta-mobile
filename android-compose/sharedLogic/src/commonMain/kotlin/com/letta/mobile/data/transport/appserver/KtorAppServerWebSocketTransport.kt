@@ -114,30 +114,55 @@ class KtorAppServerWebSocketTransport(
     }
 
     private suspend fun DefaultClientWebSocketSession.runBidirectionalSession() = coroutineScope {
+        // Both queues are deliberately lossless. Control responses are
+        // correctness-critical, and stream deltas form the durable timeline
+        // projection, so neither may be silently evicted. RuntimeEventFanout owns
+        // bounded per-subscriber buffering after this socket-level handoff.
+        val controlDeliveryQueue = Channel<AppServerReceivedFrame>(Channel.UNLIMITED)
+        val streamDeliveryQueue = Channel<AppServerReceivedFrame>(Channel.UNLIMITED)
         val sender = launch {
             for (command in controlCommandQueue) {
                 send(Frame.Text(protocol.encodeCommand(command)))
             }
         }
+        val controlDelivery = launch {
+            for (frame in controlDeliveryQueue) {
+                controlFrameFlow.emit(frame)
+            }
+        }
+        val streamDelivery = launch {
+            for (frame in streamDeliveryQueue) {
+                streamFrameFlow.emit(frame)
+            }
+        }
         try {
-            receiveAndDemuxFrames()
+            receiveAndDemuxFrames(controlDeliveryQueue, streamDeliveryQueue)
         } finally {
             sender.cancel()
+            controlDeliveryQueue.close()
+            streamDeliveryQueue.close()
+            controlDelivery.cancel()
+            streamDelivery.cancel()
         }
     }
 
-    private suspend fun DefaultClientWebSocketSession.receiveAndDemuxFrames() {
+    private suspend fun DefaultClientWebSocketSession.receiveAndDemuxFrames(
+        controlDeliveryQueue: Channel<AppServerReceivedFrame>,
+        streamDeliveryQueue: Channel<AppServerReceivedFrame>,
+    ) {
         for (frame in incoming) {
             if (frame is Frame.Text) {
                 // protocol.decodeFrame is total: malformed frames surface as
                 // AppServerInboundFrame.DecodeFailure rather than throwing, so a
                 // bad frame never tears down this receive loop (letta-mobile-lgns8.4).
-                val text = frame.readText()
-                val channel = protocol.classifyInboundChannel(text)
-                val received = protocol.decodeFrame(text, channel)
+                val received = protocol.decodeFrame(frame.readText())
                 when (received.channel) {
-                    AppServerChannel.Control -> controlFrameFlow.emit(received)
-                    AppServerChannel.Stream -> streamFrameFlow.emit(received)
+                    AppServerChannel.Control -> check(controlDeliveryQueue.trySend(received).isSuccess) {
+                        "control delivery queue closed while WebSocket receive loop is active"
+                    }
+                    AppServerChannel.Stream -> check(streamDeliveryQueue.trySend(received).isSuccess) {
+                        "stream delivery queue closed while WebSocket receive loop is active"
+                    }
                 }
             }
         }
@@ -171,13 +196,16 @@ internal fun CloseReason?.isTerminal(): Boolean {
  */
 internal fun Throwable.isTerminalHandshakeFailure(): Boolean {
     val text = (message ?: "") + " " + (cause?.message ?: "")
-    return text.contains("401") ||
-        text.contains("403") ||
-        text.contains("426") ||
+    return TERMINAL_HTTP_STATUS.containsMatchIn(text) ||
         text.contains("Unauthorized", ignoreCase = true) ||
         text.contains("Forbidden", ignoreCase = true) ||
         text.contains("Upgrade Required", ignoreCase = true)
 }
+
+private val TERMINAL_HTTP_STATUS = Regex(
+    pattern = "(?i)\\b(?:http(?:\\s+response)?(?:\\s+status|\\s+code)?|" +
+        "status(?:\\s+code)?|response\\s+code)\\D{0,16}(?:401|403|426)\\b",
+)
 
 /**
  * Resolve the single bidirectional App Server WebSocket URL.

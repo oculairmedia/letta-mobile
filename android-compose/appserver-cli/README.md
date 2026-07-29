@@ -19,17 +19,18 @@ The zip is written under `appserver-cli/build/distributions/`. Unzip it and run
 ## Commands
 
 ```powershell
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.27.15 --letta-arg=--backend --letta-arg local --listen ws://127.0.0.1:4500
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.9 --listen ws://127.0.0.1:4500
 .\bin\meridian-app-server.bat app-server-serve --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file .\token.txt --ws-token-sha256 <sha256>
-.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.27.15 --dry-run
+.\bin\meridian-app-server.bat app-server-serve --letta-command pnpm --letta-arg dlx --letta-arg @letta-ai/letta-code@0.29.9 --dry-run
 ```
 
 Loopback development uses no WebSocket auth. Non-loopback listeners require
 `--ws-auth`; the client then sends `Authorization: Bearer <token>`.
 
-Use one direct control owner per App Server process. If several mobile/desktop
-clients need the same process, put a fanout controller in front of it instead
-of letting every client write to `/ws?channel=control`.
+Each 0.29.9 client opens one bidirectional `/ws` connection. Never add the
+removed `?channel=control|stream` query. Upstream supports concurrent clients;
+Iroh deployments still use the Kotlin wrapper as their authorization, runtime
+ownership, and fanout boundary.
 
 Smoke a running local App Server:
 
