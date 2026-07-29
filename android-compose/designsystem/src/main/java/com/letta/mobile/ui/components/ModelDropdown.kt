@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.designsystem.R
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -106,7 +107,7 @@ fun ModelDropdown(
                                 }
                             },
                             onClick = {
-                                onModelSelected(model.handle ?: model.name)
+                                onModelSelected(ModelCatalog.selectionValue(models, model))
                                 filterText = ""
                                 expanded = false
                             },

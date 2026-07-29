@@ -67,7 +67,7 @@ class ModelCatalogAliasProvenanceTest {
                     put(
                         "updateArgs",
                         buildJsonObject {
-                            put("handle", "gpt-4o")
+                            put("handle", "openai/gpt-4o")
                             put("provider_type", "selection-$route")
                             put("provider_name", "byok-$route")
                             put("model_endpoint", "https://$route.example/v1")
@@ -86,6 +86,15 @@ class ModelCatalogAliasProvenanceTest {
             setOf("https://east.example/v1", "https://west.example/v1"),
             models.map { it.modelEndpoint }.toSet(),
         )
+        val westSelection = ModelCatalog.selectionValue(models, models.single { it.id == "west" })
+        val createParams = AgentCreateParams(
+            name = "West route",
+            model = westSelection,
+        ).withCatalogModelRouting(models)
+        assertEquals("openai/gpt-4o", createParams.model)
+        assertEquals("selection-west", createParams.modelSettings?.providerType)
+        assertEquals("byok-west", createParams.modelSettings?.providerName)
+        assertEquals("https://west.example/v1", createParams.llmConfig?.modelEndpoint)
     }
 
     @Test

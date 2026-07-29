@@ -63,6 +63,33 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun duplicateHandlesUseUniqueRouteIdsAsSelectionValues() {
+        val east = LlmModel(
+            id = "east",
+            name = "GPT-4o East",
+            handle = "openai/gpt-4o",
+            providerType = "azure",
+            modelEndpoint = "https://east.example/v1",
+        )
+        val west = east.copy(
+            id = "west",
+            name = "GPT-4o West",
+            modelEndpoint = "https://west.example/v1",
+        )
+        val models = listOf(east, west)
+
+        assertEquals("east", ModelCatalog.selectionValue(models, east))
+        assertEquals("west", ModelCatalog.selectionValue(models, west))
+        assertEquals(west, ModelCatalog.selectedModel(models, "west"))
+        assertNull(ModelCatalog.selectedModel(models, "openai/gpt-4o"))
+        assertEquals("openai/gpt-4o", ModelCatalog.transportValue(models, "west"))
+        assertEquals(
+            setOf("east", "west"),
+            ModelCatalog.group(models).flatMap { group -> group.models.map { it.value } }.toSet(),
+        )
+    }
+
+    @Test
     fun testGroup() {
         val models = listOf(
             LlmModel(id = "1", name = "Claude", handle = "claude-3", providerType = "anthropic"),

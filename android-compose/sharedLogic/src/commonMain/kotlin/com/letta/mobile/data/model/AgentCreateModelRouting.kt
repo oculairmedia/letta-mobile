@@ -29,11 +29,15 @@ fun LlmModel.toAgentCreateLlmConfig(): LlmConfig? {
  * replacing settings the caller supplied explicitly.
  */
 fun AgentCreateParams.withCatalogModelRouting(availableModels: List<LlmModel>): AgentCreateParams =
-    ModelCatalog.selectedModel(availableModels, model).applyRoutingTo(this)
+    ModelCatalog.selectedModel(availableModels, model).applyRoutingTo(this, availableModels)
 
-private fun LlmModel?.applyRoutingTo(params: AgentCreateParams): AgentCreateParams {
+private fun LlmModel?.applyRoutingTo(
+    params: AgentCreateParams,
+    availableModels: List<LlmModel>,
+): AgentCreateParams {
     val selectedModel = this ?: return params
     return params.copy(
+        model = ModelCatalog.transportValue(availableModels, params.model),
         modelSettings = params.modelSettings.withRoutingFrom(selectedModel),
         llmConfig = params.llmConfig ?: selectedModel.toAgentCreateLlmConfig(),
     )

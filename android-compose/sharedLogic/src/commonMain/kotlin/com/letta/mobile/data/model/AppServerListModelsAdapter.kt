@@ -73,12 +73,10 @@ object AppServerListModelsAdapter {
         val name = display ?: handle ?: entry.id
         val limits = extractLimits(entry, raw)
         val routingScopes = listOfNotNull(entry.updateArgs, raw, entry.flags)
-        val provider = providerFromHandle(handle.orEmpty())
-            .ifBlank {
-                routingScopes.firstNotNullOfOrNull {
-                    firstString(it, "provider_type", "providerType")
-                }.orEmpty()
-            }
+        val provider = routingScopes.firstNotNullOfOrNull {
+            firstString(it, "provider_type", "providerType")
+        }.orEmpty()
+            .ifBlank { providerFromHandle(handle.orEmpty()) }
             .ifBlank { providerFromHandle(presentation.orEmpty()) }
         val model = LlmModel(
             id = entry.id.ifBlank { handle.orEmpty() },

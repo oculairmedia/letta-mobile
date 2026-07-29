@@ -8,6 +8,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
@@ -65,15 +66,37 @@ data: [DONE]
         assertEquals("Remote response", assertIs<AssistantMessage>(message).content)
     }
 
+    @Test
+    fun listLlmModelsNormalizesBareHttpCatalogLimits() = runTest {
+        val gateway = gatewayWithResponse(
+            body = """
+                [{
+                  "id":"openai/MiniMax-M3",
+                  "name":"MiniMax-M3",
+                  "handle":"openai/MiniMax-M3",
+                  "provider_type":"openai"
+                }]
+            """.trimIndent(),
+            status = HttpStatusCode.OK,
+            contentType = ContentType.Application.Json.toString(),
+        )
+
+        val model = gateway.listLlmModels().single()
+
+        assertEquals(200_000, model.contextWindow)
+        assertEquals(16_384, model.maxOutputTokens)
+    }
+
     private fun gatewayWithResponse(
         body: String,
         status: HttpStatusCode,
+        contentType: String = "text/event-stream",
     ): DesktopLettaHttpChatGateway {
         val client = HttpClient(MockEngine {
             respond(
                 content = body,
                 status = status,
-                headers = headersOf(HttpHeaders.ContentType, "text/event-stream"),
+                headers = headersOf(HttpHeaders.ContentType, contentType),
             )
         }) {
             install(ContentNegotiation) {

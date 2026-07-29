@@ -7,7 +7,7 @@ enum class ModelBadge { Byok, Local }
 
 /** A single selectable model, with display metadata derived for the picker. */
 data class ModelOption(
-    /** The value passed back on selection (matches the agent `model` handle). */
+    /** Stable picker token; route IDs disambiguate rows that share one handle. */
     val value: String,
     val displayName: String,
     /** e.g. "200K · reasoning"; null when nothing notable is known. */
@@ -28,9 +28,21 @@ data class ModelGroup(val provider: String, val models: List<ModelOption>)
  * source of truth.
  */
 object ModelCatalog {
-    /** The selection value for [model], matching how agents store `model`. */
+    /** The transport value for [model], matching how agents store `model`. */
     fun valueOf(model: LlmModel): String =
         model.handle?.takeIf { it.isNotBlank() } ?: model.name.ifBlank { model.id }
+
+    /**
+     * Returns a picker token that retains route identity when multiple rows
+     * share one transport handle. Unique handles keep their existing value.
+     */
+    fun selectionValue(models: List<LlmModel>, model: LlmModel): String {
+        val transportValue = valueOf(model)
+        if (models.count { valueOf(it) == transportValue } < 2) return transportValue
+        return model.id.takeIf { id ->
+            id.isNotBlank() && models.count { it.id == id } == 1
+        } ?: transportValue
+    }
 
     /**
      * Resolves a stored selection against a catalog. Exact route values win
@@ -39,8 +51,20 @@ object ModelCatalog {
      */
     fun selectedModel(models: List<LlmModel>, selectedValue: String?): LlmModel? {
         val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return null
-        models.firstOrNull { valueOf(it) == selected }?.let { return it }
+        models.filter { selectionValue(models, it) == selected }.singleOrNull()?.let { return it }
+        models.filter { valueOf(it) == selected }.singleOrNull()?.let { return it }
         return models.filter { selected in it.selectionAliases }.singleOrNull()
+    }
+
+    /**
+     * Converts a picker token back to the model handle sent to the backend.
+     * Stored aliases are preserved because they are not picker tokens for the
+     * resolved canonical row.
+     */
+    fun transportValue(models: List<LlmModel>, selectedValue: String?): String? {
+        val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return selectedValue
+        val model = selectedModel(models, selected) ?: return selectedValue
+        return if (selectionValue(models, model) == selected) valueOf(model) else selectedValue
     }
 
     /** Group [models] by provider, preserving a stable provider order.
@@ -52,13 +76,15 @@ object ModelCatalog {
     fun group(models: List<LlmModel>, selectedValue: String? = null): List<ModelGroup> {
         val normalized = ModelCatalogNormalizer.normalize(models).toMutableList()
         val selected = selectedValue?.takeIf { it.isNotBlank() }
-        if (selected != null && normalized.none { valueOf(it) == selected }) {
-            models.firstOrNull { valueOf(it) == selected }?.let { normalized.add(it) }
+        if (selected != null && normalized.none { selectionValue(normalized, it) == selected }) {
+            models.filter {
+                selectionValue(models, it) == selected || valueOf(it) == selected
+            }.singleOrNull()?.let { normalized.add(it) }
         }
         val ordered = LinkedHashMap<String, MutableList<ModelOption>>()
         normalized.forEach { model ->
             val provider = providerLabel(model)
-            ordered.getOrPut(provider) { mutableListOf() }.add(toOption(model))
+            ordered.getOrPut(provider) { mutableListOf() }.add(toOption(normalized, model))
         }
         return ordered.entries
             .sortedBy { providerSortKey(it.key) }
@@ -78,8 +104,8 @@ object ModelCatalog {
         }
     }
 
-    private fun toOption(model: LlmModel): ModelOption = ModelOption(
-        value = valueOf(model),
+    private fun toOption(models: List<LlmModel>, model: LlmModel): ModelOption = ModelOption(
+        value = selectionValue(models, model),
         displayName = model.displayName,
         sublabel = sublabel(model),
         badge = badge(model),
