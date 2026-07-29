@@ -13,6 +13,7 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
@@ -48,13 +49,6 @@ private data class RequiredCatalogModel(
     val selectionValue: String,
 )
 
-data class DesktopAgentCreateRequest(
-    val name: String,
-    val model: String?,
-    val embedding: String?,
-    val modelRoute: ModelRouteIdentity? = null,
-)
-
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
@@ -63,7 +57,7 @@ class DesktopChatController(
         createDefaultDesktopChatGateway(bootstrapState.config)
     },
     private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
-    private val agentModelByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
+    private val agentByIdProvider: suspend (agentIds: Set<String>) -> Map<String, Agent> = { emptyMap() },
     // The backend doesn't yet persist a conversation's archived flag, so we keep a
     // local, durable record of archived ids and overlay it on every load. Still
     // PATCHes the server so this lights up automatically once the backend lands.
@@ -458,22 +452,22 @@ class DesktopChatController(
      * refresh.
      */
     fun createAgent(
-        request: DesktopAgentCreateRequest,
+        name: String,
+        model: String?,
+        embedding: String?,
         onCreated: (String) -> Unit = {},
     ) {
         if (closed) return
-        val agentName = request.name.ifBlank { "New agent" }
+        val agentName = name.ifBlank { "New agent" }
         scope.launch {
             try {
                 val gw = gatewayExtras ?: return@launch
-                val catalogModel = request.model?.let {
-                    requireCatalogModel(gw, it, request.modelRoute)
-                }
+                val catalogModel = model?.let { requireCatalogModel(gw, it) }
                 val agent = gw.createAgent(
                     AgentCreateParams(
                         name = agentName,
                         model = catalogModel?.selectionValue,
-                        embedding = request.embedding,
+                        embedding = embedding,
                         includeBaseTools = true,
                         memoryBlocks = listOf(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
@@ -557,8 +551,8 @@ class DesktopChatController(
             val label = when {
                 !override.isNullOrBlank() -> override
                 !agentId.isNullOrBlank() ->
-                    runCatching { agentModelByIdProvider(setOf(agentId)) }
-                        .getOrNull()?.get(agentId)?.takeIf { it.isNotBlank() } ?: "Auto"
+                    runCatching { agentByIdProvider(setOf(agentId)) }
+                        .getOrNull()?.get(agentId)?.model?.takeIf { it.isNotBlank() } ?: "Auto"
                 else -> "Auto"
             }
             if (!closed && _state.value.selectedConversationId == conversationId) {
@@ -951,7 +945,6 @@ class DesktopChatController(
     private suspend fun requireCatalogModel(
         extras: ChatGatewayExtras,
         selectedValue: String,
-        routeIdentity: ModelRouteIdentity?,
     ): RequiredCatalogModel {
         val cached = _availableModels.value
         val initialResult = if (cached.isNotEmpty()) {
@@ -967,18 +960,29 @@ class DesktopChatController(
         val models = result.getOrElse { cause ->
             throw IllegalStateException("Model catalog is unavailable; retry agent creation.", cause)
         }
-        val selectedModel = requireNotNull(
-            ModelCatalog.selectedModelForRoute(
-                models = models,
-                selectedValue = selectedValue,
-                routeIdentity = routeIdentity,
-            ),
-        ) {
+        val selectedModel = ModelCatalog.selectedModel(models, selectedValue)
+            ?: selectedModelForCurrentAgentRoute(models, selectedValue)
+        requireNotNull(selectedModel) {
             "Selected model is not available in the current catalog; choose a model and retry."
         }
         return RequiredCatalogModel(
             models = models,
             selectionValue = ModelCatalog.selectionValue(models, selectedModel),
+        )
+    }
+
+    private suspend fun selectedModelForCurrentAgentRoute(
+        models: List<LlmModel>,
+        selectedValue: String,
+    ): LlmModel? {
+        val agentId = _state.value.selectedConversation?.agentId?.takeIf { it.isNotBlank() } ?: return null
+        val agent = runCatching { agentByIdProvider(setOf(agentId)) }.getOrNull()?.get(agentId)
+            ?.takeIf { it.model == selectedValue }
+            ?: return null
+        return ModelCatalog.selectedModelForRoute(
+            models = models,
+            selectedValue = selectedValue,
+            routeIdentity = ModelRouteIdentity.from(agent),
         )
     }
 

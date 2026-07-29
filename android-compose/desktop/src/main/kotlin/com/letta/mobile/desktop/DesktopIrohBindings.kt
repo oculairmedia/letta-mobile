@@ -217,8 +217,8 @@ private fun buildDesktopChatController(
         agentNamesByIdProvider = { agentIds ->
             resolveDesktopAgentNames(agentIds, bindings.irohAgentDirectory, httpRepo)
         },
-        agentModelByIdProvider = { agentIds ->
-            resolveDesktopAgentModels(agentIds, bindings.irohAgentDirectory, httpRepo)
+        agentByIdProvider = { agentIds ->
+            resolveDesktopAgents(agentIds, bindings.irohAgentDirectory, httpRepo)
         },
         loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
         persistArchivedConversationIds = { ids ->

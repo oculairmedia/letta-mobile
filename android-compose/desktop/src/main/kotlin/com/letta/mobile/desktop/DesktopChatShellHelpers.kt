@@ -11,8 +11,6 @@ import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
-import com.letta.mobile.data.model.ModelRouteIdentity
-import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.memory.MemoryParityItem
@@ -20,6 +18,7 @@ import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.chat.runtime.groupSubagentConversations
 import com.letta.mobile.data.model.SubagentEntry
+import com.letta.mobile.data.repository.api.IAgentRepository
 import kotlinx.coroutines.CoroutineScope
 import com.letta.mobile.avatar.core.AvatarActivity
 import com.letta.mobile.desktop.avatar.DesktopAvatarCompanion
@@ -29,7 +28,6 @@ import com.letta.mobile.desktop.chat.ConversationArchiveFilter
 import com.letta.mobile.data.search.PaletteItem
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.ComposerCommand
-import com.letta.mobile.desktop.chat.DesktopAgentCreateRequest
 import com.letta.mobile.desktop.chat.DesktopChatController
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
 import com.letta.mobile.desktop.data.DesktopFileSecureSettingsStore
@@ -363,22 +361,14 @@ internal fun buildComposerCommands(params: BuildComposerCommandsParams): List<Co
     }
 }
 
-/** Builds a new-agent request, copying defaults and route identity from the focused agent. */
-internal fun resolveNewAgentCreateRequest(
-    name: String,
+/** Model/embedding defaults for a new agent, copied from the focused agent. */
+internal fun resolveNewAgentDefaults(
     agentRepository: IAgentRepository,
     templateAgentId: String?,
     modelValue: String?,
-): DesktopAgentCreateRequest {
-    val template = templateAgentId?.let(agentRepository::getCachedAgent)
-    return DesktopAgentCreateRequest(
-        name = name,
-        model = modelValue ?: template?.model,
-        embedding = template?.embedding,
-        modelRoute = template
-            ?.takeIf { modelValue == null }
-            ?.let(ModelRouteIdentity::from),
-    )
+): Pair<String?, String?> {
+    val template = templateAgentId?.let { agentRepository.getCachedAgent(it) }
+    return (modelValue ?: template?.model) to template?.embedding
 }
 
 internal fun conversationRecency(label: String): java.time.Instant =
