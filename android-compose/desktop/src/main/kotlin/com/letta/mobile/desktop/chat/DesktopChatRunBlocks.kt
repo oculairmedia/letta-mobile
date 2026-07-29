@@ -83,11 +83,20 @@ internal fun DesktopRunBlock(
     item: ChatRenderItem.RunBlock,
     streamingMessageId: StreamingMessageId? = null,
 ) {
-    val messages = item.messages.map { it.first }
-    val reasoning = messages.filter { it.isReasoning && it.content.isNotBlank() }
-    val toolCalls = messages.flatMap { it.toolCalls.orEmpty() }
-    val narration = messages.filter {
-        !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank()
+    // These four passes are pure projections of item.messages, but the chat
+    // timeline recomposes continuously while a turn streams — so recomputing
+    // them per frame, per run block, scaled with transcript length. Key them on
+    // the message list so a streaming turn only re-derives the block whose
+    // messages actually changed.
+    val messages = remember(item.messages) { item.messages.map { it.first } }
+    val reasoning = remember(messages) {
+        messages.filter { it.isReasoning && it.content.isNotBlank() }
+    }
+    val toolCalls = remember(messages) { messages.flatMap { it.toolCalls.orEmpty() } }
+    val narration = remember(messages) {
+        messages.filter {
+            !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank()
+        }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         reasoning.forEach { ReasoningRow(it.content) }

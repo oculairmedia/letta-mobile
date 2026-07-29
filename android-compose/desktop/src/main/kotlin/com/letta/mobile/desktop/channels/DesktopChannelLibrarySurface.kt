@@ -38,19 +38,28 @@ fun DesktopChannelLibrarySurface(
     var query by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf<ChannelDisplayStatus?>(null) }
 
-    val statusesPresent = ChannelDisplayStatus.entries.filter { s -> state.channels.any { it.status == s } }
-    val filtered = state.channels.filter { channel ->
-        (statusFilter == null || channel.status == statusFilter) &&
-            (
-                query.isBlank() ||
-                    channel.title.contains(query, true) ||
-                    channel.subtitle.contains(query, true) ||
-                    channel.detailText.contains(query, true)
-                )
+    // statusesPresent is O(statuses × channels) and the section grouping scans
+    // the filtered list once per status, so key both on the inputs that can
+    // actually change them rather than re-deriving on every recomposition.
+    val statusesPresent = remember(state.channels) {
+        ChannelDisplayStatus.entries.filter { s -> state.channels.any { it.status == s } }
+    }
+    val filtered = remember(state.channels, statusFilter, query) {
+        state.channels.filter { channel ->
+            (statusFilter == null || channel.status == statusFilter) &&
+                (
+                    query.isBlank() ||
+                        channel.title.contains(query, true) ||
+                        channel.subtitle.contains(query, true) ||
+                        channel.detailText.contains(query, true)
+                    )
+        }
     }
     // Group by connection status — each status is a labelled section in the grid.
-    val sections = statusesPresent.mapNotNull { status ->
-        filtered.filter { it.status == status }.takeIf { it.isNotEmpty() }?.let { status.label to it }
+    val sections = remember(statusesPresent, filtered) {
+        statusesPresent.mapNotNull { status ->
+            filtered.filter { it.status == status }.takeIf { it.isNotEmpty() }?.let { status.label to it }
+        }
     }
 
     Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {

@@ -56,8 +56,12 @@ internal fun DesktopBackgroundTasksPanel(
     onFetchTodos: (suspend (String) -> List<SubagentTodo>)? = null,
 ) {
     var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
-    val running = subagents.filter { it.status == SubagentStatus.RUNNING }
-    val finished = subagents.filter { it.status != SubagentStatus.RUNNING && it.entryKey() !in clearedKeys }
+    // The panel stays open while subagents stream status updates, so keep these
+    // partitions keyed to their inputs instead of re-filtering per recomposition.
+    val running = remember(subagents) { subagents.filter { it.status == SubagentStatus.RUNNING } }
+    val finished = remember(subagents, clearedKeys) {
+        subagents.filter { it.status != SubagentStatus.RUNNING && it.entryKey() !in clearedKeys }
+    }
 
     Column(
         modifier = modifier
