@@ -37,10 +37,11 @@ git push --force-with-lease                 # safe force-push to your branch
 
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
-- **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`.
+- **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`. Two `Merge branch 'main' into <branch>` commits in a PR's history is a strong signal that this rule was broken.
 - **CI gates merges, not pushes.** Required status checks currently configured on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, and `perf-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
-- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`) and `detekt (advisory)` surface debt without blocking merge. Do not treat them as required gates yet.
+- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`) and `detekt (advisory)` surface debt without blocking merge. Do not treat them as required gates yet. `codecov`, `qodana`, and CodeScene Code Health Review are likewise advisory.
 - **Additive module tests:** on PRs, `scripts/ci/changed-gradle-modules.sh` may also run `:feature-chat` / `:feature-editagent` / `:designsystem` / `:desktop` / `:cli` unit tests when those trees change. This never skips `:sharedLogic:allTests`.
+- **Run the pre-push checklist before opening the PR.** See the next section. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
 
 ## Module map (where work belongs)
 
@@ -78,6 +79,112 @@ git push --force-with-lease
 ```
 
 Do not `git merge origin/main` into your feature branch — see hard rules above.
+
+## Pre-push PR readiness checklist (run these before opening a PR)
+
+The cost of getting this right at dev time is a few seconds. The cost of
+getting it wrong is a 20-minute CI round trip plus a code-review thread.
+Every failure class below has been observed on at least one merged PR in the
+last wave. The checklist below is designed to catch each one *before* it
+costs a CI cycle.
+
+```bash
+# 0. Confirm you actually branched from current main.
+git fetch origin && git rebase origin/main && git push --force-with-lease
+
+# 1. Scope audit — confirm the diff is the diff. This is the #1 hidden
+#    rollback detector (see PR #1013 / commit 30e91c7be which silently
+#    rolled back 143 unrelated files).
+BASE=$(git merge-base origin/main HEAD)
+git diff --stat $BASE..HEAD -- ':!*.beads*'
+# A test-only PR touching one file should have ~1 file in the diff. If
+# `git diff --stat` shows dozens of files when you only changed one, STOP
+# and figure out where the extra files came from before opening the PR.
+
+# 2. Sensitive-path grep — anything under these paths must be load-bearing
+#    for the change, not incidental. Use this to audit yourself:
+SENSITIVE='authz|security|capability|Iroh|appserver|supervisor|local-backend|ProcessHandleController|BridgeEgress|AppServerTurnEngine|LocalImageContext'
+git diff --name-only $BASE..HEAD | grep -E "$SENSITIVE"
+# Each hit must be intentional. If you find one that isn't, stop and
+# investigate — see PR #1013 and PR #1027 for the cost of getting this
+# wrong. A hit is fine when the file IS the class under test; a hit is
+# not fine when the file is a sibling that got dragged in by a stale base.
+
+# 3. Stale-base detector — branches based on old main look "small" but
+#    actually re-apply merged commits as "new". The two cheapest signals:
+git log --oneline $BASE..HEAD --no-merges | wc -l   # raw commit count
+git log $BASE..HEAD --not --remotes/origin/main --oneline | wc -l
+# If the second number is small but the first is large, you likely merged
+# main into your branch instead of rebasing. That is the failure mode
+# that produced PR #1013's 144-file phantom rollback.
+
+# 4. Title/scope match — when adding tests, the diff MUST be the file
+#    named in the title. Cheap heuristic:
+git diff --name-only $BASE..HEAD | grep -i "$(git log -1 --format=%s HEAD | head -c 20)"
+# If your PR title says "add X test" but X isn't in the file list, the
+# branch and the title disagree. Fix one or the other before pushing.
+
+# 5. Local gate — required CI is :app compile + testDebugUnitTest, plus
+#    :sharedLogic:allTests + :desktop:test if sharedLogic moved. Run all
+#    that apply BEFORE pushing. Failed required gate = guaranteed red CI.
+cd android-compose
+[ "$BASE_TOUCHED_SHARED" = "1" ] && ./gradlew --no-daemon :sharedLogic:allTests :desktop:test || true
+./gradlew --no-daemon :app:compileRootDebugKotlin :app:testRootDebugUnitTest
+
+# 6. Mechanical-debt preflight — the four inspections that light up on
+#    EVERY PR's first commit: Unused import directive, Unused symbol,
+#    Long overload to Duration conversion, Redundant suspend modifier,
+#    plus CodeScene "Complex Method" and "Excess Function Arguments".
+#    Pre-fix them at dev cost, not after CI flags them.
+./gradlew --no-daemon :app:detekt   # advisory; do not lower thresholds
+# Visual scan for: unused imports, `5_000L` that should be `5.seconds`,
+# a method with 6+ params that wants a parameter object, a single
+# function doing dispatch on type — split it before pushing.
+
+# 7. Concurrent-collection defaults for sharedLogic — every recent PR
+#    had to add these on iteration 2+. Bake them in on first commit:
+#    - Stamp `connectionGeneration` at frame ingest; reject frames with
+#      a stale gen at every cross-component boundary.
+#    - Register a frame with a registry / fanout ONLY when a subscriber
+#      can observe it (no phantom leases).
+#    - `markDispatched` / `releaseClaim` ONLY after a successful send;
+#      on failure, leave the claim in place so the next attempt retries.
+#    - Cleanup under `NonCancellable`; a `try { cancelAndJoin() }` in
+#      `finally` is a textbook lost-unlock.
+#    - New turn / new run / new connection ALWAYS supersedes the prior;
+#      drop prior-gen entries from caches and leases at the moment the
+#      new identity is recorded.
+#    See PRs #1039, #1040, #1042 for the full checklist.
+
+# 8. Distinct failure categories — the 4 infra checks below are
+#    advisory and CANNOT block your merge. Do not iterate to "fix" them.
+#    - `CodeScene Code Health Review` — advisory, often pre-existing.
+#    - `codecov` — repo not registered; see PR #1023 PM comment.
+#    - `qodana` — finds 70-150 new "Unused import" items on every PR
+#      because the import optimizer runs on a different target set;
+#      pre-fix unused imports locally and the Qodana count drops by
+#      half on its own.
+#    - `detekt (advisory)` — `maxIssues: 0` on main, pre-existing.
+#    The required gates that DO block merge are: `test`,
+#    `build-apk-pass`, `shared-multiplatform`, `perf-gate`.
+#    When any required gate fails, fix it. When only advisory fails,
+#    document the cost in a PR comment and proceed.
+
+# 9. PR description — every PR must state, in one sentence each:
+#    - what behavior changes
+#    - how the regression test exercises it
+#    - which transport / module surface it touches (mobile, desktop,
+#      iroh, appserver, shim)
+#    - whether it requires a matched wrapper + APK deploy (anything
+#      touching `sharedLogic` appserver transport does)
+```
+
+**Why this checklist exists.** The merge window of 2026-07-26 to 2026-07-29
+saw 23 PRs land. Of the 8 non-trivial ones, the average was 3 review
+iterations and 7 commits before merge, almost all chasing one of: stale-base
+phantom rollbacks, mechanical Qodana debt, or missing concurrent-collection
+defaults. None of these is hard to fix at dev time. All of them cost ~20
+minutes of CI per iteration when caught after push.
 
 ## Development Environment & Platform Paths
 
