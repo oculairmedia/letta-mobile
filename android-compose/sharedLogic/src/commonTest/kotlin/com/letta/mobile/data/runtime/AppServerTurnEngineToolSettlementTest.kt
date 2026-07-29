@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -167,6 +168,10 @@ class AppServerTurnEngineToolSettlementTest {
             client = client,
             requestIdFactory = { "req" },
             turnIdleTimeoutMs = 50L,
+            // letta-mobile-h5t1g: this case intentionally exercises a SURFACED,
+            // never-answered approval, so it must opt out of the approve-all
+            // default that would otherwise auto-allow the call.
+            permissionMode = AppServerPermissionMode.Standard,
         )
 
         engine.runTurn(command).test {

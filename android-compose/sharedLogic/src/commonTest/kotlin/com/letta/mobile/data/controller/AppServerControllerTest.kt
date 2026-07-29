@@ -2,11 +2,13 @@ package com.letta.mobile.data.controller
 
 import app.cash.turbine.test
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerCreatedRuntimeEntities
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
@@ -23,8 +25,10 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -108,6 +112,90 @@ class AppServerControllerTest {
             )
             assertEquals(2, client.runtimeStartCommands.size)
             assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.last().mode)
+        } finally {
+            controller.close()
+        }
+    }
+
+    @Test
+    fun coldRuntimeStartWithoutExplicitModeUsesUnrestrictedDefault() = runTest {
+        // letta-mobile-h5t1g: nothing cached and no mode passed (app reconnect,
+        // App Server restart, runtime eviction) must start approve-all, not
+        // Standard — Standard parks the first tool call until the watchdog kills it.
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(client = client)
+        try {
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+            )
+            assertEquals(AppServerPermissionMode.Unrestricted, client.runtimeStartCommands.single().mode)
+        } finally {
+            controller.close()
+        }
+    }
+
+    @Test
+    fun coldTurnWithoutCachedModeAutoApprovesToolCall() = runTest {
+        // letta-mobile-h5t1g: the engine-started (cold) path resolves the same
+        // default, so the first tool call of a cold turn is auto-approved.
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            parentCoroutineContext = Dispatchers.Unconfined,
+        )
+        val turn = TurnCommand(
+            backendId = BackendId("backend-1"),
+            runtimeId = RuntimeId("runtime-1"),
+            agentId = AgentId("agent-1"),
+            conversationId = ConversationId("conv-1"),
+            input = TurnInput.UserMessage(localMessageId = "local-1", text = "hello"),
+        )
+        try {
+            controller.runTurn(turn).test {
+                assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+                assertEquals(AppServerPermissionMode.Unrestricted, client.runtimeStartCommands.single().mode)
+                assertIs<AppServerInputPayload.CreateMessage>(assertIs<AppServerCommand.Input>(client.sentCommands.single()).payload)
+
+                client.emit(
+                    AppServerInboundFrame.ControlRequest(
+                        requestId = "approval-1",
+                        request = buildJsonObject {
+                            put("subtype", "can_use_tool")
+                            put("tool_name", "searxng_web_search")
+                            put("tool_call_id", "tool-call-1")
+                            put("input", buildJsonObject { put("query", "iroh") })
+                        },
+                        agentId = "agent-1",
+                        conversationId = "conv-1",
+                    ),
+                )
+                runCurrent()
+
+                val approval = assertIs<AppServerInputPayload.ApprovalResponse>(
+                    assertIs<AppServerCommand.Input>(client.sentCommands.last()).payload,
+                )
+                assertEquals("approval-1", approval.requestId)
+                assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+                cancelAndIgnoreRemainingEvents()
+            }
+        } finally {
+            controller.close()
+        }
+    }
+
+    @Test
+    fun explicitStandardModeIsHonoredOverDefault() = runTest {
+        // letta-mobile-h5t1g: an explicitly passed mode always wins over the default.
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(client = client)
+        try {
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                mode = AppServerPermissionMode.Standard,
+            )
+            assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.single().mode)
         } finally {
             controller.close()
         }

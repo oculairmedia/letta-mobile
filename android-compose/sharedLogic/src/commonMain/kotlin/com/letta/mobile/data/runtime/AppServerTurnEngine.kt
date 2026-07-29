@@ -76,7 +76,9 @@ class AppServerTurnEngine(
         name = "letta-mobile",
         version = "0.1",
     ),
-    private val permissionMode: AppServerPermissionMode = AppServerPermissionMode.Standard,
+    // letta-mobile-h5t1g: same default source as the controller — an engine built
+    // without an explicit mode approves tool calls instead of parking the turn.
+    private val permissionMode: AppServerPermissionMode = RuntimePermissionDefaults.DEFAULT_MODE,
     private val permissionModeProvider: (TurnCommand) -> AppServerPermissionMode = { permissionMode },
     private val requestIdFactory: () -> String = ::defaultRequestId,
     /**
