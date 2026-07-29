@@ -72,6 +72,7 @@ class AgentCreateModelRoutingTest {
             providerName = "llmux",
             modelEndpoint = "http://llmux:4000/v1",
             contextWindow = 200_000,
+            maxOutputTokens = 16_384,
         )
 
         val params = AgentCreateParams(
@@ -83,6 +84,7 @@ class AgentCreateModelRoutingTest {
         assertEquals("openai", params.modelSettings?.providerType)
         assertEquals("llmux", params.modelSettings?.providerName)
         assertEquals(0.5, params.modelSettings?.temperature)
+        assertEquals(16_384, params.modelSettings?.maxOutputTokens)
         assertEquals("MiniMax-M3", params.llmConfig?.model)
         assertEquals("http://llmux:4000/v1", params.llmConfig?.modelEndpoint)
         assertEquals(200_000, params.llmConfig?.contextWindow)

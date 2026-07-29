@@ -28,11 +28,14 @@ fun LlmModel.toAgentCreateLlmConfig(): LlmConfig? {
  * Adds catalog-derived routing fields to an agent-create request without
  * replacing settings the caller supplied explicitly.
  */
-fun AgentCreateParams.withCatalogModelRouting(availableModels: List<LlmModel>): AgentCreateParams {
-    val selectedModel = ModelCatalog.selectedModel(availableModels, model) ?: return this
-    return copy(
-        modelSettings = modelSettings.withRoutingFrom(selectedModel),
-        llmConfig = llmConfig ?: selectedModel.toAgentCreateLlmConfig(),
+fun AgentCreateParams.withCatalogModelRouting(availableModels: List<LlmModel>): AgentCreateParams =
+    ModelCatalog.selectedModel(availableModels, model).applyRoutingTo(this)
+
+private fun LlmModel?.applyRoutingTo(params: AgentCreateParams): AgentCreateParams {
+    val selectedModel = this ?: return params
+    return params.copy(
+        modelSettings = params.modelSettings.withRoutingFrom(selectedModel),
+        llmConfig = params.llmConfig ?: selectedModel.toAgentCreateLlmConfig(),
     )
 }
 
@@ -52,16 +55,24 @@ private fun ModelSettings?.withRoutingFrom(model: LlmModel): ModelSettings? {
         providerType = model.providerType.ifBlank { null },
         providerName = model.providerName,
         providerCategory = model.providerCategory,
+        maxOutputTokens = model.maxOutputTokens?.takeIf { it > 0 }
+            ?: model.maxTokens?.takeIf { it > 0 },
     )
     return this?.copy(
         providerType = providerType ?: catalogRouting.providerType,
         providerName = providerName ?: catalogRouting.providerName,
         providerCategory = providerCategory ?: catalogRouting.providerCategory,
-    ) ?: catalogRouting.takeIf(ModelSettings::hasProviderRouting)
+        maxOutputTokens = maxOutputTokens ?: catalogRouting.maxOutputTokens,
+    ) ?: catalogRouting.takeIf(ModelSettings::hasCatalogSettings)
 }
 
-private fun ModelSettings.hasProviderRouting(): Boolean =
-    listOf(providerType, providerName, providerCategory).any { !it.isNullOrBlank() }
+private fun ModelSettings.hasCatalogSettings(): Boolean =
+    listOf(
+        providerType,
+        providerName,
+        providerCategory,
+        maxOutputTokens?.toString(),
+    ).any { !it.isNullOrBlank() }
 
 private fun String.removeRoutingProviderPrefix(): String {
     val slash = indexOf('/')

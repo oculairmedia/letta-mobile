@@ -61,12 +61,14 @@ class ModelCatalogAliasProvenanceTest {
                 buildJsonObject {
                     put("id", route)
                     put("handle", "openai/gpt-4o")
+                    put("provider_type", "presentation-provider")
                     put("provider_name", "presentation-shared")
                     put("model_endpoint", "https://presentation.example/v1")
                     put(
                         "updateArgs",
                         buildJsonObject {
-                            put("handle", "openai/gpt-4o")
+                            put("handle", "gpt-4o")
+                            put("provider_type", "selection-$route")
                             put("provider_name", "byok-$route")
                             put("model_endpoint", "https://$route.example/v1")
                         },
@@ -78,6 +80,7 @@ class ModelCatalogAliasProvenanceTest {
         val models = AppServerListModelsAdapter.toLlmModels(entries)
 
         assertEquals(2, models.size)
+        assertEquals(setOf("selection-east", "selection-west"), models.map { it.providerType }.toSet())
         assertEquals(setOf("byok-east", "byok-west"), models.map { it.providerName }.toSet())
         assertEquals(
             setOf("https://east.example/v1", "https://west.example/v1"),

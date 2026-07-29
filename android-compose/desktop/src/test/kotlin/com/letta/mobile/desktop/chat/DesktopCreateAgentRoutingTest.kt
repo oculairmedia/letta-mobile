@@ -35,6 +35,7 @@ class DesktopCreateAgentRoutingTest {
         runCurrent()
 
         assertEquals("llmux", gateway.createdParams?.modelSettings?.providerName)
+        assertEquals(16_384, gateway.createdParams?.modelSettings?.maxOutputTokens)
         assertEquals("http://llmux:4000/v1", gateway.createdParams?.llmConfig?.modelEndpoint)
         assertEquals(200_000, gateway.createdParams?.llmConfig?.contextWindow)
         controller.close()
@@ -54,6 +55,7 @@ private class RoutingGateway : FakeDesktopChatGateway(), ChatGatewayExtras {
             providerName = "llmux",
             modelEndpoint = "http://llmux:4000/v1",
             contextWindow = 200_000,
+            maxOutputTokens = 16_384,
         ),
     )
 
