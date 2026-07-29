@@ -29,12 +29,19 @@ class ModelCatalogTest {
             providerType = "openai",
             selectionAliases = setOf("lmstudio/MiniMax-M3"),
         )
+        val models = listOf(sharedModel)
+        val selectedModel = ModelCatalog.selectedModel(models, "lmstudio/MiniMax-M3")
 
+        assertEquals(sharedModel, selectedModel)
         assertEquals(
-            sharedModel,
-            ModelCatalog.selectedModel(listOf(sharedModel), "lmstudio/MiniMax-M3"),
+            "openai/MiniMax-M3",
+            ModelCatalog.selectionValue(models, requireNotNull(selectedModel)),
         )
-        assertNull(ModelCatalog.selectedModel(listOf(sharedModel), "anthropic/MiniMax-M3"))
+        assertEquals(
+            "lmstudio/MiniMax-M3",
+            ModelCatalog.transportValue(models, "lmstudio/MiniMax-M3"),
+        )
+        assertNull(ModelCatalog.selectedModel(models, "anthropic/MiniMax-M3"))
     }
 
     @Test
