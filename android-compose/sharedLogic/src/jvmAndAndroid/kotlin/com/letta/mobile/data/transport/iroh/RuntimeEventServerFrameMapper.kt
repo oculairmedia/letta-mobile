@@ -2,6 +2,8 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
+import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
 import com.letta.mobile.runtime.ToolExecutionStatus
@@ -136,11 +138,14 @@ object RuntimeEventServerFrameMapper {
             // error-then-terminal ordering the stream-delta error path uses), so
             // the coordinator can classify the failure and show it.
             val failure = payload.reason?.takeIf { it.isNotBlank() }?.let { reason ->
+                val kind = terminalReasonKind(reason)
                 ServerFrame.Error(
                     id = "turn_error-${UUID.randomUUID()}",
                     ts = nowIso(),
                     code = "app_server_turn_failed",
-                    message = reason,
+                    // Never forward the raw provider/run reason over Iroh —
+                    // fixed per-family copy only (letta-mobile-o0atv).
+                    message = TurnFailureNotices.messageFor(kind),
                     conversationId = context.conversationId,
                     turnId = context.turnId,
                     runId = context.runId,

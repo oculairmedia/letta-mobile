@@ -688,6 +688,20 @@ class ChatSendCoordinator(
                         return
                     }
                 }
+                // Ignore Error frames for other conversations/turns so a foreign
+                // failure cannot poison this turn's buffered reason.
+                if (event.conversationId != null &&
+                    activeWsConversationId != null &&
+                    event.conversationId != activeWsConversationId
+                ) {
+                    return
+                }
+                if (event.turnId != null &&
+                    activeWsTurnId != null &&
+                    event.turnId != activeWsTurnId
+                ) {
+                    return
+                }
                 recordRuntimeEvent(event, activeWsConversationId)
                 // lcp-axv: stash the error and wait for the immediately-
                 // following TurnDone to flip the UI. Surfacing the error
@@ -813,6 +827,7 @@ class ChatSendCoordinator(
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
+        deliveredAssistantContentThisTurn = false
         // letta-mobile-dangling-tool: a fresh turn on this conversation
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
@@ -1007,7 +1022,28 @@ class ChatSendCoordinator(
         recordEvent: WsTimelineEvent.TurnDone?,
     ) {
         val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
-        if (status == "failed" || status == "cancelled") {
+        // letta-mobile-br5g0: a Failed terminal has two very different user
+        // meanings. Only a turn that delivered NO completed assistant reply is a
+        // dead turn worth a hard error state; a Failed terminal that lands after
+        // the reply completed (non-error stop_reason) is a trailing aux-step
+        // failure and must not be painted like a dead turn.
+        val mainReplyCompleted = deliveredAssistantContentThisTurn &&
+            !stopReasonForTurn.isNullOrBlank() &&
+            !stopReasonForTurn.equals("error", ignoreCase = true)
+        val failureNotice = if (status == "failed") {
+            TurnFailureNotices.forFailedTerminal(
+                reason = bufferedErrorMessage,
+                deliveredAssistantContent = deliveredAssistantContentThisTurn,
+                mainReplyCompleted = mainReplyCompleted,
+            )
+        } else {
+            null
+        }
+        val deadTurn = failureNotice != null
+        // Skip abandoned-fragment cleanup for delivered-then-failed turns: a
+        // legitimate short reply (e.g. "OK") must not be purged before we
+        // classify the failure as aux-only.
+        if (status == "cancelled" || (status == "failed" && deadTurn)) {
             cleanupAbandonedAssistantFragmentsSafely(
                 conversationId = conversationId,
                 runId = runId,
@@ -1035,21 +1071,6 @@ class ChatSendCoordinator(
                 )
             }
         }
-        // letta-mobile-br5g0: a Failed terminal has two very different user
-        // meanings. Only a turn that delivered NO assistant content is a dead
-        // turn worth a hard error state; a Failed terminal that lands after the
-        // reply was delivered is a trailing aux-step failure (title/summary
-        // generation inheriting the conversation model) and must not be painted
-        // like a dead turn.
-        val failureNotice = if (status == "failed") {
-            TurnFailureNotices.forFailedTerminal(
-                reason = bufferedErrorMessage,
-                deliveredAssistantContent = deliveredAssistantContentThisTurn,
-            )
-        } else {
-            null
-        }
-        val deadTurn = failureNotice != null
         if (status == "failed" && failureNotice == null) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnDone.failedAfterDelivery",
@@ -1078,7 +1099,7 @@ class ChatSendCoordinator(
             // Delivered-then-failed keeps whatever error state was already on
             // screen (normally none) — the user got their answer.
             "failed" -> if (deadTurn) {
-                bufferedErrorMessage ?: failureNotice?.message ?: "Turn failed"
+                bufferedErrorMessage ?: failureNotice!!.message
             } else {
                 ui.currentError()
             }

@@ -24,13 +24,25 @@ class TurnFailureNoticesTest {
     }
 
     @Test
-    fun deliveredContentSuppressesTheNoticeEntirely() {
+    fun completedReplySuppressesTheNoticeEntirely() {
         assertNull(
             TurnFailureNotices.forFailedTerminal(
                 reason = "Model provider error: Provider finish_reason: content_filter",
                 deliveredAssistantContent = true,
+                mainReplyCompleted = true,
             ),
         )
+    }
+
+    @Test
+    fun partialDeliveredContentStillSurfacesANotice() {
+        val notice = TurnFailureNotices.forFailedTerminal(
+            reason = "Model provider error: Provider finish_reason: content_filter",
+            deliveredAssistantContent = true,
+            mainReplyCompleted = false,
+        )
+        assertNotNull(notice)
+        assertEquals("content_filter", notice.kind)
     }
 
     @Test
@@ -48,8 +60,11 @@ class TurnFailureNoticesTest {
             "HTTP 429 rate limit exceeded",
             "request timed out after 60000ms",
             "Model provider error: upstream returned 500",
+            "empty response from model",
             "Conversation conv-1 is busy with run local-run-7",
             "Run ended while waiting for approval of 1 tool call",
+            "invalid tool call ids: toolu-abc",
+            "turn aborted by client cancel",
         )
         val notices = reasons.map {
             TurnFailureNotices.forFailedTerminal(it, deliveredAssistantContent = false)!!

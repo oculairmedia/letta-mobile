@@ -410,6 +410,9 @@ class IrohAdminRpcChatGateway(
          */
         private var deliveredAssistantContent: Boolean = false
 
+        /** True after a non-error stop_reason for this turn (main reply finished). */
+        private var mainReplyCompleted: Boolean = false
+
         /** Last failure text observed for this turn, used only for classification. */
         private var failureReason: String? = null
 
@@ -417,6 +420,7 @@ class IrohAdminRpcChatGateway(
             when (event) {
                 is WsTimelineEvent.TurnStarted -> onTurnStarted(event)
                 is WsTimelineEvent.MessageDelta -> onMessageDelta(event, emit)
+                is WsTimelineEvent.StopReason -> onStopReason(event)
                 is WsTimelineEvent.TurnDone -> onTurnDone(event, emit)
                 is WsTimelineEvent.Error -> onError(event, emit)
                 is WsTimelineEvent.Disconnected -> onDisconnected(event)
@@ -429,6 +433,13 @@ class IrohAdminRpcChatGateway(
         private fun onTurnStarted(event: WsTimelineEvent.TurnStarted) {
             if (event.conversationId == conversationId.value && turnId == null) {
                 turnId = event.turnId
+            }
+        }
+
+        private fun onStopReason(event: WsTimelineEvent.StopReason) {
+            if (turnId != null && event.turnId != turnId) return
+            if (!event.stopReason.equals("error", ignoreCase = true)) {
+                mainReplyCompleted = true
             }
         }
 
@@ -456,27 +467,29 @@ class IrohAdminRpcChatGateway(
         }
 
         private suspend fun onError(event: WsTimelineEvent.Error, emit: suspend (LettaMessage) -> Unit) {
-            val forThisTurn = event.conversationId == conversationId.value ||
-                (turnId != null && event.turnId == turnId)
-            if (!forThisTurn) return
+            if (event.conversationId != null && event.conversationId != conversationId.value) return
+            if (event.turnId != null && turnId != null && event.turnId != turnId) return
+            // Untagged errors while we already own a turn are too ambiguous to
+            // attribute; only accept conversation-scoped or turn-scoped matches.
+            if (event.conversationId == null && event.turnId == null && turnId != null) return
             failureReason = event.message.ifBlank { event.code }
             failTurn(emit, "Iroh turn error ${event.code}: ${event.message}")
         }
 
         /**
-         * letta-mobile-br5g0: a Failed terminal that lands AFTER assistant
-         * content was delivered is a trailing aux-step failure (title/summary
-         * generation), not a dead turn — the user already has their answer, so
-         * the send completes normally instead of throwing and painting the
-         * prompt red. A turn that delivered nothing gets a visible ERROR row in
-         * the timeline (fixed per-family copy, no raw reason) before the
-         * existing failure signalling runs.
+         * letta-mobile-br5g0: a Failed terminal that lands AFTER the main reply
+         * completed is a trailing aux-step failure (title/summary generation),
+         * not a dead turn — the user already has their answer, so the send
+         * completes normally instead of throwing and painting the prompt red.
+         * Partial streamed content without a non-error stop_reason still gets a
+         * visible ERROR row.
          */
         private suspend fun failTurn(emit: suspend (LettaMessage) -> Unit, detail: String) {
             if (terminal.isCompleted) return
             val notice = TurnFailureNotices.forFailedTerminal(
                 reason = failureReason,
                 deliveredAssistantContent = deliveredAssistantContent,
+                mainReplyCompleted = mainReplyCompleted,
             )
             if (notice == null) {
                 Telemetry.event(

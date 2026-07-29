@@ -48,13 +48,18 @@ object TurnFailureNotices {
      * @param reason raw terminal reason from the run lifecycle. Used ONLY to
      *   derive the sanitized family; it is never returned in [TurnFailureNotice].
      * @param deliveredAssistantContent whether this turn already delivered
-     *   assistant content to the timeline (computed from turn state).
+     *   any assistant content to the timeline (computed from turn state).
+     * @param mainReplyCompleted whether there is explicit evidence the main
+     *   assistant reply finished (e.g. a non-error stop_reason) so a later
+     *   Failed terminal is a trailing aux-step failure. Partial streamed
+     *   content alone must NOT suppress the notice.
      */
     fun forFailedTerminal(
         reason: String?,
         deliveredAssistantContent: Boolean,
+        mainReplyCompleted: Boolean = false,
     ): TurnFailureNotice? {
-        if (deliveredAssistantContent) return null
+        if (deliveredAssistantContent && mainReplyCompleted) return null
         val kind = terminalReasonKind(reason) ?: OTHER_KIND
         return TurnFailureNotice(kind = kind, message = messageFor(kind))
     }

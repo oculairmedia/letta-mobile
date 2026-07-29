@@ -202,6 +202,34 @@ class AppServerControllerTest {
     }
 
     @Test
+    fun modeLessRestartAfterStandardPreservesCachedMode() = runTest {
+        // Reconnect / mode-less startRuntime must not silently upgrade a prior
+        // Standard runtime to Unrestricted via the cold-start default.
+        val client = FakeAppServerClient()
+        val controller = DefaultAppServerController(
+            client = client,
+            requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
+        )
+        try {
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                mode = AppServerPermissionMode.Standard,
+            )
+            assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.single().mode)
+            controller.onTransportDisconnected()
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+            )
+            assertEquals(2, client.runtimeStartCommands.size)
+            assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.last().mode)
+        } finally {
+            controller.close()
+        }
+    }
+
+    @Test
     fun stopRuntimeEvictsCacheSoNextStartReseeds() = runTest {
         // letta-mobile-eeu5p: a model switch calls stopRuntime; the next turn's
         // startRuntime must issue a FRESH runtime_start (reseeding the model)

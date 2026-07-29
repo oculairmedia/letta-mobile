@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -10,6 +11,7 @@ import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -51,7 +53,8 @@ class RuntimeEventServerFrameMapperTest {
         // dead turn with no explanation at all.
         val error = assertIs<ServerFrame.Error>(frames[0])
         assertEquals("app_server_turn_failed", error.code)
-        assertEquals("boom", error.message)
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, error.message)
+        assertFalse(error.message.contains("boom"))
         assertEquals("turn-1", error.turnId)
         assertEquals("run-1", error.runId)
         val turnDone = assertIs<ServerFrame.TurnDone>(frames[1])

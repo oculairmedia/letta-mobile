@@ -201,9 +201,10 @@ class DefaultAppServerController(
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        // letta-mobile-h5t1g: an explicitly requested mode always wins; only the
-        // absent case falls back to the single default source.
-        val effectiveMode = mode ?: defaultPermissionMode()
+        // Explicit request wins; otherwise honor a mode retained across disconnect
+        // (ReconnectCoordinator calls startRuntime without mode). Only the fully
+        // absent case falls back to the cold-start default (letta-mobile-h5t1g).
+        val effectiveMode = mode ?: runtimePermissionModes[key] ?: defaultPermissionMode()
         evictCachedRuntimeIfModeMismatch(key, effectiveMode)?.let { return it }
         runtimePermissionModes[key] = effectiveMode
         val response = startRuntimeRemote(

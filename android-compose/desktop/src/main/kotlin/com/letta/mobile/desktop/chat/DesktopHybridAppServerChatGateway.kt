@@ -182,20 +182,19 @@ class DesktopHybridAppServerChatGateway internal constructor(
             // letta-mobile-br5g0: computed from the turn's OWN observed frames —
             // did this turn actually put assistant content on screen?
             var deliveredAssistantContent = false
+            var mainReplyCompleted = false
             try {
                 turnEngine.runTurn(command).collect { draft ->
                     val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
                     if (lifecycle?.status == RuntimeRunStatus.Failed) {
-                        // letta-mobile-br5g0: a Failed terminal AFTER the reply was
-                        // delivered is a trailing aux-step failure (title/summary
-                        // generation), not a dead turn — completing normally keeps
-                        // the delivered content rendered and the prompt un-reddened.
-                        // A turn that delivered nothing emits a visible ERROR row
-                        // (fixed per-family copy, never the raw provider reason)
-                        // before the existing failure signalling runs.
+                        // letta-mobile-br5g0: a Failed terminal AFTER the main reply
+                        // completed is a trailing aux-step failure, not a dead turn.
+                        // Partial streamed content without a completed stop still
+                        // emits a visible ERROR row.
                         val notice = TurnFailureNotices.forFailedTerminal(
                             reason = lifecycle.reason,
                             deliveredAssistantContent = deliveredAssistantContent,
+                            mainReplyCompleted = mainReplyCompleted,
                         ) ?: return@collect
                         emit(
                             ErrorMessage(
@@ -209,6 +208,27 @@ class DesktopHybridAppServerChatGateway internal constructor(
                             502,
                             "App Server turn failed: ${lifecycle.reason ?: "unknown"}",
                         )
+                    }
+                    when (val payload = draft.payload) {
+                        is RuntimeEventPayload.RemoteStreamFrame -> {
+                            if (payload.messageType == "stop_reason") {
+                                val stop = runCatching {
+                                    kotlinx.serialization.json.Json.parseToJsonElement(payload.body)
+                                        .let { it as? kotlinx.serialization.json.JsonObject }
+                                        ?.get("stop_reason")
+                                        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+                                }.getOrNull()
+                                if (stop == null || !stop.equals("error", ignoreCase = true)) {
+                                    mainReplyCompleted = true
+                                }
+                            }
+                        }
+                        is RuntimeEventPayload.RunLifecycleChanged -> {
+                            if (payload.status == RuntimeRunStatus.Completed) {
+                                mainReplyCompleted = true
+                            }
+                        }
+                        else -> Unit
                     }
                     draft.toLettaMessages(
                         agentId = agentId,

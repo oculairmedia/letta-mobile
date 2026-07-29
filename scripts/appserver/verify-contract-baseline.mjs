@@ -91,7 +91,9 @@ function loadDeclarationCorpus(packageRoot, primaryPath) {
     const text = readFileSync(declarationPath, "utf8");
     declarations.set(packageRelativePath, { path: packageRelativePath, text });
 
-    const importPattern = /(?:from\s+|import\s*\(\s*)["'](\.\/[^"']+)["']/g;
+    // Follow both `./` and `../` relative imports so dist/types/* siblings
+    // contribute to protocol_corpus_sha256 (parent-relative imports are common).
+    const importPattern = /(?:from\s+|import\s*\(\s*)["'](\.\.?\/[^"']+)["']/g;
     let match;
     while ((match = importPattern.exec(text)) !== null) {
       pending.push(resolveLocalDeclaration(declarationPath, match[1]));

@@ -99,8 +99,7 @@ class KtorAppServerWebSocketTransport(
                 request = { bearerToken?.let(::bearerAuth) },
             ) {
                 coordinator.onSessionOpen()
-                runBidirectionalSession()
-                val closeReason = closeReason.await()
+                val closeReason = runBidirectionalSession()
                 terminal = closeReason.isTerminal()
                 reason = closeReason?.let { "${it.code} ${it.message}".trim() } ?: "App Server session closed"
             }
@@ -114,7 +113,12 @@ class KtorAppServerWebSocketTransport(
         }
     }
 
-    private suspend fun DefaultClientWebSocketSession.runBidirectionalSession() = coroutineScope {
+    /**
+     * @return the peer [CloseReason] observed for this session. Drain timeouts
+     * after a clean EOF still return that close reason so a terminal policy
+     * close is not misclassified as a retryable delivery failure.
+     */
+    private suspend fun DefaultClientWebSocketSession.runBidirectionalSession(): CloseReason? = coroutineScope {
         // Keep control delivery independent from a slow stream collector without
         // allowing either handoff to retain an unbounded number of frames. A full
         // queue fails the generation explicitly; silently evicting accepted
@@ -137,6 +141,7 @@ class KtorAppServerWebSocketTransport(
             }
         }
         var reachedEndOfStream = false
+        var drainTimedOut = false
         try {
             receiveAndDemuxFrames(controlDeliveryQueue, streamDeliveryQueue)
             reachedEndOfStream = true
@@ -144,17 +149,26 @@ class KtorAppServerWebSocketTransport(
             sender.cancel()
             controlDeliveryQueue.close()
             streamDeliveryQueue.close()
-            finishDeliveryJobs(reachedEndOfStream, controlDelivery, streamDelivery)
+            drainTimedOut = !finishDeliveryJobs(reachedEndOfStream, controlDelivery, streamDelivery)
         }
+        val closeReason = closeReason.await()
+        if (drainTimedOut && !closeReason.isTerminal()) {
+            throw AppServerDeliveryDrainTimeoutException(DELIVERY_DRAIN_TIMEOUT_MILLIS)
+        }
+        closeReason
     }
 
+    /**
+     * @return true when delivery jobs finished within the deadline (or were
+     * cancelled because EOF was not reached); false when the drain timed out.
+     */
     private suspend fun finishDeliveryJobs(
         reachedEndOfStream: Boolean,
         vararg jobs: Job,
-    ) {
+    ): Boolean {
         if (!reachedEndOfStream) {
             jobs.forEach { it.cancel() }
-            return
+            return true
         }
 
         val drained = withTimeoutOrNull(DELIVERY_DRAIN_TIMEOUT_MILLIS) {
@@ -162,8 +176,9 @@ class KtorAppServerWebSocketTransport(
         } != null
         if (!drained) {
             jobs.forEach { it.cancel() }
-            throw AppServerDeliveryDrainTimeoutException(DELIVERY_DRAIN_TIMEOUT_MILLIS)
+            return false
         }
+        return true
     }
 
     private suspend fun DefaultClientWebSocketSession.receiveAndDemuxFrames(
