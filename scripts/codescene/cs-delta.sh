@@ -25,6 +25,13 @@ if ! command -v cs >/dev/null 2>&1; then
   fi
 fi
 
+# Fall back to the dedicated token file (0600) when the env var is unset —
+# keeps the PAT out of shell profiles while letting hooks find it.
+if [ -z "${CS_ACCESS_TOKEN:-}" ] && [ -r "$HOME/.config/codescene/token" ]; then
+  CS_ACCESS_TOKEN="$(head -n1 "$HOME/.config/codescene/token")"
+  export CS_ACCESS_TOKEN
+fi
+
 if [ -z "${CS_ACCESS_TOKEN:-}" ]; then
   echo "[codescene] CS_ACCESS_TOKEN not set — skipping delta analysis." >&2
   echo "[codescene] mint a PAT at https://codescene.io/users/me/pat and export CS_ACCESS_TOKEN=<pat>" >&2

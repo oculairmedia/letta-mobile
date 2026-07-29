@@ -85,16 +85,32 @@ object TurnFailureNotices {
      *   assistant reply finished (e.g. a completed stop_reason) so a later
      *   Failed terminal is a trailing aux-step failure. Partial streamed
      *   content alone must NOT suppress the notice.
+     * @param kindHint an already-sanitized family carried on the wire (the
+     *   mapper's Error frame `code`). When it is a known family it wins over
+     *   reclassifying [reason]: on the Iroh path [reason] is the fixed
+     *   per-family COPY, and re-running [terminalReasonKind] over copy
+     *   downgraded `content_filter` to `provider_error` and the approval/tool
+     *   families to `other`. Unknown hints (transport error codes) are ignored.
      */
     fun forFailedTerminal(
         reason: String?,
         deliveredAssistantContent: Boolean,
         mainReplyCompleted: Boolean = false,
+        kindHint: String? = null,
     ): TurnFailureNotice? {
         if (deliveredAssistantContent && mainReplyCompleted) return null
-        val kind = terminalReasonKind(reason) ?: OTHER_KIND
+        val kind = kindHint?.takeIf { isKnownKind(it) }
+            ?: terminalReasonKind(reason)
+            ?: OTHER_KIND
         return TurnFailureNotice(kind = kind, message = messageFor(kind))
     }
+
+    /**
+     * Whether [kind] is one of the sanitized families [terminalReasonKind]
+     * produces — i.e. safe to trust as a pre-classified failure family from a
+     * wire frame's `code` rather than a transport/HTTP error code.
+     */
+    fun isKnownKind(kind: String?): Boolean = kind != null && kind in KNOWN_KINDS
 
     /** Fixed per-family copy. Never interpolates the raw reason. */
     fun messageFor(kind: String?): String = when (kind) {
@@ -123,6 +139,20 @@ object TurnFailureNotices {
     }
 
     private const val OTHER_KIND = "other"
+
+    /** Families [terminalReasonKind] can produce. Keep in sync with it. */
+    private val KNOWN_KINDS = setOf(
+        "content_filter",
+        "approval_pending",
+        "invalid_tool_call_ids",
+        "conversation_busy",
+        "empty_response",
+        "rate_limited",
+        "timeout",
+        "provider_error",
+        "aborted",
+        OTHER_KIND,
+    )
 
     private val STREAM_DELTA_JSON = Json { ignoreUnknownKeys = true; isLenient = true }
 }

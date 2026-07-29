@@ -415,6 +415,10 @@ class IrohAdminRpcChatGateway(
 
         /** Last failure text observed for this turn, used only for classification. */
         private var failureReason: String? = null
+        // letta-mobile-br5g0 (codex review): sanitized family carried on the
+        // wire in Error.code — preserved so the fixed copy in `message` is
+        // never reclassified (that downgraded content_filter to provider_error).
+        private var failureKind: String? = null
 
         suspend fun route(event: WsTimelineEvent, emit: suspend (LettaMessage) -> Unit) {
             when (event) {
@@ -475,6 +479,7 @@ class IrohAdminRpcChatGateway(
             // attribute; only accept conversation-scoped or turn-scoped matches.
             if (event.conversationId == null && event.turnId == null && turnId != null) return
             failureReason = event.message.ifBlank { event.code }
+            failureKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }
             failTurn(emit, "Iroh turn error ${event.code}: ${event.message}")
         }
 
@@ -492,13 +497,14 @@ class IrohAdminRpcChatGateway(
                 reason = failureReason,
                 deliveredAssistantContent = deliveredAssistantContent,
                 mainReplyCompleted = mainReplyCompleted,
+                kindHint = failureKind,
             )
             if (notice == null) {
                 Telemetry.event(
                     "IrohChatGateway", "turn.failedAfterDelivery",
                     "conversationId" to conversationId.value,
                     "turnId" to (turnId ?: ""),
-                    "reasonKind" to (terminalReasonKind(failureReason) ?: "<none>"),
+                    "reasonKind" to (failureKind ?: terminalReasonKind(failureReason) ?: "<none>"),
                 )
                 terminal.complete(Unit)
                 return

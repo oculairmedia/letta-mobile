@@ -15,6 +15,7 @@ import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
+import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
@@ -99,10 +100,15 @@ class ChatSendCoordinator(
     // TurnDone arrives, so the "agent typing" indicator clears in sync with
     // the actual end-of-turn signal.
     @Volatile private var bufferedErrorMessage: String? = null
+    // letta-mobile-br5g0 (codex review): the mapper's Error frame already
+    // carries the sanitized failure family in `code`; reclassifying the fixed
+    // copy in `message` downgraded content_filter to provider_error. Buffer the
+    // wire family (when it is a known one) alongside the message.
+    @Volatile private var bufferedErrorKind: String? = null
     // letta-mobile-br5g0: set when this turn ingested assistant content. Drives
     // the dead-turn vs delivered-then-failed split in [finishActiveTurn].
     @Volatile private var deliveredAssistantContentThisTurn: Boolean = false
-    private val preConversationMessageDeltas = ArrayDeque<LettaMessage>()
+    private val preConversationMessageDeltas = ArrayDeque<WsTimelineEvent.MessageDelta>()
     private val pendingSendLock = SynchronizedObject()
     private val pendingSends = ArrayDeque<PendingWsSend>()
     @Volatile private var pendingConversationBootstrapLocal: PendingWsSend? = null
@@ -548,11 +554,15 @@ class ChatSendCoordinator(
                     "isReplay" to event.isReplay,
                 )
                 if (conversationId == null) {
-                    preConversationMessageDeltas.addLast(event.message)
+                    preConversationMessageDeltas.addLast(event)
                     return
                 }
                 recordRuntimeEvent(event, conversationId)
-                rememberActiveAssistantMessageRunId(event.message)
+                rememberActiveAssistantMessageRunId(
+                    message = event.message,
+                    frameConversationId = event.conversationId,
+                    isReplay = event.isReplay,
+                )
                 timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
                 if (!event.isReplay) {
                     rememberLiveIngest(conversationId)
@@ -561,6 +571,7 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.StopReason -> {
                 recordRuntimeEvent(event, activeWsConversationId)
+                if (ignoreForeignTurnStop(event)) return
                 recordStopReasonForTurn(event)
                 markTurnVisuallyComplete(reason = "stopReason")
             }
@@ -690,6 +701,7 @@ class ChatSendCoordinator(
                 // here would race with TurnDone and could leave isStreaming
                 // / isAgentTyping stuck if TurnDone is delayed.
                 bufferedErrorMessage = event.message.ifBlank { event.code }
+                bufferedErrorKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }
                 Telemetry.event(
                     "AdminChatVM", "ws.error.buffered",
                     "code" to event.code,
@@ -809,6 +821,7 @@ class ChatSendCoordinator(
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
+        bufferedErrorKind = null
         deliveredAssistantContentThisTurn = false
         // letta-mobile-dangling-tool: a fresh turn on this conversation
         // supersedes whatever the previous turn's post-turn dangling-
@@ -925,7 +938,18 @@ class ChatSendCoordinator(
         notice: TurnFailureNotice,
     ) {
         val stableRunId = runId.takeIf { it.isNotBlank() }
-        val id = "turn-failed-${stableRunId ?: turnId.ifBlank { "unknown" }}"
+        val stableTurnId = turnId.takeIf { it.isNotBlank() }
+        // letta-mobile-br5g0 (codex review): run ids reset across App Server
+        // restarts (local-run-1 gets reused), so the run id alone is not
+        // globally unique. Key the row by (turn, run) so a later failure that
+        // reuses the run number still renders instead of merging into the old
+        // row; a replayed terminal for the SAME turn still dedupes.
+        val id = "turn-failed-" + when {
+            stableTurnId != null && stableRunId != null -> "$stableTurnId-$stableRunId"
+            stableTurnId != null -> stableTurnId
+            stableRunId != null -> stableRunId
+            else -> "unknown"
+        }
         runCatching {
             timelineRepository.ingestExternalTransportMessage(
                 agentId = agentId,
@@ -955,14 +979,64 @@ class ChatSendCoordinator(
         )
     }
 
-    private fun rememberActiveAssistantMessageRunId(message: LettaMessage) {
+    /**
+     * letta-mobile-br5g0: "did this turn deliver assistant content" is read
+     * from observed turn state (an assistant delta with non-blank text was
+     * ingested), never inferred from timing.
+     *
+     * codex review (P1): the evidence must BELONG to the active turn.
+     * Server-side Iroh fanout and replay push assistant deltas from other
+     * conversations/turns through this same flow; counting those marked a
+     * failing turn as delivered and suppressed its failure notice. Scope:
+     * never from replay, only while a turn is active, only when the frame's
+     * conversation (when tagged — r3i1z) matches, and only when the message's
+     * run id matches the active run. Synthetic iroh-run-* placeholders are
+     * treated as unknown (run-id promotion may not have landed yet); untagged
+     * frames fall back to active-turn scoping. A run id is NOT required — a
+     * delivered reply without one still counts as delivered.
+     */
+    private fun countsAsActiveTurnDelivery(
+        message: AssistantMessage,
+        frameConversationId: String?,
+        isReplay: Boolean,
+    ): Boolean {
+        if (isReplay) return false
+        if (activeWsTurnId == null) return false
+        if (message.content.isBlank()) return false
+        if (!frameConversationMatchesActive(frameConversationId)) return false
+        return runMatchesActiveTurn(message.runId)
+    }
+
+    /** Untagged frames (r3i1z) fall back to active-turn scoping. */
+    private fun frameConversationMatchesActive(frameConversationId: String?): Boolean {
+        val active = activeWsConversationId ?: return true
+        val tagged = frameConversationId ?: return true
+        return tagged == active
+    }
+
+    /**
+     * Synthetic iroh-run-* placeholders are treated as unknown (run-id
+     * promotion may not have landed yet); a message without a run id falls
+     * back to active-turn scoping.
+     */
+    private fun runMatchesActiveTurn(runId: String?): Boolean {
+        val messageRunId = runId?.takeIf { it.isNotBlank() } ?: return true
+        val activeRun = activeWsRunId ?: return true
+        if (IROH_SYNTHETIC_RUN_ID_PREFIXES.any { activeRun.startsWith(it) }) return true
+        return messageRunId == activeRun
+    }
+
+    private fun rememberActiveAssistantMessageRunId(
+        message: LettaMessage,
+        frameConversationId: String?,
+        isReplay: Boolean,
+    ) {
         if (message !is AssistantMessage) return
-        // letta-mobile-br5g0: "did this turn deliver assistant content" is read
-        // from observed turn state (an assistant delta with non-blank text was
-        // ingested), never inferred from timing. A run id is NOT required — a
-        // delivered reply that carries no run id still counts as delivered.
-        if (message.content.isNotBlank()) deliveredAssistantContentThisTurn = true
-        val messageRunId = message.runId?.takeIf { it.isNotBlank() } ?: return
+        if (countsAsActiveTurnDelivery(message, frameConversationId, isReplay)) {
+            deliveredAssistantContentThisTurn = true
+        }
+        val messageRunId = message.runId?.takeIf { it.isNotBlank() }
+        if (messageRunId == null) return
         activeAssistantMessageRunIds += messageRunId
         while (activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
             activeAssistantMessageRunIds.remove(activeAssistantMessageRunIds.first())
@@ -999,6 +1073,24 @@ class ChatSendCoordinator(
      * (requires_approval) may still be followed by a completed main-reply stop —
      * upgrade so Failed-after-delivered suppression uses the right signal.
      */
+    /**
+     * letta-mobile-br5g0 (codex review P1): a stop_reason from a DIFFERENT
+     * turn (fanout/replay) must not count as this turn's main-reply completion
+     * evidence — a foreign completed stop would suppress the active turn's
+     * failure notice.
+     */
+    private fun ignoreForeignTurnStop(event: WsTimelineEvent.StopReason): Boolean {
+        val activeTurn = activeWsTurnId ?: return false
+        if (event.turnId.isBlank() || event.turnId == activeTurn) return false
+        Telemetry.event(
+            "AdminChatVM", "ws.stopReason.foreignTurnIgnored",
+            "received" to event.stopReason,
+            "turnId" to event.turnId,
+            "activeTurnId" to activeTurn,
+        )
+        return true
+    }
+
     private fun recordStopReasonForTurn(event: WsTimelineEvent.StopReason) {
         val previous = stopReasonForTurn
         when {
@@ -1054,6 +1146,7 @@ class ChatSendCoordinator(
                 reason = bufferedErrorMessage,
                 deliveredAssistantContent = deliveredAssistantContentThisTurn,
                 mainReplyCompleted = mainReplyCompleted,
+                kindHint = bufferedErrorKind,
             )
         } else {
             null
@@ -1096,7 +1189,7 @@ class ChatSendCoordinator(
                 "turnId" to turnId,
                 "runId" to runId,
                 // Sanitized family only — never the raw reason (letta-mobile-o0atv).
-                "reasonKind" to (terminalReasonKind(bufferedErrorMessage) ?: "<none>"),
+                "reasonKind" to (bufferedErrorKind ?: terminalReasonKind(bufferedErrorMessage) ?: "<none>"),
             )
         }
         failureNotice?.let { notice ->
@@ -1170,6 +1263,7 @@ class ChatSendCoordinator(
         stopReasonForTurn = null
         usageRecordedForTurn = false
         bufferedErrorMessage = null
+        bufferedErrorKind = null
         deliveredAssistantContentThisTurn = false
     }
 
@@ -1241,10 +1335,14 @@ class ChatSendCoordinator(
 
     private suspend fun drainPreConversationMessages(conversationId: String) {
         while (true) {
-            val message = preConversationMessageDeltas.removeFirstOrNull() ?: return
-            recordRuntimeEvent(WsTimelineEvent.MessageDelta(message), conversationId)
-            rememberActiveAssistantMessageRunId(message)
-            timelineRepository.ingestExternalTransportMessage(agentId, conversationId, message, source = "coordinator.preConversationDrain")
+            val delta = preConversationMessageDeltas.removeFirstOrNull() ?: return
+            recordRuntimeEvent(delta, conversationId)
+            rememberActiveAssistantMessageRunId(
+                message = delta.message,
+                frameConversationId = delta.conversationId,
+                isReplay = delta.isReplay,
+            )
+            timelineRepository.ingestExternalTransportMessage(agentId, conversationId, delta.message, source = "coordinator.preConversationDrain")
         }
     }
 

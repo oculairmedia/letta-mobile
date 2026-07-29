@@ -95,6 +95,40 @@ class TurnFailureNoticesTest {
     }
 
     @Test
+    fun knownKindHintWinsOverReclassifyingTheCopy() {
+        // letta-mobile-br5g0 (codex review): the Iroh path supplies the fixed
+        // copy as `reason`; classifying it downgrades the family. A known
+        // wire-carried kind must win.
+        val notice = TurnFailureNotices.forFailedTerminal(
+            reason = TurnFailureNotices.messageFor("content_filter"),
+            deliveredAssistantContent = false,
+            kindHint = "content_filter",
+        )
+        assertEquals("content_filter", notice?.kind)
+        assertEquals(TurnFailureNotices.messageFor("content_filter"), notice?.message)
+    }
+
+    @Test
+    fun unknownKindHintFallsBackToClassifyingReason() {
+        val notice = TurnFailureNotices.forFailedTerminal(
+            reason = "Model provider error: Provider finish_reason: content_filter",
+            deliveredAssistantContent = false,
+            kindHint = "app_server_turn_failed",
+        )
+        assertEquals("content_filter", notice?.kind)
+    }
+
+    @Test
+    fun isKnownKindAcceptsOnlyClassifierFamilies() {
+        assertTrue(TurnFailureNotices.isKnownKind("content_filter"))
+        assertTrue(TurnFailureNotices.isKnownKind("other"))
+        assertFalse(TurnFailureNotices.isKnownKind("app_server_turn_failed"))
+        assertFalse(TurnFailureNotices.isKnownKind("cursor_expired"))
+        assertFalse(TurnFailureNotices.isKnownKind(null))
+        assertFalse(TurnFailureNotices.isKnownKind(""))
+    }
+
+    @Test
     fun stopReasonFromStreamDeltaBodyReadsNestedAndBareForms() {
         assertEquals(
             "end_turn",

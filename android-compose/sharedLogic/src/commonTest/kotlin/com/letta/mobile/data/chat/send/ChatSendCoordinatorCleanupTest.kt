@@ -521,6 +521,119 @@ class ChatSendCoordinatorCleanupTest {
         assertNull(ui.currentError())
     }
 
+    // letta-mobile-br5g0 (codex review): the mapper ships the sanitized family
+    // in Error.code with fixed copy in Error.message. Reclassifying the copy
+    // downgraded content_filter to provider_error — the wire code must win.
+    @Test
+    fun errorFrameKnownCodeIsPreservedNotReclassifiedFromCopy() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "content_filter",
+                // Current wire shape: fixed per-family copy, NOT the raw reason.
+                // The copy says "refused", which terminalReasonKind does not
+                // recognize — only the code carries the family.
+                message = TurnFailureNotices.messageFor("content_filter"),
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        advanceUntilIdle()
+
+        val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
+        assertEquals("content_filter", errorRow.code)
+        assertEquals(TurnFailureNotices.messageFor("content_filter"), errorRow.text)
+    }
+
+    // letta-mobile-br5g0 (codex review P1): assistant deltas and completed
+    // stops from ANOTHER conversation/turn (server-side fanout, replay) must
+    // not count as this turn's delivery evidence — a foreign signal suppressed
+    // the active turn's failure notice and marked the prompt sent.
+    @Test
+    fun foreignDeltaAndStopDoNotSuppressFailureNotice() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        val otid = timeline.externalLocals.last().otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        // Fanned-out assistant delta from a different conversation and run.
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "mf", contentRaw = JsonPrimitive("foreign reply"), runId = "run-foreign"),
+                conversationId = "conv-other",
+            ),
+        )
+        // Completed stop from a different turn.
+        coordinator.handleEvent(
+            WsTimelineEvent.StopReason(turnId = "turn-other", runId = "run-foreign", stopReason = "end_turn"),
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "content_filter",
+                message = TurnFailureNotices.messageFor("content_filter"),
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        advanceUntilIdle()
+
+        val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
+        assertEquals("content_filter", errorRow.code)
+        assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", otid)), timeline.failedLocals)
+    }
+
+    // letta-mobile-br5g0 (codex review P1): replayed deltas are history, not
+    // proof this turn delivered anything.
+    @Test
+    fun replayedDeltaDoesNotCountAsDeliveredContent() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                AssistantMessage(id = "m1", contentRaw = JsonPrimitive("old reply"), runId = "run-1"),
+                isReplay = true,
+                conversationId = "conv-1",
+            ),
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        advanceUntilIdle()
+
+        assertEquals(1, timeline.ingestedMessages.filterIsInstance<ErrorMessage>().size)
+    }
+
+    // letta-mobile-br5g0 (codex review P2): run ids reset across App Server
+    // restarts, so the failure row is keyed by (turn, run) — a later failure
+    // reusing local-run-1 must produce a distinct row.
+    @Test
+    fun failureRowIdIncludesTurnIdentity() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val coordinator = coordinator(timeline, ui, FakeChannelTransport(mutableListOf(true)))
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-1"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-1", "failed"))
+        advanceUntilIdle()
+
+        val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
+        assertEquals("turn-failed-turn-1-local-run-1", errorRow.id)
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
