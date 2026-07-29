@@ -114,12 +114,12 @@ class KtorAppServerWebSocketTransport(
     }
 
     private suspend fun DefaultClientWebSocketSession.runBidirectionalSession() = coroutineScope {
-        // Both queues are deliberately lossless. Control responses are
-        // correctness-critical, and stream deltas form the durable timeline
-        // projection, so neither may be silently evicted. RuntimeEventFanout owns
-        // bounded per-subscriber buffering after this socket-level handoff.
-        val controlDeliveryQueue = Channel<AppServerReceivedFrame>(Channel.UNLIMITED)
-        val streamDeliveryQueue = Channel<AppServerReceivedFrame>(Channel.UNLIMITED)
+        // Keep control delivery independent from a slow stream collector without
+        // allowing either handoff to retain an unbounded number of frames. A full
+        // queue fails the generation explicitly; silently evicting accepted
+        // control responses or timeline deltas would corrupt client state.
+        val controlDeliveryQueue = Channel<AppServerReceivedFrame>(DELIVERY_QUEUE_CAPACITY)
+        val streamDeliveryQueue = Channel<AppServerReceivedFrame>(DELIVERY_QUEUE_CAPACITY)
         val sender = launch {
             for (command in controlCommandQueue) {
                 send(Frame.Text(protocol.encodeCommand(command)))
@@ -135,14 +135,21 @@ class KtorAppServerWebSocketTransport(
                 streamFrameFlow.emit(frame)
             }
         }
+        var reachedEndOfStream = false
         try {
             receiveAndDemuxFrames(controlDeliveryQueue, streamDeliveryQueue)
+            reachedEndOfStream = true
         } finally {
             sender.cancel()
             controlDeliveryQueue.close()
             streamDeliveryQueue.close()
-            controlDelivery.cancel()
-            streamDelivery.cancel()
+            if (reachedEndOfStream) {
+                controlDelivery.join()
+                streamDelivery.join()
+            } else {
+                controlDelivery.cancel()
+                streamDelivery.cancel()
+            }
         }
     }
 
@@ -157,14 +164,19 @@ class KtorAppServerWebSocketTransport(
                 // bad frame never tears down this receive loop (letta-mobile-lgns8.4).
                 val received = protocol.decodeFrame(frame.readText())
                 when (received.channel) {
-                    AppServerChannel.Control -> check(controlDeliveryQueue.trySend(received).isSuccess) {
-                        "control delivery queue closed while WebSocket receive loop is active"
-                    }
-                    AppServerChannel.Stream -> check(streamDeliveryQueue.trySend(received).isSuccess) {
-                        "stream delivery queue closed while WebSocket receive loop is active"
-                    }
+                    AppServerChannel.Control -> controlDeliveryQueue.enqueueOrFail(received, "control")
+                    AppServerChannel.Stream -> streamDeliveryQueue.enqueueOrFail(received, "stream")
                 }
             }
+        }
+    }
+
+    private fun Channel<AppServerReceivedFrame>.enqueueOrFail(
+        frame: AppServerReceivedFrame,
+        channelName: String,
+    ) {
+        if (!trySend(frame).isSuccess) {
+            throw AppServerDeliveryOverflowException(channelName, DELIVERY_QUEUE_CAPACITY)
         }
     }
 
@@ -175,8 +187,16 @@ class KtorAppServerWebSocketTransport(
 
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
+        const val DELIVERY_QUEUE_CAPACITY = 256
     }
 }
+
+private class AppServerDeliveryOverflowException(
+    channelName: String,
+    capacity: Int,
+) : IllegalStateException(
+    "App Server $channelName delivery queue exceeded its bounded capacity of $capacity frames",
+)
 
 /**
  * A close is terminal (must not be blindly retried) when the peer signals an
@@ -203,8 +223,9 @@ internal fun Throwable.isTerminalHandshakeFailure(): Boolean {
 }
 
 private val TERMINAL_HTTP_STATUS = Regex(
-    pattern = "(?i)\\b(?:http(?:\\s+response)?(?:\\s+status|\\s+code)?|" +
-        "status(?:\\s+code)?|response\\s+code)\\D{0,16}(?:401|403|426)\\b",
+    pattern = "(?i)(?:\\bbut\\s+was\\s+|" +
+        "\\b(?:http(?:\\s+response)?(?:\\s+status|\\s+code)?|" +
+        "status(?:\\s+code)?|response\\s+code)\\D{0,16})(?:401|403|426)\\b",
 )
 
 /**

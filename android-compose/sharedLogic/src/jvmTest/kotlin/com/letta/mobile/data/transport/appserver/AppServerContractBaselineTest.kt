@@ -145,6 +145,11 @@ class AppServerContractBaselineTest {
         assertEquals(baseline.requiredString("version"), source.requiredString("version"))
         assertEquals(baseline.requiredString("node"), source.requiredString("node_version"))
         assertEquals(baseline.requiredString("protocol_sha256"), source.requiredString("protocol_sha256"))
+        assertEquals(
+            baseline.requiredString("protocol_corpus_sha256"),
+            source.requiredString("protocol_corpus_sha256"),
+        )
+        assertEquals(baseline["protocol_corpus_files"], source["protocol_corpus_files"])
         assertTrue(fixtureText("cli-version.txt").startsWith(baseline.requiredString("version")))
         assertEquals("installed-protocol-v2-inventory.json", matrix["observed_installed_contract"]!!.jsonObject.requiredString("protocol_inventory_fixture"))
     }

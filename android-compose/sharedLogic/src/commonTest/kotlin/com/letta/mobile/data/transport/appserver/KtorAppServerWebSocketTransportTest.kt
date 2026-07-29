@@ -54,10 +54,17 @@ class KtorAppServerWebSocketTransportTest {
     @Test
     fun terminalHandshakeFailureRequiresAnHttpStatusOrNamedRejection() {
         assertTrue(
-            RuntimeException("Server returned HTTP response code: 426 Upgrade Required")
+            RuntimeException("Handshake exception, expected status code 101 but was 426")
                 .isTerminalHandshakeFailure(),
         )
-        assertTrue(RuntimeException("Handshake failed with status code 403").isTerminalHandshakeFailure())
+        assertTrue(
+            RuntimeException("Handshake exception, expected status code 101 but was 403")
+                .isTerminalHandshakeFailure(),
+        )
+        assertTrue(
+            RuntimeException("Handshake exception, expected status code 101 but was 401")
+                .isTerminalHandshakeFailure(),
+        )
         assertFalse(RuntimeException("Failed to connect to /127.0.0.1:4260").isTerminalHandshakeFailure())
         assertFalse(RuntimeException("Failed to connect to /127.0.0.1:426").isTerminalHandshakeFailure())
     }

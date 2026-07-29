@@ -154,6 +154,84 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
+    fun deliveryQueueOverflowFailsTheGenerationInsteadOfGrowingWithoutBound() = runBlocking {
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) {
+                    repeat(OVERFLOW_BURST_SIZE) {
+                        send(Frame.Text(STREAM_STATUS_FRAME))
+                    }
+                }
+            }
+        }
+        val transport = transport(port)
+        val releaseStreamCollector = CompletableDeferred<Unit>()
+        val streamCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            transport.streamFrames.collect {
+                releaseStreamCollector.await()
+            }
+        }
+
+        try {
+            withTimeout(TIMEOUT) {
+                transport.connectionState.first { it == AppServerConnectionState.Ready }
+            }
+            transport.sendControl(AppServerCommand.Auth(requestId = "overflow", token = ""))
+
+            val failed = withTimeout(TIMEOUT) {
+                transport.connectionState.first { it is AppServerConnectionState.Failed }
+            } as AppServerConnectionState.Failed
+            assertTrue(failed.reason.orEmpty().contains("bounded capacity"))
+        } finally {
+            releaseStreamCollector.complete(Unit)
+            streamCollector.cancel()
+            transport.close()
+        }
+    }
+
+    @Test
+    fun normalEndOfStreamDrainsAcceptedFramesBeforeTeardown() = runBlocking {
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) {
+                    repeat(DRAIN_BURST_SIZE) {
+                        send(Frame.Text(STREAM_STATUS_FRAME))
+                    }
+                    close(CloseReason(CloseReason.Codes.NORMAL, "complete"))
+                }
+            }
+        }
+        val transport = transport(port)
+        val receivedAllFrames = CompletableDeferred<Unit>()
+        val streamCollector = launch(start = CoroutineStart.UNDISPATCHED) {
+            var received = 0
+            transport.streamFrames.collect {
+                delay(2)
+                received += 1
+                if (received == DRAIN_BURST_SIZE) {
+                    receivedAllFrames.complete(Unit)
+                }
+            }
+        }
+
+        try {
+            withTimeout(TIMEOUT) {
+                transport.connectionState.first { it == AppServerConnectionState.Ready }
+            }
+            transport.sendControl(AppServerCommand.Auth(requestId = "drain", token = ""))
+
+            withTimeout(TIMEOUT) { receivedAllFrames.await() }
+            withTimeout(TIMEOUT) {
+                transport.connectionState.first { it is AppServerConnectionState.Failed }
+            }
+            assertTrue(transport.connectionState.value is AppServerConnectionState.Failed)
+        } finally {
+            streamCollector.cancel()
+            transport.close()
+        }
+    }
+
+    @Test
     fun terminalCloseCodeIsClassifiedTerminal() = runBlocking {
         val port = startServer {
             close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "unauthorized"))
@@ -178,7 +256,7 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     private fun caughtLegacyChannelIsTerminal(): Boolean {
         // Unit-level: handshake failure classifier treats 426 as terminal so
         // reconnect supervisors do not spin against an intentionally rejected URL.
-        val error = RuntimeException("Server returned HTTP response code: 426 Upgrade Required")
+        val error = RuntimeException("Handshake exception, expected status code 101 but was 426")
         return error.isTerminalHandshakeFailure()
     }
 
@@ -222,6 +300,8 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     private companion object {
         val TIMEOUT = 5.seconds
         const val STREAM_BURST_SIZE = 256
+        const val OVERFLOW_BURST_SIZE = 512
+        const val DRAIN_BURST_SIZE = 128
         const val AUTH_RESPONSE_FRAME =
             """{"type":"auth_response","request_id":"backpressure","success":true}"""
         const val STREAM_STATUS_FRAME =

@@ -27,6 +27,7 @@ assertContains(
   "pinned package baseline",
 );
 assertContains(inventory.source.protocol_sha256, "protocol declaration hash");
+assertContains(inventory.source.protocol_corpus_sha256, "protocol declaration corpus hash");
 
 for (const command of inventory.commands) {
   assertContains(`\`${command}\``, `upstream command ${command}`);

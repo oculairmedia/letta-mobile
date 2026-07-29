@@ -9,6 +9,15 @@ Upstream baseline: `@letta-ai/letta-code@0.29.9`, Node `v24.18.0`
 Protocol declaration SHA-256:
 `41874aad00d23d3f63a5aaab86986ac707e1437a0d02625d7ee161d261f0a285`
 
+Protocol declaration corpus SHA-256:
+`ed16a93a9e9c96dacb95e3597c7a48f62a5172fb1844b50372e8f531b4084713`
+
+The corpus contains the public barrel, `protocol_v2.d.ts`, and every recursively
+referenced local declaration (`app-server-info.d.ts` and
+`conversation-fork-protocol.d.ts`). The verifier sorts package-relative paths,
+then hashes each path, UTF-8 byte length, and exact file bytes with NUL
+separators. Both fixture files pin the ordered file list as well as the hash.
+
 ## Purpose
 
 This document is the entry point for auditing the complete App Server v2
@@ -679,7 +688,7 @@ Residual inconsistencies after Phases 1–4 (not accepted end state):
    depend on an explicitly injected `admin_rest_service` adapter rather than
    native App Server v2. Those adapters must not default to a LettaShim base.
 3. **Upstream exposure exceeds Kotlin support.** The pinned upstream protocol
-   has 90 commands and 99 messages; Kotlin types only the adopted subset.
+   has 91 commands and 100 messages; Kotlin types only the adopted subset.
    Unknown-frame preservation is not equivalent to supported behavior.
 4. **`skill.list_agent` is intentionally unavailable.** Process-global
    availability must not be presented as per-agent install state. Reintroduce
@@ -711,8 +720,9 @@ Residual inconsistencies after Phases 1–4 (not accepted end state):
 node scripts/appserver/verify-v2-audit-doc.mjs
 ```
 
-Any version, declaration hash, command union, or message union change requires
-a reviewed baseline and audit-document update before implementation changes.
+Any version, declaration or declaration-corpus hash, command union, or message
+union change requires a reviewed baseline and audit-document update before
+implementation changes.
 
 ### 2. Run contract and ownership tests
 

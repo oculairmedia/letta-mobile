@@ -6,6 +6,13 @@
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",
     "protocol_sha256": "41874aad00d23d3f63a5aaab86986ac707e1437a0d02625d7ee161d261f0a285",
+    "protocol_corpus_sha256": "ed16a93a9e9c96dacb95e3597c7a48f62a5172fb1844b50372e8f531b4084713",
+    "protocol_corpus_files": [
+      "dist/types/types/app-server-info.d.ts",
+      "dist/types/types/app-server-protocol.d.ts",
+      "dist/types/types/conversation-fork-protocol.d.ts",
+      "dist/types/types/protocol_v2.d.ts"
+    ],
     "source_map_origin": "src/types/protocol_v2.ts",
     "observation": "installed_package_declaration_unions",
     "reproduction": "scripts/appserver/verify-contract-baseline.mjs --package-root <installed-package-root-or-npm-prefix>"

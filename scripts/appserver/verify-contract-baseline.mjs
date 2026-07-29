@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const args = process.argv.slice(2);
@@ -24,13 +24,20 @@ const declaration = join(packageRoot, inventory.source.protocol_declaration);
 const declarationText = readFileSync(declaration, "utf8");
 // 0.29.x re-exports app_server_info types from a sibling module; unions still
 // live in protocol_v2.d.ts but member interfaces may be declared next door.
-const declarationCorpus = loadDeclarationCorpus(packageRoot, declaration, declarationText);
+const declarations = loadDeclarationCorpus(packageRoot, declaration);
+const declarationCorpus = declarations.map(({ text }) => text).join("\n");
+const declarationCorpusHash = sha256DeclarationCorpus(declarations);
+const declarationPaths = declarations.map(({ path }) => path);
 
 assertEqual("package name", matrix.baseline.package, packageJson.name);
 assertEqual("package version", matrix.baseline.version, packageJson.version);
 assertEqual("Node version", matrix.baseline.node, process.version);
 assertEqual("protocol hash", matrix.baseline.protocol_sha256, sha256(declarationText));
 assertEqual("inventory protocol hash", inventory.source.protocol_sha256, sha256(declarationText));
+assertEqual("protocol corpus hash", matrix.baseline.protocol_corpus_sha256, declarationCorpusHash);
+assertEqual("inventory protocol corpus hash", inventory.source.protocol_corpus_sha256, declarationCorpusHash);
+assertEqual("protocol corpus files", matrix.baseline.protocol_corpus_files, declarationPaths);
+assertEqual("inventory protocol corpus files", inventory.source.protocol_corpus_files, declarationPaths);
 assertEqual("command union", inventory.commands, extractDiscriminants(declarationCorpus, "WsProtocolCommand"));
 assertEqual("message union", inventory.messages, extractDiscriminants(declarationCorpus, "WsProtocolMessage"));
 
@@ -69,42 +76,73 @@ function verifyProbe(probe, probeArgs, executable = process.execPath) {
   assertEqual(`${probe.classification} output`, expected, actual);
 }
 
-function loadDeclarationCorpus(packageRoot, primaryPath, primaryText) {
-  const parts = [primaryText];
-  const importPattern = /from\s+"(\.\/[^"]+)"/g;
-  let match;
-  while ((match = importPattern.exec(primaryText)) !== null) {
-    const relative = match[1].endsWith(".ts") || match[1].endsWith(".d.ts")
-      ? match[1]
-      : `${match[1]}.d.ts`;
-    const sibling = resolve(join(primaryPath, ".."), relative);
+function loadDeclarationCorpus(packageRoot, primaryPath) {
+  const pending = [
+    primaryPath,
+    join(packageRoot, "dist/types/types/app-server-protocol.d.ts"),
+  ];
+  const declarations = new Map();
+
+  while (pending.length > 0) {
+    const declarationPath = pending.pop();
+    const packageRelativePath = normalizePath(relative(packageRoot, declarationPath));
+    if (declarations.has(packageRelativePath)) continue;
+
+    const text = readFileSync(declarationPath, "utf8");
+    declarations.set(packageRelativePath, { path: packageRelativePath, text });
+
+    const importPattern = /(?:from\s+|import\s*\(\s*)["'](\.\/[^"']+)["']/g;
+    let match;
+    while ((match = importPattern.exec(text)) !== null) {
+      pending.push(resolveLocalDeclaration(declarationPath, match[1]));
+    }
+  }
+
+  return [...declarations.values()].sort((left, right) => {
+    if (left.path < right.path) return -1;
+    if (left.path > right.path) return 1;
+    return 0;
+  });
+}
+
+function resolveLocalDeclaration(importerPath, specifier) {
+  const candidates = declarationCandidates(specifier);
+
+  for (const candidate of candidates) {
+    const declarationPath = resolve(dirname(importerPath), candidate);
     try {
-      parts.push(readFileSync(sibling, "utf8"));
+      readFileSync(declarationPath, "utf8");
+      return declarationPath;
     } catch {
-      // Optional sibling; union members that need it will fail extractDiscriminants.
+      // Try the next TypeScript declaration resolution form.
     }
   }
-  // Also pull the public barrel when present so re-exported siblings are covered.
-  try {
-    const barrel = join(packageRoot, "dist/types/types/app-server-protocol.d.ts");
-    const barrelText = readFileSync(barrel, "utf8");
-    let barrelMatch;
-    const barrelImports = /from\s+"(\.\/[^"]+)"/g;
-    while ((barrelMatch = barrelImports.exec(barrelText)) !== null) {
-      const relative = barrelMatch[1].endsWith(".d.ts") || barrelMatch[1].endsWith(".ts")
-        ? barrelMatch[1]
-        : `${barrelMatch[1]}.d.ts`;
-      const sibling = resolve(join(barrel, ".."), relative);
-      try {
-        parts.push(readFileSync(sibling, "utf8"));
-      } catch {
-        // ignore missing
-      }
-    }
-  } catch {
-    // barrel optional
+  throw new Error(`Missing local declaration ${specifier} imported by ${importerPath}`);
+}
+
+function declarationCandidates(specifier) {
+  if (specifier.endsWith(".d.ts") || specifier.endsWith(".ts")) return [specifier];
+  if (specifier.endsWith(".js")) return [specifier.replace(/\.js$/, ".d.ts"), specifier];
+  return [`${specifier}.d.ts`, join(specifier, "index.d.ts")];
+}
+
+function sha256DeclarationCorpus(declarations) {
+  const hash = createHash("sha256");
+  for (const declaration of declarations) {
+    // Path and byte-length separators make concatenation unambiguous while
+    // preserving the exact declaration bytes.
+    hash.update(declaration.path);
+    hash.update("\0");
+    hash.update(String(Buffer.byteLength(declaration.text, "utf8")));
+    hash.update("\0");
+    hash.update(declaration.text);
+    hash.update("\0");
   }
-  return parts.join("\n");
+  return hash.digest("hex");
+}
+
+function normalizePath(path) {
+  return path.replaceAll("\\", "/");
 }
 
 function extractDiscriminants(source, unionName) {
