@@ -25,12 +25,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -54,6 +57,11 @@ internal fun DesktopCommandPalette(
 ) {
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val groups = remember(items, query.text) { CommandPalette.grouped(items, query.text) }
+    // Cmd/Ctrl-K is a type-immediately affordance: the palette is useless until
+    // the query field has focus, so claim it on open rather than making the user
+    // click the field they just summoned.
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
     Box(
         modifier = Modifier
@@ -95,7 +103,7 @@ internal fun DesktopCommandPalette(
                     JewelTextField(
                         value = query,
                         onValueChange = { query = it },
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                     )
                 }
                 Box(
