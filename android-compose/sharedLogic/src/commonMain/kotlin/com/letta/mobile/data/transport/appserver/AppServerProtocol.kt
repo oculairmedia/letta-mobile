@@ -192,6 +192,13 @@ data class AppServerReceivedFrame(
     val channel: AppServerChannel,
     val frame: AppServerInboundFrame,
     val raw: JsonObject,
+    /**
+     * Connection generation that produced this frame (lgns8.22.4). Stamped when
+     * the frame enters a stable reconnect pipe so delayed delivery cannot
+     * register under a successor generation. Null for transports that do not
+     * stamp (tests / direct clients) — callers fall back to the live provider.
+     */
+    @Transient val connectionGeneration: Long? = null,
 )
 
 @Serializable

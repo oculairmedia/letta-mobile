@@ -113,6 +113,13 @@ class ReconnectingAppServerClient(
     override val isConnected: Flow<Boolean> = _state.map { it is ReconnectingClientState.Ready }
 
     private var current: AppServerClientGeneration? = null
+    /**
+     * lgns8.22.4: mirrors DefaultAppServerController.connectionGeneration.
+     * Allocated with getAndIncrement at each pipe start so every connected
+     * transport (including failed recovery) gets a unique stamp. Controller
+     * failGeneration must run on NeverReady-after-pipe via onDisconnected.
+     */
+    private val pipeGenerationSeq = kotlinx.atomicfu.atomic(0L)
 
     /**
      * Runs the supervise loop until a terminal state or scope cancellation.
@@ -199,7 +206,12 @@ class ReconnectingAppServerClient(
         // snapshots emitted during onRecovered. Starting the pipe after recovery
         // drops those frames and leaves skill.list / subagents empty until an
         // unrelated later event.
-        val pipe = scope.launch { generation.client.events.collect { _events.emit(it) } }
+        val pipeGeneration = pipeGenerationSeq.getAndIncrement()
+        val pipe = scope.launch {
+            generation.client.events.collect { frame ->
+                _events.emit(frame.copy(connectionGeneration = pipeGeneration))
+            }
+        }
 
         // Reattach runtimes / re-register tools / sync BEFORE reporting Ready,
         // so external callers never observe a half-recovered generation. The
@@ -215,6 +227,9 @@ class ReconnectingAppServerClient(
             pipe.cancel()
             current = null
             generation.close("recovery failed")
+            // Pipe already stamped this generation; invalidate it so a replay on
+            // the retry is not classified Duplicate under the same stamp.
+            listener.onDisconnected("recovery failed: ${e.message}")
             return GenerationOutcome.NeverReady("recovery failed: ${e.message}")
         }
 
