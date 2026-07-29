@@ -13,13 +13,13 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
-import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
+import com.letta.mobile.data.model.ModelRouteIdentity
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
@@ -46,6 +46,13 @@ import kotlin.time.Duration.Companion.milliseconds
 private data class RequiredCatalogModel(
     val models: List<LlmModel>,
     val selectionValue: String,
+)
+
+data class DesktopAgentCreateRequest(
+    val name: String,
+    val model: String?,
+    val embedding: String?,
+    val modelRoute: ModelRouteIdentity? = null,
 )
 
 class DesktopChatController(
@@ -446,30 +453,27 @@ class DesktopChatController(
     }
 
     /**
-     * Create a new agent (cloning model/embedding from a template agent so the
-     * config is valid for this backend), open a conversation for it, and select
-     * it. [onCreated] reports the new agent id so the UI can refresh.
+     * Create a new agent from pre-resolved model defaults, open a conversation
+     * for it, and select it. [onCreated] reports the new agent id so the UI can
+     * refresh.
      */
     fun createAgent(
-        name: String,
-        model: String?,
-        embedding: String?,
-        modelRouteTemplate: Agent? = null,
+        request: DesktopAgentCreateRequest,
         onCreated: (String) -> Unit = {},
     ) {
         if (closed) return
-        val agentName = name.ifBlank { "New agent" }
+        val agentName = request.name.ifBlank { "New agent" }
         scope.launch {
             try {
                 val gw = gatewayExtras ?: return@launch
-                val catalogModel = model?.let {
-                    requireCatalogModel(gw, it, modelRouteTemplate)
+                val catalogModel = request.model?.let {
+                    requireCatalogModel(gw, it, request.modelRoute)
                 }
                 val agent = gw.createAgent(
                     AgentCreateParams(
                         name = agentName,
                         model = catalogModel?.selectionValue,
-                        embedding = embedding,
+                        embedding = request.embedding,
                         includeBaseTools = true,
                         memoryBlocks = listOf(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
@@ -947,7 +951,7 @@ class DesktopChatController(
     private suspend fun requireCatalogModel(
         extras: ChatGatewayExtras,
         selectedValue: String,
-        routeTemplate: Agent?,
+        routeIdentity: ModelRouteIdentity?,
     ): RequiredCatalogModel {
         val cached = _availableModels.value
         val initialResult = if (cached.isNotEmpty()) {
@@ -963,18 +967,11 @@ class DesktopChatController(
         val models = result.getOrElse { cause ->
             throw IllegalStateException("Model catalog is unavailable; retry agent creation.", cause)
         }
-        val template = routeTemplate?.takeIf { it.model == selectedValue }
         val selectedModel = requireNotNull(
             ModelCatalog.selectedModelForRoute(
                 models = models,
                 selectedValue = selectedValue,
-                providerType = template?.modelSettings?.providerType
-                    ?: template?.llmConfig?.modelEndpointType,
-                providerName = template?.modelSettings?.providerName
-                    ?: template?.llmConfig?.providerName,
-                providerCategory = template?.modelSettings?.providerCategory
-                    ?: template?.llmConfig?.providerCategory,
-                modelEndpoint = template?.llmConfig?.modelEndpoint,
+                routeIdentity = routeIdentity,
             ),
         ) {
             "Selected model is not available in the current catalog; choose a model and retry."

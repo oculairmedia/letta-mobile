@@ -96,9 +96,11 @@ class ModelCatalogTest {
             ModelCatalog.selectedModelForRoute(
                 models = models,
                 selectedValue = "openai/gpt-4o",
-                providerType = "azure",
-                providerName = "byok-west",
-                modelEndpoint = "https://west.example/v1",
+                routeIdentity = ModelRouteIdentity(
+                    providerType = "azure",
+                    providerName = "byok-west",
+                    modelEndpoint = "https://west.example/v1",
+                ),
             ),
         )
         assertEquals("openai/gpt-4o", ModelCatalog.transportValue(models, "west"))

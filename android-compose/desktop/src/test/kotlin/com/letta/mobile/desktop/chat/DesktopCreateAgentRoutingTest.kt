@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelRouteIdentity
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.desktop.buildModelOptions
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
@@ -33,9 +34,11 @@ class DesktopCreateAgentRoutingTest {
         controller.start()
         runCurrent()
         controller.createAgent(
-            name = "Desktop agent",
-            model = "openai/MiniMax-M3",
-            embedding = null,
+            DesktopAgentCreateRequest(
+                name = "Desktop agent",
+                model = "openai/MiniMax-M3",
+                embedding = null,
+            ),
         )
         runCurrent()
 
@@ -59,7 +62,13 @@ class DesktopCreateAgentRoutingTest {
         controller.start()
         runCurrent()
         val westSelection = buildModelOptions(routes).single { it.first.endsWith("West") }.second
-        controller.createAgent(name = "West agent", model = westSelection, embedding = null)
+        controller.createAgent(
+            DesktopAgentCreateRequest(
+                name = "West agent",
+                model = westSelection,
+                embedding = null,
+            ),
+        )
         runCurrent()
 
         assertEquals("openai/gpt-4o", gateway.createdParams?.model)
@@ -88,10 +97,12 @@ class DesktopCreateAgentRoutingTest {
         controller.start()
         runCurrent()
         controller.createAgent(
-            name = "Cloned west agent",
-            model = template.model,
-            embedding = null,
-            modelRouteTemplate = template,
+            DesktopAgentCreateRequest(
+                name = "Cloned west agent",
+                model = template.model,
+                embedding = null,
+                modelRoute = ModelRouteIdentity.from(template),
+            ),
         )
         runCurrent()
 
@@ -114,9 +125,11 @@ class DesktopCreateAgentRoutingTest {
         controller.start()
         runCurrent()
         controller.createAgent(
-            name = "Pending catalog agent",
-            model = "openai/MiniMax-M3",
-            embedding = null,
+            DesktopAgentCreateRequest(
+                name = "Pending catalog agent",
+                model = "openai/MiniMax-M3",
+                embedding = null,
+            ),
         )
         runCurrent()
         assertNull(gateway.createdParams)
