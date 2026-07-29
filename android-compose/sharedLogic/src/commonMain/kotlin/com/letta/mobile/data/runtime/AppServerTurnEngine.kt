@@ -788,6 +788,20 @@ class AppServerTurnEngine(
                 }
                 if (!received.matches(scope)) {
                     handleScopeRejectedFrame(received, scope, leaseToken)?.let { status ->
+                        // Same abnormal-terminal settlement as the exact-scope path:
+                        // TurnCompleted skips cancel/finally settlement intentionally.
+                        settleDanglingToolCalls(
+                            command,
+                            emittedToolCallIds,
+                            returnedToolCallIds,
+                            emitDraft,
+                            when (status) {
+                                RuntimeRunStatus.Cancelled ->
+                                    "Tool execution interrupted by mismatched-scope cancellation"
+                                else ->
+                                    "Tool execution interrupted by mismatched-scope failure"
+                            },
+                        )
                         flushTail()
                         emitDraft(command.draftForScopeRejectedTerminal(status))
                         throw TurnCompleted

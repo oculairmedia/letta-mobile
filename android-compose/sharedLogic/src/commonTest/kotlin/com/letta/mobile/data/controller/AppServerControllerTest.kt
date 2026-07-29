@@ -92,22 +92,25 @@ class AppServerControllerTest {
             client = client,
             requestIdFactory = { "req-${client.runtimeStartCommands.size + 1}" },
         )
+        try {
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                mode = AppServerPermissionMode.Unrestricted,
+            )
+            assertEquals(1, client.runtimeStartCommands.size)
+            assertEquals(AppServerPermissionMode.Unrestricted, client.runtimeStartCommands.single().mode)
 
-        controller.startRuntime(
-            agentId = AgentId("agent-1"),
-            conversationId = ConversationId("conv-1"),
-            mode = AppServerPermissionMode.Unrestricted,
-        )
-        assertEquals(1, client.runtimeStartCommands.size)
-        assertEquals(AppServerPermissionMode.Unrestricted, client.runtimeStartCommands.single().mode)
-
-        controller.startRuntime(
-            agentId = AgentId("agent-1"),
-            conversationId = ConversationId("conv-1"),
-            mode = AppServerPermissionMode.Standard,
-        )
-        assertEquals(2, client.runtimeStartCommands.size)
-        assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.last().mode)
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                mode = AppServerPermissionMode.Standard,
+            )
+            assertEquals(2, client.runtimeStartCommands.size)
+            assertEquals(AppServerPermissionMode.Standard, client.runtimeStartCommands.last().mode)
+        } finally {
+            controller.close()
+        }
     }
 
     @Test
@@ -253,31 +256,34 @@ class AppServerControllerTest {
     fun runTurnAfterStartRuntimeReusesCachedScopeWithoutSecondRuntimeStart() = runTest {
         val client = FakeAppServerClient()
         val controller = DefaultAppServerController(client = client)
+        try {
+            controller.startRuntime(
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+            )
+            assertEquals(1, client.runtimeStartCommands.size)
 
-        controller.startRuntime(
-            agentId = AgentId("agent-1"),
-            conversationId = ConversationId("conv-1"),
-        )
-        assertEquals(1, client.runtimeStartCommands.size)
+            val command = TurnCommand(
+                backendId = BackendId("backend-1"),
+                runtimeId = RuntimeId("runtime-1"),
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                input = TurnInput.UserMessage(
+                    localMessageId = "local-1",
+                    text = "hello",
+                ),
+            )
 
-        val command = TurnCommand(
-            backendId = BackendId("backend-1"),
-            runtimeId = RuntimeId("runtime-1"),
-            agentId = AgentId("agent-1"),
-            conversationId = ConversationId("conv-1"),
-            input = TurnInput.UserMessage(
-                localMessageId = "local-1",
-                text = "hello",
-            ),
-        )
-
-        controller.runTurn(command).test {
-            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            assertEquals(1, client.runtimeStartCommands.size, "TurnEngine must reuse controller cache")
-            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
-            assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
-            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            awaitComplete()
+            controller.runTurn(command).test {
+                assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+                assertEquals(1, client.runtimeStartCommands.size, "TurnEngine must reuse controller cache")
+                client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+                assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload)
+                assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+                awaitComplete()
+            }
+        } finally {
+            controller.close()
         }
     }
 

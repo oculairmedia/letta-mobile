@@ -131,10 +131,19 @@ class DefaultAppServerController(
         response: AppServerInboundFrame.RuntimeStartResponse,
         startedGeneration: Long,
     ) {
+        val key = RuntimeKey(command.agentId.value, command.conversationId.value)
+        val recordId = "${command.agentId.value}:${command.conversationId.value}"
+        // Preserve cwd from the durable registry so reconnect doesn't lose the
+        // project directory when a mutating preflight restarts the runtime.
+        val existingCwd = runtimeRegistry?.load(recordId)?.cwd
         val canonical = runtimeMutex.withLock {
             if (connectionGeneration.value != startedGeneration) return@withLock null
             val scope = response.runtime ?: return@withLock null
-            val key = RuntimeKey(command.agentId.value, command.conversationId.value)
+            // Engine-started runtimes default to Standard when no mode was stored;
+            // record it so a later startRuntime(Standard) reuses the cache.
+            if (key !in runtimePermissionModes) {
+                runtimePermissionModes[key] = AppServerPermissionMode.Standard
+            }
             CanonicalRuntime(
                 scope = scope,
                 agent = response.agent,
@@ -145,7 +154,7 @@ class DefaultAppServerController(
         recordStartedRuntime(
             agentId = command.agentId,
             conversationId = command.conversationId,
-            cwd = null,
+            cwd = existingCwd,
             canonical = canonical,
         )
     }

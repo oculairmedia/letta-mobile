@@ -4,6 +4,8 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -21,6 +23,7 @@ class AppServerRuntimeEventRouter(
     private val fanout: RuntimeEventFanout = RuntimeEventFanout(),
 ) {
     private val collectorJob = atomic<Job?>(null)
+    private val attachLock = SynchronizedObject()
 
     /**
      * Attach a sole collector. No-op when an active collector is already running
@@ -29,18 +32,18 @@ class AppServerRuntimeEventRouter(
      *
      * Uses [CoroutineStart.UNDISPATCHED] so `inbound.collect` subscribes before
      * this method returns, closing the race where a turn starts before the
-     * collector is listening. Concurrent attach is CAS-guarded so two callers
-     * cannot leak duplicate collectors.
+     * collector is listening. Concurrent attach is serialized on [attachLock] so
+     * two callers cannot both subscribe before either wins the collector slot
+     * (which would duplicate zero-replay frames).
      */
     fun attach(scope: CoroutineScope, inbound: Flow<AppServerReceivedFrame>) {
-        while (true) {
+        synchronized(attachLock) {
             val existing = collectorJob.value
             if (existing != null && existing.isActive) return
             val newJob = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 inbound.collect { received -> fanout.route(received) }
             }
-            if (collectorJob.compareAndSet(existing, newJob)) return
-            newJob.cancel()
+            collectorJob.value = newJob
         }
     }
 
