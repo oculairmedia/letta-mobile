@@ -1891,6 +1891,11 @@ class AppServerTurnEngine(
             "terminal.failure",
             "status" to status.name,
             "hasReason" to !reason.isNullOrBlank(),
+            // letta-mobile-aktss: classified failure family. The raw reason stays
+            // redacted (o0atv), but a category token alone would have made the
+            // 2026-07-29 provider-refusal and stale-approval incidents a one-line
+            // grep instead of a multi-layer log hunt.
+            "reasonKind" to (terminalReasonKind(reason) ?: "<none>"),
             "exceptionType" to (exceptionTypeToken(reason) ?: "<none>"),
             "provider" to (provider ?: "<none>"),
             "handle" to (handle ?: "<none>"),
@@ -1902,6 +1907,13 @@ class AppServerTurnEngine(
         )
     }
 
+    /**
+     * letta-mobile-aktss: sanitized classification of a terminal failure reason.
+     * Returns a fixed category token, never any substring of the reason itself,
+     * so the o0atv no-secrets guarantee is preserved. Categories mirror the
+     * failure families letta-code actually produces (run error details and
+     * provider passthroughs) — extend the list as new families are identified.
+     */
     /** Best-effort exception class name from a terminal reason string. */
     private fun exceptionTypeToken(reason: String?): String? {
         if (reason.isNullOrBlank()) return null
@@ -1937,5 +1949,32 @@ class AppServerTurnEngine(
             nextRequestId += 1
             return "app-server-${nextRequestId}"
         }
+    }
+}
+
+/**
+ * letta-mobile-aktss: sanitized classification of a terminal failure reason.
+ * Returns a fixed category token, never any substring of the reason itself,
+ * so the o0atv no-secrets guarantee is preserved. Categories mirror the
+ * failure families letta-code actually produces (run error details and
+ * provider passthroughs) — extend the list as new families are identified.
+ * Order matters: specific families are matched before generic ones.
+ */
+internal fun terminalReasonKind(reason: String?): String? {
+    if (reason.isNullOrBlank()) return null
+    val r = reason.lowercase()
+    return when {
+        // Provider refusal surfaced as an OpenAI-compat finish_reason
+        // (e.g. "Model provider error: Provider finish_reason: content_filter").
+        "content_filter" in r || "refusal" in r -> "content_filter"
+        "waiting for approval" in r -> "approval_pending"
+        "invalid tool call ids" in r -> "invalid_tool_call_ids"
+        "conversation" in r && "busy" in r -> "conversation_busy"
+        "empty content in" in r || "empty response" in r -> "empty_response"
+        "rate limit" in r || "429" in r || "overloaded" in r || "529" in r -> "rate_limited"
+        "timed out" in r || "timeout" in r -> "timeout"
+        "model provider error" in r || "provider" in r -> "provider_error"
+        "abort" in r || "cancel" in r || "interrupt" in r -> "aborted"
+        else -> "other"
     }
 }
