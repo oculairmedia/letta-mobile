@@ -1,5 +1,10 @@
 package com.letta.mobile.data.runtime
 
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+
 /**
  * letta-mobile-br5g0: user-facing description of a terminal turn failure.
  *
@@ -42,6 +47,33 @@ object TurnFailureNotices {
     const val GENERIC_MESSAGE: String = "This turn failed before the assistant could reply."
 
     /**
+     * Stop reasons that mean the main assistant reply finished successfully
+     * enough that a later Failed terminal is trailing aux work, not a dead turn.
+     * Intermediate stops like `requires_approval` and terminal `error` do NOT
+     * qualify.
+     */
+    fun isCompletedMainReplyStopReason(stopReason: String?): Boolean {
+        if (stopReason.isNullOrBlank()) return false
+        return when (stopReason.lowercase()) {
+            "end_turn", "stop_sequence", "max_tokens" -> true
+            else -> false
+        }
+    }
+
+    /**
+     * Extracts `stop_reason` from either a bare stop frame or a nested
+     * `stream_delta` envelope (`delta.stop_reason`). Returns null on missing
+     * fields or malformed JSON — callers must treat null as "no evidence",
+     * never as success.
+     */
+    fun stopReasonFromStreamDeltaBody(body: String): String? =
+        runCatching {
+            val root = STREAM_DELTA_JSON.parseToJsonElement(body).jsonObject
+            root["stop_reason"]?.jsonPrimitive?.contentOrNull
+                ?: root["delta"]?.jsonObject?.get("stop_reason")?.jsonPrimitive?.contentOrNull
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+
+    /**
      * Returns the notice to render for a Failed terminal, or null when nothing
      * user-facing should be added to the timeline.
      *
@@ -50,7 +82,7 @@ object TurnFailureNotices {
      * @param deliveredAssistantContent whether this turn already delivered
      *   any assistant content to the timeline (computed from turn state).
      * @param mainReplyCompleted whether there is explicit evidence the main
-     *   assistant reply finished (e.g. a non-error stop_reason) so a later
+     *   assistant reply finished (e.g. a completed stop_reason) so a later
      *   Failed terminal is a trailing aux-step failure. Partial streamed
      *   content alone must NOT suppress the notice.
      */
@@ -91,4 +123,6 @@ object TurnFailureNotices {
     }
 
     private const val OTHER_KIND = "other"
+
+    private val STREAM_DELTA_JSON = Json { ignoreUnknownKeys = true; isLenient = true }
 }

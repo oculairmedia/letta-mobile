@@ -209,26 +209,8 @@ class DesktopHybridAppServerChatGateway internal constructor(
                             "App Server turn failed: ${lifecycle.reason ?: "unknown"}",
                         )
                     }
-                    when (val payload = draft.payload) {
-                        is RuntimeEventPayload.RemoteStreamFrame -> {
-                            if (payload.messageType == "stop_reason") {
-                                val stop = runCatching {
-                                    kotlinx.serialization.json.Json.parseToJsonElement(payload.body)
-                                        .let { it as? kotlinx.serialization.json.JsonObject }
-                                        ?.get("stop_reason")
-                                        ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-                                }.getOrNull()
-                                if (stop == null || !stop.equals("error", ignoreCase = true)) {
-                                    mainReplyCompleted = true
-                                }
-                            }
-                        }
-                        is RuntimeEventPayload.RunLifecycleChanged -> {
-                            if (payload.status == RuntimeRunStatus.Completed) {
-                                mainReplyCompleted = true
-                            }
-                        }
-                        else -> Unit
+                    if (marksMainReplyCompleted(draft.payload)) {
+                        mainReplyCompleted = true
                     }
                     draft.toLettaMessages(
                         agentId = agentId,
@@ -246,6 +228,22 @@ class DesktopHybridAppServerChatGateway internal constructor(
                 activeSendConversations.remove(conversationId)
             }
         }
+    }
+
+    /**
+     * Explicit main-reply completion only — parse failures and intermediate
+     * stops (requires_approval / error) return false.
+     */
+    private fun marksMainReplyCompleted(payload: RuntimeEventPayload): Boolean = when (payload) {
+        is RuntimeEventPayload.RemoteStreamFrame -> {
+            payload.messageType == "stop_reason" &&
+                TurnFailureNotices.isCompletedMainReplyStopReason(
+                    TurnFailureNotices.stopReasonFromStreamDeltaBody(payload.body),
+                )
+        }
+        is RuntimeEventPayload.RunLifecycleChanged ->
+            payload.status == RuntimeRunStatus.Completed
+        else -> false
     }
 
     override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {

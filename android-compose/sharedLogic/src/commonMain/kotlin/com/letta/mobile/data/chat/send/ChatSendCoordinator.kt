@@ -561,25 +561,7 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.StopReason -> {
                 recordRuntimeEvent(event, activeWsConversationId)
-                // lcp-cv3 §end-of-turn ordering: stop_reason is first-wins on
-                // the shim. Defensive guard — log duplicates rather than overwrite.
-                val previous = stopReasonForTurn
-                if (previous != null) {
-                    Telemetry.event(
-                        "AdminChatVM", "ws.stopReason.duplicate",
-                        "previous" to previous,
-                        "received" to event.stopReason,
-                        "turnId" to event.turnId,
-                    )
-                } else {
-                    stopReasonForTurn = event.stopReason
-                    Telemetry.event(
-                        "AdminChatVM", "ws.stopReason",
-                        "value" to event.stopReason,
-                        "turnId" to event.turnId,
-                        "runId" to event.runId,
-                    )
-                }
+                recordStopReasonForTurn(event)
                 markTurnVisuallyComplete(reason = "stopReason")
             }
             is WsTimelineEvent.UsageStatistics -> {
@@ -1012,6 +994,44 @@ class ChatSendCoordinator(
     private fun isStaleTerminalForOlderTurn(incomingTurnId: String): Boolean =
         !turnIdentity.acceptsTerminal(incomingTurnId)
 
+    /**
+     * lcp-cv3: stop_reason is first-wins for telemetry, but intermediate stops
+     * (requires_approval) may still be followed by a completed main-reply stop —
+     * upgrade so Failed-after-delivered suppression uses the right signal.
+     */
+    private fun recordStopReasonForTurn(event: WsTimelineEvent.StopReason) {
+        val previous = stopReasonForTurn
+        when {
+            previous == null -> {
+                stopReasonForTurn = event.stopReason
+                Telemetry.event(
+                    "AdminChatVM", "ws.stopReason",
+                    "value" to event.stopReason,
+                    "turnId" to event.turnId,
+                    "runId" to event.runId,
+                )
+            }
+            TurnFailureNotices.isCompletedMainReplyStopReason(event.stopReason) &&
+                !TurnFailureNotices.isCompletedMainReplyStopReason(previous) -> {
+                stopReasonForTurn = event.stopReason
+                Telemetry.event(
+                    "AdminChatVM", "ws.stopReason.upgraded",
+                    "previous" to previous,
+                    "received" to event.stopReason,
+                    "turnId" to event.turnId,
+                )
+            }
+            else -> {
+                Telemetry.event(
+                    "AdminChatVM", "ws.stopReason.duplicate",
+                    "previous" to previous,
+                    "received" to event.stopReason,
+                    "turnId" to event.turnId,
+                )
+            }
+        }
+    }
+
     private suspend fun finishActiveTurn(
         status: String,
         runId: String,
@@ -1028,8 +1048,7 @@ class ChatSendCoordinator(
         // the reply completed (non-error stop_reason) is a trailing aux-step
         // failure and must not be painted like a dead turn.
         val mainReplyCompleted = deliveredAssistantContentThisTurn &&
-            !stopReasonForTurn.isNullOrBlank() &&
-            !stopReasonForTurn.equals("error", ignoreCase = true)
+            TurnFailureNotices.isCompletedMainReplyStopReason(stopReasonForTurn)
         val failureNotice = if (status == "failed") {
             TurnFailureNotices.forFailedTerminal(
                 reason = bufferedErrorMessage,

@@ -52,7 +52,7 @@ class RuntimeEventServerFrameMapperTest {
         // terminal, otherwise a provider failure reaches the UI as a silent
         // dead turn with no explanation at all.
         val error = assertIs<ServerFrame.Error>(frames[0])
-        assertEquals("app_server_turn_failed", error.code)
+        assertEquals("other", error.code)
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, error.message)
         assertFalse(error.message.contains("boom"))
         assertEquals("turn-1", error.turnId)

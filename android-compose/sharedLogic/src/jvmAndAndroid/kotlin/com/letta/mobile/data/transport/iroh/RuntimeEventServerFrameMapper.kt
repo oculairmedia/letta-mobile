@@ -138,13 +138,13 @@ object RuntimeEventServerFrameMapper {
             // error-then-terminal ordering the stream-delta error path uses), so
             // the coordinator can classify the failure and show it.
             val failure = payload.reason?.takeIf { it.isNotBlank() }?.let { reason ->
-                val kind = terminalReasonKind(reason)
+                val kind = terminalReasonKind(reason) ?: "other"
                 ServerFrame.Error(
                     id = "turn_error-${UUID.randomUUID()}",
                     ts = nowIso(),
-                    code = "app_server_turn_failed",
-                    // Never forward the raw provider/run reason over Iroh —
-                    // fixed per-family copy only (letta-mobile-o0atv).
+                    // Sanitized family token — never the raw provider/run reason
+                    // (letta-mobile-o0atv).
+                    code = kind,
                     message = TurnFailureNotices.messageFor(kind),
                     conversationId = context.conversationId,
                     turnId = context.turnId,

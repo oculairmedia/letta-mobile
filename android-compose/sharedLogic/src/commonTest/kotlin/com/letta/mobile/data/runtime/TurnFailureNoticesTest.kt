@@ -81,4 +81,32 @@ class TurnFailureNoticesTest {
         assertFalse(notice.message.contains("sk-live-abcdef"))
         assertFalse(notice.kind.contains("sk-live-abcdef"))
     }
+
+    @Test
+    fun onlyTerminalSuccessStopsCountAsMainReplyComplete() {
+        assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("end_turn"))
+        assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("stop_sequence"))
+        assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("max_tokens"))
+        assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason("requires_approval"))
+        assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason("error"))
+        assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason("cancelled"))
+        assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason(null))
+        assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason(""))
+    }
+
+    @Test
+    fun stopReasonFromStreamDeltaBodyReadsNestedAndBareForms() {
+        assertEquals(
+            "end_turn",
+            TurnFailureNotices.stopReasonFromStreamDeltaBody(
+                """{"type":"stream_delta","delta":{"message_type":"stop_reason","stop_reason":"end_turn"}}""",
+            ),
+        )
+        assertEquals(
+            "error",
+            TurnFailureNotices.stopReasonFromStreamDeltaBody("""{"stop_reason":"error"}"""),
+        )
+        assertNull(TurnFailureNotices.stopReasonFromStreamDeltaBody("{not-json"))
+        assertNull(TurnFailureNotices.stopReasonFromStreamDeltaBody("""{"delta":{}}"""))
+    }
 }

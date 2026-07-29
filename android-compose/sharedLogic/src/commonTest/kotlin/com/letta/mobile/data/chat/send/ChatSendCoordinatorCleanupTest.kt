@@ -499,9 +499,13 @@ class ChatSendCoordinatorCleanupTest {
                 AssistantMessage(id = "m1", contentRaw = JsonPrimitive("here is your answer"), runId = "run-1"),
             ),
         )
+        // Main reply completed (end_turn) — later Failed is trailing aux work.
+        coordinator.handleEvent(
+            WsTimelineEvent.StopReason(turnId = "turn-1", runId = "run-1", stopReason = "end_turn"),
+        )
         coordinator.handleEvent(
             WsTimelineEvent.Error(
-                code = "app_server_turn_failed",
+                code = "content_filter",
                 message = "Model provider error: Provider finish_reason: content_filter",
                 conversationId = "conv-1",
                 turnId = "turn-1",

@@ -116,6 +116,7 @@ class DesktopHybridAppServerChatGatewayTest {
         val toolName: String? = null,
         val status: String? = null,
         val output: String? = null,
+        val stopReason: String? = null,
     )
 
     private fun streamDeltaEnvelope(spec: DeltaSpec): String {
@@ -127,6 +128,7 @@ class DesktopHybridAppServerChatGatewayTest {
             spec.toolName?.let { put("tool_name", it) }
             spec.status?.let { put("status", it) }
             spec.output?.let { put("output", it) }
+            spec.stopReason?.let { put("stop_reason", it) }
             spec.content?.let {
                 val key = when (spec.messageType) {
                     "reasoning_message" -> "reasoning"
@@ -172,6 +174,8 @@ class DesktopHybridAppServerChatGatewayTest {
         status = "success",
         output = "ok",
     )
+    private val endTurnStopDelta =
+        DeltaSpec(messageType = "stop_reason", runId = "run-1", stopReason = "end_turn")
 
     private fun draft(payload: RuntimeEventPayload): RuntimeEventDraft = RuntimeEventDraft(
         backendId = BackendId("desktop-app-server"),
@@ -304,7 +308,20 @@ class DesktopHybridAppServerChatGatewayTest {
     fun send_failedLifecycleAfterDeliveredContentCompletesNormally() = runTest {
         val turnEngine = FakeTurnEngine {
             flowOf(
-                draft(RuntimeEventPayload.RemoteStreamFrame(frameId = "f1", body = streamDeltaEnvelope(assistantDelta))),
+                draft(
+                    RuntimeEventPayload.RemoteStreamFrame(
+                        frameId = "f1",
+                        body = streamDeltaEnvelope(assistantDelta),
+                        messageType = "assistant_message",
+                    ),
+                ),
+                draft(
+                    RuntimeEventPayload.RemoteStreamFrame(
+                        frameId = "f2",
+                        body = streamDeltaEnvelope(endTurnStopDelta),
+                        messageType = "stop_reason",
+                    ),
+                ),
                 draft(
                     RuntimeEventPayload.RunLifecycleChanged(
                         status = RuntimeRunStatus.Failed,

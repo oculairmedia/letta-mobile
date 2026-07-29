@@ -437,8 +437,10 @@ class IrohAdminRpcChatGateway(
         }
 
         private fun onStopReason(event: WsTimelineEvent.StopReason) {
-            if (turnId != null && event.turnId != turnId) return
-            if (!event.stopReason.equals("error", ignoreCase = true)) {
+            // Ignore foreign / premature stop frames until this send owns a turn.
+            val ownedTurnId = turnId ?: return
+            if (event.turnId != ownedTurnId) return
+            if (TurnFailureNotices.isCompletedMainReplyStopReason(event.stopReason)) {
                 mainReplyCompleted = true
             }
         }
