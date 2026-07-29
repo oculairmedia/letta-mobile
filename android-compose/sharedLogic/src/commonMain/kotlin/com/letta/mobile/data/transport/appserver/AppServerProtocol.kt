@@ -115,31 +115,29 @@ object AppServerProtocol {
             ?: AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
 
     private fun decodeConnectionFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "auth_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AuthResponse>(parsed.raw) }
-        "runtime_start_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.RuntimeStartResponse>(parsed.raw) }
-        "sync_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.SyncResponse>(parsed.raw) }
-        "abort_message_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AbortMessageResponse>(parsed.raw) }
-        "admin_rpc_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AdminRpcResponse>(parsed.raw) }
+        "auth_response" -> decodeTyped<AppServerInboundFrame.AuthResponse>(parsed)
+        "runtime_start_response" -> decodeTyped<AppServerInboundFrame.RuntimeStartResponse>(parsed)
+        "sync_response" -> decodeTyped<AppServerInboundFrame.SyncResponse>(parsed)
+        "abort_message_response" -> decodeTyped<AppServerInboundFrame.AbortMessageResponse>(parsed)
+        "admin_rpc_response" -> decodeTyped<AppServerInboundFrame.AdminRpcResponse>(parsed)
         else -> null
     }
 
     private fun decodeRuntimeEventFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "stream_delta" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.StreamDelta>(parsed.raw) }
-        "update_loop_status" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateLoopStatus>(parsed.raw) }
-        "update_device_status" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateDeviceStatus>(parsed.raw) }
-        "update_queue" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateQueue>(parsed.raw) }
-        "update_subagent_state" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.UpdateSubagentState>(parsed.raw) }
-        "external_tool_call_request" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.ExternalToolCallRequest>(parsed.raw)
-        }
-        "control_request" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.ControlRequest>(parsed.raw) }
+        "stream_delta" -> decodeTyped<AppServerInboundFrame.StreamDelta>(parsed)
+        "update_loop_status" -> decodeTyped<AppServerInboundFrame.UpdateLoopStatus>(parsed)
+        "update_device_status" -> decodeTyped<AppServerInboundFrame.UpdateDeviceStatus>(parsed)
+        "update_queue" -> decodeTyped<AppServerInboundFrame.UpdateQueue>(parsed)
+        "update_subagent_state" -> decodeTyped<AppServerInboundFrame.UpdateSubagentState>(parsed)
+        "external_tool_call_request" -> decodeTyped<AppServerInboundFrame.ExternalToolCallRequest>(parsed)
+        "control_request" -> decodeTyped<AppServerInboundFrame.ControlRequest>(parsed)
         else -> null
     }
 
     private fun decodeCatalogFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "list_models_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.ListModelsResponse>(parsed.raw) }
-        "skill_enable_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.SkillEnableResponse>(parsed.raw) }
-        "skill_disable_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.SkillDisableResponse>(parsed.raw) }
+        "list_models_response" -> decodeTyped<AppServerInboundFrame.ListModelsResponse>(parsed)
+        "skill_enable_response" -> decodeTyped<AppServerInboundFrame.SkillEnableResponse>(parsed)
+        "skill_disable_response" -> decodeTyped<AppServerInboundFrame.SkillDisableResponse>(parsed)
         "skills_updated" -> decodeSkillsUpdated(parsed)
         else -> null
     }
@@ -157,51 +155,42 @@ object AppServerProtocol {
         }
 
     private fun decodeCronFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "cron_list_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronListResponse>(parsed.raw) }
-        "cron_add_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronAddResponse>(parsed.raw) }
-        "cron_get_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronGetResponse>(parsed.raw) }
-        "cron_runs_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronRunsResponse>(parsed.raw) }
-        "cron_trigger_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronTriggerResponse>(parsed.raw) }
-        "cron_update_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronUpdateResponse>(parsed.raw) }
-        "cron_delete_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteResponse>(parsed.raw) }
-        "cron_delete_all_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.CronDeleteAllResponse>(parsed.raw) }
+        "cron_list_response" -> decodeTyped<AppServerInboundFrame.CronListResponse>(parsed)
+        "cron_add_response" -> decodeTyped<AppServerInboundFrame.CronAddResponse>(parsed)
+        "cron_get_response" -> decodeTyped<AppServerInboundFrame.CronGetResponse>(parsed)
+        "cron_runs_response" -> decodeTyped<AppServerInboundFrame.CronRunsResponse>(parsed)
+        "cron_trigger_response" -> decodeTyped<AppServerInboundFrame.CronTriggerResponse>(parsed)
+        "cron_update_response" -> decodeTyped<AppServerInboundFrame.CronUpdateResponse>(parsed)
+        "cron_delete_response" -> decodeTyped<AppServerInboundFrame.CronDeleteResponse>(parsed)
+        "cron_delete_all_response" -> decodeTyped<AppServerInboundFrame.CronDeleteAllResponse>(parsed)
         else -> null
     }
 
     private fun decodeAgentFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "get_reflection_settings_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.GetReflectionSettingsResponse>(parsed.raw)
-        }
-        "set_reflection_settings_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.SetReflectionSettingsResponse>(parsed.raw)
-        }
-        "agent_list_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentListResponse>(parsed.raw) }
-        "agent_retrieve_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentRetrieveResponse>(parsed.raw) }
-        "agent_create_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentCreateResponse>(parsed.raw) }
-        "agent_update_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentUpdateResponse>(parsed.raw) }
-        "agent_delete_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.AgentDeleteResponse>(parsed.raw) }
+        "get_reflection_settings_response" -> decodeTyped<AppServerInboundFrame.GetReflectionSettingsResponse>(parsed)
+        "set_reflection_settings_response" -> decodeTyped<AppServerInboundFrame.SetReflectionSettingsResponse>(parsed)
+        "agent_list_response" -> decodeTyped<AppServerInboundFrame.AgentListResponse>(parsed)
+        "agent_retrieve_response" -> decodeTyped<AppServerInboundFrame.AgentRetrieveResponse>(parsed)
+        "agent_create_response" -> decodeTyped<AppServerInboundFrame.AgentCreateResponse>(parsed)
+        "agent_update_response" -> decodeTyped<AppServerInboundFrame.AgentUpdateResponse>(parsed)
+        "agent_delete_response" -> decodeTyped<AppServerInboundFrame.AgentDeleteResponse>(parsed)
         else -> null
     }
 
     private fun decodeConversationFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "conversation_list_response" -> decodeKnown(parsed) { json.decodeFromJsonElement<AppServerInboundFrame.ConversationListResponse>(parsed.raw) }
-        "conversation_retrieve_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.ConversationRetrieveResponse>(parsed.raw)
-        }
-        "conversation_create_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.ConversationCreateResponse>(parsed.raw)
-        }
-        "conversation_update_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.ConversationUpdateResponse>(parsed.raw)
-        }
-        "conversation_messages_list_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.ConversationMessagesListResponse>(parsed.raw)
-        }
-        "conversation_compact_response" -> decodeKnown(parsed) {
-            json.decodeFromJsonElement<AppServerInboundFrame.ConversationCompactResponse>(parsed.raw)
-        }
+        "conversation_list_response" -> decodeTyped<AppServerInboundFrame.ConversationListResponse>(parsed)
+        "conversation_retrieve_response" -> decodeTyped<AppServerInboundFrame.ConversationRetrieveResponse>(parsed)
+        "conversation_create_response" -> decodeTyped<AppServerInboundFrame.ConversationCreateResponse>(parsed)
+        "conversation_update_response" -> decodeTyped<AppServerInboundFrame.ConversationUpdateResponse>(parsed)
+        "conversation_messages_list_response" -> decodeTyped<AppServerInboundFrame.ConversationMessagesListResponse>(parsed)
+        "conversation_compact_response" -> decodeTyped<AppServerInboundFrame.ConversationCompactResponse>(parsed)
         else -> null
     }
+
+    private inline fun <reified Frame : AppServerInboundFrame> decodeTyped(
+        parsed: ParsedInboundFrame,
+    ): AppServerInboundFrame =
+        decodeKnown(parsed) { json.decodeFromJsonElement<Frame>(parsed.raw) }
 
     private inline fun decodeKnown(
         parsed: ParsedInboundFrame,
