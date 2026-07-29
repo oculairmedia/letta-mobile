@@ -11,6 +11,9 @@ assert_file() { [[ -f "$REPO_ROOT/$1" ]] && pass "$1 exists" || fail "$1 exists"
 assert_contains() {
   if rg -q --fixed-strings -- "$2" "$REPO_ROOT/$1"; then pass "$1 contains $2"; else fail "$1 contains $2"; fi
 }
+assert_not_contains() {
+  if rg -q --fixed-strings -- "$2" "$REPO_ROOT/$1"; then fail "$1 omits $2"; else pass "$1 omits $2"; fi
+}
 
 for file in \
   .serena/project.yml \
@@ -43,6 +46,12 @@ assert_contains scripts/scip/scip-java-pilot.sh 'sha256sum --check --status'
 assert_contains scripts/scip/scip-java-pilot.sh 'ulimit -u "$SCIP_PROCESS_LIMIT"'
 assert_contains .gitignore '.local/'
 assert_contains docs/tooling/serena-scip-pilot.md 'Android Gradle integration as unsupported'
+assert_contains .github/workflows/architecture-graph.yml "cache-read-only: \${{ github.event_name == 'pull_request' }}"
+assert_not_contains .github/workflows/architecture-graph.yml 'Run advisory architecture gates'
+assert_not_contains .github/workflows/architecture-graph.yml 'advisoryDetekt'
+assert_contains .github/workflows/codecov.yml 'Classify coverage scope'
+assert_contains .github/workflows/codecov.yml "if: steps.coverage-scope.outputs.run == 'true'"
+assert_not_contains .github/workflows/codecov.yml '    paths:'
 
 paths="$($REPO_ROOT/scripts/mcp/serena.sh paths)"
 [[ "$paths" == *"SERENA_HOME=$REPO_ROOT/.local/serena/home"* ]] && pass 'Serena paths are project-local' || fail 'Serena paths are project-local'
