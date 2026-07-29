@@ -105,6 +105,55 @@ class AppServerTurnEngineExternalToolResponseTest {
         assertEquals("echoed: hi", sent.result?.content?.single()?.text)
     }
 
+    @Test
+    fun duplicateExternalToolRequestIdIsAnsweredOnlyOnce() = runTest {
+        var invokeCount = 0
+        val registry = ExternalToolRegistry(
+            tools = listOf(
+                object : ExternalTool {
+                    override val name = "echo"
+                    override val description = "counting echo"
+                    override val inputSchema: JsonObject? = null
+                    override val capability = Capability.SlimAgents
+                    override suspend fun invoke(input: JsonObject): ExternalToolResult {
+                        invokeCount += 1
+                        return ExternalToolResult.Success("ok")
+                    }
+                },
+            ),
+            capabilities = RemoteCapabilities(slimAgents = true),
+        )
+        val client = CapturingClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            requestIdFactory = { "req" },
+            turnIdleTimeoutMs = 50L,
+            externalToolRegistry = registry,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            client.emitExternalToolCallRequest(
+                requestId = "ext-dup",
+                toolCallId = "tc-dup",
+                toolName = "echo",
+                input = buildJsonObject { put("text", "once") },
+            )
+            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
+            // Replay the same request_id — must not produce a second response.
+            client.emitExternalToolCallRequest(
+                requestId = "ext-dup",
+                toolCallId = "tc-dup",
+                toolName = "echo",
+                input = buildJsonObject { put("text", "once") },
+            )
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        assertEquals(1, client.externalResponses.size)
+        assertEquals(1, invokeCount)
+    }
+
     private object EchoTool : ExternalTool {
         override val name = "echo"
         override val description = "test echo tool"

@@ -510,6 +510,111 @@ class RuntimeEventFanoutTest {
         fanout.releaseTurnLock(agentId, conversationId)
         assertEquals(0, fanout.turnLockCount(), "idle lock with no viewers must retire")
     }
+
+    @Test
+    fun unscopedExternalToolRequestIsDeliveredOnceAndDeduped() = runTest {
+        val fanout = RuntimeEventFanout()
+        val (_, eventsA) = fanout.subscribe(AgentId("agent-A"), ConversationId("conv-A"), "sub-A")
+        val (_, eventsB) = fanout.subscribe(AgentId("agent-B"), ConversationId("conv-B"), "sub-B")
+
+        val request = AppServerInboundFrame.ExternalToolCallRequest(
+            requestId = "ext-1",
+            runtime = null,
+            toolCallId = "tc-1",
+            toolName = "Echo",
+            input = buildJsonObject {},
+        )
+
+        val received = mutableListOf<String>()
+        val jobA = launch {
+            eventsA.test {
+                received.add("A:" + (awaitItem().frame as AppServerInboundFrame.ExternalToolCallRequest).requestId)
+                expectNoEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+        val jobB = launch {
+            eventsB.test {
+                received.add("B:" + (awaitItem().frame as AppServerInboundFrame.ExternalToolCallRequest).requestId)
+                expectNoEvents()
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+        delay(50.milliseconds)
+        fanout.route(received(request))
+        // Dispatched (buffered, not yet claimed) stays retriable — a turn claim
+        // is what locks out further fanout delivery of the same request_id.
+        assertTrue(
+            fanout.inboundControlRegistry().tryClaim(
+                requestId = "ext-1",
+                leaseToken = 1L,
+                connectionGeneration = 0L,
+            ),
+        )
+        fanout.route(received(request))
+        delay(50.milliseconds)
+        jobA.cancel()
+        jobB.cancel()
+        jobA.join()
+        jobB.join()
+
+        assertEquals(2, received.size)
+        assertTrue(received.contains("A:ext-1"))
+        assertTrue(received.contains("B:ext-1"))
+        assertEquals(1, fanout.inboundControlRegistry().pendingCount())
+    }
+
+    @Test
+    fun unscopedExternalToolDispatchedWithoutClaimAllowsReplayDelivery() = runTest {
+        val fanout = RuntimeEventFanout()
+        val (_, events) = fanout.subscribe(AgentId("agent-A"), ConversationId("conv-A"), "sub-A")
+        val request = AppServerInboundFrame.ExternalToolCallRequest(
+            requestId = "ext-replay",
+            runtime = null,
+            toolCallId = "tc-replay",
+            toolName = "Echo",
+            input = buildJsonObject {},
+        )
+        val ids = mutableListOf<String>()
+        val job = launch {
+            events.test {
+                ids.add((awaitItem().frame as AppServerInboundFrame.ExternalToolCallRequest).requestId)
+                ids.add((awaitItem().frame as AppServerInboundFrame.ExternalToolCallRequest).requestId)
+                cancelAndIgnoreRemainingEvents()
+            }
+        }
+        delay(50.milliseconds)
+        fanout.route(received(request))
+        // No claim — Dispatched duplicate must still deliver (subscriber cancelled
+        // before matches() would otherwise leave the request stuck forever).
+        fanout.route(received(request))
+        delay(50.milliseconds)
+        job.cancel()
+        job.join()
+        assertEquals(listOf("ext-replay", "ext-replay"), ids)
+    }
+
+    @Test
+    fun unscopedControlIsNotRegisteredWhenNoSubscribersExist() = runTest {
+        val fanout = RuntimeEventFanout()
+        val request = AppServerInboundFrame.ExternalToolCallRequest(
+            requestId = "ext-early",
+            runtime = null,
+            toolCallId = "tc-early",
+            toolName = "Echo",
+            input = buildJsonObject {},
+        )
+        fanout.route(received(request))
+        assertEquals(0, fanout.inboundControlRegistry().pendingCount())
+
+        val (_, events) = fanout.subscribe(AgentId("agent-1"), ConversationId("conv-1"), "sub-1")
+        events.test {
+            fanout.route(received(request))
+            assertEquals("ext-early", (awaitItem().frame as AppServerInboundFrame.ExternalToolCallRequest).requestId)
+            cancelAndIgnoreRemainingEvents()
+        }
+        assertEquals(1, fanout.inboundControlRegistry().pendingCount())
+    }
 }
 
 private fun received(frame: AppServerInboundFrame): AppServerReceivedFrame =

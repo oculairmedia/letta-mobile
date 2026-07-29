@@ -71,9 +71,11 @@ class DefaultAppServerController(
     private val parentCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : AppServerController {
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
-    private val eventRouter = AppServerRuntimeEventRouter()
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
     private val connectionGeneration = atomic(0L)
+    private val eventRouter = AppServerRuntimeEventRouter(
+        connectionGenerationProvider = { connectionGeneration.value },
+    )
 
     init {
         eventRouter.attach(controllerScope, client.events)
@@ -112,6 +114,7 @@ class DefaultAppServerController(
                 }
             },
             connectionGenerationProvider = { connectionGeneration.value },
+            inboundControlRegistry = eventRouter.inboundControlRegistry(),
             onRuntimeInvalidated = {
                 runtimeMutex.withLock { runtimeCache.clear() }
             },
@@ -304,7 +307,9 @@ class DefaultAppServerController(
         // Do not detach the router here: ReconnectingAppServerClient.events is a
         // stable pipe across generations. Detaching would drop recovery
         // runtime_start/sync terminals before markConnected() re-attaches.
+        val priorGeneration = connectionGeneration.value
         connectionGeneration.incrementAndGet()
+        eventRouter.inboundControlRegistry().failGeneration(priorGeneration)
         runtimeMutex.withLock {
             // Canonical runtime scopes are generation-local: every cached scope
             // was minted by the generation that just died and must be re-fetched
@@ -313,6 +318,10 @@ class DefaultAppServerController(
             runtimeCache.clear()
         }
         turnEngine.invalidateRuntime(notifyHost = false)
+        turnEngine.cancelActiveLeaseForGeneration(
+            failedGeneration = priorGeneration,
+            reason = "connection generation superseded: ${reason ?: "disconnect"}",
+        )
         _state.value = AppServerControllerState.Disconnected(reason)
     }
 
@@ -402,6 +411,7 @@ class DefaultAppServerController(
                 ),
             ),
         )
+        turnEngine.markInboundControlAnswered(effectiveRequestId)
         if (toolCallId != null && capturedRequestId != null) {
             turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
         }

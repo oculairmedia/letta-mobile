@@ -286,7 +286,12 @@ class ReconnectingAppServerClientTest {
         generations[1].client.emitted.tryEmit(frame)
         runCurrent()
 
-        assertEquals(listOf(frame), received)
+        assertEquals(1, received.size)
+        assertEquals(frame.channel, received.single().channel)
+        assertEquals(frame.frame, received.single().frame)
+        assertEquals(frame.raw, received.single().raw)
+        // Second generation after Served disconnect — pipe stamp is 1.
+        assertEquals(1L, received.single().connectionGeneration)
     }
 
     @Test

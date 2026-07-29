@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
@@ -120,6 +121,13 @@ class AppServerTurnEngine(
      */
     private val connectionGenerationProvider: () -> Long = { 0L },
     /**
+     * lgns8.22.4: server→client control / external-tool correlation. Shared with
+     * the controller router when present; otherwise a local registry for direct
+     * [AppServerClient.events] collection (unit tests / hosts without fanout).
+     */
+    private val inboundControlRegistry: InboundControlRequestRegistry =
+        eventRouter?.inboundControlRegistry() ?: InboundControlRequestRegistry(),
+    /**
      * Invoked when [invalidateRuntime] clears the engine cache (e.g. after a
      * mutating context preflight) so controllers can drop their matching cache.
      */
@@ -141,6 +149,20 @@ class AppServerTurnEngine(
     private val leaseTokenSeq = atomic(0L)
     private var runtime: AppServerRuntimeScope? = null
     private val inboundSource = TurnInboundSource(client, eventRouter)
+    /** Cached external-tool results keyed by requestId for send-retry across generations. */
+    private val externalToolResultCache =
+        mutableMapOf<String, AppServerExternalToolResult>()
+
+    /**
+     * lgns8.22.4: cancel the active turn immediately when its connection generation
+     * is superseded. Must not wait for another inbound frame — a turn parked at a
+     * user-input gate pauses the idle watchdog and would otherwise hang forever.
+     */
+    fun cancelActiveLeaseForGeneration(failedGeneration: Long, reason: String = "connection generation superseded") {
+        val lease = activeLeaseRef.value ?: return
+        if (lease.connectionGeneration > failedGeneration) return
+        lease.ownerJob?.cancel(CancellationException(reason))
+    }
 
     /**
      * Drops the cached runtime scope so the next turn re-issues runtime_start.
@@ -167,23 +189,59 @@ class AppServerTurnEngine(
      * connection has since dropped the send is lost, but the App Server re-emits
      * the still-blocking request on reconnect/sync, so the next collect re-answers.
      */
-    private suspend fun guaranteeExternalToolResponse(request: AppServerInboundFrame.ExternalToolCallRequest) {
-        val result: AppServerExternalToolResult = try {
-            when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
-                is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
-                is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
-                null -> toolResult(
-                    "external tool '${request.toolName}' is not handled by this controller",
+    private suspend fun guaranteeExternalToolResponse(
+        request: AppServerInboundFrame.ExternalToolCallRequest,
+        leaseToken: Long,
+    ) {
+        val generation = connectionGenerationProvider()
+        // Direct client.events path may not have gone through the fanout register.
+        inboundControlRegistry.register(
+            InboundControlRequestRegistry.RegisterRequest(
+                requestId = request.requestId,
+                kind = InboundControlRequestRegistry.Kind.ExternalTool,
+                connectionGeneration = generation,
+                agentId = request.runtime?.agentId,
+                conversationId = request.runtime?.conversationId,
+                toolCallId = request.toolCallId,
+            ),
+        )
+        // matches() already claimed delivery for this lease; only answer if we own it
+        // (or claim here on paths that skipped the registry match branch).
+        if (!inboundControlRegistry.ownsClaim(request.requestId, leaseToken, generation) &&
+            !inboundControlRegistry.tryClaim(request.requestId, leaseToken, generation)
+        ) {
+            Telemetry.event(
+                "AppServerTurnEngine", "externalTool.claimSkipped",
+                "requestId" to request.requestId,
+                "leaseToken" to leaseToken,
+                "generation" to generation,
+            )
+            return
+        }
+        val cacheKey = request.requestId
+        // Never re-invoke non-idempotent tools on replay after a failed send —
+        // reuse the cached result computed on the first successful claim. Keyed
+        // by requestId only so successor-generation replays still hit the cache.
+        val result: AppServerExternalToolResult = externalToolResultCache[cacheKey] ?: run {
+            val computed = try {
+                when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
+                    is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
+                    is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
+                    null -> toolResult(
+                        "external tool '${request.toolName}' is not handled by this controller",
+                        isError = true,
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                toolResult(
+                    "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
                     isError = true,
                 )
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            toolResult(
-                "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
-                isError = true,
-            )
+            externalToolResultCache[cacheKey] = computed
+            computed
         }
         Telemetry.event(
             "AppServerTurnEngine", "externalTool.responded",
@@ -192,12 +250,21 @@ class AppServerTurnEngine(
             "toolName" to request.toolName,
             "isError" to (result.isError == true).toString(),
             "handled" to (externalToolRegistry != null).toString(),
+            "cached" to externalToolResultCache.containsKey(cacheKey).toString(),
         )
         runCatching {
             client.sendExternalToolResponse(
                 AppServerCommand.ExternalToolCallResponse(requestId = request.requestId, result = result),
             )
-        }.onFailure { Telemetry.error("AppServerTurnEngine", "externalTool.responseSendFailed", it) }
+        }.onSuccess {
+            inboundControlRegistry.markAnswered(request.requestId, generation)
+            externalToolResultCache.remove(cacheKey)
+        }.onFailure {
+            Telemetry.error("AppServerTurnEngine", "externalTool.responseSendFailed", it)
+            // Keep retriable: server never saw the response and will re-emit.
+            // Cached result above prevents re-invoking the tool on replay.
+            inboundControlRegistry.releaseClaim(request.requestId, leaseToken, generation)
+        }
     }
 
     private fun toolResult(text: String, isError: Boolean) = AppServerExternalToolResult(
@@ -239,6 +306,11 @@ class AppServerTurnEngine(
         userInputApprovalIdsRef.update { current ->
             if (current[toolCallId] == requestId) current - toolCallId else current
         }
+    }
+
+    /** Mark an inbound control/approval request answered after a successful send. */
+    fun markInboundControlAnswered(requestId: String) {
+        inboundControlRegistry.markAnswered(requestId, connectionGenerationProvider())
     }
 
     /**
@@ -534,6 +606,10 @@ class AppServerTurnEngine(
                 val releasedOwner = activeTurnOwnerRef.value
                 val releasedLease = activeLeaseRef.value
                 if (releasedLease?.token == leaseToken) {
+                    inboundControlRegistry.releaseClaimsForLease(
+                        leaseToken = leaseToken,
+                        connectionGeneration = releasedLease.connectionGeneration,
+                    )
                     activeLeaseRef.compareAndSet(releasedLease, null)
                     activeTurnOwnerRef.compareAndSet(releasedOwner, null)
                 }
@@ -773,6 +849,9 @@ class AppServerTurnEngine(
                 if (isConnectionGenerationSuperseded(leaseToken)) {
                     // Settle before TurnCompleted — clean-completion markers skip
                     // the cancel/finally settlement path intentionally.
+                    // Transport generation rolled over mid-turn — end immediately
+                    // so recovered frames are not ignored until the idle watchdog
+                    // (or forever, if a user-input gate paused it).
                     settleDanglingToolCalls(
                         command,
                         emittedToolCallIds,
@@ -786,7 +865,10 @@ class AppServerTurnEngine(
                     )
                     throw TurnCompleted
                 }
-                if (!received.matches(scope)) {
+                if (received.isStaleGenerationForLease(leaseToken)) {
+                    return@collect
+                }
+                if (!received.matches(scope, leaseToken)) {
                     handleScopeRejectedFrame(received, scope, leaseToken)?.let { status ->
                         // Same abnormal-terminal settlement as the exact-scope path:
                         // TurnCompleted skips cancel/finally settlement intentionally.
@@ -830,7 +912,7 @@ class AppServerTurnEngine(
                 // carries request_id (toToolCallDraft discards it) and the client
                 // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
                 (received.frame as? AppServerInboundFrame.ExternalToolCallRequest)
-                    ?.let { guaranteeExternalToolResponse(it) }
+                    ?.let { guaranteeExternalToolResponse(it, leaseToken) }
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the
@@ -1110,6 +1192,17 @@ class AppServerTurnEngine(
             lease.connectionGeneration != connectionGenerationProvider()
     }
 
+    /**
+     * Drop frames stamped for a prior reconnect generation before
+     * [handleScopeRejectedFrame] can treat their terminals as authoritative.
+     */
+    private fun AppServerReceivedFrame.isStaleGenerationForLease(leaseToken: Long): Boolean {
+        val lease = activeLeaseRef.value ?: return false
+        if (lease.token != leaseToken) return false
+        val frameGeneration = connectionGeneration ?: return false
+        return frameGeneration != lease.connectionGeneration
+    }
+
     private fun TurnCommand.draftForScopeRejectedTerminal(status: RuntimeRunStatus): RuntimeEventDraft =
         when (status) {
             RuntimeRunStatus.Failed -> failedDraft(
@@ -1198,6 +1291,10 @@ class AppServerTurnEngine(
                     ),
                 ),
             ),
+        )
+        inboundControlRegistry.markAnswered(
+            approval.requestId,
+            connectionGenerationProvider(),
         )
         return true
     }
@@ -1435,20 +1532,80 @@ class AppServerTurnEngine(
 
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
+        leaseToken: Long,
     ): Boolean {
+        val lease = activeLeaseRef.value
+        if (lease == null || lease.token != leaseToken) return false
+        // Reject delayed frames stamped for a prior reconnect generation even when
+        // the live provider has already advanced (or a new lease shares the runtime).
+        val frameGeneration = connectionGeneration
+        if (frameGeneration != null && frameGeneration != lease.connectionGeneration) {
+            return false
+        }
+        // Generation mismatch is handled by the collect loop (terminate turn).
+        if (lease.connectionGeneration != connectionGenerationProvider()) return false
         val eventRuntime = frame.runtime
         if (eventRuntime == null) {
             // lgns8.22.4: runtime-less auth/admin/unknown frames are not turn
-            // wildcards — they must not reset the idle watchdog or become turn
-            // output. External tool requests are answered on the turn path and
-            // may arrive without a runtime envelope.
-            // Fanout broadcasts unscoped ExternalToolCallRequest and ControlRequest;
-            // both must reach the turn mapper/auto-approver or the server stays blocked.
-            return frame is AppServerInboundFrame.ExternalToolCallRequest ||
-                frame is AppServerInboundFrame.ControlRequest
+            // wildcards. External-tool / control requests correlate through the
+            // inbound registry (registered by fanout or here on the direct path).
+            return when (val f = frame) {
+                is AppServerInboundFrame.ExternalToolCallRequest,
+                is AppServerInboundFrame.ControlRequest,
+                -> claimInboundControlDelivery(f, leaseToken, lease.connectionGeneration)
+                else -> false
+            }
         }
-        return eventRuntime.agentId == scope.agentId &&
-            eventRuntime.conversationId == scope.conversationId
+        if (eventRuntime.agentId != scope.agentId ||
+            eventRuntime.conversationId != scope.conversationId
+        ) {
+            return false
+        }
+        // Scoped control still needs exclusive delivery claim so replays do not
+        // surface duplicate ApprovalRequested cards on the direct events path.
+        val control = frame
+        if (control is AppServerInboundFrame.ControlRequest ||
+            control is AppServerInboundFrame.ExternalToolCallRequest
+        ) {
+            return claimInboundControlDelivery(control, leaseToken, lease.connectionGeneration)
+        }
+        return true
+    }
+
+    private fun claimInboundControlDelivery(
+        frame: AppServerInboundFrame,
+        leaseToken: Long,
+        connectionGeneration: Long,
+    ): Boolean {
+        registerInboundControl(frame)
+        val requestId = frame.requestId ?: return false
+        // First observer claims delivery; later replays of the same request_id
+        // in this generation are dropped (approvals and external tools alike).
+        return inboundControlRegistry.tryClaim(requestId, leaseToken, connectionGeneration)
+    }
+
+    private fun registerInboundControl(frame: AppServerInboundFrame) {
+        val requestId = frame.requestId ?: return
+        val kind = when (frame) {
+            is AppServerInboundFrame.ExternalToolCallRequest ->
+                InboundControlRequestRegistry.Kind.ExternalTool
+            is AppServerInboundFrame.ControlRequest ->
+                InboundControlRequestRegistry.Kind.Approval
+            else -> return
+        }
+        val toolCallId = (frame as? AppServerInboundFrame.ExternalToolCallRequest)?.toolCallId
+        inboundControlRegistry.register(
+            InboundControlRequestRegistry.RegisterRequest(
+                requestId = requestId,
+                kind = kind,
+                connectionGeneration = connectionGenerationProvider(),
+                agentId = frame.runtime?.agentId
+                    ?: (frame as? AppServerInboundFrame.ControlRequest)?.agentId,
+                conversationId = frame.runtime?.conversationId
+                    ?: (frame as? AppServerInboundFrame.ControlRequest)?.conversationId,
+                toolCallId = toolCallId,
+            ),
+        )
     }
 
     private fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
