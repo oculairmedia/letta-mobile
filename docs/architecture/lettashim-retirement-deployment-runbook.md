@@ -286,7 +286,7 @@ node scripts/appserver/verify-v2-audit-doc.mjs
 
 ~/.nvm/versions/node/v24.18.0/bin/node \
   scripts/appserver/verify-contract-baseline.mjs \
-  --package-root <installed-0.28.8-package-root>
+  --package-root <installed-0.29.9-package-root>
 ```
 
 If Node 24.18 is not installed, install/use that exact runtime. Do not waive the

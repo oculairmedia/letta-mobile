@@ -28,11 +28,43 @@ object AppServerProtocol {
     /** Upper bound on decode-failure diagnostic length so logs/traces stay bounded. */
     const val MAX_DIAGNOSTIC_LENGTH: Int = 512
 
+    /**
+     * Upstream stream-channel message types (Letta Code `STREAM_CHANNEL_MESSAGE_TYPES`).
+     * On one-socket transports these are demuxed into [AppServerChannel.Stream];
+     * everything else (including malformed JSON) lands on [AppServerChannel.Control].
+     */
+    val STREAM_CHANNEL_MESSAGE_TYPES: Set<String> = setOf(
+        "stream_delta",
+        "update_device_status",
+        "update_loop_status",
+        "update_queue",
+        "update_subagent_state",
+    )
+
     private val redactedPrimitive = JsonPrimitive(REDACTED_PLACEHOLDER)
     private val emptyRaw = JsonObject(emptyMap())
 
     fun encodeCommand(command: AppServerCommand): String =
         json.encodeToString(AppServerCommand.serializer(), command)
+
+    /**
+     * Classify an inbound raw frame for demux on a one-socket transport.
+     * Matches upstream's historical stream-channel set; unparseable frames
+     * default to control (same as the official JS client's single-socket label).
+     */
+    fun classifyInboundChannel(rawJson: String): AppServerChannel {
+        val type = runCatching {
+            (json.parseToJsonElement(rawJson) as? JsonObject)
+                ?.get("type")
+                ?.let { it as? JsonPrimitive }
+                ?.contentOrNull
+        }.getOrNull()
+        return if (type != null && type in STREAM_CHANNEL_MESSAGE_TYPES) {
+            AppServerChannel.Stream
+        } else {
+            AppServerChannel.Control
+        }
+    }
 
     /**
      * Decode one inbound App Server frame. This is **total** — it never throws.
@@ -329,7 +361,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     // Runtime-native admin commands (lgns8.7), shapes pinned against the
-    // installed @letta-ai/letta-code 0.28.8 protocol declaration. query/body
+    // installed @letta-ai/letta-code 0.29.9 protocol declaration. query/body
     // stay raw JSON so unknown upstream fields pass through untouched.
 
     @Serializable

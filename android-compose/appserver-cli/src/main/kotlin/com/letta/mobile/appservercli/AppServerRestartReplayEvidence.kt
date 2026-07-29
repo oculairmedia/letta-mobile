@@ -151,7 +151,7 @@ data class AppServerRestartReplayEvidence(
          * (matches the lgns8.1 contract baseline). Bumping the installed package
          * requires regenerating the evidence via the live probe.
          */
-        const val PINNED_LETTA_CODE_VERSION: String = "0.28.8"
+        const val PINNED_LETTA_CODE_VERSION: String = "0.29.9"
 
         private val json = Json { ignoreUnknownKeys = true }
 

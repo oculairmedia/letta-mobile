@@ -7,11 +7,12 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.launch
 
 /**
- * Transport seam for the App Server's dual WebSocket channels.
+ * Transport seam for the App Server WebSocket session.
  *
- * Implementations send commands only on the control channel and receive events
- * from both channels. Request correlation is valid only for control responses
- * that include `request_id`; stream/state events are merged for observation.
+ * Upstream ≥ 0.29.7 uses one bidirectional socket. Implementations still expose
+ * [controlFrames] / [streamFrames] as a demux of that session by message type so
+ * request correlation (control, `request_id`) and stream observers stay separate.
+ * Sends go on the single writable session via [sendControl].
  */
 interface AppServerTransport {
     val controlFrames: Flow<AppServerReceivedFrame>

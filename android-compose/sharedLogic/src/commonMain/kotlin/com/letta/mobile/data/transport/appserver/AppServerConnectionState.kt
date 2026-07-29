@@ -2,21 +2,21 @@ package com.letta.mobile.data.transport.appserver
 
 /**
  * Explicit lifecycle of one App Server transport connection generation
- * (letta-mobile-lgns8.2).
+ * (letta-mobile-lgns8.21.1).
  *
- * A "generation" is the control + stream WebSocket pair treated as a single
- * atomic unit: readiness begins [Disconnected] (never optimistically connected),
- * advances to [Ready] only when BOTH sockets are open, and any single-socket
- * failure tears down the whole generation into [Failed].
+ * A "generation" is one bidirectional WebSocket session: readiness begins
+ * [Disconnected] (never optimistically connected), advances to [Ready] once the
+ * session socket is open, and any close/failure tears the generation into
+ * [Failed].
  */
 sealed interface AppServerConnectionState {
-    /** No sockets established yet (initial state — not optimistically connected). */
+    /** No session established yet (initial state — not optimistically connected). */
     data object Disconnected : AppServerConnectionState
 
-    /** At least one socket is opening but the generation is not fully ready. */
+    /** The session socket is opening but the generation is not fully ready. */
     data object Connecting : AppServerConnectionState
 
-    /** Both control and stream sockets are open; the generation may be used. */
+    /** The bidirectional session socket is open; the generation may be used. */
     data object Ready : AppServerConnectionState
 
     /**

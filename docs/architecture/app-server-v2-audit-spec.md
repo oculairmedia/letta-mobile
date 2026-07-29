@@ -4,7 +4,7 @@ Status: implemented-system snapshot for audit
 
 Snapshot date: 2026-07-27
 
-Upstream baseline: `@letta-ai/letta-code@0.28.8`, Node `v24.18.0`
+Upstream baseline: `@letta-ai/letta-code@0.29.9`, Node `v24.18.0`
 
 Protocol declaration SHA-256:
 `68ef0a3683f7e57be02638d5973e7211493658dd0d0038e3e0d5f571da3116f4`

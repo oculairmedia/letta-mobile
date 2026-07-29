@@ -22,14 +22,17 @@ const packageJson = readJson(join(packageRoot, "package.json"));
 const entrypoint = join(packageRoot, "letta.js");
 const declaration = join(packageRoot, inventory.source.protocol_declaration);
 const declarationText = readFileSync(declaration, "utf8");
+// 0.29.x re-exports app_server_info types from a sibling module; unions still
+// live in protocol_v2.d.ts but member interfaces may be declared next door.
+const declarationCorpus = loadDeclarationCorpus(packageRoot, declaration, declarationText);
 
 assertEqual("package name", matrix.baseline.package, packageJson.name);
 assertEqual("package version", matrix.baseline.version, packageJson.version);
 assertEqual("Node version", matrix.baseline.node, process.version);
 assertEqual("protocol hash", matrix.baseline.protocol_sha256, sha256(declarationText));
 assertEqual("inventory protocol hash", inventory.source.protocol_sha256, sha256(declarationText));
-assertEqual("command union", inventory.commands, extractDiscriminants(declarationText, "WsProtocolCommand"));
-assertEqual("message union", inventory.messages, extractDiscriminants(declarationText, "WsProtocolMessage"));
+assertEqual("command union", inventory.commands, extractDiscriminants(declarationCorpus, "WsProtocolCommand"));
+assertEqual("message union", inventory.messages, extractDiscriminants(declarationCorpus, "WsProtocolMessage"));
 
 const probes = new Map(matrix.cli_probes.map((probe) => [probe.classification, probe]));
 verifyProbe(probes.get("installed_node_version"), ["--version"], process.execPath);
@@ -64,6 +67,44 @@ function verifyProbe(probe, probeArgs, executable = process.execPath) {
   const actual = execFileSync(executable, probeArgs, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
   const expected = readFileSync(join(fixtureRoot, probe.fixture), "utf8");
   assertEqual(`${probe.classification} output`, expected, actual);
+}
+
+function loadDeclarationCorpus(packageRoot, primaryPath, primaryText) {
+  const parts = [primaryText];
+  const importPattern = /from\s+"(\.\/[^"]+)"/g;
+  let match;
+  while ((match = importPattern.exec(primaryText)) !== null) {
+    const relative = match[1].endsWith(".ts") || match[1].endsWith(".d.ts")
+      ? match[1]
+      : `${match[1]}.d.ts`;
+    const sibling = resolve(join(primaryPath, ".."), relative);
+    try {
+      parts.push(readFileSync(sibling, "utf8"));
+    } catch {
+      // Optional sibling; union members that need it will fail extractDiscriminants.
+    }
+  }
+  // Also pull the public barrel when present so re-exported siblings are covered.
+  try {
+    const barrel = join(packageRoot, "dist/types/types/app-server-protocol.d.ts");
+    const barrelText = readFileSync(barrel, "utf8");
+    let barrelMatch;
+    const barrelImports = /from\s+"(\.\/[^"]+)"/g;
+    while ((barrelMatch = barrelImports.exec(barrelText)) !== null) {
+      const relative = barrelMatch[1].endsWith(".d.ts") || barrelMatch[1].endsWith(".ts")
+        ? barrelMatch[1]
+        : `${barrelMatch[1]}.d.ts`;
+      const sibling = resolve(join(barrel, ".."), relative);
+      try {
+        parts.push(readFileSync(sibling, "utf8"));
+      } catch {
+        // ignore missing
+      }
+    }
+  } catch {
+    // barrel optional
+  }
+  return parts.join("\n");
 }
 
 function extractDiscriminants(source, unionName) {

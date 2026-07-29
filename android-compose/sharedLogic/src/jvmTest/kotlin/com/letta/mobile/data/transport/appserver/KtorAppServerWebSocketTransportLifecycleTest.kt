@@ -3,6 +3,7 @@ package com.letta.mobile.data.transport.appserver
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO as ClientCIO
 import io.ktor.client.plugins.websocket.WebSockets as ClientWebSockets
+import io.ktor.client.plugins.websocket.webSocket
 import io.ktor.server.application.install
 import io.ktor.server.cio.CIO as ServerCIO
 import io.ktor.server.engine.EmbeddedServer
@@ -22,21 +23,23 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * JVM WebSocket lifecycle tests for the atomic dual-socket generation
- * (letta-mobile-lgns8.2), driven against a real embedded Ktor server so they
- * exercise genuine connect/close/frame behavior: truthful readiness, one-socket
- * failure tearing down both, malformed-frame tolerance, and terminal close-code
- * classification.
+ * JVM WebSocket lifecycle tests for the one-socket session generation
+ * (letta-mobile-lgns8.21.1), driven against a real embedded Ktor server so they
+ * exercise genuine connect/close/frame behavior: truthful readiness, demux of
+ * stream vs control message types, malformed-frame tolerance, and terminal
+ * close-code classification.
  */
 class KtorAppServerWebSocketTransportLifecycleTest {
     private var server: EmbeddedServer<*, *>? = null
@@ -49,34 +52,27 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
-    fun bothSocketsOpenReachReadyAndPreserveBothChannelEvents() = runBlocking {
+    fun sessionOpenReachesReadyAndDemuxesControlAndStreamEvents() = runBlocking {
         val received = Channel<String>(Channel.UNLIMITED)
-        val port = startServer { channel ->
-            if (channel == "control") {
+        val port = startServer {
+            coroutineScope {
+                launch { sendRepeating(STREAM_STATUS_FRAME) }
                 for (frame in incoming) {
                     if (frame is Frame.Text) received.send(frame.readText())
                 }
-            } else {
-                // Emit repeatedly so a subscriber that attaches after readiness still
-                // catches a frame (streamFrames is replay=0).
-                sendRepeating("""{"type":"update_loop_status","runtime":{"agent_id":"a","conversation_id":"c"},"event_seq":1,"emitted_at":"t","idempotency_key":"k","loop_status":{"status":"WAITING_ON_INPUT"}}""")
             }
         }
         val transport = transport(port)
 
-        // Deflake: streamFrames is replay=0, so subscribe BEFORE asserting readiness
-        // — otherwise a frame emitted in the window between Ready and .first() is
-        // lost and the collector waits for the next 250ms tick (a snapshot-after-async
-        // race under CI load). Collecting first closes the window deterministically.
+        // Deflake: streamFrames is replay=0, so subscribe BEFORE asserting readiness.
         val streamFrameDeferred = async { withTimeout(TIMEOUT) { transport.streamFrames.first() } }
 
         withTimeout(TIMEOUT) { transport.connectionState.first { it == AppServerConnectionState.Ready } }
 
-        // Stream-channel event is delivered to the transport.
         val streamFrame = streamFrameDeferred.await()
         assertIs<AppServerInboundFrame.UpdateLoopStatus>(streamFrame.frame)
+        assertEquals(AppServerChannel.Stream, streamFrame.channel)
 
-        // Control-channel send reaches the server.
         transport.sendControl(AppServerCommand.Auth(requestId = "r", token = ""))
         assertTrue(withTimeout(TIMEOUT) { received.receive() }.contains("\"type\":\"auth\""))
 
@@ -84,13 +80,9 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
-    fun oneSocketClosingTearsDownTheWholeGeneration() = runBlocking {
-        val port = startServer { channel ->
-            if (channel == "stream") {
-                close(CloseReason(CloseReason.Codes.NORMAL, "stream gone"))
-            } else {
-                awaitCancellationLike()
-            }
+    fun sessionClosingTearsDownTheGeneration() = runBlocking {
+        val port = startServer {
+            close(CloseReason(CloseReason.Codes.NORMAL, "session gone"))
         }
         val transport = transport(port)
 
@@ -105,26 +97,16 @@ class KtorAppServerWebSocketTransportLifecycleTest {
 
     @Test
     fun malformedFrameIsToleratedWithoutTearingDownAReadyGeneration() = runBlocking {
-        val port = startServer { channel ->
-            if (channel == "stream") {
-                sendRepeating("this-is-not-json")
-            } else {
-                awaitCancellationLike()
-            }
+        val port = startServer {
+            sendRepeating("this-is-not-json")
         }
         val transport = transport(port)
 
-        // Deflake: AWAIT Ready before observing the frame. The stream socket can
-        // deliver its (malformed) frame before the control channel finishes its
-        // handshake, so snapshotting connectionState.value right after the first
-        // frame raced against the generation actually reaching Ready. Await it
-        // first (both channels up), exactly as the sibling tests await their
-        // terminal states — then the "still Ready" assertion below is deterministic.
         withTimeout(TIMEOUT) { transport.connectionState.first { it == AppServerConnectionState.Ready } }
 
-        val frame = withTimeout(TIMEOUT) { transport.streamFrames.first() }
+        // Unparseable frames demux to control (official JS client labels all as control).
+        val frame = withTimeout(TIMEOUT) { transport.controlFrames.first() }
         assertIs<AppServerInboundFrame.DecodeFailure>(frame.frame)
-        // A malformed frame must not fail a Ready generation — it stays Ready.
         assertEquals(AppServerConnectionState.Ready, transport.connectionState.value)
 
         transport.close()
@@ -132,12 +114,8 @@ class KtorAppServerWebSocketTransportLifecycleTest {
 
     @Test
     fun terminalCloseCodeIsClassifiedTerminal() = runBlocking {
-        val port = startServer { channel ->
-            if (channel == "control") {
-                close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "unauthorized"))
-            } else {
-                awaitCancellationLike()
-            }
+        val port = startServer {
+            close(CloseReason(CloseReason.Codes.VIOLATED_POLICY, "unauthorized"))
         }
         val transport = transport(port)
 
@@ -147,6 +125,20 @@ class KtorAppServerWebSocketTransportLifecycleTest {
         assertTrue(failed.terminal, "1008 VIOLATED_POLICY must be terminal, was: $failed")
 
         transport.close()
+    }
+
+    @Test
+    fun productionUrlsNeverIncludeChannelQuery() {
+        assertTrue(!appServerUrl("ws://127.0.0.1:4500").contains("channel="))
+        assertTrue(!appServerUrl("ws://127.0.0.1:4500?channel=control").contains("channel="))
+        assertTrue(caughtLegacyChannelIsTerminal())
+    }
+
+    private fun caughtLegacyChannelIsTerminal(): Boolean {
+        // Unit-level: handshake failure classifier treats 426 as terminal so
+        // reconnect supervisors do not spin against an intentionally rejected URL.
+        val error = RuntimeException("Server returned HTTP response code: 426 Upgrade Required")
+        return error.isTerminalHandshakeFailure()
     }
 
     private fun transport(port: Int): KtorAppServerWebSocketTransport {
@@ -159,14 +151,18 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     private fun startServer(
-        handler: suspend io.ktor.server.websocket.DefaultWebSocketServerSession.(channel: String) -> Unit,
+        handler: suspend io.ktor.server.websocket.DefaultWebSocketServerSession.() -> Unit,
     ): Int {
         val embedded = embeddedServer(ServerCIO, port = 0) {
             install(ServerWebSockets)
             routing {
                 webSocket("/ws") {
-                    val channel = call.request.queryParameters["channel"].orEmpty()
-                    handler(channel)
+                    // Mirror upstream ≥0.29.7: reject legacy split-channel query.
+                    if (call.request.queryParameters.contains("channel")) {
+                        close(CloseReason(CloseReason.Codes.CANNOT_ACCEPT, "Upgrade Required"))
+                        return@webSocket
+                    }
+                    handler()
                 }
             }
         }
@@ -175,15 +171,6 @@ class KtorAppServerWebSocketTransportLifecycleTest {
         return runBlocking { embedded.engine.resolvedConnectors().first().port }
     }
 
-    // Keep a server session open until the client disconnects/cancels.
-    private suspend fun io.ktor.server.websocket.DefaultWebSocketServerSession.awaitCancellationLike() {
-        for (frame in incoming) {
-            // drain; loop exits when the peer closes
-        }
-    }
-
-    // Emit [text] on a short interval until the session is cancelled/closed, so a
-    // late subscriber to the replay=0 stream flow still observes a frame.
     private suspend fun io.ktor.server.websocket.DefaultWebSocketServerSession.sendRepeating(text: String) {
         while (true) {
             send(Frame.Text(text))
@@ -192,6 +179,8 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     private companion object {
-        val TIMEOUT = 30.seconds
+        val TIMEOUT = 5.seconds
+        const val STREAM_STATUS_FRAME =
+            """{"type":"update_loop_status","runtime":{"agent_id":"a","conversation_id":"c"},"event_seq":1,"emitted_at":"t","idempotency_key":"k","loop_status":{"status":"WAITING_ON_INPUT"}}"""
     }
 }
