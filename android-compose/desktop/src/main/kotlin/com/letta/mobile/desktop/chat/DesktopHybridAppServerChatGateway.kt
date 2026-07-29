@@ -73,6 +73,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val client: AppServerClient,
     private val httpGateway: DesktopLettaHttpChatGateway,
     private val transportResources: DesktopTransportResources? = null,
+    private val onClose: (() -> Unit)? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         httpGateway.getConversation(conversationId).agentId.value
@@ -278,6 +279,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
     }
 
     override fun close() {
+        onClose?.invoke()
         httpGateway.close()
         transportResources?.close()
     }

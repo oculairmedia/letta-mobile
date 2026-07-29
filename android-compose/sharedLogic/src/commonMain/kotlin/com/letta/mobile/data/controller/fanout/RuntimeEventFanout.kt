@@ -2,14 +2,19 @@ package com.letta.mobile.data.controller.fanout
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedSendChannelException
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /**
  * Fanout layer for routing App Server runtime events to multiple UI clients.
@@ -34,11 +39,11 @@ import kotlinx.coroutines.sync.withLock
  * val fanout = RuntimeEventFanout()
  *
  * // Subscribe to a runtime
- * val events: Flow<AppServerInboundFrame> = fanout.subscribe(agentId, conversationId)
+ * val events: Flow<AppServerReceivedFrame> = fanout.subscribe(agentId, conversationId)
  *
  * // Feed events from the controller into the fanout
- * controllerClient.events.collect { receivedFrame ->
- *     fanout.route(receivedFrame.frame)
+ * controllerClient.events.collect { received ->
+ *     fanout.route(received)
  * }
  *
  * // Unsubscribe when done
@@ -50,10 +55,14 @@ import kotlinx.coroutines.sync.withLock
  */
 class RuntimeEventFanout {
     /**
-     * Per-subscriber buffered channels. Buffering starts at [subscribe], not at
-     * collect, so frames cannot be lost in the subscribe→collect handoff window.
-     * There is no shared replay cache (lgns8.22.3): a new subscriber never sees
-     * a prior turn's terminal.
+     * Per-subscriber channels. Buffering starts at [subscribe], not at collect,
+     * so frames cannot be lost in the subscribe→collect handoff window. There is
+     * no shared replay cache (lgns8.22.3): a new subscriber never sees a prior
+     * turn's terminal.
+     *
+     * Capacity is bounded ([SUBSCRIBER_BUFFER_CAPACITY]) for memory safety.
+     * [route] delivers to subscribers concurrently so a full buffer on one
+     * runtime cannot head-of-line block delivery to others.
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
@@ -65,30 +74,28 @@ class RuntimeEventFanout {
 
     /**
      * Master lock for protecting internal state.
+     *
+     * Blocking [SynchronizedObject] (not a suspending [Mutex]) so [closeAllSubscribersSync]
+     * from non-suspend [AppServerRuntimeEventRouter.detach] never skips cleanup when
+     * route/subscribe holds the lock.
      */
-    private val stateMutex = Mutex()
+    private val stateLock = SynchronizedObject()
 
     /**
      * Subscribes to events for a specific runtime.
      *
-     * Returns a Flow of all events (stream_delta, update_loop_status, etc.) for
-     * the given runtime. Multiple subscribers can subscribe to the same runtime;
-     * each receives events on its own buffered channel.
-     *
-     * @param agentId The agent ID for the runtime
-     * @param conversationId The conversation ID for the runtime
-     * @param subscriberId Optional unique ID for this subscriber (auto-generated if not provided)
-     * @return A pair of (subscriberId, event flow) for this subscription
+     * Returns a Flow of all received frames (stream_delta, update_loop_status, etc.)
+     * for the given runtime. Multiple subscribers can subscribe to the same runtime;
+     * each receives events on its own buffered channel with full channel/raw fidelity.
      */
     suspend fun subscribe(
         agentId: AgentId,
         conversationId: ConversationId,
         subscriberId: String = generateSubscriberId(),
-    ): Pair<String, Flow<AppServerInboundFrame>> = stateMutex.withLock {
+    ): Pair<String, Flow<AppServerReceivedFrame>> = synchronized(stateLock) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val channel = Channel<AppServerInboundFrame>(
+        val channel = Channel<AppServerReceivedFrame>(
             capacity = SUBSCRIBER_BUFFER_CAPACITY,
-            onBufferOverflow = BufferOverflow.DROP_OLDEST,
         )
         subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
         subscriberId to channel.receiveAsFlow()
@@ -101,54 +108,71 @@ class RuntimeEventFanout {
      * **not** removed here — an active turn/lease must survive viewer churn
      * (lgns8.22.3). Idle locks are retired from [releaseTurnLock] once no waiters
      * remain and no viewers are subscribed.
-     *
-     * @param subscriberId The subscriber ID returned by subscribe()
-     * @return true if the subscriber was found and removed, false otherwise
      */
-    suspend fun unsubscribe(subscriberId: String): Boolean = stateMutex.withLock {
+    suspend fun unsubscribe(subscriberId: String): Boolean = synchronized(stateLock) {
         val slot = subscribers.remove(subscriberId) ?: return false
         slot.channel.close()
         true
     }
 
     /**
-     * Routes an event to the appropriate runtime's subscribers.
+     * Routes a received frame to subscribers for its runtime scope.
      *
-     * Only events with a runtime scope are routed (stream_delta, update_loop_status,
-     * update_device_status, update_queue, update_subagent_state). Other events are
-     * ignored.
-     *
-     * Events are routed to ALL subscribers for that runtime. If no subscribers exist
-     * for a runtime, the event is dropped (not buffered).
-     *
-     * @param frame The inbound frame to route
+     * Runtime-scoped events go to exact (agent, conversation) subscribers.
+     * Terminal-bearing stream deltas also reach same-conversation subscribers
+     * (different agent) so TurnEngine can apply authoritative-terminal release.
+     * Unscoped external-tool / control requests are broadcast to every active
+     * subscriber — TurnEngine must answer them to avoid wedging the server.
      */
-    suspend fun route(frame: AppServerInboundFrame) {
-        val runtime = frame.runtime ?: return // Only route events with a runtime scope
-
-        val key = RuntimeKey(runtime.agentId, runtime.conversationId)
-        val channels = stateMutex.withLock {
-            subscribers.values.filter { it.key == key }.map { it.channel }
+    suspend fun route(received: AppServerReceivedFrame) {
+        val channels = synchronized(stateLock) {
+            val runtime = received.frame.runtime
+            when {
+                runtime == null -> {
+                    if (!received.frame.isUnscopedTurnControl()) emptyList()
+                    else subscribers.values.map { it.channel }
+                }
+                received.isTerminalBearingStreamDelta() -> {
+                    subscribers.values.filter {
+                        it.key.conversationId == runtime.conversationId
+                    }.map { it.channel }
+                }
+                else -> {
+                    val key = RuntimeKey(runtime.agentId, runtime.conversationId)
+                    subscribers.values.filter { it.key == key }.map { it.channel }
+                }
+            }
         }
-        for (channel in channels) {
-            channel.trySend(frame)
+        // Deliver concurrently so a full buffer on one subscriber cannot HOL-block
+        // unrelated runtimes (bounded channels + isolated sends).
+        coroutineScope {
+            channels.map { channel ->
+                async {
+                    try {
+                        channel.send(received)
+                    } catch (_: ClosedSendChannelException) {
+                        // Concurrent unsubscribe closed this channel after the snapshot.
+                    }
+                }
+            }.awaitAll()
         }
     }
 
-    /**
-     * Acquires the turn lock for a specific runtime.
-     *
-     * This ensures only one turn executes at a time on a given runtime, while
-     * allowing parallel turns on different runtimes.
-     *
-     * The caller MUST call releaseTurnLock when the turn completes.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     */
+    /** Close every subscriber channel (used by [AppServerRuntimeEventRouter.detach]). */
+    fun closeAllSubscribersSync() = synchronized(stateLock) {
+        val open = subscribers.values.toList()
+        subscribers.clear()
+        // Close with a cause so turn collectors fail the lease instead of
+        // treating detach as a clean end-of-stream completion.
+        val cause = kotlinx.coroutines.CancellationException(
+            "AppServerRuntimeEventRouter detached",
+        )
+        open.forEach { it.channel.close(cause) }
+    }
+
     suspend fun acquireTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val entry = stateMutex.withLock {
+        val entry = synchronized(stateLock) {
             runtimeTurnLocks.getOrPut(key) { TurnLockEntry() }.also {
                 it.waiters.incrementAndGet()
             }
@@ -161,33 +185,13 @@ class RuntimeEventFanout {
         }
     }
 
-    /**
-     * Releases the turn lock for a specific runtime.
-     *
-     * When the last waiter releases and no viewers remain for the runtime, the
-     * lock entry is removed so long-lived fanouts do not retain every RuntimeKey forever.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     */
     suspend fun releaseTurnLock(agentId: AgentId, conversationId: ConversationId) {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val entry = stateMutex.withLock { runtimeTurnLocks[key] } ?: return
+        val entry = synchronized(stateLock) { runtimeTurnLocks[key] } ?: return
         entry.mutex.unlock()
         retireTurnLockIfIdle(key, entry)
     }
 
-    /**
-     * Executes a turn with the per-runtime lock.
-     *
-     * This is a convenience wrapper that acquires the lock, executes the block,
-     * and releases the lock even if the block throws.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     * @param block The turn execution block
-     * @return The result of the block
-     */
     suspend fun <T> withTurnLock(
         agentId: AgentId,
         conversationId: ConversationId,
@@ -201,39 +205,27 @@ class RuntimeEventFanout {
         }
     }
 
-    /**
-     * Returns the number of active subscribers.
-     */
-    suspend fun subscriberCount(): Int = stateMutex.withLock {
+    suspend fun subscriberCount(): Int = synchronized(stateLock) {
         subscribers.size
     }
 
-    /**
-     * Returns the number of distinct runtimes that currently have subscribers.
-     */
-    suspend fun runtimeFlowCount(): Int = stateMutex.withLock {
+    suspend fun runtimeFlowCount(): Int = synchronized(stateLock) {
         subscribers.values.map { it.key }.toSet().size
     }
 
     /** Test/telemetry: number of retained per-runtime turn locks. */
-    suspend fun turnLockCount(): Int = stateMutex.withLock {
+    suspend fun turnLockCount(): Int = synchronized(stateLock) {
         runtimeTurnLocks.size
     }
 
-    /**
-     * Returns the number of subscribers for a specific runtime.
-     *
-     * @param agentId The agent ID
-     * @param conversationId The conversation ID
-     * @return The count of subscribers for this runtime
-     */
-    suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int = stateMutex.withLock {
-        val key = RuntimeKey(agentId.value, conversationId.value)
-        subscribers.values.count { it.key == key }
-    }
+    suspend fun subscriberCountForRuntime(agentId: AgentId, conversationId: ConversationId): Int =
+        synchronized(stateLock) {
+            val key = RuntimeKey(agentId.value, conversationId.value)
+            subscribers.values.count { it.key == key }
+        }
 
-    private suspend fun retireTurnLockIfIdle(key: RuntimeKey, entry: TurnLockEntry) {
-        stateMutex.withLock {
+    private fun retireTurnLockIfIdle(key: RuntimeKey, entry: TurnLockEntry) {
+        synchronized(stateLock) {
             if (entry.waiters.decrementAndGet() > 0) return
             if (subscribers.values.any { it.key == key }) return
             if (runtimeTurnLocks[key] === entry) {
@@ -244,32 +236,43 @@ class RuntimeEventFanout {
 
     private data class SubscriberSlot(
         val key: RuntimeKey,
-        val channel: Channel<AppServerInboundFrame>,
+        val channel: Channel<AppServerReceivedFrame>,
     )
 
     private class TurnLockEntry(
         val mutex: Mutex = Mutex(),
-        /** Acquire attempts in flight or holding the mutex. */
         val waiters: kotlinx.atomicfu.AtomicInt = atomic(0),
     )
 
-    /**
-     * Internal key for runtime identification.
-     */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
 
     companion object {
-        private const val SUBSCRIBER_BUFFER_CAPACITY = 64
+        /**
+         * Per-subscriber buffer. Large enough for bursty stream deltas; when full,
+         * that subscriber's send suspends while other runtimes continue via
+         * concurrent [route] delivery.
+         */
+        const val SUBSCRIBER_BUFFER_CAPACITY = 256
 
-        // Atomic so concurrent subscribe() calls that auto-generate IDs cannot
-        // collide on the same counter value.
         private val nextSubscriberId = atomic(0)
 
-        /**
-         * Generates a unique subscriber ID.
-         */
-        private fun generateSubscriberId(): String {
-            return "subscriber-${nextSubscriberId.incrementAndGet()}"
-        }
+        private fun generateSubscriberId(): String =
+            "subscriber-${nextSubscriberId.incrementAndGet()}"
     }
+}
+
+private fun AppServerInboundFrame.isUnscopedTurnControl(): Boolean =
+    this is AppServerInboundFrame.ExternalToolCallRequest ||
+        this is AppServerInboundFrame.ControlRequest
+
+private fun AppServerReceivedFrame.isTerminalBearingStreamDelta(): Boolean {
+    val streamDelta = frame as? AppServerInboundFrame.StreamDelta ?: return false
+    val messageType = runCatching {
+        (streamDelta.delta as? kotlinx.serialization.json.JsonObject)
+            ?.get("message_type")
+            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+    }.getOrNull()
+    return messageType == "stop_reason" ||
+        messageType == "error_message" ||
+        messageType == "loop_error"
 }

@@ -16,6 +16,7 @@ import com.letta.mobile.runtime.TurnInput
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,95 +51,111 @@ import kotlinx.serialization.json.put
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerControllerCrossDeviceBusyTest {
 
+    private fun controller(client: FakeWireClient) = DefaultAppServerController(
+        client = client,
+        // Router must observe SharedFlow emits on the calling thread under runTest;
+        // the production Default dispatcher races with advanceUntilIdle/join.
+        parentCoroutineContext = Dispatchers.Unconfined,
+    )
+
     @Test
     fun secondDeviceSendAfterCompletedTerminalIsAccepted() = runTest {
         val client = FakeWireClient()
-        val controller = DefaultAppServerController(client = client)
+        val controller = controller(client)
+        try {
+            // Device A runs a turn to a completed terminal.
+            val deviceA = launch { controller.runTurn(commandA).collect() }
+            runCurrent()
+            client.emit(stopReason("run-A"))
+            advanceUntilIdle()
+            deviceA.join()
 
-        // Device A runs a turn to a completed terminal.
-        val deviceA = launch { controller.runTurn(commandA).collect() }
-        runCurrent()
-        client.emit(stopReason("run-A"))
-        advanceUntilIdle()
-        deviceA.join()
+            // Device B (different connection, SAME shared engine) sends next.
+            var deviceBAccepted = false
+            val deviceB = launch { controller.runTurn(commandB).collect { deviceBAccepted = true } }
+            runCurrent()
+            client.emit(stopReason("run-B"))
+            advanceUntilIdle()
+            deviceB.join()
 
-        // Device B (different connection, SAME shared engine) sends next.
-        var deviceBAccepted = false
-        val deviceB = launch { controller.runTurn(commandB).collect { deviceBAccepted = true } }
-        runCurrent()
-        client.emit(stopReason("run-B"))
-        advanceUntilIdle()
-        deviceB.join()
-
-        assertTrue(deviceBAccepted, "second device must be able to send immediately after A's terminal")
-        assertEquals(
-            listOf("otid-A", "otid-B"),
-            client.userClientMessageIds,
-            "each device's send issues exactly one input, OTID preserved once",
-        )
+            assertTrue(deviceBAccepted, "second device must be able to send immediately after A's terminal")
+            assertEquals(
+                listOf("otid-A", "otid-B"),
+                client.userClientMessageIds,
+                "each device's send issues exactly one input, OTID preserved once",
+            )
+        } finally {
+            controller.close()
+        }
     }
 
     @Test
     fun postTerminalFrameTrickleDoesNotBlockCrossDeviceSend() = runTest {
         val client = FakeWireClient()
-        val controller = DefaultAppServerController(client = client)
-
-        val deviceA = launch { controller.runTurn(commandA).collect() }
-        runCurrent()
-        // A completes...
-        client.emit(stopReason("run-A"))
-        runCurrent()
-        // ...then a steady trickle of later matching frames (delayed cleanup /
-        // cross-device viewer traffic) arrives. The regression re-armed the
-        // completed-terminal quiet timer on each, deferring busy release.
-        repeat(20) {
-            client.emit(assistantMessage("run-A"))
+        val controller = controller(client)
+        try {
+            val deviceA = launch { controller.runTurn(commandA).collect() }
             runCurrent()
+            // A completes...
+            client.emit(stopReason("run-A"))
+            runCurrent()
+            // ...then a steady trickle of later matching frames (delayed cleanup /
+            // cross-device viewer traffic) arrives. The regression re-armed the
+            // completed-terminal quiet timer on each, deferring busy release.
+            repeat(20) {
+                client.emit(assistantMessage("run-A"))
+                runCurrent()
+            }
+            advanceUntilIdle()
+            deviceA.join()
+
+            var deviceBAccepted = false
+            val deviceB = launch { controller.runTurn(commandB).collect { deviceBAccepted = true } }
+            runCurrent()
+            client.emit(stopReason("run-B"))
+            advanceUntilIdle()
+            deviceB.join()
+
+            assertTrue(
+                deviceBAccepted,
+                "a post-terminal frame trickle must not keep the shared engine busy",
+            )
+        } finally {
+            controller.close()
         }
-        advanceUntilIdle()
-        deviceA.join()
-
-        var deviceBAccepted = false
-        val deviceB = launch { controller.runTurn(commandB).collect { deviceBAccepted = true } }
-        runCurrent()
-        client.emit(stopReason("run-B"))
-        advanceUntilIdle()
-        deviceB.join()
-
-        assertTrue(
-            deviceBAccepted,
-            "a post-terminal frame trickle must not keep the shared engine busy",
-        )
     }
 
     @Test
     fun reconnectResendAfterCompletedTerminalPreservesOtidExactlyOnce() = runTest {
         val client = FakeWireClient()
-        val controller = DefaultAppServerController(client = client)
+        val controller = controller(client)
+        try {
+            // Original connection: runTurn to completed terminal.
+            val original = launch { controller.runTurn(commandA).collect() }
+            runCurrent()
+            client.emit(stopReason("run-A"))
+            advanceUntilIdle()
+            original.join()
 
-        // Original connection: runTurn to completed terminal.
-        val original = launch { controller.runTurn(commandA).collect() }
-        runCurrent()
-        client.emit(stopReason("run-A"))
-        advanceUntilIdle()
-        original.join()
+            // Reconnect: a redialed connection re-issues runTurn for the SAME
+            // conversation (fresh send, new OTID). It must be accepted and must not
+            // duplicate the prior OTID.
+            var reconnectAccepted = false
+            val reconnect = launch { controller.runTurn(commandReconnect).collect { reconnectAccepted = true } }
+            runCurrent()
+            client.emit(stopReason("run-reconnect"))
+            advanceUntilIdle()
+            reconnect.join()
 
-        // Reconnect: a redialed connection re-issues runTurn for the SAME
-        // conversation (fresh send, new OTID). It must be accepted and must not
-        // duplicate the prior OTID.
-        var reconnectAccepted = false
-        val reconnect = launch { controller.runTurn(commandReconnect).collect { reconnectAccepted = true } }
-        runCurrent()
-        client.emit(stopReason("run-reconnect"))
-        advanceUntilIdle()
-        reconnect.join()
-
-        assertTrue(reconnectAccepted, "reconnect re-send after a completed terminal must be accepted")
-        assertEquals(
-            listOf("otid-A", "otid-reconnect"),
-            client.userClientMessageIds,
-            "reconnect send preserves its OTID exactly once; no duplication of the prior turn",
-        )
+            assertTrue(reconnectAccepted, "reconnect re-send after a completed terminal must be accepted")
+            assertEquals(
+                listOf("otid-A", "otid-reconnect"),
+                client.userClientMessageIds,
+                "reconnect send preserves its OTID exactly once; no duplication of the prior turn",
+            )
+        } finally {
+            controller.close()
+        }
     }
 
     private companion object {

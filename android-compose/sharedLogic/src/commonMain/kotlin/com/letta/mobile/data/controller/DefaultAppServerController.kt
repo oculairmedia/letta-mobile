@@ -1,6 +1,7 @@
 package com.letta.mobile.data.controller
 
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
@@ -17,13 +18,18 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
+import kotlinx.atomicfu.atomic
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 /**
  * Default implementation of [AppServerController].
  *
@@ -57,7 +63,22 @@ class DefaultAppServerController(
      */
     private val turnContextPreflight: TurnContextPreflight = TurnContextPreflight.None,
     private val clock: Clock = Clock.System,
+    /**
+     * Extra context for the controller-owned router collector. Tests pass
+     * [kotlinx.coroutines.Dispatchers.Unconfined] so SharedFlow emissions are
+     * observed synchronously (avoids Default-dispatcher races under runTest).
+     */
+    private val parentCoroutineContext: CoroutineContext = EmptyCoroutineContext,
 ) : AppServerController {
+    private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
+    private val eventRouter = AppServerRuntimeEventRouter()
+    /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
+    private val connectionGeneration = atomic(0L)
+
+    init {
+        eventRouter.attach(controllerScope, client.events)
+    }
+
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
     override val state: StateFlow<AppServerControllerState> = _state.asStateFlow()
 
@@ -84,6 +105,57 @@ class DefaultAppServerController(
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
             turnContextPreflight = turnContextPreflight,
+            eventRouter = eventRouter,
+            runtimeScopeResolver = { command ->
+                runtimeMutex.withLock {
+                    runtimeCache[RuntimeKey(command.agentId.value, command.conversationId.value)]?.scope
+                }
+            },
+            connectionGenerationProvider = { connectionGeneration.value },
+            onRuntimeInvalidated = {
+                runtimeMutex.withLock { runtimeCache.clear() }
+            },
+            onRuntimeEnsured = { command, response, startedGeneration ->
+                refillEnsuredRuntime(command, response, startedGeneration)
+            },
+        )
+    }
+
+    /**
+     * Refill the controller cache (and durable registry) after an engine-issued
+     * `runtime_start`. Ignores completions that raced a generation bump so a
+     * dead-generation scope cannot undo [onTransportDisconnected]'s clear.
+     */
+    private suspend fun refillEnsuredRuntime(
+        command: TurnCommand,
+        response: AppServerInboundFrame.RuntimeStartResponse,
+        startedGeneration: Long,
+    ) {
+        val key = RuntimeKey(command.agentId.value, command.conversationId.value)
+        val recordId = "${command.agentId.value}:${command.conversationId.value}"
+        // Preserve cwd from the durable registry so reconnect doesn't lose the
+        // project directory when a mutating preflight restarts the runtime.
+        val existingCwd = runtimeRegistry?.load(recordId)?.cwd
+        val canonical = runtimeMutex.withLock {
+            if (connectionGeneration.value != startedGeneration) return@withLock null
+            val scope = response.runtime ?: return@withLock null
+            // Engine-started runtimes default to Standard when no mode was stored;
+            // record it so a later startRuntime(Standard) reuses the cache.
+            if (key !in runtimePermissionModes) {
+                runtimePermissionModes[key] = AppServerPermissionMode.Standard
+            }
+            CanonicalRuntime(
+                scope = scope,
+                agent = response.agent,
+                conversation = response.conversation,
+                created = response.created,
+            ).also { runtimeCache[key] = it }
+        } ?: return
+        recordStartedRuntime(
+            agentId = command.agentId,
+            conversationId = command.conversationId,
+            cwd = existingCwd,
+            canonical = canonical,
         )
     }
 
@@ -95,14 +167,64 @@ class DefaultAppServerController(
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime = runtimeMutex.withLock {
+        startRuntimeLocked(
+            agentId = agentId,
+            conversationId = conversationId,
+            cwd = cwd,
+            mode = mode,
+            recoverApprovals = recoverApprovals,
+            forceDeviceStatus = forceDeviceStatus,
+        )
+    }
+
+    private suspend fun startRuntimeLocked(
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        mode: AppServerPermissionMode?,
+        recoverApprovals: Boolean,
+        forceDeviceStatus: Boolean,
+    ): CanonicalRuntime {
         val key = RuntimeKey(agentId.value, conversationId.value)
         val effectiveMode = mode ?: AppServerPermissionMode.Standard
+        evictCachedRuntimeIfModeMismatch(key, effectiveMode)?.let { return it }
         runtimePermissionModes[key] = effectiveMode
+        val response = startRuntimeRemote(
+            key = key,
+            agentId = agentId,
+            conversationId = conversationId,
+            cwd = cwd,
+            effectiveMode = effectiveMode,
+            recoverApprovals = recoverApprovals,
+            forceDeviceStatus = forceDeviceStatus,
+        )
+        return cacheStartedRuntime(key, agentId, conversationId, cwd, response)
+    }
 
-        // Return cached runtime if already started for this agent+conversation
-        runtimeCache[key]?.let { return it }
+    /**
+     * Returns a matching cached runtime, or null when a fresh start is required.
+     * Evicts and invalidates the engine when the cached permission mode differs.
+     */
+    private suspend fun evictCachedRuntimeIfModeMismatch(
+        key: RuntimeKey,
+        effectiveMode: AppServerPermissionMode,
+    ): CanonicalRuntime? {
+        val cached = runtimeCache[key] ?: return null
+        if (runtimePermissionModes[key] == effectiveMode) return cached
+        runtimeCache.remove(key)
+        turnEngine.invalidateRuntime(notifyHost = false)
+        return null
+    }
 
-        // Issue runtime_start
+    private suspend fun startRuntimeRemote(
+        key: RuntimeKey,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        effectiveMode: AppServerPermissionMode,
+        recoverApprovals: Boolean,
+        forceDeviceStatus: Boolean,
+    ): AppServerInboundFrame.RuntimeStartResponse {
         val response = try {
             client.runtimeStart(
                 AppServerCommand.RuntimeStart(
@@ -117,35 +239,45 @@ class DefaultAppServerController(
                 ),
             )
         } catch (e: Exception) {
+            turnEngine.invalidateRuntime(notifyHost = false)
             _state.value = AppServerControllerState.Error(
                 message = "Failed to start runtime: ${e.message}",
                 cause = e,
             )
             throw AppServerControllerException("Failed to start runtime for $key", e)
         }
-
         if (!response.success) {
+            turnEngine.invalidateRuntime(notifyHost = false)
             val errorMsg = response.error ?: "Unknown error"
             _state.value = AppServerControllerState.Error(
                 message = "Runtime start failed: $errorMsg",
             )
             throw AppServerControllerException("Runtime start failed for $key: $errorMsg")
         }
+        return response
+    }
 
+    private suspend fun cacheStartedRuntime(
+        key: RuntimeKey,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        cwd: String?,
+        response: AppServerInboundFrame.RuntimeStartResponse,
+    ): CanonicalRuntime {
         val scope = response.runtime
-            ?: throw AppServerControllerException("Runtime start succeeded but returned no runtime scope")
-
-        // Store canonical runtime
+            ?: run {
+                turnEngine.invalidateRuntime(notifyHost = false)
+                throw AppServerControllerException("Runtime start succeeded but returned no runtime scope")
+            }
         val canonical = CanonicalRuntime(
             scope = scope,
             agent = response.agent,
             conversation = response.conversation,
             created = response.created,
         )
-
         runtimeCache[key] = canonical
         recordStartedRuntime(agentId, conversationId, cwd, canonical)
-        canonical
+        return canonical
     }
 
     private suspend fun recordStartedRuntime(
@@ -169,6 +301,10 @@ class DefaultAppServerController(
     }
 
     override suspend fun onTransportDisconnected(reason: String?) {
+        // Do not detach the router here: ReconnectingAppServerClient.events is a
+        // stable pipe across generations. Detaching would drop recovery
+        // runtime_start/sync terminals before markConnected() re-attaches.
+        connectionGeneration.incrementAndGet()
         runtimeMutex.withLock {
             // Canonical runtime scopes are generation-local: every cached scope
             // was minted by the generation that just died and must be re-fetched
@@ -176,11 +312,17 @@ class DefaultAppServerController(
             // the durable registry survive — they are intent, not server state.
             runtimeCache.clear()
         }
-        turnEngine.invalidateRuntime()
+        turnEngine.invalidateRuntime(notifyHost = false)
         _state.value = AppServerControllerState.Disconnected(reason)
     }
 
     override fun markConnected() {
+        // Collector is retained across disconnect (see onTransportDisconnected);
+        // only attach if it died. Re-attaching would cancel the stable pipe and
+        // drop zero-replay SharedFlow frames during the gap.
+        if (!eventRouter.isAttached()) {
+            eventRouter.attach(controllerScope, client.events)
+        }
         _state.value = AppServerControllerState.Connected
     }
 
@@ -198,7 +340,7 @@ class DefaultAppServerController(
         }
         // Drop in-flight turn state so the next turn cannot reuse a runtime that
         // was started with the pre-update agent configuration.
-        turnEngine.invalidateRuntime()
+        turnEngine.invalidateRuntime(notifyHost = false)
     }
 
     override suspend fun stopAllRuntimes() {
@@ -206,7 +348,7 @@ class DefaultAppServerController(
             runtimeCache.clear()
             runtimePermissionModes.clear()
         }
-        turnEngine.invalidateRuntime()
+        turnEngine.invalidateRuntime(notifyHost = false)
     }
 
     override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> =
@@ -305,6 +447,12 @@ class DefaultAppServerController(
      * Internal key for runtime cache.
      */
     private data class RuntimeKey(val agentId: String, val conversationId: String)
+
+    /** Tear down the inbound router collector and controller scope (tests / shutdown). */
+    override fun close() {
+        eventRouter.detach()
+        controllerScope.cancel()
+    }
 
     companion object {
         private val DEFAULT_CLIENT_INFO = AppServerRuntimeStartClientInfo(
