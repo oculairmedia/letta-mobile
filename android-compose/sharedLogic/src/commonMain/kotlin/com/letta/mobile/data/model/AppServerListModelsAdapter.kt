@@ -72,13 +72,17 @@ object AppServerListModelsAdapter {
             ?: presentation?.takeIf { it != handle }
         val name = display ?: handle ?: entry.id
         val limits = extractLimits(entry, raw)
-        val routingScopes = listOfNotNull(raw, entry.updateArgs, entry.flags)
-        val provider = providerFromHandle(handle.orEmpty())
-            .ifBlank { raw?.let { firstString(it, "provider_type", "providerType") }.orEmpty() }
+        val routingScopes = listOfNotNull(entry.updateArgs, raw, entry.flags)
+        val provider = routingScopes.firstNotNullOfOrNull {
+            firstString(it, "provider_type", "providerType")
+        }.orEmpty()
+            .ifBlank { providerFromHandle(handle.orEmpty()) }
             .ifBlank { providerFromHandle(presentation.orEmpty()) }
         val model = LlmModel(
             id = entry.id.ifBlank { handle.orEmpty() },
             name = name,
+            model = entry.updateArgs?.let { firstString(it, "model") }
+                ?: raw?.let { firstString(it, "model") },
             handle = handle,
             displayNameOverride = display,
             providerType = provider,
@@ -100,6 +104,7 @@ object AppServerListModelsAdapter {
             maxOutputTokens = limits.second,
             maxTokens = limits.second,
             enableReasoner = null,
+            selectionAliases = extractSelectionAliases(raw),
         )
         return ModelCatalogNormalizer.enrichLimits(model)
     }
@@ -130,6 +135,7 @@ object AppServerListModelsAdapter {
         return buildJsonObject {
             put("id", model.id)
             put("name", model.name)
+            model.model?.let { put("model", it) }
             model.handle?.let { put("handle", it) }
             model.displayNameOverride?.let { put("display_name", it) }
             put("provider_type", model.providerType)
@@ -141,6 +147,14 @@ object AppServerListModelsAdapter {
             model.contextWindow?.takeIf { it > 0 }?.let { put("context_window", it) }
             model.maxOutputTokens?.takeIf { it > 0 }?.let { put("max_output_tokens", it) }
             model.maxTokens?.takeIf { it > 0 }?.let { put("max_tokens", it) }
+            if (model.selectionAliases.isNotEmpty()) {
+                put(
+                    "selection_aliases",
+                    buildJsonArray {
+                        model.selectionAliases.forEach { add(JsonPrimitive(it)) }
+                    },
+                )
+            }
             selection?.let { put("selection_handle", it) }
             // Merge normalized limits into the server-provided updateArgs so extra
             // selection fields (model / model_handle / id) survive adaptation.
@@ -214,6 +228,12 @@ object AppServerListModelsAdapter {
         val slash = handle.indexOf('/')
         return if (slash > 0) handle.substring(0, slash) else ""
     }
+
+    private fun extractSelectionAliases(raw: JsonObject?): Set<String> =
+        (raw?.get("selection_aliases") as? JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.contentOrNull?.takeIf(String::isNotBlank) }
+            ?.toSet()
+            .orEmpty()
 
     private fun firstString(raw: JsonObject, vararg keys: String): String? =
         keys.firstNotNullOfOrNull { key ->

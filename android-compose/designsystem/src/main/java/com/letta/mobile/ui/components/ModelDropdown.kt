@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.designsystem.R
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -30,6 +31,7 @@ fun ModelDropdown(
     onLoadModels: () -> Unit,
     modifier: Modifier = Modifier,
     label: String = "Model",
+    selectionValue: (LlmModel) -> String = ModelCatalog::valueOf,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var filterText by remember { mutableStateOf("") }
@@ -106,7 +108,7 @@ fun ModelDropdown(
                                 }
                             },
                             onClick = {
-                                onModelSelected(model.handle ?: model.name)
+                                onModelSelected(selectionValue(model))
                                 filterText = ""
                                 expanded = false
                             },

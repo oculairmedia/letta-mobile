@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.composer.MentionKind
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.memory.MemoryParityItem
@@ -137,11 +138,11 @@ internal fun AvatarPresenceEffects(params: AvatarPresenceParams) {
     }
 }
 
-/** Model picker options: display label to model handle (or name fallback). */
+/** Model picker options: display label to route-stable selection token. */
 internal fun buildModelOptions(availableModels: List<LlmModel>): List<Pair<String, String>> =
     availableModels.map { model ->
         val label = model.displayNameOverride?.takeIf { it.isNotBlank() } ?: model.name
-        val value = model.handle?.takeIf { it.isNotBlank() } ?: model.name
+        val value = ModelCatalog.selectionValue(availableModels, model)
         label to value
     }
 
@@ -375,6 +376,3 @@ internal fun conversationRecency(label: String): java.time.Instant =
         ?: if (label == "Queued") java.time.Instant.MAX else java.time.Instant.MIN
 
 private const val AVATAR_COMPANION_VRM_PATH_KEY = "avatar.companion.vrm_path"
-
-
-

@@ -65,6 +65,10 @@ internal fun DesktopModelPickerSheet(
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val groups = remember(models, selectedValue) { ModelCatalog.group(models, selectedValue) }
     val filtered = remember(groups, query.text) { ModelCatalog.filter(groups, query.text) }
+    val selectedOptionValue = remember(models, selectedValue) {
+        ModelCatalog.selectedModel(models, selectedValue)
+            ?.let { ModelCatalog.selectionValue(models, it) }
+    }
 
     Box(
         modifier = Modifier
@@ -133,9 +137,14 @@ internal fun DesktopModelPickerSheet(
                         items(group.models, key = { "${group.provider}-${it.value}" }) { option ->
                             ModelRow(
                                 option = option,
-                                selected = option.value == selectedValue,
+                                selected = option.value == selectedOptionValue,
                                 onClick = {
-                                    onSelect(option.value)
+                                    val value = if (option.value == selectedOptionValue) {
+                                        selectedValue ?: option.value
+                                    } else {
+                                        option.value
+                                    }
+                                    onSelect(value)
                                     onDismiss()
                                 },
                             )

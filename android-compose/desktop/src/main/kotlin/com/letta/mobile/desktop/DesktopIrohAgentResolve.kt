@@ -76,14 +76,14 @@ internal suspend fun resolveDesktopAgentNames(
     ),
 )
 
-/** Agent id -> model handle, mirroring [resolveDesktopAgentNames]. */
-internal suspend fun resolveDesktopAgentModels(
+/** Agent id -> full agent config, mirroring [resolveDesktopAgentNames]. */
+internal suspend fun resolveDesktopAgents(
     agentIds: Set<String>,
     irohDirectory: IrohAdminRpcAgentDirectory?,
     httpAgentRepository: () -> IAgentRepository,
-): Map<String, String> = resolveDesktopAgentField(
+): Map<String, Agent> = resolveDesktopAgentField(
     ResolveDesktopAgentFieldParams(
         sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
-        fromAgent = { agent -> nonBlank(agent.model) },
+        fromAgent = { it },
     ),
 )

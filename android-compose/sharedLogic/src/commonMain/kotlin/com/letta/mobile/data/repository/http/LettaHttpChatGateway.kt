@@ -14,6 +14,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
@@ -199,7 +200,7 @@ open class LettaHttpChatGateway(
             applyAuth()
         }
         response.requireSuccess()
-        return response.body()
+        return ModelCatalogNormalizer.normalize(response.body())
     }
 
     /** Set the model override for an existing conversation. */

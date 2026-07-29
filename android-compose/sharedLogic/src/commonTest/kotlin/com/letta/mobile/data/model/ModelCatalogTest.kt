@@ -21,6 +21,96 @@ class ModelCatalogTest {
     }
 
     @Test
+    fun selectedModelUsesAliasWhenNoExactRouteExists() {
+        val sharedModel = LlmModel(
+            id = "openai/MiniMax-M3",
+            name = "MiniMax-M3",
+            handle = "openai/MiniMax-M3",
+            providerType = "openai",
+            selectionAliases = setOf("lmstudio/MiniMax-M3"),
+        )
+        val models = listOf(sharedModel)
+        val selectedModel = ModelCatalog.selectedModel(models, "lmstudio/MiniMax-M3")
+
+        assertEquals(sharedModel, selectedModel)
+        assertEquals(
+            "openai/MiniMax-M3",
+            ModelCatalog.selectionValue(models, requireNotNull(selectedModel)),
+        )
+        assertEquals(
+            "lmstudio/MiniMax-M3",
+            ModelCatalog.transportValue(models, "lmstudio/MiniMax-M3"),
+        )
+        assertNull(ModelCatalog.selectedModel(models, "anthropic/MiniMax-M3"))
+    }
+
+    @Test
+    fun selectedModelPrefersExactCustomRouteOverSharedAlias() {
+        val sharedModel = LlmModel(
+            id = "shared",
+            name = "MiniMax-M3",
+            handle = "openai/MiniMax-M3",
+            providerType = "openai",
+            modelEndpoint = "https://llmux.example/v1",
+            selectionAliases = setOf("lmstudio/MiniMax-M3"),
+        )
+        val customModel = LlmModel(
+            id = "custom",
+            name = "MiniMax-M3",
+            handle = "lmstudio/MiniMax-M3",
+            providerType = "lmstudio",
+            providerCategory = "byok",
+            modelEndpoint = "https://custom.example/v1",
+        )
+
+        assertEquals(
+            customModel,
+            ModelCatalog.selectedModel(listOf(sharedModel, customModel), "lmstudio/MiniMax-M3"),
+        )
+    }
+
+    @Test
+    fun duplicateHandlesUseUniqueRouteIdsAsSelectionValues() {
+        val east = LlmModel(
+            id = "east",
+            name = "GPT-4o East",
+            handle = "openai/gpt-4o",
+            providerType = "azure",
+            providerName = "byok-east",
+            modelEndpoint = "https://east.example/v1",
+        )
+        val west = east.copy(
+            id = "west",
+            name = "GPT-4o West",
+            providerName = "byok-west",
+            modelEndpoint = "https://west.example/v1",
+        )
+        val models = listOf(east, west)
+
+        assertEquals("east", ModelCatalog.selectionValue(models, east))
+        assertEquals("west", ModelCatalog.selectionValue(models, west))
+        assertEquals(west, ModelCatalog.selectedModel(models, "west"))
+        assertNull(ModelCatalog.selectedModel(models, "openai/gpt-4o"))
+        assertEquals(
+            west,
+            ModelCatalog.selectedModelForRoute(
+                models = models,
+                selectedValue = "openai/gpt-4o",
+                routeIdentity = ModelRouteIdentity(
+                    providerType = "azure",
+                    providerName = "byok-west",
+                    modelEndpoint = "https://west.example/v1",
+                ),
+            ),
+        )
+        assertEquals("openai/gpt-4o", ModelCatalog.transportValue(models, "west"))
+        assertEquals(
+            setOf("east", "west"),
+            ModelCatalog.group(models).flatMap { group -> group.models.map { it.value } }.toSet(),
+        )
+    }
+
+    @Test
     fun testGroup() {
         val models = listOf(
             LlmModel(id = "1", name = "Claude", handle = "claude-3", providerType = "anthropic"),

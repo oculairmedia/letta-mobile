@@ -66,6 +66,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
@@ -777,8 +778,8 @@ internal fun ModelPickerSheet(
         sorted.groupBy { it.providerType.ifBlank { "Other" } }
     }
 
-    val currentModelHandle = remember(currentModel) {
-        currentModel?.takeIf { it.isNotBlank() }
+    val activeModel = remember(models, currentModel) {
+        ModelCatalog.selectedModel(models, currentModel)
     }
 
     ModalBottomSheet(
@@ -859,7 +860,7 @@ internal fun ModelPickerSheet(
                             },
                         ) { _, model ->
                             val handle = model.handle ?: model.name
-                            val isActive = handle == currentModelHandle
+                            val isActive = model == activeModel
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()

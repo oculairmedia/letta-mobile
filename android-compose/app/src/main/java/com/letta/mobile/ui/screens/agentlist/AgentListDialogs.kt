@@ -29,9 +29,11 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.ModelSettings
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
+import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ModelDropdown
 import com.letta.mobile.ui.components.MultiFieldInputDialog
@@ -140,7 +142,7 @@ internal fun CreateAgentDialog(
         confirmEnabled = resources.validation.enabled,
         onConfirm = {
             onCreate(
-                buildAgentCreateParams(formState),
+                buildAgentCreateParams(formState, resources.llmModels),
                 formState.runtimeOption,
             )
         },
@@ -193,9 +195,12 @@ fun validateCreateAgentForm(
     return CreateAgentValidation(enabled = true, disabledReason = null)
 }
 
-internal fun buildAgentCreateParams(formState: CreateAgentFormState): AgentCreateParams {
+internal fun buildAgentCreateParams(
+    formState: CreateAgentFormState,
+    availableModels: List<LlmModel> = emptyList(),
+): AgentCreateParams {
     val isLocal = formState.runtimeOption == AgentCreateRuntimeOption.LOCAL_LETTACODE
-    return AgentCreateParams(
+    val params = AgentCreateParams(
         name = formState.name,
         description = formState.description.ifBlank { null },
         model = formState.model.ifBlank { null },
@@ -216,6 +221,7 @@ internal fun buildAgentCreateParams(formState: CreateAgentFormState): AgentCreat
         includeBaseTools = if (isLocal) false else formState.includeBaseTools,
         parallelToolCalls = if (isLocal) false else null,
     )
+    return if (isLocal) params else params.withCatalogModelRouting(availableModels)
 }
 
 @Composable
@@ -360,6 +366,7 @@ private fun CreateAgentRuntimeModels(
                 onLoadModels = resources.onLoadModels,
                 modifier = Modifier.fillMaxWidth(),
                 label = stringResource(R.string.common_model),
+                selectionValue = { ModelCatalog.selectionValue(resources.llmModels, it) },
             )
         }
         return
@@ -371,6 +378,7 @@ private fun CreateAgentRuntimeModels(
         onLoadModels = resources.onLoadModels,
         modifier = Modifier.fillMaxWidth(),
         label = stringResource(R.string.common_model),
+        selectionValue = { ModelCatalog.selectionValue(resources.llmModels, it) },
     )
     ModelDropdown(
         selectedModel = formState.embedding,

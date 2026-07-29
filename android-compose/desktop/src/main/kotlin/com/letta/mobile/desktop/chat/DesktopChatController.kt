@@ -13,19 +13,25 @@ import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
 import com.letta.mobile.data.chat.runtime.persistedTitleCandidate
 import com.letta.mobile.data.chat.runtime.toChatConversationSummaries
+import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ModelCatalog
+import com.letta.mobile.data.model.ModelRouteIdentity
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.ui.chat.render.ChatTimelineProjector
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.desktop.DesktopBootstrapState
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +43,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 import kotlin.time.Duration.Companion.milliseconds
+
+private data class RequiredCatalogModel(
+    val models: List<LlmModel>,
+    val selectionValue: String,
+)
+
 class DesktopChatController(
     private val bootstrapState: DesktopBootstrapState,
     private val scope: CoroutineScope,
@@ -45,7 +57,7 @@ class DesktopChatController(
         createDefaultDesktopChatGateway(bootstrapState.config)
     },
     private val agentNamesByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
-    private val agentModelByIdProvider: suspend (agentIds: Set<String>) -> Map<String, String> = { emptyMap() },
+    private val agentByIdProvider: suspend (agentIds: Set<String>) -> Map<String, Agent> = { emptyMap() },
     // The backend doesn't yet persist a conversation's archived flag, so we keep a
     // local, durable record of archived ids and overlay it on every load. Still
     // PATCHes the server so this lights up automatically once the backend lands.
@@ -210,6 +222,7 @@ class DesktopChatController(
     }
 
     private var gateway: DesktopChatGateway? = null
+    private var modelCatalogLoad: Deferred<Result<List<LlmModel>>>? = null
 
     /**
      * Single point of truth for the active gateway. Keeps [_canSubmitApprovals] in
@@ -217,6 +230,11 @@ class DesktopChatController(
      * actually submit (a [DesktopApprovalSubmitter]).
      */
     private fun bindGateway(next: DesktopChatGateway?) {
+        if (gateway !== next) {
+            modelCatalogLoad?.cancel()
+            modelCatalogLoad = null
+            _availableModels.value = emptyList()
+        }
         gateway = next
         _canSubmitApprovals.value = next is ApprovalSubmittingGateway || next is DesktopApprovalSubmitter
     }
@@ -429,9 +447,9 @@ class DesktopChatController(
     }
 
     /**
-     * Create a new agent (cloning model/embedding from a template agent so the
-     * config is valid for this backend), open a conversation for it, and select
-     * it. [onCreated] reports the new agent id so the UI can refresh.
+     * Create a new agent from pre-resolved model defaults, open a conversation
+     * for it, and select it. [onCreated] reports the new agent id so the UI can
+     * refresh.
      */
     fun createAgent(
         name: String,
@@ -444,17 +462,18 @@ class DesktopChatController(
         scope.launch {
             try {
                 val gw = gatewayExtras ?: return@launch
+                val catalogModel = model?.let { requireCatalogModel(gw, it) }
                 val agent = gw.createAgent(
                     AgentCreateParams(
                         name = agentName,
-                        model = model,
+                        model = catalogModel?.selectionValue,
                         embedding = embedding,
                         includeBaseTools = true,
                         memoryBlocks = listOf(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
                             BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
                         ),
-                    ),
+                    ).withCatalogModelRouting(catalogModel?.models.orEmpty()),
                 )
                 onCreated(agent.id.value)
                 val conversation = gw.createConversation(agent.id.value)
@@ -475,8 +494,9 @@ class DesktopChatController(
         val conversationId = _state.value.selectedConversationId ?: return
         conversationModelById = conversationModelById + (conversationId to model)
         _state.update { it.copy(composerModelLabel = model) }
+        val transportModel = ModelCatalog.transportValue(_availableModels.value, model).orEmpty()
         scope.launch {
-            runCatching { gatewayExtras?.setConversationModel(conversationId, model) }
+            runCatching { gatewayExtras?.setConversationModel(conversationId, transportModel) }
                 .onFailure { t ->
                     _state.update {
                         it.copy(errorMessage = t.message ?: "Could not change model")
@@ -531,8 +551,8 @@ class DesktopChatController(
             val label = when {
                 !override.isNullOrBlank() -> override
                 !agentId.isNullOrBlank() ->
-                    runCatching { agentModelByIdProvider(setOf(agentId)) }
-                        .getOrNull()?.get(agentId)?.takeIf { it.isNotBlank() } ?: "Auto"
+                    runCatching { agentByIdProvider(setOf(agentId)) }
+                        .getOrNull()?.get(agentId)?.model?.takeIf { it.isNotBlank() } ?: "Auto"
                 else -> "Auto"
             }
             if (!closed && _state.value.selectedConversationId == conversationId) {
@@ -884,10 +904,7 @@ class DesktopChatController(
             bindGateway(nextGateway)
 
             // Load the model catalog for the composer model picker (best-effort).
-            scope.launch {
-                val models = runCatching { gatewayExtras?.listLlmModels() }.getOrNull().orEmpty()
-                if (!closed) _availableModels.value = models
-            }
+            gatewayExtras?.let(::startModelCatalogLoad)
 
             reloadConversationsAndSelect(preferConversationId = null)
         } catch (cancelled: CancellationException) {
@@ -904,6 +921,69 @@ class DesktopChatController(
                 )
             }
         }
+    }
+
+    private fun startModelCatalogLoad(
+        extras: ChatGatewayExtras,
+        replaceCurrent: Boolean = false,
+    ): Deferred<Result<List<LlmModel>>> {
+        if (!replaceCurrent) modelCatalogLoad?.let { return it }
+        modelCatalogLoad?.cancel()
+        return scope.async {
+            try {
+                val models = extras.listLlmModels()
+                if (!closed && gatewayExtras === extras) _availableModels.value = models
+                Result.success(models)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (t: Throwable) {
+                Result.failure(t)
+            }
+        }.also { modelCatalogLoad = it }
+    }
+
+    private suspend fun requireCatalogModel(
+        extras: ChatGatewayExtras,
+        selectedValue: String,
+    ): RequiredCatalogModel {
+        val cached = _availableModels.value
+        val initialResult = if (cached.isNotEmpty()) {
+            Result.success(cached)
+        } else {
+            startModelCatalogLoad(extras).await()
+        }
+        val result = if (initialResult.isFailure) {
+            startModelCatalogLoad(extras, replaceCurrent = true).await()
+        } else {
+            initialResult
+        }
+        val models = result.getOrElse { cause ->
+            throw IllegalStateException("Model catalog is unavailable; retry agent creation.", cause)
+        }
+        val selectedModel = ModelCatalog.selectedModel(models, selectedValue)
+            ?: selectedModelForCurrentAgentRoute(models, selectedValue)
+        requireNotNull(selectedModel) {
+            "Selected model is not available in the current catalog; choose a model and retry."
+        }
+        return RequiredCatalogModel(
+            models = models,
+            selectionValue = ModelCatalog.selectionValue(models, selectedModel),
+        )
+    }
+
+    private suspend fun selectedModelForCurrentAgentRoute(
+        models: List<LlmModel>,
+        selectedValue: String,
+    ): LlmModel? {
+        val agentId = _state.value.selectedConversation?.agentId?.takeIf { it.isNotBlank() } ?: return null
+        val agent = runCatching { agentByIdProvider(setOf(agentId)) }.getOrNull()?.get(agentId)
+            ?.takeIf { it.model == selectedValue }
+            ?: return null
+        return ModelCatalog.selectedModelForRoute(
+            models = models,
+            selectedValue = selectedValue,
+            routeIdentity = ModelRouteIdentity.from(agent),
+        )
     }
 
     /**
