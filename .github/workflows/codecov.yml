@@ -32,18 +32,41 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Classify coverage scope
+        id: coverage-scope
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          run_coverage=true
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            run_coverage=false
+            if git diff --name-only "$BASE_SHA"...HEAD |
+              grep -Eq '^(\.github/workflows/codecov\.yml|android-compose/)'; then
+              run_coverage=true
+            fi
+          fi
+          echo "run=$run_coverage" >> "$GITHUB_OUTPUT"
+          echo "Coverage workload required: $run_coverage"
+
       - name: Setup Java 26
+        if: steps.coverage-scope.outputs.run == 'true'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 26
 
       - name: Setup Gradle
+        if: steps.coverage-scope.outputs.run == 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # Android `test` is the sole PR writer; coverage consumes its shared
+          # Gradle state without adding another 40s cache upload.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Validate Android SDK
+        if: steps.coverage-scope.outputs.run == 'true'
         shell: bash
         run: |
           sdk_root="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -53,12 +76,15 @@ jobs:
           echo "ANDROID_SDK_ROOT=$sdk_root" >> "$GITHUB_ENV"
 
       - name: Generate aggregated Kover XML report
+        if: steps.coverage-scope.outputs.run == 'true'
         run: ./gradlew --no-configuration-cache :koverXmlReportCi
 
       - name: Verify coverage report
+        if: steps.coverage-scope.outputs.run == 'true'
         run: test -s build/reports/kover/report.xml
 
       - name: Upload coverage to Codecov
+        if: steps.coverage-scope.outputs.run == 'true'
         uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: true

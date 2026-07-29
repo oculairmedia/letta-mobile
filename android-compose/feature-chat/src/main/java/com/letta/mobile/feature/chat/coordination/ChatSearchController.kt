@@ -4,13 +4,13 @@ import com.letta.mobile.data.model.MessageSearchRequest
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.toParsed
-import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.ui.chat.render.ChatUiState
 internal class ChatSearchController(
-    private val messageRepository: MessageRepository,
+    private val messageRepository: IMessageRepository,
 ) {
     fun localResults(
         query: String,

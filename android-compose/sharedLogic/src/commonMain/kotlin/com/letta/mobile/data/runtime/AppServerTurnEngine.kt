@@ -5,6 +5,8 @@ import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecisi
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.extras.ExternalToolResult
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
 import com.letta.mobile.data.transport.appserver.AppServerExternalToolResultContent
@@ -15,6 +17,7 @@ import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartClientInfo
+import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeEventSource
@@ -100,19 +103,57 @@ class AppServerTurnEngine(
      * no controller tools, so every request still gets a benign error response.
      */
     private val externalToolRegistry: ExternalToolRegistry? = null,
+    /**
+     * lgns8.22.3: when set, turn collection subscribes to the controller-owned
+     * inbound router instead of collecting [AppServerClient.events] directly.
+     */
+    private val eventRouter: AppServerRuntimeEventRouter? = null,
+    /**
+     * lgns8 / qhlo0: when the controller has already started a runtime, reuse its
+     * canonical scope instead of issuing a duplicate runtime_start from the engine.
+     */
+    private val runtimeScopeResolver: suspend (TurnCommand) -> AppServerRuntimeScope? = { null },
+    /**
+     * lgns8.22.4: connection generation stamped onto each lease. Incremented by
+     * the controller on transport disconnect so old-generation frames cannot
+     * mutate a successor lease.
+     */
+    private val connectionGenerationProvider: () -> Long = { 0L },
+    /**
+     * Invoked when [invalidateRuntime] clears the engine cache (e.g. after a
+     * mutating context preflight) so controllers can drop their matching cache.
+     */
+    private val onRuntimeInvalidated: suspend () -> Unit = {},
+    /**
+     * Invoked after [ensureRuntime] issues a fresh `runtime_start` so controllers
+     * can refill their cache (needed for [DefaultAppServerController.submitApproval]
+     * after preflight-driven restart). [startedGeneration] is the connection
+     * generation observed before the RPC; hosts must ignore stale completions.
+     */
+    private val onRuntimeEnsured: suspend (
+        TurnCommand,
+        AppServerInboundFrame.RuntimeStartResponse,
+        Long,
+    ) -> Unit = { _, _, _ -> },
 ) : TurnEngine {
     /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
     private val activeLeaseRef = atomic<TurnLease?>(null)
     private val leaseTokenSeq = atomic(0L)
     private var runtime: AppServerRuntimeScope? = null
+    private val inboundSource = TurnInboundSource(client, eventRouter)
 
     /**
      * Drops the cached runtime scope so the next turn re-issues runtime_start.
      * Called on transport disconnect/generation rollover (lgns8.5): a scope
      * minted by a dead generation must never be reused against the next one.
+     *
+     * @param notifyHost when true, also invokes [onRuntimeInvalidated] so a
+     *   controller cache cannot undo a mutating preflight. Hosts that already
+     *   cleared their own cache (stop/disconnect) pass false.
      */
-    fun invalidateRuntime() {
+    suspend fun invalidateRuntime(notifyHost: Boolean = true) {
         runtime = null
+        if (notifyHost) onRuntimeInvalidated()
     }
 
     /**
@@ -169,6 +210,7 @@ class AppServerTurnEngine(
      * Derived from [activeLeaseRef] — never force-unlocks exclusion.
      */
     private val activeTurnOwnerRef = atomic<ActiveTurnOwner?>(null)
+    private val runIdGate = TurnRunIdGate(activeLeaseRef, activeTurnOwnerRef)
 
     /**
      * letta-mobile-vilsn: tool_call_id -> real approval id (the can_use_tool
@@ -398,6 +440,7 @@ class AppServerTurnEngine(
             phase = TurnLeasePhase.Preparing,
             ownerJob = coroutineContext[Job],
             processRole = ownerProcessRole,
+            connectionGeneration = connectionGenerationProvider(),
             settleDeadlineMs = terminalSettleQuietMs,
             watchdogDeadlineMs = turnIdleTimeoutMs,
         )
@@ -560,7 +603,7 @@ class AppServerTurnEngine(
         }
     }
 
-    private fun recordPreflightFailure(command: TurnCommand, errorClass: String) {
+    private suspend fun recordPreflightFailure(command: TurnCommand, errorClass: String) {
         invalidateRuntime()
         Telemetry.event(
             "AppServerTurnEngine",
@@ -720,48 +763,52 @@ class AppServerTurnEngine(
         }
 
         var turnEndReason: String? = null
+        // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
+        // prior ids are superseded and must not complete/mutate this lease.
+        runIdGate.beginLease(leaseToken)
+        val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
         try {
             collectorReady.complete(Unit)
-            client.events.collect { received ->
+            inboundEvents.collect { received ->
+                if (isConnectionGenerationSuperseded(leaseToken)) {
+                    // Settle before TurnCompleted — clean-completion markers skip
+                    // the cancel/finally settlement path intentionally.
+                    settleDanglingToolCalls(
+                        command,
+                        emittedToolCallIds,
+                        returnedToolCallIds,
+                        emitDraft,
+                        "Connection generation superseded during turn",
+                    )
+                    flushTail()
+                    emitDraft(
+                        command.failedDraft("Connection generation superseded during turn"),
+                    )
+                    throw TurnCompleted
+                }
                 if (!received.matches(scope)) {
-                    // letta-mobile-kyqdt: P1c KEY PROBE (TELEMETRY-ONLY). A frame
-                    // was rejected by the scope filter. If it CARRIED a terminal
-                    // (stop_reason / terminal lifecycle), record the rejected
-                    // scope decision so the owner metadata proves the leading
-                    // hypothesis: "a terminal arrived but failed matches(scope)".
-                    // Pure read/write — the control-flow return below is
-                    // unchanged; we do NOT gate on this record.
-                    if (received.carriesTerminal()) {
-                        noteOwnerScopeDecision(
-                            scopeMatched = false,
-                            source = "scope_rejected_terminal",
-                            seq = received.eventSeqOrNull(),
-                            leaseToken = leaseToken,
+                    handleScopeRejectedFrame(received, scope, leaseToken)?.let { status ->
+                        // Same abnormal-terminal settlement as the exact-scope path:
+                        // TurnCompleted skips cancel/finally settlement intentionally.
+                        settleDanglingToolCalls(
+                            command,
+                            emittedToolCallIds,
+                            returnedToolCallIds,
+                            emitDraft,
+                            when (status) {
+                                RuntimeRunStatus.Cancelled ->
+                                    "Tool execution interrupted by mismatched-scope cancellation"
+                                else ->
+                                    "Tool execution interrupted by mismatched-scope failure"
+                            },
                         )
-                        Telemetry.event(
-                            "AppServerTurnEngine", "terminal.scope_rejected",
-                            "expectedAgent" to scope.agentId,
-                            "expectedConv" to scope.conversationId,
-                            "frameAgent" to received.frame.runtime?.agentId,
-                            "frameConv" to received.frame.runtime?.conversationId,
-                            "eventSeq" to received.eventSeqOrNull(),
-                        )
-                        // letta-mobile-kyqdt STEP 2: AUTHORITATIVE TERMINAL RELEASE.
-                        // If the rejected terminal-bearing frame is for the SAME
-                        // conversation, release the engine on the authoritative
-                        // terminal — no settle-window, no scope-match requirement.
-                        // Closes the passive-observer stuck-for-5-min gap.
-                        if (received.frame.runtime?.conversationId == scope.conversationId) {
-                            noteOwnerTerminal(
-                                RuntimeRunStatus.Completed,
-                                source = "authoritative_terminal_scope_mismatched",
-                                seq = received.eventSeqOrNull(),
-                                scopeMatched = false,
-                                leaseToken = leaseToken,
-                            )
-                            throw TurnCompleted
-                        }
+                        flushTail()
+                        emitDraft(command.draftForScopeRejectedTerminal(status))
+                        throw TurnCompleted
                     }
+                    return@collect
+                }
+                if (!runIdGate.accepts(received, leaseToken)) {
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
@@ -791,7 +838,9 @@ class AppServerTurnEngine(
                 // run_id → draft.runId); we do not alter that promotion flow.
                 val frameSeq = received.eventSeqOrNull()
                 val drafts = mapper.map(command, received)
-                drafts.firstOrNull { it.runId != null }?.runId?.value?.let { promoteOwnerRunId(it, leaseToken) }
+                drafts.firstOrNull { it.runId != null }?.runId?.value?.let { newRunId ->
+                    runIdGate.promote(newRunId, leaseToken)
+                }
                 drafts.forEach { draft ->
                     val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
                     if (autoApproved != null) {
@@ -1003,8 +1052,74 @@ class AppServerTurnEngine(
             // user-input gate so none leaks into a later turn and keeps a fresh
             // watchdog wrongly paused.
             userInputApprovalIdsRef.update { emptyMap() }
+            fanoutSubscriberId?.let { subId ->
+                withContext(NonCancellable) {
+                    inboundSource.unsubscribe(subId)
+                }
+            }
         }
     }
+
+    /**
+     * Handles a frame rejected by [matches]. Records telemetry for terminal-
+     * bearing rejects and, for same-conversation terminals, returns the
+     * lifecycle status the collect loop must emit before releasing the lease
+     * (lgns8.22.4: error_message → Failed).
+     */
+    private fun handleScopeRejectedFrame(
+        received: AppServerReceivedFrame,
+        scope: AppServerRuntimeScope,
+        leaseToken: Long,
+    ): RuntimeRunStatus? {
+        if (!received.carriesLifecycleTerminal()) return null
+        // Superseded run IDs must not complete the active lease via the
+        // same-conversation mismatch fallback (exact-scope path already gates
+        // through runIdGate.accepts).
+        if (!runIdGate.accepts(received, leaseToken)) return null
+        noteOwnerScopeDecision(
+            scopeMatched = false,
+            source = "scope_rejected_terminal",
+            seq = received.eventSeqOrNull(),
+            leaseToken = leaseToken,
+        )
+        Telemetry.event(
+            "AppServerTurnEngine", "terminal.scope_rejected",
+            "expectedAgent" to scope.agentId,
+            "expectedConv" to scope.conversationId,
+            "frameAgent" to received.frame.runtime?.agentId,
+            "frameConv" to received.frame.runtime?.conversationId,
+            "eventSeq" to received.eventSeqOrNull(),
+        )
+        // Authoritative terminal release for the SAME conversation closes the
+        // passive-observer stuck-for-5-min gap (letta-mobile-kyqdt STEP 2).
+        if (received.frame.runtime?.conversationId != scope.conversationId) return null
+        val status = received.lifecycleStatusFromTerminal() ?: return null
+        noteOwnerTerminal(
+            status,
+            source = "authoritative_terminal_scope_mismatched",
+            seq = received.eventSeqOrNull(),
+            scopeMatched = false,
+            leaseToken = leaseToken,
+        )
+        return status
+    }
+
+    private fun isConnectionGenerationSuperseded(leaseToken: Long): Boolean {
+        val lease = activeLeaseRef.value ?: return false
+        return lease.token == leaseToken &&
+            lease.connectionGeneration != connectionGenerationProvider()
+    }
+
+    private fun TurnCommand.draftForScopeRejectedTerminal(status: RuntimeRunStatus): RuntimeEventDraft =
+        when (status) {
+            RuntimeRunStatus.Failed -> failedDraft(
+                "Authoritative terminal from same-conversation mismatched agent scope",
+            )
+            RuntimeRunStatus.Cancelled -> cancelledDraft(
+                "Authoritative cancel from same-conversation mismatched agent scope",
+            )
+            else -> completedDraft(runId = null)
+        }
 
     /**
      * When the runtime is Unrestricted and [draft] is an approval request,
@@ -1127,9 +1242,14 @@ class AppServerTurnEngine(
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
     private suspend fun ensureRuntime(command: TurnCommand, turnPermissionMode: AppServerPermissionMode): AppServerRuntimeScope {
+        runtimeScopeResolver(command)?.let { resolved ->
+            runtime = resolved
+            return resolved
+        }
         runtime?.let { cached ->
             if (cached.matches(command)) return cached
         }
+        val generationAtStart = connectionGenerationProvider()
         val response = client.runtimeStart(
             AppServerCommand.RuntimeStart(
                 requestId = requestIdFactory(),
@@ -1146,7 +1266,14 @@ class AppServerTurnEngine(
             error(response.error ?: "App Server runtime_start failed.")
         }
         val returnedRuntime = response.runtime ?: error("App Server runtime_start returned no runtime.")
+        // Disconnect may have rolled the generation while this RPC was in flight —
+        // never keep or publish a dead-generation scope.
+        if (connectionGenerationProvider() != generationAtStart) {
+            runtime = null
+            error("Connection generation superseded during runtime_start")
+        }
         runtime = returnedRuntime
+        onRuntimeEnsured(command, response, generationAtStart)
         return returnedRuntime
     }
 
@@ -1224,6 +1351,16 @@ class AppServerTurnEngine(
             payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Failed, reason = reason),
         )
 
+    private fun TurnCommand.cancelledDraft(reason: String): RuntimeEventDraft =
+        RuntimeEventDraft(
+            backendId = backendId,
+            runtimeId = runtimeId,
+            agentId = agentId,
+            conversationId = conversationId,
+            source = RuntimeEventSource.LocalRuntime,
+            payload = RuntimeEventPayload.RunLifecycleChanged(RuntimeRunStatus.Cancelled, reason = reason),
+        )
+
     private fun RuntimeEventDraft.isTerminalLifecycle(): Boolean {
         val lifecycle = payload as? RuntimeEventPayload.RunLifecycleChanged ?: return false
         return lifecycle.status == RuntimeRunStatus.Completed ||
@@ -1299,15 +1436,21 @@ class AppServerTurnEngine(
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
     ): Boolean {
-        val eventRuntime = frame.runtime ?: return true
+        val eventRuntime = frame.runtime
+        if (eventRuntime == null) {
+            // lgns8.22.4: runtime-less auth/admin/unknown frames are not turn
+            // wildcards — they must not reset the idle watchdog or become turn
+            // output. External tool requests are answered on the turn path and
+            // may arrive without a runtime envelope.
+            // Fanout broadcasts unscoped ExternalToolCallRequest and ControlRequest;
+            // both must reach the turn mapper/auto-approver or the server stays blocked.
+            return frame is AppServerInboundFrame.ExternalToolCallRequest ||
+                frame is AppServerInboundFrame.ControlRequest
+        }
         return eventRuntime.agentId == scope.agentId &&
             eventRuntime.conversationId == scope.conversationId
     }
 
-    /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort event_seq for a received
-     * frame, if the concrete frame type carries one. Pure read; null otherwise.
-     */
     private fun AppServerReceivedFrame.eventSeqOrNull(): Long? =
         when (val f = frame) {
             is AppServerInboundFrame.StreamDelta -> f.eventSeq
@@ -1318,24 +1461,6 @@ class AppServerTurnEngine(
             else -> null
         }
 
-    /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY. Best-effort check whether a received
-     * frame CARRIES a terminal signal (stop_reason / error / terminal
-     * lifecycle), used only to record the scope-match decision for
-     * terminal-bearing frames that were rejected by matches(scope). Pure read of
-     * the frame's delta message_type; never gates control flow.
-     */
-    private fun AppServerReceivedFrame.carriesTerminal(): Boolean {
-        val streamDelta = frame as? AppServerInboundFrame.StreamDelta
-            ?: return false
-        val messageType = runCatching {
-            val delta = streamDelta.delta.jsonObject
-            delta.string("message_type")
-        }.getOrNull() ?: return false
-        return messageType == "stop_reason" || messageType == "error_message"
-    }
-
-    
     /**
      * letta-mobile-oqfbj: extract tool_call_id from a RemoteStreamFrame body.
      * Handles tool_call_message, approval_request_message, and tool_return_message frames.
@@ -1527,24 +1652,6 @@ class AppServerTurnEngine(
                 lastTerminalSeq = seq ?: lease.lastTerminalSeq,
                 lastTerminalScopeMatched = scopeMatched ?: lease.lastTerminalScopeMatched,
             )
-        }
-    }
-
-    /**
-     * letta-mobile-kyqdt: TELEMETRY-ONLY. Promotes the server-assigned/promoted
-     * run id into the active-turn owner (if one is set and not yet stamped with
-     * a run id). Pure `copy(runId=…)` metadata write — no control-flow, no lock
-     * interaction, no effect on emitted drafts or the run-id promotion path.
-     * Token-gated so a stale owner cannot promote into a successor lease (lgns8.22.2).
-     */
-    private fun promoteOwnerRunId(runId: String, leaseToken: Long) {
-        if (activeLeaseRef.value?.token != leaseToken) return
-        val current = activeTurnOwnerRef.value ?: return
-        if (current.runId == runId) return
-        activeTurnOwnerRef.value = current.copy(runId = runId)
-        activeLeaseRef.update { lease ->
-            if (lease == null || lease.token != leaseToken || lease.runId == runId) lease
-            else lease.copy(runId = runId)
         }
     }
 

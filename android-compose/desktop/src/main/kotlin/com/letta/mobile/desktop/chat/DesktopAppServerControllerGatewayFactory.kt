@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -65,8 +66,11 @@ class DesktopAppServerControllerGatewayFactory(
         val client = DefaultAppServerClient(transport)
         // Iroh turns run on the wrapper; client-local preflight would be a
         // duplicate typed-command path (Android dial already uses None).
+        val eventRouter = AppServerRuntimeEventRouter()
         val turnEngine = buildDesktopAppServerTurnEngine(
             client = client,
+            scope = controllerScope,
+            eventRouter = eventRouter,
             turnContextPreflight = if (isIroh) {
                 TurnContextPreflight.None
             } else {
@@ -84,6 +88,7 @@ class DesktopAppServerControllerGatewayFactory(
             client = client,
             httpGateway = httpGateway,
             transportResources = transportResources,
+            onClose = { eventRouter.detach() },
         )
     }
 
@@ -153,9 +158,13 @@ class DesktopAppServerControllerGatewayFactory(
  */
 internal fun buildDesktopAppServerTurnEngine(
     client: AppServerClient,
+    scope: CoroutineScope,
+    eventRouter: AppServerRuntimeEventRouter = AppServerRuntimeEventRouter(),
     turnContextPreflight: TurnContextPreflight = AppServerContextWindowPreflight(client),
-): AppServerTurnEngine =
-    AppServerTurnEngine(
+): AppServerTurnEngine {
+    // lgns8.22.3: one inbound collector per desktop gateway generation.
+    eventRouter.attach(scope, client.events)
+    return AppServerTurnEngine(
         client = client,
         clientInfo = AppServerRuntimeStartClientInfo(
             name = "letta-desktop",
@@ -164,7 +173,9 @@ internal fun buildDesktopAppServerTurnEngine(
         ),
         permissionMode = AppServerPermissionMode.Unrestricted,
         turnContextPreflight = turnContextPreflight,
+        eventRouter = eventRouter,
     )
+}
 
 /**
  * The iroh auth exchange doubles as the transport handshake: it advertises the

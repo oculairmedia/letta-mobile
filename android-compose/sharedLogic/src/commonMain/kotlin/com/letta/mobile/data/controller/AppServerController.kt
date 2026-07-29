@@ -164,6 +164,15 @@ interface AppServerController {
     fun markConnected() {
         // Default no-op.
     }
+
+    /**
+     * Tear down inbound routing and any controller-owned scopes. Hosts that
+     * create/discard controllers across connect cycles must call this so the
+     * router collector cannot outlive the transport.
+     */
+    fun close() {
+        // Default no-op for test fakes.
+    }
 }
 
 /**

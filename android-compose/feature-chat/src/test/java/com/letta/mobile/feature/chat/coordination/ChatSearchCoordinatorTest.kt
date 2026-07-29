@@ -1,6 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.MessageSearchRequest
@@ -30,7 +30,7 @@ class ChatSearchCoordinatorTest {
     fun `updateQuery with blank string clears state`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val scope = TestScope(testDispatcher)
-        val repo = mockk<MessageRepository>(relaxed = true)
+        val repo = mockk<IMessageRepository>(relaxed = true)
         val uiState = MutableStateFlow(
             ChatUiState(
                 searchQuery = "old",
@@ -61,7 +61,7 @@ class ChatSearchCoordinatorTest {
     fun `updateQuery immediately updates local results and starts search`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val scope = TestScope(testDispatcher)
-        val repo = mockk<MessageRepository>(relaxed = true)
+        val repo = mockk<IMessageRepository>(relaxed = true)
 
         val localMessage = UiMessage(
             id = "msg1",
@@ -94,7 +94,7 @@ class ChatSearchCoordinatorTest {
     fun `remote debounce updates results and clears searching flag`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val scope = TestScope(testDispatcher)
-        val repo = mockk<MessageRepository>()
+        val repo = mockk<IMessageRepository>()
         
         coEvery { repo.searchMessages(any()) } returns listOf(
             MessageSearchResult(
@@ -151,7 +151,7 @@ class ChatSearchCoordinatorTest {
     fun `concurrent queries cancel previous debounce`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val scope = TestScope(testDispatcher)
-        val repo = mockk<MessageRepository>()
+        val repo = mockk<IMessageRepository>()
         
         coEvery { repo.searchMessages(any()) } returns emptyList()
 
@@ -186,7 +186,7 @@ class ChatSearchCoordinatorTest {
     fun `remote query failure updates isSearching safely`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val scope = TestScope(testDispatcher)
-        val repo = mockk<MessageRepository>()
+        val repo = mockk<IMessageRepository>()
         
         coEvery { repo.searchMessages(any()) } throws RuntimeException("Network Error")
 

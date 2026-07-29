@@ -63,11 +63,10 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Let same-repo PRs write Gradle User Home caches so the build-apk
-          # jobs can restore task outputs produced by the test job. Fork PRs
-          # stay read-only to avoid untrusted Gradle User Home cache writes.
-          # Project-local state is handled by the separate same-repo-only cache
-          # step below.
+          # Let same-repo PRs refresh Gradle User Home caches for later workflow
+          # runs. Fork PRs stay read-only to avoid untrusted Gradle User Home
+          # cache writes. Project-local state is handled by the separate
+          # same-repo-only cache step below.
           cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
 
       - name: Cache project-local Gradle state
@@ -91,21 +90,9 @@ jobs:
         working-directory: ${{ github.workspace }}
         run: bash scripts/tests/ci-policy-scripts-test.sh
 
-      - name: Compile all debug variants
-        run: ./gradlew :core:domain:compileKotlin :core:data:compileDebugKotlin :core:testutil:compileDebugKotlin :app:compileRootDebugKotlin :app:compileSideloadDebugKotlin :app:compilePlayDebugKotlin
-
-      - name: Run unit tests
-        run: |
-          ./gradlew :core:data:testDebugUnitTest :app:testRootDebugUnitTest
-          ./gradlew :app:testScreenshot
-
-      # Architecture guardrails (audit P3.6 / gn7kr.24). `:architecture-tests:test`
-      # enforces the Konsist/ArchUnit rules (minus the advisory *RepositoryArchitectureTest
-      # set, which its own filter excludes); `:architecture-tests:architectureTest` runs
-      # those advisory repository checks. Runs inside the required `test` job so a
-      # regression blocks the merge instead of silently never executing.
-      - name: Run architecture tests
-        run: ./gradlew :architecture-tests:test :architecture-tests:architectureTest
+      - name: Enforce stateful mock isolation
+        working-directory: ${{ github.workspace }}
+        run: bash scripts/ci/stateful-mock-gate.sh
 
       # Additive module tests: when a PR only (or also) touches feature/designsystem/
       # desktop/cli trees, run those unit tests in addition to the base set.
@@ -131,14 +118,36 @@ jobs:
             echo "No additive module tests for this diff"
           fi
 
-      - name: Run additive module unit tests
-        if: github.event_name == 'pull_request' && steps.additive_modules.outputs.tasks != ''
-        run: ./gradlew ${{ steps.additive_modules.outputs.tasks }}
+      # One Gradle invocation gives project parallelism the complete task graph,
+      # avoids repeated configuration, and reuses compiled outputs immediately.
+      # Root debug is compiled by testRootDebugUnitTest; Play is compiled by the
+      # required play-release APK job. Sideload is the only unique flavor compile.
+      # Architecture guardrails stay inside the required `test` job.
+      - name: Run Android verification task graph
+        env:
+          ADDITIVE_TASKS: ${{ steps.additive_modules.outputs.tasks }}
+        run: |
+          tasks=(
+            :app:compileSideloadDebugKotlin
+            :core:data:testDebugUnitTest
+            :app:testRootDebugUnitTest
+            :app:testScreenshot
+            :architecture-tests:test
+            :architecture-tests:architectureTest
+          )
+          if [[ -n "${ADDITIVE_TASKS}" ]]; then
+            read -r -a additive_tasks <<< "${ADDITIVE_TASKS}"
+            tasks+=("${additive_tasks[@]}")
+          fi
+          ./gradlew "${tasks[@]}"
 
   detekt:
     # Advisory static analysis. Wired with continue-on-error so existing debt
     # does not block merges; findings still show on the PR checks list.
     name: detekt (advisory)
+    # Keep advisory work out of the initial runner queue so required checks
+    # acquire capacity first.
+    needs: [test, shared-multiplatform, build-apk-pass]
     runs-on: ubuntu-latest
     continue-on-error: true
     defaults:
@@ -158,7 +167,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # The required test job is the sole PR cache writer. Advisory jobs
+          # restore shared entries without uploading competing snapshots.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Run detekt
         run: ./gradlew detekt --continue
@@ -203,7 +214,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # The required test job is the sole PR cache writer.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Cache Konan (Kotlin/Native) toolchain
         uses: actions/cache@v4
@@ -213,22 +225,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
 
-      - name: Compile and test sharedLogic across all KMP targets
+      - name: Run shared multiplatform verification task graph
         # :sharedLogic:allTests runs the jvm + android-unit + host-native test
         # suites, which forces compilation of commonMain/commonTest for every
         # configured target. This is the gate that would have caught the
-        # native-only break fixed in b97bcf48.
-        run: ./gradlew :sharedLogic:allTests
-
-      - name: Build and test desktop module
-        run: ./gradlew :desktop:test
-
-      - name: Build App Server CLI distribution
-        run: ./gradlew :appserver-cli:test :appserver-cli:distZip
+        # native-only break fixed in b97bcf48. One invocation also avoids two
+        # extra configuration phases and exposes the full graph to Gradle.
+        run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip
 
   build-apk:
     runs-on: ubuntu-latest
-    needs: test
+    # Deliberately independent of `test`: GitHub can fan out test, shared KMP
+    # verification, and both APK variants as soon as the workflow starts. The
+    # jobs restore warm state from prior trusted runs instead of serializing the
+    # entire matrix for a same-run cache handoff. Keep build-apk-pass as the
+    # stable required-check aggregator.
     strategy:
       fail-fast: false
       matrix:
@@ -263,17 +274,18 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          # Restore the Gradle User Home entry written by the test job; keep
-          # fork PRs read-only and leave project-local state to the separate
-          # same-repo-only cache below.
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # Restore Gradle User Home state from prior trusted workflow runs;
+          # keep all PR matrix consumers read-only and leave project-local state to the
+          # separate same-repo-only cache below.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
-      - name: Cache project-local Gradle state
+      - name: Restore project-local Gradle state
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
-          # Same key as the test job: build-apk can restore the project-local
-          # state produced by test after the dependency edge completes.
+          # The exact key supports reruns of this commit; the restore prefix
+          # supplies warm project state from earlier trusted commits. APK jobs
+          # consume but never upload this state; the required test job owns saves.
           path: |
             android-compose/.gradle
             android-compose/.kotlin

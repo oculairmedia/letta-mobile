@@ -71,6 +71,11 @@ interface NodeClient {
 data class RemoteNodeHandle(
     val controller: AppServerController,
 ) {
+    /** Release controller-owned router/collector resources for this handle. */
+    fun close() {
+        controller.close()
+    }
+
     /**
      * Starts a runtime on the remote node.
      *

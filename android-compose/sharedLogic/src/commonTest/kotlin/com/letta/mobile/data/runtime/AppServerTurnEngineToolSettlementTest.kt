@@ -265,6 +265,46 @@ class AppServerTurnEngineToolSettlementTest {
         }
     }
 
+    @Test
+    fun generationRolloverSettlesDanglingToolCalls() = runTest {
+        var generation = 0L
+        val client = SettlementTestClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            requestIdFactory = { "req" },
+            turnIdleTimeoutMs = 60_000L,
+            connectionGenerationProvider = { generation },
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+
+            client.emitToolCall("call-1", "search")
+            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
+
+            generation = 1L
+            // Wake the collect loop so it observes the superseded generation.
+            client.emitToolCall("call-wake", "noop")
+
+            val syntheticReturn = assertIs<RuntimeEventPayload.ToolReturnObserved>(awaitItem().payload)
+            assertEquals(ToolCallId("call-1"), syntheticReturn.toolCallId)
+            assertEquals(ToolExecutionStatus.Failed, syntheticReturn.status)
+            assertTrue(
+                syntheticReturn.body.contains("generation", ignoreCase = true),
+                "Synthetic return should mention generation: ${syntheticReturn.body}",
+            )
+
+            val failed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Failed, failed.status)
+            assertTrue(
+                failed.reason?.contains("generation", ignoreCase = true) == true,
+                "Failed reason should mention generation: ${failed.reason}",
+            )
+
+            awaitComplete()
+        }
+    }
+
     private companion object {
         val command = TurnCommand(
             backendId = BackendId("iroh-app-server"),

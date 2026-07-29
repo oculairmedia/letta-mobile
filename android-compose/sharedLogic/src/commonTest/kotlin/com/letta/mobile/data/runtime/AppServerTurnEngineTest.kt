@@ -855,6 +855,66 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun supersededRunIdFramesAreDroppedAfterMidTurnReassignment() = runTest {
+        // lgns8.22.4: after the lease promotes from run-1 → run-2, a late
+        // run-1 terminal must not complete the turn.
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-1"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            client.emit(streamDelta(messageType = "assistant_message", runId = "run-2"))
+            assertEquals("assistant_message", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+
+            // Stale terminal for superseded run-1 — must be ignored.
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-1"))
+            runCurrent()
+            expectNoEvents()
+
+            client.emit(streamDelta(messageType = "stop_reason", runId = "run-2"))
+            assertEquals("stop_reason", assertIs<RuntimeEventPayload.RemoteStreamFrame>(awaitItem().payload).messageType)
+            val completed = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Completed, completed.status)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun authoritativeSameConversationErrorMessageRecordsFailedNotCompleted() = runTest {
+        // lgns8.22.4: same-conversation scope-mismatched error_message must
+        // record Failed on the owner, never Completed.
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+        val wrongAgentSameConv = AppServerRuntimeScope("agent-OTHER", "conv-1")
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            client.emit(
+                streamDelta(
+                    messageType = "error_message",
+                    runId = "run-1",
+                    runtime = wrongAgentSameConv,
+                ),
+            )
+            val terminal = assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(RuntimeRunStatus.Failed, terminal.status)
+            awaitComplete()
+        }
+
+        val released = com.letta.mobile.util.Telemetry.snapshot().first {
+            it.tag == "AppServerTurnEngine" && it.name == "activeTurn.released"
+        }
+        assertEquals(RuntimeRunStatus.Failed.name, released.attrs["lastTerminal"])
+        assertEquals(false, released.attrs["lastTerminalScopeMatched"])
+        assertEquals("authoritative_terminal_scope_mismatched", released.attrs["lastTerminalSource"])
+    }
+
+    @Test
     fun activeTurnOwnerRecordsScopeRejectedTerminalWhenTerminalFailsScopeMatch() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)

@@ -13,6 +13,7 @@ import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.IrohSecretKeyStore
+import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.runtime.AppServerTurnEngine
@@ -716,16 +717,12 @@ class IrohChannelTransport(
             // App Server). Client-side preflight would send agent_retrieve /
             // conversation_messages_list as typed control frames; the node only
             // accepts auth/runtime_start/input/admin_rpc/sync/abort.
-            val engine = AppServerTurnEngine(
-                client = appServerClient,
-                clientInfo = AppServerRuntimeStartClientInfo(
-                    name = "letta-mobile-android-iroh",
-                    version = config.clientVersion,
-                ),
-                permissionMode = AppServerPermissionMode.Unrestricted,
-                turnContextPreflight = TurnContextPreflight.None,
-            )
             transport!!.awaitConnectionReady()
+            val (engine, eventRouter) = buildIrohTurnEngine(
+                client = appServerClient,
+                clientVersion = config.clientVersion,
+                routerScope = scope,
+            )
             IrohConnectionHandle(
                 config = config,
                 ticket = ticket,
@@ -734,6 +731,7 @@ class IrohChannelTransport(
                 turnEngine = engine,
                 serverCapabilities = auth.capabilities?.toSet(),
                 close = { reason ->
+                    eventRouter.detach()
                     closeIrohResources(reason, transport, localEndpoint)
                 },
             ).also { handle -> dialedHandle.set(handle) }
@@ -1264,6 +1262,30 @@ class IrohChannelTransport(
         runCatching { transport?.close() }
         runCatching { endpoint?.shutdown() }
         runCatching { endpoint?.close() }
+    }
+
+    /**
+     * lgns8.22.3: one inbound collector per dial generation; turns subscribe via
+     * fanout instead of collecting [AppServerClient.events] directly.
+     */
+    private fun buildIrohTurnEngine(
+        client: DefaultAppServerClient,
+        clientVersion: String,
+        routerScope: CoroutineScope,
+    ): Pair<AppServerTurnEngine, AppServerRuntimeEventRouter> {
+        val eventRouter = AppServerRuntimeEventRouter()
+        eventRouter.attach(routerScope, client.events)
+        val engine = AppServerTurnEngine(
+            client = client,
+            clientInfo = AppServerRuntimeStartClientInfo(
+                name = "letta-mobile-android-iroh",
+                version = clientVersion,
+            ),
+            permissionMode = AppServerPermissionMode.Unrestricted,
+            turnContextPreflight = TurnContextPreflight.None,
+            eventRouter = eventRouter,
+        )
+        return engine to eventRouter
     }
 
     private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
