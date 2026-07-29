@@ -37,10 +37,11 @@ git push --force-with-lease                 # safe force-push to your branch
 
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
-- **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`.
-- **CI gates merges, not pushes.** Required status checks currently configured on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, and `perf-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
-- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`) and `detekt (advisory)` surface debt without blocking merge. Do not treat them as required gates yet.
+- **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`. Two `Merge branch 'main' into <branch>` commits in a PR's history is a strong signal that this rule was broken.
+- **CI gates merges, not pushes.** Required status checks on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, and `codecov`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
+- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`), `detekt (advisory)`, `qodana`, and CodeScene Code Health Review surface debt without blocking merge. Do not treat them as required gates.
 - **Additive module tests:** on PRs, `scripts/ci/changed-gradle-modules.sh` may also run `:feature-chat` / `:feature-editagent` / `:designsystem` / `:desktop` / `:cli` unit tests when those trees change. This never skips `:sharedLogic:allTests`.
+- **Run the pre-push checklist before opening the PR.** See the next section. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
 
 ## Module map (where work belongs)
 
@@ -78,6 +79,120 @@ git push --force-with-lease
 ```
 
 Do not `git merge origin/main` into your feature branch — see hard rules above.
+
+## Pre-push PR readiness checklist (run these before opening a PR)
+
+The cost of getting this right at dev time is a few seconds. The cost of
+getting it wrong is a 20-minute CI round trip plus a code-review thread.
+Every failure class below has been observed on at least one merged PR in the
+last wave. The checklist below is designed to catch each one *before* it
+costs a CI cycle.
+
+```bash
+# 0. Fetch and rebase. Do NOT push yet — run all checks first, then push last.
+git fetch origin && git rebase origin/main
+[[ "$(git rev-parse --abbrev-ref HEAD)" == "main" ]] && echo "STOP: on main" && exit 1
+
+# 1. Scope audit — confirm the diff is the diff. This is the #1 hidden
+#    rollback detector (see PR #1013 / commit 30e91c7be which silently
+#    rolled back 143 unrelated files).
+BASE=$(git merge-base origin/main HEAD)
+git diff --stat $BASE..HEAD
+# A test-only PR touching one file should have ~1 file in the diff. If
+# `git diff --stat` shows dozens of files when you only changed one, STOP
+# and figure out where the extra files came from before opening the PR.
+
+# 2. Sensitive-path grep — anything under these paths must be load-bearing
+#    for the change, not incidental. Use this to audit yourself:
+SENSITIVE='authz|security|capability|[Ii]roh|appserver|supervisor|local-backend|ProcessHandleController|BridgeEgress|AppServerTurnEngine|LocalImageContext'
+git diff --name-only $BASE..HEAD | grep -iE "$SENSITIVE"
+# Each hit must be intentional. If you find one that isn't, stop and
+# investigate — see PR #1013 and PR #1027 for the cost of getting this
+# wrong. A hit is fine when the file IS the class under test; a hit is
+# not fine when the file is a sibling that got dragged in by a stale base.
+
+# 3. Stale-base detector — branches based on old main look "small" but
+#    actually re-apply merged commits as "new". The two signals:
+#    Signal 1: total commits between your branch and merge-base.
+#    Signal 2: commits between your branch and merge-base, EXCLUDING
+#    everything reachable from origin/main (so merged-main commits
+#    drop out, leaving only your actual feature commits).
+git log --oneline $BASE..HEAD --no-merges | wc -l   # signal 1
+git log $BASE..HEAD --not --remotes/origin/main --oneline | wc -l  # signal 2
+# If signal 2 is much smaller than signal 1, you likely merged main
+# into your branch instead of rebasing. That is the failure mode that
+# produced PR #1013's 144-file phantom rollback.
+
+# 4. Title/scope match — manually compare: does the PR title describe
+#    the files actually changed?
+echo "Files changed:" && git diff --name-only $BASE..HEAD
+echo "Latest commit subject:" && git log -1 --format=%s HEAD
+# If your PR title says "add X test" but X isn't in the file list, the
+# branch and the title disagree. Fix one or the other before pushing.
+
+# 5. Local gate — required CI is :app compile + testDebugUnitTest, plus
+#    :sharedLogic:allTests + :desktop:test if sharedLogic changed. Run all
+#    that apply BEFORE pushing. Failed required gate = guaranteed red CI.
+cd android-compose
+SHARED_HITS=$(git diff --name-only $BASE..HEAD | grep -cF 'sharedLogic/' || true)
+if [ "$SHARED_HITS" -gt 0 ]; then
+  ./gradlew --no-daemon :sharedLogic:allTests :desktop:test
+fi
+./gradlew --no-daemon :app:compileRootDebugKotlin :app:testRootDebugUnitTest
+
+# 6. Mechanical-debt preflight — catches the issues that light up on
+#    EVERY PR's first commit: Unused import directive, Unused symbol,
+#    Long overload to Duration conversion, Redundant suspend modifier,
+#    plus CodeScene "Complex Method" and "Excess Function Arguments".
+#    Pre-fix them at dev cost, not after CI flags them.
+./gradlew --no-daemon :app:detekt   # advisory; do not lower thresholds
+# Visual scan for: unused imports, `5_000L` that should be `5.seconds`,
+# a method with 6+ params that wants a parameter object, a single
+# function doing dispatch on type — split it before pushing.
+
+# 7. Concurrent-collection defaults for sharedLogic — every recent PR
+#    had to add these on iteration 2+. Bake them in on first commit:
+#    - Stamp `connectionGeneration` at frame ingest; reject frames with
+#      a stale gen at every cross-component boundary.
+#    - Register a frame with a registry / fanout ONLY when a subscriber
+#      can observe it (no phantom leases).
+#    - `markDispatched` only after a successful send; the claim
+#      remains for the sender to retry on failure.
+#    - Cleanup under `NonCancellable`; a `try { cancelAndJoin() }` in
+#      `finally` is a textbook lost-unlock.
+#    - New turn / new run / new connection ALWAYS supersedes the prior;
+#      drop prior-gen entries from caches and leases at the moment the
+#      new identity is recorded.
+#    See PRs #1039, #1040, #1042 for the full checklist.
+
+# 8. Required vs advisory — know which CI checks block merge and which don't.
+#    Required (any red = merge blocked):
+#      `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, `codecov`
+#    Advisory (cannot block merge; do not iterate to "fix" them):
+#    - `CodeScene Code Health Review` — advisory, often pre-existing.
+#    - `detekt (advisory)` — `maxIssues: 0` on main, pre-existing.
+#    - `qodana` — runs on `android-compose/**` PRs only; advisory.
+#    - `Advisory AGENTS.md policy` — greppable rules, never blocks.
+#    When any required gate fails, fix it. When only advisory fails,
+#    document the cost in a PR comment and proceed.
+
+# 9. PR description — every PR must state, in one sentence each:
+#    - what behavior changes
+#    - how the regression test exercises it
+#    - which transport / module surface it touches (mobile, desktop,
+#      iroh, appserver, shim)
+#    - whether it requires a matched wrapper + APK deploy (only when
+#      touching `sharedLogic` App Server transport)
+
+# 10. Push — only after all checks above pass.
+git push --force-with-lease
+```
+
+**Why this checklist exists.** The merge window of 2026-07-26 to 2026-07-29
+saw 22 PRs land. The non-trivial ones averaged 3 review iterations and 7 commits
+before merge, almost all chasing one of: stale-base phantom rollbacks, mechanical
+detekt debt, or missing concurrent-collection defaults. None of these is hard to
+fix at dev time. All cost ~20 minutes of CI per iteration when caught after push.
 
 ## Development Environment & Platform Paths
 
