@@ -48,6 +48,23 @@ assert_contains "$perf_workflow" 'Classify performance impact'
 assert_contains "$perf_workflow" "if: steps.classify.outputs.run_benchmark == 'true'"
 assert_not_contains "$perf_workflow" '  macrobenchmark:'
 
+# The pre-push PR readiness checklist (AGENTS.md) names exactly which checks are
+# required (block merge) versus advisory (never block). Lock the truth into CI
+# so future workflow edits can't silently re-promote an advisory check into a
+# required one without surfacing it here. `gh api ... branches/main/protection`
+# is the live source; this test pins the structural contract.
+branch_protection="$(
+  gh api repos/oculairmedia/letta-mobile/branches/main/protection \
+    --jq '.required_status_checks.contexts | sort | join(",")' \
+    2>/dev/null || echo ''
+)"
+if [[ -n "$branch_protection" ]]; then
+  assert_eq "$branch_protection" \
+    'build-apk-pass,codecov,perf-gate,shared-multiplatform,test'
+else
+  echo "ci-policy-scripts-test: skipping branch-protection assertion (gh unavailable)" >&2
+fi
+
 shared_job="$(
   awk '
     /^  shared-multiplatform:$/ { in_job = 1; next }
