@@ -2,10 +2,18 @@ name: Qodana
 on:
   workflow_dispatch:
   pull_request:
+    paths:
+      - ".github/workflows/qodana_code_quality.yml"
+      - "android-compose/**"
+      - "qodana.yaml"
   push:
     branches: # Specify your branches here
       - main # The 'main' branch
       - 'releases/*' # The release branches
+    paths:
+      - ".github/workflows/qodana_code_quality.yml"
+      - "android-compose/**"
+      - "qodana.yaml"
 
 jobs:
   qodana:

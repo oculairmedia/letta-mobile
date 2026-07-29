@@ -265,8 +265,10 @@ kover {
 // maintaining stability through conservative resource allocation.
 //
 // Rationale:
-// - maxParallelForks = (cores / 2).coerceAtLeast(1) balances parallelism vs.
-//   memory pressure, disk I/O contention, and CPU context-switching overhead.
+// - maxParallelForks = min(cores / 2, 4) balances parallelism vs. memory
+//   pressure, disk I/O contention, and CPU context-switching overhead. The cap
+//   prevents high-core developer machines from starting dozens of 1.5-3 GB
+//   Robolectric workers. Override deliberately with -PtestMaxParallelForks=N.
 // - forkEvery=100 recycles JVM workers to prevent memory leaks and shared
 //   static state accumulation across long test suites.
 // - Forked JVMs are isolated from the main build process, preventing classpath
@@ -277,7 +279,13 @@ kover {
 // ───────────────────────────────────────────────────────────────────────────
 subprojects {
     tasks.withType<Test>().configureEach {
-        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
+        val configuredForkCap = providers.gradleProperty("testMaxParallelForks")
+            .orNull
+            ?.toIntOrNull()
+            ?.coerceAtLeast(1)
+            ?: 4
+        maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2)
+            .coerceIn(1, configuredForkCap)
 
         // CI runs tests on Java 26. These flags acknowledge the reflective/native
         // access used by current test/runtime dependencies (MockK/ByteBuddy,

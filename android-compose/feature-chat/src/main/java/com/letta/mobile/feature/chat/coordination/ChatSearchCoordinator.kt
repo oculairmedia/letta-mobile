@@ -1,6 +1,6 @@
 package com.letta.mobile.feature.chat.coordination
 
-import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.milliseconds
  */
 internal class ChatSearchCoordinator(
     private val scope: CoroutineScope,
-    messageRepository: MessageRepository,
+    messageRepository: IMessageRepository,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val agentId: String,
     private val conversationId: () -> String?,

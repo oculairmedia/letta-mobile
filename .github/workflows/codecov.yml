@@ -3,8 +3,14 @@ name: Codecov
 on:
   push:
     branches: [main]
+    paths:
+      - ".github/workflows/codecov.yml"
+      - "android-compose/**"
   pull_request:
     branches: [main]
+    paths:
+      - ".github/workflows/codecov.yml"
+      - "android-compose/**"
   workflow_dispatch:
 
 concurrency:
@@ -41,7 +47,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
+          # Android `test` is the sole PR writer; coverage consumes its shared
+          # Gradle state without adding another 40s cache upload.
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Validate Android SDK
         shell: bash

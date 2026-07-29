@@ -4,7 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
@@ -31,7 +31,7 @@ internal class AdminChatComposerCoordinator(
     private val explicitConversationId: String?,
     private val isShimBackend: () -> Boolean,
     private val sessionManager: SessionManager,
-    private val messageRepository: MessageRepository,
+    private val messageRepository: IMessageRepository,
     private val slashCommandRepository: ISlashCommandRepository,
     private val isStreaming: () -> Boolean,
     private val projectContextAvailable: Boolean,

@@ -3,7 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.repository.MessageRepository
+import com.letta.mobile.data.repository.api.IMessageRepository
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.feature.chat.send.ChatSendContext
@@ -35,7 +35,7 @@ class AdminChatComposerCoordinatorTest {
     private val composerController = mockk<ChatComposerController>(relaxed = true)
     private val chatSendStrategySelector = mockk<ChatSendStrategySelector>(relaxed = true)
     private val chatBannerController = mockk<ChatBannerController>(relaxed = true)
-    private val messageRepository = mockk<MessageRepository>(relaxed = true)
+    private val messageRepository = mockk<IMessageRepository>(relaxed = true)
     private val slashCommandRepository = mockk<ISlashCommandRepository>(relaxed = true)
     private val sessionManager = mockk<SessionManager>(relaxed = true)
     private val uiState = MutableStateFlow(ChatUiState())
