@@ -32,10 +32,15 @@ object ModelCatalog {
     fun valueOf(model: LlmModel): String =
         model.handle?.takeIf { it.isNotBlank() } ?: model.name.ifBlank { model.id }
 
-    /** Whether [selectedValue] is this model or an alias removed during normalization. */
-    fun isSelected(model: LlmModel, selectedValue: String?): Boolean {
-        val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return false
-        return valueOf(model) == selected || selected in model.selectionAliases
+    /**
+     * Resolves a stored selection against a catalog. Exact route values win
+     * before aliases, so a preserved custom route cannot be shadowed by an
+     * alias recorded on a normalized shared route.
+     */
+    fun selectedModel(models: List<LlmModel>, selectedValue: String?): LlmModel? {
+        val selected = selectedValue?.takeIf { it.isNotBlank() } ?: return null
+        models.firstOrNull { valueOf(it) == selected }?.let { return it }
+        return models.filter { selected in it.selectionAliases }.singleOrNull()
     }
 
     /** Group [models] by provider, preserving a stable provider order.

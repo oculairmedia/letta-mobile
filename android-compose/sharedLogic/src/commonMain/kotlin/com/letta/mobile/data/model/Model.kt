@@ -8,6 +8,7 @@ import kotlinx.serialization.Transient
 data class LlmModel(
     val id: String = "",
     val name: String = "",
+    val model: String? = null,
     val handle: String? = null,
     @SerialName("display_name") val displayNameOverride: String? = null,
     @SerialName("provider_type") val providerType: String = "",

@@ -221,6 +221,7 @@ object ModelCatalogNormalizer {
         copy(
             id = id.ifBlank { alternate.id },
             name = name.ifBlank { alternate.name },
+            model = model.orNonBlank(alternate.model),
             displayNameOverride = displayNameOverride.orNonBlank(alternate.displayNameOverride),
             providerType = providerType.ifBlank { alternate.providerType },
             providerName = providerName.orNonBlank(alternate.providerName),

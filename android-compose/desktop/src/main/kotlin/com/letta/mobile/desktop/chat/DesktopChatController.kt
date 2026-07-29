@@ -19,6 +19,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.ui.chat.render.ChatTimelineProjector
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -454,7 +455,7 @@ class DesktopChatController(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
                             BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
                         ),
-                    ),
+                    ).withCatalogModelRouting(_availableModels.value),
                 )
                 onCreated(agent.id.value)
                 val conversation = gw.createConversation(agent.id.value)

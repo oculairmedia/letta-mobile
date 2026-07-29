@@ -781,6 +781,9 @@ internal fun ModelPickerSheet(
     val currentModelHandle = remember(currentModel) {
         currentModel?.takeIf { it.isNotBlank() }
     }
+    val activeModel = remember(models, currentModelHandle) {
+        ModelCatalog.selectedModel(models, currentModelHandle)
+    }
 
     ModalBottomSheet(
         sheetState = sheetState,
@@ -860,7 +863,7 @@ internal fun ModelPickerSheet(
                             },
                         ) { _, model ->
                             val handle = model.handle ?: model.name
-                            val isActive = ModelCatalog.isSelected(model, currentModelHandle)
+                            val isActive = model == activeModel
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()

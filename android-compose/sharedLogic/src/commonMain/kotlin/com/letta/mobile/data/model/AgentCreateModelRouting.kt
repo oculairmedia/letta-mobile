@@ -14,11 +14,12 @@ fun LlmModel.toAgentCreateLlmConfig(): LlmConfig? {
         modelEndpoint,
         modelWrapper,
     ).any { !it.isNullOrBlank() }
-    if (!hasRouteMetadata && context == null) return null
+    if (!hasRouteMetadata && context == null && model.isNullOrBlank()) return null
 
     val selection = ModelCatalog.valueOf(this)
     return LlmConfig(
-        model = ModelCatalogNormalizer.underlyingModelId(selection).ifBlank { null },
+        model = model?.takeIf { it.isNotBlank() }
+            ?: selection.removeRoutingProviderPrefix().ifBlank { null },
         displayName = displayNameOverride,
         modelEndpointType = modelEndpointType,
         modelEndpoint = modelEndpoint,
@@ -28,4 +29,36 @@ fun LlmModel.toAgentCreateLlmConfig(): LlmConfig? {
         contextWindow = context,
         handle = selection,
     )
+}
+
+/**
+ * Adds catalog-derived routing fields to an agent-create request without
+ * replacing settings the caller supplied explicitly.
+ */
+fun AgentCreateParams.withCatalogModelRouting(availableModels: List<LlmModel>): AgentCreateParams {
+    val selectedModel = ModelCatalog.selectedModel(availableModels, model) ?: return this
+    val selectedProviderType = selectedModel.providerType.takeIf { it.isNotBlank() }
+    val hasProviderMetadata = listOf(
+        selectedProviderType,
+        selectedModel.providerName,
+        selectedModel.providerCategory,
+    ).any { !it.isNullOrBlank() }
+    val routedSettings = if (modelSettings != null || hasProviderMetadata) {
+        (modelSettings ?: ModelSettings()).copy(
+            providerType = modelSettings?.providerType ?: selectedProviderType,
+            providerName = modelSettings?.providerName ?: selectedModel.providerName,
+            providerCategory = modelSettings?.providerCategory ?: selectedModel.providerCategory,
+        )
+    } else {
+        null
+    }
+    return copy(
+        modelSettings = routedSettings,
+        llmConfig = llmConfig ?: selectedModel.toAgentCreateLlmConfig(),
+    )
+}
+
+private fun String.removeRoutingProviderPrefix(): String {
+    val slash = indexOf('/')
+    return if (slash > 0 && slash < lastIndex) substring(slash + 1) else this
 }

@@ -21,8 +21,8 @@ class ModelCatalogTest {
     }
 
     @Test
-    fun selectedAliasMatchesNormalizedWinner() {
-        val model = LlmModel(
+    fun selectedModelUsesAliasWhenNoExactRouteExists() {
+        val sharedModel = LlmModel(
             id = "openai/MiniMax-M3",
             name = "MiniMax-M3",
             handle = "openai/MiniMax-M3",
@@ -30,9 +30,36 @@ class ModelCatalogTest {
             selectionAliases = setOf("lmstudio/MiniMax-M3"),
         )
 
-        assertTrue(ModelCatalog.isSelected(model, "openai/MiniMax-M3"))
-        assertTrue(ModelCatalog.isSelected(model, "lmstudio/MiniMax-M3"))
-        assertFalse(ModelCatalog.isSelected(model, "anthropic/MiniMax-M3"))
+        assertEquals(
+            sharedModel,
+            ModelCatalog.selectedModel(listOf(sharedModel), "lmstudio/MiniMax-M3"),
+        )
+        assertNull(ModelCatalog.selectedModel(listOf(sharedModel), "anthropic/MiniMax-M3"))
+    }
+
+    @Test
+    fun selectedModelPrefersExactCustomRouteOverSharedAlias() {
+        val sharedModel = LlmModel(
+            id = "shared",
+            name = "MiniMax-M3",
+            handle = "openai/MiniMax-M3",
+            providerType = "openai",
+            modelEndpoint = "https://llmux.example/v1",
+            selectionAliases = setOf("lmstudio/MiniMax-M3"),
+        )
+        val customModel = LlmModel(
+            id = "custom",
+            name = "MiniMax-M3",
+            handle = "lmstudio/MiniMax-M3",
+            providerType = "lmstudio",
+            providerCategory = "byok",
+            modelEndpoint = "https://custom.example/v1",
+        )
+
+        assertEquals(
+            customModel,
+            ModelCatalog.selectedModel(listOf(sharedModel, customModel), "lmstudio/MiniMax-M3"),
+        )
     }
 
     @Test

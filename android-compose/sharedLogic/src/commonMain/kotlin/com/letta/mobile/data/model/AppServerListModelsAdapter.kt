@@ -79,6 +79,8 @@ object AppServerListModelsAdapter {
         val model = LlmModel(
             id = entry.id.ifBlank { handle.orEmpty() },
             name = name,
+            model = entry.updateArgs?.let { firstString(it, "model") }
+                ?: raw?.let { firstString(it, "model") },
             handle = handle,
             displayNameOverride = display,
             providerType = provider,
@@ -131,6 +133,7 @@ object AppServerListModelsAdapter {
         return buildJsonObject {
             put("id", model.id)
             put("name", model.name)
+            model.model?.let { put("model", it) }
             model.handle?.let { put("handle", it) }
             model.displayNameOverride?.let { put("display_name", it) }
             put("provider_type", model.providerType)
