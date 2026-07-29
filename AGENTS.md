@@ -146,6 +146,12 @@ fi
 #    plus CodeScene "Complex Method" and "Excess Function Arguments".
 #    Pre-fix them at dev cost, not after CI flags them.
 ./gradlew --no-daemon :app:detekt   # advisory; do not lower thresholds
+# CodeScene delta — the same analysis the "CodeScene Code Health Review"
+# PR check runs, but local. Needs the `cs` CLI + CS_ACCESS_TOKEN (PAT from
+# https://codescene.io/users/me/pat); skips silently when absent. The
+# pre-push hook runs this automatically in advisory mode; run it by hand
+# (or with CS_DELTA_GATE=1 to hard-fail on findings) via:
+../scripts/codescene/cs-delta.sh
 # Visual scan for: unused imports, `5_000L` that should be `5.seconds`,
 # a method with 6+ params that wants a parameter object, a single
 # function doing dispatch on type — split it before pushing.
