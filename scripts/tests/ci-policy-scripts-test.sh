@@ -61,6 +61,8 @@ branch_protection="$(
 if [[ -n "$branch_protection" ]]; then
   assert_eq "$branch_protection" \
     'build-apk-pass,codecov,perf-gate,shared-multiplatform,test'
+else
+  echo "ci-policy-scripts-test: skipping branch-protection assertion (gh unavailable)" >&2
 fi
 
 shared_job="$(

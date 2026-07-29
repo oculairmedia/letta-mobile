@@ -17,7 +17,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 - Kotlin / Jetpack Compose / Compose Desktop
 - Kotlin Multiplatform — `sharedLogic` consumed by Android, JVM/desktop, host-native
 - Hilt (Android DI), Room (Android persistence), Ktor (HTTP + WebSocket transports)
-- Iroh QUIC (`com.iroh:iroh:1.0.0`) for P2P transport
+- Iroh QUIC (`computer.iroh:iroh:1.0.0`) for P2P transport
 - Material 3 + Lucide icons + A2UI renderer
 - Gradle 9.4.1, JDK 17/21/26 (CI uses JDK 26; detekt requires JDK 21)
 
@@ -27,7 +27,7 @@ The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The W
 
 ```bash
 cd android-compose
-cp local.properties.example local.properties
+cp -f local.properties.example local.properties
 export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 ./gradlew :app:assembleDebug                # Android APK
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
@@ -45,10 +45,10 @@ For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/lett
 | `feature-chat/` `feature-editagent/` | Compose feature modules |
 | `core/data/` | Repositories, Room DB, transport-bound data sources |
 | `core/domain/` | Domain models, repository interfaces, business rules |
-| `core/runtime/` | App Server turn engine, fanout, recovery |
+| `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire-shape schemas |
 | `designsystem/` | Reusable Compose UI, theming, A2UI renderer, LettaIcons |
-| `sharedLogic/` | **Platform-neutral KMP module** — domain, transport, timeline, IPC |
+| `sharedLogic/` | **Platform-neutral KMP module** — domain, turn engine, fanout, transport, timeline, IPC |
 | `desktop/` | Compose Desktop — windowing, Ktor engine, OS lock, installer |
 | `cli/` `appserver-cli/` | JVM tooling for probes, restart-replay evidence, shim-off parity gates |
 
@@ -56,7 +56,7 @@ For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/lett
 - `designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md` — A2UI renderer and catalog authoring guide (read before touching A2UI payloads, catalog IDs, or renderer dispatch)
 - `app/src/main/java/com/letta/mobile/ui/screens/` — Android screen composables
 - `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/` — Iroh + App Server transports (platform-neutral)
-- `core/runtime/src/commonMain/kotlin/com/letta/mobile/runtime/` — App Server turn engine and `RuntimeEventFanout`
+- `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/` — App Server turn engine (`AppServerTurnEngine.kt`), `RuntimeEventFanout`, and transports
 - `appserver-cli/` — JVM probe toolchain for App Server contract verification
 
 **The cardinal rule:** feature logic goes in `sharedLogic/commonMain`. Platform modules (`app/`, `desktop/`) only bind. Duplicating repository logic across `app/` and `desktop/` is the documented anti-pattern — the `shared-multiplatform` required CI gate backstops this.
@@ -113,6 +113,7 @@ bd close <id>         # Close a bead
 1. **File issues for remaining work** — Create beads issues for anything that needs follow-up.
 2. **Run quality gates locally** (if code changed):
    ```bash
+   cd android-compose
    ./gradlew --no-daemon :app:compileRootDebugKotlin
    ./gradlew --no-daemon :app:testRootDebugUnitTest
    ```

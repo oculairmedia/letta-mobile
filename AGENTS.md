@@ -89,38 +89,44 @@ last wave. The checklist below is designed to catch each one *before* it
 costs a CI cycle.
 
 ```bash
-# 0. Confirm you actually branched from current main.
-git fetch origin && git rebase origin/main && git push --force-with-lease
+# 0. Fetch and rebase. Do NOT push yet — run all checks first, then push last.
+git fetch origin && git rebase origin/main
+[[ "$(git rev-parse --abbrev-ref HEAD)" == "main" ]] && echo "STOP: on main" && exit 1
 
 # 1. Scope audit — confirm the diff is the diff. This is the #1 hidden
 #    rollback detector (see PR #1013 / commit 30e91c7be which silently
 #    rolled back 143 unrelated files).
 BASE=$(git merge-base origin/main HEAD)
-git diff --stat $BASE..HEAD -- ':!*.beads*'
+git diff --stat $BASE..HEAD
 # A test-only PR touching one file should have ~1 file in the diff. If
 # `git diff --stat` shows dozens of files when you only changed one, STOP
 # and figure out where the extra files came from before opening the PR.
 
 # 2. Sensitive-path grep — anything under these paths must be load-bearing
 #    for the change, not incidental. Use this to audit yourself:
-SENSITIVE='authz|security|capability|Iroh|appserver|supervisor|local-backend|ProcessHandleController|BridgeEgress|AppServerTurnEngine|LocalImageContext'
-git diff --name-only $BASE..HEAD | grep -E "$SENSITIVE"
+SENSITIVE='authz|security|capability|[Ii]roh|appserver|supervisor|local-backend|ProcessHandleController|BridgeEgress|AppServerTurnEngine|LocalImageContext'
+git diff --name-only $BASE..HEAD | grep -iE "$SENSITIVE"
 # Each hit must be intentional. If you find one that isn't, stop and
 # investigate — see PR #1013 and PR #1027 for the cost of getting this
 # wrong. A hit is fine when the file IS the class under test; a hit is
 # not fine when the file is a sibling that got dragged in by a stale base.
 
 # 3. Stale-base detector — branches based on old main look "small" but
-#    actually re-apply merged commits as "new". The two cheapest signals:
-git log --oneline $BASE..HEAD --no-merges | wc -l   # raw commit count
-git log $BASE..HEAD --not --remotes/origin/main --oneline | wc -l
-# If the second number is small but the first is large, you likely merged
-# main into your branch instead of rebasing. That is the failure mode
-# that produced PR #1013's 144-file phantom rollback.
+#    actually re-apply merged commits as "new". The two signals:
+#    Signal 1: total commits between your branch and merge-base.
+#    Signal 2: commits between your branch and merge-base, EXCLUDING
+#    everything reachable from origin/main (so merged-main commits
+#    drop out, leaving only your actual feature commits).
+git log --oneline $BASE..HEAD --no-merges | wc -l   # signal 1
+git log $BASE..HEAD --not --remotes/origin/main --oneline | wc -l  # signal 2
+# If signal 2 is much smaller than signal 1, you likely merged main
+# into your branch instead of rebasing. That is the failure mode that
+# produced PR #1013's 144-file phantom rollback.
 
-# 4. Title/scope match — when adding tests, the diff MUST be the file
-#    named in the title. Cheap heuristic:
-git diff --name-only $BASE..HEAD | grep -i "$(git log -1 --format=%s HEAD | head -c 20)"
+# 4. Title/scope match — manually compare: does the PR title describe
+#    the files actually changed?
+echo "Files changed:" && git diff --name-only $BASE..HEAD
+echo "Latest commit subject:" && git log -1 --format=%s HEAD
 # If your PR title says "add X test" but X isn't in the file list, the
 # branch and the title disagree. Fix one or the other before pushing.
 
@@ -134,7 +140,7 @@ if [ "$SHARED_HITS" -gt 0 ]; then
 fi
 ./gradlew --no-daemon :app:compileRootDebugKotlin :app:testRootDebugUnitTest
 
-# 6. Mechanical-debt preflight — the four inspections that light up on
+# 6. Mechanical-debt preflight — catches the issues that light up on
 #    EVERY PR's first commit: Unused import directive, Unused symbol,
 #    Long overload to Duration conversion, Redundant suspend modifier,
 #    plus CodeScene "Complex Method" and "Excess Function Arguments".
@@ -150,8 +156,8 @@ fi
 #      a stale gen at every cross-component boundary.
 #    - Register a frame with a registry / fanout ONLY when a subscriber
 #      can observe it (no phantom leases).
-#    - `markDispatched` / `releaseClaim` ONLY after a successful send;
-#      on failure, leave the claim in place so the next attempt retries.
+#    - `markDispatched` only after a successful send; the claim
+#      remains for the sender to retry on failure.
 #    - Cleanup under `NonCancellable`; a `try { cancelAndJoin() }` in
 #      `finally` is a textbook lost-unlock.
 #    - New turn / new run / new connection ALWAYS supersedes the prior;
@@ -175,8 +181,11 @@ fi
 #    - how the regression test exercises it
 #    - which transport / module surface it touches (mobile, desktop,
 #      iroh, appserver, shim)
-#    - whether it requires a matched wrapper + APK deploy (anything
-#      touching `sharedLogic` appserver transport does)
+#    - whether it requires a matched wrapper + APK deploy (only when
+#      touching `sharedLogic` App Server transport)
+
+# 10. Push — only after all checks above pass.
+git push --force-with-lease
 ```
 
 **Why this checklist exists.** The merge window of 2026-07-26 to 2026-07-29

@@ -22,7 +22,7 @@ Everything under [`android-compose/`](android-compose/).
 | Path | Purpose |
 |---|---|
 | `app/` | Android app: screens, navigation, ViewModels, Hilt DI |
-| `feature-chat/` | Chat screens, presenters, request shaping |
+| `feature-chat/` | Chat screens, presenters |
 | `feature-editagent/` | Agent editor |
 | `core/data/` | Repositories, Room database, data sources |
 | `core/domain/` | Domain models, repository interfaces, business rules |
@@ -47,10 +47,10 @@ cd letta-mobile
 ./scripts/install-hooks.sh          # activate .githooks/ via core.hooksPath
 
 cd android-compose
-cp local.properties.example local.properties
+cp -f local.properties.example local.properties
 export JAVA_HOME="/usr/lib/jvm/jdk-26"
 ./gradlew :app:assembleDebug        # Android APK
-./gradlew :desktop:run              # Compose Desktop (needs JDK 26 + a display)
+./gradlew :desktop:run              # Compose Desktop (needs JDK 26, Rust toolchain, and a display)
 ```
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md) for full setup instructions (Linux, macOS, Windows).
@@ -86,4 +86,4 @@ the full release flow.
 - Issue tracking is **bd** (beads) — `bd ready`, `bd show <id>`, `bd update <id> --claim`.
   Never commit `.beads` artifacts.
 - The pre-push hook compiles `:app:compileRootDebugKotlin` from `android-compose/`.
-- Anything touching `sharedLogic` transport code requires a matched wrapper + APK deploy.
+- Anything touching `sharedLogic` **App Server transport** requires a matched wrapper + APK deploy.
