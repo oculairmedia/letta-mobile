@@ -41,6 +41,41 @@ object AppServerProtocol {
         "update_subagent_state",
     )
 
+    private val KNOWN_INBOUND_MESSAGE_TYPES: Set<String> = STREAM_CHANNEL_MESSAGE_TYPES + setOf(
+        "auth_response",
+        "runtime_start_response",
+        "sync_response",
+        "abort_message_response",
+        "external_tool_call_request",
+        "control_request",
+        "admin_rpc_response",
+        "list_models_response",
+        "skill_enable_response",
+        "skill_disable_response",
+        "skills_updated",
+        "cron_list_response",
+        "cron_add_response",
+        "cron_get_response",
+        "cron_runs_response",
+        "cron_trigger_response",
+        "cron_update_response",
+        "cron_delete_response",
+        "cron_delete_all_response",
+        "get_reflection_settings_response",
+        "set_reflection_settings_response",
+        "agent_list_response",
+        "agent_retrieve_response",
+        "agent_create_response",
+        "agent_update_response",
+        "agent_delete_response",
+        "conversation_list_response",
+        "conversation_retrieve_response",
+        "conversation_create_response",
+        "conversation_update_response",
+        "conversation_messages_list_response",
+        "conversation_compact_response",
+    )
+
     private val redactedPrimitive = JsonPrimitive(REDACTED_PLACEHOLDER)
     private val emptyRaw = JsonObject(emptyMap())
 
@@ -105,92 +140,21 @@ object AppServerProtocol {
         )
     }
 
-    private fun decodeInboundFrame(parsed: ParsedInboundFrame): AppServerInboundFrame =
-        decodeConnectionFrame(parsed)
-            ?: decodeRuntimeEventFrame(parsed)
-            ?: decodeCatalogFrame(parsed)
-            ?: decodeCronFrame(parsed)
-            ?: decodeAgentFrame(parsed)
-            ?: decodeConversationFrame(parsed)
-            ?: AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
-
-    private fun decodeConnectionFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "auth_response" -> decodeTyped<AppServerInboundFrame.AuthResponse>(parsed)
-        "runtime_start_response" -> decodeTyped<AppServerInboundFrame.RuntimeStartResponse>(parsed)
-        "sync_response" -> decodeTyped<AppServerInboundFrame.SyncResponse>(parsed)
-        "abort_message_response" -> decodeTyped<AppServerInboundFrame.AbortMessageResponse>(parsed)
-        "admin_rpc_response" -> decodeTyped<AppServerInboundFrame.AdminRpcResponse>(parsed)
-        else -> null
-    }
-
-    private fun decodeRuntimeEventFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "stream_delta" -> decodeTyped<AppServerInboundFrame.StreamDelta>(parsed)
-        "update_loop_status" -> decodeTyped<AppServerInboundFrame.UpdateLoopStatus>(parsed)
-        "update_device_status" -> decodeTyped<AppServerInboundFrame.UpdateDeviceStatus>(parsed)
-        "update_queue" -> decodeTyped<AppServerInboundFrame.UpdateQueue>(parsed)
-        "update_subagent_state" -> decodeTyped<AppServerInboundFrame.UpdateSubagentState>(parsed)
-        "external_tool_call_request" -> decodeTyped<AppServerInboundFrame.ExternalToolCallRequest>(parsed)
-        "control_request" -> decodeTyped<AppServerInboundFrame.ControlRequest>(parsed)
-        else -> null
-    }
-
-    private fun decodeCatalogFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "list_models_response" -> decodeTyped<AppServerInboundFrame.ListModelsResponse>(parsed)
-        "skill_enable_response" -> decodeTyped<AppServerInboundFrame.SkillEnableResponse>(parsed)
-        "skill_disable_response" -> decodeTyped<AppServerInboundFrame.SkillDisableResponse>(parsed)
-        "skills_updated" -> decodeSkillsUpdated(parsed)
-        else -> null
-    }
-
-    private fun decodeSkillsUpdated(parsed: ParsedInboundFrame): AppServerInboundFrame =
-        decodeKnown(parsed) {
-            val decoded = json.decodeFromJsonElement<AppServerInboundFrame.SkillsUpdated>(parsed.raw)
-            if (decoded.skills != null) {
-                decoded
-            } else {
+    private fun decodeInboundFrame(parsed: ParsedInboundFrame): AppServerInboundFrame {
+        if (parsed.typeName !in KNOWN_INBOUND_MESSAGE_TYPES) {
+            return AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
+        }
+        return decodeKnown(parsed) {
+            val decoded = json.decodeFromJsonElement<AppServerInboundFrame>(parsed.raw)
+            if (decoded is AppServerInboundFrame.SkillsUpdated && decoded.skills == null) {
                 // Nested payloads decode with skills=null because unknown keys are
                 // ignored. Preserve those for NativeSkillsCatalog's raw fallback.
                 AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
+            } else {
+                decoded
             }
         }
-
-    private fun decodeCronFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "cron_list_response" -> decodeTyped<AppServerInboundFrame.CronListResponse>(parsed)
-        "cron_add_response" -> decodeTyped<AppServerInboundFrame.CronAddResponse>(parsed)
-        "cron_get_response" -> decodeTyped<AppServerInboundFrame.CronGetResponse>(parsed)
-        "cron_runs_response" -> decodeTyped<AppServerInboundFrame.CronRunsResponse>(parsed)
-        "cron_trigger_response" -> decodeTyped<AppServerInboundFrame.CronTriggerResponse>(parsed)
-        "cron_update_response" -> decodeTyped<AppServerInboundFrame.CronUpdateResponse>(parsed)
-        "cron_delete_response" -> decodeTyped<AppServerInboundFrame.CronDeleteResponse>(parsed)
-        "cron_delete_all_response" -> decodeTyped<AppServerInboundFrame.CronDeleteAllResponse>(parsed)
-        else -> null
     }
-
-    private fun decodeAgentFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "get_reflection_settings_response" -> decodeTyped<AppServerInboundFrame.GetReflectionSettingsResponse>(parsed)
-        "set_reflection_settings_response" -> decodeTyped<AppServerInboundFrame.SetReflectionSettingsResponse>(parsed)
-        "agent_list_response" -> decodeTyped<AppServerInboundFrame.AgentListResponse>(parsed)
-        "agent_retrieve_response" -> decodeTyped<AppServerInboundFrame.AgentRetrieveResponse>(parsed)
-        "agent_create_response" -> decodeTyped<AppServerInboundFrame.AgentCreateResponse>(parsed)
-        "agent_update_response" -> decodeTyped<AppServerInboundFrame.AgentUpdateResponse>(parsed)
-        "agent_delete_response" -> decodeTyped<AppServerInboundFrame.AgentDeleteResponse>(parsed)
-        else -> null
-    }
-
-    private fun decodeConversationFrame(parsed: ParsedInboundFrame): AppServerInboundFrame? = when (parsed.typeName) {
-        "conversation_list_response" -> decodeTyped<AppServerInboundFrame.ConversationListResponse>(parsed)
-        "conversation_retrieve_response" -> decodeTyped<AppServerInboundFrame.ConversationRetrieveResponse>(parsed)
-        "conversation_create_response" -> decodeTyped<AppServerInboundFrame.ConversationCreateResponse>(parsed)
-        "conversation_update_response" -> decodeTyped<AppServerInboundFrame.ConversationUpdateResponse>(parsed)
-        "conversation_messages_list_response" -> decodeTyped<AppServerInboundFrame.ConversationMessagesListResponse>(parsed)
-        "conversation_compact_response" -> decodeTyped<AppServerInboundFrame.ConversationCompactResponse>(parsed)
-        else -> null
-    }
-
-    private inline fun <reified Frame : AppServerInboundFrame> decodeTyped(
-        parsed: ParsedInboundFrame,
-    ): AppServerInboundFrame =
-        decodeKnown(parsed) { json.decodeFromJsonElement<Frame>(parsed.raw) }
 
     private inline fun decodeKnown(
         parsed: ParsedInboundFrame,
@@ -683,6 +647,8 @@ data class AppServerLoopStatus(
     @SerialName("active_run_ids") val activeRunIds: List<String> = emptyList(),
 )
 
+@OptIn(ExperimentalSerializationApi::class)
+@JsonClassDiscriminator("type")
 @Serializable
 sealed interface AppServerInboundFrame {
     val type: String?
