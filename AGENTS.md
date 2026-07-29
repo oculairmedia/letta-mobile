@@ -38,8 +38,8 @@ git push --force-with-lease                 # safe force-push to your branch
 - **Never commit on `main` / `master`.** The pre-commit hook in `.githooks/pre-commit` will refuse. Bypassing with `--no-verify` defeats the purpose — don't.
 - **Never push to `origin main`.** The pre-push hook refuses and branch protection on the remote would reject it anyway.
 - **Never merge `main` into a feature branch.** Always `git rebase origin/main`. Merging produces phantom-conflict commit chains (same content, different SHAs) that wedge the next merge to `main`. Two `Merge branch 'main' into <branch>` commits in a PR's history is a strong signal that this rule was broken.
-- **CI gates merges, not pushes.** Required status checks currently configured on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, and `perf-gate`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
-- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`) and `detekt (advisory)` surface debt without blocking merge. Do not treat them as required gates yet. `codecov`, `qodana`, and CodeScene Code Health Review are likewise advisory.
+- **CI gates merges, not pushes.** Required status checks on `main`: `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, and `codecov`. All must be green before squash-merge. (`build-apk` is a matrix job; branch protection requires the stable aggregator `build-apk-pass`.)
+- **Advisory CI (non-blocking):** `Advisory AGENTS.md policy` (greppable rules via `scripts/ci/agents-policy-check.sh`), `detekt (advisory)`, and CodeScene Code Health Review surface debt without blocking merge. Do not treat them as required gates.
 - **Additive module tests:** on PRs, `scripts/ci/changed-gradle-modules.sh` may also run `:feature-chat` / `:feature-editagent` / `:designsystem` / `:desktop` / `:cli` unit tests when those trees change. This never skips `:sharedLogic:allTests`.
 - **Run the pre-push checklist before opening the PR.** See the next section. Skipping it is the documented root cause of every multi-iteration review loop in the last wave.
 
@@ -125,10 +125,13 @@ git diff --name-only $BASE..HEAD | grep -i "$(git log -1 --format=%s HEAD | head
 # branch and the title disagree. Fix one or the other before pushing.
 
 # 5. Local gate — required CI is :app compile + testDebugUnitTest, plus
-#    :sharedLogic:allTests + :desktop:test if sharedLogic moved. Run all
+#    :sharedLogic:allTests + :desktop:test if sharedLogic changed. Run all
 #    that apply BEFORE pushing. Failed required gate = guaranteed red CI.
 cd android-compose
-[ "$BASE_TOUCHED_SHARED" = "1" ] && ./gradlew --no-daemon :sharedLogic:allTests :desktop:test || true
+SHARED_HITS=$(git diff --name-only $BASE..HEAD | grep -cF 'sharedLogic/' || true)
+if [ "$SHARED_HITS" -gt 0 ]; then
+  ./gradlew --no-daemon :sharedLogic:allTests :desktop:test
+fi
 ./gradlew --no-daemon :app:compileRootDebugKotlin :app:testRootDebugUnitTest
 
 # 6. Mechanical-debt preflight — the four inspections that light up on
@@ -156,17 +159,13 @@ cd android-compose
 #      new identity is recorded.
 #    See PRs #1039, #1040, #1042 for the full checklist.
 
-# 8. Distinct failure categories — the 4 infra checks below are
-#    advisory and CANNOT block your merge. Do not iterate to "fix" them.
+# 8. Required vs advisory — know which CI checks block merge and which don't.
+#    Required (any red = merge blocked):
+#      `test`, `build-apk-pass`, `shared-multiplatform`, `perf-gate`, `codecov`
+#    Advisory (cannot block merge; do not iterate to "fix" them):
 #    - `CodeScene Code Health Review` — advisory, often pre-existing.
-#    - `codecov` — repo not registered; see PR #1023 PM comment.
-#    - `qodana` — finds 70-150 new "Unused import" items on every PR
-#      because the import optimizer runs on a different target set;
-#      pre-fix unused imports locally and the Qodana count drops by
-#      half on its own.
 #    - `detekt (advisory)` — `maxIssues: 0` on main, pre-existing.
-#    The required gates that DO block merge are: `test`,
-#    `build-apk-pass`, `shared-multiplatform`, `perf-gate`.
+#    - `Advisory AGENTS.md policy` — greppable rules, never blocks.
 #    When any required gate fails, fix it. When only advisory fails,
 #    document the cost in a PR comment and proceed.
 
@@ -180,11 +179,10 @@ cd android-compose
 ```
 
 **Why this checklist exists.** The merge window of 2026-07-26 to 2026-07-29
-saw 23 PRs land. Of the 8 non-trivial ones, the average was 3 review
-iterations and 7 commits before merge, almost all chasing one of: stale-base
-phantom rollbacks, mechanical Qodana debt, or missing concurrent-collection
-defaults. None of these is hard to fix at dev time. All of them cost ~20
-minutes of CI per iteration when caught after push.
+saw 22 PRs land. The non-trivial ones averaged 3 review iterations and 7 commits
+before merge, almost all chasing one of: stale-base phantom rollbacks, mechanical
+detekt debt, or missing concurrent-collection defaults. None of these is hard to
+fix at dev time. All cost ~20 minutes of CI per iteration when caught after push.
 
 ## Development Environment & Platform Paths
 
