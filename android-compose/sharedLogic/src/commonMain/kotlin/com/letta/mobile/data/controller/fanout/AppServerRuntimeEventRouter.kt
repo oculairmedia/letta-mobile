@@ -20,10 +20,17 @@ import kotlinx.coroutines.launch
  * per-runtime subscribers via [RuntimeEventFanout].
  */
 class AppServerRuntimeEventRouter(
-    private val fanout: RuntimeEventFanout = RuntimeEventFanout(),
+    private val inboundControlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
+    private val connectionGenerationProvider: () -> Long = { 0L },
+    private val fanout: RuntimeEventFanout = RuntimeEventFanout(
+        inboundControlRegistry = inboundControlRegistry,
+        connectionGenerationProvider = connectionGenerationProvider,
+    ),
 ) {
     private val collectorJob = atomic<Job?>(null)
     private val attachLock = SynchronizedObject()
+
+    fun inboundControlRegistry(): InboundControlRequestRegistry = inboundControlRegistry
 
     /**
      * Attach a sole collector. No-op when an active collector is already running

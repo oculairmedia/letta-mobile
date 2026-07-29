@@ -14,7 +14,6 @@ import kotlinx.coroutines.channels.ClosedSendChannelException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.receiveAsFlow
-import kotlinx.coroutines.sync.Mutex
 
 /**
  * Fanout layer for routing App Server runtime events to multiple UI clients.
@@ -53,7 +52,18 @@ import kotlinx.coroutines.sync.Mutex
  * THREAD-SAFETY:
  * All public methods are thread-safe and can be called from multiple coroutines.
  */
-class RuntimeEventFanout {
+class RuntimeEventFanout(
+    /**
+     * lgns8.22.4: correlates server→client control / external-tool requests so
+     * the same request_id is not rebroadcast after the first delivery.
+     */
+    private val inboundControlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
+    /**
+     * Connection generation stamped onto inbound control registrations. The
+     * controller bumps this on disconnect; fanout reads it at route time.
+     */
+    private val connectionGenerationProvider: () -> Long = { 0L },
+) {
     /**
      * Per-subscriber channels. Buffering starts at [subscribe], not at collect,
      * so frames cannot be lost in the subscribe→collect handoff window. There is
@@ -65,6 +75,9 @@ class RuntimeEventFanout {
      * runtime cannot head-of-line block delivery to others.
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
+
+    /** Exposed for TurnEngine / controller correlation (same instance). */
+    fun inboundControlRegistry(): InboundControlRequestRegistry = inboundControlRegistry
 
     /**
      * Per-runtime turn locks. Ensures only one turn executes at a time per runtime.
@@ -121,40 +134,86 @@ class RuntimeEventFanout {
      * Runtime-scoped events go to exact (agent, conversation) subscribers.
      * Terminal-bearing stream deltas also reach same-conversation subscribers
      * (different agent) so TurnEngine can apply authoritative-terminal release.
-     * Unscoped external-tool / control requests are broadcast to every active
-     * subscriber — TurnEngine must answer them to avoid wedging the server.
+     * Unscoped external-tool / control requests register in
+     * [inboundControlRegistry] then deliver once (duplicate request_ids drop).
      */
     suspend fun route(received: AppServerReceivedFrame) {
-        val channels = synchronized(stateLock) {
-            val runtime = received.frame.runtime
-            when {
-                runtime == null -> {
-                    if (!received.frame.isUnscopedTurnControl()) emptyList()
-                    else subscribers.values.map { it.channel }
-                }
-                received.isTerminalBearingStreamDelta() -> {
-                    subscribers.values.filter {
-                        it.key.conversationId == runtime.conversationId
-                    }.map { it.channel }
-                }
-                else -> {
-                    val key = RuntimeKey(runtime.agentId, runtime.conversationId)
-                    subscribers.values.filter { it.key == key }.map { it.channel }
-                }
-            }
+        val plan = synchronized(stateLock) { planRoute(received) }
+        val delivered = deliverToChannels(plan.channels, received)
+        plan.markDispatchedIfNeeded(delivered)
+    }
+
+    private fun RoutePlan.markDispatchedIfNeeded(delivered: Boolean) {
+        if (!delivered) return
+        val requestId = controlRequestId ?: return
+        val generation = controlGeneration ?: return
+        inboundControlRegistry.markDispatched(requestId, generation)
+    }
+
+    private data class RoutePlan(
+        val channels: List<Channel<AppServerReceivedFrame>>,
+        val controlRequestId: String? = null,
+        val controlGeneration: Long? = null,
+    )
+
+    private fun planRoute(received: AppServerReceivedFrame): RoutePlan {
+        val runtime = received.frame.runtime
+        return when {
+            runtime == null -> planUnscopedControl(received)
+            received.isTerminalBearingStreamDelta() -> RoutePlan(
+                channels = subscribers.values
+                    .filter { it.key.conversationId == runtime.conversationId }
+                    .map { it.channel },
+            )
+            else -> planScoped(received, runtime)
         }
-        // Deliver concurrently so a full buffer on one subscriber cannot HOL-block
+    }
+
+    private fun planUnscopedControl(received: AppServerReceivedFrame): RoutePlan {
+        if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(emptyList())
+        val targets = subscribers.values.map { it.channel }
+        if (targets.isEmpty()) return RoutePlan(emptyList())
+        if (!registerUnscopedControl(received, runtime = null)) return RoutePlan(emptyList())
+        return RoutePlan(
+            channels = targets,
+            controlRequestId = received.frame.requestId,
+            controlGeneration = frameGeneration(received),
+        )
+    }
+
+    private fun planScoped(
+        received: AppServerReceivedFrame,
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope,
+    ): RoutePlan {
+        val key = RuntimeKey(runtime.agentId, runtime.conversationId)
+        val targets = subscribers.values.filter { it.key == key }.map { it.channel }
+        if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(targets)
+        if (targets.isEmpty()) return RoutePlan(emptyList())
+        if (!registerUnscopedControl(received, runtime)) return RoutePlan(emptyList())
+        return RoutePlan(
+            channels = targets,
+            controlRequestId = received.frame.requestId,
+            controlGeneration = frameGeneration(received),
+        )
+    }
+
+    private suspend fun deliverToChannels(
+        channels: List<Channel<AppServerReceivedFrame>>,
+        received: AppServerReceivedFrame,
+    ): Boolean {
+        // Concurrent sends: a full buffer on one subscriber cannot HOL-block
         // unrelated runtimes (bounded channels + isolated sends).
-        coroutineScope {
+        return coroutineScope {
             channels.map { channel ->
                 async {
                     try {
                         channel.send(received)
+                        true
                     } catch (_: ClosedSendChannelException) {
-                        // Concurrent unsubscribe closed this channel after the snapshot.
+                        false
                     }
                 }
-            }.awaitAll()
+            }.awaitAll().any { it }
         }
     }
 
@@ -168,6 +227,49 @@ class RuntimeEventFanout {
             "AppServerRuntimeEventRouter detached",
         )
         open.forEach { it.channel.close(cause) }
+    }
+
+    private fun frameGeneration(received: AppServerReceivedFrame): Long =
+        received.connectionGeneration ?: connectionGenerationProvider()
+
+    /**
+     * @return true when this frame should be delivered to turn subscribers.
+     */
+    private fun registerUnscopedControl(
+        received: AppServerReceivedFrame,
+        runtime: com.letta.mobile.data.transport.appserver.AppServerRuntimeScope?,
+    ): Boolean {
+        val frame = received.frame
+        val requestId = frame.requestId ?: return false
+        val kind = when (frame) {
+            is AppServerInboundFrame.ExternalToolCallRequest ->
+                InboundControlRequestRegistry.Kind.ExternalTool
+            is AppServerInboundFrame.ControlRequest ->
+                InboundControlRequestRegistry.Kind.Approval
+            else -> return false
+        }
+        val toolCallId = (frame as? AppServerInboundFrame.ExternalToolCallRequest)?.toolCallId
+        val generation = frameGeneration(received)
+        return when (
+            val result = inboundControlRegistry.register(
+                InboundControlRequestRegistry.RegisterRequest(
+                    requestId = requestId,
+                    kind = kind,
+                    connectionGeneration = generation,
+                    agentId = runtime?.agentId,
+                    conversationId = runtime?.conversationId,
+                    toolCallId = toolCallId,
+                ),
+            )
+        ) {
+            is InboundControlRequestRegistry.RegisterResult.Accepted -> true
+            // Retriable until a lease claims: Pending (never delivered / send-failed
+            // release) or Dispatched (buffered but collector cancelled before claim).
+            is InboundControlRequestRegistry.RegisterResult.Duplicate ->
+                result.entry.state == InboundControlRequestRegistry.State.Pending ||
+                    result.entry.state == InboundControlRequestRegistry.State.Dispatched
+            is InboundControlRequestRegistry.RegisterResult.GenerationFailed -> false
+        }
     }
 
     suspend fun acquireTurnLock(agentId: AgentId, conversationId: ConversationId) {
@@ -261,7 +363,7 @@ class RuntimeEventFanout {
     }
 }
 
-private fun AppServerInboundFrame.isUnscopedTurnControl(): Boolean =
+private fun AppServerInboundFrame.isServerInitiatedControlFrame(): Boolean =
     this is AppServerInboundFrame.ExternalToolCallRequest ||
         this is AppServerInboundFrame.ControlRequest
 
