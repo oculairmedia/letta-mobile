@@ -1896,6 +1896,13 @@ class AppServerTurnEngine(
             // 2026-07-29 provider-refusal and stale-approval incidents a one-line
             // grep instead of a multi-layer log hunt.
             "reasonKind" to (terminalReasonKind(reason) ?: "<none>"),
+            // letta-mobile-imgdrop: when the reason matches no known family the
+            // category alone is a dead end, so add a no-content structural
+            // fingerprint (length bucket, word count, charset flags, digest).
+            // Only emitted for unclassified reasons to keep healthy logs quiet.
+            "reasonShape" to (
+                if (terminalReasonKind(reason) == "other") terminalReasonShape(reason) else "<n/a>"
+                ),
             "exceptionType" to (exceptionTypeToken(reason) ?: "<none>"),
             "provider" to (provider ?: "<none>"),
             "handle" to (handle ?: "<none>"),
@@ -1973,8 +1980,71 @@ internal fun terminalReasonKind(reason: String?): String? {
         "empty content in" in r || "empty response" in r -> "empty_response"
         "rate limit" in r || "429" in r || "overloaded" in r || "529" in r -> "rate_limited"
         "timed out" in r || "timeout" in r -> "timeout"
+        // letta-mobile-imgdrop: attachment/media families. A turn carrying an
+        // image failed in ~264ms with reasonKind=other and no user-visible
+        // error, so none of the families above matched. These are checked
+        // before the generic provider/abort catch-alls.
+        "image" in r || "attachment" in r || "media" in r || "mime" in r -> "media_rejected"
+        "too large" in r || "payload" in r || "exceeds" in r ||
+            "413" in r || "size limit" in r -> "payload_too_large"
+        "unsupported" in r || "not supported" in r -> "unsupported_input"
+        "malformed" in r || "invalid json" in r || "parse" in r ||
+            "decode" in r -> "malformed_input"
         "model provider error" in r || "provider" in r -> "provider_error"
+        // Checked after provider_error: auth/not-found wording frequently
+        // co-occurs with a provider prefix, and aktss already pinned those
+        // strings to provider_error. Only reasons with no provider marker at
+        // all fall through to these.
+        "unauthorized" in r || "forbidden" in r || "api key" in r ||
+            "401" in r || "403" in r -> "auth_failed"
+        "not found" in r || "unknown model" in r || "404" in r -> "not_found"
         "abort" in r || "cancel" in r || "interrupt" in r -> "aborted"
         else -> "other"
     }
+}
+
+/**
+ * letta-mobile-imgdrop: structural fingerprint of a terminal reason, for the
+ * case where [terminalReasonKind] returns "other" and there is nothing else to
+ * go on. Emits only *shape* facts plus a digest — never any substring of the
+ * reason — so the o0atv no-secrets guarantee holds even for unclassified text.
+ *
+ * The digest lets the same unknown failure be correlated across occurrences
+ * (and matched against a candidate string offline by hashing that candidate),
+ * which is what turns a silent drop into something identifiable without ever
+ * writing the message to a log.
+ */
+internal fun terminalReasonShape(reason: String?): String {
+    if (reason.isNullOrBlank()) return "<none>"
+    val lenBucket = when (val n = reason.length) {
+        in 0..32 -> "len<=32"
+        in 33..128 -> "len<=128"
+        in 129..512 -> "len<=512"
+        else -> "len>512:${n / 512}k"
+    }
+    val words = reason.split(' ', '\n', '\t').count { it.isNotBlank() }
+    val flags = buildList {
+        if (reason.any { it.isDigit() }) add("digits")
+        if ("://" in reason) add("url")
+        if (reason.trimStart().startsWith('{') || reason.trimStart().startsWith('[')) add("json")
+        if ('/' in reason || '\\' in reason) add("path")
+        if (':' in reason) add("colon")
+        if (reason.any { it.code > 127 }) add("nonascii")
+    }.ifEmpty { listOf("plain") }.joinToString("+")
+    return "$lenBucket|words=$words|$flags|d=${stableReasonDigest(reason)}"
+}
+
+/**
+ * Stable, platform-independent 32-bit FNV-1a digest rendered as 8 hex chars.
+ * Deliberately not a cryptographic hash: it exists to correlate repeats of the
+ * same unknown reason, not to protect it. It is one-way with respect to the
+ * log, so no reason content leaks.
+ */
+private fun stableReasonDigest(value: String): String {
+    var hash = 0x811C9DC5u
+    for (byte in value.encodeToByteArray()) {
+        hash = hash xor (byte.toUInt() and 0xFFu)
+        hash *= 0x01000193u
+    }
+    return hash.toString(16).padStart(8, '0')
 }
