@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
+import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.desktop.chat.AgentOrb
 
 /**
@@ -237,9 +238,13 @@ private fun ColumnScope.ExpandedAgentLibrary(
 ) {
     // Spotify-style in-panel filter: search never leaves the library.
     var query by remember { mutableStateOf(TextFieldValue("")) }
+    // Uses the shared TextMatch so the rail matches the same way as the command
+    // palette and every other catalog. The previous raw `contains` required the
+    // typed text to be a literal substring INCLUDING punctuation, so
+    // "pm letta mobile" could not find an agent named "PM - letta-mobile".
     val filtered = remember(groups, query.text) {
         val needle = query.text.trim()
-        if (needle.isEmpty()) groups else groups.filter { it.name.contains(needle, ignoreCase = true) }
+        if (needle.isEmpty()) groups else groups.filter { TextMatch.matches(needle, it.name) }
     }
     val spaces = remember(filtered) { deriveAgentSpaces(filtered) }
     // Orb colors key off the UNfiltered position so identities stay stable

@@ -40,6 +40,33 @@ class TextMatchTest {
     }
 
     @Test
+    fun spacedQueryFindsPunctuatedName() {
+        // The reported defect: an agent named "PM - letta-mobile" was
+        // unfindable by typing its words, because the old whole-query
+        // `contains` required the separator and hyphen to be typed literally.
+        assertTrue(TextMatch.matches("pm letta mobile", "PM - letta-mobile"))
+        assertTrue(TextMatch.matches("PM letta mobile", "PM - letta-mobile"))
+        // Sibling agents that differ only in the trailing token stay distinct.
+        assertFalse(TextMatch.matches("pm letta mobile", "PM - letta-code"))
+        assertFalse(TextMatch.matches("pm letta mobile", "PM - vibesync"))
+    }
+
+    @Test
+    fun punctuationInQueryStillMatches() {
+        // Typing the exact punctuated name must keep working.
+        assertTrue(TextMatch.matches("PM - letta-mobile", "PM - letta-mobile"))
+        assertTrue(TextMatch.matches("letta-mobile", "PM - letta-mobile"))
+        assertTrue(TextMatch.matches("letta mobile", "PM - letta-mobile"))
+    }
+
+    @Test
+    fun tokensMayMatchAcrossSeparateFields() {
+        // Palette rows carry label + sublabel; a query spanning both should hit.
+        assertTrue(TextMatch.matches("letta agent", "PM - letta-mobile", "agent"))
+        assertFalse(TextMatch.matches("letta destination", "PM - letta-mobile", "agent"))
+    }
+
+    @Test
     fun testMatchRanking() {
         // While TextMatch.matches just returns a boolean, the common search
         // primitive logic uses it in filters where the list order or count
