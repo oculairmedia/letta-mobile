@@ -11,17 +11,26 @@ import kotlin.test.assertEquals
 
 class ApprovalTimelineStreamTest {
     @Test
-    fun runlessLiveRejectionDecidesUniqueRequest() {
-        val seeded = reduce(
-            frame = request(runId = null, calls = listOf(call("call-1", "danger"))),
-        ).next
+    fun responseRunCorrelation() {
+        listOf(
+            ResponseScenario("matching run", requestRun = "run-1", responseRun = "run-1", approve = true, decided = true),
+            ResponseScenario("mismatched run", requestRun = "run-1", responseRun = "run-other", approve = false, decided = false),
+            ResponseScenario("runless rejection", requestRun = null, responseRun = null, approve = false, decided = true),
+        ).forEach { scenario ->
+            val seeded = reduce(
+                frame = request(runId = scenario.requestRun, calls = listOf(call("call-approval", "danger"))),
+            ).next
+            val output = reduce(
+                prev = seeded,
+                frame = response(approve = scenario.approve, runId = scenario.responseRun),
+            )
 
-        val output = reduce(
-            prev = seeded,
-            frame = response(approve = false, runId = null),
-        )
-
-        assertEquals(true, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
+            assertEquals(
+                scenario.decided,
+                (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided,
+                scenario.name,
+            )
+        }
     }
 
     @Test
@@ -50,20 +59,6 @@ class ApprovalTimelineStreamTest {
     }
 
     @Test
-    fun matchingResponseRunDecidesApproval() {
-        val seeded = reduce(
-            frame = request(calls = listOf(call("call-approval", "danger"))),
-        ).next
-
-        val output = reduce(
-            prev = seeded,
-            frame = response(approve = true),
-        )
-
-        assertEquals(true, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
-    }
-
-    @Test
     fun multiCallApprovalDecidesOnlyAfterEveryReturn() {
         val seeded = reduce(
             frame = request(calls = listOf(call("call-a", "read"), call("call-b", "write"))),
@@ -79,20 +74,6 @@ class ApprovalTimelineStreamTest {
             frame = returned("call-b", "run-1", "written"),
         ).next
         assertEquals(true, (completed.events.single() as TimelineEvent.Confirmed).approvalDecided)
-    }
-
-    @Test
-    fun mismatchedResponseRunLeavesApprovalPending() {
-        val seeded = reduce(
-            frame = request(calls = listOf(call("call-approval", "danger"))),
-        ).next
-
-        val output = reduce(
-            prev = seeded,
-            frame = response(approve = false, runId = "run-other"),
-        )
-
-        assertEquals(false, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
     }
 
     private fun reduce(
@@ -129,5 +110,13 @@ class ApprovalTimelineStreamTest {
         toolCallId = callId,
         runId = runId,
         toolReturnRaw = JsonPrimitive(body),
+    )
+
+    private data class ResponseScenario(
+        val name: String,
+        val requestRun: String?,
+        val responseRun: String?,
+        val approve: Boolean,
+        val decided: Boolean,
     )
 }
