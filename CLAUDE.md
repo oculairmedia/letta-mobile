@@ -7,7 +7,7 @@ Letta Mobile is a Kotlin Multiplatform project that ships **two clients** from o
 - **Android app** (`com.letta.mobile` / `.dev`) — Compose UI, Hilt, Room, Material 3, A2UI renderer.
 - **Compose Desktop** — same `sharedLogic`, Skiko rendering, packaged CLI.
 
-The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server (`@letta-ai/letta-code@0.29.9`) is reached over a single bidirectional `/ws` connection.
+The primary production transport is **Iroh QUIC** (`iroh://<nodeId>@…`). The WebSocket App Server (`@letta-ai/letta-code@0.29.12`) is reached over a single bidirectional `/ws` connection.
 
 **Location:** `/opt/stacks/letta-mobile`
 **Build root:** `android-compose/` (the Gradle workspace)
@@ -33,7 +33,7 @@ export JAVA_HOME="/usr/lib/jvm/jdk-26"      # CI parity
 ./gradlew :desktop:run                      # Compose Desktop (needs a display; on a headless VM use DISPLAY=:1 and SOFTWARE rendering)
 ```
 
-For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/letta-code@0.29.9` (see the App Server section of `AGENTS.md`).
+For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/letta-code@0.29.12` (see the App Server section of `AGENTS.md`).
 
 ---
 

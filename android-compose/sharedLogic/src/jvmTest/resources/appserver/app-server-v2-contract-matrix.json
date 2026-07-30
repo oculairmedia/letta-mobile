@@ -1,7 +1,7 @@
 {
   "baseline": {
     "package": "@letta-ai/letta-code",
-    "version": "0.29.9",
+    "version": "0.29.12",
     "node": "v24.18.0",
     "package_engine": ">=22.19.0",
     "protocol_export": "dist/types/types/app-server-protocol.d.ts -> dist/types/types/protocol_v2.d.ts",
@@ -19,7 +19,7 @@
   },
   "observed_installed_contract": {
     "classification": "app_server_v2",
-    "source": "installed @letta-ai/letta-code 0.29.9 declarations and bundled runtime",
+    "source": "installed @letta-ai/letta-code 0.29.12 declarations and bundled runtime",
     "protocol_inventory_fixture": "installed-protocol-v2-inventory.json",
     "mobile_typed_frame_fixture": "protocol-frames.jsonl",
     "deprecation_claim": "letta app-server --help warns it is deprecated and prints letta server --listen usage"
@@ -31,7 +31,7 @@
     "admin_boundary": "v2 exposure does not itself transfer product or durable-state ownership from Admin REST"
   },
   "upstream_socket_behavior": {
-    "source": "installed letta.js 0.29.9 one-socket app-server listener and dist/app-server-client.js",
+    "source": "installed letta.js 0.29.12 one-socket app-server listener and dist/app-server-client.js",
     "session_model": "one bidirectional WebSocket per client at /ws (no channel query)",
     "legacy_split_channel": "requests with ?channel=control|stream are rejected with HTTP 426 Upgrade Required",
     "capabilities_split_channels": false,
