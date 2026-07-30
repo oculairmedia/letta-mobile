@@ -53,6 +53,7 @@ For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/lett
 | `cli/` `appserver-cli/` | JVM tooling for probes, restart-replay evidence, shim-off parity gates |
 
 **Important directories:**
+- `docs/reference/letta-docs.md` — **how to look up Letta's own docs** (index at `docs.letta.com/llms.txt`, canonical markdown at any page + `/index.md`, plus a page map). Read Letta docs instead of guessing at agent/memory/App-Server semantics; they are fetched on demand, not vendored.
 - `designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md` — A2UI renderer and catalog authoring guide (read before touching A2UI payloads, catalog IDs, or renderer dispatch)
 - `app/src/main/java/com/letta/mobile/ui/screens/` — Android screen composables
 - `sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/` — Iroh + App Server transports (platform-neutral)
