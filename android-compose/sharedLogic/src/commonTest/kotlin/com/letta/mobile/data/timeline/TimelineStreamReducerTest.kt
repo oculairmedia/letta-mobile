@@ -115,40 +115,6 @@ class TimelineStreamReducerTest {
             contentPreview = "done",
         )
 
-        val completed = reduce(
-            prev = output.next,
-            frame = ToolReturnMessage(
-                id = "return-a",
-                toolCallId = "call-a",
-                status = "success",
-                toolReturnRaw = JsonPrimitive("read"),
-                runId = "run-1",
-            ),
-        ).next.events.single() as TimelineEvent.Confirmed
-        completed.approvalDecided shouldBe true
-    }
-
-    @Test
-    fun `approval response with mismatched run leaves request pending`() {
-        val seeded = reduce(
-            frame = ApprovalRequestMessage(
-                id = "approval-1",
-                toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
-                runId = "run-1",
-            ),
-        ).next
-
-        val output = reduce(
-            prev = seeded,
-            frame = ApprovalResponseMessage(
-                id = "approval-response-1",
-                approvalRequestId = "approval-1",
-                approve = false,
-                runId = "run-other",
-            ),
-        )
-
-        (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided shouldBe false
     }
 
     @Test

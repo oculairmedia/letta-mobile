@@ -61,6 +61,9 @@ internal fun TimelineEvent.Confirmed.matchesApprovalResponse(response: ApprovalR
     approvalRequestId == response.approvalRequestId &&
         !runId.isNullOrBlank() && runId == response.runId
 
+internal fun Timeline.matchingApprovalEvent(response: ApprovalResponseMessage): TimelineEvent.Confirmed? =
+    events.filterIsInstance<TimelineEvent.Confirmed>().firstOrNull { it.matchesApprovalResponse(response) }
+
 private fun String?.isCompatibleRun(requestRunId: String?): Boolean {
     val evidenceRun = takeUnless(String?::isNullOrBlank)
     val expectedRun = requestRunId.takeUnless(String?::isNullOrBlank)

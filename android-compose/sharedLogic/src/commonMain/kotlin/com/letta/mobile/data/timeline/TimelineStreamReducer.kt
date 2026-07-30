@@ -62,9 +62,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     // default; enable Telemetry.chatHotPathDebugEnabled while investigating.
     if (message is ApprovalResponseMessage) {
         val reqId = message.approvalRequestId ?: return output()
-        val match = timeline.events.firstOrNull {
-            it is TimelineEvent.Confirmed && it.matchesApprovalResponse(message)
-        } as? TimelineEvent.Confirmed ?: return output()
+        val match = timeline.matchingApprovalEvent(message) ?: return output()
         if (match.approvalDecided) {
             hotPathTelemetry(
                 "streamSubscriber.eventDeduped",
