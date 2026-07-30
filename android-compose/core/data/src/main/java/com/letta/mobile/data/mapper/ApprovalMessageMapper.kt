@@ -3,6 +3,7 @@ package com.letta.mobile.data.mapper
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ApprovalDecisionPayload
 import com.letta.mobile.data.model.ApprovalResponsePayload
+import com.letta.mobile.data.model.ApprovalToolCallPayload
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.UiToolApprovalDecision
 
@@ -17,6 +18,46 @@ internal fun List<AppMessage>.renderedToolCallIds(): Set<String> = buildSet {
         if (message.messageType == MessageType.TOOL_CALL || message.messageType == MessageType.TOOL_RETURN) {
             message.toolCallId?.takeIf(String::isNotBlank)?.let(::add)
         }
+    }
+}
+
+/**
+ * Tool call ids that already have a `TOOL_RETURN`, i.e. the tool ran to completion.
+ *
+ * A returned tool call is proof that its approval was resolved: the runtime only
+ * executes a gated call after a decision. This is deliberately derived from
+ * message data rather than from a runtime event — `ApprovalResolved` is never
+ * emitted by the server (letta.js suppresses `approval_response_message` and has
+ * no `approval_resolved` signal at all), so an event-driven clear would wait
+ * forever. See letta-mobile-jbui1.
+ */
+internal fun List<AppMessage>.returnedToolCallIds(): Set<String> = buildSet {
+    for (message in this@returnedToolCallIds) {
+        if (message.messageType == MessageType.TOOL_RETURN) {
+            message.toolCallId?.takeIf(String::isNotBlank)?.let(::add)
+        }
+    }
+}
+
+/**
+ * Ids of `APPROVAL_REQUEST` messages whose every tool call has already returned,
+ * so the request card is stale and must not render.
+ *
+ * Fail-open by construction: a request with no usable tool calls, or with any call
+ * still outstanding, is NOT absorbed. Hiding a genuinely pending approval would
+ * strand the turn with no way for the user to answer, which is strictly worse than
+ * showing one stale card.
+ */
+internal fun List<AppMessage>.resolvedApprovalRequestIds(
+    returnedToolCallIds: Set<String>,
+): Set<String> = buildSet {
+    for (message in this@resolvedApprovalRequestIds) {
+        if (message.messageType != MessageType.APPROVAL_REQUEST) continue
+        val request = message.approvalRequest ?: continue
+        val callIds = request.toolCalls.map(ApprovalToolCallPayload::toolCallId)
+            .filter(String::isNotBlank)
+        if (callIds.isEmpty()) continue
+        if (callIds.all { it in returnedToolCallIds }) add(message.id)
     }
 }
 

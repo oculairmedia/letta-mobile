@@ -732,6 +732,97 @@ The implementation looks solid. One actionable issue: handle the null case.</res
             ui[0].approvalRequest!!.toolCalls.single().name shouldBe "Bash"
         }
 
+        // letta-mobile-jbui1: an approval request card is only ever cleared by a runtime
+        // ApprovalResolved event, which the server never emits. These pin the derived
+        // fallback: a request is dropped once its tool calls have all returned.
+        "drop approval request once every tool call has returned" {
+            val messages = listOf(
+                ApprovalRequestMessage(
+                    id = "approval-1",
+                    toolCalls = listOf(
+                        ToolCall(
+                            toolCallId = "tool-call-1",
+                            name = "Bash",
+                            arguments = "{\"command\":\"ls\"}",
+                        )
+                    ),
+                ).toAppMessage()!!,
+            ) + listOf(
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "return-1",
+                    toolCallId = "tool-call-1",
+                    status = "success",
+                    toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("done"),
+                ),
+            ).toAppMessages()
+
+            val ui = messages.toUiMessages()
+
+            ui.none { it.approvalRequest != null } shouldBe true
+        }
+
+        "keep approval request while any tool call is still outstanding" {
+            val messages = listOf(
+                ApprovalRequestMessage(
+                    id = "approval-1",
+                    toolCalls = listOf(
+                        ToolCall(toolCallId = "tool-call-1", name = "Bash", arguments = "{}"),
+                        ToolCall(toolCallId = "tool-call-2", name = "Read", arguments = "{}"),
+                    ),
+                ).toAppMessage()!!,
+            ) + listOf(
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "return-1",
+                    toolCallId = "tool-call-1",
+                    status = "success",
+                    toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("done"),
+                ),
+            ).toAppMessages()
+
+            val ui = messages.toUiMessages()
+
+            ui.count { it.approvalRequest != null } shouldBe 1
+        }
+
+        "keep pending approval request when nothing has returned" {
+            val messages = listOf(
+                ApprovalRequestMessage(
+                    id = "approval-1",
+                    toolCalls = listOf(
+                        ToolCall(toolCallId = "tool-call-1", name = "Bash", arguments = "{}"),
+                    ),
+                ).toAppMessage()!!,
+            )
+
+            val ui = messages.toUiMessages()
+
+            ui.count { it.approvalRequest != null } shouldBe 1
+        }
+
+        // Fail open: hiding a genuinely pending approval strands the turn with no way to
+        // answer it, which is strictly worse than one stale card.
+        "keep approval request whose tool call ids are unusable" {
+            val messages = listOf(
+                ApprovalRequestMessage(
+                    id = "approval-1",
+                    toolCalls = listOf(
+                        ToolCall(toolCallId = "", name = "Bash", arguments = "{}"),
+                    ),
+                ).toAppMessage()!!,
+            ) + listOf(
+                com.letta.mobile.data.model.ToolReturnMessage(
+                    id = "return-1",
+                    toolCallId = "tool-call-1",
+                    status = "success",
+                    toolReturnRaw = kotlinx.serialization.json.JsonPrimitive("done"),
+                ),
+            ).toAppMessages()
+
+            val ui = messages.toUiMessages()
+
+            ui.count { it.approvalRequest != null } shouldBe 1
+        }
+
         "map approval responses to dedicated approval ui messages" {
             val messages = listOf(
                 ApprovalResponseMessage(
