@@ -621,11 +621,7 @@ private fun applyPendingToolReturns(
     pendingToolReturnsByCallId: LinkedHashMap<String, ToolReturnMessage>,
 ): TimelineEvent.Confirmed {
     if (ev.messageType != TimelineMessageType.TOOL_CALL || ev.toolCalls.isEmpty()) return ev
-    val matchingReturns = ev.toolCalls.mapNotNull { toolCall ->
-        val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        val toolReturn = pendingToolReturnsByCallId.remove(callId) ?: return@mapNotNull null
-        callId to toolReturn
-    }
+    val matchingReturns = ev.takeMatchingPendingReturns(pendingToolReturnsByCallId)
     if (matchingReturns.isEmpty()) return ev
     val firstReturn = matchingReturns.first().second
     // letta-mobile-fe51r: shared fold keeps projected previews from
@@ -641,7 +637,8 @@ private fun applyPendingToolReturns(
     )
     val firstCallId = matchingReturns.first().first
     return ev.copy(
-        approvalDecided = true,
+        approvalDecided = ev.approvalDecided ||
+            ev.willCompleteWith(matchingReturns.mapTo(mutableSetOf()) { it.first }),
         toolReturnContent = fold.contentByCallId[firstCallId] ?: ev.toolReturnContent,
         toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
         toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),

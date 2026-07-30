@@ -11,6 +11,87 @@ import kotlin.test.assertEquals
 
 class ApprovalTimelineStreamTest {
     @Test
+    fun runlessLiveRejectionDecidesUniqueRequest() {
+        val seeded = reduce(
+            frame = ApprovalRequestMessage(
+                id = "approval-1",
+                toolCall = ToolCall(toolCallId = "call-1", name = "danger", arguments = "{}"),
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = ApprovalResponseMessage(
+                id = "response-1",
+                approvalRequestId = "approval-1",
+                approve = false,
+            ),
+        )
+
+        assertEquals(true, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
+    }
+
+    @Test
+    fun earlyPartialReturnDoesNotDecideMultiCallApproval() {
+        val pending = persistentMapOf(
+            "call-a" to ToolReturnMessage(
+                "return-a",
+                toolCallId = "call-a",
+                runId = "run-1",
+                toolReturnRaw = JsonPrimitive("read"),
+            ),
+        )
+        val output = reduceStreamFrame(
+            TimelineReducerInput(
+                prev = Timeline("conv-1"),
+                frame = ApprovalRequestMessage(
+                    id = "approval-1",
+                    runId = "run-1",
+                    toolCalls = listOf(
+                        ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
+                        ToolCall(toolCallId = "call-b", name = "write", arguments = "b"),
+                    ),
+                ),
+                pendingToolReturnsByCallId = pending,
+                source = "test",
+            ),
+        )
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        assertEquals(false, event.approvalDecided)
+        assertEquals("read", event.toolReturnContentByCallId["call-a"])
+    }
+
+    @Test
+    fun earlyMismatchedRunReturnStaysPendingAndDoesNotAttach() {
+        val pending = persistentMapOf(
+            "call-a" to ToolReturnMessage(
+                "return-a",
+                toolCallId = "call-a",
+                runId = "run-other",
+                toolReturnRaw = JsonPrimitive("wrong"),
+            ),
+        )
+        val output = reduceStreamFrame(
+            TimelineReducerInput(
+                prev = Timeline("conv-1"),
+                frame = ApprovalRequestMessage(
+                    id = "approval-1",
+                    runId = "run-1",
+                    toolCall = ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
+                ),
+                pendingToolReturnsByCallId = pending,
+                source = "test",
+            ),
+        )
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        assertEquals(false, event.approvalDecided)
+        assertEquals(null, event.toolReturnContentByCallId["call-a"])
+        assertEquals(setOf("call-a"), output.updatedPendingToolReturnsByCallId.keys)
+    }
+
+    @Test
     fun matchingResponseRunDecidesApproval() {
         val seeded = reduce(
             frame = ApprovalRequestMessage(

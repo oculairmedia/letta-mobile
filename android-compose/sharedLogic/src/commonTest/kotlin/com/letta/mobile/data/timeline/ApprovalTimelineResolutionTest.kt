@@ -19,6 +19,16 @@ class ApprovalTimelineResolutionTest {
     }
 
     @Test
+    fun responseWithoutDecisionDoesNotResolve() {
+        val request = event("request-1", "run-1", "call-1")
+        val evidence = approvalTimelineEvidence(
+            listOf(ApprovalResponseMessage("response-1", approvalRequestId = "request-1", runId = "run-1")),
+        )
+
+        assertFalse(request.hasExplicitApprovalResponse(evidence))
+    }
+
+    @Test
     fun mismatchedRunFailsOpen() {
         val request = event("request-1", "run-1", "call-1")
         val evidence = approvalTimelineEvidence(
