@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,6 +32,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,6 +73,10 @@ internal fun CreateScheduleModal(params: CreateScheduleModalParams) {
     var name by remember { mutableStateOf("") }
     var prompt by remember { mutableStateOf("") }
     var draft by remember { mutableStateOf(CronBuilderState()) }
+    // Modal opens on the empty name field, so claim focus rather than making the
+    // user click into the first thing they need to fill in.
+    val nameFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { nameFocusRequester.requestFocus() }
 
     Box(
         Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).clickable(onClick = params.onDismiss),
@@ -82,7 +89,11 @@ internal fun CreateScheduleModal(params: CreateScheduleModalParams) {
         ) {
             CreateScheduleModalHeader(onDismiss = params.onDismiss)
             Spacer(Modifier.height(16.dp))
-            CreateScheduleNameField(name = name, onNameChange = { name = it })
+            CreateScheduleNameField(
+                name = name,
+                onNameChange = { name = it },
+                focusRequester = nameFocusRequester,
+            )
             Spacer(Modifier.height(14.dp))
             CreateSchedulePromptField(prompt = prompt, onPromptChange = { prompt = it })
             Spacer(Modifier.height(14.dp))
@@ -126,10 +137,19 @@ private fun CreateScheduleModalHeader(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun CreateScheduleNameField(name: String, onNameChange: (String) -> Unit) {
+private fun CreateScheduleNameField(
+    name: String,
+    onNameChange: (String) -> Unit,
+    focusRequester: FocusRequester,
+) {
     Text("NAME", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.customColors.onSurfaceMutedColor)
     Spacer(Modifier.height(6.dp))
-    DesktopTextField(value = name, onValueChange = onNameChange, placeholder = "Morning briefing", modifier = Modifier.fillMaxWidth())
+    DesktopTextField(
+        value = name,
+        onValueChange = onNameChange,
+        placeholder = "Morning briefing",
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
+    )
 }
 
 @Composable

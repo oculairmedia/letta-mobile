@@ -60,7 +60,7 @@ internal fun FavoriteAgentCard(
 ) {
     var showContextMenu by remember { mutableStateOf(false) }
     val toolCount = agent.tools.size
-    val blockCount = agent.blocks.size
+    val blockCount = agent.coreBlocks.size
     val supporting = agent.description
         ?.takeIf { it.isNotBlank() }
         ?: agent.model
@@ -260,7 +260,7 @@ internal fun AgentCard(
     val view = LocalView.current
 
     val toolCount = agent.tools.size
-    val blockCount = agent.blocks.size
+    val blockCount = agent.coreBlocks.size
     val supporting = agent.description
         ?.takeIf { it.isNotBlank() }
         ?: agent.model

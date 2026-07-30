@@ -10,6 +10,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -97,6 +98,24 @@ class IrohAgentAndScheduleRepositoryTest {
 
         assertEquals("Fresh", agent.name)
         assertEquals("Fresh", repository.getCachedAgent(AgentId("agent-1"))?.name)
+    }
+
+    @Test
+    fun getAgentPropagatesCancellationInsteadOfReturningCachedAgent() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohAdminTransport()
+        transport.rpcResponder = { call ->
+            when (call.method) {
+                "agent.list" -> ok("""[{"id":"agent-1","name":"Cached"}]""")
+                "agent.get" -> throw CancellationException("cancelled")
+                else -> error("unexpected rpc ${call.method}")
+            }
+        }
+        val repository = IrohAgentRepository { IrohAdminRpcAgentDirectory(transport) }
+        repository.refreshAgents()
+
+        kotlin.test.assertFailsWith<CancellationException> {
+            repository.getAgent(AgentId("agent-1")).first()
+        }
     }
 
     @Test
