@@ -105,12 +105,33 @@ internal fun MessageToolCalls(
     approvalRequest: UiApprovalRequest? = null,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
+    // letta-mobile-nfaks: this composable is the NON-run tool card path (a tool-call
+    // message that never got grouped into a RunBlock step). It previously ignored
+    // LocalUseProjectedToolTimeline entirely, so with the projected timeline on, one
+    // conversation could show two different tool card styles: run-grouped calls came
+    // out as projected StatusTimeline rows while a standalone message still rendered
+    // the legacy ToolCallCard / CompactToolCallGroupCard. Route through the same
+    // projection so the presentation is decided by the flag, not by whether the
+    // message happened to land inside a multi-message run.
+    if (LocalUseProjectedToolTimeline.current) {
+        ProjectedMessageToolCalls(
+            toolCalls = toolCalls,
+            modifier = modifier,
+            messageId = messageId,
+            animateEntrance = animateEntrance,
+            approvalRequest = approvalRequest,
+            onAttachmentImageTap = onAttachmentImageTap,
+        )
+        return
+    }
+
     val pendingApprovalToolCallIds = remember(approvalRequest) {
         approvalRequest?.toolCalls
             ?.mapTo(mutableSetOf()) { it.toolCallId }
             .orEmpty()
     }
     val reducedMotion = rememberReducedMotionEnabled()
+
     // letta-mobile-7kpxn: a streaming message can flip from a single
     // ToolCallCard to the multi-tool CompactToolCallGroupCard as additional
     // tool calls land. Previously this was a bare `if/else` swap that popped
