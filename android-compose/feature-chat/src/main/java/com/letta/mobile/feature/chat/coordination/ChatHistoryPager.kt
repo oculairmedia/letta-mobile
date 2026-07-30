@@ -137,17 +137,7 @@ internal class ChatHistoryPager(
                 }
 
                 val previousCount = uiState.value.messages.size
-                if (approvalEvidenceConversationId != conversationId) {
-                    respondedRequestRuns.clear()
-                    returnedCallRuns.clear()
-                    approvalEvidenceConversationId = conversationId
-                }
-                respondedRequestRuns += olderPage.approvalEvidence.respondedRequestRuns
-                returnedCallRuns += olderPage.approvalEvidence.returnedCallRuns
-                val resolvedRequestIds = resolvedApprovalRequestFactIds(
-                    olderPage.approvalRequests,
-                    ApprovalTerminalEvidence(respondedRequestRuns, returnedCallRuns),
-                )
+                val resolvedRequestIds = accumulateResolvedApprovals(conversationId, olderPage)
                 val olderUi = olderMessages.toUiMessages(resolvedRequestIds)
                 val mergedMessages = chatTimelineObserver.mergeOlderPage(
                     conversationId = conversationId,
@@ -196,6 +186,23 @@ internal class ChatHistoryPager(
                 }
             }
         }
+    }
+
+    private fun accumulateResolvedApprovals(
+        conversationId: String,
+        page: com.letta.mobile.data.repository.api.OlderMessagesPage,
+    ): Set<String> {
+        if (approvalEvidenceConversationId != conversationId) {
+            respondedRequestRuns.clear()
+            returnedCallRuns.clear()
+            approvalEvidenceConversationId = conversationId
+        }
+        respondedRequestRuns += page.approvalEvidence.respondedRequestRuns
+        returnedCallRuns += page.approvalEvidence.returnedCallRuns
+        return resolvedApprovalRequestFactIds(
+            page.approvalRequests,
+            ApprovalTerminalEvidence(respondedRequestRuns, returnedCallRuns),
+        )
     }
 
     /**
