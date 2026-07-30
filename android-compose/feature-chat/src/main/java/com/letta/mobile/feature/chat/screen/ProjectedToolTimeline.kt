@@ -22,6 +22,7 @@ import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.data.chat.projection.ToolTimelineProjector
 import com.letta.mobile.data.chat.projection.ToolTimelineState
 import com.letta.mobile.data.chat.projection.aggregateState
+import com.letta.mobile.data.chat.projection.projectToolTimelineGroupFromCalls
 import com.letta.mobile.data.chat.projection.toWireStatus
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiImageAttachment
@@ -123,6 +124,57 @@ internal fun ProjectedToolTimelineGroupStepRow(
             onAttachmentImageTap = onAttachmentImageTap,
         )
     }
+}
+
+/**
+ * Projected presentation for tool calls that are NOT part of a multi-message run step
+ * (letta-mobile-nfaks).
+ *
+ * [MessageToolCalls] used to render the legacy card family unconditionally, so with the
+ * projected timeline enabled a single conversation could show two different tool card
+ * styles side by side — projected StatusTimeline rows for run-grouped calls, legacy
+ * cards for a standalone tool-call message. This routes the standalone case through the
+ * same projector and the same [ProjectedToolTimelineGroupCard], so the flag alone decides
+ * the presentation.
+ *
+ * The group is keyed on the message id, matching the message-backed key the run path
+ * derives, so a message that later gets absorbed into a run step keeps its row identity
+ * (no re-entrance animation, no expansion state loss).
+ *
+ * Approval controls are deliberately NOT rendered here: the bubble
+ * ([ChatMessageBubble]) already renders [ApprovalRequestControls] beneath any
+ * tool-call-bearing message, and passing them down would duplicate the buttons.
+ */
+@Composable
+internal fun ProjectedMessageToolCalls(
+    toolCalls: List<UiToolCall>,
+    modifier: Modifier = Modifier,
+    messageId: String? = null,
+    animateEntrance: Boolean = false,
+    approvalRequest: UiApprovalRequest? = null,
+    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
+) {
+    val groupKey = remember(messageId) { "group:message:${messageId.orEmpty()}" }
+    val groups = remember(toolCalls, approvalRequest, groupKey) {
+        RenderDiagnostics.measureProjection {
+            listOfNotNull(
+                projectToolTimelineGroupFromCalls(
+                    toolCalls = toolCalls,
+                    groupKey = groupKey,
+                    messageId = messageId,
+                    approvalRequest = approvalRequest,
+                ),
+            )
+        }
+    }
+    if (groups.isEmpty()) return
+
+    ProjectedToolTimelineGroupCard(
+        groups = groups,
+        modifier = modifier,
+        animateRows = animateEntrance,
+        onAttachmentImageTap = onAttachmentImageTap,
+    )
 }
 
 /**

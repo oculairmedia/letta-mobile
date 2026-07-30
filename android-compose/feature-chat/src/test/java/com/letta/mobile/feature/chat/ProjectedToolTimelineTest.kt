@@ -17,7 +17,9 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.screen.LocalUseProjectedToolTimeline
+import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import com.letta.mobile.feature.chat.screen.RunBlock
+import kotlinx.collections.immutable.persistentListOf
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertEquals
@@ -620,6 +622,76 @@ class ProjectedToolTimelineTest {
             ),
         ),
     )
+
+    // letta-mobile-nfaks: MessageToolCalls is the standalone (non-run) tool card path.
+    // It used to ignore LocalUseProjectedToolTimeline, so a conversation could show two
+    // different tool card styles at once. These two tests pin the flag as the single
+    // decider: projected rows when on, legacy card when off.
+    @Test
+    fun messageToolCalls_usesProjectedTimelineWhenFlagOn() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
+                        MessageToolCalls(
+                            toolCalls = persistentListOf(
+                                UiToolCall(
+                                    name = "Bash",
+                                    arguments = """{"command":"pwd"}""",
+                                    result = null,
+                                    toolCallId = "call-a",
+                                ),
+                            ),
+                            messageId = "msg-standalone",
+                        )
+                    }
+                }
+            }
+        }
+
+        // The projected row family renders the projector's summary label.
+        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+    }
+
+    @Test
+    fun messageToolCalls_usesLegacyCardWhenFlagOff() {
+        composeRule.setContent {
+            LettaTheme(
+                appTheme = AppTheme.LIGHT,
+                themePreset = ThemePreset.DEFAULT,
+                dynamicColor = false,
+            ) {
+                LettaChatTheme {
+                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides false) {
+                        MessageToolCalls(
+                            toolCalls = persistentListOf(
+                                UiToolCall(
+                                    name = "Bash",
+                                    arguments = """{"command":"pwd"}""",
+                                    result = null,
+                                    toolCallId = "call-a",
+                                ),
+                                UiToolCall(
+                                    name = "Bash",
+                                    arguments = """{"command":"ls"}""",
+                                    result = null,
+                                    toolCallId = "call-b",
+                                ),
+                            ),
+                            messageId = "msg-standalone",
+                        )
+                    }
+                }
+            }
+        }
+
+        // Legacy grouped card keeps its "N tool calls" header.
+        composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
+    }
 
     private fun toolMessage(
         id: String,
