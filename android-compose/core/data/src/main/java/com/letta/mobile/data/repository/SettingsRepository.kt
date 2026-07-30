@@ -274,26 +274,15 @@ class SettingsRepository internal constructor(
     }
 
     override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
-        val normalizedAgentId = agentId.takeIf { it.isNotBlank() } ?: return
-        // letta-mobile-etib9: a blank/absent agentName must NOT erase a name we
-        // already resolved for this same agent. The chat screen calls this on
-        // entry with whatever the nav arg carried, which is blank on a cold
-        // start; treating that as a "remove" dropped LAST_CHAT_AGENT_NAME, and
-        // the next launch restored the now-nameless selection as a blank nav
-        // arg, re-seeding a blank header forever. Blank is a no-op (carry the
-        // previous name forward), never a clear.
-        //
-        // Only carry forward when the agent is unchanged: reusing the previous
-        // agent's name for a DIFFERENT agent would render a confidently wrong
-        // name, which is worse than an empty one.
-        val previous = _lastChatSelection.value
-        val resolvedAgentName = agentName?.takeIf { it.isNotBlank() }
-            ?: previous?.takeIf { it.agentId == normalizedAgentId }?.agentName
-        val selection = LastChatSelection(
-            agentId = normalizedAgentId,
-            agentName = resolvedAgentName,
-            conversationId = conversationId?.takeIf { it.isNotBlank() },
-        )
+        // letta-mobile-etib9: merge policy (blank name is a no-op, carried
+        // forward only for the same agent) lives in sharedLogic/commonMain so
+        // production and every test substitute share one implementation.
+        val selection = mergeLastChatSelection(
+            previous = _lastChatSelection.value,
+            agentId = agentId,
+            agentName = agentName,
+            conversationId = conversationId,
+        ) ?: return
         _lastChatSelection.update { selection }
         secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_ID.name, selection.agentId)
         val selectedAgentName = selection.agentName
