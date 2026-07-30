@@ -274,12 +274,15 @@ class SettingsRepository internal constructor(
     }
 
     override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
-        val normalizedAgentId = agentId.takeIf { it.isNotBlank() } ?: return
-        val selection = LastChatSelection(
-            agentId = normalizedAgentId,
-            agentName = agentName?.takeIf { it.isNotBlank() },
-            conversationId = conversationId?.takeIf { it.isNotBlank() },
-        )
+        // letta-mobile-etib9: merge policy (blank name is a no-op, carried
+        // forward only for the same agent) lives in sharedLogic/commonMain so
+        // production and every test substitute share one implementation.
+        val selection = mergeLastChatSelection(
+            previous = _lastChatSelection.value,
+            agentId = agentId,
+            agentName = agentName,
+            conversationId = conversationId,
+        ) ?: return
         _lastChatSelection.update { selection }
         secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_ID.name, selection.agentId)
         val selectedAgentName = selection.agentName

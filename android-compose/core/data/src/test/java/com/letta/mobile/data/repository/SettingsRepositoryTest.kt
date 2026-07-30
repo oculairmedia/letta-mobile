@@ -318,4 +318,57 @@ class SettingsRepositoryTest {
         initialRepo.setChatTimelineMode(ChatTimelineMode.TIMELINE_V1)
         assertEquals(ChatTimelineMode.TIMELINE_V1, restoredRepo.getChatTimelineMode().first())
     }
+
+    // letta-mobile-etib9: a blank agentName from a cold-start nav arg must not
+    // erase a previously resolved name, and must not survive across a switch to
+    // a different agent.
+    @Test
+    fun `setLastChatSelection blank agentName preserves stored name for same agent`() {
+        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+
+        repository.setLastChatSelection("agent-1", null, "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+
+        repository.setLastChatSelection("agent-1", "   ", "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+    }
+
+    @Test
+    fun `setLastChatSelection blank agentName does not leak name across agents`() {
+        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        repository.setLastChatSelection("agent-2", null, "conv-2")
+
+        assertEquals("agent-2", repository.lastChatSelection.value?.agentId)
+        assertNull(repository.lastChatSelection.value?.agentName)
+    }
+
+    @Test
+    fun `stored agent name survives restart after a blank selection write`() {
+        val secureStore = InMemorySecureSettingsStore()
+        val dataStore = createTestPreferencesDataStore()
+        val initialRepo = SettingsRepository(
+            dataStore = dataStore,
+            secureSettingsStore = secureStore,
+        )
+
+        initialRepo.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        // Cold-start entry into chat re-writes the selection with a blank name.
+        initialRepo.setLastChatSelection("agent-1", null, "conv-1")
+
+        val restoredRepo = SettingsRepository(
+            dataStore = dataStore,
+            secureSettingsStore = secureStore,
+        )
+        assertEquals("PM-letta-mobile", restoredRepo.lastChatSelection.value?.agentName)
+    }
+
+    @Test
+    fun `setLastChatSelection still stores a newly resolved name`() {
+        repository.setLastChatSelection("agent-1", null, "conv-1")
+        assertNull(repository.lastChatSelection.value?.agentName)
+
+        repository.setLastChatSelection("agent-1", "PM-letta-mobile", "conv-1")
+        assertEquals("PM-letta-mobile", repository.lastChatSelection.value?.agentName)
+    }
 }
