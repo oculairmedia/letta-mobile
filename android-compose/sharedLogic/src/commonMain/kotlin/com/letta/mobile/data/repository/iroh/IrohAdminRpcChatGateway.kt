@@ -518,6 +518,7 @@ class IrohAdminRpcAgentDirectory(
         // `limit` — mirrors the REST cache-refresh paging (AgentRepository
         // CACHE_REFRESH_PAGE_SIZE) and the message.list frame-cap paging.
         val out = ArrayList<Agent>(minOf(limit, 64))
+        val seenIds = HashSet<String>()
         var offset = 0
         while (out.size < limit) {
             val pageLimit = minOf(AGENT_LIST_PAGE_SIZE, limit - out.size)
@@ -528,11 +529,20 @@ class IrohAdminRpcAgentDirectory(
             val page: List<Agent> =
                 adminRpcDecodedList("agent.list", "/v1/agents?limit=$pageLimit&offset=$offset", body)
             if (page.isEmpty()) break
-            out += page
-            // A short page means we've reached the end. (If the server ever
-            // ignored `limit` and returned everything at once, page.size >=
-            // pageLimit keeps us looping; the next offset then returns empty and
-            // we stop — so this is safe either way.)
+            // Only NEW ids count. The comment below used to claim a backend that
+            // ignores `limit` is "safe either way" — it is not. A backend that
+            // ignores BOTH limit and offset returns its first page forever, so
+            // the short-page test never fires and this loop ran to the 2500 cap:
+            // 125 round trips per refresh, each carrying full agent objects,
+            // accumulating the same page over and over. Observed in production.
+            val fresh = page.filter { seenIds.add(it.id.value) }
+            out += fresh
+            // A page that contributes nothing new means the backend is not
+            // paginating; stop rather than hammer it. (Cost of a false positive
+            // is a truncated roster — the same outcome as the old heuristic, but
+            // reached in 2 requests instead of 125.)
+            if (fresh.isEmpty()) break
+            // A short page means we've reached the end.
             if (page.size < pageLimit) break
             offset += page.size
         }
