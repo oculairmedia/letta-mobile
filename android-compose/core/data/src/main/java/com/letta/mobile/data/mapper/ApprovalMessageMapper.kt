@@ -50,15 +50,17 @@ internal fun List<AppMessage>.returnedToolCallIds(): Set<String> = buildSet {
  */
 internal fun List<AppMessage>.resolvedApprovalRequestIds(
     returnedToolCallIds: Set<String>,
-): Set<String> = buildSet {
-    for (message in this@resolvedApprovalRequestIds) {
-        if (message.messageType != MessageType.APPROVAL_REQUEST) continue
-        val request = message.approvalRequest ?: continue
-        val callIds = request.toolCalls.map(ApprovalToolCallPayload::toolCallId)
-            .filter(String::isNotBlank)
-        if (callIds.isEmpty()) continue
-        if (callIds.all { it in returnedToolCallIds }) add(message.id)
-    }
+): Set<String> =
+    filter { it.isResolvedApprovalRequest(returnedToolCallIds) }
+        .mapTo(mutableSetOf(), AppMessage::id)
+
+private fun AppMessage.isResolvedApprovalRequest(returnedToolCallIds: Set<String>): Boolean {
+    if (messageType != MessageType.APPROVAL_REQUEST) return false
+    val callIds = approvalRequest?.toolCalls
+        ?.map(ApprovalToolCallPayload::toolCallId)
+        ?.filter(String::isNotBlank)
+        .orEmpty()
+    return callIds.isNotEmpty() && callIds.all { it in returnedToolCallIds }
 }
 
 internal fun List<AppMessage>.foldedApprovals(
