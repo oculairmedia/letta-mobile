@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
+import com.letta.mobile.data.repository.mergeLastChatSelection
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -134,11 +135,14 @@ class FakeSettingsRepository(
     override fun getPinnedConversationIds(): Flow<Set<String>> = pinnedConversationIds
 
     override fun setLastChatSelection(agentId: String, agentName: String?, conversationId: String?) {
-        lastChatSelectionState.value = LastChatSelection(
+        // letta-mobile-etib9: share the production merge policy so tests written
+        // against ISettingsRepository exercise real blank-name semantics.
+        lastChatSelectionState.value = mergeLastChatSelection(
+            previous = lastChatSelectionState.value,
             agentId = agentId,
             agentName = agentName,
             conversationId = conversationId,
-        )
+        ) ?: lastChatSelectionState.value
     }
 
     override suspend fun setConversationPinned(conversationId: String, pinned: Boolean) {
