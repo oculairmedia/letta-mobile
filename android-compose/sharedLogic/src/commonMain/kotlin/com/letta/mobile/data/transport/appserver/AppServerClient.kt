@@ -11,11 +11,11 @@ import kotlinx.coroutines.launch
 /**
  * Typed client for one Letta Code App Server process.
  *
- * The upstream App Server exposes one writable control channel per process plus
- * a receive-only stream channel. Use one direct client/transport as the control
- * owner for a runtime process; multi-client remote access needs an external
- * fanout/arbitration layer instead of several clients writing to the same
- * process.
+ * Upstream ≥ 0.29.7 exposes one bidirectional WebSocket per client. The shared
+ * transport demuxes inbound frames into control vs stream flows by message type.
+ * Use one direct client/transport as the session owner for a runtime process;
+ * multi-client remote access needs an external fanout/arbitration layer instead
+ * of several clients writing to the same process.
  */
 interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>

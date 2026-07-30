@@ -17,16 +17,16 @@ class ExecutableProbeTest {
         val probe = ExecutableProbe(
             runner(
                 mapOf(
-                    "letta --version" to CommandResult(0, "letta 0.28.8"),
-                    "node --version" to CommandResult(0, "v22.19.0"),
+                    "letta --version" to CommandResult(0, "letta 0.29.9"),
+                    "node --version" to CommandResult(0, "v24.18.0"),
                     "letta --help" to CommandResult(0, "Commands:\n  app-server\n  server"),
                     "letta server --help" to CommandResult(0, "Options:\n  --backend <type>"),
                 ),
             ),
         )
         val result = probe.probe("letta")
-        assertEquals("letta 0.28.8", result.lettaVersion)
-        assertEquals("v22.19.0", result.nodeVersion)
+        assertEquals("letta 0.29.9", result.lettaVersion)
+        assertEquals("v24.18.0", result.nodeVersion)
     }
 
     @Test

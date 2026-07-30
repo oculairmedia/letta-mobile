@@ -13,6 +13,7 @@ import com.letta.mobile.data.transport.ChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.runtime.BackendCapabilities
@@ -406,7 +407,7 @@ class WsChatSendCoordinatorTest {
         coordinator.handleEvent(WsTimelineEvent.SubscribeDone(runId = "run-1", lastSeq = 42L, status = "failed"))
         advanceUntilIdle()
 
-        assertEquals("Turn failed", uiState.value.error)
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
         assertEquals(false, uiState.value.isAgentTyping)
         // A "failed" SubscribeDone status marks the optimistic local FAILED,
@@ -955,7 +956,7 @@ class WsChatSendCoordinatorTest {
         coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
         advanceUntilIdle()
 
-        assertEquals("Turn failed", uiState.value.error)
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
         assertEquals(false, uiState.value.isAgentTyping)
     }
@@ -1239,7 +1240,7 @@ class WsChatSendCoordinatorTest {
             timelineRepository.failedLocals.single(),
         )
         assertTrue(timelineRepository.sentLocals.isEmpty())
-        assertEquals("Turn failed", uiState.value.error)
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
         assertEquals(false, uiState.value.isStreaming)
         assertEquals(false, uiState.value.isAgentTyping)
     }
@@ -1330,7 +1331,7 @@ class WsChatSendCoordinatorTest {
         coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
         advanceUntilIdle()
 
-        assertEquals("Turn failed", uiState.value.error)
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
     }
 
     private fun settingsRepository(): () -> LettaConfig? = {

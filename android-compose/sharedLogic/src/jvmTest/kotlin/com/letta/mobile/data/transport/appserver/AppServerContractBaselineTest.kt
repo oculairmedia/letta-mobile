@@ -12,6 +12,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonPrimitive
 
 class AppServerContractBaselineTest {
@@ -39,8 +40,8 @@ class AppServerContractBaselineTest {
         val classifiedCommands = capabilities.flatMap { it.stringSet("commands") }
         val classifiedMessages = capabilities.flatMap { it.stringSet("messages") }
 
-        assertEquals(90, commands.size, "Update the pinned count after reviewing an upstream union change")
-        assertEquals(99, messages.size, "Update the pinned count after reviewing an upstream union change")
+        assertEquals(91, commands.size, "Update the pinned count after reviewing an upstream union change")
+        assertEquals(100, messages.size, "Update the pinned count after reviewing an upstream union change")
         assertEquals(commands, classifiedCommands.toSet())
         assertEquals(messages, classifiedMessages.toSet())
         assertEquals(classifiedCommands.size, classifiedCommands.toSet().size, "A command has multiple capability owners")
@@ -99,12 +100,13 @@ class AppServerContractBaselineTest {
         val reconnect = matrix["reconnect_classes"]!!.jsonObject
 
         assertEquals("app_server_v2", observed.requiredString("classification"))
-        assertEquals("none; installed upstream help and declarations do not label app-server deprecated", observed.requiredString("deprecation_claim"))
-        assertTrue(upstream.requiredString("second_control").contains("1008"))
-        assertTrue(upstream.requiredString("stream_disconnect").contains("control session and runtime remain active"))
-        assertTrue(upstream.requiredString("official_client_disconnect").contains("does not automatically close the sibling"))
-        assertTrue(kotlinPolicy.requiredString("stream_disconnect").contains("rebuild both sockets"))
-        assertTrue(kotlinPolicy.requiredString("note").contains("not required by the upstream server behavior"))
+        assertTrue(observed.requiredString("deprecation_claim").contains("deprecated"))
+        assertTrue(upstream.requiredString("session_model").contains("one bidirectional WebSocket"))
+        assertTrue(upstream.requiredString("legacy_split_channel").contains("426"))
+        assertEquals(false, upstream["capabilities_split_channels"]!!.jsonPrimitive.boolean)
+        assertTrue(upstream.requiredString("official_client").contains("one socket"))
+        assertTrue(kotlinPolicy.requiredString("session_disconnect").contains("rebuild the one socket"))
+        assertTrue(kotlinPolicy.requiredString("note").contains("One-socket reconnect"))
         assertTrue(reconnect.requiredString("turn_input").contains("do_not_blind_retry"))
         assertTrue(reconnect.requiredString("external_tool_result").contains("do_not_reexecute_tool"))
         assertTrue(reconnect.requiredString("event").contains("idempotency_key"))
@@ -117,19 +119,20 @@ class AppServerContractBaselineTest {
         val probes = matrix["cli_probes"]!!.jsonArray.map { it.jsonObject }
             .associateBy { it.requiredString("classification") }
 
-        assertEquals("0.28.8", baseline.requiredString("version"))
+        assertEquals("0.29.9", baseline.requiredString("version"))
         assertEquals("v24.18.0", baseline.requiredString("node"))
         assertEquals("v24.18.0\n", fixtureText(probes.getValue("installed_node_version").requiredString("fixture")))
-        assertEquals("0.28.8 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
+        assertEquals("0.29.9 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
 
         val serverListener = probes.getValue("server_listener")
         val appServer = probes.getValue("app_server_v2")
-        assertProbe(serverListener, expectedUsage = "Usage: letta server", forbiddenUsage = "Usage: letta app-server")
-        assertProbe(appServer, expectedUsage = "Usage: letta app-server", forbiddenUsage = "Usage: letta server")
+        // 0.29.x unified CLI: both probes emit `letta server --listen` help.
+        assertProbe(serverListener, expectedUsage = "Usage:\n  letta server", forbiddenUsage = "Usage: letta app-server")
+        assertProbe(appServer, expectedUsage = "Usage:\n  letta server", forbiddenUsage = "Usage: letta app-server")
         assertTrue("app_server_v2" in appServer.stringSet("capabilities"))
-        assertTrue("app_server_v2" in serverListener.stringSet("not_capabilities"))
+        assertTrue("app_server_v2" in serverListener.stringSet("capabilities"))
+        assertTrue("listen_url" in appServer.stringSet("capabilities"))
         assertTrue("cloud_environment_registration" in serverListener.stringSet("capabilities"))
-        assertTrue("cloud_environment_registration" in appServer.stringSet("not_capabilities"))
     }
 
     @Test
@@ -142,6 +145,11 @@ class AppServerContractBaselineTest {
         assertEquals(baseline.requiredString("version"), source.requiredString("version"))
         assertEquals(baseline.requiredString("node"), source.requiredString("node_version"))
         assertEquals(baseline.requiredString("protocol_sha256"), source.requiredString("protocol_sha256"))
+        assertEquals(
+            baseline.requiredString("protocol_corpus_sha256"),
+            source.requiredString("protocol_corpus_sha256"),
+        )
+        assertEquals(baseline["protocol_corpus_files"], source["protocol_corpus_files"])
         assertTrue(fixtureText("cli-version.txt").startsWith(baseline.requiredString("version")))
         assertEquals("installed-protocol-v2-inventory.json", matrix["observed_installed_contract"]!!.jsonObject.requiredString("protocol_inventory_fixture"))
     }

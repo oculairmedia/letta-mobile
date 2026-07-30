@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeRunStatus
@@ -10,6 +11,7 @@ import com.letta.mobile.runtime.ToolExecutionStatus
 import com.letta.mobile.runtime.ToolName
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -44,6 +46,26 @@ class RuntimeEventServerFrameMapperTest {
     fun failedLifecycle_mapsToTurnDoneFailed() {
         val frames = RuntimeEventServerFrameMapper.map(
             RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Failed, reason = "boom"),
+            context,
+        )
+        // letta-mobile-br5g0: the reason rides an Error frame ahead of the
+        // terminal, otherwise a provider failure reaches the UI as a silent
+        // dead turn with no explanation at all.
+        val error = assertIs<ServerFrame.Error>(frames[0])
+        assertEquals("other", error.code)
+        assertEquals(TurnFailureNotices.GENERIC_MESSAGE, error.message)
+        assertFalse(error.message.contains("boom"))
+        assertEquals("turn-1", error.turnId)
+        assertEquals("run-1", error.runId)
+        val turnDone = assertIs<ServerFrame.TurnDone>(frames[1])
+        assertEquals("failed", turnDone.status)
+        assertEquals(2, frames.size)
+    }
+
+    @Test
+    fun failedLifecycleWithoutReason_mapsToTurnDoneOnly() {
+        val frames = RuntimeEventServerFrameMapper.map(
+            RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Failed, reason = null),
             context,
         )
         val turnDone = assertIs<ServerFrame.TurnDone>(frames.single())

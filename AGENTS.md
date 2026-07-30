@@ -146,6 +146,12 @@ fi
 #    plus CodeScene "Complex Method" and "Excess Function Arguments".
 #    Pre-fix them at dev cost, not after CI flags them.
 ./gradlew --no-daemon :app:detekt   # advisory; do not lower thresholds
+# CodeScene delta — the same analysis the "CodeScene Code Health Review"
+# PR check runs, but local. Needs the `cs` CLI + CS_ACCESS_TOKEN (PAT from
+# https://codescene.io/users/me/pat); skips silently when absent. The
+# pre-push hook runs this automatically in advisory mode; run it by hand
+# (or with CS_DELTA_GATE=1 to hard-fail on findings) via:
+../scripts/codescene/cs-delta.sh
 # Visual scan for: unused imports, `5_000L` that should be `5.seconds`,
 # a method with 6+ params that wants a parameter object, a single
 # function doing dispatch on type — split it before pushing.
@@ -523,13 +529,14 @@ commands live in `README.md`, `CONTRIBUTING.md`, and `android-compose/README.md`
 ### App Server contract / probe toolchain (epic letta-mobile-lgns8)
 
 - For App Server v2 contract and probe work, **Node `v24.18.0`** (via nvm:
-  `~/.nvm/versions/node/v24.18.0/bin/node`) and **`@letta-ai/letta-code@0.28.8`**
+  `~/.nvm/versions/node/v24.18.0/bin/node`) and **`@letta-ai/letta-code@0.29.9`**
   (`~/letta-code-install/node_modules/@letta-ai/letta-code`) are provisioned in the snapshot.
 - The contract verifier pins the exact Node + package versions, so run it with Node 24.18.0:
-  `node scripts/appserver/verify-contract-baseline.mjs --package-root ~/letta-code-install/node_modules/@letta-ai/letta-code`.
+  `~/.nvm/versions/node/v24.18.0/bin/node scripts/appserver/verify-contract-baseline.mjs --package-root ~/letta-code-install/node_modules/@letta-ai/letta-code`.
 - Launch the local App Server for probes with
-  `node <package-root>/letta.js app-server --listen ws://127.0.0.1:4500` (capability-detect the
-  newer `letta server --backend local --listen` syntax where supported).
+  `~/.nvm/versions/node/v24.18.0/bin/node <package-root>/letta.js server --listen ws://127.0.0.1:4500` (or the deprecated
+  `letta app-server --listen` alias). Clients must use the one-socket `/ws` URL — legacy
+  `?channel=control|stream` upgrades are rejected with HTTP 426.
 
 ### Running the app on this VM
 

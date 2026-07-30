@@ -29,7 +29,7 @@ class OwnedAppServerProcessTest {
     @Test
     fun `spawn parses the announced listen url and owns the live child`() {
         val owned = OwnedAppServerProcess.spawn(
-            command = sh("""echo 'Listening on ws://127.0.0.1:41234'; echo 'Control: ws://127.0.0.1:41234/ws?channel=control'; sleep 30"""),
+            command = sh("""echo 'Listening on ws://127.0.0.1:41234'; echo 'Control: ws://127.0.0.1:41234/ws'; sleep 30"""),
         )
         try {
             assertEquals("ws://127.0.0.1:41234", owned.wsBaseUrl)
