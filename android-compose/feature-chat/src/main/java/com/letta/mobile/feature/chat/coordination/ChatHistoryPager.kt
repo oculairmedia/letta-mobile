@@ -137,8 +137,7 @@ internal class ChatHistoryPager(
                 }
 
                 val previousCount = uiState.value.messages.size
-                val resolvedRequestIds = accumulateResolvedApprovals(conversationId, olderPage)
-                val olderUi = olderMessages.toUiMessages(resolvedRequestIds)
+                val olderUi = projectOlderPage(conversationId, olderPage)
                 val mergedMessages = chatTimelineObserver.mergeOlderPage(
                     conversationId = conversationId,
                     olderMessages = olderUi,
@@ -204,6 +203,11 @@ internal class ChatHistoryPager(
             ApprovalTerminalEvidence(respondedRequestRuns, returnedCallRuns),
         )
     }
+
+    private fun projectOlderPage(
+        conversationId: String,
+        page: com.letta.mobile.data.repository.api.OlderMessagesPage,
+    ): List<UiMessage> = page.messages.toUiMessages(accumulateResolvedApprovals(conversationId, page))
 
     /**
      * Sliding-window release: called when the user scrolls back toward the
