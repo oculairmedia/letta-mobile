@@ -1,7 +1,7 @@
 {
   "source": {
     "package": "@letta-ai/letta-code",
-    "version": "0.29.9",
+    "version": "0.29.12",
     "node_version": "v24.18.0",
     "public_export": "dist/types/types/app-server-protocol.d.ts",
     "protocol_declaration": "dist/types/types/protocol_v2.d.ts",

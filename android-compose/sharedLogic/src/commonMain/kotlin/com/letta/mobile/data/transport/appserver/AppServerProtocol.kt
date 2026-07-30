@@ -360,7 +360,7 @@ sealed interface AppServerCommand {
     ) : AppServerCommand
 
     // Runtime-native admin commands (lgns8.7), shapes pinned against the
-    // installed @letta-ai/letta-code 0.29.9 protocol declaration. query/body
+    // installed @letta-ai/letta-code 0.29.12 protocol declaration. query/body
     // stay raw JSON so unknown upstream fields pass through untouched.
 
     @Serializable
