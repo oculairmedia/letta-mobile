@@ -4,7 +4,7 @@
     "decided_at": "2026-07-22",
     "review_status": "phase4-complete; zero shim_until_cutover operation fallbacks (letta-mobile-lgns8.10.4)",
     "sources": [
-      "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.29.9, lgns8.21.1)",
+      "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.29.12, lgns8.21.1)",
       "app-server-v2-contract-matrix.json (lgns8.1)",
       "docs/architecture/app-server-rest-admin-audit-fanout.md (ph9ws.14/.15, lgns8.1)",
       "AdminRpcRegistry.buildRouter registered methods (enumerated by IrohAdminOwnershipMatrixTest)"

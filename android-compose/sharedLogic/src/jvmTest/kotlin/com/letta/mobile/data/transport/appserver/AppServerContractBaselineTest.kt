@@ -119,10 +119,10 @@ class AppServerContractBaselineTest {
         val probes = matrix["cli_probes"]!!.jsonArray.map { it.jsonObject }
             .associateBy { it.requiredString("classification") }
 
-        assertEquals("0.29.9", baseline.requiredString("version"))
+        assertEquals("0.29.12", baseline.requiredString("version"))
         assertEquals("v24.18.0", baseline.requiredString("node"))
         assertEquals("v24.18.0\n", fixtureText(probes.getValue("installed_node_version").requiredString("fixture")))
-        assertEquals("0.29.9 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
+        assertEquals("0.29.12 (Letta Code)\n", fixtureText(probes.getValue("installed_version").requiredString("fixture")))
 
         val serverListener = probes.getValue("server_listener")
         val appServer = probes.getValue("app_server_v2")
