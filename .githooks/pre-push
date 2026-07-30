@@ -55,3 +55,9 @@ if [ -z "${JAVA_HOME:-}" ]; then
 fi
 
 ./gradlew :app:compileRootDebugKotlin
+
+# 3. CodeScene delta (advisory) — surfaces the code-health findings the
+#    "CodeScene Code Health Review" PR check would flag, before the push.
+#    Skips silently when the `cs` CLI or CS_ACCESS_TOKEN is absent; set
+#    CS_DELTA_GATE=1 to make findings block the push.
+"$repo_root/scripts/codescene/cs-delta.sh" || exit 1

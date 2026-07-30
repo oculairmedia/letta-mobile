@@ -422,6 +422,80 @@ class AppServerTurnEngineTest {
     }
 
     @Test
+    fun engineWithoutExplicitPermissionModeAutoApprovesToolCalls() = runTest {
+        // letta-mobile-h5t1g: an engine built with no explicit mode (cold start,
+        // nothing cached) must approve tool calls instead of parking the turn until
+        // the idle watchdog force-fails it.
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(client = client)
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertIs<AppServerInputPayload.CreateMessage>(assertIs<AppServerCommand.Input>(client.sentCommands.single()).payload)
+
+            client.emit(
+                AppServerInboundFrame.ControlRequest(
+                    requestId = "approval-1",
+                    request = buildJsonObject {
+                        put("subtype", "can_use_tool")
+                        put("tool_name", "searxng_web_search")
+                        put("tool_call_id", "tool-call-1")
+                        put("input", buildJsonObject { put("query", "iroh") })
+                    },
+                    agentId = runtime.agentId,
+                    conversationId = runtime.conversationId,
+                ),
+            )
+            runCurrent()
+
+            val approvalInput = assertIs<AppServerCommand.Input>(client.sentCommands.last())
+            val approval = assertIs<AppServerInputPayload.ApprovalResponse>(approvalInput.payload)
+            assertEquals("approval-1", approval.requestId)
+            assertIs<AppServerApprovalResponseDecision.Allow>(approval.decision)
+
+            assertIs<RuntimeEventPayload.ToolCallObserved>(awaitItem().payload)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun explicitStandardModeStillSurfacesApprovalInsteadOfAutoApproving() = runTest {
+        // letta-mobile-h5t1g: the default changed, but an explicitly requested
+        // Standard mode must still gate tool calls behind a user decision.
+        val client = FakeAppServerClient()
+        val engine = AppServerTurnEngine(
+            client = client,
+            permissionMode = AppServerPermissionMode.Standard,
+        )
+
+        engine.runTurn(command).test {
+            assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
+            assertEquals(1, client.sentCommands.size)
+
+            client.emit(
+                AppServerInboundFrame.ControlRequest(
+                    requestId = "approval-1",
+                    request = buildJsonObject {
+                        put("subtype", "can_use_tool")
+                        put("tool_name", "searxng_web_search")
+                        put("tool_call_id", "tool-call-1")
+                        put("input", buildJsonObject { put("query", "iroh") })
+                    },
+                    agentId = runtime.agentId,
+                    conversationId = runtime.conversationId,
+                ),
+            )
+            runCurrent()
+
+            // No approval answered on the wire: only the original CreateMessage.
+            assertEquals(1, client.sentCommands.size)
+            val approvalRequested = assertIs<RuntimeEventPayload.ApprovalRequested>(awaitItem().payload)
+            assertEquals("approval-1", approvalRequested.request.approvalId.value)
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun unrestrictedRuntimeAutoApprovesStreamedApprovalRequestMessagesWithoutEmittingCards() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(

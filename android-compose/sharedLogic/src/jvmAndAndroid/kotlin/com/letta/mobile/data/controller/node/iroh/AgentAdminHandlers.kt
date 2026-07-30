@@ -25,19 +25,36 @@ object AgentAdminHandlers {
     ) {
         val nativeClient = tiers.nativeClient
         router.register("agent.list") { params ->
-            val limit = param(params, AdminParamKey("limit"))
-            val offset = param(params, AdminParamKey("offset"))
+            val limit = param(params, AdminParamKey("limit"))?.toLongOrNull()?.coerceAtLeast(1L)
+            val offset = param(params, AdminParamKey("offset"))?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
             NativeAdmin.require(nativeClient, NativeAdminOp.AgentList) { c ->
+                // letta-mobile-pu7j7: the lc-local-backend pages by `after`
+                // cursor and has NO offset concept — a forwarded offset was
+                // silently dropped, so every page of a paged roster sweep
+                // returned the same first ~20 agents (the store's default
+                // limit) and agents beyond page 1 never resolved. Emulate
+                // offset here: fetch offset+limit rows in one read (the store
+                // is in-memory) and slice locally, preserving the admin RPC's
+                // limit/offset contract for both clients.
+                val pageSize = limit ?: DEFAULT_AGENT_LIST_LIMIT
+                val fetch = (offset + pageSize).coerceAtMost(MAX_AGENT_LIST_FETCH)
                 val response = c.agentList(
                     AppServerCommand.AgentList(
                         requestId = NativeAdmin.requestId(),
-                        query = NativeAdmin.queryOf(
-                            "limit" to limit,
-                            "offset" to offset,
-                        ),
+                        query = NativeAdmin.queryOf("limit" to fetch.toString()),
                     ),
                 )
-                if (response.success) response.agents ?: JsonArray(emptyList()) else null
+                when {
+                    !response.success -> null
+                    else -> {
+                        val all = response.agents ?: JsonArray(emptyList())
+                        if (offset == 0L && all.size <= pageSize) {
+                            all
+                        } else {
+                            JsonArray(all.drop(offset.toInt()).take(pageSize.toInt()))
+                        }
+                    }
+                }
             }
         }
         router.register("agent.get") { params ->
@@ -109,5 +126,15 @@ object AgentAdminHandlers {
         }
     }
 
-}
 
+    /** Mirrors the lc-local-backend default page size for agent.list. */
+    private const val DEFAULT_AGENT_LIST_LIMIT = 20L
+
+    /**
+     * letta-mobile-pu7j7: ceiling for the offset-emulation fetch so a bogus
+     * offset cannot request an unbounded read. Far above any real roster
+     * (~100 agents in production stores).
+     */
+    private const val MAX_AGENT_LIST_FETCH = 10_000L
+
+}

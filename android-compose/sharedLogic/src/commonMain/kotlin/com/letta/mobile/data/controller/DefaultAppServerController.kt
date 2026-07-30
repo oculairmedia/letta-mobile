@@ -6,6 +6,7 @@ import com.letta.mobile.data.controller.registry.RuntimeRecord
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
+import com.letta.mobile.data.runtime.RuntimePermissionDefaults
 import com.letta.mobile.data.runtime.TurnContextPreflight
 import kotlin.time.Clock
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -69,6 +70,16 @@ class DefaultAppServerController(
      * observed synchronously (avoids Default-dispatcher races under runTest).
      */
     private val parentCoroutineContext: CoroutineContext = EmptyCoroutineContext,
+    /**
+     * letta-mobile-h5t1g: the mode used whenever a caller passes no explicit mode
+     * and nothing is cached for the runtime key (cold start, reconnect, eviction).
+     * Single source of truth for every fallback in this class — an explicit mode
+     * (e.g. from a `runtime_start` frame) always wins. letta-mobile-4mps3 will bind
+     * the settings toggle here instead of the hardcoded default.
+     */
+    private val defaultPermissionMode: () -> AppServerPermissionMode = {
+        RuntimePermissionDefaults.DEFAULT_MODE
+    },
 ) : AppServerController {
     private val controllerScope = CoroutineScope(SupervisorJob() + parentCoroutineContext)
     /** lgns8.22.4: bumps on every transport disconnect so leases are generation-scoped. */
@@ -102,7 +113,7 @@ class DefaultAppServerController(
             clientInfo = clientInfo,
             permissionModeProvider = { command ->
                 runtimePermissionModes[RuntimeKey(command.agentId.value, command.conversationId.value)]
-                    ?: AppServerPermissionMode.Standard
+                    ?: defaultPermissionMode()
             },
             requestIdFactory = requestIdFactory,
             externalToolRegistry = externalToolRegistry,
@@ -142,10 +153,11 @@ class DefaultAppServerController(
         val canonical = runtimeMutex.withLock {
             if (connectionGeneration.value != startedGeneration) return@withLock null
             val scope = response.runtime ?: return@withLock null
-            // Engine-started runtimes default to Standard when no mode was stored;
-            // record it so a later startRuntime(Standard) reuses the cache.
+            // letta-mobile-h5t1g: engine-started runtimes use the default mode when
+            // none was stored; record it so a later startRuntime with the same mode
+            // reuses the cache instead of evicting on a phantom mismatch.
             if (key !in runtimePermissionModes) {
-                runtimePermissionModes[key] = AppServerPermissionMode.Standard
+                runtimePermissionModes[key] = defaultPermissionMode()
             }
             CanonicalRuntime(
                 scope = scope,
@@ -189,7 +201,10 @@ class DefaultAppServerController(
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime {
         val key = RuntimeKey(agentId.value, conversationId.value)
-        val effectiveMode = mode ?: AppServerPermissionMode.Standard
+        // Explicit request wins; otherwise honor a mode retained across disconnect
+        // (ReconnectCoordinator calls startRuntime without mode). Only the fully
+        // absent case falls back to the cold-start default (letta-mobile-h5t1g).
+        val effectiveMode = mode ?: runtimePermissionModes[key] ?: defaultPermissionMode()
         evictCachedRuntimeIfModeMismatch(key, effectiveMode)?.let { return it }
         runtimePermissionModes[key] = effectiveMode
         val response = startRuntimeRemote(

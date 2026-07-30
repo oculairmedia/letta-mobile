@@ -13,7 +13,6 @@ import io.ktor.websocket.readText
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -23,23 +22,27 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * Ktor-backed App Server transport (letta-mobile-lgns8.2: atomic dual-WebSocket
- * connection generation with truthful readiness).
+ * Ktor-backed App Server transport (letta-mobile-lgns8.21.1: one bidirectional
+ * WebSocket session with truthful readiness).
  *
- * The control and stream sockets form ONE connection generation:
+ * Letta Code ≥ 0.29.7 rejects legacy `?channel=control|stream` upgrades with
+ * HTTP 426. This transport opens a single `/ws` session:
  * - [connectionState] starts [AppServerConnectionState.Disconnected] — never
- *   optimistically connected — and only reaches [AppServerConnectionState.Ready]
- *   once BOTH sockets are open.
- * - The first socket to close or fail tears down the whole generation (cancels
- *   the sibling socket and closes the control queue so pending sends fail) and
- *   moves to [AppServerConnectionState.Failed], distinguishing terminal
- *   auth/config failures from retryable drops.
+ *   optimistically connected — and reaches [AppServerConnectionState.Ready]
+ *   once the socket is open.
+ * - Close or failure tears down the generation (closes the command queue so
+ *   pending sends fail) and moves to [AppServerConnectionState.Failed],
+ *   distinguishing terminal auth/config failures from retryable drops.
+ * - Inbound frames are decoded once, then demuxed into [controlFrames] /
+ *   [streamFrames] by message type so existing request correlation and stream
+ *   observers keep working without dual sockets.
  *
  * `bearerToken` is intentionally optional: loopback App Server runs omit WS auth,
- * while non-loopback/headless hosts should launch `letta app-server` with
- * `--ws-auth` and pass the matching bearer token here.
+ * while non-loopback/headless hosts should launch `letta app-server` / `letta
+ * server --listen` with `--ws-auth` and pass the matching bearer token here.
  */
 class KtorAppServerWebSocketTransport(
     private val httpClient: HttpClient,
@@ -58,7 +61,7 @@ class KtorAppServerWebSocketTransport(
 
     private val coordinator = AppServerConnectionGeneration(
         onTeardown = {
-            // Fail pending/buffered sends, then cancel both sockets atomically.
+            // Fail pending/buffered sends, then cancel the session socket.
             controlCommandQueue.close(CancellationException("App Server connection generation torn down"))
             generationJob.cancel(CancellationException("App Server connection generation torn down"))
         },
@@ -74,8 +77,7 @@ class KtorAppServerWebSocketTransport(
     init {
         genScope.launch {
             coordinator.markConnecting()
-            launch { runChannel(AppServerChannel.Control) }
-            launch { runChannel(AppServerChannel.Stream) }
+            runSession()
         }
     }
 
@@ -88,60 +90,121 @@ class KtorAppServerWebSocketTransport(
         generationJob.cancelAndJoinQuietly()
     }
 
-    private suspend fun runChannel(channel: AppServerChannel) {
+    private suspend fun runSession() {
         var terminal = false
         var reason: String? = null
         try {
             httpClient.webSocket(
-                urlString = appServerChannelUrl(baseUrl, channel),
+                urlString = appServerUrl(baseUrl),
                 request = { bearerToken?.let(::bearerAuth) },
             ) {
-                coordinator.onChannelOpen(channel)
-                if (channel == AppServerChannel.Control) {
-                    runControlSession()
-                } else {
-                    receiveFrames(channel, streamFrameFlow)
-                }
-                val closeReason = closeReason.await()
+                coordinator.onSessionOpen()
+                val closeReason = runBidirectionalSession()
                 terminal = closeReason.isTerminal()
-                reason = closeReason?.let { "${it.code} ${it.message}".trim() } ?: "${channel.name} channel closed"
+                reason = closeReason?.let { "${it.code} ${it.message}".trim() } ?: "App Server session closed"
             }
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (error: Throwable) {
             terminal = error.isTerminalHandshakeFailure()
-            reason = error.message ?: "${channel.name} channel error"
+            reason = error.message ?: "App Server session error"
         } finally {
-            // Idempotent: the first channel to finish finalizes the generation and
-            // triggers teardown; the sibling's later call is a no-op.
-            coordinator.onChannelClosedOrFailed(terminal = terminal, reason = reason)
+            coordinator.onSessionClosedOrFailed(terminal = terminal, reason = reason)
         }
     }
 
-    private suspend fun DefaultClientWebSocketSession.runControlSession() = coroutineScope {
+    /**
+     * @return the peer [CloseReason] observed for this session. Drain timeouts
+     * after a clean EOF still return that close reason so a terminal policy
+     * close is not misclassified as a retryable delivery failure.
+     */
+    private suspend fun DefaultClientWebSocketSession.runBidirectionalSession(): CloseReason? = coroutineScope {
+        // Keep control delivery independent from a slow stream collector without
+        // allowing either handoff to retain an unbounded number of frames. A full
+        // queue fails the generation explicitly; silently evicting accepted
+        // control responses or timeline deltas would corrupt client state.
+        val controlDeliveryQueue = Channel<AppServerReceivedFrame>(DELIVERY_QUEUE_CAPACITY)
+        val streamDeliveryQueue = Channel<AppServerReceivedFrame>(DELIVERY_QUEUE_CAPACITY)
         val sender = launch {
             for (command in controlCommandQueue) {
                 send(Frame.Text(protocol.encodeCommand(command)))
             }
         }
+        val controlDelivery = launch {
+            for (frame in controlDeliveryQueue) {
+                controlFrameFlow.emit(frame)
+            }
+        }
+        val streamDelivery = launch {
+            for (frame in streamDeliveryQueue) {
+                streamFrameFlow.emit(frame)
+            }
+        }
+        var reachedEndOfStream = false
+        var drainTimedOut = false
         try {
-            receiveFrames(AppServerChannel.Control, controlFrameFlow)
+            receiveAndDemuxFrames(controlDeliveryQueue, streamDeliveryQueue)
+            reachedEndOfStream = true
         } finally {
             sender.cancel()
+            controlDeliveryQueue.close()
+            streamDeliveryQueue.close()
+            drainTimedOut = !finishDeliveryJobs(reachedEndOfStream, controlDelivery, streamDelivery)
         }
+        val closeReason = closeReason.await()
+        if (drainTimedOut && !closeReason.isTerminal()) {
+            throw AppServerDeliveryDrainTimeoutException(DELIVERY_DRAIN_TIMEOUT_MILLIS)
+        }
+        closeReason
     }
 
-    private suspend fun DefaultClientWebSocketSession.receiveFrames(
-        channel: AppServerChannel,
-        sink: MutableSharedFlow<AppServerReceivedFrame>,
+    /**
+     * @return true when delivery jobs finished within the deadline (or were
+     * cancelled because EOF was not reached); false when the drain timed out.
+     */
+    private suspend fun finishDeliveryJobs(
+        reachedEndOfStream: Boolean,
+        vararg jobs: Job,
+    ): Boolean {
+        if (!reachedEndOfStream) {
+            jobs.forEach { it.cancel() }
+            return true
+        }
+
+        val drained = withTimeoutOrNull(DELIVERY_DRAIN_TIMEOUT_MILLIS) {
+            jobs.forEach { it.join() }
+        } != null
+        if (!drained) {
+            jobs.forEach { it.cancel() }
+            return false
+        }
+        return true
+    }
+
+    private suspend fun DefaultClientWebSocketSession.receiveAndDemuxFrames(
+        controlDeliveryQueue: Channel<AppServerReceivedFrame>,
+        streamDeliveryQueue: Channel<AppServerReceivedFrame>,
     ) {
         for (frame in incoming) {
             if (frame is Frame.Text) {
                 // protocol.decodeFrame is total: malformed frames surface as
                 // AppServerInboundFrame.DecodeFailure rather than throwing, so a
                 // bad frame never tears down this receive loop (letta-mobile-lgns8.4).
-                sink.emit(protocol.decodeFrame(frame.readText(), channel))
+                val received = protocol.decodeFrame(frame.readText())
+                when (received.channel) {
+                    AppServerChannel.Control -> controlDeliveryQueue.enqueueOrFail(received, "control")
+                    AppServerChannel.Stream -> streamDeliveryQueue.enqueueOrFail(received, "stream")
+                }
             }
+        }
+    }
+
+    private fun Channel<AppServerReceivedFrame>.enqueueOrFail(
+        frame: AppServerReceivedFrame,
+        channelName: String,
+    ) {
+        if (!trySend(frame).isSuccess) {
+            throw AppServerDeliveryOverflowException(channelName, DELIVERY_QUEUE_CAPACITY)
         }
     }
 
@@ -152,8 +215,23 @@ class KtorAppServerWebSocketTransport(
 
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
+        const val DELIVERY_QUEUE_CAPACITY = 256
+        const val DELIVERY_DRAIN_TIMEOUT_MILLIS = 1_000L
     }
 }
+
+private class AppServerDeliveryDrainTimeoutException(
+    timeoutMillis: Long,
+) : IllegalStateException(
+    "App Server delivery queues did not drain within ${timeoutMillis}ms after socket EOF",
+)
+
+private class AppServerDeliveryOverflowException(
+    channelName: String,
+    capacity: Int,
+) : IllegalStateException(
+    "App Server $channelName delivery queue exceeded its bounded capacity of $capacity frames",
+)
 
 /**
  * A close is terminal (must not be blindly retried) when the peer signals an
@@ -168,24 +246,44 @@ internal fun CloseReason?.isTerminal(): Boolean {
 
 /**
  * A handshake failure is terminal when it reflects auth/authorization rejection
- * (HTTP 401/403) rather than a transient connect error.
+ * (HTTP 401/403) or the legacy split-channel rejection (HTTP 426) rather than a
+ * transient connect error.
  */
 internal fun Throwable.isTerminalHandshakeFailure(): Boolean {
     val text = (message ?: "") + " " + (cause?.message ?: "")
-    return text.contains("401") ||
-        text.contains("403") ||
+    return TERMINAL_HTTP_STATUS.containsMatchIn(text) ||
         text.contains("Unauthorized", ignoreCase = true) ||
-        text.contains("Forbidden", ignoreCase = true)
+        text.contains("Forbidden", ignoreCase = true) ||
+        text.contains("Upgrade Required", ignoreCase = true)
 }
 
-internal fun appServerChannelUrl(baseUrl: String, channel: AppServerChannel): String {
-    val channelName = when (channel) {
-        AppServerChannel.Control -> "control"
-        AppServerChannel.Stream -> "stream"
-    }
-    return URLBuilder().takeFrom(baseUrl).apply {
+private val TERMINAL_HTTP_STATUS = Regex(
+    pattern = "(?i)(?:\\bbut\\s+was\\s+|" +
+        "\\b(?:http(?:\\s+response)?(?:\\s+status|\\s+code)?|" +
+        "status(?:\\s+code)?|response\\s+code)\\D{0,16})(?:401|403|426)\\b",
+)
+
+/**
+ * Resolve the single bidirectional App Server WebSocket URL.
+ *
+ * Strips any legacy `channel` query parameter — Letta Code ≥ 0.29.7 rejects
+ * `?channel=control|stream` with HTTP 426.
+ */
+internal fun appServerUrl(baseUrl: String): String =
+    URLBuilder().takeFrom(baseUrl).apply {
         encodedPath = "/ws"
         parameters.clear()
-        parameters.append("channel", channelName)
     }.buildString()
+
+/** @deprecated Prefer [appServerUrl]; both historical channels resolve to the same socket. */
+@Deprecated(
+    message = "App Server uses one bidirectional WebSocket; channel URLs are rejected by ≥0.29.7",
+    replaceWith = ReplaceWith("appServerUrl(baseUrl)"),
+)
+internal fun appServerChannelUrl(baseUrl: String, channel: AppServerChannel): String {
+    // Keep the parameter referenced so call sites that still pass a channel compile
+    // during the migration window without unused-parameter warnings.
+    @Suppress("UNUSED_VARIABLE")
+    val ignored = channel
+    return appServerUrl(baseUrl)
 }

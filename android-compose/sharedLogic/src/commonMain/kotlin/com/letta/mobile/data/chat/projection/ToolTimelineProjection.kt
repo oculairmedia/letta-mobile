@@ -237,16 +237,49 @@ fun projectToolTimelineGroup(
         "group::$fallbackIndex"
     }
 
+    return projectToolTimelineGroupFromCalls(
+        toolCalls = callsSource,
+        groupKey = groupKey,
+        messageId = message.id,
+        runId = message.runId,
+        approvalRequest = message.approvalRequest,
+        previousGroup = previousGroup,
+    )
+}
+
+/**
+ * Projects a bare list of [UiToolCall]s into a [ToolTimelineGroup].
+ *
+ * This is the message-free half of [projectToolTimelineGroup]: a caller that already
+ * holds the calls (plus the identity it wants the group keyed on) does not need to
+ * synthesize a [UiMessage] just to reach the projection. Used by the non-run
+ * `MessageToolCalls` path (letta-mobile-nfaks) so a tool card rendered outside a
+ * multi-message run still gets the projected presentation instead of the legacy one.
+ *
+ * Key derivation, duplicate-key disambiguation, state aggregation and referential
+ * reuse against [previousGroup] are identical to the message-backed path by
+ * construction — there is exactly one implementation.
+ */
+fun projectToolTimelineGroupFromCalls(
+    toolCalls: List<UiToolCall>,
+    groupKey: String,
+    messageId: String? = null,
+    runId: String? = null,
+    approvalRequest: UiApprovalRequest? = null,
+    previousGroup: ToolTimelineGroup? = null,
+): ToolTimelineGroup? {
+    if (toolCalls.isEmpty()) return null
+
     val previousCallsByKey = previousGroup?.calls?.associateBy { it.key }.orEmpty()
 
-    val seenCallKeys = HashSet<String>(callsSource.size)
-    val projectedCalls = ArrayList<ToolTimelineCall>(callsSource.size)
+    val seenCallKeys = HashSet<String>(toolCalls.size)
+    val projectedCalls = ArrayList<ToolTimelineCall>(toolCalls.size)
 
-    for ((index, toolCall) in callsSource.withIndex()) {
+    for ((index, toolCall) in toolCalls.withIndex()) {
         val rawCallKey = if (!toolCall.toolCallId.isNullOrBlank()) {
             "call:${toolCall.toolCallId}"
         } else {
-            "call::${message.id}-$index"
+            "call::${messageId.orEmpty()}-$index"
         }
 
         var candidateKey = rawCallKey
@@ -258,7 +291,7 @@ fun projectToolTimelineGroup(
         val prevCall = previousCallsByKey[candidateKey]
         val call = projectToolTimelineCall(
             toolCall = toolCall,
-            messageApprovalRequest = message.approvalRequest,
+            messageApprovalRequest = approvalRequest,
             keyOverride = candidateKey,
             fallbackIndex = index,
             previousCall = prevCall,
@@ -273,8 +306,8 @@ fun projectToolTimelineGroup(
         key = groupKey,
         calls = projectedCalls,
         state = overallState,
-        messageId = message.id,
-        runId = message.runId,
+        messageId = messageId,
+        runId = runId,
         durationMs = totalDuration,
     )
 

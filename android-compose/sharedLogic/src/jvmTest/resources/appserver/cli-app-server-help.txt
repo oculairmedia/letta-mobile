@@ -1,20 +1,33 @@
-Usage: letta app-server [--listen <url>]
+Usage:
+  letta server [remote options]
+  letta server --listen [url] [App Server options]
 
-Run a local Letta Code app-server using native v2 websocket frames.
+Run the local agent server as a remote environment, with messaging channels, or as an App Server.
 
-Options:
-  --listen <url>  WebSocket listen URL. Defaults to ws://127.0.0.1:0
-  --ws-auth <mode>  WebSocket auth mode for non-loopback listeners. Supported: capability-token, signed-bearer-token
+Remote environment options:
+  --env-name <name>  Friendly name for this environment (uses hostname if not provided)
+  --channels <list>  Comma-separated channel names to enable (e.g. telegram)
+  --install-channel-runtimes  Install missing runtime dependencies for selected channels
+  --debug  Log WebSocket events instead of showing the interactive status UI
+
+App Server options:
+  --listen [url]  Accept App Server connections. If URL is omitted, binds to an available loopback port
+  --openai-api  Serve OpenAI-compatible /v1/models and /v1/chat/completions routes (each agent is a model)
+  --ws-auth <mode>  Authentication for non-loopback listeners and Origin-bearing native clients: capability-token or signed-bearer-token
   --ws-token-file <path>  Absolute path to the capability-token file
   --ws-token-sha256 <hex>  Hex-encoded SHA-256 digest of the capability token
   --ws-shared-secret-file <path>  Absolute path to the shared secret file for signed JWT bearer tokens
   --ws-issuer <issuer>  Expected issuer for signed JWT bearer tokens
   --ws-audience <audience>  Expected audience for signed JWT bearer tokens
-  --ws-max-clock-skew-seconds <seconds>  Maximum clock skew for signed JWT bearer token validation
-  -h, --help      Show this help message
+  --ws-max-clock-skew-seconds <seconds>  Maximum signed-token clock skew
+
+Common options:
+  -h, --help  Show this help message
 
 Examples:
-  letta app-server
-  letta app-server --listen ws://127.0.0.1:4500
-  letta app-server --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file /path/to/token
-  letta app-server --listen ws://0.0.0.0:4500 --ws-auth signed-bearer-token --ws-shared-secret-file /path/to/secret
+  letta server
+  letta server --env-name "work-laptop"
+  letta server --channels telegram
+  letta server --listen
+  letta server --listen ws://127.0.0.1:4500
+  letta server --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file /path/to/token

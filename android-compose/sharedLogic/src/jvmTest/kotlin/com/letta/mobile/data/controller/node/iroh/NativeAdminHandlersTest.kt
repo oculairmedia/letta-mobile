@@ -53,7 +53,12 @@ class NativeAdminHandlersTest {
         // Extra conversation ids the native conversation.list returns in addition
         // to conv-1 — used to prove P3.4 cross-conversation scope filtering.
         val extraConversationIds: List<String> = emptyList(),
+        // letta-mobile-pu7j7: roster size for agent_list; the fake honors the
+        // numeric `limit` in the command query exactly like lc-local-backend
+        // (and, like it, has no offset concept).
+        val agentRosterSize: Int = 1,
     ) : AppServerClient {
+        var lastAgentListQuery: kotlinx.serialization.json.JsonObject? = null
         override val events: Flow<AppServerReceivedFrame> = MutableSharedFlow()
         val calls = mutableListOf<String>()
 
@@ -75,14 +80,24 @@ class NativeAdminHandlersTest {
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = error("unused")
 
-        override suspend fun agentList(command: AppServerCommand.AgentList) = record(
-            "agent_list",
-            AppServerInboundFrame.AgentListResponse(
-                requestId = command.requestId,
-                success = true,
-                agents = buildJsonArray { add(buildJsonObject { put("id", "agent-1"); put("name", "A") }) },
-            ),
-        )
+        override suspend fun agentList(command: AppServerCommand.AgentList): AppServerInboundFrame.AgentListResponse {
+            lastAgentListQuery = command.query
+            val limit = command.query?.get("limit")
+                ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() }
+                ?: 20
+            return record(
+                "agent_list",
+                AppServerInboundFrame.AgentListResponse(
+                    requestId = command.requestId,
+                    success = true,
+                    agents = buildJsonArray {
+                        (1..minOf(limit, agentRosterSize)).forEach { n ->
+                            add(buildJsonObject { put("id", "agent-$n"); put("name", "A$n") })
+                        }
+                    },
+                ),
+            )
+        }
 
         override suspend fun agentRetrieve(command: AppServerCommand.AgentRetrieve) = record(
             "agent_retrieve",
@@ -171,6 +186,29 @@ class NativeAdminHandlersTest {
         AgentAdminHandlers.register(r, controller = null, tiers = NativeReadTiers(nativeClient = client))
         ConversationAdminHandlers.register(r, tiers = NativeReadTiers(nativeClient = client))
         return r
+    }
+
+    // letta-mobile-pu7j7: lc-local-backend has no offset concept, so the
+    // handler emulates it — fetch offset+limit in one read, slice locally.
+    @Test
+    fun agentListOffsetReturnsSecondPageNotFirstPageAgain() = runTest {
+        val client = FakeNativeClient(agentRosterSize = 5)
+        val r = router(client)
+        val response = dispatch(r, "agent.list", mapOf("limit" to "2", "offset" to "2"))
+        assertTrue("agent-3" in response && "agent-4" in response, "expected page 2, got: $response")
+        assertFalse("agent-1\"" in response, "page 2 must not repeat page 1: $response")
+        // The single native read must cover offset+limit rows.
+        val requestedLimit = client.lastAgentListQuery?.get("limit")
+            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        assertEquals("4", requestedLimit)
+    }
+
+    @Test
+    fun agentListOffsetBeyondRosterReturnsEmptyPage() = runTest {
+        val client = FakeNativeClient(agentRosterSize = 3)
+        val r = router(client)
+        val response = dispatch(r, "agent.list", mapOf("limit" to "2", "offset" to "10"))
+        assertFalse("agent-" in response, "expected empty page, got: $response")
     }
 
     private suspend fun dispatch(r: AdminRpcRouter, method: String, params: Map<String, String>): String =

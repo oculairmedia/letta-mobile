@@ -1,23 +1,33 @@
-Usage: letta server [--env-name <name>] [--channels <list>] [--debug]
+Usage:
+  letta server [remote options]
+  letta server --listen [url] [App Server options]
 
-Register this letta-code instance to receive messages from Letta Cloud.
+Run the local agent server as a remote environment, with messaging channels, or as an App Server.
 
-Options:
+Remote environment options:
   --env-name <name>  Friendly name for this environment (uses hostname if not provided)
   --channels <list>  Comma-separated channel names to enable (e.g. telegram)
-  --install-channel-runtimes  Install missing runtime deps for the selected channels before startup
-  --debug            Plain-text mode: log all WebSocket events instead of interactive UI
-  -h, --help         Show this help message
+  --install-channel-runtimes  Install missing runtime dependencies for selected channels
+  --debug  Log WebSocket events instead of showing the interactive status UI
+
+App Server options:
+  --listen [url]  Accept App Server connections. If URL is omitted, binds to an available loopback port
+  --openai-api  Serve OpenAI-compatible /v1/models and /v1/chat/completions routes (each agent is a model)
+  --ws-auth <mode>  Authentication for non-loopback listeners and Origin-bearing native clients: capability-token or signed-bearer-token
+  --ws-token-file <path>  Absolute path to the capability-token file
+  --ws-token-sha256 <hex>  Hex-encoded SHA-256 digest of the capability token
+  --ws-shared-secret-file <path>  Absolute path to the shared secret file for signed JWT bearer tokens
+  --ws-issuer <issuer>  Expected issuer for signed JWT bearer tokens
+  --ws-audience <audience>  Expected audience for signed JWT bearer tokens
+  --ws-max-clock-skew-seconds <seconds>  Maximum signed-token clock skew
+
+Common options:
+  -h, --help  Show this help message
 
 Examples:
-  letta channels configure telegram          # Configure Telegram first
-  letta server                              # Uses hostname as default
+  letta server
   letta server --env-name "work-laptop"
-  letta server --channels telegram           # Enable Telegram channel
-  letta server --channels telegram --install-channel-runtimes
-  letta server --debug                       # Log all WS events
-
-Once connected, this instance will listen for incoming messages from cloud agents.
-Messages will be executed locally using your letta-code environment.
-Telegram flow: configure the bot, start the listener with --channels telegram,
-then message the bot from Telegram and run /channels telegram pair <code> in the target conversation.
+  letta server --channels telegram
+  letta server --listen
+  letta server --listen ws://127.0.0.1:4500
+  letta server --listen ws://0.0.0.0:4500 --ws-auth capability-token --ws-token-file /path/to/token
