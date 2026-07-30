@@ -23,18 +23,33 @@ private suspend fun <T : Any> resolveDesktopAgentField(
     val sources = params.sources
     val irohDirectory = sources.irohDirectory
     if (irohDirectory != null) {
-        return resolveFromIrohDirectory(irohDirectory, params.fromAgent)
+        return resolveFromIrohDirectory(irohDirectory, params)
     }
     return resolveFromHttpRepository(params)
 }
 
 private suspend fun <T : Any> resolveFromIrohDirectory(
     irohDirectory: IrohAdminRpcAgentDirectory,
-    fromAgent: (Agent) -> T?,
-): Map<String, T> =
+    params: ResolveDesktopAgentFieldParams<T>,
+): Map<String, T> {
+    val fromAgent = params.fromAgent
+    val resolved = mutableMapOf<String, T>()
     runCatching { irohDirectory.listAgents() }.getOrDefault(emptyList())
-        .mapNotNull { agent -> fromAgent(agent)?.let { agent.id.value to it } }
-        .toMap()
+        .forEach { agent -> fromAgent(agent)?.let { resolved[agent.id.value] = it } }
+    // Per-id fallback, mirroring the HTTP path (which this branch was missing).
+    // agent.list does NOT necessarily contain every agent: the backend currently
+    // ignores limit/offset and returns only its first page, so an agent outside
+    // that page resolved to nothing and rendered as its raw id ("agent-c356b…")
+    // — which also made it unsearchable, since the rail searches display names.
+    params.sources.agentIds
+        .filter { it !in resolved }
+        .forEach { id ->
+            runCatching { irohDirectory.getAgent(id) }.getOrNull()
+                ?.let(fromAgent)
+                ?.let { resolved[id] = it }
+        }
+    return resolved
+}
 
 private suspend fun <T : Any> resolveFromHttpRepository(
     params: ResolveDesktopAgentFieldParams<T>,
