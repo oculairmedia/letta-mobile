@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.mapper.toUiMessages
+import com.letta.mobile.data.chat.projection.ApprovalTerminalEvidence
+import com.letta.mobile.data.chat.projection.resolvedApprovalRequestFactIds
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.UiMessage
@@ -22,6 +24,10 @@ internal class ChatHistoryPager(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val activeConversationId: () -> String?,
 ) {
+    private val respondedRequestRuns = mutableSetOf<Pair<String, String?>>()
+    private val returnedCallRuns = mutableSetOf<Pair<String, String?>>()
+    private var approvalEvidenceConversationId: String? = null
+
     fun loadOlderMessages(clientModeEnabled: Boolean) {
         // letta-mobile-doq50: every short-circuit path is now telemetered so
         // 'no loading indicator at all' diagnostics are answerable without
@@ -131,7 +137,18 @@ internal class ChatHistoryPager(
                 }
 
                 val previousCount = uiState.value.messages.size
-                val olderUi = olderMessages.toUiMessages()
+                if (approvalEvidenceConversationId != conversationId) {
+                    respondedRequestRuns.clear()
+                    returnedCallRuns.clear()
+                    approvalEvidenceConversationId = conversationId
+                }
+                respondedRequestRuns += olderPage.approvalEvidence.respondedRequestRuns
+                returnedCallRuns += olderPage.approvalEvidence.returnedCallRuns
+                val resolvedRequestIds = resolvedApprovalRequestFactIds(
+                    olderPage.approvalRequests,
+                    ApprovalTerminalEvidence(respondedRequestRuns, returnedCallRuns),
+                )
+                val olderUi = olderMessages.toUiMessages(resolvedRequestIds)
                 val mergedMessages = chatTimelineObserver.mergeOlderPage(
                     conversationId = conversationId,
                     olderMessages = olderUi,

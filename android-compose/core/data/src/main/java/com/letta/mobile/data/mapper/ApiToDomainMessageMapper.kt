@@ -107,9 +107,9 @@ private fun ToolCallMessage.mapToolCall(state: MessageMappingState): AppMessage 
 }
 
 private fun ApprovalRequestMessage.mapApprovalRequest(state: MessageMappingState): AppMessage {
-    val calls = effectiveToolCalls.mapNotNull { toolCall ->
-        val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        val toolName = toolCall.name?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+    val calls = effectiveToolCalls.map { toolCall ->
+        val callId = toolCall.effectiveId
+        val toolName = toolCall.name.orEmpty()
         val arguments = toolCall.arguments.orEmpty()
         state.remember(callId, toolName, arguments)
         ApprovalToolCallPayload(callId, toolName, arguments)

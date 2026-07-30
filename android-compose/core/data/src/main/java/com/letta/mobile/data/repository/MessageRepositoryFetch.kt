@@ -3,6 +3,8 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.repository.api.OlderMessagesPage
 import com.letta.mobile.data.mapper.toAppMessages
+import com.letta.mobile.data.chat.projection.approvalTerminalEvidence
+import com.letta.mobile.data.chat.projection.approvalRequestFacts
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
@@ -125,19 +127,24 @@ internal object MessageRepositoryFetch {
                 beforeMessageId = beforeMessageId,
                 limit = olderMessagesPageSize,
             )
-            return OlderMessagesPage(page.messages.toAppMessages(), hasMore = page.hasMore)
+            return OlderMessagesPage(
+                messages = page.messages.toAppMessages(),
+                hasMore = page.hasMore,
+                approvalEvidence = approvalTerminalEvidence(page.messages),
+                approvalRequests = approvalRequestFacts(page.messages),
+            )
         }
 
+        val rawMessages = messageApi.fetchRecentMessages(
+            conversationId = conversationId,
+            messageLimit = olderMessagesPageSize,
+            beforeMessageId = beforeMessageId,
+        )
         return OlderMessagesPage(
-            messages = fetchOlderMessages(
-                messageApi = messageApi,
-                irohTimelineTransport = irohTimelineTransport,
-                agentId = agentId,
-                conversationId = conversationId,
-                beforeMessageId = beforeMessageId,
-                olderMessagesPageSize = olderMessagesPageSize,
-            ),
+            messages = rawMessages.toAppMessages(),
             hasMore = null,
+            approvalEvidence = approvalTerminalEvidence(rawMessages),
+            approvalRequests = approvalRequestFacts(rawMessages),
         )
     }
 

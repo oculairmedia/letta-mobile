@@ -732,10 +732,10 @@ The implementation looks solid. One actionable issue: handle the null case.</res
             ui[0].approvalRequest!!.toolCalls.single().name shouldBe "Bash"
         }
 
-        // letta-mobile-jbui1: an approval request card is only ever cleared by a runtime
-        // ApprovalResolved event, which the server never emits. These pin the derived
-        // fallback: a request is dropped once its tool calls have all returned.
-        "drop approval request once every tool call has returned" {
+        // letta-mobile-jbui1: terminal evidence removes only the actionable approval
+        // controls. The request remains as the completed tool card so command details
+        // are not lost when no separate ToolCallMessage was persisted.
+        "preserve approval request details until shared projection resolves it" {
             val messages = listOf(
                 ApprovalRequestMessage(
                     id = "approval-1",
@@ -756,9 +756,13 @@ The implementation looks solid. One actionable issue: handle the null case.</res
                 ),
             ).toAppMessages()
 
-            val ui = messages.toUiMessages()
+            val ui = messages.toUiMessages(setOf("approval-1"))
 
             ui.none { it.approvalRequest != null } shouldBe true
+            val completed = ui.single { it.id == "approval-1" }
+            completed.role shouldBe "tool"
+            completed.toolCalls!!.single().arguments shouldBe "{\"command\":\"ls\"}"
+            completed.toolCalls!!.single().result shouldBe "done"
         }
 
         "keep approval request while any tool call is still outstanding" {
