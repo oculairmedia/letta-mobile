@@ -51,6 +51,16 @@ internal fun TimelineEvent.Confirmed.allApprovalCallsReturned(
     toolCalls.all { it.effectiveId.isNotBlank() } &&
     matchingReturns.mapTo(mutableSetOf()) { it.first }.size == toolCalls.size
 
+internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallId: String): Boolean =
+    toolCalls.isNotEmpty() && toolCalls.all { call ->
+        val callId = call.effectiveId
+        callId.isNotBlank() && (callId == returnedCallId || callId in toolReturnContentByCallId)
+    }
+
+internal fun TimelineEvent.Confirmed.matchesApprovalResponse(response: ApprovalResponseMessage): Boolean =
+    approvalRequestId == response.approvalRequestId &&
+        !runId.isNullOrBlank() && runId == response.runId
+
 private fun String?.isCompatibleRun(requestRunId: String?): Boolean {
     val evidenceRun = takeUnless(String?::isNullOrBlank)
     val expectedRun = requestRunId.takeUnless(String?::isNullOrBlank)
