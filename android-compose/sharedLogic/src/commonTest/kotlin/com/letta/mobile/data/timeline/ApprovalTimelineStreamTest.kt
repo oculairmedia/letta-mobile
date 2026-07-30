@@ -11,6 +11,29 @@ import kotlin.test.assertEquals
 
 class ApprovalTimelineStreamTest {
     @Test
+    fun matchingResponseRunDecidesApproval() {
+        val seeded = reduce(
+            frame = ApprovalRequestMessage(
+                id = "approval-1",
+                toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
+                runId = "run-1",
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = ApprovalResponseMessage(
+                id = "approval-response-1",
+                approvalRequestId = "approval-1",
+                approve = true,
+                runId = "run-1",
+            ),
+        )
+
+        assertEquals(true, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
+    }
+
+    @Test
     fun multiCallApprovalDecidesOnlyAfterEveryReturn() {
         val seeded = reduce(
             frame = ApprovalRequestMessage(

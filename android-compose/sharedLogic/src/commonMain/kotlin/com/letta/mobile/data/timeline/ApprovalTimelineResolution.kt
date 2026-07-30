@@ -52,7 +52,7 @@ internal fun TimelineEvent.Confirmed.allApprovalCallsReturned(
     matchingReturns.mapTo(mutableSetOf()) { it.first }.size == toolCalls.size
 
 internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallId: String): Boolean =
-    toolCalls.isNotEmpty() && toolCalls.all { call ->
+    if (approvalRequestId == null) true else toolCalls.isNotEmpty() && toolCalls.all { call ->
         val callId = call.effectiveId
         callId.isNotBlank() && (callId == returnedCallId || callId in toolReturnContentByCallId)
     }

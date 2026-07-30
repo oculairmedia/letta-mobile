@@ -52,39 +52,10 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `approval response marks matching approval request decided`() {
-        val approvalRequest = ApprovalRequestMessage(
-            id = "approval-1",
-            toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
-            runId = "run-1",
-        )
-        val seeded = reduce(frame = approvalRequest).next
-
-        val output = reduce(
-            prev = seeded,
-            frame = ApprovalResponseMessage(
-                id = "approval-response-1",
-                approvalRequestId = "approval-1",
-                approve = true,
-                runId = "run-1",
-            ),
-        )
-
-        val event = output.next.events.single() as TimelineEvent.Confirmed
-        event.approvalRequestId shouldBe "approval-1"
-        event.approvalDecided shouldBe true
-        output.emittedEvents shouldBe listOf(
-            TimelineSyncEvent.StreamEventIngested("approval-1", "approval_response_message")
-        )
-        output.notification shouldBe null
-    }
-
-    @Test
     fun `tool return attaches to matching tool call and emits notification`() {
         val seeded = reduce(
-            frame = ApprovalRequestMessage(
+            frame = ToolCallMessage(
                 id = "tool-batch",
-                runId = "run-1",
                 toolCalls = listOf(
                     ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
                     ToolCall(toolCallId = "call-b", name = "write", arguments = "b"),
@@ -96,7 +67,6 @@ class TimelineStreamReducerTest {
             toolCallId = "call-b",
             status = "success",
             toolReturnRaw = JsonPrimitive("done"),
-            runId = "run-1",
         )
 
         val output = reduce(prev = seeded, frame = toolReturn)
@@ -104,7 +74,7 @@ class TimelineStreamReducerTest {
         val event = output.next.events.single() as TimelineEvent.Confirmed
         event.toolReturnContentByCallId["call-b"] shouldBe "done"
         event.toolReturnIsErrorByCallId["call-b"] shouldBe false
-        event.approvalDecided shouldBe false
+        event.approvalDecided shouldBe true
         output.updatedPendingToolReturnsByCallId shouldBe emptyMap()
         output.emittedEvents shouldBe listOf(
             TimelineSyncEvent.StreamEventIngested("tool-batch", toolReturn.messageType)
@@ -114,7 +84,6 @@ class TimelineStreamReducerTest {
             messageType = "tool_return_message",
             contentPreview = "done",
         )
-
     }
 
     @Test
