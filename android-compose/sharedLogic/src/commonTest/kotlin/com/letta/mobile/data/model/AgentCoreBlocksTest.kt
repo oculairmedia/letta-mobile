@@ -53,6 +53,17 @@ class AgentCoreBlocksTest {
     }
 
     @Test
+    fun explicitEmptyTopLevelWinsOverNestedBlocks() {
+        val agent = json.decodeFromString<Agent>(
+            """
+            {"id":"agent-1","name":"Meridian","blocks":[],
+             "memory":{"blocks":[{"id":"stale","label":"persona","value":"old"}]}}
+            """.trimIndent(),
+        )
+        assertEquals(emptyList(), agent.coreBlocks)
+    }
+
+    @Test
     fun emptyWhenNeitherShapeCarriesBlocks() {
         val agent = json.decodeFromString<Agent>("""{"id":"agent-1","name":"Meridian"}""")
         assertEquals(emptyList(), agent.coreBlocks)

@@ -77,7 +77,7 @@ data class Agent(
     @SerialName("embedding_config") val embeddingConfig: EmbeddingConfig? = null,
     @SerialName("context_window_limit") val contextWindowLimit: Int? = null,
     @SerialName("response_format") val responseFormat: JsonElement? = null,
-    val blocks: List<Block> = emptyList(),
+    val blocks: List<Block>? = null,
     /**
      * Canonical Letta `AgentState` nests core-memory blocks HERE; only the admin
      * shim also duplicates them to the top-level [blocks]. Decoding both shapes
@@ -122,7 +122,7 @@ data class Agent(
      * this — reading [blocks] directly renders 0 blocks against a backend that
      * only emits the canonical shape.
      */
-    val coreBlocks: List<Block> get() = blocks.ifEmpty { memory?.blocks.orEmpty() }
+    val coreBlocks: List<Block> get() = blocks ?: memory?.blocks.orEmpty()
 }
 
 /** The `memory` sub-object of a canonical Letta `AgentState`. */

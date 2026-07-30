@@ -19,6 +19,12 @@ class TextMatchTest {
     }
 
     @Test
+    fun unicodeCaseVariantsRemainSearchable() {
+        assertTrue(TextMatch.matches("Σ", "ς"))
+        assertTrue(TextMatch.matches("I", "ı"))
+    }
+
+    @Test
     fun testPartialSubstringMatching() {
         assertTrue(TextMatch.matches("def", "abcdefghi"))
     }

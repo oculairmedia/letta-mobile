@@ -59,7 +59,7 @@ internal class EditAgentAgentLoader(
             .getOrDefault(emptyList())
 
     private fun Agent.toEditableBlocks(): List<EditableBlock> =
-        blocks.map { block ->
+        coreBlocks.map { block ->
             EditableBlock(
                 id = block.id.value,
                 label = block.label ?: "",

@@ -25,7 +25,7 @@ object TextMatch {
         // Joined with a space so no token can match across a field boundary —
         // tokens never contain spaces by construction.
         val haystack = fields.filterNotNull().joinToString(separator = " ") { normalize(it) }
-        return tokens.all { haystack.contains(it) }
+        return tokens.all { haystack.contains(it, ignoreCase = true) }
     }
 
     private fun tokenize(text: String): List<String> =

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.subagents.projectSubagentTasks
 import java.time.Duration
 import java.time.Instant
 
@@ -58,10 +59,11 @@ internal fun DesktopBackgroundTasksPanel(
     var clearedKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
     // The panel stays open while subagents stream status updates, so keep these
     // partitions keyed to their inputs instead of re-filtering per recomposition.
-    val running = remember(subagents) { subagents.filter { it.status == SubagentStatus.RUNNING } }
-    val finished = remember(subagents, clearedKeys) {
-        subagents.filter { it.status != SubagentStatus.RUNNING && it.entryKey() !in clearedKeys }
+    val projection = remember(subagents, clearedKeys) {
+        projectSubagentTasks(subagents, clearedKeys, SubagentEntry::entryKey)
     }
+    val running = projection.running
+    val finished = projection.finished
 
     Column(
         modifier = modifier

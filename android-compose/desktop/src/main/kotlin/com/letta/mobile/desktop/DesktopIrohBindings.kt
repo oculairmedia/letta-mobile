@@ -204,7 +204,7 @@ private fun buildDesktopChatController(
     bindings: DesktopChatControllerBindings,
 ): DesktopChatController {
     val runtime = bindings.runtime
-    val httpRepo = {
+    val agentRepository = {
         runtime.dataBindings.sessionGraphProvider.current.agentRepository
     }
     return DesktopChatController(
@@ -215,10 +215,10 @@ private fun buildDesktopChatController(
                 ?: createDefaultDesktopChatGateway(runtime.bootstrapState.config)
         },
         agentNamesByIdProvider = { agentIds ->
-            resolveDesktopAgentNames(agentIds, bindings.irohAgentDirectory, httpRepo)
+            resolveDesktopAgentNames(agentIds, agentRepository())
         },
         agentByIdProvider = { agentIds ->
-            resolveDesktopAgents(agentIds, bindings.irohAgentDirectory, httpRepo)
+            resolveDesktopAgents(agentIds, agentRepository())
         },
         loadArchivedConversationIds = { loadArchivedConversationIds(bindings.secureSettingsStore) },
         persistArchivedConversationIds = { ids ->

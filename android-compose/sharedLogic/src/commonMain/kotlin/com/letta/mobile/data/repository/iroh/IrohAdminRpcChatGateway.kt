@@ -607,7 +607,7 @@ class IrohAdminRpcAgentDirectory(
             // 125 round trips per refresh, each carrying full agent objects,
             // accumulating the same page over and over. Observed in production.
             val fresh = page.filter { seenIds.add(it.id.value) }
-            out += fresh
+            out += fresh.take(limit - out.size)
             // A page that contributes nothing new means the backend is not
             // paginating; stop rather than hammer it. (Cost of a false positive
             // is a truncated roster — the same outcome as the old heuristic, but

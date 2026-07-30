@@ -353,6 +353,20 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun listAgentsNeverExceedsRequestedLimitWhenBackendOvershoots() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = {
+            ok((0 until 12).joinToString(prefix = "[", postfix = "]") { """{"id":"agent-$it","name":"A"}""" })
+        }
+        val directory = IrohAdminRpcAgentDirectory(transport)
+
+        val agents = directory.listAgents(limit = 5)
+
+        assertEquals(5, agents.size)
+        assertEquals((0 until 5).map { "agent-$it" }, agents.map { it.id.value })
+    }
+
+    @Test
     fun listAgentsPagesInSmallChunksAndStopsOnAShortPage() = runTest(UnconfinedTestDispatcher()) {
         // Regression: a single limit=200 agent.list read returns FULL agent
         // objects (multi-MB) and timed out on a slow link ("admin_rpc timed out"

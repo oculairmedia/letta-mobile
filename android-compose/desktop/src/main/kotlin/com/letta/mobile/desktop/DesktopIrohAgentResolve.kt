@@ -2,70 +2,22 @@ package com.letta.mobile.desktop
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.repository.api.IAgentRepository
-import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import kotlinx.coroutines.flow.first
 
-private data class DesktopAgentResolveSources(
-    val agentIds: Set<String>,
-    val irohDirectory: IrohAdminRpcAgentDirectory?,
-    val httpAgentRepository: () -> IAgentRepository,
-)
-
-private data class ResolveDesktopAgentFieldParams<T : Any>(
-    val sources: DesktopAgentResolveSources,
-    val fromAgent: (Agent) -> T?,
-    val refreshBeforeResolve: Boolean = false,
-)
-
 private suspend fun <T : Any> resolveDesktopAgentField(
-    params: ResolveDesktopAgentFieldParams<T>,
+    agentIds: Set<String>,
+    agentRepository: IAgentRepository,
+    refreshBeforeResolve: Boolean,
+    fromAgent: (Agent) -> T?,
 ): Map<String, T> {
-    val sources = params.sources
-    val irohDirectory = sources.irohDirectory
-    if (irohDirectory != null) {
-        return resolveFromIrohDirectory(irohDirectory, params)
-    }
-    return resolveFromHttpRepository(params)
-}
-
-private suspend fun <T : Any> resolveFromIrohDirectory(
-    irohDirectory: IrohAdminRpcAgentDirectory,
-    params: ResolveDesktopAgentFieldParams<T>,
-): Map<String, T> {
-    val fromAgent = params.fromAgent
-    val resolved = mutableMapOf<String, T>()
-    runCatching { irohDirectory.listAgents() }.getOrDefault(emptyList())
-        .forEach { agent -> fromAgent(agent)?.let { resolved[agent.id.value] = it } }
-    // Per-id fallback, mirroring the HTTP path (which this branch was missing).
-    // agent.list does NOT necessarily contain every agent: the backend currently
-    // ignores limit/offset and returns only its first page, so an agent outside
-    // that page resolved to nothing and rendered as its raw id ("agent-c356b…")
-    // — which also made it unsearchable, since the rail searches display names.
-    params.sources.agentIds
-        .filter { it !in resolved }
-        .forEach { id ->
-            runCatching { irohDirectory.getAgent(id) }.getOrNull()
-                ?.let(fromAgent)
-                ?.let { resolved[id] = it }
-        }
-    return resolved
-}
-
-private suspend fun <T : Any> resolveFromHttpRepository(
-    params: ResolveDesktopAgentFieldParams<T>,
-): Map<String, T> {
-    val sources = params.sources
-    val agentRepository = sources.httpAgentRepository()
-    if (params.refreshBeforeResolve) {
-        runCatching { agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS) }
-    }
+    if (refreshBeforeResolve) agentRepository.refreshAgentsIfStale(maxAgeMs = DESKTOP_AGENT_NAME_REFRESH_MAX_AGE_MS)
     val resolved = mutableMapOf<String, T>()
     agentRepository.agents.value.forEach { agent ->
-        params.fromAgent(agent)?.let { resolved[agent.id.value] = it }
+        fromAgent(agent)?.let { resolved[agent.id.value] = it }
     }
-    sources.agentIds.filter { it !in resolved }.forEach { id ->
-        val value = agentRepository.getCachedAgent(id)?.let(params.fromAgent)
-            ?: runCatching { agentRepository.getAgent(id).first() }.getOrNull()?.let(params.fromAgent)
+    agentIds.filter { it !in resolved }.forEach { id ->
+        val value = agentRepository.getCachedAgent(id)?.let(fromAgent)
+            ?: agentRepository.getAgent(id).first()?.let(fromAgent)
         value?.let { resolved[id] = it }
     }
     return resolved
@@ -73,32 +25,22 @@ private suspend fun <T : Any> resolveFromHttpRepository(
 
 private fun nonBlank(value: String?): String? = value?.takeIf { it.isNotBlank() }
 
-/**
- * Resolves agent id -> display name for the chat shell. Over iroh:// there is
- * no HTTP agent repository, so names come from the admin_rpc agent directory;
- * otherwise from the cached repository, fetching any still-unresolved id
- * directly. [httpAgentRepository] is only evaluated on the HTTP path.
- */
 internal suspend fun resolveDesktopAgentNames(
     agentIds: Set<String>,
-    irohDirectory: IrohAdminRpcAgentDirectory?,
-    httpAgentRepository: () -> IAgentRepository,
+    agentRepository: IAgentRepository,
 ): Map<String, String> = resolveDesktopAgentField(
-    ResolveDesktopAgentFieldParams(
-        sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
-        fromAgent = { agent -> nonBlank(agent.name) },
-        refreshBeforeResolve = true,
-    ),
+    agentIds = agentIds,
+    agentRepository = agentRepository,
+    refreshBeforeResolve = true,
+    fromAgent = { agent -> nonBlank(agent.name) },
 )
 
-/** Agent id -> full agent config, mirroring [resolveDesktopAgentNames]. */
 internal suspend fun resolveDesktopAgents(
     agentIds: Set<String>,
-    irohDirectory: IrohAdminRpcAgentDirectory?,
-    httpAgentRepository: () -> IAgentRepository,
+    agentRepository: IAgentRepository,
 ): Map<String, Agent> = resolveDesktopAgentField(
-    ResolveDesktopAgentFieldParams(
-        sources = DesktopAgentResolveSources(agentIds, irohDirectory, httpAgentRepository),
-        fromAgent = { it },
-    ),
+    agentIds = agentIds,
+    agentRepository = agentRepository,
+    refreshBeforeResolve = false,
+    fromAgent = { it },
 )

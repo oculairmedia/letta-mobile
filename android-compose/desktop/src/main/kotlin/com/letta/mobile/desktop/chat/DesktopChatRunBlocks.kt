@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.projectRunContent
 import com.letta.mobile.data.model.UiToolCall
 
 @Composable
@@ -88,16 +89,13 @@ internal fun DesktopRunBlock(
     // them per frame, per run block, scaled with transcript length. Key them on
     // the message list so a streaming turn only re-derives the block whose
     // messages actually changed.
-    val messages = remember(item.messages) { item.messages.map { it.first } }
-    val reasoning = remember(messages) {
-        messages.filter { it.isReasoning && it.content.isNotBlank() }
+    val projection = remember(item.messages) {
+        projectRunContent(item.messages.map { it.first })
     }
-    val toolCalls = remember(messages) { messages.flatMap { it.toolCalls.orEmpty() } }
-    val narration = remember(messages) {
-        messages.filter {
-            !it.isReasoning && it.toolCalls.isNullOrEmpty() && it.content.isNotBlank()
-        }
-    }
+    val messages = projection.messages
+    val reasoning = projection.reasoning
+    val toolCalls = projection.toolCalls
+    val narration = projection.narration
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         reasoning.forEach { ReasoningRow(it.content) }
         if (toolCalls.isNotEmpty()) {
