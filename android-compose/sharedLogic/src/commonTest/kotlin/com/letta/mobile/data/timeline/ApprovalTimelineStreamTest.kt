@@ -13,19 +13,12 @@ class ApprovalTimelineStreamTest {
     @Test
     fun runlessLiveRejectionDecidesUniqueRequest() {
         val seeded = reduce(
-            frame = ApprovalRequestMessage(
-                id = "approval-1",
-                toolCall = ToolCall(toolCallId = "call-1", name = "danger", arguments = "{}"),
-            ),
+            frame = request(runId = null, calls = listOf(call("call-1", "danger"))),
         ).next
 
         val output = reduce(
             prev = seeded,
-            frame = ApprovalResponseMessage(
-                id = "response-1",
-                approvalRequestId = "approval-1",
-                approve = false,
-            ),
+            frame = response(approve = false, runId = null),
         )
 
         assertEquals(true, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
@@ -33,28 +26,9 @@ class ApprovalTimelineStreamTest {
 
     @Test
     fun earlyPartialReturnDoesNotDecideMultiCallApproval() {
-        val pending = persistentMapOf(
-            "call-a" to ToolReturnMessage(
-                "return-a",
-                toolCallId = "call-a",
-                runId = "run-1",
-                toolReturnRaw = JsonPrimitive("read"),
-            ),
-        )
-        val output = reduceStreamFrame(
-            TimelineReducerInput(
-                prev = Timeline("conv-1"),
-                frame = ApprovalRequestMessage(
-                    id = "approval-1",
-                    runId = "run-1",
-                    toolCalls = listOf(
-                        ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
-                        ToolCall(toolCallId = "call-b", name = "write", arguments = "b"),
-                    ),
-                ),
-                pendingToolReturnsByCallId = pending,
-                source = "test",
-            ),
+        val output = reduceWithPending(
+            request(calls = listOf(call("call-a", "read"), call("call-b", "write"))),
+            returned("call-a", "run-1", "read"),
         )
 
         val event = output.next.events.single() as TimelineEvent.Confirmed
@@ -64,25 +38,9 @@ class ApprovalTimelineStreamTest {
 
     @Test
     fun earlyMismatchedRunReturnStaysPendingAndDoesNotAttach() {
-        val pending = persistentMapOf(
-            "call-a" to ToolReturnMessage(
-                "return-a",
-                toolCallId = "call-a",
-                runId = "run-other",
-                toolReturnRaw = JsonPrimitive("wrong"),
-            ),
-        )
-        val output = reduceStreamFrame(
-            TimelineReducerInput(
-                prev = Timeline("conv-1"),
-                frame = ApprovalRequestMessage(
-                    id = "approval-1",
-                    runId = "run-1",
-                    toolCall = ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
-                ),
-                pendingToolReturnsByCallId = pending,
-                source = "test",
-            ),
+        val output = reduceWithPending(
+            request(calls = listOf(call("call-a", "read"))),
+            returned("call-a", "run-other", "wrong"),
         )
 
         val event = output.next.events.single() as TimelineEvent.Confirmed
@@ -94,21 +52,12 @@ class ApprovalTimelineStreamTest {
     @Test
     fun matchingResponseRunDecidesApproval() {
         val seeded = reduce(
-            frame = ApprovalRequestMessage(
-                id = "approval-1",
-                toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
-                runId = "run-1",
-            ),
+            frame = request(calls = listOf(call("call-approval", "danger"))),
         ).next
 
         val output = reduce(
             prev = seeded,
-            frame = ApprovalResponseMessage(
-                id = "approval-response-1",
-                approvalRequestId = "approval-1",
-                approve = true,
-                runId = "run-1",
-            ),
+            frame = response(approve = true),
         )
 
         assertEquals(true, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
@@ -117,24 +66,17 @@ class ApprovalTimelineStreamTest {
     @Test
     fun multiCallApprovalDecidesOnlyAfterEveryReturn() {
         val seeded = reduce(
-            frame = ApprovalRequestMessage(
-                id = "approval-1",
-                runId = "run-1",
-                toolCalls = listOf(
-                    ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
-                    ToolCall(toolCallId = "call-b", name = "write", arguments = "b"),
-                ),
-            ),
+            frame = request(calls = listOf(call("call-a", "read"), call("call-b", "write"))),
         ).next
         val partial = reduce(
             prev = seeded,
-            frame = ToolReturnMessage("return-a", toolCallId = "call-a", runId = "run-1", toolReturnRaw = JsonPrimitive("read")),
+            frame = returned("call-a", "run-1", "read"),
         ).next
         assertEquals(false, (partial.events.single() as TimelineEvent.Confirmed).approvalDecided)
 
         val completed = reduce(
             prev = partial,
-            frame = ToolReturnMessage("return-b", toolCallId = "call-b", runId = "run-1", toolReturnRaw = JsonPrimitive("written")),
+            frame = returned("call-b", "run-1", "written"),
         ).next
         assertEquals(true, (completed.events.single() as TimelineEvent.Confirmed).approvalDecided)
     }
@@ -142,21 +84,12 @@ class ApprovalTimelineStreamTest {
     @Test
     fun mismatchedResponseRunLeavesApprovalPending() {
         val seeded = reduce(
-            frame = ApprovalRequestMessage(
-                id = "approval-1",
-                toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
-                runId = "run-1",
-            ),
+            frame = request(calls = listOf(call("call-approval", "danger"))),
         ).next
 
         val output = reduce(
             prev = seeded,
-            frame = ApprovalResponseMessage(
-                id = "approval-response-1",
-                approvalRequestId = "approval-1",
-                approve = false,
-                runId = "run-other",
-            ),
+            frame = response(approve = false, runId = "run-other"),
         )
 
         assertEquals(false, (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided)
@@ -166,4 +99,35 @@ class ApprovalTimelineStreamTest {
         prev: Timeline = Timeline("conv-1"),
         frame: com.letta.mobile.data.model.LettaMessage,
     ) = reduceStreamFrame(TimelineReducerInput(prev, frame, persistentMapOf(), source = "test"))
+
+    private fun reduceWithPending(request: ApprovalRequestMessage, returned: ToolReturnMessage) = reduceStreamFrame(
+        TimelineReducerInput(
+            prev = Timeline("conv-1"),
+            frame = request,
+            pendingToolReturnsByCallId = persistentMapOf(returned.toolCallId!! to returned),
+            source = "test",
+        ),
+    )
+
+    private fun request(runId: String? = "run-1", calls: List<ToolCall>) = ApprovalRequestMessage(
+        id = "approval-1",
+        runId = runId,
+        toolCalls = calls,
+    )
+
+    private fun response(approve: Boolean, runId: String? = "run-1") = ApprovalResponseMessage(
+        id = "response-1",
+        approvalRequestId = "approval-1",
+        approve = approve,
+        runId = runId,
+    )
+
+    private fun call(id: String, name: String) = ToolCall(toolCallId = id, name = name, arguments = "{}")
+
+    private fun returned(callId: String, runId: String?, body: String) = ToolReturnMessage(
+        id = "return-$callId",
+        toolCallId = callId,
+        runId = runId,
+        toolReturnRaw = JsonPrimitive(body),
+    )
 }
