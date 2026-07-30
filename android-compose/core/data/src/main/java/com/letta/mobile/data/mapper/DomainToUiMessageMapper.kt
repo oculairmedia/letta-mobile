@@ -44,11 +44,7 @@ internal fun List<AppMessage>.mapToUiMessages(): List<UiMessage> {
                 }
                 MessageType.USER, MessageType.ASSISTANT ->
                     add(message.mapToUiMessage().correlateSubagentNotification(subagentCallsByTaskId))
-                MessageType.REASONING -> add(message.mapToUiMessage())
-                // letta-mobile-jbui1: drop an approval request whose tool calls have all
-                // returned. The card is otherwise immortal — its only clear signal is a
-                // runtime ApprovalResolved event the server never emits.
-                MessageType.APPROVAL_REQUEST -> add(message.mapToUiMessage())
+                MessageType.REASONING, MessageType.APPROVAL_REQUEST -> add(message.mapToUiMessage())
                 MessageType.APPROVAL_RESPONSE -> if (
                     message.id !in absorbedResponses && message.hasExplicitApprovalDecision()
                 ) {

@@ -1,8 +1,6 @@
 package com.letta.mobile.data.repository.api
 
 import com.letta.mobile.data.model.AppMessage
-import com.letta.mobile.data.chat.projection.ApprovalTerminalEvidence
-import com.letta.mobile.data.chat.projection.ApprovalRequestFact
 
 /**
  * letta-mobile-f0ixs: one page of backfilled history plus an explicit "is there more" answer.
@@ -19,6 +17,4 @@ import com.letta.mobile.data.chat.projection.ApprovalRequestFact
 data class OlderMessagesPage(
     val messages: List<AppMessage>,
     val hasMore: Boolean?,
-    val approvalEvidence: ApprovalTerminalEvidence = ApprovalTerminalEvidence(emptySet(), emptySet()),
-    val approvalRequests: List<ApprovalRequestFact> = emptyList(),
 )

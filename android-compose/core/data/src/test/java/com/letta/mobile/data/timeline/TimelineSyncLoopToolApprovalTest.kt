@@ -67,7 +67,7 @@ class TimelineSyncLoopToolApprovalTest {
         )
         api.addStoredMessage(
             com.letta.mobile.data.model.ApprovalRequestMessage(
-                id = reqId, toolCalls = persistentListOf(toolCall),
+                id = reqId, toolCalls = persistentListOf(toolCall), runId = "run-1",
             )
         )
         api.addStoredMessage(
@@ -75,6 +75,7 @@ class TimelineSyncLoopToolApprovalTest {
                 id = "ret-1",
                 toolCallId = tcid,
                 toolReturnRaw = JsonPrimitive("hi\n"),
+                runId = "run-1",
             )
         )
 
@@ -107,7 +108,7 @@ class TimelineSyncLoopToolApprovalTest {
         )
         api.addStoredMessage(
             com.letta.mobile.data.model.ApprovalRequestMessage(
-                id = "req-batch",
+                id = "req-batch", runId = "run-batch",
                 toolCalls = persistentListOf(callA, callB),
             )
         )
@@ -116,6 +117,7 @@ class TimelineSyncLoopToolApprovalTest {
                 id = "ret-a",
                 toolCallId = "toolu_a",
                 toolReturnRaw = JsonPrimitive("a-output"),
+                runId = "run-batch",
             )
         )
         api.addStoredMessage(
@@ -124,6 +126,7 @@ class TimelineSyncLoopToolApprovalTest {
                 toolCallId = "toolu_b",
                 toolReturnRaw = JsonPrimitive("b-output"),
                 status = "error",
+                runId = "run-batch",
             )
         )
 
@@ -155,12 +158,13 @@ class TimelineSyncLoopToolApprovalTest {
         // Seed the store with a user message so send has something to build from.
         api.nextStreamMessages = listOf(
             com.letta.mobile.data.model.ApprovalRequestMessage(
-                id = reqId, toolCalls = persistentListOf(toolCall),
+                id = reqId, toolCalls = persistentListOf(toolCall), runId = "run-2",
             ),
             com.letta.mobile.data.model.ToolReturnMessage(
                 id = "ret-2",
                 toolCallId = tcid,
                 toolReturnRaw = JsonPrimitive("file_a\nfile_b\n"),
+                runId = "run-2",
             ),
         )
         val dispatcher = StandardTestDispatcher(testScheduler)

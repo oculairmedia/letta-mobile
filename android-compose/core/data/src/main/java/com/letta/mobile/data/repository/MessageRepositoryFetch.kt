@@ -3,8 +3,6 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.repository.api.OlderMessagesPage
 import com.letta.mobile.data.mapper.toAppMessages
-import com.letta.mobile.data.chat.projection.approvalTerminalEvidence
-import com.letta.mobile.data.chat.projection.approvalRequestFacts
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
@@ -130,8 +128,6 @@ internal object MessageRepositoryFetch {
             return OlderMessagesPage(
                 messages = page.messages.toAppMessages(),
                 hasMore = page.hasMore,
-                approvalEvidence = approvalTerminalEvidence(page.messages),
-                approvalRequests = approvalRequestFacts(page.messages),
             )
         }
 
@@ -143,8 +139,6 @@ internal object MessageRepositoryFetch {
         return OlderMessagesPage(
             messages = rawMessages.toAppMessages(),
             hasMore = null,
-            approvalEvidence = approvalTerminalEvidence(rawMessages),
-            approvalRequests = approvalRequestFacts(rawMessages),
         )
     }
 

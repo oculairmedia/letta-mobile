@@ -1,8 +1,6 @@
 package com.letta.mobile.data.timeline
 
-import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.ToolReturnMessage
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
@@ -15,33 +13,17 @@ fun applyReturnsAndResponsesFromSnapshot(
     snapshot: List<LettaMessage>,
     state: MutableStateFlow<Timeline>,
 ) {
-    val decidedIds = snapshot.filterIsInstance<ApprovalResponseMessage>()
-        .mapNotNull { it.approvalRequestId }
-        .filter { it.isNotBlank() }
-        .toSet()
-    val returnsByCallId: Map<String, ToolReturnMessage> =
-        snapshot.filterIsInstance<ToolReturnMessage>()
-            .mapNotNull { r ->
-                val callId = r.toolCallId
-                if (!callId.isNullOrBlank()) callId to r else null
-            }
-            .toMap()
-    if (decidedIds.isEmpty() && returnsByCallId.isEmpty()) return
-    val returnedToolCallIds = returnsByCallId.keys
+    val evidence = approvalTimelineEvidence(snapshot)
+    if (evidence.responsesByRequestId.isEmpty() && evidence.returnsByCallId.isEmpty()) return
     val newEvents = state.value.events.map { ev ->
         if (ev !is TimelineEvent.Confirmed || ev.messageType != TimelineMessageType.TOOL_CALL) {
             return@map ev
         }
-        val matchingReturns = ev.toolCalls.mapNotNull { tc ->
-            val callId = tc.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val toolReturn = returnsByCallId[callId] ?: return@mapNotNull null
-            callId to toolReturn
-        }
+        val matchingReturns = ev.matchingToolReturns(evidence)
         val matchingReturn = matchingReturns.firstOrNull()?.second
-        val byResponse = ev.approvalRequestId != null && ev.approvalRequestId in decidedIds
-        val byReturn = ev.toolCalls.any { toolCall ->
-            toolCall.effectiveId.takeIf { it.isNotBlank() }?.let { it in returnedToolCallIds } == true
-        }
+        val byResponse = ev.hasExplicitApprovalResponse(evidence)
+        val byReturn = if (ev.approvalRequestId == null) matchingReturns.isNotEmpty()
+            else ev.allApprovalCallsReturned(matchingReturns)
         if (matchingReturn == null && !byResponse && !byReturn) return@map ev
         // letta-mobile-fe51r: shared fold keeps projected previews from
         // clobbering full bodies and tracks truncation markers per call id.

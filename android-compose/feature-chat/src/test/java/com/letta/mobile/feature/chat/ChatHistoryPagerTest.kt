@@ -7,12 +7,6 @@ import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.ApprovalRequestMessage
-import com.letta.mobile.data.model.ApprovalResponseMessage
-import com.letta.mobile.data.model.ToolCall
-import com.letta.mobile.data.mapper.toAppMessage
-import com.letta.mobile.data.chat.projection.ApprovalRequestFact
-import com.letta.mobile.data.chat.projection.ApprovalTerminalEvidence
 import com.letta.mobile.data.repository.MessageRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -122,45 +116,6 @@ class ChatHistoryPagerTest {
         advanceUntilIdle()
 
         assertFalse(harness.uiState.value.hasMoreOlderMessages)
-    }
-
-    @Test
-    fun `newer response resolves older approval across page boundary`() = runTest {
-        val harness = Harness(scope = this)
-        val response = ApprovalResponseMessage(
-            id = "response-1",
-            approvalRequestId = "approval-1",
-            approve = false,
-            runId = "run-1",
-        )
-        val request = ApprovalRequestMessage(
-            id = "approval-1",
-            runId = "run-1",
-            toolCall = ToolCall(toolCallId = "call-1", name = "Bash", arguments = "{\"command\":\"pwd\"}"),
-        )
-        coEvery { harness.messageRepository.fetchOlderMessagesPage(any<AgentId>(), any<ConversationId>(), any()) } returnsMany
-            listOf(
-                OlderMessagesPage(
-                    listOf(appMessage("newer-1", "newer")),
-                    hasMore = true,
-                    approvalEvidence = ApprovalTerminalEvidence(setOf("approval-1" to "run-1"), emptySet()),
-                ),
-                OlderMessagesPage(
-                    listOf(request.toAppMessage()!!),
-                    hasMore = false,
-                    approvalRequests = listOf(ApprovalRequestFact("approval-1", "run-1", listOf("call-1"))),
-                ),
-            )
-
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
-        advanceUntilIdle()
-        harness.pager.loadOlderMessages(clientModeEnabled = false)
-        advanceUntilIdle()
-
-        val approvalRow = harness.uiState.value.messages.single { it.id == "approval-1" }
-        assertEquals("tool", approvalRow.role)
-        assertEquals(null, approvalRow.approvalRequest)
-        assertEquals("{\"command\":\"pwd\"}", approvalRow.toolCalls!!.single().arguments)
     }
 
     @Test

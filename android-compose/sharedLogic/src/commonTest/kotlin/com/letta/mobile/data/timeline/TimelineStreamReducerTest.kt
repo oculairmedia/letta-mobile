@@ -56,6 +56,7 @@ class TimelineStreamReducerTest {
         val approvalRequest = ApprovalRequestMessage(
             id = "approval-1",
             toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
+            runId = "run-1",
         )
         val seeded = reduce(frame = approvalRequest).next
 
@@ -65,6 +66,7 @@ class TimelineStreamReducerTest {
                 id = "approval-response-1",
                 approvalRequestId = "approval-1",
                 approve = true,
+                runId = "run-1",
             ),
         )
 
@@ -80,8 +82,9 @@ class TimelineStreamReducerTest {
     @Test
     fun `tool return attaches to matching tool call and emits notification`() {
         val seeded = reduce(
-            frame = ToolCallMessage(
+            frame = ApprovalRequestMessage(
                 id = "tool-batch",
+                runId = "run-1",
                 toolCalls = listOf(
                     ToolCall(toolCallId = "call-a", name = "read", arguments = "a"),
                     ToolCall(toolCallId = "call-b", name = "write", arguments = "b"),
@@ -93,6 +96,7 @@ class TimelineStreamReducerTest {
             toolCallId = "call-b",
             status = "success",
             toolReturnRaw = JsonPrimitive("done"),
+            runId = "run-1",
         )
 
         val output = reduce(prev = seeded, frame = toolReturn)
@@ -100,7 +104,7 @@ class TimelineStreamReducerTest {
         val event = output.next.events.single() as TimelineEvent.Confirmed
         event.toolReturnContentByCallId["call-b"] shouldBe "done"
         event.toolReturnIsErrorByCallId["call-b"] shouldBe false
-        event.approvalDecided shouldBe true
+        event.approvalDecided shouldBe false
         output.updatedPendingToolReturnsByCallId shouldBe emptyMap()
         output.emittedEvents shouldBe listOf(
             TimelineSyncEvent.StreamEventIngested("tool-batch", toolReturn.messageType)
@@ -110,6 +114,41 @@ class TimelineStreamReducerTest {
             messageType = "tool_return_message",
             contentPreview = "done",
         )
+
+        val completed = reduce(
+            prev = output.next,
+            frame = ToolReturnMessage(
+                id = "return-a",
+                toolCallId = "call-a",
+                status = "success",
+                toolReturnRaw = JsonPrimitive("read"),
+                runId = "run-1",
+            ),
+        ).next.events.single() as TimelineEvent.Confirmed
+        completed.approvalDecided shouldBe true
+    }
+
+    @Test
+    fun `approval response with mismatched run leaves request pending`() {
+        val seeded = reduce(
+            frame = ApprovalRequestMessage(
+                id = "approval-1",
+                toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
+                runId = "run-1",
+            ),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = ApprovalResponseMessage(
+                id = "approval-response-1",
+                approvalRequestId = "approval-1",
+                approve = false,
+                runId = "run-other",
+            ),
+        )
+
+        (output.next.events.single() as TimelineEvent.Confirmed).approvalDecided shouldBe false
     }
 
     @Test

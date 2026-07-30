@@ -63,7 +63,10 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     if (message is ApprovalResponseMessage) {
         val reqId = message.approvalRequestId ?: return output()
         val match = timeline.events.firstOrNull {
-            it is TimelineEvent.Confirmed && it.approvalRequestId == reqId
+            it is TimelineEvent.Confirmed &&
+                it.approvalRequestId == reqId &&
+                !it.runId.isNullOrBlank() &&
+                it.runId == message.runId
         } as? TimelineEvent.Confirmed ?: return output()
         if (match.approvalDecided) {
             hotPathTelemetry(
@@ -108,8 +111,14 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                     if (tcid in fold.contentByCallId) fold.contentByCallId
                     else fold.contentByCallId + (tcid to "")
                 val body = contentByCallId.getValue(tcid)
+                val allCallsReturned = match.toolCalls.isNotEmpty() &&
+                    match.toolCalls.all { call ->
+                        val callId = call.effectiveId
+                        callId.isNotBlank() &&
+                            (callId == tcid || callId in contentByCallId || callId in match.toolReturnContentByCallId)
+                    }
                 val updated = match.copy(
-                    approvalDecided = true,
+                    approvalDecided = match.approvalDecided || allCallsReturned,
                     toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
                     toolReturnIsError = isError,
                     toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),

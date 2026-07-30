@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.util.Telemetry
@@ -29,15 +30,17 @@ class TimelineHydrationReducerTest {
         val result = TimelineHydrationReducer.reduce(
             conversationId = "conversation-1",
             serverMessagesChronological = listOf(
-                ToolCallMessage(
-                    id = "tool-call-1",
+                ApprovalRequestMessage(
+                    id = "approval-1",
                     toolCall = ToolCall(toolCallId = "call-1", name = "Bash", arguments = "{}"),
+                    runId = "run-1",
                 ),
                 ToolReturnMessage(
                     id = "tool-return-1",
                     toolCallId = "call-1",
                     status = "success",
                     toolReturnRaw = JsonPrimitive("ok"),
+                    runId = "run-1",
                 ),
             ),
             timelineBeforeFetch = Timeline("conversation-1"),
@@ -60,6 +63,7 @@ class TimelineHydrationReducerTest {
                 ToolCallMessage(
                     id = "tool-call-image",
                     toolCall = ToolCall(toolCallId = "call-image", name = "Read", arguments = "{}"),
+                    runId = "run-image",
                 ),
                 ToolReturnMessage(
                     id = "tool-return-image",
@@ -76,6 +80,7 @@ class TimelineHydrationReducerTest {
                             })
                         })
                     },
+                    runId = "run-image",
                 ),
             ),
             timelineBeforeFetch = Timeline("conversation-1"),
