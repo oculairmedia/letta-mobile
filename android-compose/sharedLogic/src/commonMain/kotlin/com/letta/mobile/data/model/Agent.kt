@@ -78,6 +78,13 @@ data class Agent(
     @SerialName("context_window_limit") val contextWindowLimit: Int? = null,
     @SerialName("response_format") val responseFormat: JsonElement? = null,
     val blocks: List<Block> = emptyList(),
+    /**
+     * Canonical Letta `AgentState` nests core-memory blocks HERE; only the admin
+     * shim also duplicates them to the top-level [blocks]. Decoding both shapes
+     * means either payload resolves — read [coreBlocks] rather than [blocks]
+     * anywhere you want "this agent's core memory".
+     */
+    val memory: AgentMemory? = null,
     val tools: List<Tool> = emptyList(),
     val sources: List<JsonObject> = emptyList(),
     val tags: List<String> = emptyList(),
@@ -107,6 +114,22 @@ data class Agent(
     val hidden: Boolean? = null,
     @SerialName("managed_group") val managedGroup: JsonObject? = null,
     @SerialName("multi_agent_group") val multiAgentGroup: JsonObject? = null,
+) {
+    /**
+     * This agent's core-memory blocks, from whichever shape the backend sent.
+     * Prefers the top-level [blocks]; falls back to the canonical nested
+     * [AgentMemory.blocks]. Every "show this agent's memory" surface must use
+     * this — reading [blocks] directly renders 0 blocks against a backend that
+     * only emits the canonical shape.
+     */
+    val coreBlocks: List<Block> get() = blocks.ifEmpty { memory?.blocks.orEmpty() }
+}
+
+/** The `memory` sub-object of a canonical Letta `AgentState`. */
+@Serializable
+data class AgentMemory(
+    val blocks: List<Block> = emptyList(),
+    @SerialName("file_blocks") val fileBlocks: List<Block> = emptyList(),
 )
 
 @Serializable

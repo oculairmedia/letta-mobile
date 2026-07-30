@@ -348,7 +348,9 @@ object MemoryParityMapper {
         val selectedTools = selectedAgent?.tools
             ?: allTools.takeIf { selectedAgentId == null && agents.isEmpty() }
             ?: emptyList()
-        val selectedBlocks = selectedAgent?.blocks.orEmpty()
+        // coreBlocks, not blocks: a backend may send core memory nested under
+        // `memory.blocks` (canonical Letta) instead of at the top level.
+        val selectedBlocks = selectedAgent?.coreBlocks.orEmpty()
         val channelSection = channelsSection(backendDescriptor, channelTransportState)
         val sections = listOf(
             skillsSection(selectedTools),
