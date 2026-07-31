@@ -28,6 +28,12 @@ enforced by `IrohAdminOwnershipMatrixTest`, which:
 - keeps unsupported native operations (`conversation_delete`,
   `skill_list_command`) and the epic-scoped unrouted domains (crons, search,
   channels, secrets, filesystem/terminal, MCP catalog) explicit;
+- requires every shim-only surface row (an `unrouted_domains` entry that names
+  `shim_routes`) to carry a `disposition` from `enums.unrouted_dispositions`,
+  caller `evidence`, and a `successor` — lgns8.25 dispositioned
+  `work_activity_ingest`, `worker_events`, `usage_summary`,
+  `permissions_preview`, and `pool_introspection`; see
+  `lgns8-epic-status-and-shim-retirement-ceiling.md` for the evidence;
 - forbids any direct-Letta-storage data store.
 
 ## Ownership summary
