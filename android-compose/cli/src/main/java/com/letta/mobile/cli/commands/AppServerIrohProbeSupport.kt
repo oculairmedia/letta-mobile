@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.letta.mobile.cli.probe.WrapperProcessScan
+import com.letta.mobile.cli.probe.WrapperScanMode
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
@@ -48,6 +49,10 @@ internal data class IrohProbeOptions(
     val wrapperUnit: String = WrapperProcessScan.DEFAULT_UNIT,
     /** Explicit wrapper PID; overrides systemd resolution when the wrapper is not a unit. */
     val wrapperPid: Int? = null,
+    /** Which shim-off run this is — deployment stays strict (letta-mobile-jr5tx). */
+    val wrapperScanMode: WrapperScanMode = WrapperScanMode.DEPLOYMENT,
+    /** Hermetic-only declaration that the harness spawns no wrapper process. */
+    val wrapperScanNotApplicable: String? = null,
 ) {
     fun dumpPath(): ProbeDumpPath? = dumpFramesPath?.let(::ProbeDumpPath)
 }
