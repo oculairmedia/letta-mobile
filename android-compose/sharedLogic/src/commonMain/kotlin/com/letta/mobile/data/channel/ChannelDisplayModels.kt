@@ -40,8 +40,21 @@ data class ChannelDisplayItem(
 enum class ChannelDisplayStatus(val label: String) {
     Connected("Connected"),
     Connecting("Connecting"),
+    /**
+     * letta-mobile-wxy4s: the connection dropped and the supervisor is redialing.
+     * Distinct from [Disconnected] on purpose — "reconnecting" must read
+     * differently from "dead", and BOTH must read differently from "connected".
+     * The 2026-07-31 incident was invisible precisely because dead connections
+     * kept rendering cached data with no staleness signal at all.
+     */
+    Reconnecting("Reconnecting"),
     Idle("Idle"),
     Disconnected("Disconnected"),
+    ;
+
+    /** True when the surface is showing data that may be stale. */
+    val isStale: Boolean
+        get() = this == Reconnecting || this == Disconnected
 }
 
 object ChannelDisplayMapper {
@@ -75,7 +88,9 @@ object ChannelDisplayMapper {
             append("Connected")
             canonicalLiveTransport?.takeIf { it.isNotBlank() }?.let { append(" via $it") }
         }
-        is ChannelTransportState.Disconnected -> reason.ifBlank { "Disconnected" }
+        is ChannelTransportState.Disconnected ->
+            if (willReconnect) "Reconnecting${reason.takeIf { it.isNotBlank() }?.let { " — $it" }.orEmpty()}"
+            else reason.ifBlank { "Disconnected" }
     }
 
     private fun ChannelTransportState.detailText(): String = when (this) {
@@ -92,7 +107,13 @@ object ChannelDisplayMapper {
                 a2uiVersion?.takeIf { it.isNotBlank() }?.let { append(" ($it)") }
             }
         }
-        is ChannelTransportState.Disconnected -> reason.ifBlank { "Live channel transport is disconnected." }
+        is ChannelTransportState.Disconnected ->
+            if (willReconnect) {
+                "Live channel transport lost its connection and is reconnecting. " +
+                    "Anything shown may be stale."
+            } else {
+                reason.ifBlank { "Live channel transport is disconnected." }
+            }
     }
 
     private fun ChannelTransportState.metadataLabels(status: ChannelDisplayStatus): List<String> = when (this) {
@@ -111,6 +132,8 @@ object ChannelDisplayMapper {
             status.label,
             "Code $code",
             "Auth".takeIf { isAuthFailure },
+            // wxy4s: never let a surface render cached data without saying so.
+            "Stale".takeIf { status.isStale },
         )
     }
 
@@ -118,7 +141,12 @@ object ChannelDisplayMapper {
         ChannelTransportState.Idle -> ChannelDisplayStatus.Idle
         is ChannelTransportState.Connecting -> ChannelDisplayStatus.Connecting
         is ChannelTransportState.Connected -> ChannelDisplayStatus.Connected
-        is ChannelTransportState.Disconnected -> ChannelDisplayStatus.Disconnected
+        // wxy4s: a supervisor-driven redial (Degraded) sets willReconnect=true —
+        // surface it as Reconnecting so the user sees recovery in progress rather
+        // than a hard failure (or, worse, nothing at all).
+        is ChannelTransportState.Disconnected ->
+            if (willReconnect && !isAuthFailure) ChannelDisplayStatus.Reconnecting
+            else ChannelDisplayStatus.Disconnected
     }
 }
 

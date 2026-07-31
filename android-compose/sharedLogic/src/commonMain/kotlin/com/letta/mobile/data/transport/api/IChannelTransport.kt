@@ -121,6 +121,21 @@ interface RedialAwareChannelTransport {
     val redialWhileTurnActive: SharedFlow<RedialWhileTurnActive>
 }
 
+/**
+ * letta-mobile-wxy4s: transports that run an application-level liveness probe and
+ * can be asked to run one RIGHT NOW.
+ *
+ * QUIC state cannot be trusted to notice a peer that vanished without a
+ * CONNECTION_CLOSE; a periodic probe can, but its loop is unreliable while an
+ * Android app is backgrounded (doze). Screen-resume coordinators call [probeNow]
+ * so a returning user gets sub-second detection instead of waiting a full probe
+ * interval on a connection that has been dead for hours.
+ */
+interface LivenessProbingChannelTransport {
+    /** Runs one liveness probe immediately and restarts the periodic interval. */
+    fun probeNow()
+}
+
 data class RedialWhileTurnActive(
     val agentId: String,
     val conversationId: String,

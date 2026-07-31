@@ -16,6 +16,16 @@ internal class AdminChatScreenLifecycleCoordinator(
     private val sessionState: MutableStateFlow<ChatSessionState>,
     private val resolveConversationAndLoad: () -> Unit,
     private val updateSessionState: (reducer: (ChatSessionState) -> ChatSessionState) -> Unit,
+    /**
+     * letta-mobile-wxy4s: force an immediate connection-liveness probe on resume.
+     * The transport's periodic probe cannot be trusted while the app is
+     * backgrounded (doze), and the recovery branch below is DEAD CODE until the
+     * connection state actually flips — which is exactly what happened during the
+     * 2026-07-31 incident: the app came back to the foreground, the connection was
+     * long dead, nothing had noticed, so `conn` was still Connected and no
+     * reconnect ran. Probing first makes that branch reachable.
+     */
+    private val probeConnection: () -> Unit = {},
 ) {
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
@@ -27,6 +37,9 @@ internal class AdminChatScreenLifecycleCoordinator(
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastScreenResumedAtMs < 200) return
         lastScreenResumedAtMs = now
+        // Probe BEFORE reading connection state: a dead-but-unnoticed connection
+        // must be detectable within a probe round-trip rather than a full interval.
+        probeConnection()
         val currentId = conversationId()?.value
         if (currentId != null) {
             currentConversationTracker.setCurrent(currentId)

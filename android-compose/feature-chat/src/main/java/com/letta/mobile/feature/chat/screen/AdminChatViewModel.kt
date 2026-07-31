@@ -328,6 +328,8 @@ internal class AdminChatViewModel @Inject constructor(
             isShimBackend = isShimBackend,
             wsChatBridge = wsChatBridge,
             uiState = _uiState,
+            updateSessionState = ::updateSessionState,
+            onReconnected = ::resolveConversationAndLoad,
         )
     }
 
@@ -361,6 +363,7 @@ internal class AdminChatViewModel @Inject constructor(
             sessionState = _sessionState,
             resolveConversationAndLoad = ::resolveConversationAndLoad,
             updateSessionState = ::updateSessionState,
+            probeConnection = wsChatBridge::probeNow,
         )
     }
 

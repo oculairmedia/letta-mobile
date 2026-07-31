@@ -39,6 +39,19 @@ interface ChatGatewayExtras {
     suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation
 }
 
+/**
+ * letta-mobile-wxy4s: gateways that can report their underlying transport's
+ * connection state, so a UI controller can surface a drop and auto-recover after
+ * the redial instead of silently rendering cached data.
+ *
+ * Probed the same way as [ChatGatewayExtras] / ApprovalSubmittingGateway: the
+ * controller casts its gateway to this interface and, when present, collects
+ * [connectionState]. Gateways without a live transport simply don't implement it.
+ */
+interface ConnectionStatusGateway {
+    val connectionState: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.transport.ChannelTransportState>
+}
+
 interface ChatSessionGraph<out Repositories : SessionRepositoryGraph> {
     val repositories: Repositories
     val gateway: ChatGateway

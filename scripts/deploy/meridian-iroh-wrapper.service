@@ -26,6 +26,10 @@ Type=simple
 # wrapper must not inherit provider credentials or LETTA_LOCAL_BACKEND_* — those
 # belong to the App Server. See the runbook's "Wrapper Environment" section.
 EnvironmentFile=/etc/meridian/iroh-wrapper.env
+# The dist targets JVM 21 (class-file 65) and iroh requires it; the host default
+# java is 17, so without this pin the first launch dies with
+# UnsupportedClassVersionError.
+Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 
 # The release tree is self-contained; the launcher script sets its own classpath
 # from the sibling lib/ directory. WorkingDirectory is only a safe neutral cwd.

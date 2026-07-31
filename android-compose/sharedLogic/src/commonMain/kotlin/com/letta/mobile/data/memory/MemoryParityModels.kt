@@ -593,6 +593,8 @@ object MemoryParityMapper {
 private fun ChannelDisplayItem.toMemoryStatus(): MemoryChannelStatus = when (status) {
     ChannelDisplayStatus.Connected -> MemoryChannelStatus.Connected
     ChannelDisplayStatus.Connecting -> MemoryChannelStatus.Connecting
+    // wxy4s: a redial in progress is a connecting state, not a dead one.
+    ChannelDisplayStatus.Reconnecting -> MemoryChannelStatus.Connecting
     ChannelDisplayStatus.Idle -> MemoryChannelStatus.Idle
     ChannelDisplayStatus.Disconnected -> MemoryChannelStatus.Disconnected
 }

@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
@@ -83,7 +84,14 @@ class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     private val deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway, ConnectionStatusGateway {
+
+    // letta-mobile-wxy4s: expose the transport's connection state so UI
+    // controllers can surface a drop (and auto-recover after the redial) instead
+    // of silently rendering cached data across a dead connection.
+    override val connectionState: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.transport.ChannelTransportState>
+        get() = transport.state
+
 
     private val bridge = WsChatBridge(transport)
     private val json = lettaWireJson
@@ -369,9 +377,16 @@ class IrohAdminRpcChatGateway(
                 }
             }
         }
+        // letta-mobile-wxy4s: SECONDARY MASKING FIX. These synthesized heartbeats
+        // used to emit unconditionally, so TimelineSyncLoop's silence watchdog
+        // never cycled even when the transport was long dead — the UI kept being
+        // told "the stream is fine". Gate them on the transport actually being
+        // Connected (same shape as DesktopHybridAppServerChatGateway) so a dead
+        // connection goes silent and the watchdog can do its job.
         val heartbeats = flow<TimelineStreamFrame> {
-            while (true) {
+            while (transport.state.value is com.letta.mobile.data.transport.ChannelTransportState.Connected) {
                 delay(heartbeatIntervalMs.milliseconds)
+                if (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) break
                 emit(TimelineStreamFrame.Heartbeat)
             }
         }

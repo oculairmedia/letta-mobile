@@ -463,6 +463,40 @@ class IrohAdminRpcChatGatewayTest {
         result = Json.parseToJsonElement(resultJson),
     )
 
+    // letta-mobile-wxy4s: SECONDARY MASKING. Iroh has no idle pings, so this
+    // gateway synthesizes heartbeats to keep TimelineSyncLoop's silence watchdog
+    // from cycling an idle-but-healthy subscription. Unconditionally, that also
+    // told the loop "the stream is fine" across a DEAD connection for as long as
+    // the app stayed open — one of the two masks that hid the 2026-07-31 outage.
+    // Heartbeats must therefore stop the moment the transport is not Connected.
+    @Test
+    fun heartbeatsStopWhenTransportIsNotConnected() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        val gateway = IrohAdminRpcChatGateway(transport = transport, heartbeatIntervalMs = 10)
+        val frames = mutableListOf<TimelineStreamFrame>()
+        val collector = launch { gateway.streamConversation("conv-1").collect { frames += it } }
+        try {
+            while (frames.none { it is TimelineStreamFrame.Heartbeat }) {
+                kotlinx.coroutines.delay(10)
+            }
+            transport.transportState.value = ChannelTransportState.Disconnected(
+                code = 0,
+                reason = "liveness_probe_failed",
+                willReconnect = true,
+            )
+            kotlinx.coroutines.delay(50)
+            val settled = frames.count { it is TimelineStreamFrame.Heartbeat }
+            kotlinx.coroutines.delay(200)
+            assertEquals(
+                settled,
+                frames.count { it is TimelineStreamFrame.Heartbeat },
+                "a dead transport must go silent so the timeline silence watchdog can cycle",
+            )
+        } finally {
+            collector.cancel()
+        }
+    }
+
     private class FakeIrohTransport(
         private val sendAccepts: Boolean = true,
     ) : IChannelTransport {
@@ -475,8 +509,10 @@ class IrohAdminRpcChatGatewayTest {
             AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "${call.method} has no responder")
         }
 
-        override val state: StateFlow<ChannelTransportState> =
-            MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
+        val transportState = MutableStateFlow<ChannelTransportState>(
+            ChannelTransportState.Connected("server", "session", "device"),
+        )
+        override val state: StateFlow<ChannelTransportState> = transportState
         override val events = MutableSharedFlow<ServerFrame>()
         override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
 

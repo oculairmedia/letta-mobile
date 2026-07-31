@@ -108,6 +108,7 @@ private fun ChannelCard(channel: ChannelDisplayItem, modifier: Modifier) {
 private fun ChannelDisplayStatus.accent(): Color = when (this) {
     ChannelDisplayStatus.Connected -> MaterialTheme.customColors.successColor
     ChannelDisplayStatus.Connecting -> MaterialTheme.customColors.runningColor
+    ChannelDisplayStatus.Reconnecting -> MaterialTheme.customColors.runningColor
     ChannelDisplayStatus.Idle -> MaterialTheme.colorScheme.onSurfaceVariant
     ChannelDisplayStatus.Disconnected -> MaterialTheme.colorScheme.error
 }
