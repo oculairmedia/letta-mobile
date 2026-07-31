@@ -1,10 +1,19 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.AppServerController
+import com.letta.mobile.data.controller.AppServerControllerState
+import com.letta.mobile.data.controller.CanonicalRuntime
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.runtime.RuntimeEventDraft
+import com.letta.mobile.runtime.TurnCommand
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -12,9 +21,12 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -36,6 +48,10 @@ import kotlinx.serialization.json.put
  * - a bare `success:false` is not enough for required product methods.
  */
 class ShimOffParityGateTest {
+    private companion object {
+        const val PEER_NODE_ID = "peer-node-1"
+    }
+
     private var savedFactory: (() -> AdminProxyTransport)? = null
     private val proxyDialCount = java.util.concurrent.atomic.AtomicInteger(0)
 
@@ -113,8 +129,37 @@ class ShimOffParityGateTest {
         override suspend fun conversationUpdate(command: AppServerCommand.ConversationUpdate) =
             AppServerInboundFrame.ConversationUpdateResponse(command.requestId, true, convObj())
 
+        // message.get / tool_return.get project a single message out of this page,
+        // so the runtime must actually hold the message the gate asks for.
         override suspend fun conversationMessagesList(command: AppServerCommand.ConversationMessagesList) =
-            AppServerInboundFrame.ConversationMessagesListResponse(command.requestId, true, JsonArray(emptyList()))
+            AppServerInboundFrame.ConversationMessagesListResponse(
+                command.requestId,
+                true,
+                buildJsonArray {
+                    add(
+                        buildJsonObject {
+                            put("id", "m-1")
+                            put("type", "tool_return_message")
+                            put("conversation_id", "conv-1")
+                            put("tool_call_id", "tc-1")
+                        },
+                    )
+                },
+            )
+
+        override suspend fun getReflectionSettings(command: AppServerCommand.GetReflectionSettings) =
+            AppServerInboundFrame.GetReflectionSettingsResponse(
+                command.requestId,
+                true,
+                buildJsonObject { put("trigger", "manual") },
+            )
+
+        override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings) =
+            AppServerInboundFrame.SetReflectionSettingsResponse(
+                command.requestId,
+                true,
+                buildJsonObject { put("trigger", "manual") },
+            )
 
         override suspend fun listModels(command: AppServerCommand.ListModels) =
             AppServerInboundFrame.ListModelsResponse(command.requestId, true, JsonArray(emptyList()))
@@ -150,12 +195,65 @@ class ShimOffParityGateTest {
             AppServerInboundFrame.CronDeleteAllResponse(command.requestId, true)
     }
 
-    private fun productionRouter(): AdminRpcRouter =
+    /**
+     * Minimal live App Server controller. The matrix routes `approval.submit`
+     * (and health/control ops) through `controller_native`, so a shim-off parity
+     * run must model the controller being PRESENT — its absence is a separate,
+     * explicitly asserted failure mode ([approvalSubmitFailsClosedWithoutController]).
+     */
+    private class GateController : AppServerController {
+        override val state: Flow<AppServerControllerState> = flowOf(AppServerControllerState.Connected)
+
+        var submittedApprovalRequestId: String? = null
+
+        override suspend fun startRuntime(
+            agentId: AgentId,
+            conversationId: ConversationId,
+            cwd: String?,
+            mode: AppServerPermissionMode?,
+            recoverApprovals: Boolean,
+            forceDeviceStatus: Boolean,
+        ): CanonicalRuntime = CanonicalRuntime(
+            scope = AppServerRuntimeScope(agentId = agentId.value, conversationId = conversationId.value),
+        )
+
+        override fun runTurn(command: TurnCommand): Flow<RuntimeEventDraft> = emptyFlow()
+
+        override suspend fun sync(
+            runtime: AppServerRuntimeScope,
+            recoverApprovals: Boolean,
+            forceDeviceStatus: Boolean,
+        ): AppServerInboundFrame.SyncResponse = error("unused")
+
+        override suspend fun abort(
+            runtime: AppServerRuntimeScope,
+            runId: String?,
+        ): AppServerInboundFrame.AbortMessageResponse = error("unused")
+
+        override suspend fun submitApproval(
+            agentId: AgentId,
+            conversationId: ConversationId?,
+            approvalRequestId: String,
+            approve: Boolean,
+            reason: String?,
+            toolCallId: String?,
+            updatedInput: JsonObject?,
+        ) {
+            submittedApprovalRequestId = approvalRequestId
+        }
+    }
+
+    /** A peer must already be paired for the pair.peer.* rows to be exercisable. */
+    private fun pairedPeerStore() = InMemoryPairedPeerStore().apply {
+        save(PairedPeer(nodeId = PEER_NODE_ID, name = "gate-peer", pairedAtMs = 1))
+    }
+
+    private fun productionRouter(controller: AppServerController? = GateController()): AdminRpcRouter =
         AdminRpcRegistry.buildRouter(
             adminBaseUrl = "http://127.0.0.1:9", // shim host — but transport is forced to fail
-            controller = null,
+            controller = controller,
             subagentRegistrySource = EmptySubagentSource,
-            pairingService = IrohPairingService(InMemoryPairedPeerStore()),
+            pairingService = IrohPairingService(pairedPeerStore()),
             nativeClient = NativeRuntime(),
             shimRetired = true,
             vibesyncBaseUrl = null, // VibeSync not injected
@@ -171,8 +269,28 @@ class ShimOffParityGateTest {
         put("name", "demo")
         put("cron", "0 0 * * *")
         put("prompt", "hi")
+        // pairing rows address a peer by node id; reflection.set carries settings
+        put("node_id", PEER_NODE_ID)
+        put("capabilities", "chat.read")
+        put("trigger", "manual")
+        put("step_count", "5")
         // native opt-ins / skill path installs
         if (method == "skill.install") put("skill_path", "/skills/demo")
+        if (method == "approval.submit") {
+            put(
+                "payload",
+                buildJsonObject {
+                    put("streaming", false)
+                    put(
+                        "messages",
+                        Json.parseToJsonElement(
+                            """[{"type":"approval","approval_request_id":"approval-1","approve":true,""" +
+                                """"approvals":[{"tool_call_id":"tc-1","approve":true}]}]""",
+                        ),
+                    )
+                },
+            )
+        }
     }
 
     @Test
@@ -198,33 +316,31 @@ class ShimOffParityGateTest {
 
     @Test
     fun runtimeOwnedOpsSucceedNativelyWithShimOff() = runTest {
-        val router = productionRouter()
-        // Runtime-owned ops that serve natively with no shim fallback (Phase 2).
-        val nativeOk = listOf(
-            "agent.list", "agent.get", "agent.create", "agent.update", "agent.delete",
-            "conversation.list", "conversation.get", "conversation.create",
-            "conversation.update", "conversation.archive", "conversation.restore",
-            "message.list",
-            "model.list", "skill.install", "skill.uninstall", "skill.list",
-            "cron.list", "cron.add", "cron.get", "cron.trigger",
-        )
+        // lgns8.21.10: DERIVED from the executable ownership matrix — every row whose
+        // post-shim owner is app_server_v2/controller_native with fallback `none` must
+        // serve natively. No second hand-maintained list to drift: a new matrix row
+        // automatically becomes a parity expectation here.
+        val nativeOk = IrohAdminOwnershipMatrix.shimFreeNativeMethods()
+        assertTrue(nativeOk.isNotEmpty(), "ownership matrix declares no shim-free native methods")
         val dialsBefore = proxyDialCount.get()
+        // Collect every failure: one regressed method must not mask the rest.
+        val failures = mutableListOf<String>()
         nativeOk.forEach { method ->
-            val obj = Json.parseToJsonElement(
-                router.dispatch(
-                    AdminRpcInvocation("g", method, params(method), AdminRpcRequestContext.Authenticated),
-                ),
-            ).jsonObject
-            assertEquals(
-                "true",
-                obj["success"]?.jsonPrimitive?.content,
-                "$method must serve natively shim-off (success:true required; bare success:false is not parity): $obj",
-            )
-            assertTrue(
-                obj["error"] == null || obj["error"]?.jsonPrimitive?.content.isNullOrBlank(),
-                "$method native success must not carry an error payload: $obj",
-            )
+            // A fresh router per method: destructive rows (pair.peer.revoke) must not
+            // make the outcome depend on iteration order.
+            val obj = dispatch(productionRouter(), method)
+            if (obj["success"]?.jsonPrimitive?.content != "true") {
+                failures += "$method -> $obj"
+            } else if (!obj["error"]?.jsonPrimitive?.content.isNullOrBlank()) {
+                failures += "$method succeeded but carried an error payload -> $obj"
+            }
         }
+        assertEquals(
+            emptyList(),
+            failures,
+            "matrix rows owned by ${IrohAdminOwnershipMatrix.SHIM_FREE_OWNERS} with fallback=none must serve " +
+                "natively shim-off (success:true required; bare success:false is not parity)",
+        )
         assertEquals(
             dialsBefore,
             proxyDialCount.get(),
@@ -235,18 +351,22 @@ class ShimOffParityGateTest {
     @Test
     fun capabilityGatedAndUnroutedOpsDenyCleanlyWithoutCrashing() = runTest {
         val router = productionRouter()
-        // conversation.delete: capability_unavailable unconditionally (Phase 2)
-        val del = Json.parseToJsonElement(
-            router.dispatch(AdminRpcInvocation("g", "conversation.delete", params("conversation.delete"), AdminRpcRequestContext.Authenticated)),
-        ).jsonObject
-        assertEquals("false", del["success"]?.jsonPrimitive?.content)
-        assertTrue(del["error"]?.jsonPrimitive?.content?.contains("capability_unavailable") == true)
+        // lgns8.21.10: derived — every capability_gated_unsupported row must return
+        // the exact capability_unavailable contract, not a bare success:false.
+        val gated = IrohAdminOwnershipMatrix.capabilityGatedMethods()
+        assertTrue("conversation.delete" in gated, "conversation.delete must stay capability-gated")
+        gated.forEach { method ->
+            val obj = dispatch(router, method)
+            assertEquals("false", obj["success"]?.jsonPrimitive?.content, "$method")
+            assertTrue(
+                obj["error"]?.jsonPrimitive?.content?.contains("capability_unavailable") == true,
+                "$method must deny with capability_unavailable: $obj",
+            )
+        }
 
         // project.*: capability_unavailable (no VibeSync service injected)
         ProjectAdminHandlers.PROJECT_METHODS.forEach { method ->
-            val obj = Json.parseToJsonElement(
-                router.dispatch(AdminRpcInvocation("g", method, params(method), AdminRpcRequestContext.Authenticated)),
-            ).jsonObject
+            val obj = dispatch(router, method)
             assertEquals("false", obj["success"]?.jsonPrimitive?.content, "$method")
             assertTrue(obj["error"]?.jsonPrimitive?.content?.contains("capability_unavailable") == true, "$method")
         }
@@ -255,14 +375,65 @@ class ShimOffParityGateTest {
     @Test
     fun boundedAdminMethodsDegradeToCleanFailureNotCrash() = runTest {
         val router = productionRouter()
-        // These have no native backend; with the shim off they must fail
-        // gracefully (success:false) — never throw/hang.
-        listOf("run.list", "tool.list", "block.list", "archive.list", "identity.list", "schedule.list", "job.list", "mcp.list")
-            .forEach { method ->
-                val obj = Json.parseToJsonElement(
-                    router.dispatch(AdminRpcInvocation("g", method, params(method), AdminRpcRequestContext.Authenticated)),
-                ).jsonObject
-                assertEquals("false", obj["success"]?.jsonPrimitive?.content, "$method should fail gracefully shim-off")
-            }
+        // lgns8.21.10: derived — bounded services (admin REST, VibeSync) are NOT
+        // injected here, so every such row must degrade to a clean success:false
+        // rather than throwing or hanging. Previously eight methods were listed by
+        // hand while the matrix declared 45.
+        val bounded = IrohAdminOwnershipMatrix.boundedServiceMethods()
+        assertTrue(bounded.isNotEmpty(), "ownership matrix declares no bounded-service methods")
+        bounded.forEach { method ->
+            val obj = dispatch(router, method)
+            assertEquals(
+                "false",
+                obj["success"]?.jsonPrimitive?.content,
+                "$method should fail gracefully with its bounded service absent: $obj",
+            )
+        }
     }
+
+    /**
+     * The matrix is the single source of truth: every registered method is
+     * classified into exactly one gate expectation above, so a new row cannot
+     * land without gate coverage (lgns8.21.10).
+     */
+    @Test
+    fun everyRegisteredMethodCarriesAGateExpectation() = runTest {
+        val router = productionRouter()
+        val covered = IrohAdminOwnershipMatrix.shimFreeNativeMethods() +
+            IrohAdminOwnershipMatrix.capabilityGatedMethods() +
+            IrohAdminOwnershipMatrix.boundedServiceMethods()
+        assertEquals(
+            emptySet(),
+            router.registeredMethods - covered.toSet(),
+            "registered admin_rpc methods without a shim-off parity expectation — " +
+                "add an ownership matrix row (post_shim_owner/post_shim_fallback) for them",
+        )
+        assertEquals(
+            covered.size,
+            covered.toSet().size,
+            "a method may not appear in two gate expectation buckets",
+        )
+    }
+
+    /**
+     * Explicit absent-service failure for the controller-backed row: with no live
+     * controller the op must deny with `capability_unavailable`, never silently
+     * succeed or dial the shim (lgns8.21.10 bounded-service contract).
+     */
+    @Test
+    fun approvalSubmitFailsClosedWithoutController() = runTest {
+        val router = productionRouter(controller = null)
+        val obj = dispatch(router, "approval.submit")
+
+        assertEquals("false", obj["success"]?.jsonPrimitive?.content, "$obj")
+        assertTrue(
+            obj["error"]?.jsonPrimitive?.content?.contains("capability_unavailable") == true,
+            "approval.submit without a controller must deny with capability_unavailable: $obj",
+        )
+        assertEquals(0, proxyDialCount.get(), "absent controller must not fall back to the shim")
+    }
+
+    private suspend fun dispatch(router: AdminRpcRouter, method: String) = Json.parseToJsonElement(
+        router.dispatch(AdminRpcInvocation("g", method, params(method), AdminRpcRequestContext.Authenticated)),
+    ).jsonObject
 }
