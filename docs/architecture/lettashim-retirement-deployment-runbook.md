@@ -577,6 +577,7 @@ scripts/iroh_probe.sh '<iroh-ticket>' \
   --admin-base-url http://127.0.0.1:9 \
   --scenario admin-rpc \
   --scenario no-http \
+  --wrapper-scan-mode deployment \
   --wrapper-unit meridian-iroh-wrapper
 ```
 
@@ -584,12 +585,45 @@ scripts/iroh_probe.sh '<iroh-ticket>' \
 attributable (letta-mobile-lgns8.21.9): the scan joins `/proc/<MainPID>/fd`
 with that process's `/proc/net/tcp{,6}`, so it proves the WRAPPER opened zero
 admin-HTTP connections rather than merely that the probe process stayed clean.
-The turn notes carry the evidence — `no_http_wrapper_unit`,
-`no_http_wrapper_pid`, `no_http_wrapper_start`, `no_http_wrapper_window_ms`,
-`no_http_wrapper_sample_interval_ms` — and the gate FAILS
-(`no_http_wrapper_pid_unresolved` / `no_http_wrapper_pid_changed`) when the PID
-cannot be resolved or the service restarts mid-window, so a restarted wrapper
+The turn notes carry the evidence — `no_http_wrapper_scan_mode`,
+`no_http_wrapper_unit`, `no_http_wrapper_pid`, `no_http_wrapper_start`,
+`no_http_wrapper_window_ms`, `no_http_wrapper_sample_interval_ms` — and the gate
+FAILS (`no_http_wrapper_pid_unresolved` / `no_http_wrapper_pid_changed`) when the
+PID cannot be resolved or the service restarts mid-window, so a restarted wrapper
 can never render green.
+
+#### Wrapper-scan modes (letta-mobile-jr5tx)
+
+Which process the scan attributes to is DECLARED by `--wrapper-scan-mode`, never
+inferred from whether systemd happens to answer. There are exactly two modes:
+
+| Mode | Who runs it | What it scans | Missing wrapper |
+|---|---|---|---|
+| `deployment` (default) | this runbook, against the production host | `systemctl show <unit> -p MainPID`, or `--wrapper-pid` for a non-unit deployment | **hard failure** — `no_http_wrapper_pid_unresolved:<unit>` |
+| `hermetic` | `scripts/iroh_probe_hermetic.sh` / the `iroh-probe` CI workflow | the wrapper process the harness itself spawned, passed as `--wrapper-pid` | `--wrapper-scan-not-applicable <reason>` records a distinct evidence state |
+
+Rules that keep the gate honest:
+
+- `deployment` mode REJECTS `--wrapper-scan-not-applicable`
+  (`no_http_wrapper_scan_not_applicable_rejected:<unit>`). On the production host
+  "there is no wrapper to scan" is the failure, not an excuse — an absent or
+  inactive unit must stay red.
+- `hermetic` mode never consults systemd. It requires either `--wrapper-pid`
+  (the normal path: CI spawns `app-server-serve-iroh-stub` and hands the gate
+  that child's PID, so the scan still proves the process serving Iroh opened zero
+  admin-HTTP connections) or an explicit `--wrapper-scan-not-applicable <reason>`
+  when the harness genuinely spawns no wrapper process. A hermetic run with
+  neither is a usage error.
+- Neither mode is a bypass for the scan itself: once a PID is being watched, a
+  dirty socket count (`no_http_tcp_connects:<n>`), a dead or replaced process
+  (`no_http_wrapper_pid_changed`), an unreadable `/proc`
+  (`no_http_wrapper_scan_unavailable`), or zero samples
+  (`no_http_wrapper_no_samples`) fail the turn in hermetic mode exactly as they
+  do in deployment mode.
+
+Deployment sign-off evidence must show `no_http_wrapper_scan_mode=deployment`
+plus a resolved `no_http_wrapper_pid`. A `hermetic` line, or any
+`not_applicable` state, in a deployment run is not acceptance evidence.
 
 Run the repository's two-client live-sync probe and every admin parity probe
 added by the migration. Exercise at minimum:
