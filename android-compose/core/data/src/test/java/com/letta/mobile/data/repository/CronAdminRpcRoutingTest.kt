@@ -1,6 +1,5 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.model.CronTask
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -22,12 +21,14 @@ import org.junit.Test
  *    onto the native `cron.*` admin_rpc methods (#997). This test drives the
  *    repository through a transport shaped like that bridge — its cron methods
  *    are implemented *by calling* `adminRpc` — and asserts the resulting
- *    admin_rpc method names.
+ *    admin_rpc method names for a read (`cron.list`) and a write
+ *    (`cron.delete`).
  *  - shim config -> the legacy shim WS cron frames, which remain functional.
  *    Covered by `CronRepositoryTest` via `FakeChannelTransport`.
  *
- * (The per-field admin_rpc request/response mapping is separately pinned by
- * `sharedLogic` jvmTest `IrohChannelTransportCronRpcTest`.)
+ * (The per-field admin_rpc request/response mapping for every cron verb,
+ * `cron.add` included, is separately pinned by `sharedLogic` jvmTest
+ * `IrohChannelTransportCronRpcTest`.)
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CronAdminRpcRoutingTest {
@@ -38,22 +39,11 @@ class CronAdminRpcRoutingTest {
         val repository = CronRepository(transport, TestScope(testScheduler))
 
         val listed = repository.refresh("agent-1")
-        val added = repository.addSchedule(
-            CronAddParams(
-                agentId = "agent-1",
-                name = "nightly",
-                description = "nightly run",
-                prompt = "go",
-                recurring = true,
-                cron = "0 3 * * *",
-            ),
-        )
         val deleted = repository.deleteSchedule(agentId = "agent-1", taskId = TASK_ID)
 
         assertTrue(listed.isSuccess)
-        assertTrue(added.isSuccess)
         assertTrue(deleted.isSuccess)
-        assertEquals(listOf("cron.list", "cron.add", "cron.delete"), transport.adminRpcMethods)
+        assertEquals(listOf("cron.list", "cron.delete"), transport.adminRpcMethods)
     }
 
     /**
@@ -89,48 +79,10 @@ class CronAdminRpcRoutingTest {
             )
         }
 
-        @Suppress("LongParameterList") // Signature is fixed by IChannelTransport.
-        override suspend fun sendCronAdd(
-            agentId: String,
-            name: String,
-            description: String,
-            prompt: String,
-            recurring: Boolean,
-            cron: String?,
-            every: String?,
-            at: String?,
-            timezone: String?,
-            conversationId: String?,
-            timeoutMs: Long,
-        ): ServerFrame.CronAddResponse {
-            adminRpc("cron.add", "", null)
-            return ServerFrame.CronAddResponse(
-                id = "f2",
-                ts = TS,
-                requestId = REQUEST_ID,
-                success = true,
-                task = task(agentId = agentId, name = name, prompt = prompt),
-            )
-        }
-
         override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse {
             adminRpc("cron.delete", "", null)
             return ServerFrame.CronDeleteResponse(id = "f3", ts = TS, requestId = REQUEST_ID, success = true)
         }
-
-        private fun task(agentId: String, name: String, prompt: String) = CronTask(
-            id = TASK_ID,
-            agentId = agentId,
-            conversationId = "",
-            name = name,
-            description = "",
-            cron = "",
-            timezone = "",
-            recurring = true,
-            prompt = prompt,
-            status = "active",
-            createdAt = TS,
-        )
     }
 
     private companion object {
