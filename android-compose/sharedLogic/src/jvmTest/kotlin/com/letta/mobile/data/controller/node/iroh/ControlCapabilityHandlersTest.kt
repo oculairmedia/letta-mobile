@@ -111,7 +111,7 @@ class ControlCapabilityHandlersTest {
     ): AdminRpcRouter {
         val r = AdminRpcRouter()
         HealthAdminHandlers.register(r, controller)
-        ModelAdminHandlers.register(r, "http://127.0.0.1:9", client)
+        ModelAdminHandlers.register(r, client)
         SkillAdminHandlers.register(r, nativeClient = client)
         ConversationAdminHandlers.register(r, NativeReadTiers(nativeClient = client))
         return r

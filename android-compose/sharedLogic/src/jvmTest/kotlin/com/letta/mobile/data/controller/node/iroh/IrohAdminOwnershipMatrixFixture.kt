@@ -50,6 +50,18 @@ internal object IrohAdminOwnershipMatrix {
         .map { it.requiredString("method") }
         .sorted()
 
+    /**
+     * lgns8.9: methods served from the READ-ONLY on-disk local backend store.
+     * They must succeed when `LETTA_LOCAL_BACKEND_DIR` is wired to a store that
+     * holds the row, and fail closed (never dial an admin host) when it is not.
+     */
+    fun localBackendStoreMethods(): List<String> = operations
+        .filter { it.requiredString("post_shim_owner") == LOCAL_BACKEND_STORE_OWNER }
+        .map { it.requiredString("method") }
+        .sorted()
+
+    const val LOCAL_BACKEND_STORE_OWNER: String = "local_backend_store"
+
     fun fixtureJson(name: String): JsonObject {
         val stream = checkNotNull(javaClass.getResourceAsStream("/appserver/$name")) { "Missing fixture $name" }
         return Json.parseToJsonElement(stream.bufferedReader(Charsets.UTF_8).use { it.readText() }).jsonObject

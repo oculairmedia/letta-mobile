@@ -58,8 +58,9 @@ This is transitional and must not become the shim-free deployment mechanism:
 - artifact identity and rollback are weak;
 - the service shares `/etc/meridian/appserver.env`, exposing provider secrets
   the wrapper does not need;
-- `LETTA_LOCAL_BACKEND_DIR` is currently present and enables a direct-storage
-  read tier;
+- `LETTA_LOCAL_BACKEND_DIR` is present and, since lgns8.9, is the DECLARED
+  owner of the read-only admin read tier (runs/steps, agent context, memory
+  blocks); unset means those methods fail closed;
 - absent an override, the wrapper defaults its generic admin base to
   `http://127.0.0.1:8291`.
 
@@ -170,18 +171,21 @@ Landed in this Phase 3 slice:
 
 - `phase3_decision` recorded for all former admin REST domains
   (`bounded_service` × 36, `deny_fail_closed` × 4);
-- `adminRestBaseUrl` defaults to **null** (no implicit LettaShim `:8291`);
-- production injects only `LETTA_IROH_ADMIN_REST_BASE_URL` when a bounded
-  adapter is deliberately deployed;
-- `agent.context` routes through that same optional admin REST injection;
+- `adminRestBaseUrl` defaults to **null** (no implicit LettaShim `:8291`), and
+  since lgns8.9 it is ignored entirely — the admin REST adapter is retired and
+  `LETTA_IROH_ADMIN_REST_BASE_URL` is no longer read by production wiring;
+- `agent.context` is served from the read-only local-backend store tier;
 - `goal.*` and `slash_command.*` are product-removed (always
   `capability_unavailable`);
 - VibeSync remains an explicit `vibesyncBaseUrl` (default null in the registry).
 
-Still open inside Phase 3:
+Closed by lgns8.9 (Phase 5):
 
-- stand up real non-shim bounded services for the 36 `bounded_service` domains
-  (or adopt/propose upstream v2 commands);
+- all 36 former `bounded_service` domains have real non-shim owners — 5 native
+  v2 (`cron_*`, `write_memory_file`), 6 read-only local-backend-store reads,
+  10 controller-native catalogs/empty lists, 15 documented fail-closed denials;
+
+Still open inside Phase 3:
 - remove remaining skill/health/subagent dependence on `adminBaseUrl` (Phase 4).
 
 Domains requiring decisions:

@@ -1,6 +1,8 @@
 # lgns8 epic: status, achievable scope, and the shim-retirement ceiling
 
-Date: 2026-07-23 (shim-only surfaces disposition + train/channels addendum appended 2026-07-31)
+Date: 2026-07-23 · **rewritten 2026-07-31 for `letta-mobile-lgns8.9`** (admin-REST
+ceiling recomputed), with the shim-only-surfaces disposition and the
+train/channels addendum retained below.
 
 Beads: `letta-mobile-lgns8` (epic) and children .9/.10/.11/.16/.17/.23/.25, plus
 `letta-mobile-q2b9z` (upstream channel-registry blocker)
@@ -8,62 +10,153 @@ Beads: `letta-mobile-lgns8` (epic) and children .9/.10/.11/.16/.17/.23/.25, plus
 ## Why this document
 
 The lgns8 epic is "Supersede lettashim with a Kotlin-controlled Letta App
-Server v2." Implementation of the runtime-native path (.3–.8, .12–.15) and the
-d6e8g security epic is merged. This note records a load-bearing architectural
-finding that bounds what "supersede/retire lettashim" can mean today, so the
-remaining issues (.9/.10/.11) can be scoped and closed honestly rather than
-left implying a retirement that the architecture cannot deliver.
+Server v2." This note records what "retire lettashim" can actually mean, so the
+remaining issues can be closed honestly rather than left implying a retirement
+the architecture cannot deliver.
 
-## The finding: lettashim IS the admin backend
+**It has been rewritten because the ceiling moved.** The earlier version said
+the 39 `admin_rest_service` admin_rpc methods "have no native backend to move
+to" and must keep the shim as their network target. That conclusion was drawn
+from the *shape* of the App Server protocol (no REST admin API) without
+auditing what admin-shim's `/v1` handlers actually **did**. The audit — reading
+every route in `admin-shim/server.ts` on the pinned `@letta-ai/letta-code`
+0.29.12 host — found that almost none of them proxy anything:
 
-The real Letta App Server (`letta app-server --listen`) exposes **only** the
-runtime WebSocket v2 protocol (`runtime_start`, `input`, `sync`,
-`abort_message`, approvals, native `agent_*`/`conversation_*`/`list_models`/
-`skill_*`/`cron_*` commands). It has **no REST admin API**.
+| What the handler really is | Count | Consequence |
+|---|---|---|
+| a read of the on-disk `lc-local-backend` store | 6 | the controller can read the same files |
+| a hard-coded constant (tool catalog, provider, embedding model) | 4 | the constant moves into the controller |
+| `stubList` — literally `json(res, 200, [])` | 6 | answer natively; there is no data to lose |
+| a thin translation over cron tasks | 4 | native `cron_*` commands already expose those tasks |
+| **a route admin-shim never registered (404 today)** | **16** | nothing works there now; denying is parity |
 
-lettashim (`admin-shim/server.ts`, `:8291`) is the **only** implementation of
-the `/v1/*` admin REST surface — a local, file-backed emulation
-(`backend: "letta-code-local"`), not a proxy in front of a real App Server. For
-`/api/*` (projects) it reverse-proxies to VibeSync (`:3099`).
+Sixteen of the thirty-six were already dead. The remaining ceiling is therefore
+much smaller than previously recorded, and it is a *write* ceiling.
 
-Consequence: the 39 `admin_rest_service` admin_rpc methods (runs/steps,
-archives/folders/passages/groups, identities, models/providers, schedules/jobs,
-tools, blocks, mcp, goals, slash-commands) have **no native backend to move
-to**. The lgns8.13 ownership matrix already encodes this — every one of those
-rows is `fallback: shim_until_cutover`.
+## The corrected finding: lettashim is a file-store reader, not the admin backend
+
+The real Letta App Server (`letta app-server --listen`) exposes only the runtime
+WebSocket v2 protocol and has no REST admin API — that part stands. But
+lettashim (`admin-shim/server.ts`, `:8291`) is **not** a backend either: it is a
+thin emulation over the on-disk store at `/root/.letta/lc-local-backend`
+(`lib/store.ts`, `lib/runs.ts`, `lib/crons.ts`). Whatever it could serve, it
+served by reading that directory.
+
+So the Kotlin controller has exactly three legitimate non-shim owners, and
+lgns8.9 assigned all thirty-six methods to one of them (or to an explicit
+denial):
+
+1. **`app_server_v2`** — a native command exists. This is the only owner allowed
+   to perform admin WRITES, because the App Server is the local backend's single
+   writer. (Epic constraint: *do not run multiple writers against one
+   local-backend root*.)
+2. **`local_backend_store`** — a **read-only** reader over the same directory
+   lettashim read, for reads with no native command.
+3. **`controller_native`** — constants and empty-by-contract lists that never
+   touched a datastore in the first place.
+
+Everything else is `capability_gated_unsupported`: a typed, documented,
+fail-closed denial.
+
+## Per-method disposition (all 36 former `admin_rest_service` methods)
+
+`authorization_class` is preserved verbatim from the #1008 capability gates.
+
+### `app_server_v2` — native command (5; **3 of them writes**)
+
+| Method | Native contract | Auth class |
+|---|---|---|
+| `schedule.list` | `cron_list` | `admin_read` |
+| `schedule.get` | `cron_get` | `admin_read` |
+| `schedule.create` | `cron_add` | `admin_write` |
+| `schedule.delete` | `cron_delete` | `admin_write` |
+| `block.update_agent` | `write_memory_file` | `admin_write` |
+
+`schedule.*` was never its own store: admin-shim's `/v1/agents/{id}/schedule`
+routes are `cronTaskToScheduledMessage` / `scheduleCreateParamsToCronBody` over
+`lib/crons.ts`. Only that translation moves into the controller.
+`block.update_agent` carries `agent_id` + `label`, and a core-memory block *is*
+the memfs file `memory/system/<label>.md`, so it maps 1:1 onto
+`write_memory_file` — a route admin-shim never even had.
+
+### `local_backend_store` — read-only on-disk reads (6)
+
+| Method | Store path | Auth class |
+|---|---|---|
+| `run.list` | `runs/<id>/run.json` (live root; never `_archive`) | `admin_read` |
+| `run.get` | `runs/<id>/run.json`, archive-resolving | `admin_read` |
+| `step.list` | `runs/<id>/steps.jsonl` | `admin_read` |
+| `agent.context` | agent record + `system-prompt.json` + transcript | `admin_read` |
+| `block.list` | the agent's `memfs` system memory files, unioned | `admin_read` |
+| `block.get` | the same files, by synthesised id | `admin_read` |
+
+Gated on `LETTA_LOCAL_BACKEND_DIR`; unset means a typed capability error, never
+an HTTP fallback.
+
+### `controller_native` — constants and empty-by-contract (10)
+
+| Method | Why | Auth class |
+|---|---|---|
+| `tool.list`, `tool.get` | port of the hard-coded `BUILTIN_TOOL_DEFINITIONS` catalog | `admin_read` |
+| `provider.list` | port of the single synthesised `lmstudio-local` provider | `admin_read` |
+| `model.list.embedding` | port of the hard-coded embedding descriptor | `admin_read` |
+| `archive.list`, `folder.list`, `group.list`, `identity.list`, `job.list`, `mcp.list` | admin-shim `stubList` → `[]`; the entity does not exist here | `admin_read` |
+
+### `capability_gated_unsupported` — fail-closed denials (15)
+
+Every one of these is a route **admin-shim does not implement** (it 404s), so
+the denial is parity with production today, not a regression.
+
+| Method | Auth class | Why denied |
+|---|---|---|
+| `tool.create`, `tool.update`, `tool.delete`, `tool.attach`, `tool.detach` | `admin_write` | letta-code tools are code-defined, not records; `update_toolset` is the live-session toolset, not admin CRUD |
+| `block.create`, `block.update`, `block.delete`, `block.attach`, `block.detach` | `admin_write` | no globally addressable block entity; the global id is shim-synthesised; attach/detach is meaningless for per-agent memfs files |
+| `passage.create`, `passage.delete` | `admin_write` | no archival-memory store exists |
+| `passage.list` | `admin_read` | same — nothing to read |
+| `identity.get` | `admin_read` | no identity entity (the list is a stub) |
+| `job.get` | `admin_read` | no job entity (the list is a stub) |
+
+### `message.search` — decided: permanent denial
+
+`message.search` has **no admin_rpc method** and therefore no matrix row; the
+decision lives in `unrouted_domains.search`. The pinned 0.29.12 inventory has no
+message-search command (`grep_in_files` / `search_files` are workspace *file*
+search, not transcript search), and admin-shim implements it over its own
+`lib/search.ts` index which the controller does not own. It must never be added
+as an ad hoc proxy. Clients search locally over `message.list` pages.
+
+## THE REMAINING UPSTREAM CEILING
+
+This is now the whole of it — **12 write methods and 3 read methods**, all
+already non-functional, each waiting on one of five upstream App Server
+commands:
+
+| Upstream ask | Would lift |
+|---|---|
+| a **tool-library** command (admin CRUD distinct from `update_toolset`) | `tool.create`, `tool.update`, `tool.delete`, `tool.attach`, `tool.detach` |
+| a **global block** command (addressing a block by a stable global id) | `block.create`, `block.update`, `block.delete`, `block.attach`, `block.detach` |
+| an **archival-memory / passage** command | `passage.list`, `passage.create`, `passage.delete` |
+| an **identity** command (or a decision that the entity does not exist) | `identity.get` |
+| a **job** command (or the same decision) | `job.get` |
+| a **message/conversation search** command | `message.search` (no method today) |
+
+Nothing on that list is served by lettashim either. **The wrapper no longer
+needs lettashim's REST admin surface at all**: the ownership matrix declares
+zero `admin_rest_service` rows, `LETTA_IROH_ADMIN_REST_BASE_URL` is no longer
+consumed, and `AdminRestServiceInjectionTest` fails if either is reintroduced.
 
 ## What this means per issue
 
-- **lgns8.9** (replace admin proxies with injected services): achievable part
-  landed in PR #977 — `project.*` now calls VibeSync `:3099` directly (off the
-  shim splice), plus the `CapabilityUnavailable` degradation pattern. The 39
-  admin methods can only be *structurally* refactored (injected/testable
-  wrappers around the same shim calls); their network target must remain the
-  shim because there is no alternative. 8 of them (`folder.list`, `group.list`,
-  `identity.list`/`.get`, `mcp.list`, `job.list`/`.get`, `step.list`,
-  `archive.list`) are shim **stubs that return `[]`** — deprecating them to
-  capability-unavailable would regress the mobile admin screens for no gain, so
-  they stay. `message.search` has no Iroh surface → permanent denial.
-
-- **lgns8.10** (shim-off parity gate): can prove the **runtime** path works with
-  the shim's runtime role off (native turns + native admin ops succeed, bounded
-  admin degrades to capability-unavailable without failing chat). It **cannot**
-  prove the admin surface works shim-off, because the shim is the admin backend.
-
-- **lgns8.11** (production cutover / lettashim retirement): **inherently
-  partial**. The runtime role can be retired (turns/agents/conversations go
-  native). The admin role **cannot** be retired until the upstream App Server
-  gains a REST admin API — outside this repo. `lettashim retired` cannot be
-  made true here.
-
-## Recommended scope resolution
-
-Close lgns8.9/.10/.11 at their **achievable** scope (runtime path native and
-off-shim; admin surface bounded, injected, and gracefully degrading), and split
-the admin-surface-off-shim work into a new issue explicitly **blocked on
-upstream App Server REST admin**. That keeps the epic honest: the Kotlin
-controller is the runtime authority and the bounded admin adapter owner; the
-shim remains only as the admin datastore until upstream closes the gap.
+- **lgns8.9** — complete at its real scope. `project.*` went to VibeSync (#977);
+  the 36 admin methods now have real owners or documented denials; the read-only
+  store tier from #998 is re-wired and extended to runs/steps/context/blocks.
+- **lgns8.10** (shim-off parity gate) — can now prove the admin surface too, not
+  just the runtime. `ShimOffParityGateTest` derives its expectations from the
+  matrix and covers four buckets: shim-free native, capability-gated,
+  bounded-service (VibeSync only), and local-backend-store.
+- **lgns8.11** (production cutover) — the admin role of the shim is retired.
+  What still blocks full retirement is **channels**, not admin (see the addendum
+  below), so `lgns8.11` should be marked blocked on `lgns8.23`/`q2b9z`.
 
 ## Shim-only surfaces: disposition (lgns8.25, 2026-07-31)
 
@@ -158,9 +251,8 @@ today is lettashim with `SHIM_CHANNELS_ENABLED=1`.
 
 The consequence is blunt: **retiring lettashim right now takes Matrix and the
 mobile channel host down with it** (~130 per-agent Matrix identities, 180
-`routing.yaml` routes). This is not the ceiling described earlier in this
-document — that ceiling was about admin surfaces the App Server does not expose.
-This is a second, independent ceiling on the channels surface, and it sits
+`routing.yaml` routes). With the admin ceiling now closed by lgns8.9, **channels
+is the only remaining structural blocker to shim retirement**, and it sits
 upstream of this repository.
 
 ### 3. lgns8.23 re-scope options

@@ -61,6 +61,7 @@ object AppServerProtocol {
         "cron_update_response",
         "cron_delete_response",
         "cron_delete_all_response",
+        "write_memory_file_response",
         "get_reflection_settings_response",
         "set_reflection_settings_response",
         "agent_list_response",
@@ -464,6 +465,23 @@ sealed interface AppServerCommand {
 
     // Native cron scheduling (lgns8.8): replaces the legacy mobile-WS cron
     // path, which retires with the shim in lgns8.11.
+
+    /**
+     * lgns8.9: the native owner of an agent memory-block write. Core-memory
+     * blocks are MemFS files (`memory/system/<label>.md`), and this command is
+     * how the App Server — the local backend's single writer — commits one.
+     */
+    @Serializable
+    @SerialName("write_memory_file")
+    data class WriteMemoryFile(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("agent_id") val agentId: String,
+        /** Relative to the agent's memory root; rejected upstream if it escapes. */
+        val path: String,
+        val content: String,
+        val encoding: String? = null,
+        @SerialName("commit_message") val commitMessage: String? = null,
+    ) : AppServerCommand
 
     @Serializable
     @SerialName("cron_list")
@@ -937,6 +955,21 @@ sealed interface AppServerInboundFrame {
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "cron_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+    @Serializable
+    @SerialName("write_memory_file_response")
+    data class WriteMemoryFileResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("agent_id") val agentId: String? = null,
+        val path: String? = null,
+        val committed: Boolean = false,
+        @SerialName("commit_sha") val commitSha: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "write_memory_file_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }

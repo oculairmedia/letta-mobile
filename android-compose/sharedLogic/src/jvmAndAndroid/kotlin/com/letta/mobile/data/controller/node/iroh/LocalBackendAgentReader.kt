@@ -17,7 +17,10 @@ import java.io.File
  * `store.ts:readBlocksForAgent`. Split out of the former monolithic
  * `LocalBackendAdminStore` as pure code motion — no behavior change.
  */
-internal class LocalBackendAgentReader(private val support: LocalBackendStoreSupport) {
+internal class LocalBackendAgentReader(
+    private val support: LocalBackendStoreSupport,
+    private val blockReader: LocalBackendBlockReader,
+) {
 
     /**
      * Port of admin-shim `GET /v1/agents` (non-slim): read `agents/{id}.json`, sort
@@ -185,45 +188,11 @@ internal class LocalBackendAgentReader(private val support: LocalBackendStoreSup
     }
 
     /**
-     * Port of admin-shim `store.ts:readBlocksForAgent`. Blocks live as
-     * `memfs/<agentId>/memory/system/<label>.md`; each file is one Block. The
-     * id MUST be sha256(`agentId:label`)[..24] (the shim switched off a base64
-     * slice that collided and crashed mobile's blocks screen on duplicate keys).
+     * Port of admin-shim `store.ts:readBlocksForAgent`, now owned by
+     * [LocalBackendBlockReader] so `block.list`/`block.get` and the agent
+     * projection cannot drift apart (the block id is a locked wire invariant).
      */
-    private fun readBlocksForAgent(agentId: String): JsonArray {
-        val dir = File(File(File(File(support.baseDir, "memfs"), agentId), "memory"), "system")
-        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".md") } ?: return JsonArray(emptyList())
-        // Deterministic order (readdir order is fs-dependent; sort for stable output).
-        return buildJsonArray {
-            files.sortedBy { it.name }.forEach { f ->
-                val label = f.name.removeSuffix(".md")
-                val value = runCatching { f.readText() }.getOrDefault("")
-                add(
-                    buildJsonObject {
-                        put("id", "block-" + sha256Hex("$agentId:$label").take(24))
-                        put("label", label)
-                        put("value", value)
-                        put("description", JsonNull)
-                        put("metadata", JsonNull)
-                        put("limit", 5000)
-                        put("created_by_id", JsonNull)
-                        put("last_updated_by_id", JsonNull)
-                        put("is_template", false)
-                        put("template_name", JsonNull)
-                        put("preserve_on_migration", false)
-                        put("read_only", false)
-                        put("tags", JsonArray(emptyList()))
-                        put("hidden", JsonNull)
-                        put("project_id", JsonNull)
-                        put("template_id", JsonNull)
-                        put("base_template_id", JsonNull)
-                        put("deployment_id", JsonNull)
-                        put("entity_id", JsonNull)
-                    },
-                )
-            }
-        }
-    }
+    private fun readBlocksForAgent(agentId: String): JsonArray = blockReader.blocksForAgent(agentId)
 
     private fun parseModelHandle(handle: String): ModelInfo {
         val idx = handle.indexOf('/')

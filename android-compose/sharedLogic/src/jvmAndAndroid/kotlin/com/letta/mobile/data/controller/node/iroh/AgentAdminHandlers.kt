@@ -21,7 +21,6 @@ object AgentAdminHandlers {
         router: AdminRpcRouter,
         controller: AppServerController? = null,
         tiers: NativeReadTiers = NativeReadTiers(),
-        adminRestBaseUrl: String? = null,
     ) {
         val nativeClient = tiers.nativeClient
         router.register("agent.list") { params ->
@@ -108,21 +107,33 @@ object AgentAdminHandlers {
                 if (response.success) buildJsonObject { put("deleted", true) } as JsonObject else null
             }
         }
-        if (adminRestBaseUrl == null) {
-            CapabilityUnavailable.register(router, setOf("agent.context"), service = "admin_rest")
-        } else {
-            val api = AdminHandlerSupport(AdminProxyClient(adminRestBaseUrl))
-            router.register("agent.context") { params ->
-                val id = params.requireParam(AdminParamKey("agent_id"))
-                MessageListPageGuard.boundObjectStringFields(
-                    MessageListPageGuard.dropField(
-                        api.get(AdminPath.v1("agents", id, "context")) {
-                            query("conversation_id", param(params, AdminParamKey("conversation_id")))
-                        },
-                        "messages",
-                    ),
-                )
-            }
+        registerAgentContext(router, tiers.localBackendStore)
+    }
+
+    /**
+     * lgns8.9: `agent.context` is served from the on-disk local backend store.
+     *
+     * admin-shim's `GET /v1/agents/{id}/context` was itself a store read
+     * (`handleAgentContext`: agent record + `system-prompt.json` + the transcript
+     * fan-out), so [LocalBackendContextReader] is the same computation without
+     * the HTTP hop. The pinned App Server v2 inventory has no context command, so
+     * with no store configured the method fails closed — never a shim dial.
+     *
+     * The page guard still runs on the result: context carries a full transcript,
+     * and bounding it is controller-owned regardless of source.
+     */
+    private fun registerAgentContext(router: AdminRpcRouter, store: LocalBackendAdminStore?) {
+        if (store == null) {
+            CapabilityUnavailable.register(router, setOf("agent.context"), service = "local_backend_store")
+            return
+        }
+        router.register("agent.context") { params ->
+            val id = params.requireParam(AdminParamKey("agent_id"))
+            val context = store.agentContextProjected(id, param(params, AdminParamKey("conversation_id")))
+                ?: adminError("agent $id not found")
+            MessageListPageGuard.boundObjectStringFields(
+                MessageListPageGuard.dropField(context, "messages"),
+            )
         }
     }
 

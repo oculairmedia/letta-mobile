@@ -11,6 +11,13 @@ import java.io.File
 /** Pagination shape for [LocalBackendMessageReader.listMessagesProjected] (mirrors the shim's message.list query). */
 data class MessagePage(val limit: Int?, val before: String?, val after: String?, val order: String?)
 
+/** Transcript inputs for the `agent.context` projection — see [LocalBackendMessageReader.contextTranscript]. */
+internal data class ContextTranscript(
+    val conversationDir: File,
+    val storedMessageCount: Int,
+    val projected: JsonArray,
+)
+
 /**
  * lgns8.9 slice 3: on-disk `message.list` reader.
  *
@@ -70,6 +77,39 @@ internal class LocalBackendMessageReader(
                 projection.localMessageToConversationMessages(m, data.sidecars).forEach { add(it) }
             }
         }
+    }.getOrNull()
+
+    /**
+     * lgns8.9: the transcript inputs `agent.context` needs — the RAW stored
+     * message count (admin-shim's `messages.length`, which drives every token
+     * estimate in the context response) plus the SAME wire fan-out `message.list`
+     * serves. Kept here so the context reader reuses this reader's cache,
+     * sidecar loading, and conversation resolution rather than re-implementing
+     * them. `null` when the conversation cannot be resolved.
+     */
+    fun contextTranscript(conversationId: String?, agentId: String): ContextTranscript? = runCatching {
+        // admin-shim: `url.searchParams.get("conversation_id") ?? "default"`, and
+        // the bare literal "default" resolves to (default, <agentId>).
+        val requested = conversationId?.takeIf { it.isNotEmpty() } ?: "default"
+        val (internalConvId, resolvedAgentId) = if (requested == "default") {
+            "default" to agentId
+        } else {
+            resolveConversation(requested, agentId) ?: ("default" to agentId)
+        }
+        val dir = File(
+            File(support.baseDir, "conversations"),
+            support.b64UrlEncode(support.conversationKey(internalConvId, resolvedAgentId)),
+        )
+        val data = loadMessageData(dir, resolvedAgentId, internalConvId)
+        ContextTranscript(
+            conversationDir = dir,
+            storedMessageCount = data.messages.size,
+            projected = buildJsonArray {
+                data.messages.forEach { m ->
+                    projection.localMessageToConversationMessages(m, data.sidecars).forEach { add(it) }
+                }
+            },
+        )
     }.getOrNull()
 
     /** Apply `before` cursor, newest-`limit` window, then `order` — the shim's message.list paging. */

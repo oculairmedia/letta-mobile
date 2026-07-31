@@ -18,4 +18,21 @@ internal object CapabilityUnavailable {
             }
         }
     }
+
+    /**
+     * lgns8.9: a PERMANENT denial — the operation has no owner and is not
+     * waiting on injection. [reason] must name the evidence (which upstream
+     * surface is missing) so the error tells an operator what would unblock it,
+     * and so the shim-retirement ceiling doc can be generated from the code.
+     *
+     * Every denial here is a method that admin-shim itself does NOT implement
+     * (it 404s), so denying is parity, not a regression.
+     */
+    fun denyFailClosed(router: AdminRpcRouter, methods: Set<String>, reason: String) {
+        methods.forEach { method ->
+            router.register(method) {
+                adminError("capability_unavailable: '$method' has no non-shim owner — $reason")
+            }
+        }
+    }
 }
