@@ -49,7 +49,7 @@ class AppServerTurnEngineExternalToolResponseTest {
     @Test
     fun anUnhandledToolCallGetsAMatchedIsErrorResponseSoTheTurnDoesNotHang() = runTest {
         val client = CapturingClient() // no registry wired
-        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "req" }, turnIdleTimeoutMs = 50L)
+        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "req" }, turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS)
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload) // Started
@@ -83,7 +83,7 @@ class AppServerTurnEngineExternalToolResponseTest {
         val engine = AppServerTurnEngine(
             client = client,
             requestIdFactory = { "req" },
-            turnIdleTimeoutMs = 50L,
+            turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS,
             externalToolRegistry = registry,
         )
 
@@ -127,7 +127,7 @@ class AppServerTurnEngineExternalToolResponseTest {
         val engine = AppServerTurnEngine(
             client = client,
             requestIdFactory = { "req" },
-            turnIdleTimeoutMs = 50L,
+            turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS,
             externalToolRegistry = registry,
         )
 
@@ -164,6 +164,14 @@ class AppServerTurnEngineExternalToolResponseTest {
     }
 
     private companion object {
+        /**
+         * The idle watchdog reads the WALL CLOCK while runTest skips virtual
+         * delays, so a short window makes these tests race real host scheduling
+         * (they were flaky under load with 50ms). Every test here drives the turn
+         * to an explicit cancel, so the watchdog must simply never fire.
+         */
+        const val TEST_IDLE_TIMEOUT_MS = 60_000L
+
         val command = TurnCommand(
             backendId = BackendId("iroh-app-server"),
             runtimeId = RuntimeId("iroh:test"),
