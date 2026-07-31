@@ -23,7 +23,7 @@ class ApprovalRegistryTest {
     @Test
     fun recordMakesGateOutstandingForThatRuntimeOnly() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
 
         assertTrue(registry.hasOutstanding(keyA))
         assertFalse(registry.hasOutstanding(keyB))
@@ -34,8 +34,8 @@ class ApprovalRegistryTest {
     @Test
     fun clearKeyDoesNotTouchASiblingRuntime() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_a", "perm-call_a")
-        registry.record(keyB, "call_b", "perm-call_b")
+        registry.record(keyA, ApprovalRegistry.Gate("call_a", "perm-call_a"))
+        registry.record(keyB, ApprovalRegistry.Gate("call_b", "perm-call_b"))
 
         // Conversation B reaching a terminal must not free A's parked question.
         registry.clearKey(keyB)
@@ -49,8 +49,8 @@ class ApprovalRegistryTest {
     @Test
     fun resolveClearsOnlyTheMatchingGate() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
-        registry.record(keyA, "call_2", "perm-call_2")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
+        registry.record(keyA, ApprovalRegistry.Gate("call_2", "perm-call_2"))
 
         registry.resolve(keyA, "call_1")
 
@@ -61,7 +61,7 @@ class ApprovalRegistryTest {
     @Test
     fun resolveIsScopedToItsRuntimeKey() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
 
         registry.resolve(keyB, "call_1")
 
@@ -71,7 +71,7 @@ class ApprovalRegistryTest {
     @Test
     fun approvalIdForFindsTheGateWithoutConsumingIt() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
 
         assertEquals("perm-call_1", registry.approvalIdFor("call_1"))
         // A failed send must leave the id answerable for the user's retry.
@@ -82,7 +82,7 @@ class ApprovalRegistryTest {
     @Test
     fun approvalIdForSearchesEveryRuntimeKey() {
         val registry = ApprovalRegistry()
-        registry.record(keyB, "call_b", "perm-call_b")
+        registry.record(keyB, ApprovalRegistry.Gate("call_b", "perm-call_b"))
 
         assertEquals("perm-call_b", registry.approvalIdFor("call_b"))
         assertNull(registry.approvalIdFor("call_unknown"))
@@ -91,9 +91,9 @@ class ApprovalRegistryTest {
     @Test
     fun clearIfMatchesConsumesTheGateAfterASuccessfulSend() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
 
-        registry.clearIfMatches("call_1", "perm-call_1")
+        registry.clearIfMatches(ApprovalRegistry.Gate("call_1", "perm-call_1"))
 
         assertFalse(registry.hasOutstanding(keyA))
         assertNull(registry.approvalIdFor("call_1"))
@@ -103,12 +103,12 @@ class ApprovalRegistryTest {
     @Test
     fun clearIfMatchesLeavesAReSurfacedGateAlone() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
         // Same tool call parked again under a NEW control-request id.
-        registry.record(keyA, "call_1", "perm-call_1-retry")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1-retry"))
 
         // The late success for the OLD id must not delete the live gate.
-        registry.clearIfMatches("call_1", "perm-call_1")
+        registry.clearIfMatches(ApprovalRegistry.Gate("call_1", "perm-call_1"))
 
         assertEquals("perm-call_1-retry", registry.approvalIdFor("call_1"))
         assertTrue(registry.hasOutstanding(keyA))
@@ -117,8 +117,8 @@ class ApprovalRegistryTest {
     @Test
     fun emptiedRuntimeKeysAreDroppedSoAnIdleClientTracksNothing() {
         val registry = ApprovalRegistry()
-        registry.record(keyA, "call_1", "perm-call_1")
-        registry.record(keyB, "call_2", "perm-call_2")
+        registry.record(keyA, ApprovalRegistry.Gate("call_1", "perm-call_1"))
+        registry.record(keyB, ApprovalRegistry.Gate("call_2", "perm-call_2"))
         assertEquals(2, registry.trackedCount())
 
         registry.resolve(keyA, "call_1")
@@ -130,9 +130,9 @@ class ApprovalRegistryTest {
     @Test
     fun overflowEvictsTheLeastRecentRuntimeAndNeverTheOneBeingRecorded() {
         val registry = ApprovalRegistry(cap = 2)
-        registry.record(TurnRuntimeKey("a", "1"), "call_1", "perm-1")
-        registry.record(TurnRuntimeKey("a", "2"), "call_2", "perm-2")
-        registry.record(TurnRuntimeKey("a", "3"), "call_3", "perm-3")
+        registry.record(TurnRuntimeKey("a", "1"), ApprovalRegistry.Gate("call_1", "perm-1"))
+        registry.record(TurnRuntimeKey("a", "2"), ApprovalRegistry.Gate("call_2", "perm-2"))
+        registry.record(TurnRuntimeKey("a", "3"), ApprovalRegistry.Gate("call_3", "perm-3"))
 
         assertEquals(2, registry.trackedCount())
         assertNull(registry.approvalIdFor("call_1"))

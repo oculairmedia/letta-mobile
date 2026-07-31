@@ -42,12 +42,11 @@ class ExternalToolDispatcherTest {
         val client = RecordingClient()
         val dispatcher = dispatcher(client, registry = null)
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
         val sent = client.responses.single()
-        assertEquals("req-1", sent.requestId)
-        assertEquals(true, sent.result?.isError)
-        assertTrue(sent.result?.content?.single()?.text.orEmpty().contains("not handled"))
+        assertEquals(REQUEST_ID, sent.requestId)
+        sent.assertIsErrorContaining("not handled")
     }
 
     @Test
@@ -55,7 +54,7 @@ class ExternalToolDispatcherTest {
         val client = RecordingClient()
         val dispatcher = dispatcher(client, registry = registryOf(EchoTool { ExternalToolResult.Success("echoed") }))
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
         val sent = client.responses.single()
         assertEquals("echoed", sent.result?.content?.single()?.text)
@@ -70,12 +69,11 @@ class ExternalToolDispatcherTest {
             registry = registryOf(EchoTool { throw IllegalStateException("boom") }),
         )
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
         val sent = client.responses.single()
-        assertEquals("req-1", sent.requestId)
-        assertEquals(true, sent.result?.isError)
-        assertTrue(sent.result?.content?.single()?.text.orEmpty().contains("boom"))
+        assertEquals(REQUEST_ID, sent.requestId)
+        sent.assertIsErrorContaining("boom")
     }
 
     @Test
@@ -91,11 +89,10 @@ class ExternalToolDispatcherTest {
             ),
         )
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
         val sent = client.responses.single()
-        assertEquals(true, sent.result?.isError)
-        assertTrue(sent.result?.content?.single()?.text.orEmpty().contains("timed out"))
+        sent.assertIsErrorContaining("timed out")
     }
 
     @Test
@@ -111,15 +108,11 @@ class ExternalToolDispatcherTest {
             generation = { 1L },
         )
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
         assertEquals(0, invocations)
         assertTrue(client.responses.isEmpty())
-        val ref = InboundControlRequestRegistry.RequestRef("req-1", "call_1")
-        assertEquals(
-            InboundControlRequestRegistry.State.Pending,
-            assertNotNull(controlRegistry.lookup(ref, 0L)).state,
-        )
+        controlRegistry.assertRequestState(InboundControlRequestRegistry.State.Pending)
     }
 
     @Test
@@ -131,10 +124,8 @@ class ExternalToolDispatcherTest {
 
         // Two independent dispatch passes sharing the cache — the reconnect replay
         // shape, where the second answer must not re-run a non-idempotent tool.
-        dispatcher(client, registry, cache = cache)
-            .answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
-        dispatcher(client, registry, cache = cache)
-            .answer(request("req-1", "call_1"), leaseToken = 2L, validatedGeneration = 0L)
+        dispatcher(client, registry, cache = cache).answerRequest()
+        dispatcher(client, registry, cache = cache).answerRequest(leaseToken = 2L)
 
         assertEquals(1, invocations)
         assertEquals(2, client.responses.size)
@@ -148,13 +139,9 @@ class ExternalToolDispatcherTest {
         val controlRegistry = InboundControlRequestRegistry()
         val dispatcher = dispatcher(client, registry = null, controlRegistry = controlRegistry)
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
-        val ref = InboundControlRequestRegistry.RequestRef("req-1", "call_1")
-        assertEquals(
-            InboundControlRequestRegistry.State.Pending,
-            assertNotNull(controlRegistry.lookup(ref, 0L)).state,
-        )
+        controlRegistry.assertRequestState(InboundControlRequestRegistry.State.Pending)
     }
 
     @Test
@@ -163,13 +150,9 @@ class ExternalToolDispatcherTest {
         val controlRegistry = InboundControlRequestRegistry()
         val dispatcher = dispatcher(client, registry = null, controlRegistry = controlRegistry)
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
-        val ref = InboundControlRequestRegistry.RequestRef("req-1", "call_1")
-        assertEquals(
-            InboundControlRequestRegistry.State.Answered,
-            assertNotNull(controlRegistry.lookup(ref, 0L)).state,
-        )
+        controlRegistry.assertRequestState(InboundControlRequestRegistry.State.Answered)
     }
 
     @Test
@@ -177,24 +160,38 @@ class ExternalToolDispatcherTest {
         val client = RecordingClient()
         val controlRegistry = InboundControlRequestRegistry()
         val dispatcher = dispatcher(client, registry = null, controlRegistry = controlRegistry)
-        val ref = InboundControlRequestRegistry.RequestRef("req-1", "call_1")
         controlRegistry.register(
             InboundControlRequestRegistry.RegisterRequest(
-                requestId = "req-1",
+                requestId = REQUEST_ID,
                 kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 0L,
-                toolCallId = "call_1",
+                connectionGeneration = CLAIM_GENERATION,
+                toolCallId = TOOL_CALL_ID,
             ),
         )
         // Another lease already owns the claim.
-        assertTrue(controlRegistry.tryClaim(ref, leaseToken = 9L, connectionGeneration = 0L))
+        assertTrue(controlRegistry.tryClaim(ref, leaseToken = 9L, connectionGeneration = CLAIM_GENERATION))
 
-        dispatcher.answer(request("req-1", "call_1"), leaseToken = 1L, validatedGeneration = 0L)
+        dispatcher.answerRequest()
 
         assertTrue(client.responses.isEmpty())
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /** The one request identity every case here dispatches. */
+    private val ref = InboundControlRequestRegistry.RequestRef(REQUEST_ID, TOOL_CALL_ID)
+
+    private suspend fun ExternalToolDispatcher.answerRequest(leaseToken: Long = 1L) =
+        answer(request(REQUEST_ID, TOOL_CALL_ID), leaseToken = leaseToken, validatedGeneration = CLAIM_GENERATION)
+
+    private fun AppServerCommand.ExternalToolCallResponse.assertIsErrorContaining(fragment: String) {
+        assertEquals(true, result?.isError)
+        assertTrue(result?.content?.single()?.text.orEmpty().contains(fragment))
+    }
+
+    private fun InboundControlRequestRegistry.assertRequestState(expected: InboundControlRequestRegistry.State) {
+        assertEquals(expected, assertNotNull(lookup(ref, CLAIM_GENERATION)).state)
+    }
 
     private fun dispatcher(
         client: AppServerClient,
@@ -230,6 +227,12 @@ class ExternalToolDispatcherTest {
         override val capability: Capability = Capability.SlimAgents
         override val inputSchema: JsonObject? = null
         override suspend fun invoke(input: JsonObject): ExternalToolResult = body()
+    }
+
+    private companion object {
+        const val REQUEST_ID = "req-1"
+        const val TOOL_CALL_ID = "call_1"
+        const val CLAIM_GENERATION = 0L
     }
 
     private class RecordingClient : AppServerClient {

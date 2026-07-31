@@ -47,15 +47,22 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
     private val gates = linkedMapOf<TurnRuntimeKey, Map<String, String>>()
 
     /**
-     * Record a surfaced gate for [key]. Called when a non-auto-approved
+     * One parked interactive tool call. [approvalId] is the REAL can_use_tool
+     * control-request id; pairing the two in a type keeps callers from
+     * transposing two same-typed identifiers at the call site.
+     */
+    data class Gate(val toolCallId: String, val approvalId: String)
+
+    /**
+     * Record a surfaced [gate] for [key]. Called when a non-auto-approved
      * AskUserQuestion / ExitPlanMode approval reaches the collect body, from
      * either the ControlRequest path or the streamed `approval_request_message`
      * path (letta-mobile-vilsn.7).
      */
-    fun record(key: TurnRuntimeKey, toolCallId: String, approvalId: String) {
+    fun record(key: TurnRuntimeKey, gate: Gate) {
         synchronized(lock) {
             val current = gates.remove(key) ?: emptyMap()
-            gates[key] = current + (toolCallId to approvalId)
+            gates[key] = current + (gate.toolCallId to gate.approvalId)
             evictOverflowLocked(keep = key)
         }
     }
@@ -106,18 +113,18 @@ internal class ApprovalRegistry(private val cap: Int = MAX_TRACKED_RUNTIME_KEYS)
     }
 
     /**
-     * Consume [toolCallId]'s gate on whichever runtime holds it, but ONLY when
-     * the recorded id still equals [approvalId]. A mismatch means the gate was
-     * already re-surfaced under a newer approval id, which the successful send
-     * for the OLD id must not delete.
+     * Consume [gate]'s tool call on whichever runtime holds it, but ONLY when
+     * the recorded id still equals the gate's approval id. A mismatch means the
+     * gate was already re-surfaced under a newer approval id, which the
+     * successful send for the OLD id must not delete.
      */
-    fun clearIfMatches(toolCallId: String, approvalId: String) {
+    fun clearIfMatches(gate: Gate) {
         synchronized(lock) {
             val victims = gates.entries
-                .filter { it.value[toolCallId] == approvalId }
+                .filter { it.value[gate.toolCallId] == gate.approvalId }
                 .map { it.key }
             for (key in victims) {
-                val next = (gates[key] ?: continue) - toolCallId
+                val next = (gates[key] ?: continue) - gate.toolCallId
                 if (next.isEmpty()) gates.remove(key) else gates[key] = next
             }
         }

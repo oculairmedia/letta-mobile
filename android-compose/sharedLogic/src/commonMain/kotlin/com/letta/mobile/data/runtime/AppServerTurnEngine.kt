@@ -371,7 +371,7 @@ class AppServerTurnEngine(
         approvals.approvalIdFor(toolCallId)
 
     fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
-        approvals.clearIfMatches(toolCallId, requestId)
+        approvals.clearIfMatches(ApprovalRegistry.Gate(toolCallId, requestId))
     }
 
     /**
@@ -1197,8 +1197,10 @@ class AppServerTurnEngine(
                                 // toolu_…).
                                 approvals.record(
                                     slot.key,
-                                    payload.request.callId.value,
-                                    payload.request.approvalId.value,
+                                    ApprovalRegistry.Gate(
+                                        toolCallId = payload.request.callId.value,
+                                        approvalId = payload.request.approvalId.value,
+                                    ),
                                 )
                             }
                         }
@@ -1240,7 +1242,10 @@ class AppServerTurnEngine(
                                     callId != null &&
                                     RuntimeUserInputTools.requiresUserInput(approval.toolName)
                                 ) {
-                                    approvals.record(slot.key, callId, approval.requestId)
+                                    approvals.record(
+                                        slot.key,
+                                        ApprovalRegistry.Gate(callId, approval.requestId),
+                                    )
                                 }
                             }
                         }
