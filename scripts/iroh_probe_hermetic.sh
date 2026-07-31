@@ -183,6 +183,21 @@ if [[ ${#PROBE_USER_ARGS[@]} -eq 0 ]]; then
   PROBE_USER_ARGS=("${PROBE_DEFAULT_ARGS[@]}")
 fi
 
+# no-http wrapper attribution (letta-mobile-jr5tx). This harness spawns and owns
+# the process that serves Iroh, so there is no systemd unit to resolve — but the
+# gate must still prove that THAT process opened zero admin-HTTP connections.
+# Declare hermetic mode explicitly and hand the scan the stub's PID; only if the
+# stub never reported one do we fall back to the not-applicable evidence state,
+# which the deployment gate rejects. Production keeps the strict systemd path.
+WRAPPER_SCAN_ARGS=(--wrapper-scan-mode hermetic --wrapper-unit iroh-probe-stub)
+if [[ -n "${STUB_PID}" ]]; then
+  WRAPPER_SCAN_ARGS+=(--wrapper-pid "${STUB_PID}")
+  echo "[iroh-probe-hermetic] wrapper scan pid=${STUB_PID}" >&2
+else
+  WRAPPER_SCAN_ARGS+=(--wrapper-scan-not-applicable hermetic_stub_pid_not_reported)
+  echo "[iroh-probe-hermetic] wrapper scan not applicable: stub reported no PID" >&2
+fi
+
 set +e
 PROBE_ARGS="$(quote_cli_args \
   app-server-iroh-probe \
@@ -191,6 +206,7 @@ PROBE_ARGS="$(quote_cli_args \
   --agent-id probe-agent \
   --admin-base-url "${ADMIN_BASE}" \
   --json \
+  "${WRAPPER_SCAN_ARGS[@]}" \
   "${PROBE_USER_ARGS[@]}" \
 )"
 ./gradlew --quiet :cli:run -PcliArgs="${PROBE_ARGS}" | tee "${PROBE_LOG}"

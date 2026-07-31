@@ -1,6 +1,7 @@
 package com.letta.mobile.cli.commands
 
 import com.letta.mobile.cli.probe.NoHttpWrapperEvidence
+import com.letta.mobile.cli.probe.WrapperScanMode
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -84,6 +85,67 @@ class NoHttpProbeEvidenceTest {
         assertTrue(
             "no_http_wrapper_scan_unavailable:meridian-iroh-wrapper" in turn.scenarioViolations,
             "${turn.scenarioViolations}",
+        )
+    }
+
+    /**
+     * jr5tx — the hermetic CI run scans the harness-spawned wrapper, so the turn
+     * carries the same attributable evidence as a deployment run, tagged with the
+     * mode that produced it.
+     */
+    @Test
+    fun `hermetic scan of the spawned wrapper annotates the turn like a deployment scan`() {
+        val turn = NoHttpProbeScenario.annotateNoHttp(
+            baseTurn,
+            listOf(0, 0),
+            cleanEvidence.copy(unit = "iroh-probe-stub", pid = 909, mode = WrapperScanMode.HERMETIC),
+        )
+
+        assertEquals(emptyList<String>(), turn.scenarioViolations)
+        assertTrue("no_http_wrapper_scan_mode=hermetic" in turn.notes, "${turn.notes}")
+        assertTrue("no_http_wrapper_pid=909" in turn.notes, "${turn.notes}")
+    }
+
+    /** A dirty hermetic wrapper is still a violation — the mode is not a bypass. */
+    @Test
+    fun `hermetic scan still fails when the spawned wrapper dials the admin port`() {
+        val turn = NoHttpProbeScenario.annotateNoHttp(
+            baseTurn,
+            listOf(0, 3),
+            cleanEvidence.copy(mode = WrapperScanMode.HERMETIC, pid = 909, maxConnections = 3),
+        )
+
+        assertTrue("no_http_tcp_connects:3" in turn.scenarioViolations, "${turn.scenarioViolations}")
+    }
+
+    @Test
+    fun `not applicable is a distinct recorded state accepted only by the hermetic run`() {
+        val notApplicable = cleanEvidence.copy(
+            unit = "iroh-probe-stub",
+            pid = null,
+            sampleCount = 0,
+            notApplicableReason = "hermetic_stub_pid_not_reported",
+        )
+
+        val hermetic = NoHttpProbeScenario.annotateNoHttp(
+            baseTurn,
+            emptyList(),
+            notApplicable.copy(mode = WrapperScanMode.HERMETIC),
+        )
+        assertEquals(emptyList<String>(), hermetic.scenarioViolations)
+        assertTrue(
+            "no_http_wrapper_scan_not_applicable=hermetic_stub_pid_not_reported" in hermetic.notes,
+            "${hermetic.notes}",
+        )
+
+        val deployment = NoHttpProbeScenario.annotateNoHttp(
+            baseTurn,
+            emptyList(),
+            notApplicable.copy(mode = WrapperScanMode.DEPLOYMENT),
+        )
+        assertTrue(
+            "no_http_wrapper_scan_not_applicable_rejected:iroh-probe-stub" in deployment.scenarioViolations,
+            "${deployment.scenarioViolations}",
         )
     }
 }
