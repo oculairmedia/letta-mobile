@@ -36,6 +36,20 @@ import kotlinx.serialization.json.jsonObject
  *  - flat:   { type:"image", mimeType, data:"<base64>" }
  *  - nested: { type:"image", source:{ type:"base64", media_type, data:"<base64>" } }
  *
+ * …and BOTH on-disk ROW shapes (letta-mobile-6ppdr):
+ *  - session-log v3 envelope (what letta-code 0.29.x actually writes):
+ *    { type:"message", id, parentId, timestamp, message:{ role, content:[…] } }
+ *  - legacy flat row: { id, role, content:[…] }
+ * See [SessionLogEnvelope]. Before that fix this class read `role`/`content` at
+ * the TOP level only, so it never once fired on a real 0.29.x transcript.
+ *
+ * REWRITE SAFETY: this pass REWRITES a file that owns user data. Only the image
+ * PARTS inside `message.content` are replaced; the envelope, every other
+ * top-level field, every other content part and every unknown/future field are
+ * carried through verbatim (see [SessionLogEnvelope.withBody]). Any row that
+ * cannot be confidently parsed is passed through UNCHANGED (fail-open per row,
+ * telemetered) — never dropped, never re-serialized.
+ *
  * Single parse, atomic write, idempotent (a part with empty data / stripped:true
  * is left untouched → no-op once stripped).
  */
@@ -112,12 +126,22 @@ class LocalImageContextStripper(
         var partsStripped = 0
         var bytesFreed = 0
         var changed = false
+        var unparseableRows = 0
 
         val rebuilt = lines.mapIndexed { index, line ->
             if (index == latestImageUserIndex) return@mapIndexed (latestImageFullLine ?: line)
 
-            val row = rows.getOrNull(index) ?: return@mapIndexed line
-            val content = row["content"] as? JsonArray ?: return@mapIndexed line
+            // FAIL-OPEN PER ROW (letta-mobile-6ppdr): a row we cannot parse is
+            // emitted byte-for-byte as it was read. It is never dropped and
+            // never re-serialized from a partial understanding of its shape.
+            val row = rows.getOrNull(index) ?: run {
+                unparseableRows++
+                return@mapIndexed line
+            }
+            // v3 envelope OR legacy flat row — `content` lives on the message
+            // BODY, which for a flat row is the row itself.
+            val body = SessionLogEnvelope.body(row)
+            val content = body["content"] as? JsonArray ?: return@mapIndexed line
             if (content.none { isStrippableImage(it) }) return@mapIndexed line
 
             val newContent = buildJsonArray {
@@ -133,11 +157,23 @@ class LocalImageContextStripper(
                     }
                 }
             }
-            val newMap = LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(row)
-            newMap["content"] = newContent
-            json.encodeToString(JsonObject.serializer(), JsonObject(newMap))
+            // Preserve EVERYTHING except the content array: the body's own other
+            // fields (id/role/…/unknown) keep their value and position, and the
+            // envelope around it is restored intact.
+            val newBodyMap = LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(body)
+            newBodyMap["content"] = newContent
+            val newBody = JsonObject(newBodyMap)
+            json.encodeToString(JsonObject.serializer(), SessionLogEnvelope.withBody(row, newBody))
         }
 
+        if (unparseableRows > 0) {
+            Telemetry.event(
+                IMAGE_PIPELINE_TAG,
+                "strip.unparseable_row_passthrough",
+                "rows" to unparseableRows,
+                level = Telemetry.Level.WARN,
+            )
+        }
         if (!changed) return StripReport(0, 0)
 
         // letta-mobile-lgns8.20 (data-loss guard): the embedded letta.js node
@@ -301,8 +337,11 @@ class LocalImageContextStripper(
      * i.e. isStrippableImage returns true).
      */
     private fun JsonObject.isUserImageMessage(): Boolean {
-        if (this["role"]?.jsonStr() != "user") return false
-        val content = this["content"] as? JsonArray ?: return false
+        // Envelope-aware (letta-mobile-6ppdr): role/content live on the message
+        // body, which is the row itself only for a legacy flat row.
+        val body = SessionLogEnvelope.body(this)
+        if (body["role"]?.jsonStr() != "user") return false
+        val content = body["content"] as? JsonArray ?: return false
         return content.any { isStrippableImage(it) }
     }
 

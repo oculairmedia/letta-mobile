@@ -1,5 +1,6 @@
 package com.letta.mobile.runtime.local
 
+import com.letta.mobile.util.Telemetry
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.OutputStream
@@ -45,6 +46,14 @@ import kotlinx.serialization.json.put
  *    name, arguments}, ... ] }
  *  - tool result row: { id, role:"toolResult", toolCallId, isError,
  *    content:[ {type:"text", text} ] }
+ *
+ * …each of which letta-code 0.29.x wraps in a session-log **v3 envelope**
+ * (`{type:"message", id, parentId, timestamp, message:{…}}`) — see
+ * [SessionLogEnvelope]. Every classification read below therefore goes through
+ * the message BODY, which is the row itself for a legacy flat row. Before
+ * letta-mobile-6ppdr this class read the top level only, so it never healed a
+ * real 0.29.x transcript. Synthetic rows are emitted in the SAME shape as the
+ * transcript they are inserted into, so letta.js keeps loading them.
  *
  * Mutation is append-only (synthetic toolResult rows) + atomic write
  * (temp file + rename) so a crash mid-heal leaves either the old transcript
@@ -107,6 +116,22 @@ class LocalConversationHealer(
         val parsed: List<JsonObject?> = lines.map { line ->
             runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
         }
+        // Envelope-unwrapped view (letta-mobile-6ppdr). EVERY classification
+        // read below uses this: `role`, `content`, `toolCallId` and the message
+        // `id` live on the message BODY, which is the row itself for a legacy
+        // flat row and the nested `message` object for a v3 envelope. A row we
+        // could not parse stays null and is treated as opaque — kept verbatim,
+        // never dropped (fail-open per row, telemetered below).
+        val bodies: List<JsonObject?> = parsed.map { it?.let(SessionLogEnvelope::body) }
+        val unparseableRows = parsed.count { it == null }
+        if (unparseableRows > 0) {
+            Telemetry.event(
+                HEAL_TAG,
+                "heal.unparseable_row_passthrough",
+                "rows" to unparseableRows,
+                level = Telemetry.Level.WARN,
+            )
+        }
 
         // ── Cheap detection pass (no allocation of new lists): decide whether
         //    anything needs healing BEFORE doing any O(n) rewrite of a possibly
@@ -114,7 +139,7 @@ class LocalConversationHealer(
         val declaredCallIds = HashSet<String>()
         val callIdToName = HashMap<String, String>()
         var hasStaleHealRow = false
-        for (row in parsed) {
+        for (row in bodies) {
             row ?: continue
             if (row.stringField("role") == "assistant") {
                 (row["content"] as? JsonArray)?.forEach { part ->
@@ -135,7 +160,7 @@ class LocalConversationHealer(
         // toolResult ids present, and orphans (no declaring call).
         val resultCallIds = HashSet<String>()
         val orphanResultIds = HashSet<String>()
-        for (row in parsed) {
+        for (row in bodies) {
             row ?: continue
             if (row.stringField("role") != "toolResult") continue
             val cid = row.stringField("toolCallId") ?: continue
@@ -154,8 +179,8 @@ class LocalConversationHealer(
         //    synthetic rows — the actual bytes are never rebuilt from the
         //    (possibly bounded) parsed text; see [rewriteSelectively].
         val keptIndices = LinkedHashSet<Int>()
-        for (i in parsed.indices) {
-            val row = parsed[i]
+        for (i in bodies.indices) {
+            val row = bodies[i]
             if (row == null) {
                 keptIndices.add(i)
                 continue
@@ -176,7 +201,7 @@ class LocalConversationHealer(
         // re-surfaces its call as dangling → to be re-inserted in position).
         val keptResultIds = HashSet<String>()
         for (i in keptIndices) {
-            val row = parsed[i] ?: continue
+            val row = bodies[i] ?: continue
             if (row.stringField("role") == "toolResult") {
                 row.stringField("toolCallId")?.let(keptResultIds::add)
             }
@@ -188,14 +213,24 @@ class LocalConversationHealer(
 
         val insertAfterIndex = HashMap<Int, MutableList<JsonObject>>()
         for (i in keptIndices) {
-            val row = parsed[i] ?: continue
+            val row = bodies[i] ?: continue
             if (row.stringField("role") != "assistant") continue
             (row["content"] as? JsonArray)?.forEach { part ->
                 val p = part as? JsonObject ?: return@forEach
                 if (p.stringField("type") != "toolCall") return@forEach
                 val callId = p.stringField("id") ?: return@forEach
                 callIdToSynthetic[callId]?.let { synthetic ->
-                    insertAfterIndex.getOrPut(i) { mutableListOf() }.add(synthetic)
+                    // Emit the synthetic row in the SAME shape as its anchor:
+                    // a v3 envelope on a v3 transcript (parentId/timestamp
+                    // copied from the anchor, so the bytes stay deterministic
+                    // and the idempotency check below still holds), a bare flat
+                    // row on a legacy transcript.
+                    val shaped = SessionLogEnvelope.wrapLike(
+                        anchor = parsed[i],
+                        body = synthetic,
+                        entryId = "heal-$callId",
+                    )
+                    insertAfterIndex.getOrPut(i) { mutableListOf() }.add(shaped)
                 }
             }
         }
@@ -218,9 +253,9 @@ class LocalConversationHealer(
         // 1:1 and nothing else was dropped, this is a true no-op.
         var realDrops = 0
         val staleHealDropPairs = HashSet<Pair<Int, String>>()
-        for (i in parsed.indices) {
+        for (i in bodies.indices) {
             if (i in keptIndices) continue
-            val row = parsed[i] ?: continue
+            val row = bodies[i] ?: continue
             val id = row.stringField("id").orEmpty()
             if (id.startsWith("heal-")) {
                 val callId = row.stringField("toolCallId")
@@ -232,7 +267,11 @@ class LocalConversationHealer(
             realDrops++
         }
         val insertedPairs = insertAfterIndex.entries
-            .flatMap { (i, rows) -> rows.mapNotNull { row -> row.stringField("toolCallId")?.let { cid -> i to cid } } }
+            .flatMap { (i, rows) ->
+                rows.mapNotNull { row ->
+                    SessionLogEnvelope.body(row).stringField("toolCallId")?.let { cid -> i to cid }
+                }
+            }
             .toSet()
         if (realDrops == 0 && staleHealDropPairs == insertedPairs) {
             return HealReport(emptyList(), 0) // regenerated heal rows are byte-for-byte identical → true no-op
@@ -267,6 +306,14 @@ class LocalConversationHealer(
         } catch (_: AtomicMoveNotSupportedException) {
             Files.move(tmp, transcript.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }
+        Telemetry.event(
+            HEAL_TAG,
+            "heal.transcript_healed",
+            "danglingToolCalls" to finalDangling.size,
+            "rowsAppended" to callIdToSynthetic.size,
+            "orphanToolResults" to orphanResultIds.size,
+            "rowsRemoved" to dropCount,
+        )
         return HealReport(
             orphanCallIds = finalDangling,
             rowsAppended = callIdToSynthetic.size,
@@ -385,4 +432,9 @@ class LocalConversationHealer(
 
     private fun JsonObject.stringField(key: String): String? =
         this[key]?.jsonPrimitive?.takeIf { it.isString }?.content
+
+    companion object {
+        /** Telemetry tag for the on-device transcript healer (letta-mobile-6ppdr / lgns8.20). */
+        const val HEAL_TAG = "LocalConversationHealer"
+    }
 }

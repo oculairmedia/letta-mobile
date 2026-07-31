@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -254,9 +255,10 @@ class ImagePipelineEndToEndTest {
      * [LocalImageContextStripper.stripTranscript] and this test goes red (the
      * tail image is replaced by a `[image omitted from context: …]` text part).
      *
-     * Runs on the LEGACY flat row shape deliberately — that is the only shape
-     * [LocalImageContextStripper] currently understands; see
-     * [documented gap: stripper is a no-op on real session-log v3 transcripts].
+     * Runs on the LEGACY flat row shape deliberately — the stripper handles
+     * both shapes since letta-mobile-6ppdr (see
+     * [stripper fires on real session-log v3 transcripts]), and the flat shape
+     * keeps this canary focused on the cap/re-read path.
      */
     @Test
     fun `oversized transcript still hydrates the image in the tail past the 8MB cap`() {
@@ -475,34 +477,33 @@ class ImagePipelineEndToEndTest {
     }
 
     /**
-     * RESIDUAL GAP 2 (FOUND BY THIS HARNESS, letta-mobile-iej8j):
-     * [LocalImageContextStripper] and [LocalConversationHealer] read `role` /
-     * `content` at the TOP LEVEL of each transcript row, but letta-code 0.29.x
-     * writes session-log **v3 envelopes** —
+     * RESIDUAL GAP 2 (FOUND BY THIS HARNESS, letta-mobile-iej8j) — NOW FIXED
+     * (letta-mobile-6ppdr): [LocalImageContextStripper] and
+     * [LocalConversationHealer] used to read `role` / `content` at the TOP
+     * LEVEL of each transcript row, but letta-code 0.29.x writes session-log
+     * **v3 envelopes** —
      * `{"type":"message","id":…,"parentId":…,"timestamp":…,"message":{role,content}}`
      * (`localTranscriptSessionEntries` in the bundle). Every unit test for those
-     * two classes uses the legacy FLAT shape, so the mismatch was invisible.
+     * two classes used the legacy FLAT shape, so the mismatch was invisible.
      *
      * Evidence from the live store (`/root/.letta/lc-local-backend`,
      * 2026-07-31): 89,991 v3-envelope rows, 27 legacy flat rows, 124 image
-     * parts, and ZERO `stripped` placeholders — i.e. the stripper has never
-     * once fired on real data.
+     * parts, and ZERO `stripped` placeholders — i.e. the stripper had never
+     * once fired on real data, leaving the context-bloat protection of 87itk
+     * and the tool-call healing of lgns8.20 inert on 0.29.x transcripts.
      *
-     * CONSEQUENCE: on a real transcript the pre-turn pass is a NO-OP. That is
-     * fail-SAFE for the image itself (nothing is destroyed, and the reader /
-     * projection path DO unwrap v3 correctly, which is why hydration works),
-     * but the context-bloat protection of 87itk and the tool-call healing of
-     * lgns8.20 are BOTH inert on 0.29.x transcripts.
+     * `SessionLogEnvelope` now unwraps the envelope on read and restores it on
+     * write, so the pre-turn pass fires on real transcripts.
      *
-     * TRACKED: letta-mobile-6ppdr.
-     * TODO(letta-mobile-6ppdr): teach the stripper + healer
-     * `LocalBackendMessageReader.normalizeMessage`'s envelope unwrap (and write
-     * rows back in the same envelope), then FLIP this assertion to expect a
-     * real strip. Deliberately NOT fixed here: this file is a test bead and the
-     * fix rewrites a turn-hot-path file that owns user data.
+     * FAIL-ON-REVERT: revert the `SessionLogEnvelope.body`/`withBody` calls in
+     * [LocalImageContextStripper] and this test goes red — `partsStripped`
+     * drops back to 0 and no `strip.parts_stripped` telemetry fires. Envelope
+     * shape and unit-level behaviour are covered in depth by
+     * `SessionLogV3TranscriptTest`; this asserts it end-to-end on a transcript
+     * written by the real persist path.
      */
     @Test
-    fun `documented gap - stripper is a no-op on real session-log v3 transcripts`() {
+    fun `stripper fires on real session-log v3 transcripts`() {
         val base = tmp.newFolder("store")
         val dir = conversationDir(base, DEFAULT_CONV_KEY)
         val transcript = File(dir, "messages.jsonl")
@@ -516,25 +517,35 @@ class ImagePipelineEndToEndTest {
 
         val report = LocalImageContextStripper(blobStore = LocalImageBlobStore(dir)).stripTranscript(transcript)
 
-        assertEquals("CURRENT BEHAVIOR (gap): nothing is stripped on a v3 transcript", 0, report.partsStripped)
-        assertEquals("the transcript is left byte-identical", v3, transcript.readText())
-        assertNull(
-            "no strip telemetry fires because the pass never recognizes a row",
-            Telemetry.snapshot().firstOrNull { it.name == "strip.parts_stripped" },
-        )
+        assertEquals("FIXED (6ppdr): both v3 image parts are stripped", 2, report.partsStripped)
+        assertTrue("stripping frees transcript bytes", report.bytesFreed > 0)
+        assertNotEquals("the transcript is rewritten, not left byte-identical", v3, transcript.readText())
+        val stripEvent = Telemetry.snapshot().single { it.name == "strip.parts_stripped" }
+        assertEquals(2, stripEvent.attrs["parts"])
 
-        // The images are therefore ALL still on disk in full — and every one of
-        // them is still a schema-valid provider image_url, so the pipeline is
-        // functionally correct (just unbounded). Assert that explicitly so a
-        // future envelope fix cannot regress correctness while fixing bloat.
-        val urls = transcript.readLines()
+        // The envelope survives the rewrite and the image parts became
+        // placeholders INSIDE message.content — no provider image_url is left.
+        val rows = transcript.readLines()
             .filter { it.isNotBlank() }
-            .mapNotNull { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
-            .mapNotNull { it["message"] as? JsonObject }
-            .mapNotNull { it["content"] as? JsonArray }
+            .map { json.parseToJsonElement(it).jsonObject }
+        val messageRows = rows.mapNotNull { row -> (row["message"] as? JsonObject)?.let { row to it } }
+        assertEquals("both message rows keep their v3 envelope", 2, messageRows.size)
+        messageRows.forEach { (row, body) ->
+            assertEquals("message", row["type"]!!.jsonPrimitive.content)
+            assertEquals("user", body["role"]!!.jsonPrimitive.content)
+        }
+        val urls = messageRows
+            .mapNotNull { (_, body) -> body["content"] as? JsonArray }
             .flatMap { LettaJs.providerImageUrls(it) }
-        assertEquals(2, urls.size)
-        urls.forEach { assertValidProviderImageUrl(it) }
+        assertEquals("no base64 image_url survives the strip", 0, urls.size)
+
+        // …and the bytes are not lost: the blob store holds each image so the
+        // hydration path can put it back.
+        val placeholders = messageRows
+            .mapNotNull { (_, body) -> body["content"] as? JsonArray }
+            .flatMap { parts -> parts.mapNotNull { it as? JsonObject } }
+            .filter { it["stripped"]?.jsonPrimitive?.content?.toBoolean() == true }
+        assertEquals("each stripped image left a placeholder", 2, placeholders.size)
     }
 
     // ─────────────────────────────────────────────────────────────────────
