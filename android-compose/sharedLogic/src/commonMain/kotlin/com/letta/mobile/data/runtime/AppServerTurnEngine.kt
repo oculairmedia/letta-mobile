@@ -963,42 +963,50 @@ class AppServerTurnEngine(
             is RuntimeEventPayload.RemoteStreamFrame -> {
                 // Extract tool_call_id from tool_call_message and approval_request_message frames
                 extractToolCallId(payload.body)?.let { ledger.emitted.add(it) }
-                // Extract returned tool_call_id from tool_return_message frames
-                if (payload.messageType == "tool_return_message") {
-                    extractToolCallId(payload.body)?.let {
-                        ledger.returned.add(it)
-                        // letta-mobile-vilsn.6: a streamed tool_return
-                        // resolves that specific outstanding gate.
-                        approvals.resolve(key, it)
-                    }
-                }
-                // letta-mobile-vilsn.7: some App Server transports deliver
-                // the tool-call approval as a StreamDelta
-                // approval_request_message (RemoteStreamFrame) rather than
-                // a ControlRequest (which maps to ApprovalRequested above).
-                // That path bypassed gate registration entirely, so a
-                // parked AskUserQuestion/ExitPlanMode arriving this way was
-                // never added to the [ApprovalRegistry]: the idle watchdog
-                // was not paused (vilsn.6) and the submit path could not
-                // recover the real can_use_tool request id via
-                // userInputApprovalId. Register it here exactly like
-                // the ApprovalRequested branch does.
-                if (payload.messageType == "approval_request_message") {
-                    val approval = draft.toApprovalAutoAllowRequest()
-                    val callId = approval?.toolCallId
-                    if (approval != null &&
-                        callId != null &&
-                        RuntimeUserInputTools.requiresUserInput(approval.toolName)
-                    ) {
-                        approvals.record(
-                            key,
-                            ApprovalRegistry.Gate(callId, approval.requestId),
-                        )
-                    }
-                }
+                resolveStreamedToolReturn(payload, key, ledger)
+                recordStreamedApprovalGate(draft, payload, key)
             }
             else -> {}
         }
+    }
+
+    /**
+     * Extract the returned tool_call_id from a streamed `tool_return_message`.
+     * letta-mobile-vilsn.6: a streamed tool_return resolves that specific
+     * outstanding gate.
+     */
+    private fun resolveStreamedToolReturn(
+        payload: RuntimeEventPayload.RemoteStreamFrame,
+        key: TurnRuntimeKey,
+        ledger: ToolCallLedger,
+    ) {
+        if (payload.messageType != "tool_return_message") return
+        extractToolCallId(payload.body)?.let {
+            ledger.returned.add(it)
+            approvals.resolve(key, it)
+        }
+    }
+
+    /**
+     * letta-mobile-vilsn.7: some App Server transports deliver the tool-call
+     * approval as a StreamDelta `approval_request_message` (RemoteStreamFrame)
+     * rather than a ControlRequest (which maps to ApprovalRequested). That path
+     * bypassed gate registration entirely, so a parked AskUserQuestion /
+     * ExitPlanMode arriving this way was never added to the [ApprovalRegistry]:
+     * the idle watchdog was not paused (vilsn.6) and the submit path could not
+     * recover the real can_use_tool request id via [userInputApprovalId].
+     * Register it here exactly like the ApprovalRequested branch does.
+     */
+    private fun recordStreamedApprovalGate(
+        draft: RuntimeEventDraft,
+        payload: RuntimeEventPayload.RemoteStreamFrame,
+        key: TurnRuntimeKey,
+    ) {
+        if (payload.messageType != "approval_request_message") return
+        val approval = draft.toApprovalAutoAllowRequest() ?: return
+        val callId = approval.toolCallId ?: return
+        if (!RuntimeUserInputTools.requiresUserInput(approval.toolName)) return
+        approvals.record(key, ApprovalRegistry.Gate(callId, approval.requestId))
     }
 
     /** tool_call_ids observed for one turn (letta-mobile-oqfbj settlement). */
