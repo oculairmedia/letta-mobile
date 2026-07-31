@@ -417,6 +417,11 @@ class DefaultAppServerController(
             defaultApproveMessage = "Approved by mobile client.",
             defaultDenyMessage = "Denied by mobile client.",
         )
+        // lgns8.22.4.1.4: capture the generation this decision is sent ON. Reading
+        // the live generation after the send would let an old-connection response
+        // mark a successor-generation recovery replay Answered, dropping the replay
+        // even though the server may never have received the decision.
+        val claimGeneration = connectionGeneration.value
         client.input(
             AppServerCommand.Input(
                 runtime = runtime,
@@ -426,7 +431,7 @@ class DefaultAppServerController(
                 ),
             ),
         )
-        turnEngine.markInboundControlAnswered(effectiveRequestId)
+        turnEngine.markInboundControlAnswered(effectiveRequestId, claimGeneration)
         if (toolCallId != null && capturedRequestId != null) {
             turnEngine.clearUserInputApprovalId(toolCallId, capturedRequestId)
         }
