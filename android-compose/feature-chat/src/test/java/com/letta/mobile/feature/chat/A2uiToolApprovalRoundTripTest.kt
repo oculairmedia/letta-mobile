@@ -22,18 +22,22 @@ import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 import com.letta.mobile.ui.a2ui.A2uiTestTags
 import com.letta.mobile.ui.test.setLettaTestContent
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.test.TestResult
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withContext
@@ -51,6 +55,7 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
+import org.junit.Before
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -62,6 +67,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 @Tag("integration")
@@ -72,21 +79,85 @@ class A2uiToolApprovalRoundTripTest {
     private val openServers = mutableListOf<A2uiShimServer>()
     private val openTransports = mutableListOf<ChannelTransport>()
 
+    /**
+     * letta-mobile-likm4: pays this class's one-time initialisation cost **outside** any
+     * `runTest` body.
+     *
+     * Whichever test JUnit happens to run first absorbs the first-touch cost of the Robolectric
+     * sandbox, OkHttp/MockWebServer and kotlinx-serialization. Measured here: the first test in
+     * the class takes ~8.5s on an idle host but ~56s under heavy contention, while every
+     * subsequent test in the same class takes ~1s. That cost used to be incurred *inside* the
+     * test body, where it counts against `runTest`'s wall-clock deadline — so under load the
+     * first-executed test blew the deadline and failed as
+     * `UncompletedCoroutinesError: After waiting for 1m, the test body did not run to completion`.
+     * Nothing was deadlocked; the body was simply still doing real work. This also explains why
+     * the reported victim moved between runs (#1031 blamed
+     * helloResumeReplayedFramesStayInWireOrderBeforeLiveFrames, #1063 blamed
+     * subscribeFrameWithMessageTypeOnlyReplaysAndAdvancesCursor): JUnit's method order decides
+     * who runs first, and only the first test is exposed.
+     *
+     * `@Before` runs outside the `runTest` body, so doing a full connect/disconnect cycle here
+     * moves that initialisation off the deadline entirely. It is bounded so a genuine transport
+     * regression cannot hang the suite instead.
+     */
+    @Before
+    fun warmUpTransportOutsideTestDeadline() {
+        if (warmedUp) return
+        warmedUp = true
+        val server = A2uiShimServer()
+        val transport = ChannelTransport(RunCursorStore.inMemory(), NoOpConversationCursorStore)
+        try {
+            runBlocking {
+                withTimeout(WARM_UP_TIMEOUT) {
+                    val connected = collectSubscribed {
+                        transport.state.first { it is ChannelTransportState.Connected }
+                    }
+                    transport.connect(
+                        baseShimUrl = server.baseUrl(),
+                        token = "token",
+                        deviceId = "device",
+                        clientVersion = "test",
+                    )
+                    connected.await()
+                    transport.disconnect()
+                }
+            }
+        } finally {
+            server.close()
+        }
+    }
+
     @After
     fun tearDown() {
         openTransports.forEach { it.disconnectForTest() }
         openServers.forEach(A2uiShimServer::close)
     }
 
+    /**
+     * letta-mobile-likm4: an explicit, coherent wall-clock budget for the test body.
+     *
+     * The per-interaction budget in this class is [TIMEOUT_MS] (15s) and a test can legitimately
+     * chain three of them, so `runTest`'s 60s default was *smaller* than this class's own worst
+     * case plus setup. That inversion is what turned a slow-but-healthy run into an opaque
+     * "test body did not run to completion" instead of a precise
+     * `TimeoutCancellationException` pointing at the exact await that stalled.
+     *
+     * This is deliberately not a way to let a hang pass: the inner [withRealTimeout] budgets are
+     * unchanged and still fail fast at 15s. Raising only the outer deadline lets those inner
+     * detectors do their job rather than being pre-empted by the harness.
+     */
+    private fun a2uiRunTest(body: suspend TestScope.() -> Unit): TestResult =
+        runTest(timeout = TEST_BODY_TIMEOUT, testBody = body)
+
     @Test
-    fun toolApprovalOnceRoundTripsOverAdminShimWebSocket() = runTest {
+    fun toolApprovalOnceRoundTripsOverAdminShimWebSocket() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
         val manager = A2uiSurfaceManager()
         connect(transport, bridge, server)
 
-        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val surfaceArrived = collectSubscribed {
             bridge.a2uiEvents.first { event ->
                 event.messages.any { it.surfaceId == SurfaceId }
             }
@@ -111,7 +182,7 @@ class A2uiToolApprovalRoundTripTest {
         composeRule.onNodeWithText("rm -rf /tmp/junk").assertIsDisplayed()
         assertTrue("ToolApprovalCard should render inside the 2s budget", elapsedMs(renderedAt) < 2_000)
 
-        val confirmation = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val confirmation = collectSubscribed {
             bridge.events.first { event ->
                 val message = (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage
                 message?.content == "Executed rm -rf /tmp/junk"
@@ -133,14 +204,14 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun toolApprovalRequestIdPropagatesFromA2uiFrameForRestRouting() = runTest {
+    fun toolApprovalRequestIdPropagatesFromA2uiFrameForRestRouting() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
         val manager = A2uiSurfaceManager()
         connect(transport, bridge, server)
 
-        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val surfaceArrived = collectSubscribed {
             bridge.a2uiEvents.first { event ->
                 event.requestId == "approval-rest-1" &&
                     event.messages.any { it.surfaceId == SurfaceId }
@@ -174,7 +245,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun channelTransportTracksInFlightAndCancelPerConversation() = runTest {
+    fun channelTransportTracksInFlightAndCancelPerConversation() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
@@ -191,7 +262,7 @@ class A2uiToolApprovalRoundTripTest {
         withRealTimeout { server.frames.receiveOfType("send_message") }
         withRealTimeout { server.frames.receiveOfType("send_message") }
 
-        val convBStarted = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val convBStarted = collectSubscribed {
             bridge.events.first { event ->
                 (event as? WsTimelineEvent.TurnStarted)?.conversationId == "conv-b"
             }
@@ -206,7 +277,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun reconnectResumeSendsSubscribeForPersistedRunCursor() = runTest {
+    fun reconnectResumeSendsSubscribeForPersistedRunCursor() = a2uiRunTest {
         val cursorStore = RunCursorStore.inMemory().apply {
             record("conv-resume", "run-resume", 7L)
         }
@@ -222,7 +293,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun connectSendsHelloResumeForPersistedConversationCursors() = runTest {
+    fun connectSendsHelloResumeForPersistedConversationCursors() = a2uiRunTest {
         val conversationCursorStore = FakeConversationCursorStore(
             "conv-resume-a" to 7L,
             "conv-resume-b" to 11L,
@@ -240,7 +311,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun connectOmitsHelloResumeForEmptyConversationCursorStore() = runTest {
+    fun connectOmitsHelloResumeForEmptyConversationCursorStore() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport(conversationCursorStore = FakeConversationCursorStore())
         val bridge = WsChatBridge(transport)
@@ -253,29 +324,24 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun helloResumeReplayedFramesStayInWireOrderBeforeLiveFrames() = runTest {
+    fun helloResumeReplayedFramesStayInWireOrderBeforeLiveFrames() = a2uiRunTest {
         val conversationCursorStore = FakeConversationCursorStore("conv-resume" to 10L)
         val server = openServer()
         val transport = openTransport(conversationCursorStore = conversationCursorStore)
         val bridge = WsChatBridge(transport)
         connect(transport, bridge, server)
 
-        // letta-mobile-ddpc2 family (b): bridge.events is a cold merge(), so collecting it
-        // launches child collectors that must be dispatched before they attach. UNDISPATCHED only
-        // guarantees this coroutine STARTS synchronously — not that the merge is attached — so a
-        // send that lands first is dropped and take(3) then waits out the whole timeout. The
-        // sibling test below synchronizes on a server frame first; this one had no barrier at all.
-        // onStart fires from inside collection, so awaiting it puts the sends strictly after it.
-        val subscribed = CompletableDeferred<Unit>()
-        val observed = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        // letta-mobile-likm4: supersedes the earlier onStart {} barrier, which was not sufficient —
+        // onStart runs *before* merge() attaches its child collectors, so the first sendRaw could
+        // still land in the gap and be dropped by the replay = 0 SharedFlow. collectSubscribed
+        // makes the entire attach path synchronous instead.
+        val observed = collectSubscribed {
             bridge.events
-                .onStart { subscribed.complete(Unit) }
                 .mapNotNull { event -> (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage }
                 .map { it.content }
                 .take(3)
                 .toList()
         }
-        withRealTimeout { subscribed.await() }
 
         server.sendRaw(
             """
@@ -303,7 +369,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun subscribeFrameWithMessageTypeOnlyReplaysAndAdvancesCursor() = runTest {
+    fun subscribeFrameWithMessageTypeOnlyReplaysAndAdvancesCursor() = a2uiRunTest {
         val cursorStore = RunCursorStore.inMemory().apply {
             record("conv-resume", "run-resume", 4L)
         }
@@ -313,7 +379,7 @@ class A2uiToolApprovalRoundTripTest {
         connect(transport, bridge, server)
         withRealTimeout { server.frames.receiveOfType("subscribe") }
 
-        val replayed = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val replayed = collectSubscribed {
             bridge.events.first { event ->
                 val message = (event as? WsTimelineEvent.MessageDelta)?.message as? AssistantMessage
                 message?.content == "replayed delta"
@@ -335,14 +401,14 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun scheduleCatalogActionsRoundTripOverAdminShimWebSocket() = runTest {
+    fun scheduleCatalogActionsRoundTripOverAdminShimWebSocket() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
         val manager = A2uiSurfaceManager()
         connect(transport, bridge, server)
 
-        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val surfaceArrived = collectSubscribed {
             bridge.a2uiEvents.first { event ->
                 event.messages.any { it.surfaceId == "schedule-surface" }
             }
@@ -370,7 +436,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun allToolApprovalAffordancesEmitExpectedUserActions() = runTest {
+    fun allToolApprovalAffordancesEmitExpectedUserActions() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
@@ -395,7 +461,7 @@ class A2uiToolApprovalRoundTripTest {
             val surfaceId = "$SurfaceId-${scenario.wireValue}"
             val callId = "call-${scenario.wireValue}"
             val manager = A2uiSurfaceManager()
-            val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            val surfaceArrived = collectSubscribed {
                 bridge.a2uiEvents.first { event ->
                     event.messages.any { it.surfaceId == surfaceId }
                 }
@@ -424,7 +490,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun toolApprovalTimeoutEmitsUserAction() = runTest {
+    fun toolApprovalTimeoutEmitsUserAction() = a2uiRunTest {
         composeRule.mainClock.autoAdvance = false
         val server = openServer()
         val transport = openTransport()
@@ -433,7 +499,7 @@ class A2uiToolApprovalRoundTripTest {
         connect(transport, bridge, server)
 
         try {
-            val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+            val surfaceArrived = collectSubscribed {
                 bridge.a2uiEvents.first { event ->
                     event.messages.any { it.surfaceId == "timeout-surface" }
                 }
@@ -471,14 +537,14 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun queuedApprovalActionTriggersReconnectAndFlushes() = runTest {
+    fun queuedApprovalActionTriggersReconnectAndFlushes() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
         val manager = A2uiSurfaceManager()
         connect(transport, bridge, server)
 
-        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val surfaceArrived = collectSubscribed {
             bridge.a2uiEvents.first { event ->
                 event.messages.any { it.surfaceId == "reconnect-surface" }
             }
@@ -497,10 +563,15 @@ class A2uiToolApprovalRoundTripTest {
             )
         }
 
-        server.closeActiveSocket()
-        withRealTimeout {
+        // letta-mobile-likm4: attach the state collector BEFORE closing the socket. The transport
+        // auto-reconnects and StateFlow conflates, so a Disconnected -> Connecting transition that
+        // completes before this collector attaches would be skipped entirely and first {} would
+        // then wait out the full wall-clock budget for a state that has already gone by.
+        val disconnected = collectSubscribed {
             bridge.state.first { it is ChannelTransportState.Disconnected }
         }
+        server.closeActiveSocket()
+        withRealTimeout { disconnected.await() }
 
         composeRule.onNodeWithText("Once").performClick()
         composeRule.onNodeWithText("Approved once").assertIsDisplayed()
@@ -515,7 +586,7 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun toolApprovalWithoutSurfaceRunIdUsesActiveTurnRouting() = runTest {
+    fun toolApprovalWithoutSurfaceRunIdUsesActiveTurnRouting() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
@@ -523,7 +594,7 @@ class A2uiToolApprovalRoundTripTest {
         connect(transport, bridge, server)
 
         server.sendTurnStarted()
-        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val surfaceArrived = collectSubscribed {
             bridge.a2uiEvents.first { event ->
                 event.messages.any { it.surfaceId == "fallback-active-surface" }
             }
@@ -554,14 +625,14 @@ class A2uiToolApprovalRoundTripTest {
     }
 
     @Test
-    fun toolApprovalWithoutSurfaceRunIdQueuesUntilTurnRoutingArrives() = runTest {
+    fun toolApprovalWithoutSurfaceRunIdQueuesUntilTurnRoutingArrives() = a2uiRunTest {
         val server = openServer()
         val transport = openTransport()
         val bridge = WsChatBridge(transport)
         val manager = A2uiSurfaceManager()
         connect(transport, bridge, server)
 
-        val surfaceArrived = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        val surfaceArrived = collectSubscribed {
             bridge.a2uiEvents.first { event ->
                 event.messages.any { it.surfaceId == "fallback-queued-surface" }
             }
@@ -639,7 +710,7 @@ private suspend fun connect(
     bridge: WsChatBridge,
     server: A2uiShimServer,
 ) = coroutineScope {
-    val connected = async(Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+    val connected = collectSubscribed {
         bridge.state.first { it is ChannelTransportState.Connected }
     }
     transport.connect(
@@ -704,6 +775,33 @@ private suspend fun Channel<JsonObject>.receiveOrNullWithin(timeoutMs: Long = 25
 
 private fun elapsedMs(startNanos: Long): Long =
     (System.nanoTime() - startNanos) / 1_000_000
+
+/**
+ * letta-mobile-likm4: starts [block] as a collector that is attached to its upstream SharedFlow
+ * **by the time this function returns**, so the caller can push server frames immediately
+ * afterwards without racing.
+ *
+ * `ChannelTransport.events` / `.frameEvents` are `MutableSharedFlow(replay = 0)`: a frame emitted
+ * before a collector attaches is dropped forever, so `first {}` / `take(n)` never completes and
+ * the test burns its full wall-clock budget.
+ *
+ * `Dispatchers.IO` + `UNDISPATCHED` is NOT sufficient. `UNDISPATCHED` only makes *this* coroutine
+ * start on the caller's thread; `WsChatBridge.events` is a cold `merge(...)`, and `merge` attaches
+ * each source from an inner coroutine that must be *dispatched*. On an idle host that dispatch
+ * wins the race, which is why this only ever failed under load — when the IO pool is saturated the
+ * inner attach is queued behind other work, `async` returns un-attached, and the very next
+ * `server.sendRaw(...)` is dropped. `onStart {}` is not a barrier either: it runs *before* `merge`
+ * attaches its children.
+ *
+ * `Dispatchers.Unconfined` removes the dependency structurally — it never needs to dispatch, so
+ * `merge`'s inner coroutines run eagerly on the caller's thread until they genuinely suspend,
+ * which for a `SharedFlow` is *after* `collect` has allocated its slot. Combined with
+ * `UNDISPATCHED` the whole attach path is synchronous, with no timing assumption anywhere.
+ * (Plain cold chains such as `bridge.a2uiEvents` attach synchronously either way; routing every
+ * collector through this helper keeps the guarantee uniform so the race cannot be reintroduced.)
+ */
+private fun <T> CoroutineScope.collectSubscribed(block: suspend () -> T): Deferred<T> =
+    async(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) { block() }
 
 private suspend fun <T> withRealTimeout(block: suspend () -> T): T =
     withContext(Dispatchers.IO) {
@@ -906,3 +1004,14 @@ private fun ChannelTransport.disconnectForTest() {
 // integration suite. Keep the interaction budgets above strict, but allow the
 // transport callback enough wall-clock time to be scheduled under contention.
 private const val TIMEOUT_MS = 15_000L
+
+// letta-mobile-likm4: guards the one-time warm-up so only the first test in the
+// class pays it, and it is paid from @Before rather than inside a runTest body.
+private var warmedUp = false
+
+private val WARM_UP_TIMEOUT = 60.seconds
+
+// Must comfortably exceed the class's own worst case: setup plus the three
+// chained TIMEOUT_MS (15s) interaction budgets a single test can legitimately
+// use. The inner budgets remain the real failure detectors.
+private val TEST_BODY_TIMEOUT = 5.minutes
