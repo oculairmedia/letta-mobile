@@ -300,7 +300,7 @@ class IrohChannelTransportEndToEndTest {
                 ).collect { }
             }
             withTimeout(2.seconds) {
-                while (!engine.isBusy) delay(10.milliseconds)
+                while (!engine.isBusy("agent", "conversation")) delay(10.milliseconds)
             }
 
             assertTrue(transport.send("agent", "conversation", "second", "otid-2", null, false))

@@ -47,7 +47,7 @@ class AppServerTurnEngineLivenessReconcilerTest {
         runCurrent()
         client.emit(streamDelta("assistant_message", "run-1"))
         runCurrent()
-        assertTrue(engine.isBusy, "engine is busy with the stuck turn")
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "engine is busy with the stuck turn")
 
         // A second send is issued. It is busy-rejected, but the reconciler queries
         // run.get (which reports "failed" = dead) and releases the stale lock.
@@ -73,7 +73,7 @@ class AppServerTurnEngineLivenessReconcilerTest {
         runCurrent()
         client.emit(streamDelta("assistant_message", "run-1"))
         runCurrent()
-        assertTrue(engine.isBusy)
+        assertTrue(engine.isBusy("agent-1", "conv-1"))
 
         // Second send: reconciler queries run.get (reports "in_progress" = ALIVE),
         // so the lock is NOT released — the silent long turn is protected.
@@ -84,7 +84,7 @@ class AppServerTurnEngineLivenessReconcilerTest {
         runCurrent()
 
         assertTrue(client.runGetQueried, "reconciler must query run.get")
-        assertTrue(engine.isBusy, "a live (in_progress) owner run must NOT be interrupted")
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "a live (in_progress) owner run must NOT be interrupted")
         assertFalse(secondAccepted, "the second send stays busy-rejected while the owner run is alive")
     }
 
@@ -104,7 +104,7 @@ class AppServerTurnEngineLivenessReconcilerTest {
             runCurrent()
             client.emit(streamDeltaNoRunId("assistant_message")) // no run_id promoted
             runCurrent()
-            assertTrue(engine.isBusy)
+            assertTrue(engine.isBusy("agent-1", "conv-1"))
 
             var secondAccepted = false
             backgroundScope.launch {
@@ -130,7 +130,7 @@ class AppServerTurnEngineLivenessReconcilerTest {
             runCurrent()
             client.emit(streamDeltaNoRunId("assistant_message"))
             runCurrent()
-            assertTrue(engine.isBusy)
+            assertTrue(engine.isBusy("agent-1", "conv-1"))
 
             var secondAccepted = false
             backgroundScope.launch {
@@ -139,7 +139,7 @@ class AppServerTurnEngineLivenessReconcilerTest {
             runCurrent()
 
             assertTrue(client.runListQueried)
-            assertTrue(engine.isBusy, "an active run for the conversation must NOT be interrupted")
+            assertTrue(engine.isBusy("agent-1", "conv-1"), "an active run for the conversation must NOT be interrupted")
             assertFalse(secondAccepted)
         }
 
