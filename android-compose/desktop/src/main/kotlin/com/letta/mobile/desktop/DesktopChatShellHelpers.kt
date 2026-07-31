@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.composer.MentionKind
@@ -172,12 +173,15 @@ internal fun buildRailAgents(
         .map { conversation ->
             val id = conversation.agentId!!
             val conversationName = conversation.agentName.takeIf { it.isNotBlank() && it != id }
-            id to (conversationName ?: rosterNameById[id] ?: conversation.agentName.ifBlank { id })
+            // DisplayNames.agent so an unresolved agent reads "Agent c356b8f2",
+            // never the raw id — raw ids in the rail/header look like errors
+            // and are unsearchable by name.
+            id to DisplayNames.agent(conversationName ?: rosterNameById[id] ?: conversation.agentName, id)
         }
     val seenIds = fromConversations.mapTo(mutableSetOf()) { it.first }
     val fromRoster = rosterAgents
         .filter { it.id.value !in seenIds }
-        .map { it.id.value to it.name.ifBlank { it.id.value } }
+        .map { it.id.value to DisplayNames.agent(it.name, it.id.value) }
         .sortedBy { it.second.lowercase() }
     // Final dedupe by id: the server can return the same row twice in list
     // endpoints during active runs (same defect as the conversation-list
