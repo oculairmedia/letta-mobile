@@ -52,7 +52,7 @@ class AdminChatGoalCoordinatorTest {
             wsChatBridge = bridge,
             uiState = state,
             bannerController = mockk<ChatBannerController>(relaxed = true),
-            isShimBackend = MutableStateFlow(false),
+            usesChannelTransport = MutableStateFlow(false),
             localRuntimeRouting = { LocalRuntimeRouting.Remote },
             onGoalSlashCommandsDetected = {},
         )
@@ -109,7 +109,7 @@ class AdminChatGoalCoordinatorTest {
             wsChatBridge = bridge,
             uiState = state,
             bannerController = mockk<ChatBannerController>(relaxed = true),
-            isShimBackend = MutableStateFlow(false),
+            usesChannelTransport = MutableStateFlow(false),
             localRuntimeRouting = { LocalRuntimeRouting.Remote },
             onGoalSlashCommandsDetected = {},
         )
@@ -149,7 +149,7 @@ class AdminChatGoalCoordinatorTest {
             wsChatBridge = bridge,
             uiState = state,
             bannerController = mockk<ChatBannerController>(relaxed = true),
-            isShimBackend = MutableStateFlow(false),
+            usesChannelTransport = MutableStateFlow(false),
             localRuntimeRouting = { LocalRuntimeRouting.Remote },
             onGoalSlashCommandsDetected = {},
         )

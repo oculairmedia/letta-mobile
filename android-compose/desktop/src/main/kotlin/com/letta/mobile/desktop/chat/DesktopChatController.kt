@@ -6,6 +6,7 @@ import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
+import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -24,6 +25,7 @@ import com.letta.mobile.data.model.ModelRouteIdentity
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
+import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.ui.chat.render.ChatTimelineProjector
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.desktop.DesktopBootstrapState
@@ -33,6 +35,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -251,6 +254,133 @@ class DesktopChatController(
         }
         gateway = next
         _canSubmitApprovals.value = next is ApprovalSubmittingGateway || next is DesktopApprovalSubmitter
+        startConnectionWatch(next)
+    }
+
+    // ------------------------------------------------------------------
+    // letta-mobile-wxy4s: CONNECTION-LOSS SURFACING + AUTO-RECOVERY
+    // ------------------------------------------------------------------
+    //
+    // Desktop already runs IrohChannelTransport, so the transport-level liveness
+    // probe gives it headless auto-redial. What was missing is the UI half: during
+    // the 2026-07-31 incident the app went right on rendering cached conversations
+    // over a dead connection, with no indication anything was wrong, for ~40
+    // minutes. This collector turns the transport's own state into (1) a visible
+    // disconnected state and (2) a re-hydrate once the supervisor's redial lands.
+    private var connectionJob: Job? = null
+
+    /**
+     * Whether the sustained-outage escalation already fired for the CURRENT outage.
+     * Controller-scoped, not job-scoped: retryConnection() rebuilds the gateway and
+     * therefore restarts the connection watch, so a job-local flag would re-arm and
+     * rebuild the gateway on a loop for as long as the backend stayed down. Cleared
+     * only when the connection actually comes back.
+     */
+    @Volatile
+    private var outageEscalated = false
+
+    private fun startConnectionWatch(next: DesktopChatGateway?) {
+        connectionJob?.cancel()
+        connectionJob = null
+        val statusGateway = next as? ConnectionStatusGateway ?: return
+        val outage = OutageTracker()
+        connectionJob = scope.launch {
+            val escalationWatchdog = launch { watchForSustainedOutage(outage) }
+            try {
+                statusGateway.connectionState.collect { transportState ->
+                    when (transportState) {
+                        is ChannelTransportState.Connected -> onTransportConnected(outage)
+                        is ChannelTransportState.Disconnected -> onTransportDisconnected(transportState, outage)
+                        else -> Unit
+                    }
+                }
+            } finally {
+                escalationWatchdog.cancel()
+            }
+        }
+    }
+
+    /**
+     * Downtime bookkeeping for one connection watch. Elapsed time is counted in
+     * POLL ticks rather than wall-clock so the escalation is driven purely by
+     * delay() — virtual-time testable and immune to clock jumps across suspend.
+     */
+    private class OutageTracker {
+        val sawDisconnect = java.util.concurrent.atomic.AtomicBoolean(false)
+        val isDown = java.util.concurrent.atomic.AtomicBoolean(false)
+        val downTicks = java.util.concurrent.atomic.AtomicInteger(0)
+
+        fun markUp() {
+            isDown.set(false)
+            downTicks.set(0)
+        }
+    }
+
+    /**
+     * ESCALATION (the bead's original "rebuild the gateway" ask). The supervisor's
+     * own backoff redial handles transient drops; only when the connection stays
+     * down past the threshold do we take the heavy hammer — and EXACTLY ONCE.
+     */
+    private suspend fun watchForSustainedOutage(outage: OutageTracker) {
+        while (true) {
+            delay(CONNECTION_ESCALATION_POLL_MS)
+            if (!outage.isDown.get()) {
+                outage.downTicks.set(0)
+                continue
+            }
+            if (outageEscalated) continue
+            val downMs = outage.downTicks.incrementAndGet() * CONNECTION_ESCALATION_POLL_MS
+            if (downMs < CONNECTION_ESCALATION_MS) continue
+            outageEscalated = true
+            retryConnection()
+            return
+        }
+    }
+
+    private suspend fun onTransportConnected(outage: OutageTracker) {
+        outage.markUp()
+        outageEscalated = false
+        if (!outage.sawDisconnect.compareAndSet(true, false)) return
+        // AUTO-RECOVER. Deliberately NOT retryConnection(): that closes the gateway
+        // and therefore destroys the IrohChannelTransport and its supervisor —
+        // throwing away the healthy connection we just redialed.
+        runCatching {
+            reloadConversationsAndSelect(
+                preferConversationId = _state.value.runtimeState.selectedConversationId,
+            )
+        }
+    }
+
+    private fun onTransportDisconnected(
+        transportState: ChannelTransportState.Disconnected,
+        outage: OutageTracker,
+    ) {
+        if (transportState.isAuthFailure) {
+            // Terminal: the supervisor sets authFailed and stops redialing, so there
+            // is nothing to auto-recover.
+            outage.markUp()
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.conversationLoadFailed(
+                        state = current.runtimeState,
+                        errorMessage = transportState.reason.ifBlank { "Authentication failed" },
+                    ),
+                )
+            }
+            return
+        }
+        outage.sawDisconnect.set(true)
+        outage.isDown.set(true)
+        _state.update { current ->
+            current.withRuntimeState(
+                ChatSessionReducer.streamDisconnected(
+                    state = current.runtimeState,
+                    generation = current.runtimeState.selectionGeneration,
+                    errorMessage = transportState.reason.ifBlank { "Connection lost" },
+                    statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
+                ),
+            )
+        }
     }
 
     // Per-conversation model overrides set this session (the picker). The
@@ -302,6 +432,8 @@ class DesktopChatController(
         if (closed) return
         closed = true
         presenceJob.cancel()
+        connectionJob?.cancel()
+        connectionJob = null
         loadJob?.cancel()
         selectJob?.cancel()
         sendJob?.cancel()
@@ -1261,6 +1393,14 @@ private const val TELEMETRY_TAG = "DesktopChat"
 
 /** Upper bound on holding "stopping…" before falling back to a local clear. */
 private const val CANCEL_TERMINAL_TIMEOUT_MS = 30_000L
+
+/**
+ * letta-mobile-wxy4s: how long the connection may stay down before the controller
+ * stops trusting the supervisor's redial and rebuilds the whole gateway. Set well
+ * above the supervisor's max backoff (8s) so normal recovery is never disturbed.
+ */
+private const val CONNECTION_ESCALATION_MS = 60_000L
+private const val CONNECTION_ESCALATION_POLL_MS = 1_000L
 
 /** letta-mobile-lgns8.19: shown when a send is attempted while a stop is pending. */
 internal const val STOPPING_SEND_BLOCKED_MESSAGE =

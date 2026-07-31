@@ -8,6 +8,7 @@ import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.RuntimeId
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class ChannelDisplayMapperTest {
     @Test
@@ -51,7 +52,31 @@ class ChannelDisplayMapperTest {
         val channel = state.channels.single()
         assertEquals("Unauthorized", channel.subtitle)
         assertEquals(ChannelDisplayStatus.Disconnected, channel.status)
-        assertEquals(listOf("Disconnected", "Code 4401", "Auth"), channel.metadataLabels)
+        // wxy4s: every non-connected surface carries the staleness chip, so cached
+        // data is never presented as if it were live.
+        assertEquals(listOf("Disconnected", "Code 4401", "Auth", "Stale"), channel.metadataLabels)
+    }
+
+    // letta-mobile-wxy4s: a supervisor-driven redial must read as "reconnecting"
+    // (recovery in progress) rather than a hard failure, and must be flagged stale
+    // so no surface silently renders cached data as if it were live.
+    @Test
+    fun redialingConnectionReadsAsReconnectingAndStale() {
+        val state = ChannelDisplayMapper.build(
+            backendDescriptor = backend(),
+            channelTransportState = ChannelTransportState.Disconnected(
+                code = 0,
+                reason = "liveness_probe_failed",
+                willReconnect = true,
+            ),
+        )
+
+        val channel = state.channels.single()
+        assertEquals(ChannelDisplayStatus.Reconnecting, channel.status)
+        assertTrue(channel.status.isStale)
+        assertTrue(channel.subtitle.startsWith("Reconnecting"))
+        assertTrue(channel.metadataLabels.contains("Stale"))
+        assertTrue(channel.detailText.contains("stale"))
     }
 
     private fun backend() = BackendDescriptor(

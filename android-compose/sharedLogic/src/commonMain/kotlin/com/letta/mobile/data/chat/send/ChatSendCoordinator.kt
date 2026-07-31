@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ReasoningMessage
+import com.letta.mobile.data.model.isIrohBackend
 import com.letta.mobile.data.model.SystemMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
@@ -1824,16 +1825,3 @@ class ChatSendCoordinator(
         val startNewConversation: Boolean = false,
     )
 }
-
-/**
- * True when the active backend is an `iroh://` node (bare, or a corrupted
- * `https://iroh://` saved config). Mirrors `IrohChannelTransport.isIrohUrl` /
- * the ShimBackendDetector check, kept commonMain-local so the send path can tell
- * an Iroh backend (authenticates by paired NodeID, no bearer token needed) from
- * the legacy admin-shim WS (which does require a token).
- */
-internal fun LettaConfig.isIrohBackend(): Boolean =
-    serverUrl.trimStart()
-        .removePrefix("https://")
-        .removePrefix("http://")
-        .startsWith("iroh://")

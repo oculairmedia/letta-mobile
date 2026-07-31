@@ -266,6 +266,13 @@ class IrohAppServerTransport(
     }
 
     suspend fun close() {
+        // letta-mobile-wxy4s: a closed transport is NOT connected. Without this,
+        // `connected` stayed true for the whole life of a closed transport and
+        // `isConnectionAlive` lied about it — which makes the adminRpc
+        // request-isolation guard treat every failure on a torn-down connection as
+        // "isolated to this request" and never escalate. Only reportReaderExit
+        // used to clear this flag, and it cannot fire for an orderly close.
+        connected.value = false
         controlCommandQueue.close()
         runCatching { keepAliveJob.cancelAndJoin() }
         runCatching { pathWatchJob?.cancelAndJoin() }

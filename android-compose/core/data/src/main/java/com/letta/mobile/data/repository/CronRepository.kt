@@ -31,9 +31,23 @@ internal fun defaultCronScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
 /**
- * letta-mobile-d52f.2: single source of truth for scheduled cron tasks
- * driven by the shim's mobile WS cron protocol (the wire layer landed in
- * [letta-mobile-d52f.1] / [ChannelTransport.sendCronList] etc.).
+ * letta-mobile-d52f.2: single source of truth for scheduled cron tasks.
+ *
+ * letta-mobile-lgns8.10.4.1 — TRANSPORT: this repository speaks only the
+ * common [IChannelTransport] cron surface (`sendCronList` / `sendCronAdd` /
+ * `sendCronDelete`). It does NOT speak the shim WS cron protocol directly, and
+ * the concrete wire format is chosen by whichever transport `SessionGraphFactory`
+ * bound for the active backend:
+ *
+ *  - `iroh://` config -> `IrohChannelTransport`, which bridges each of these
+ *    calls onto the native `cron.*` admin_rpc methods (landed in #997). No shim
+ *    frame is ever emitted.
+ *  - shim config      -> `ChannelTransport`, which emits the legacy
+ *    `cron_list` / `cron_add` / `cron_delete` shim WS frames. This is now an
+ *    explicit fallback for shim-configured backends only.
+ *
+ * Because selection happens at transport-binding time, cron cannot reach the
+ * shim from an Iroh session even by accident.
  *
  * Lifecycle:
  *  - The first subscriber for an `agentId` triggers a `cron_list` WS
@@ -93,14 +107,15 @@ open class CronRepository(
     }
 
     /**
-     * Force a fresh `cron_list` round-trip for [agentId]. Parallel
-     * callers (e.g. the push observer racing a user-initiated pull-to-
-     * refresh) share the same in-flight deferred so the shim never sees
-     * duplicate `cron_list` frames for the same scope.
+     * Force a fresh cron-list round-trip for [agentId] (`cron.list` over
+     * admin_rpc on Iroh; the legacy `cron_list` frame on a shim backend).
+     * Parallel callers (e.g. the push observer racing a user-initiated
+     * pull-to-refresh) share the same in-flight deferred so the backend never
+     * sees duplicate requests for the same scope.
      *
-     * Returns the resolved task list on success or a failure wrapping
-     * the shim's error message (or transport-level exception). Either
-     * way callers can branch on `Result.isSuccess`.
+     * Returns the resolved task list on success or a failure wrapping the
+     * backend's error message (or transport-level exception). Either way
+     * callers can branch on `Result.isSuccess`.
      */
     override suspend fun refresh(agentId: String): Result<List<CronTask>> {
         inFlightRefresh[agentId]?.takeIf { !it.isCompleted }?.let { return it.await() }

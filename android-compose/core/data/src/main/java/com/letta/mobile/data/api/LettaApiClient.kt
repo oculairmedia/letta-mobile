@@ -113,15 +113,15 @@ open class LettaApiClient @Inject constructor(
         // Iroh path route over admin_rpc before ever reaching this client;
         // anything still landing here has no Iroh path and must fail visibly.
         //
-        // Keys on isIrohUrl(activeConfig) — NOT shouldUseIroh() — deliberately:
-        // shouldUseIroh() also returns true for the debug-only DEBUG_FORCE_IROH_URL
-        // override, but that flag is committed blank and only ever set in throwaway
-        // local builds. This guard reflects the *actual* active backend; purity is
-        // therefore not enforced under a debug-force build (unrouted *Api calls
-        // still hit HTTP). Real Iroh backends (a genuine iroh:// active URL) are
-        // fully covered. The hermetic probe must use a real iroh:// ticket, never
-        // the force flag, to exercise this path.
-        if (IrohChannelTransport.isIrohUrl(activeConfig.serverUrl)) {
+        // letta-mobile-lgns8.10.4.1: keys on shouldUseIroh(), not isIrohUrl().
+        // shouldUseIroh() is the SAME predicate SessionGraphFactory uses to bind
+        // IrohChannelTransport, so the admin-HTTP guard and the transport binding
+        // can no longer disagree. The old isIrohUrl() form left one documented
+        // hole: under a debug-force build (DEBUG_FORCE_IROH_URL non-blank) the
+        // transport was Iroh while `serverUrl` stayed `http://…:8291`, so every
+        // unrouted *Api call still dialed the shim over HTTP. Iroh purity is now
+        // enforced in that build too — an unrouted call fails visibly instead.
+        if (IrohChannelTransport.shouldUseIroh(activeConfig.serverUrl)) {
             throw IrohAdminApiUnavailableException(activeConfig.serverUrl)
         }
 
