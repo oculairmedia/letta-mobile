@@ -207,7 +207,12 @@ class ChatSendCoordinatorCleanupTest {
         // per-family copy instead of the bare "Turn failed".
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, ui.currentError())
         assertFalse(ui.isStreaming())
-        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+        // Two clears: the second send's stale-presence heal (the fake transport
+        // reports no live turn while the UI still shows streaming) now settles the
+        // orphaned row AND clears the transport-active marker — PR2 review finding
+        // 5, previously it dropped the state and left the marker set — followed by
+        // the terminal's own clear.
+        assertEquals(listOf("conv-1", "conv-1"), timeline.clearedActiveConversations)
         assertEquals(1, transport.sentTexts.count { it == "second" })
     }
 

@@ -29,6 +29,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
@@ -187,10 +188,213 @@ class ChatSendCoordinatorConcurrentConversationsTest {
             assertEquals(0, ui.visualCompletions)
         }
 
+    // ---------------------------------------------------------------------
+    // PR2 review (Codex on #1056) regressions.
+    // ---------------------------------------------------------------------
+
+    /**
+     * Finding 1: [ChatSendUiSink] is a singleton bound to the VISIBLE
+     * conversation. Keyed turn state alone still let conversation A's terminal
+     * clear B's thinking indicator and paint A's error over B.
+     */
+    @Test
+    fun backgroundConversationTerminalDoesNotClearVisibleConversationPresence() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+            var active: String? = CONV_A
+            val coordinator = coordinator(timeline, ui, transport) { active }
+
+            coordinator.send("hello A").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-a", AGENT_ID, CONV_A, "run-a"))
+
+            // The user is now looking at B, which has its own live turn.
+            active = CONV_B
+            coordinator.send("hello B").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-b", AGENT_ID, CONV_B, "run-b"))
+
+            // A fails in the background.
+            coordinator.handleEvent(
+                WsTimelineEvent.Error(
+                    code = "provider_error",
+                    message = "A blew up",
+                    conversationId = CONV_A,
+                    turnId = "turn-a",
+                    runId = "run-a",
+                ),
+            )
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "failed"))
+            advanceUntilIdle()
+
+            // B is visible and still streaming; A's failure never touched its UI.
+            assertTrue(ui.isStreaming(), "B's presence must survive A's terminal")
+            assertTrue(ui.isAgentTyping())
+            assertNull(ui.currentError(), "A's error must not be painted over B")
+            assertTrue(ui.turnsFinished.isEmpty())
+            // A still settled its OWN timeline rows.
+            assertTrue(timeline.clearedActiveConversations.contains(CONV_A))
+        }
+
+    /**
+     * Finding 2: once A's state was cleared (here by SubscribeDone), a delayed
+     * TurnDone for A matched nothing and was handed to B — the sole send awaiting
+     * its TurnStarted — whose independent lifecycle had never fenced A's turn id
+     * and therefore accepted the terminal, settling B prematurely.
+     */
+    @Test
+    fun delayedTerminalForClearedConversationDoesNotSettleAwaitingSend() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val ui = RecordingUiSink()
+            val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = true)
+            var active: String? = CONV_A
+            val coordinator = coordinator(timeline, ui, transport) { active }
+
+            coordinator.send("hello A").join()
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-a", AGENT_ID, CONV_A, "run-a"))
+            // A is settled and CLEARED by a subscribe terminal, not by TurnDone.
+            coordinator.handleEvent(WsTimelineEvent.SubscribeDone("run-a", lastSeq = 1L, status = "completed"))
+            advanceUntilIdle()
+            assertEquals(listOf(CONV_A), timeline.clearedActiveConversations)
+
+            // B's send is now the only one awaiting a TurnStarted.
+            active = CONV_B
+            coordinator.send("hello B").join()
+            val otidB = timeline.externalLocals.single { it.conversationId == CONV_B }.otid
+
+            // A's delayed terminal arrives. It belongs to A's history, not to B.
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+            advanceUntilIdle()
+
+            assertTrue(timeline.sentLocals.none { it.otid == otidB }, "B must not be settled by A's terminal")
+            assertTrue(timeline.failedLocals.none { it.otid == otidB })
+            assertEquals(listOf(CONV_A), timeline.clearedActiveConversations)
+
+            // B's own terminal still settles B.
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-b", AGENT_ID, CONV_B, "run-b"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", "completed"))
+            advanceUntilIdle()
+            assertTrue(timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker(CONV_B, otidB)))
+        }
+
+    /**
+     * Finding 3: the entry cap must never cost a LIVE turn its state. A live turn
+     * in an older conversation used to be evicted by insertion order as soon as a
+     * 33rd conversation appeared, even with dozens of settled entries available.
+     */
+    @Test
+    fun liveTurnStateSurvivesManyOtherConversations() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val coordinator = coordinator(timeline, ui, transport) { CONV_A }
+
+        coordinator.send("hello A").join()
+        val otidA = timeline.externalLocals.single { it.conversationId == CONV_A }.otid
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-a", AGENT_ID, CONV_A, "run-a"))
+
+        // 40 other conversations come and go, each fully settled.
+        repeat(OVERFLOW_CONVERSATIONS) { index ->
+            val conversationId = "conv-x$index"
+            coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-x$index", AGENT_ID, conversationId, "run-x$index"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-x$index", "run-x$index", "completed"))
+        }
+        advanceUntilIdle()
+
+        // A's live turn is still tracked, so A's own terminal still settles A.
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+        advanceUntilIdle()
+
+        assertTrue(
+            timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker(CONV_A, otidA)),
+            "A's live turn state must survive the entry cap",
+        )
+        assertTrue(timeline.clearedActiveConversations.contains(CONV_A))
+    }
+
+    /**
+     * Finding 4: `wsChatBridge.events` is global and Error frames carry no agent
+     * id, so an unconditional `stateFor` opened another agent's conversation
+     * inside this coordinator and recorded that failure through this agent's sink.
+     */
+    @Test
+    fun errorForUnownedConversationIsDroppedNotAdopted() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = FakeChannelTransport(mutableListOf(true), activeChatTurn = true)
+        val recorded = mutableListOf<Pair<WsTimelineEvent, String?>>()
+        val coordinator = coordinator(
+            timeline,
+            ui,
+            transport,
+            recordRuntimeEvent = { event, conversationId -> recorded += event to conversationId },
+        ) { CONV_A }
+
+        coordinator.send("hello A").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-a", AGENT_ID, CONV_A, "run-a"))
+
+        // A failure for a conversation this coordinator has never seen and does
+        // not have on screen — it belongs to another agent's coordinator.
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "provider_error",
+                message = "foreign agent failure",
+                conversationId = "conv-owned-by-another-agent",
+                turnId = "turn-foreign",
+                runId = "run-foreign",
+            ),
+        )
+        advanceUntilIdle()
+
+        assertTrue(
+            recorded.none { it.first is WsTimelineEvent.Error },
+            "a foreign conversation's error must not be recorded through this agent's sink",
+        )
+
+        // ...and it must not have poisoned A's turn: A completes cleanly.
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+        advanceUntilIdle()
+        assertNull(ui.currentError())
+        assertEquals(listOf<String?>(null), ui.turnsFinished)
+    }
+
+    /**
+     * Finding 5: the heal discarded a non-null otid without settling its
+     * optimistic-local row or clearing the transport-active marker, so the old row
+     * stayed SENDING forever — recreating the very stuck indicator it removes.
+     */
+    @Test
+    fun stalePresenceHealSettlesOrphanedOptimisticRow() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        // No live turn anywhere: the first send's terminal simply never arrives.
+        val transport = FakeChannelTransport(mutableListOf(true, true), activeChatTurn = false)
+        val coordinator = coordinator(timeline, ui, transport) { CONV_A }
+
+        coordinator.send("orphaned").join()
+        val orphanedOtid = timeline.externalLocals.single().otid
+        assertTrue(timeline.sentLocals.isEmpty())
+
+        // The next send heals the stale presence — and must settle what it drops.
+        coordinator.send("next").join()
+        advanceUntilIdle()
+
+        assertTrue(
+            timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker(CONV_A, orphanedOtid)),
+            "the orphaned optimistic-local row must be settled, not silently dropped",
+        )
+        assertTrue(
+            timeline.clearedActiveConversations.contains(CONV_A),
+            "the external-transport-active marker must be cleared by the heal",
+        )
+    }
+
     private fun coordinator(
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
         transport: FakeChannelTransport,
+        recordRuntimeEvent: suspend (WsTimelineEvent, String?) -> Unit = { _, _ -> },
         activeConversationId: () -> String?,
     ) = ChatSendCoordinator(
         scope = CoroutineScope(UnconfinedTestDispatcher()),
@@ -206,6 +410,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         startTimelineObserver = {},
         clientVersion = { "test" },
         otidGenerator = { "otid-${++otid}" },
+        recordRuntimeEvent = recordRuntimeEvent,
     )
 
     private class RecordingUiSink(
@@ -308,6 +513,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         const val AGENT_ID = "agent-1"
         const val CONV_A = "conv-a"
         const val CONV_B = "conv-b"
+        const val OVERFLOW_CONVERSATIONS = 40
         var otid = 0
     }
 }
