@@ -72,8 +72,15 @@ class SessionScopedChannelTransport internal constructor(
     // (`if (!hasActiveChatTurn && streaming)`) fired on EVERY send regardless of a
     // genuinely active turn (the "legacy WS misclassification"). Delegate it like
     // every other IChannelTransport member.
-    override val hasActiveChatTurn: Boolean
-        get() = current.hasActiveChatTurn
+    //
+    // letta-mobile-or40x: the signal is now KEYED BY conversationId. Both forms
+    // must be delegated — inheriting either default (false) re-opens exactly the
+    // dir4k regression above, this time per conversation.
+    override fun hasActiveChatTurn(conversationId: String): Boolean =
+        current.hasActiveChatTurn(conversationId)
+
+    override val hasAnyActiveChatTurn: Boolean
+        get() = current.hasAnyActiveChatTurn
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) =
         sessionManager.withCurrentSession { it.channelTransport.connect(baseShimUrl, token, deviceId, clientVersion) }

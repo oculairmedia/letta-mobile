@@ -718,7 +718,8 @@ class ChatSendCoordinatorCleanupTest {
         override val state: StateFlow<ChannelTransportState> = MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
         override val events = MutableSharedFlow<ServerFrame>()
         override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
-        override val hasActiveChatTurn: Boolean get() = activeChatTurn
+        override fun hasActiveChatTurn(conversationId: String): Boolean = activeChatTurn
+        override val hasAnyActiveChatTurn: Boolean get() = activeChatTurn
         val sentTexts = mutableListOf<String>()
         override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
         override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; return sendResults.removeFirstOrNull() ?: true }

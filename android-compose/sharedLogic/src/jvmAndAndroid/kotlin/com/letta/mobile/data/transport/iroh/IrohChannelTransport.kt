@@ -69,6 +69,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -140,29 +141,59 @@ class IrohChannelTransport(
         else -> null
     }
 
-    private var activeSendJob: Job? = null
+    /**
+     * letta-mobile-or40x: send jobs KEYED BY conversationId.
+     *
+     * Previously a single process-wide slot. Starting a turn on conversation B
+     * overwrote the only reference to conversation A's job, so a later
+     * `cancel(B)`/teardown cancelled A's job (or vice versa) and the victim
+     * conversation never settled. Concurrent map: written from `send` (caller
+     * thread) and read/removed from job-completion callbacks and cancel
+     * coroutines on Dispatchers.IO.
+     */
+    private val activeSendJobs = ConcurrentHashMap<String, Job>()
 
     /**
-     * The turn currently being streamed, if any. Holds the promotable run id and
-     * the exactly-one-terminal guard so [cancel] can address an `abort_message`
-     * to the real (server) run id and route a synthetic cancelled terminal
-     * through the SAME guard the streaming path uses — the turn can only ever
-     * emit one [ServerFrame.TurnDone], no matter which side reaches it first.
+     * The turns currently being streamed, KEYED BY conversationId. Each holds the
+     * promotable run id and the exactly-one-terminal guard so [cancel] can address
+     * an `abort_message` to the real (server) run id and route a synthetic
+     * cancelled terminal through the SAME guard the streaming path uses — a turn
+     * can only ever emit one [ServerFrame.TurnDone], no matter which side reaches
+     * it first.
+     *
+     * letta-mobile-or40x: this used to be ONE process-wide slot, which made every
+     * per-turn invariant in this file (presence, engine/observer ownership,
+     * cancellation targeting) silently global. A conversation is the unit of
+     * ownership; the map makes that structural.
      */
-    @Volatile
-    private var activeTurn: ActiveTurn? = null
+    private val activeTurns = ConcurrentHashMap<String, ActiveTurn>()
 
     /**
-     * A nonterminal turn whose connection died before its send job could emit a
-     * terminal. Closing the stale handle cancels that job and clears
-     * [activeTurn], so retain only the immutable identity needed to trigger the
-     * existing reconcile-and-settle path after redial.
+     * Nonterminal turns whose connection died before their send job could emit a
+     * terminal, KEYED BY conversationId. Closing the stale handle cancels those
+     * jobs and drops them from [activeTurns], so retain only the immutable
+     * identity needed to trigger the existing reconcile-and-settle path after
+     * redial. Keyed writes AND keyed reads — the pre-or40x code wrote this
+     * unkeyed but cleared it keyed by conversationId.
      */
-    @Volatile
-    private var interruptedTurn: RedialWhileTurnActive? = null
+    private val interruptedTurns = ConcurrentHashMap<String, RedialWhileTurnActive>()
 
-    override val hasActiveChatTurn: Boolean
-        get() = activeTurn?.terminalReached?.isCompleted == false
+    /**
+     * letta-mobile-or40x SENSING: the last observed frame-ownership path
+     * ("engine" / "observer") per conversation, so a mid-stream ownership FLIP —
+     * the corruption that made conversation A's frames silently change consumer
+     * once conversation B evicted A from the (formerly global) turn slot — is
+     * reported instead of being absorbed. Cleared when a conversation's turn
+     * reaches its terminal, so the legitimate engine -> observer transition at
+     * end of turn is not reported as a flip.
+     */
+    private val frameOwnershipPath = ConcurrentHashMap<String, String>()
+
+    override fun hasActiveChatTurn(conversationId: String): Boolean =
+        activeTurns[conversationId]?.terminalReached?.isCompleted == false
+
+    override val hasAnyActiveChatTurn: Boolean
+        get() = activeTurns.values.any { !it.terminalReached.isCompleted }
 
     /**
      * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
@@ -250,12 +281,13 @@ class IrohChannelTransport(
                 reSubscribeViewedConversation()
             } else {
                 // Snapshot turn identity before a degraded handle is closed and
-                // its send job clears activeTurn. Intentional disconnects and
-                // config replacement must not synthesize redial recovery.
+                // its send jobs drop their entries from activeTurns. Intentional
+                // disconnects and config replacement must not synthesize redial
+                // recovery.
                 if (supervisorState is IrohConnectionState.Degraded && supervisorState.reason != "config_changed") {
-                    rememberInterruptedTurn()
+                    rememberInterruptedTurns()
                 } else if (supervisorState is IrohConnectionState.Degraded) {
-                    interruptedTurn = null
+                    interruptedTurns.clear()
                 }
                 // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
                 // stops observer ingestion. On redial a fresh Ready fires and the
@@ -408,12 +440,21 @@ class IrohChannelTransport(
      * collects this exact SharedFlow (via client.events = merge(control, stream))
      * while a local turn is active — both collectors therefore see every frame.
      * To keep exactly ONE consumer per frame, the observer collector SKIPS any
-     * frame whose conversation matches the currently-active local turn: the engine
-     * OWNS frames for its own conversation while its turn runs. The observer OWNS
+     * frame whose conversation has a live local turn: the engine OWNS frames for
+     * its own conversation while that conversation's turn runs. The observer OWNS
      * a frame only when NO local turn is active for that frame's conversation.
-     * Ownership is decided per-frame by the frame's own conversation_id vs the
-     * live activeTurn.conversationId — airtight (no overlap: a frame is engine-owned
-     * XOR observer-owned; no gap: every stream_delta is owned by exactly one side).
+     *
+     * letta-mobile-or40x — THE INVARIANT IS PER CONVERSATION. Ownership is decided
+     * by looking up the frame's own conversation_id in [activeTurns], a map keyed
+     * by conversationId. It is therefore airtight per conversation: for a given
+     * conversation a frame is engine-owned XOR observer-owned (no overlap), every
+     * stream_delta is owned by exactly one side (no gap), and — critically — that
+     * answer CANNOT change mid-stream because of activity on some OTHER
+     * conversation. Before or40x this compared against a single process-wide
+     * `activeTurn`, so starting a turn on conversation B evicted conversation A
+     * and silently flipped A's still-streaming frames from engine-owned to
+     * observer-owned (double-emitting them). Any residual flip is now reported
+     * via `ingest.ownership_switched` rather than absorbed.
      */
     private suspend fun ingestObserverFrame(received: AppServerReceivedFrame) {
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
@@ -422,10 +463,11 @@ class IrohChannelTransport(
 
         // DUAL-INGEST GUARD: if a local turn is active on THIS conversation, the
         // engine's collect already consumes+emits its frames — the observer must
-        // not touch them. Frames for a DIFFERENT conversation than the active turn
-        // (or when there is no active turn at all) belong to the observer.
-        val localTurn = activeTurn
-        if (localTurn != null && localTurn.conversationId == conversationId) {
+        // not touch them. Frames for a conversation with no live local turn belong
+        // to the observer. Keyed lookup: another conversation's turn is irrelevant.
+        val localTurn = activeTurns[conversationId]
+        recordFrameOwnership(conversationId, localTurn)
+        if (localTurn != null) {
             Telemetry.event(
                 "IrohObserver", "ingest.skip_engine_owned",
                 "conversationId" to conversationId,
@@ -579,41 +621,77 @@ class IrohChannelTransport(
             ),
         )
 
+    /**
+     * letta-mobile-or40x: recovery is announced PER CONVERSATION. Every
+     * interrupted conversation, plus every still-nonterminal live turn that has
+     * no interrupted snapshot, gets its own [RedialWhileTurnActive]. The
+     * pre-or40x version could only ever announce ONE conversation because it
+     * read single global slots.
+     */
     private fun notifyRedialIfTurnActive() {
-        val interrupted = interruptedTurn
-        val turn = activeTurn
-        val recovery = interrupted ?: turn
-            ?.takeUnless { it.hasTerminal }
-            ?.let {
-                RedialWhileTurnActive(
-                    agentId = it.agentId,
-                    conversationId = it.conversationId,
-                    turnId = it.turnId,
-                    runId = it.runId,
-                )
+        val announced = mutableSetOf<String>()
+        interruptedTurns.values.toList().forEach { recovery ->
+            announced += recovery.conversationId
+            if (_redialWhileTurnActive.tryEmit(recovery)) {
+                interruptedTurns.remove(recovery.conversationId, recovery)
             }
-            ?: return
-        if (_redialWhileTurnActive.tryEmit(recovery) && interrupted === recovery) {
-            interruptedTurn = null
+        }
+        activeTurns.values.toList().forEach { turn ->
+            if (turn.conversationId in announced || turn.hasTerminal) return@forEach
+            _redialWhileTurnActive.tryEmit(
+                RedialWhileTurnActive(
+                    agentId = turn.agentId,
+                    conversationId = turn.conversationId,
+                    turnId = turn.turnId,
+                    runId = turn.runId,
+                ),
+            )
         }
     }
 
-    private fun rememberInterruptedTurn() {
-        val turn = activeTurn ?: return
-        if (turn.hasTerminal) return
-        interruptedTurn = RedialWhileTurnActive(
-            agentId = turn.agentId,
-            conversationId = turn.conversationId,
-            turnId = turn.turnId,
-            runId = turn.runId,
-        )
+    private fun rememberInterruptedTurns() {
+        activeTurns.values.toList().forEach { turn ->
+            if (turn.hasTerminal) return@forEach
+            interruptedTurns[turn.conversationId] = RedialWhileTurnActive(
+                agentId = turn.agentId,
+                conversationId = turn.conversationId,
+                turnId = turn.turnId,
+                runId = turn.runId,
+            )
+        }
     }
 
     private fun clearInterruptedTurn(conversationId: String) {
-        if (interruptedTurn?.conversationId == conversationId) {
-            interruptedTurn = null
+        interruptedTurns.remove(conversationId)
+    }
+
+    /**
+     * letta-mobile-or40x SENSING (c): report a mid-stream ownership FLIP for a
+     * conversation. [localTurn] is the live turn for [conversationId] (engine
+     * path) or null (observer path). A flip while the conversation's stream is
+     * still running is exactly the corruption or40x fixes; it was previously
+     * 100% silent.
+     */
+    private fun recordFrameOwnership(conversationId: String, localTurn: ActiveTurn?) {
+        val path = if (localTurn != null) OWNERSHIP_ENGINE else OWNERSHIP_OBSERVER
+        val previous = frameOwnershipPath.put(conversationId, path)
+        if (previous != null && previous != path) {
+            Telemetry.event(
+                "IrohObserver", "ingest.ownership_switched",
+                "conversationId" to conversationId,
+                "from" to previous,
+                "to" to path,
+                "turnId" to (localTurn?.turnId ?: ""),
+                "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
+            )
         }
     }
+
+    /** Comma-joined ids of live nonterminal turns other than [conversationId]. */
+    private fun otherActiveConversationsLabel(conversationId: String): String =
+        activeTurns.values
+            .filter { it.conversationId != conversationId && !it.hasTerminal }
+            .joinToString(",") { it.conversationId }
 
     // letta-mobile-34xoj: track consecutive admin_rpc failures and last stream frame
     // time to decide retry-on-same-connection vs. escalate-to-reconnect.
@@ -764,7 +842,34 @@ class IrohChannelTransport(
             agentId = agentId,
             conversationId = conversationId,
         )
-        activeTurn = turn
+        // letta-mobile-or40x: KEYED registration. Starting a turn on conversation
+        // B must never displace conversation A's turn — only a new turn on the
+        // SAME conversation supersedes the previous one, and that supersession is
+        // reported (SENSING b) instead of being silently absorbed.
+        val superseded = activeTurns.put(conversationId, turn)
+        if (superseded != null && !superseded.hasTerminal) {
+            Telemetry.event(
+                "IrohTransport", "turn.superseded_nonterminal",
+                "conversationId" to conversationId,
+                "supersededTurnId" to superseded.turnId,
+                "supersededRunId" to superseded.runId,
+                "newTurnId" to turnId,
+            )
+        }
+        // SENSING (a): a turn is starting for THIS conversation while another
+        // conversation still has a nonterminal turn in flight. Legal after or40x
+        // (that is the whole point), but it is the precondition of the reported
+        // corruption, so it must be observable.
+        val concurrent = activeTurns.values.filter { it.conversationId != conversationId && !it.hasTerminal }
+        if (concurrent.isNotEmpty()) {
+            Telemetry.event(
+                "IrohTransport", "turn.concurrent_start",
+                "conversationId" to conversationId,
+                "turnId" to turnId,
+                "concurrentConversations" to concurrent.joinToString(",") { it.conversationId },
+                "concurrentTurnIds" to concurrent.joinToString(",") { it.turnId },
+            )
+        }
         val sendJob = scope.launch {
             Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to turnId, "runId" to runId)
             val handle = runCatching { supervisor.ready() }.getOrElse { error ->
@@ -910,10 +1015,36 @@ class IrohChannelTransport(
             }
         }
         turn.job = sendJob
+        activeSendJobs[conversationId] = sendJob
         sendJob.invokeOnCompletion {
-            if (activeTurn === turn) activeTurn = null
+            // letta-mobile-or40x SENSING (b): the pre-or40x identity-checked clear
+            // (`if (activeTurn === turn) activeTurn = null`) silently absorbed the
+            // case where this turn had already been evicted by another turn. Keyed
+            // removal makes that impossible across conversations, and the two
+            // remaining outcomes are now BOTH reported.
+            val removed = activeTurns.remove(conversationId, turn)
+            if (removed) {
+                frameOwnershipPath.remove(conversationId)
+                if (!turn.hasTerminal) {
+                    Telemetry.event(
+                        "IrohTransport", "turn.abandoned_nonterminal",
+                        "conversationId" to conversationId,
+                        "turnId" to turn.turnId,
+                        "runId" to turn.runId,
+                        "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
+                    )
+                }
+            } else {
+                Telemetry.event(
+                    "IrohTransport", "turn.completion_after_eviction",
+                    "conversationId" to conversationId,
+                    "turnId" to turn.turnId,
+                    "hasTerminal" to turn.hasTerminal,
+                    "currentTurnId" to (activeTurns[conversationId]?.turnId ?: ""),
+                )
+            }
+            activeSendJobs.remove(conversationId, sendJob)
         }
-        activeSendJob = sendJob
         return true
     }
 
@@ -934,9 +1065,13 @@ class IrohChannelTransport(
                 )
                 return
             }
-            if (interruptedTurn?.turnId == turn.turnId) {
-                interruptedTurn = null
+            if (interruptedTurns[turn.conversationId]?.turnId == turn.turnId) {
+                interruptedTurns.remove(turn.conversationId)
             }
+            // The engine -> observer handover at end of turn is legitimate; drop
+            // the recorded ownership path so it is not reported as a mid-stream
+            // flip by [recordFrameOwnership].
+            frameOwnershipPath.remove(turn.conversationId)
             emitBoth(frame)
             turn.terminalReached.complete(frame.status)
             return
@@ -1040,16 +1175,27 @@ class IrohChannelTransport(
         else -> null
     }
 
+    /**
+     * letta-mobile-or40x: cancel HONORS ITS ARGUMENT. Only [conversationId]'s own
+     * turn and send job are touched. The pre-or40x implementation was keyed in
+     * name only — it read the single global `activeTurn`/`activeSendJob` and so
+     * aborted and cancelled whichever conversation happened to occupy the slot.
+     * That is the reported "cancelling one conversation froze the other".
+     */
     override fun cancel(conversationId: String): Boolean {
-        val turn = activeTurn
+        val turn = activeTurns[conversationId]
         if (turn == null) {
             clearInterruptedTurn(conversationId)
-            // Nothing streaming: preserve the "cancel always yields a terminal"
-            // contract so the UI can never get stuck streaming, but there is no
-            // run to abort server-side.
-            Telemetry.event("IrohTransport", "cancel.no_active_turn", "conversationId" to conversationId)
-            activeSendJob?.cancel()
-            activeSendJob = null
+            // Nothing streaming ON THIS CONVERSATION: preserve the "cancel always
+            // yields a terminal" contract so the UI can never get stuck streaming,
+            // but there is no run to abort server-side — and, critically, no OTHER
+            // conversation's job may be cancelled here.
+            Telemetry.event(
+                "IrohTransport", "cancel.no_active_turn",
+                "conversationId" to conversationId,
+                "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
+            )
+            activeSendJobs.remove(conversationId)?.cancel()
             scope.launch {
                 emitBoth(
                     ServerFrame.TurnDone(
@@ -1112,10 +1258,21 @@ class IrohChannelTransport(
                     ),
                 )
             }
-            // 4. Terminal settled — tear down the streaming job.
+            // 4. Terminal settled — tear down THIS conversation's streaming job
+            //    only. Keyed removal: another conversation's in-flight job is
+            //    structurally unreachable from here.
             turn.job?.cancel()
-            if (activeSendJob === turn.job) activeSendJob = null
-            if (activeTurn === turn) activeTurn = null
+            turn.job?.let { activeSendJobs.remove(conversationId, it) }
+            if (!activeTurns.remove(conversationId, turn)) {
+                Telemetry.event(
+                    "IrohTransport", "cancel.turn_already_replaced",
+                    "conversationId" to conversationId,
+                    "turnId" to turn.turnId,
+                    "currentTurnId" to (activeTurns[conversationId]?.turnId ?: ""),
+                )
+            } else {
+                frameOwnershipPath.remove(conversationId)
+            }
         }
         return true
     }
@@ -1244,7 +1401,7 @@ class IrohChannelTransport(
     }
 
     override suspend fun disconnect() {
-        interruptedTurn = null
+        interruptedTurns.clear()
         stopObserverIngest("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
@@ -1257,8 +1414,25 @@ class IrohChannelTransport(
             "hasTransport" to (transport != null),
             "hasEndpoint" to (endpoint != null),
         )
-        runCatching { activeSendJob?.cancel() }
-        activeSendJob = null
+        // letta-mobile-or40x: a full teardown legitimately cancels EVERY
+        // conversation's turn — the connection those turns stream over is gone.
+        // Do it explicitly over all keyed entries (not via one global slot), and
+        // report each nonterminal casualty (SENSING b) so a teardown that eats an
+        // in-flight turn is never silent again.
+        activeSendJobs.keys.toList().forEach { conversationId ->
+            val job = activeSendJobs.remove(conversationId) ?: return@forEach
+            val turn = activeTurns[conversationId]
+            if (turn != null && !turn.hasTerminal) {
+                Telemetry.event(
+                    "IrohTransport", "turn.torn_down_nonterminal",
+                    "reason" to reason,
+                    "conversationId" to conversationId,
+                    "turnId" to turn.turnId,
+                    "runId" to turn.runId,
+                )
+            }
+            runCatching { job.cancel() }
+        }
         runCatching { transport?.close() }
         runCatching { endpoint?.shutdown() }
         runCatching { endpoint?.close() }
@@ -1522,7 +1696,7 @@ class IrohChannelTransport(
 
     private fun currentSubagentScope(): SubagentRpcScope? {
         val conversationId = viewedConversationId ?: return null
-        val agentId = activeTurn?.takeIf { it.conversationId == conversationId }?.agentId
+        val agentId = activeTurns[conversationId]?.agentId
         return SubagentRpcScope(conversationId, agentId)
     }
 
@@ -1617,6 +1791,10 @@ class IrohChannelTransport(
         // SubagentsUpdated push. Mirrors the shim's (§13.4) `started` / `completed`
         // strings the repository fold treats as informational (it keys terminal
         // detection off `subagent.status`, not this reason).
+        /** letta-mobile-or40x: frame-ownership path labels for SENSING (c). */
+        private const val OWNERSHIP_ENGINE = "engine"
+        private const val OWNERSHIP_OBSERVER = "observer"
+
         internal const val SUBAGENT_REASON_STARTED = "started"
         internal const val SUBAGENT_REASON_COMPLETED = "completed"
         // Bounded window to let the server's own terminal (from abort) arrive
