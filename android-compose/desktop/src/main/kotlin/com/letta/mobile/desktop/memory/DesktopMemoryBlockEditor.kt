@@ -30,6 +30,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -302,10 +304,15 @@ private fun ColumnScope.BlockEditorFields(params: BlockEditorFieldsParams) {
     if (params.isNew) {
         Text("Label", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         var labelField by remember { mutableStateOf(TextFieldValue(params.label)) }
+        // This branch only enters composition for a NEW block, so the effect
+        // fires exactly when the label field appears — no focus stealing when
+        // reopening the editor on an existing block, whose value loads async.
+        val labelFocusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) { labelFocusRequester.requestFocus() }
         JewelTextField(
             value = labelField,
             onValueChange = { labelField = it; params.onLabelChange(it.text) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().focusRequester(labelFocusRequester),
         )
     }
 

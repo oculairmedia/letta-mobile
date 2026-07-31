@@ -1,10 +1,8 @@
 package com.letta.mobile.data.timeline
 
 import androidx.compose.runtime.Immutable
-import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
-import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.util.Telemetry
 
 @Immutable
@@ -128,21 +126,12 @@ object TimelineHydrationReducer {
         serverMessages: List<LettaMessage>,
         rawConverted: List<TimelineEvent.Confirmed>,
     ): List<TimelineEvent.Confirmed> {
-        val decidedIds = serverMessages.filterIsInstance<ApprovalResponseMessage>()
-            .mapNotNull { it.approvalRequestId }
-            .toSet()
-        val toolReturnsByCallId: Map<String, ToolReturnMessage> =
-            serverMessages.filterIsInstance<ToolReturnMessage>()
-                .mapNotNull { tr -> tr.toolCallId?.takeIf { it.isNotBlank() }?.let { it to tr } }
-                .toMap()
-        val returnedToolCallIds = toolReturnsByCallId.keys
+        val evidence = approvalTimelineEvidence(serverMessages)
         return rawConverted.mapNotNull { ev ->
             when (ev.messageType) {
                 TimelineMessageType.TOOL_RETURN -> null
                 TimelineMessageType.TOOL_CALL -> ev.withHydratedToolReturns(
-                    decidedIds = decidedIds,
-                    returnedToolCallIds = returnedToolCallIds,
-                    toolReturnsByCallId = toolReturnsByCallId,
+                    evidence = evidence,
                 )
                 else -> ev
             }
@@ -154,19 +143,12 @@ object TimelineHydrationReducer {
     }
 
     private fun TimelineEvent.Confirmed.withHydratedToolReturns(
-        decidedIds: Set<String>,
-        returnedToolCallIds: Set<String>,
-        toolReturnsByCallId: Map<String, ToolReturnMessage>,
+        evidence: ApprovalTimelineEvidence,
     ): TimelineEvent.Confirmed {
-        val byResponse = approvalRequestId != null && approvalRequestId in decidedIds
-        val byReturn = toolCalls.any { toolCall ->
-            toolCall.effectiveId.takeIf { it.isNotBlank() }?.let { it in returnedToolCallIds } == true
-        }
-        val matchingReturns = toolCalls.mapNotNull { tc ->
-            val callId = tc.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-            val toolReturn = toolReturnsByCallId[callId] ?: return@mapNotNull null
-            callId to toolReturn
-        }
+        val byResponse = hasExplicitApprovalResponse(evidence)
+        val matchingReturns = matchingToolReturns(evidence)
+        val byReturn = if (approvalRequestId == null) matchingReturns.isNotEmpty()
+            else allApprovalCallsReturned(matchingReturns)
         val matchingReturn = matchingReturns.firstOrNull()?.second
         // letta-mobile-fe51r: shared fold keeps projected previews from
         // clobbering full bodies and tracks truncation markers per call id.

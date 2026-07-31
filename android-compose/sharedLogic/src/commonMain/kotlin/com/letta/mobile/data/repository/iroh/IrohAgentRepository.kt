@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.CancellationException
 import kotlin.time.Clock
 
 class IrohAgentRepository(
@@ -65,6 +66,8 @@ class IrohAgentRepository(
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         val agent = try {
             directory().getAgent(id.value)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (t: Throwable) {
             getCachedAgent(id)?.let { cached ->
                 emit(cached)

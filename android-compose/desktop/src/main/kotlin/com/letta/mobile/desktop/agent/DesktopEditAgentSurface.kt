@@ -148,7 +148,7 @@ internal fun DesktopEditAgentSurface(
         }
         name = agent.name
         modelValue = agent.model
-        fun block(label: String) = agent.blocks.firstOrNull { it.label == label }
+        fun block(label: String) = agent.coreBlocks.firstOrNull { it.label == label }
         block(PersonaLabel).let { personaBlockId = it?.id?.value; persona = it?.value.orEmpty() }
         block(ToneLabel).let { toneBlockId = it?.id?.value; tone = it?.value?.takeIf { v -> v in ToneOptions } }
         block(InstructionsLabel).let { instructionsBlockId = it?.id?.value; customInstructions = it?.value.orEmpty() }

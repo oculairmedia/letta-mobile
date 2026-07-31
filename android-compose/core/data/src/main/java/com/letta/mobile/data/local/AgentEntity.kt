@@ -97,7 +97,7 @@ data class AgentEntity(
             tagsJson = encodeTags(agent.tags),
             metadataJson = encodeMetadata(agent.metadata),
             toolCount = agent.tools.size,
-            blockCount = agent.blocks.size,
+            blockCount = agent.coreBlocks.size,
         )
     }
 }

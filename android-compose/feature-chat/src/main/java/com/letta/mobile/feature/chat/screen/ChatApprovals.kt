@@ -1,6 +1,5 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,7 +8,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -72,37 +70,29 @@ internal fun ApprovalRequestControls(
     isSubmitting: Boolean,
     onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
 ) {
-    var rememberedApproval by remember { mutableStateOf(approval) }
-    LaunchedEffect(approval) {
-        if (approval != null) rememberedApproval = approval
-    }
+    // Do not retain the last request in Compose state: hydration clears the request
+    // after a matching approval response or tool return, and the controls must clear
+    // with it when a resolved conversation is reopened (letta-mobile-jbui1).
+    if (approval == null) return
 
-    AnimatedVisibility(
-        visible = approval != null && rememberedApproval != null,
-        enter = ChatMotion.expandEnter(),
-        exit = ChatMotion.expandExit(),
+    Column(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        rememberedApproval?.let { visibleApproval ->
-            Column(
-                modifier = Modifier.padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                // letta-mobile-vilsn: structured question/answer card for
-                // runtime user-input tools (AskUserQuestion); falls back to the
-                // generic approve/reject controls otherwise.
-                if (!AskUserQuestionCard(approval = visibleApproval, isSubmitting = isSubmitting, onDecision = onDecision)) {
-                    Text(
-                        text = stringResource(R.string.screen_chat_approval_request_body),
-                        style = MaterialTheme.chatTypography.toolDetail,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    ApprovalActionRow(
-                        approval = visibleApproval,
-                        isSubmitting = isSubmitting,
-                        onDecision = onDecision,
-                    )
-                }
-            }
+        // letta-mobile-vilsn: structured question/answer card for
+        // runtime user-input tools (AskUserQuestion); falls back to the
+        // generic approve/reject controls otherwise.
+        if (!AskUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) {
+            Text(
+                text = stringResource(R.string.screen_chat_approval_request_body),
+                style = MaterialTheme.chatTypography.toolDetail,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            ApprovalActionRow(
+                approval = approval,
+                isSubmitting = isSubmitting,
+                onDecision = onDecision,
+            )
         }
     }
 }

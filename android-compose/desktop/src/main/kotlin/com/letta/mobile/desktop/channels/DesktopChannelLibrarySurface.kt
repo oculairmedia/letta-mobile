@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import com.letta.mobile.data.channel.ChannelDisplayItem
 import com.letta.mobile.data.channel.ChannelDisplayStatus
+import com.letta.mobile.data.channel.projectChannelLibrary
 import com.letta.mobile.desktop.components.DesktopCatalogCard
 import com.letta.mobile.desktop.components.DesktopRefreshAction
 import com.letta.mobile.desktop.components.DesktopCatalogGridPadding
@@ -38,19 +39,11 @@ fun DesktopChannelLibrarySurface(
     var query by remember { mutableStateOf("") }
     var statusFilter by remember { mutableStateOf<ChannelDisplayStatus?>(null) }
 
-    val statusesPresent = ChannelDisplayStatus.entries.filter { s -> state.channels.any { it.status == s } }
-    val filtered = state.channels.filter { channel ->
-        (statusFilter == null || channel.status == statusFilter) &&
-            (
-                query.isBlank() ||
-                    channel.title.contains(query, true) ||
-                    channel.subtitle.contains(query, true) ||
-                    channel.detailText.contains(query, true)
-                )
-    }
-    // Group by connection status — each status is a labelled section in the grid.
-    val sections = statusesPresent.mapNotNull { status ->
-        filtered.filter { it.status == status }.takeIf { it.isNotEmpty() }?.let { status.label to it }
+    // statusesPresent is O(statuses × channels) and the section grouping scans
+    // the filtered list once per status, so key both on the inputs that can
+    // actually change them rather than re-deriving on every recomposition.
+    val projection = remember(state.channels, statusFilter, query) {
+        projectChannelLibrary(state.channels, statusFilter, query)
     }
 
     Column(modifier = modifier.fillMaxHeight().background(MaterialTheme.colorScheme.background)) {
@@ -62,20 +55,20 @@ fun DesktopChannelLibrarySurface(
             actions = { DesktopRefreshAction(onRefresh) },
             chips = {
                 DesktopChipTab("All channels", statusFilter == null) { statusFilter = null }
-                statusesPresent.forEach { status ->
+                projection.statuses.forEach { status ->
                     DesktopChipTab(status.label, statusFilter == status) { statusFilter = status }
                 }
             },
         )
         when {
             state.channels.isEmpty() -> DesktopInfoBox("No live channels are available for the active backend.")
-            filtered.isEmpty() -> DesktopInfoBox("No channels match your filter.")
+            projection.filteredChannels.isEmpty() -> DesktopInfoBox("No channels match your filter.")
             else -> LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 contentPadding = DesktopCatalogGridPadding,
             ) {
-                desktopCardGrid(sections, keyOf = { it.id }) { channel, cardModifier ->
+                desktopCardGrid(projection.sections.map { it.status.label to it.channels }, keyOf = { it.id }) { channel, cardModifier ->
                     ChannelCard(channel, cardModifier)
                 }
             }

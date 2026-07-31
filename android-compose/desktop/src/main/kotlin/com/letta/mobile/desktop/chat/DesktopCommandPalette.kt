@@ -25,12 +25,15 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
@@ -54,7 +57,22 @@ internal fun DesktopCommandPalette(
 ) {
     var query by remember { mutableStateOf(TextFieldValue("")) }
     val groups = remember(items, query.text) { CommandPalette.grouped(items, query.text) }
+    // Cmd/Ctrl-K is a type-immediately affordance: the palette is useless until
+    // the query field has focus, so claim it on open rather than making the user
+    // click the field they just summoned.
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
 
+    CommandPaletteModal(onDismiss) {
+        Column {
+            PaletteSearchField(query, { query = it }, focusRequester)
+            PaletteResults(groups, query.text, onSelect, onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun CommandPaletteModal(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -80,56 +98,56 @@ internal fun DesktopCommandPalette(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             shadowElevation = 8.dp,
         ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    JewelTextField(
-                        value = query,
-                        onValueChange = { query = it },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 1.dp)
-                        .background(MaterialTheme.colorScheme.outlineVariant),
+            content()
+        }
+    }
+}
+
+@Composable
+private fun PaletteSearchField(query: TextFieldValue, onQuery: (TextFieldValue) -> Unit, focusRequester: FocusRequester) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+        JewelTextField(query, onQuery, modifier = Modifier.fillMaxWidth().focusRequester(focusRequester))
+    }
+    Box(
+        modifier = Modifier.fillMaxWidth().heightIn(min = 1.dp).background(MaterialTheme.colorScheme.outlineVariant),
+    )
+}
+
+@Composable
+private fun PaletteResults(
+    groups: List<Pair<PaletteItemKind, List<PaletteItem>>>,
+    query: String,
+    onSelect: (PaletteItem) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
+        if (groups.isEmpty()) {
+            item {
+                Text(
+                    text = "No matches for \"$query\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(20.dp),
                 )
-                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 440.dp)) {
-                    if (groups.isEmpty()) {
-                        item {
-                            Text(
-                                text = "No matches for \"${query.text}\"",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(20.dp),
-                            )
-                        }
-                    }
-                    groups.forEach { (kind, results) ->
-                        item(key = "h-$kind") {
-                            Text(
-                                text = CommandPalette.sectionTitle(kind).uppercase(),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
-                            )
-                        }
-                        items(results, key = { "$kind-${it.id}" }) { item ->
-                            PaletteRow(item = item, onClick = { onSelect(item); onDismiss() })
-                        }
-                    }
-                }
+            }
+        }
+        groups.forEach { (kind, results) ->
+            item(key = "h-$kind") {
+                Text(
+                    text = CommandPalette.sectionTitle(kind).uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 4.dp),
+                )
+            }
+            items(results, key = { "$kind-${it.id}" }) { item ->
+                PaletteRow(item = item, onClick = { onSelect(item); onDismiss() })
             }
         }
     }

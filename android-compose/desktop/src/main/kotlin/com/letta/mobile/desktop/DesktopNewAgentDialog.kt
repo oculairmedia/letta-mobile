@@ -20,18 +20,24 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import org.jetbrains.jewel.ui.component.PopupMenu as JewelPopupMenu
 import org.jetbrains.jewel.ui.component.TextField as JewelTextField
+
+private const val DEFAULT_AGENT_NAME = "New agent"
 
 internal data class NewAgentDialogParams(
     val modelOptions: List<Pair<String, String>>,
@@ -41,9 +47,19 @@ internal data class NewAgentDialogParams(
 
 @Composable
 internal fun NewAgentDialog(params: NewAgentDialogParams) {
-    var name by remember { mutableStateOf(TextFieldValue("New agent")) }
+    // The name is prefilled with a placeholder, so focus alone would leave the
+    // caret after "New agent" and typing would append to it. Select the whole
+    // default instead: the field is focused AND highlighted, so the first
+    // keystroke replaces it — standard rename behavior.
+    var name by remember {
+        mutableStateOf(
+            TextFieldValue(DEFAULT_AGENT_NAME, selection = TextRange(0, DEFAULT_AGENT_NAME.length)),
+        )
+    }
     var modelValue by remember { mutableStateOf<String?>(null) }
     var modelMenuOpen by remember { mutableStateOf(false) }
+    val nameFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { nameFocusRequester.requestFocus() }
     val modelLabel = params.modelOptions.firstOrNull { it.second == modelValue }?.first ?: "Same as current"
     Box(
         modifier = Modifier
@@ -68,7 +84,11 @@ internal fun NewAgentDialog(params: NewAgentDialogParams) {
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                NewAgentNameField(name = name, onNameChange = { name = it })
+                NewAgentNameField(
+                    name = name,
+                    onNameChange = { name = it },
+                    focusRequester = nameFocusRequester,
+                )
                 NewAgentModelPicker(
                     NewAgentModelPickerParams(
                         selection = NewAgentModelSelection(
@@ -94,6 +114,7 @@ internal fun NewAgentDialog(params: NewAgentDialogParams) {
 private fun NewAgentNameField(
     name: TextFieldValue,
     onNameChange: (TextFieldValue) -> Unit,
+    focusRequester: FocusRequester,
 ) {
     Text(
         text = "Name",
@@ -103,7 +124,7 @@ private fun NewAgentNameField(
     JewelTextField(
         value = name,
         onValueChange = onNameChange,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
     )
 }
 
