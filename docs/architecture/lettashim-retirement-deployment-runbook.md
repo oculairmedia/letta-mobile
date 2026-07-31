@@ -349,6 +349,14 @@ The wrapper's argument vector is unchanged, so migration is executable-swap only
    systemctl daemon-reload
    systemctl restart meridian-iroh-wrapper
    ```
+   **JAVA_HOME pin (found the hard way on the 2026-07-31 live deploy).** The dist
+   targets JVM 21 (class-file 65) because Iroh requires it, but the host's default
+   `java` is 17, so the first launch died with `UnsupportedClassVersionError`. The
+   unit template now carries
+   `Environment=JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64` immediately after
+   `EnvironmentFile=`. If you are editing an existing unit in place rather than
+   reinstalling the template, add that line manually before restarting, and
+   confirm with `systemctl show -p Environment meridian-iroh-wrapper`.
 5. Verify the NodeID is **unchanged** (the secret-key file is outside the release
    directory, so it must survive):
    ```bash

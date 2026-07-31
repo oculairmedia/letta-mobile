@@ -9,6 +9,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.data.controller.node.iroh.EphemeralIrohSecretKeyStore
@@ -97,7 +98,14 @@ class IrohChannelTransport(
     // before synthesizing a cancelled terminal. Overridable so tests need not
     // wait the full production window.
     private val serverTerminalWaitMs: Long = SERVER_TERMINAL_WAIT_MS,
-) : IChannelTransport, RedialAwareChannelTransport {
+    // letta-mobile-wxy4s: application-level liveness probe cadence. Overridable so
+    // tests can compress the loop; production MUST keep non-zero defaults (an
+    // interval of 0 disables the probe entirely — guarded by
+    // IrohLivenessProbeWiringTest).
+    internal val livenessProbeIntervalMs: Long = LIVENESS_PROBE_INTERVAL_MS,
+    internal val livenessProbeTimeoutMs: Long = LIVENESS_PROBE_TIMEOUT_MS,
+    internal val livenessProbeFailuresToDeclareDead: Int = LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD,
+) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
 
@@ -257,7 +265,9 @@ class IrohChannelTransport(
     }
 
     private var explicitConfig: IrohConnectConfig? = null
-    private val supervisor = IrohConnectionSupervisor(
+    // Explicit type: this field and `livenessProbe` reference each other through
+    // their lambdas, which defeats type inference.
+    private val supervisor: IrohConnectionSupervisor = IrohConnectionSupervisor(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
@@ -279,6 +289,12 @@ class IrohChannelTransport(
                 // Re-issuing the hydrate's message.list both re-registers server-side
                 // AND reconciles frames missed during the dead window.
                 reSubscribeViewedConversation()
+                // letta-mobile-wxy4s: arm the application-level liveness probe for
+                // THIS connection generation. QUIC state alone cannot detect a
+                // black-holed peer (the unacked keepalive datagram keeps resetting
+                // the idle timer), so a periodic health.check over a FRESH bidi
+                // stream is the only thing that actually tests the path.
+                livenessProbe.start(supervisorState.handle)
             } else {
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
@@ -293,9 +309,34 @@ class IrohChannelTransport(
                 // stops observer ingestion. On redial a fresh Ready fires and the
                 // collector restarts against the new handle above.
                 stopObserverIngest("state:${supervisorState::class.simpleName}")
+                // letta-mobile-wxy4s: the probe is pinned to a Ready handle; any
+                // non-Ready transition disarms it. A fresh Ready re-arms it above.
+                livenessProbe.stop("state:${supervisorState::class.simpleName}")
             }
         },
     )
+
+    /**
+     * letta-mobile-wxy4s: application-level connection liveness. QUIC state alone
+     * cannot detect a black-holed peer — the transport's unacked keepalive datagram
+     * keeps resetting the idle timer — so [IrohLivenessProbe] periodically opens a
+     * fresh bidi stream instead. See that class for the full root cause.
+     */
+    private val livenessProbe = IrohLivenessProbe(
+        intervalMs = livenessProbeIntervalMs,
+        timeoutMs = livenessProbeTimeoutMs,
+        failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
+        millisSinceLastStream = { adminRpcRetryState.millisSinceLastStream() },
+        // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
+        // after a redial destroys the healthy NEW handle.
+        reportConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
+    )
+
+    /** Test/wiring visibility: is the liveness probe currently armed? */
+    internal val isLivenessProbeArmed: Boolean get() = livenessProbe.isArmed
+
+    override fun probeNow() = livenessProbe.probeNow()
+
 
     // letta-mobile-r3i1z: OBSERVER INGESTION.
     //
@@ -1406,23 +1447,10 @@ class IrohChannelTransport(
 
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
-    /**
-     * k7yyc: true when [this] (or any cause in its chain) is a frame codec
-     * decode/size rejection — a per-request payload fault that must fail only
-     * the request, never trigger a transport reconnect.
-     */
-    private fun Throwable.isAdminRpcPayloadError(): Boolean {
-        var current: Throwable? = this
-        while (current != null) {
-            if (current is IrohFrameCodec.ProtocolException) return true
-            current = current.cause
-        }
-        return false
-    }
-
     override suspend fun disconnect() {
         interruptedTurns.clear()
         stopObserverIngest("disconnect")
+        livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
@@ -1497,11 +1525,6 @@ class IrohChannelTransport(
         is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason, willReconnect = true)
         is IrohConnectionState.AuthFailed -> ChannelTransportState.Disconnected(4001, reason, isAuthFailure = true, willReconnect = false)
         IrohConnectionState.Closed -> ChannelTransportState.Disconnected(1000, "closed")
-    }
-
-    private fun Throwable.isConnectionLostClass(): Boolean {
-        val text = listOfNotNull(message, this::class.simpleName).joinToString(" ").lowercase()
-        return listOf("closed", "timeout", "timed out", "reset", "broken pipe", "connection", "stream").any { it in text }
     }
 
     // lgns8: cron scheduling over admin_rpc. The native CronAdminHandlers already
@@ -1830,6 +1853,10 @@ class IrohChannelTransport(
         // letta-mobile-34xoj: admin_rpc retry thresholds
         private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
         private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
+        // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
+        internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
+        internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
+        internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it

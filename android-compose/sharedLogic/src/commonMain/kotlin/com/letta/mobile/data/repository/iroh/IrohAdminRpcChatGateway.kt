@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.runtime.ApprovalSubmittingGateway
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
 import com.letta.mobile.data.chat.send.lettaWireJson
@@ -83,7 +84,14 @@ class IrohAdminRpcChatGateway(
     private val transport: IChannelTransport,
     private val deviceLabel: String = "iroh-chat-gateway",
     private val heartbeatIntervalMs: Long = STREAM_HEARTBEAT_INTERVAL_MS,
-) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway {
+) : ChatGateway, ChatGatewayExtras, ConversationSummaryGateway, ApprovalSubmittingGateway, ConnectionStatusGateway {
+
+    // letta-mobile-wxy4s: expose the transport's connection state so UI
+    // controllers can surface a drop (and auto-recover after the redial) instead
+    // of silently rendering cached data across a dead connection.
+    override val connectionState: kotlinx.coroutines.flow.StateFlow<com.letta.mobile.data.transport.ChannelTransportState>
+        get() = transport.state
+
 
     private val bridge = WsChatBridge(transport)
     private val json = lettaWireJson
@@ -369,14 +377,30 @@ class IrohAdminRpcChatGateway(
                 }
             }
         }
-        val heartbeats = flow<TimelineStreamFrame> {
-            while (true) {
-                delay(heartbeatIntervalMs.milliseconds)
-                emit(TimelineStreamFrame.Heartbeat)
-            }
-        }
-        return merge(frames, heartbeats)
+        return merge(frames, connectedHeartbeats())
     }
+
+    /**
+     * letta-mobile-wxy4s: SECONDARY MASKING FIX.
+     *
+     * Iroh emits no idle pings, so these synthesized heartbeats keep
+     * TimelineSyncLoop's silence watchdog from cycling an idle-but-healthy
+     * subscription. They used to emit UNCONDITIONALLY, which also told the loop
+     * "the stream is fine" across a long-dead connection — one of the two masks
+     * that hid the 2026-07-31 outage. Gated on the transport actually being
+     * Connected (same shape as DesktopHybridAppServerChatGateway), a dead
+     * connection now goes silent and the watchdog can do its job.
+     */
+    private fun connectedHeartbeats(): Flow<TimelineStreamFrame> = flow {
+        while (isTransportConnected()) {
+            delay(heartbeatIntervalMs.milliseconds)
+            if (!isTransportConnected()) break
+            emit(TimelineStreamFrame.Heartbeat)
+        }
+    }
+
+    private fun isTransportConnected(): Boolean =
+        transport.state.value is com.letta.mobile.data.transport.ChannelTransportState.Connected
 
     // ------------------------------------------------------------------
     // Internals

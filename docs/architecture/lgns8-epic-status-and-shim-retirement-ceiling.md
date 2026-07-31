@@ -1,8 +1,9 @@
 # lgns8 epic: status, achievable scope, and the shim-retirement ceiling
 
-Date: 2026-07-23 (shim-only surfaces disposition appended 2026-07-31)
+Date: 2026-07-23 (shim-only surfaces disposition + train/channels addendum appended 2026-07-31)
 
-Beads: `letta-mobile-lgns8` (epic) and children .9/.10/.11/.16/.17/.25
+Beads: `letta-mobile-lgns8` (epic) and children .9/.10/.11/.16/.17/.23/.25, plus
+`letta-mobile-q2b9z` (upstream channel-registry blocker)
 
 ## Why this document
 
@@ -131,3 +132,58 @@ successor must be strictly read-only.
   `tool_result`s directly the way the shim does — it must either drive the App
   Server to settle, or own settlement through the admin adapter path.
 - **lgns8.16** (sleeptime/reflection parity): P1.
+
+## Addendum — 2026-07-31
+
+Three things moved on the same day; all three change what "retire the shim"
+means in the near term.
+
+### 1. Train #1077 landed
+
+The batch merge of the lgns8 queue (`#1062`, `#1066`–`#1073`, `#1075`, `#1076`,
+merged as `#1077`) is on `main`, including the list-theme work. That clears the
+queue that had been blocking further lgns8 landings; the remaining epic
+blockers below are dependency problems, not merge-order problems.
+
+### 2. Channels: a hard UPSTREAM dependency, not a design choice
+
+`letta-mobile-q2b9z` (P1) records the blocking finding for
+`letta-mobile-lgns8.23`. Verified against the pinned `@letta-ai/letta-code`
+`0.29.12`: `letta.js` ships the channel loader
+(`discoverUserChannelRegistrations`, `startChannelAccount`), but
+`initializeChannels()` is **unreachable** from `runAppServerSubcommand` — there
+is no `--channels` flag on `app-server`, and `--channels` is explicitly rejected
+when `--listen` is present. What actually imports `~/.letta/channels/*/plugin.mjs`
+today is lettashim with `SHIM_CHANNELS_ENABLED=1`.
+
+The consequence is blunt: **retiring lettashim right now takes Matrix and the
+mobile channel host down with it** (~130 per-agent Matrix identities, 180
+`routing.yaml` routes). This is not the ceiling described earlier in this
+document — that ceiling was about admin surfaces the App Server does not expose.
+This is a second, independent ceiling on the channels surface, and it sits
+upstream of this repository.
+
+### 3. lgns8.23 re-scope options
+
+Given q2b9z, option (a) from lgns8.23 — channels as a capability of the
+Kotlin-supervised App Server process — is **blocked on upstream** and cannot be
+scheduled here. The realistic options are:
+
+- **(a) Wait for upstream** to make `initializeChannels()` reachable under
+  `--listen`. Cleanest end state, zero new processes, but the schedule is not
+  ours. Track via q2b9z.
+- **(b) Kotlin-supervised standalone channel host.** Run a second, dedicated
+  `letta` process for channels under the same supervision the App Server already
+  gets (`OwnedAppServerProcess`). Unblocks shim retirement without waiting on
+  upstream, at the cost of one more supervised process and its lifecycle tests.
+  This is the only option that retires the shim on our own schedule.
+- **(c) Bounded service adapter.** Keep the shim process alive strictly as a
+  channel host with every other route denied fail-closed. Smallest change, but
+  it does not retire the shim — it renames the problem, and it keeps a Node
+  service in the critical path for Matrix.
+
+Recommendation: treat (b) as the plan of record and (a) as the preferred
+long-run convergence, with (c) available only as a bridge if the retirement date
+is forced. Either way, `lgns8.11` (full shim retirement) cannot close until one
+of these lands — it should be marked blocked on `lgns8.23`/`q2b9z` rather than
+carried as merely outstanding.

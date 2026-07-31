@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.LivenessProbingChannelTransport
 import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import kotlinx.coroutines.flow.Flow
@@ -55,6 +56,18 @@ class WsChatBridge(
         (transport as? RedialAwareChannelTransport)?.redialWhileTurnActive ?: emptyFlow()
 
     fun isConnected(): Boolean = transport.state.value is ChannelTransportState.Connected
+
+    /**
+     * letta-mobile-wxy4s: force an immediate connection-liveness probe.
+     *
+     * The transport's periodic probe is unreliable while an Android app is
+     * backgrounded (doze), so a user returning to a screen would otherwise wait a
+     * full probe interval on a connection that may have been dead for hours.
+     * No-op for transports that don't run a probe.
+     */
+    fun probeNow() {
+        (transport as? LivenessProbingChannelTransport)?.probeNow()
+    }
 
     suspend fun awaitConnected(): WsConnectionState.Connected = transport.state
         .filterIsInstance<ChannelTransportState.Connected>()
