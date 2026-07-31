@@ -63,19 +63,19 @@ class AdminProxyRequestTest {
     fun archiveListBuildsGetPath() {
         val recording = installRecordingTransport()
         val router = AdminRpcRouter()
-        ArchiveAdminHandlers.register(router, "http://admin.local")
+        ProjectAdminHandlers.register(router, "http://admin.local")
 
         runTest {
             router.dispatch(
                 requestId = "req-1",
-                method = "archive.list",
+                method = "project.list",
                 params = null,
             )
         }
 
         val call = recording.calls.single()
         assertEquals("GET", call.method)
-        assertEquals("http://admin.local/v1/archives", call.url)
+        assertEquals("http://admin.local/api/projects", call.url)
     }
 
     @Test
@@ -135,12 +135,12 @@ class AdminProxyRequestTest {
     fun non2xxUpstreamResponseDispatchesAsFailure() = runTest {
         val recording = installRecordingTransport(AdminProxyTransportResponse(404, """{"error":"missing"}"""))
         val router = AdminRpcRouter()
-        ArchiveAdminHandlers.register(router, "http://admin.local")
+        ProjectAdminHandlers.register(router, "http://admin.local")
 
         val response = Json.parseToJsonElement(
             router.dispatch(
                 requestId = "req-404",
-                method = "archive.list",
+                method = "project.list",
                 params = null,
             ),
         ).jsonObject
@@ -161,11 +161,11 @@ and newline"
         """.trimIndent()
         installRecordingTransport(AdminProxyTransportResponse(500, upstreamBody))
         val router = AdminRpcRouter()
-        ArchiveAdminHandlers.register(router, "http://admin.local")
+        ProjectAdminHandlers.register(router, "http://admin.local")
 
         val responseText = router.dispatch(
             requestId = "req-500",
-            method = "archive.list",
+            method = "project.list",
             params = null,
         )
         val response = Json.parseToJsonElement(responseText).jsonObject

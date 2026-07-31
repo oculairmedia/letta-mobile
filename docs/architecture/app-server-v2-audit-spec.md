@@ -445,11 +445,16 @@ The current machine matrix contains 89 registered methods:
 
 | Declared owner | Count | Execution class |
 | --- | ---: | --- |
-| `app_server_v2` | 29 | Native App Server v2 contract (fail-closed; no shim fallback) |
-| `admin_rest_service` | 36 | Explicitly injected bounded admin REST adapter (`LETTA_IROH_ADMIN_REST_BASE_URL`) |
-| `controller_native` | 9 | Wrapper process memory and pairing store |
+| `app_server_v2` | 33 | Native App Server v2 contract (fail-closed; no shim fallback) |
+| `capability_gated_unsupported` | 21 | Typed fail-closed response |
+| `controller_native` | 20 | Wrapper process memory, pairing store, and constant catalogs |
 | `vibesync_service` | 9 | Explicitly injected VibeSync product API (`LETTA_IROH_VIBESYNC_BASE_URL`) |
-| `capability_gated_unsupported` | 6 | Typed fail-closed response |
+| `local_backend_store` | 6 | READ-ONLY reads of the letta-code on-disk backend (`LETTA_LOCAL_BACKEND_DIR`) |
+
+`admin_rest_service` is retired (letta-mobile-lgns8.9): the count is **0** and
+`LETTA_IROH_ADMIN_REST_BASE_URL` is no longer consumed. See
+`lgns8-epic-status-and-shim-retirement-ceiling.md` for the per-method
+disposition and the remaining upstream write ceiling.
 
 Exact method rows, authorization classes, data stores, native discriminants,
 fallbacks, production first routes, post-shim owners, and migration slices are
@@ -498,15 +503,17 @@ The ownership-matrix fallback totals are:
 Phase 4 removed the last migration-time shim fallbacks: health is
 controller-native only, and subagent list/todos hydrate from
 `ControllerSubagentRegistrySource` (`update_subagent_state`) instead of
-LettaShim HTTP discovery. Bounded admin REST still requires an explicit
-`LETTA_IROH_ADMIN_REST_BASE_URL`; goal and slash command methods remain
-product-removed (`deny_fail_closed`).
+LettaShim HTTP discovery. Phase 5 (lgns8.9) then retired the bounded admin REST
+adapter outright: every former `admin_rest_service` method is now owned by a
+native v2 command, the read-only local-backend store tier, a controller-native
+constant catalog, or a documented fail-closed denial. Goal and slash command
+methods remain product-removed (`deny_fail_closed`).
 
 ### Current dependency classes
 
 | Class | Current behavior | Required correction |
 | --- | --- | --- |
-| 40 `admin_rest_service` methods | Production injects the same port-8291 base used by LettaShim | Provide a separately deployed, bounded, versioned service for each approved domain, adopt an upstream v2 command, or fail closed |
+| 0 `admin_rest_service` methods (was 40) | RESOLVED by lgns8.9 — the adapter is retired; each method has a native, store, controller-native, or fail-closed owner | Only the 15 denied write/read methods remain, blocked on the upstream commands enumerated in the retirement-ceiling doc |
 | Native-first agent/conversation/message routes | Try App Server v2, then optional direct disk, then LettaShim | Prove native parity, remove disk and HTTP fallback, and return typed native failures |
 | Model catalog | `model.list` defaults to shim REST shape; native shape is opt-in | Define one canonical mobile model projection from `list_models`; make native the only Letta-owned source |
 | Skills | Lists and agent-scoped install/uninstall use shim semantics; native v2 exposes filesystem enable/disable | Choose and document one semantic model; adapt the UI/API or provide a bounded non-shim owner |
