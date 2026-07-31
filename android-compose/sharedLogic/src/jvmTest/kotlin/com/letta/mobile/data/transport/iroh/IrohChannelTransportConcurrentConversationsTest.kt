@@ -200,6 +200,8 @@ class IrohChannelTransportConcurrentConversationsTest {
             val turnIdA = startStreamingTurnOnA(transport, engine, client, frames)
             sendIntoBWhileAStreams(transport, frames)
 
+            val terminalsBefore = frames.filterIsInstance<ServerFrame.TurnDone>().size
+
             // A's own server terminal, after B has come and gone.
             client.emitStopReason(CONV_A, seq = 20)
             withTimeout(10.seconds) {
@@ -207,8 +209,18 @@ class IrohChannelTransportConcurrentConversationsTest {
             }
             delay(300.milliseconds) // let any duplicate terminal race in
 
-            val terminalsForA = frames.filterIsInstance<ServerFrame.TurnDone>().filter { it.turnId == turnIdA }
-            assertEquals(1, terminalsForA.size, "exactly one terminal for A's turn")
+            // A's stop_reason must produce EXACTLY ONE terminal. Once B has
+            // evicted A from the transport's turn state, A's stop_reason is
+            // consumed by BOTH the engine and the observer, so the conversation
+            // settles twice — under a different turn id each time.
+            val terminalsAfter = frames.filterIsInstance<ServerFrame.TurnDone>().drop(terminalsBefore)
+            assertEquals(
+                1,
+                terminalsAfter.size,
+                "A's terminal must be emitted once, by one owner; got ${terminalsAfter.map { it.turnId to it.status }}",
+            )
+            val terminalsForA = terminalsAfter.filter { it.turnId == turnIdA }
+            assertEquals(1, terminalsForA.size, "the terminal must carry A's own turn id")
             assertEquals("completed", terminalsForA.single().status)
             assertFalse(transport.hasActiveChatTurn(CONV_A), "A's turn state must clear on its terminal")
             assertFalse(transport.hasAnyActiveChatTurn, "no turn is live once A settled")
