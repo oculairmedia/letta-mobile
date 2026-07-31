@@ -307,6 +307,68 @@ class AppServerContextWindowPreflightTest {
         assertTrue(result.compacted)
     }
 
+    @Test
+    fun oversizedAttachmentStillDecidesFromBoundedMetadata() = runTest {
+        // letta-mobile-lgns8.21.7: a multi-megabyte inline payload on the newest
+        // row must not stop the preflight from reading the tiny metadata it
+        // actually needs (role + usage + stop_reason).
+        val huge = "A".repeat(4 * 1024 * 1024)
+        val client = PreflightClient(
+            agent = buildJsonObject { put("context_window_limit", 200_000) },
+            messages = JsonArray(
+                listOf(
+                    buildJsonObject {
+                        put("id", "msg-overflow")
+                        put("role", "assistant")
+                        put("content", huge)
+                        put(
+                            "provider_result",
+                            buildJsonObject {
+                                put("stopReason", "length")
+                                put("usage", buildJsonObject { put("input", 407_000) })
+                            },
+                        )
+                    },
+                ),
+            ),
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertTrue(result.compacted)
+        assertNotNull(client.compactCommand)
+    }
+
+    @Test
+    fun budgetExhaustionDegradesInsteadOfFailing() = runTest {
+        // 200 rows whose inspectable surface far exceeds the page budget: the
+        // preflight must return a bounded answer, not throw and not hang.
+        val filler = "k".repeat(170)
+        val rows = (0 until 200).map { index ->
+            buildJsonObject {
+                put("id", "msg-$index")
+                put("role", "assistant")
+                put("content", "ok")
+                put(
+                    "message",
+                    buildJsonObject {
+                        for (field in 0 until 400) put("$filler$field", "v")
+                    },
+                )
+            }
+        }
+        val client = PreflightClient(
+            agent = buildJsonObject { put("context_window_limit", 200_000) },
+            messages = JsonArray(rows),
+            activeMessageIds = rows.indices.map { "msg-$it" },
+        )
+
+        val result = AppServerContextWindowPreflight(client).prepare("agent-1", "conv-1")
+
+        assertFalse(result.compacted)
+        assertEquals(null, client.compactCommand)
+    }
+
     private fun providerMessage(fixture: ProviderMessageFixture) = buildJsonObject {
         put("id", fixture.id)
         put("role", "assistant")
