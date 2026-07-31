@@ -110,10 +110,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
 
     override fun run() = runBlocking {
         validateOptions()
-        val scanMode = WrapperScanMode.fromCli(wrapperScanMode)
-            ?: throw UsageError("--wrapper-scan-mode must be one of ${WrapperScanMode.CLI_VALUES.joinToString(", ")}")
-        WrapperProcessScan.validateScanOptions(scanMode, wrapperPid, wrapperScanNotApplicable)
-            ?.let { throw UsageError(it) }
+        val scanMode = resolveWrapperScanMode()
         val requested = scenarios.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         val unsupported = requested - SUPPORTED_SCENARIOS
         if (unsupported.isNotEmpty()) throw UsageError("Unsupported --scenario: ${unsupported.joinToString(",")}")
@@ -155,6 +152,15 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         printHumanSummary(summary, probeConversationId)
         if (jsonOutput) println(json.encodeToString(summary))
         if (!summary.ok) exitProcess(1)
+    }
+
+    /** Parses + validates the declared `no-http` wrapper-scan mode (letta-mobile-jr5tx). */
+    private fun resolveWrapperScanMode(): WrapperScanMode {
+        val mode = WrapperScanMode.fromCli(wrapperScanMode)
+            ?: throw UsageError("--wrapper-scan-mode must be one of ${WrapperScanMode.CLI_VALUES.joinToString(", ")}")
+        WrapperProcessScan.validateScanOptions(mode, wrapperPid, wrapperScanNotApplicable)
+            ?.let { throw UsageError(it) }
+        return mode
     }
 
     private fun validateOptions() {
