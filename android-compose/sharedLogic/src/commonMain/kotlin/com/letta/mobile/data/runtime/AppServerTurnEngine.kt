@@ -4,13 +4,10 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.transport.appserver.AppServerApprovalResponseDecision
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
-import com.letta.mobile.data.controller.extras.ExternalToolResult
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
 import com.letta.mobile.data.controller.fanout.InboundControlRequestRegistry
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerExternalToolResult
-import com.letta.mobile.data.transport.appserver.AppServerExternalToolResultContent
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
@@ -48,7 +45,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
@@ -176,28 +172,27 @@ class AppServerTurnEngine(
     private val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
     private val inboundSource = TurnInboundSource(client, eventRouter)
-    /**
-     * lgns8.22.4.1.6: computed external-tool results, retained PAST a successful
-     * (one-way, hence ambiguous) send so a reconnect replay reuses the result
-     * instead of re-invoking a non-idempotent tool. Bounded + TTL-expiring so
-     * results the server never replays cannot accumulate. See
-     * [ExternalToolResultCache].
-     *
-     * letta-mobile-8xxzv: concurrent turns on different runtime keys now share
-     * this cache. It is internally lock-guarded and keyed by the request identity
-     * (request_id, tool_call_id) rather than by turn, so it stays correct — a
-     * result belongs to a REQUEST, not to whichever runtime observed it.
-     */
-    private val externalToolResultCache = ExternalToolResultCache()
 
     /**
-     * lgns8.17(c): per-invocation deadline for [ExternalTool.invoke].
-     *
-     * NOT a constructor parameter on purpose — it is a protocol-derived constant,
-     * not a per-host tuning knob, and the value must stay strictly inside the
-     * server's own window.
+     * lgns8.22.5: the FULL external-tool invocation lifecycle — claim, generation
+     * fencing, bounded invocation, result caching and the matched
+     * `external_tool_call_response`. The engine keeps only the two decisions that
+     * genuinely need a turn lease (which generation a frame validated on, and
+     * whether a request is unleased) and delegates the rest.
      */
-    private val externalToolTimeoutMs: Long = EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS
+    private val externalTools = ExternalToolDispatcher(
+        client = client,
+        externalToolRegistry = externalToolRegistry,
+        inboundControlRegistry = inboundControlRegistry,
+        connectionGenerationProvider = connectionGenerationProvider,
+    )
+
+    /**
+     * lgns8.22.5: outstanding user-input approval gates, scoped per runtime key.
+     * Owns what `TurnLeaseSlot.approvalIds` used to hold; see [ApprovalRegistry]
+     * for why claim/generation ownership stays in [InboundControlRequestRegistry].
+     */
+    private val approvals = ApprovalRegistry()
 
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
@@ -220,7 +215,7 @@ class AppServerTurnEngine(
     fun cancelActiveLeaseForGeneration(failedGeneration: Long, reason: String = "connection generation superseded") {
         // lgns8.22.4.1.6: definitive generation cleanup is the point to drop
         // external-tool results the server will never replay for.
-        externalToolResultCache.pruneExpired()
+        externalTools.pruneExpiredResults()
         leases.snapshot().forEach { slot ->
             val lease = slot.lease ?: return@forEach
             if (lease.connectionGeneration > failedGeneration) return@forEach
@@ -242,160 +237,6 @@ class AppServerTurnEngine(
         leases.snapshot().forEach { it.runtimeScope = null }
         if (notifyHost) onRuntimeInvalidated()
     }
-
-    /**
-     * lgns8.17: answer an external_tool_call_request so the App Server unblocks
-     * the turn. Executes the tool via the wired [externalToolRegistry] when it
-     * advertises it; otherwise (no registry, unknown tool, or a thrown handler)
-     * synthesizes a matched is_error response. Matching is by request_id — the
-     * ONLY correlation key the App Server uses (the response carries request_id,
-     * not tool_call_id). Fire-and-forget one-way send: any send failure is logged,
-     * never rethrown, so it can't break the turn's event collector. If the
-     * connection has since dropped the send is lost, but the App Server re-emits
-     * the still-blocking request on reconnect/sync, so the next collect re-answers.
-     */
-    private suspend fun guaranteeExternalToolResponse(
-        request: AppServerInboundFrame.ExternalToolCallRequest,
-        leaseToken: Long,
-        validatedGeneration: Long,
-    ) {
-        // lgns8.22.4.1.2: the generation is the one matches() VALIDATED for this
-        // lease, never a fresh read of the live provider. A disconnect racing this
-        // handler must not make us register/claim (and execute) under a successor
-        // generation, poisoning its registry entry and duplicating tool side effects.
-        val generation = validatedGeneration
-        val ref = InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId)
-        // Direct client.events path may not have gone through the fanout register.
-        inboundControlRegistry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = request.requestId,
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = generation,
-                agentId = request.runtime?.agentId,
-                conversationId = request.runtime?.conversationId,
-                toolCallId = request.toolCallId,
-            ),
-        )
-        // matches() already claimed delivery for this lease; only answer if we own it
-        // (or claim here on paths that skipped the registry match branch).
-        if (!inboundControlRegistry.ownsClaim(ref, leaseToken, generation) &&
-            !inboundControlRegistry.tryClaim(ref, leaseToken, generation)
-        ) {
-            Telemetry.event(
-                "AppServerTurnEngine", "externalTool.claimSkipped",
-                "requestId" to request.requestId,
-                "toolCallId" to request.toolCallId,
-                "leaseToken" to leaseToken,
-                "generation" to generation,
-            )
-            return
-        }
-        // PR #1077 review (P1): PIN the claim to this invocation before suspending.
-        // This job runs on [dispatchScope] and deliberately outlives its turn, but
-        // the turn's `finally` calls releaseClaimsForLease — which would flip this
-        // request back to Pending WHILE the tool is still running, letting a replay
-        // or successor lease execute a non-idempotent tool a second time. Detaching
-        // keeps ownership with the invocation until it answers or releases.
-        inboundControlRegistry.markDetached(ref, leaseToken, generation)
-        // Fence BEFORE invoking a possibly non-idempotent handler: if the
-        // connection died between the claim and here, the tool must not run and
-        // this claim is returned so the successor generation's replay can own it.
-        if (abortStaleExternalTool(request, leaseToken, generation, phase = "beforeInvoke")) return
-        val cached = externalToolResultCache.get(request.resultCacheKey())
-        val result: AppServerExternalToolResult = cached ?: computeAndCacheExternalToolResult(request)
-        // Tool invocation is a suspension point: re-fence before sending so an
-        // old-generation response is not written onto the successor connection.
-        // The result is cached, so the replay answers without re-invoking.
-        if (abortStaleExternalTool(request, leaseToken, generation, phase = "beforeSend")) return
-        Telemetry.event(
-            "AppServerTurnEngine", "externalTool.responded",
-            "requestId" to request.requestId,
-            "toolCallId" to request.toolCallId,
-            "toolName" to request.toolName,
-            "isError" to (result.isError == true).toString(),
-            "handled" to (externalToolRegistry != null).toString(),
-            "cached" to (cached != null).toString(),
-        )
-        runCatching {
-            client.sendExternalToolResponse(
-                AppServerCommand.ExternalToolCallResponse(requestId = request.requestId, result = result),
-            )
-        }.onSuccess {
-            // Lease-scoped: if this detached invocation lost the claim (released on
-            // an earlier send failure, then re-claimed by a successor), retiring the
-            // identity here would delete the successor's LIVE claim and strand its
-            // response. markAnsweredBy no-ops unless we still own it.
-            inboundControlRegistry.markAnsweredBy(ref, leaseToken, generation)
-            // lgns8.22.4.1.6: the cached result is deliberately RETAINED. A one-way
-            // send is an AmbiguousMutation — if the server never received it, it
-            // replays the request and the replay must reuse this result rather than
-            // re-invoke the tool. The cache expires the entry itself if no replay
-            // ever comes (bounded + TTL).
-        }.onFailure {
-            Telemetry.error("AppServerTurnEngine", "externalTool.responseSendFailed", it)
-            // Keep retriable: server never saw the response and will re-emit.
-            // Cached result above prevents re-invoking the tool on replay.
-            inboundControlRegistry.releaseClaim(ref, leaseToken, generation)
-        }
-    }
-
-    /**
-     * Invoke the wired handler (or synthesize a matched is_error result when none
-     * handles the tool) and cache the outcome.
-     *
-     * lgns8.22.4.1.6: cached by (request_id, tool_call_id) and NOT by connection
-     * generation, so a successor-generation replay reuses it and a non-idempotent
-     * tool never runs twice for one request identity.
-     */
-    private suspend fun computeAndCacheExternalToolResult(
-        request: AppServerInboundFrame.ExternalToolCallRequest,
-    ): AppServerExternalToolResult {
-        val computed = try {
-            // lgns8.17(c): BOUND the invocation. ExternalTool.invoke is arbitrary
-            // controller code; without a deadline the only bound is the turn idle
-            // watchdog, which a parked approval can pause indefinitely. On expiry we
-            // synthesize a matched is_error so the turn still terminates.
-            val outcome = if (externalToolRegistry == null) {
-                null
-            } else {
-                withTimeoutOrNull(externalToolTimeoutMs.milliseconds) {
-                    externalToolRegistry.invoke(request.toolName, request.input)
-                } ?: run {
-                    Telemetry.event(
-                        "AppServerTurnEngine", "externalTool.invocationTimedOut",
-                        "requestId" to request.requestId,
-                        "toolCallId" to request.toolCallId,
-                        "toolName" to request.toolName,
-                        "timeoutMs" to externalToolTimeoutMs,
-                        level = Telemetry.Level.WARN,
-                    )
-                    ExternalToolResult.Error(
-                        "external tool '${request.toolName}' timed out after ${externalToolTimeoutMs}ms",
-                    )
-                }
-            }
-            when (outcome) {
-                is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
-                is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
-                null -> toolResult(
-                    "external tool '${request.toolName}' is not handled by this controller",
-                    isError = true,
-                )
-            }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            toolResult(
-                "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
-                isError = true,
-            )
-        }
-        externalToolResultCache.put(request.resultCacheKey(), computed)
-        return computed
-    }
-
-    private fun AppServerInboundFrame.ExternalToolCallRequest.resultCacheKey() =
-        ExternalToolResultCache.Key(requestId, toolCallId)
 
     /**
      * Answer [received] when it is an external_tool_call_request.
@@ -439,7 +280,7 @@ class AppServerTurnEngine(
         // generation fences inside the handler, which prevent an old-generation
         // response from ever being written onto a successor connection.
         dispatchScope.launch {
-            guaranteeExternalToolResponse(toolRequest, lease.token, validatedGeneration)
+            externalTools.answer(toolRequest, lease.token, validatedGeneration)
         }
     }
 
@@ -482,40 +323,10 @@ class AppServerTurnEngine(
             "conversationId" to (runtime?.conversationId ?: ""),
             level = Telemetry.Level.WARN,
         )
-        guaranteeExternalToolResponse(
+        externalTools.answer(
             request,
             leaseToken = UNLEASED_LEASE_TOKEN,
             validatedGeneration = connectionGenerationProvider(),
-        )
-        return true
-    }
-
-    /**
-     * lgns8.22.4.1.2 fence. Returns true (and releases the claim) when the live
-     * connection generation has moved past the generation this external-tool
-     * request was validated/claimed on.
-     */
-    private fun abortStaleExternalTool(
-        request: AppServerInboundFrame.ExternalToolCallRequest,
-        leaseToken: Long,
-        generation: Long,
-        phase: String,
-    ): Boolean {
-        if (connectionGenerationProvider() == generation) return false
-        Telemetry.event(
-            "AppServerTurnEngine", "externalTool.staleGenerationAborted",
-            "requestId" to request.requestId,
-            "toolCallId" to request.toolCallId,
-            "toolName" to request.toolName,
-            "claimGeneration" to generation,
-            "liveGeneration" to connectionGenerationProvider(),
-            "phase" to phase,
-            level = Telemetry.Level.WARN,
-        )
-        inboundControlRegistry.releaseClaim(
-            InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId),
-            leaseToken,
-            generation,
         )
         return true
     }
@@ -537,30 +348,14 @@ class AppServerTurnEngine(
         return current.connectionGeneration
     }
 
-    private fun toolResult(text: String, isError: Boolean) = AppServerExternalToolResult(
-        content = listOf(AppServerExternalToolResultContent(type = "text", text = text)),
-        isError = isError,
-    )
-
-    /**
-     * letta-mobile-vilsn: tool_call_id -> real approval id (the can_use_tool
-     * control-request request_id, e.g. `perm-call_…`) for surfaced runtime
-     * user-input approvals. Populated when the approval is emitted; consumed by
-     * [userInputApprovalId] when the client submits the answer, so the
-     * ApprovalResponse targets the gate letta-code actually parked on (the id is
-     * NOT derivable from the tool_call_id — `call_…` vs `toolu_…`).
-     *
-     * letta-mobile-8xxzv: this map now lives on the per-key [TurnLeaseSlot] so a
-     * gate parked in conversation A cannot pause conversation B's idle watchdog
-     * and B's terminal cannot clear A's gate. tool_call_ids are globally unique,
-     * so the by-id lookups below simply search every slot.
-     */
-    private fun approvalSlotFor(toolCallId: String): TurnLeaseSlot? =
-        leases.snapshot().firstOrNull { it.approvalIds.containsKey(toolCallId) }
-
     /**
      * READ the recorded real approval id for [toolCallId] without removing it, or
      * null if none was recorded (non-interactive tool, or already consumed).
+     *
+     * letta-mobile-vilsn: this is the can_use_tool control-request request_id
+     * (e.g. `perm-call_…`) captured when the approval was surfaced, so the
+     * ApprovalResponse targets the gate letta-code actually parked on — it is NOT
+     * derivable from the tool_call_id (`call_…` vs `toolu_…`).
      *
      * Deliberately not consume-on-read. If `client.input` fails on a transient
      * disconnect, the id must survive so the user's retry still targets the real
@@ -568,16 +363,15 @@ class AppServerTurnEngine(
      * invalid for providers whose ids look like `toolu_…`, leaving the question
      * permanently unanswerable. [clearUserInputApprovalId] removes it only after
      * the response is actually sent.
+     *
+     * lgns8.22.5: storage lives in [ApprovalRegistry]; this stays the stable
+     * host-facing entry point (DefaultAppServerController, desktop gateway).
      */
     fun userInputApprovalId(toolCallId: String): String? =
-        approvalSlotFor(toolCallId)?.approvalIds?.get(toolCallId)
+        approvals.approvalIdFor(toolCallId)
 
     fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
-        leases.snapshot().forEach { slot ->
-            slot.updateApprovalIds { current ->
-                if (current[toolCallId] == requestId) current - toolCallId else current
-            }
-        }
+        approvals.clearIfMatches(toolCallId, requestId)
     }
 
     /**
@@ -1137,7 +931,7 @@ class AppServerTurnEngine(
         // (AskUserQuestion / ExitPlanMode parked awaiting the user's answer). An
         // unanswered question legitimately parks the turn far longer than the idle
         // window, so the watchdog MUST NOT fail it. The outstanding gates are the
-        // keys of [userInputApprovalIdsRef] (keyed by tool_call_id): a gate is
+        // gate set held by [ApprovalRegistry] for THIS runtime key: a gate is
         // ADDED when the approval is surfaced (below) and cleared ONLY when THAT
         // specific gate is genuinely resolved — the submit path consumes it via
         // [clearUserInputApprovalId], a matching tool_return is observed, or a
@@ -1145,7 +939,7 @@ class AppServerTurnEngine(
         // arbitrary inbound frame: a side-channel status frame (UpdateDeviceStatus /
         // UpdateQueue / UpdateSubagentState) that merely passes matches(scope) must
         // never resume the watchdog while the user still owes an answer.
-        fun hasOutstandingUserInputGate(): Boolean = slot.approvalIds.isNotEmpty()
+        fun hasOutstandingUserInputGate(): Boolean = approvals.hasOutstanding(slot.key)
         val watchdog = this.launch {
             // Short recheck cadence while paused so the watchdog resumes PROMPTLY
             // once the last gate clears (from ANY source — collect-loop tool_return,
@@ -1199,7 +993,7 @@ class AppServerTurnEngine(
             // ANY parked user-input approval gate — clear every outstanding gate so
             // the watchdog resumes normal behavior and no stale gate leaks into a
             // later turn.
-            slot.updateApprovalIds { emptyMap() }
+            approvals.clearKey(slot.key)
             pendingStop?.let { emitDraft(it) }
             pendingStop = null
             pendingUsage?.let { emitDraft(it) }
@@ -1401,9 +1195,11 @@ class AppServerTurnEngine(
                                 // close the gate against THIS id, which is not derivable
                                 // from the tool_call_id across LLM providers (call_… vs
                                 // toolu_…).
-                                slot.updateApprovalIds { map ->
-                                    map + (payload.request.callId.value to payload.request.approvalId.value)
-                                }
+                                approvals.record(
+                                    slot.key,
+                                    payload.request.callId.value,
+                                    payload.request.approvalId.value,
+                                )
                             }
                         }
                         is RuntimeEventPayload.ToolReturnObserved -> {
@@ -1412,7 +1208,7 @@ class AppServerTurnEngine(
                             // user-input tool_call_id genuinely resolves THAT gate —
                             // lift the pause for this specific id (no-op if the submit
                             // path already consumed it).
-                            slot.updateApprovalIds { it - payload.toolCallId.value }
+                            approvals.resolve(slot.key, payload.toolCallId.value)
                         }
                         is RuntimeEventPayload.RemoteStreamFrame -> {
                             // Extract tool_call_id from tool_call_message and approval_request_message frames
@@ -1423,7 +1219,7 @@ class AppServerTurnEngine(
                                     returnedToolCallIds.add(it)
                                     // letta-mobile-vilsn.6: a streamed tool_return
                                     // resolves that specific outstanding gate.
-                                    slot.updateApprovalIds { map -> map - it }
+                                    approvals.resolve(slot.key, it)
                                 }
                             }
                             // letta-mobile-vilsn.7: some App Server transports deliver
@@ -1432,7 +1228,7 @@ class AppServerTurnEngine(
                             // a ControlRequest (which maps to ApprovalRequested above).
                             // That path bypassed gate registration entirely, so a
                             // parked AskUserQuestion/ExitPlanMode arriving this way was
-                            // never added to userInputApprovalIdsRef: the idle watchdog
+                            // never added to the [ApprovalRegistry]: the idle watchdog
                             // was not paused (vilsn.6) and the submit path could not
                             // recover the real can_use_tool request id via
                             // userInputApprovalId. Register it here exactly like
@@ -1444,9 +1240,7 @@ class AppServerTurnEngine(
                                     callId != null &&
                                     RuntimeUserInputTools.requiresUserInput(approval.toolName)
                                 ) {
-                                    slot.updateApprovalIds { map ->
-                                        map + (callId to approval.requestId)
-                                    }
+                                    approvals.record(slot.key, callId, approval.requestId)
                                 }
                             }
                         }
@@ -1566,7 +1360,7 @@ class AppServerTurnEngine(
             // timeout, cancellation, or stream error) — clear every outstanding
             // user-input gate so none leaks into a later turn and keeps a fresh
             // watchdog wrongly paused.
-            slot.updateApprovalIds { emptyMap() }
+            approvals.clearKey(slot.key)
             fanoutSubscriberId?.let { subId ->
                 withContext(NonCancellable) {
                     inboundSource.unsubscribe(subId)
@@ -2399,20 +2193,12 @@ class AppServerTurnEngine(
         const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
         const val DEFAULT_TERMINAL_SETTLE_QUIET_MS: Long = 1_500L
         /**
-         * lgns8.17(c): deadline for ONE [ExternalTool.invoke].
-         *
-         * Chosen against the server's own bound, not picked for feel: letta-code's
-         * app-server parks an external tool call on a pending promise with
-         * `EXTERNAL_TOOL_CALL_TIMEOUT_MS = 5 * 60 * 1000` and rejects the tool call
-         * when it lapses. Our deadline must fire COMFORTABLY FIRST so the App
-         * Server receives a matched `is_error` response (the turn then terminates
-         * cleanly and the model sees a real tool result) rather than the server
-         * self-rejecting on a timeout it attributes to a dead controller. 120s
-         * leaves 3 minutes of slack for the send and any queuing, and is also well
-         * inside [DEFAULT_TURN_IDLE_TIMEOUT_MS] so a hung tool can never be the
-         * thing that trips the idle watchdog.
+         * lgns8.22.5: the invocation deadline now lives with the dispatcher that
+         * enforces it ([ExternalToolDispatcher.INVOCATION_TIMEOUT_MS], where the
+         * rationale against the server's own `EXTERNAL_TOOL_CALL_TIMEOUT_MS` is
+         * documented). Re-exported here so existing callers/tests keep one name.
          */
-        const val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = 120_000L
+        val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = ExternalToolDispatcher.INVOCATION_TIMEOUT_MS
 
         /**
          * lgns8.17(d): sentinel lease token for an answer taken with NO turn lease.

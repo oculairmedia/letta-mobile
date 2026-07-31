@@ -44,14 +44,6 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
      */
     val runIdGate = TurnRunIdGate(leaseRef, ownerRef)
 
-    /**
-     * letta-mobile-vilsn.6 outstanding user-input gates (tool_call_id -> real
-     * approval id) for THIS key. Keyed so an unanswered AskUserQuestion in
-     * conversation A cannot pause conversation B's idle watchdog, and so B's
-     * terminal cannot clear A's parked gate.
-     */
-    private val approvalIdsRef = atomic<Map<String, String>>(emptyMap())
-
     /** Cached `runtime_start` scope for this key (was one global slot). */
     private val runtimeScopeRef = atomic<AppServerRuntimeScope?>(null)
 
@@ -76,11 +68,6 @@ internal class TurnLeaseSlot(val key: TurnRuntimeKey) {
     fun updateOwner(
         block: (AppServerTurnEngine.ActiveTurnOwner?) -> AppServerTurnEngine.ActiveTurnOwner?,
     ) = ownerRef.update(block)
-
-    val approvalIds: Map<String, String> get() = approvalIdsRef.value
-
-    fun updateApprovalIds(block: (Map<String, String>) -> Map<String, String>) =
-        approvalIdsRef.update(block)
 
     var runtimeScope: AppServerRuntimeScope?
         get() = runtimeScopeRef.value
