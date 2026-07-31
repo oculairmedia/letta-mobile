@@ -31,6 +31,13 @@ object AppServerWebSocketLimits {
 /**
  * Apply the shared App Server inbound frame ceiling. Call at every
  * `install(WebSockets)` site that talks to an App Server `/ws` endpoint.
+ *
+ * ENGINE CONSTRAINT: the caller's HttpClient must use an engine that supports
+ * `maxFrameSize` (CIO does). Ktor's OkHttp engine does NOT — it fails every
+ * connect with "Max frame size switch is not supported in OkHttp engine",
+ * which took the production wrapper's App Server link down on 2026-07-31
+ * (reconnect exhausted → GaveUp → every native admin route dead). If you add
+ * a new call site, use HttpClient(CIO).
  */
 fun WebSockets.Config.applyAppServerFrameLimits() {
     maxFrameSize = AppServerWebSocketLimits.MAX_FRAME_BYTES
