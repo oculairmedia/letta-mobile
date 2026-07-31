@@ -49,9 +49,20 @@ class InboundControlRequestRegistry {
 
     enum class State { Pending, Dispatched, Claimed, Answered, Superseded }
 
-    data class EntryKey(
+    /**
+     * Identity of one inbound control request (lgns8.22.4.1.3).
+     *
+     * External tools are identified by (request_id, tool_call_id) — the App Server
+     * v2 `request_id_and_tool_call_id` idempotency key. Approvals carry no
+     * tool_call_id at this layer and leave it null.
+     */
+    data class RequestRef(
         val requestId: String,
-        val toolCallId: String?,
+        val toolCallId: String? = null,
+    )
+
+    data class EntryKey(
+        val ref: RequestRef,
         val connectionGeneration: Long,
     )
 
@@ -87,7 +98,7 @@ class InboundControlRequestRegistry {
                 return RegisterResult.GenerationFailed(request.connectionGeneration)
             }
         }
-        val key = EntryKey(request.requestId, request.toolCallId, request.connectionGeneration)
+        val key = EntryKey(RequestRef(request.requestId, request.toolCallId), request.connectionGeneration)
         entries[key]?.let { existing ->
             return RegisterResult.Duplicate(existing)
         }
@@ -113,15 +124,14 @@ class InboundControlRequestRegistry {
      * into duplicate UI events.
      */
     fun tryClaim(
-        requestId: String,
+        ref: RequestRef,
         leaseToken: Long,
         connectionGeneration: Long,
-        toolCallId: String? = null,
     ): Boolean = synchronized(lock) {
         failedGeneration?.let { failed ->
             if (connectionGeneration <= failed) return false
         }
-        val key = EntryKey(requestId, toolCallId, connectionGeneration)
+        val key = EntryKey(ref, connectionGeneration)
         val entry = entries[key] ?: return false
         when (entry.state) {
             State.Pending, State.Dispatched -> {
@@ -133,9 +143,9 @@ class InboundControlRequestRegistry {
     }
 
     /** Mark that fanout delivered the frame to at least one subscriber. */
-    fun markDispatched(requestId: String, connectionGeneration: Long, toolCallId: String? = null) {
+    fun markDispatched(ref: RequestRef, connectionGeneration: Long) {
         synchronized(lock) {
-            val key = EntryKey(requestId, toolCallId, connectionGeneration)
+            val key = EntryKey(ref, connectionGeneration)
             val entry = entries[key] ?: return
             if (entry.state == State.Pending) {
                 entries[key] = entry.copy(state = State.Dispatched)
@@ -145,12 +155,11 @@ class InboundControlRequestRegistry {
 
     /** True when [leaseToken] currently owns a Claimed (not yet Answered) entry. */
     fun ownsClaim(
-        requestId: String,
+        ref: RequestRef,
         leaseToken: Long,
         connectionGeneration: Long,
-        toolCallId: String? = null,
     ): Boolean = synchronized(lock) {
-        val entry = entries[EntryKey(requestId, toolCallId, connectionGeneration)] ?: return false
+        val entry = entries[EntryKey(ref, connectionGeneration)] ?: return false
         entry.state == State.Claimed && entry.leaseToken == leaseToken
     }
 
@@ -163,9 +172,9 @@ class InboundControlRequestRegistry {
      * marked answered by an old-connection response the server may never have seen.
      * A missing entry is a no-op by design (the claim generation already failed).
      */
-    fun markAnswered(requestId: String, connectionGeneration: Long, toolCallId: String? = null) {
+    fun markAnswered(ref: RequestRef, connectionGeneration: Long) {
         synchronized(lock) {
-            val key = EntryKey(requestId, toolCallId, connectionGeneration)
+            val key = EntryKey(ref, connectionGeneration)
             val entry = entries.remove(key) ?: return
             retainCompletedLocked(key, entry.copy(state = State.Answered))
         }
@@ -176,13 +185,12 @@ class InboundControlRequestRegistry {
      * answered (e.g. send failed because the transport dropped mid-response).
      */
     fun releaseClaim(
-        requestId: String,
+        ref: RequestRef,
         leaseToken: Long,
         connectionGeneration: Long,
-        toolCallId: String? = null,
     ) {
         synchronized(lock) {
-            val key = EntryKey(requestId, toolCallId, connectionGeneration)
+            val key = EntryKey(ref, connectionGeneration)
             val entry = entries[key] ?: return
             if (entry.state == State.Claimed && entry.leaseToken == leaseToken) {
                 entries[key] = entry.copy(state = State.Pending, leaseToken = null)
@@ -220,7 +228,7 @@ class InboundControlRequestRegistry {
 
     fun bindLease(request: BindRequest) {
         synchronized(lock) {
-            val key = EntryKey(request.requestId, request.toolCallId, request.connectionGeneration)
+            val key = EntryKey(RequestRef(request.requestId, request.toolCallId), request.connectionGeneration)
             val entry = entries[key] ?: return
             entries[key] = entry.copy(
                 leaseToken = request.leaseToken,
@@ -230,9 +238,9 @@ class InboundControlRequestRegistry {
         }
     }
 
-    fun lookup(requestId: String, connectionGeneration: Long, toolCallId: String? = null): Entry? =
+    fun lookup(ref: RequestRef, connectionGeneration: Long): Entry? =
         synchronized(lock) {
-            val key = EntryKey(requestId, toolCallId, connectionGeneration)
+            val key = EntryKey(ref, connectionGeneration)
             entries[key] ?: completed[key]
         }
 
@@ -241,15 +249,14 @@ class InboundControlRequestRegistry {
      * Claimed/Answered entries are not redelivered into the turn mapper.
      */
     fun isDeliverableTo(
-        requestId: String,
+        ref: RequestRef,
         leaseToken: Long,
         connectionGeneration: Long,
-        toolCallId: String? = null,
     ): Boolean = synchronized(lock) {
         failedGeneration?.let { failed ->
             if (connectionGeneration <= failed) return false
         }
-        val entry = entries[EntryKey(requestId, toolCallId, connectionGeneration)] ?: return false
+        val entry = entries[EntryKey(ref, connectionGeneration)] ?: return false
         entry.state == State.Pending || entry.state == State.Dispatched
     }
 
@@ -292,8 +299,8 @@ class InboundControlRequestRegistry {
             Telemetry.event(
                 "InboundControlRequestRegistry",
                 "completedHistory.evicted",
-                "requestId" to oldest.requestId,
-                "toolCallId" to (oldest.toolCallId ?: ""),
+                "requestId" to oldest.ref.requestId,
+                "toolCallId" to (oldest.ref.toolCallId ?: ""),
                 "generation" to oldest.connectionGeneration,
                 "cap" to MAX_COMPLETED_HISTORY,
                 level = Telemetry.Level.WARN,

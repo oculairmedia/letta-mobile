@@ -51,7 +51,7 @@ class RuntimeEventFanoutPendingControlTest {
 
         // The handoff registered it exactly once and marked it dispatched, so it
         // stays claimable by the successor lease but is not re-registered.
-        val entry = fanout.inboundControlRegistry().lookup("ext-recover-1", 0L, "tc-1")
+        val entry = fanout.inboundControlRegistry().lookup(controlRef("ext-recover-1", "tc-1"), 0L)
         assertEquals(InboundControlRequestRegistry.State.Dispatched, entry?.state)
     }
 
@@ -150,3 +150,7 @@ class RuntimeEventFanoutPendingControlTest {
         )
     }
 }
+
+/** Shorthand for the (request_id, tool_call_id) identity (lgns8.22.4.1.3). */
+private fun controlRef(requestId: String, toolCallId: String? = null) =
+    InboundControlRequestRegistry.RequestRef(requestId, toolCallId)

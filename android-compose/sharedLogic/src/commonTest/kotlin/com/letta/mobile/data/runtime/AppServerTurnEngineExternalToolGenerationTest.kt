@@ -228,11 +228,11 @@ class AppServerTurnEngineExternalToolGenerationTest {
 
         assertEquals(
             InboundControlRequestRegistry.State.Answered,
-            registry.lookup("approval-1", 0L)?.state,
+            registry.lookup(controlRef("approval-1"), connectionGeneration = 0L)?.state,
             "the generation the decision was actually sent on is retired",
         )
         assertTrue(
-            registry.isDeliverableTo("approval-1", leaseToken = 99L, connectionGeneration = 1L),
+            registry.isDeliverableTo(controlRef("approval-1"), leaseToken = 99L, connectionGeneration = 1L),
             "the successor generation's recovery replay must stay deliverable — the " +
                 "server may never have received the old-connection decision",
         )
@@ -267,7 +267,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
         engine.markInboundControlAnswered("approval-9", claimGeneration = 0L)
 
         assertTrue(
-            registry.isDeliverableTo("approval-9", leaseToken = 1L, connectionGeneration = 1L),
+            registry.isDeliverableTo(controlRef("approval-9"), leaseToken = 1L, connectionGeneration = 1L),
             "an answer sent on generation 0 must not retire the generation-1 replay",
         )
     }
@@ -382,3 +382,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
         }
     }
 }
+
+/** Shorthand for the (request_id, tool_call_id) identity (lgns8.22.4.1.3). */
+private fun controlRef(requestId: String, toolCallId: String? = null) =
+    InboundControlRequestRegistry.RequestRef(requestId, toolCallId)

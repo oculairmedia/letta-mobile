@@ -546,11 +546,10 @@ class RuntimeEventFanoutTest {
         // is what locks out further fanout delivery of the same request_id.
         assertTrue(
             fanout.inboundControlRegistry().tryClaim(
-                requestId = "ext-1",
+                // lgns8.22.4.1.3: external-tool identity is (request_id, tool_call_id).
+                controlRef("ext-1", "tc-1"),
                 leaseToken = 1L,
                 connectionGeneration = 0L,
-                // lgns8.22.4.1.3: external-tool identity is (request_id, tool_call_id).
-                toolCallId = "tc-1",
             ),
         )
         fanout.route(received(request))
@@ -643,3 +642,7 @@ private fun buildStreamDelta(
             put("run_id", JsonPrimitive(runId))
         },
     )
+
+/** Shorthand for the (request_id, tool_call_id) identity (lgns8.22.4.1.3). */
+private fun controlRef(requestId: String, toolCallId: String? = null) =
+    InboundControlRequestRegistry.RequestRef(requestId, toolCallId)

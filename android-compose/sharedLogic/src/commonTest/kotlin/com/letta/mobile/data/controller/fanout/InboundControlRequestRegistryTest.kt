@@ -42,11 +42,11 @@ class InboundControlRequestRegistryTest {
                 connectionGeneration = 2L,
             ),
         )
-        assertTrue(registry.tryClaim("ext-1", leaseToken = 10L, connectionGeneration = 2L))
-        assertFalse(registry.tryClaim("ext-1", leaseToken = 11L, connectionGeneration = 2L))
+        assertTrue(registry.tryClaim(controlRef("ext-1"), leaseToken = 10L, connectionGeneration = 2L))
+        assertFalse(registry.tryClaim(controlRef("ext-1"), leaseToken = 11L, connectionGeneration = 2L))
         // Owning lease also cannot claim twice — delivery is once-only.
-        assertFalse(registry.tryClaim("ext-1", leaseToken = 10L, connectionGeneration = 2L))
-        assertTrue(registry.ownsClaim("ext-1", leaseToken = 10L, connectionGeneration = 2L))
+        assertFalse(registry.tryClaim(controlRef("ext-1"), leaseToken = 10L, connectionGeneration = 2L))
+        assertTrue(registry.ownsClaim(controlRef("ext-1"), leaseToken = 10L, connectionGeneration = 2L))
     }
 
     @Test
@@ -61,7 +61,7 @@ class InboundControlRequestRegistryTest {
         )
         registry.failGeneration(3L)
         assertEquals(0, registry.pendingCount())
-        assertFalse(registry.tryClaim("perm-1", leaseToken = 1L, connectionGeneration = 3L))
+        assertFalse(registry.tryClaim(controlRef("perm-1"), leaseToken = 1L, connectionGeneration = 3L))
         assertIs<InboundControlRequestRegistry.RegisterResult.GenerationFailed>(
             registry.register(
                 InboundControlRequestRegistry.RegisterRequest(
@@ -93,13 +93,13 @@ class InboundControlRequestRegistryTest {
                 connectionGeneration = 1L,
             ),
         )
-        assertTrue(registry.tryClaim("ext-1", leaseToken = 7L, connectionGeneration = 1L))
-        registry.releaseClaim("ext-1", leaseToken = 7L, connectionGeneration = 1L)
-        assertTrue(registry.isDeliverableTo("ext-1", leaseToken = 7L, connectionGeneration = 1L))
-        assertTrue(registry.tryClaim("ext-1", leaseToken = 7L, connectionGeneration = 1L))
-        registry.markAnswered("ext-1", connectionGeneration = 1L)
-        assertFalse(registry.isDeliverableTo("ext-1", leaseToken = 7L, connectionGeneration = 1L))
-        assertFalse(registry.tryClaim("ext-1", leaseToken = 7L, connectionGeneration = 1L))
+        assertTrue(registry.tryClaim(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L))
+        registry.releaseClaim(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L)
+        assertTrue(registry.isDeliverableTo(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L))
+        assertTrue(registry.tryClaim(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L))
+        registry.markAnswered(controlRef("ext-1"), connectionGeneration = 1L)
+        assertFalse(registry.isDeliverableTo(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L))
+        assertFalse(registry.tryClaim(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L))
     }
 
     @Test
@@ -112,10 +112,10 @@ class InboundControlRequestRegistryTest {
                 connectionGeneration = 5L,
             ),
         )
-        registry.markDispatched("ext-1", connectionGeneration = 5L)
-        assertTrue(registry.isDeliverableTo("ext-1", leaseToken = 1L, connectionGeneration = 5L))
-        assertTrue(registry.tryClaim("ext-1", leaseToken = 1L, connectionGeneration = 5L))
-        assertFalse(registry.isDeliverableTo("ext-1", leaseToken = 1L, connectionGeneration = 5L))
+        registry.markDispatched(controlRef("ext-1"), connectionGeneration = 5L)
+        assertTrue(registry.isDeliverableTo(controlRef("ext-1"), leaseToken = 1L, connectionGeneration = 5L))
+        assertTrue(registry.tryClaim(controlRef("ext-1"), leaseToken = 1L, connectionGeneration = 5L))
+        assertFalse(registry.isDeliverableTo(controlRef("ext-1"), leaseToken = 1L, connectionGeneration = 5L))
     }
 
     /**
@@ -151,12 +151,12 @@ class InboundControlRequestRegistryTest {
         assertEquals(2, registry.pendingCount())
 
         // Each identity is independently claimable and answerable.
-        assertTrue(registry.tryClaim("ext-shared", leaseToken = 1L, connectionGeneration = 1L, toolCallId = "tc-a"))
-        assertTrue(registry.tryClaim("ext-shared", leaseToken = 1L, connectionGeneration = 1L, toolCallId = "tc-b"))
-        registry.markAnswered("ext-shared", connectionGeneration = 1L, toolCallId = "tc-a")
+        assertTrue(registry.tryClaim(controlRef("ext-shared", "tc-a"), leaseToken = 1L, connectionGeneration = 1L))
+        assertTrue(registry.tryClaim(controlRef("ext-shared", "tc-b"), leaseToken = 1L, connectionGeneration = 1L))
+        registry.markAnswered(controlRef("ext-shared", "tc-a"), connectionGeneration = 1L)
         assertEquals(
             InboundControlRequestRegistry.State.Claimed,
-            registry.lookup("ext-shared", 1L, "tc-b")?.state,
+            registry.lookup(controlRef("ext-shared", "tc-b"), 1L)?.state,
             "answering one tool_call_id must not retire the other",
         )
     }
@@ -180,7 +180,7 @@ class InboundControlRequestRegistryTest {
                 ),
             ),
         )
-        assertTrue(registry.tryClaim("perm-1", leaseToken = 1L, connectionGeneration = 1L))
+        assertTrue(registry.tryClaim(controlRef("perm-1"), leaseToken = 1L, connectionGeneration = 1L))
     }
 
     /**
@@ -201,7 +201,7 @@ class InboundControlRequestRegistryTest {
                     toolCallId = "tc-$index",
                 ),
             )
-            registry.markAnswered("ext-$index", connectionGeneration = 1L, toolCallId = "tc-$index")
+            registry.markAnswered(controlRef("ext-$index", "tc-$index"), connectionGeneration = 1L)
         }
 
         assertEquals(0, registry.liveEntryCount(), "answered work must leave the live map")
@@ -214,9 +214,9 @@ class InboundControlRequestRegistryTest {
         // The most recent answer is still deduped; the evicted oldest is not.
         assertEquals(
             InboundControlRequestRegistry.State.Answered,
-            registry.lookup("ext-${total - 1}", 1L, "tc-${total - 1}")?.state,
+            registry.lookup(controlRef("ext-${total - 1}", "tc-${total - 1}"), 1L)?.state,
         )
-        assertEquals(null, registry.lookup("ext-0", 1L, "tc-0"))
+        assertEquals(null, registry.lookup(controlRef("ext-0", "tc-0"), 1L))
     }
 
     @Test
@@ -230,7 +230,7 @@ class InboundControlRequestRegistryTest {
                 toolCallId = "tc-1",
             ),
         )
-        registry.markAnswered("ext-1", connectionGeneration = 1L, toolCallId = "tc-1")
+        registry.markAnswered(controlRef("ext-1", "tc-1"), connectionGeneration = 1L)
 
         val replay = registry.register(
             InboundControlRequestRegistry.RegisterRequest(
@@ -242,7 +242,7 @@ class InboundControlRequestRegistryTest {
         )
         val duplicate = assertIs<InboundControlRequestRegistry.RegisterResult.Duplicate>(replay)
         assertEquals(InboundControlRequestRegistry.State.Answered, duplicate.entry.state)
-        assertFalse(registry.tryClaim("ext-1", leaseToken = 1L, connectionGeneration = 1L, toolCallId = "tc-1"))
+        assertFalse(registry.tryClaim(controlRef("ext-1", "tc-1"), leaseToken = 1L, connectionGeneration = 1L))
     }
 
     @Test
@@ -256,7 +256,7 @@ class InboundControlRequestRegistryTest {
                 toolCallId = "tc-1",
             ),
         )
-        registry.markAnswered("ext-1", connectionGeneration = 1L, toolCallId = "tc-1")
+        registry.markAnswered(controlRef("ext-1", "tc-1"), connectionGeneration = 1L)
         registry.failGeneration(1L)
         assertEquals(0, registry.completedHistoryCount())
         assertIs<InboundControlRequestRegistry.RegisterResult.Accepted>(
@@ -298,12 +298,16 @@ class InboundControlRequestRegistryTest {
 
         // The in-flight send from the dead connection completes and marks answered
         // against the generation it was CLAIMED on.
-        registry.markAnswered("perm-1", connectionGeneration = 1L)
+        registry.markAnswered(controlRef("perm-1"), connectionGeneration = 1L)
 
         assertTrue(
-            registry.isDeliverableTo("perm-1", leaseToken = 9L, connectionGeneration = 2L),
+            registry.isDeliverableTo(controlRef("perm-1"), leaseToken = 9L, connectionGeneration = 2L),
             "the successor generation's replay must survive an old-generation answer",
         )
-        assertTrue(registry.tryClaim("perm-1", leaseToken = 9L, connectionGeneration = 2L))
+        assertTrue(registry.tryClaim(controlRef("perm-1"), leaseToken = 9L, connectionGeneration = 2L))
     }
 }
+
+/** Shorthand for the (request_id, tool_call_id) identity (lgns8.22.4.1.3). */
+private fun controlRef(requestId: String, toolCallId: String? = null) =
+    InboundControlRequestRegistry.RequestRef(requestId, toolCallId)

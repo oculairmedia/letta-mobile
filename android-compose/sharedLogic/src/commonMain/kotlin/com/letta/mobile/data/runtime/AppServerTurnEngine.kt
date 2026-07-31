@@ -209,6 +209,7 @@ class AppServerTurnEngine(
         // handler must not make us register/claim (and execute) under a successor
         // generation, poisoning its registry entry and duplicating tool side effects.
         val generation = validatedGeneration
+        val ref = InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId)
         // Direct client.events path may not have gone through the fanout register.
         inboundControlRegistry.register(
             InboundControlRequestRegistry.RegisterRequest(
@@ -222,8 +223,8 @@ class AppServerTurnEngine(
         )
         // matches() already claimed delivery for this lease; only answer if we own it
         // (or claim here on paths that skipped the registry match branch).
-        if (!inboundControlRegistry.ownsClaim(request.requestId, leaseToken, generation, request.toolCallId) &&
-            !inboundControlRegistry.tryClaim(request.requestId, leaseToken, generation, request.toolCallId)
+        if (!inboundControlRegistry.ownsClaim(ref, leaseToken, generation) &&
+            !inboundControlRegistry.tryClaim(ref, leaseToken, generation)
         ) {
             Telemetry.event(
                 "AppServerTurnEngine", "externalTool.claimSkipped",
@@ -282,7 +283,7 @@ class AppServerTurnEngine(
                 AppServerCommand.ExternalToolCallResponse(requestId = request.requestId, result = result),
             )
         }.onSuccess {
-            inboundControlRegistry.markAnswered(request.requestId, generation, request.toolCallId)
+            inboundControlRegistry.markAnswered(ref, generation)
             // lgns8.22.4.1.6: the cached result is deliberately RETAINED. A one-way
             // send is an AmbiguousMutation — if the server never received it, it
             // replays the request and the replay must reuse this result rather than
@@ -292,8 +293,34 @@ class AppServerTurnEngine(
             Telemetry.error("AppServerTurnEngine", "externalTool.responseSendFailed", it)
             // Keep retriable: server never saw the response and will re-emit.
             // Cached result above prevents re-invoking the tool on replay.
-            inboundControlRegistry.releaseClaim(request.requestId, leaseToken, generation, request.toolCallId)
+            inboundControlRegistry.releaseClaim(ref, leaseToken, generation)
         }
+    }
+
+    /**
+     * Answer [received] when it is an external_tool_call_request.
+     *
+     * lgns8.22.4.1.2: hands the VALIDATED lease generation to the handler so a
+     * disconnect racing this frame cannot make it execute/claim under the
+     * successor generation.
+     */
+    private suspend fun answerExternalToolCallIfPresent(
+        received: AppServerReceivedFrame,
+        leaseToken: Long,
+    ) {
+        val toolRequest = received.frame as? AppServerInboundFrame.ExternalToolCallRequest ?: return
+        val validatedGeneration = validatedLeaseGeneration(leaseToken)
+        if (validatedGeneration == null) {
+            Telemetry.event(
+                "AppServerTurnEngine", "externalTool.leaseGenerationUnavailable",
+                "requestId" to toolRequest.requestId,
+                "toolCallId" to toolRequest.toolCallId,
+                "leaseToken" to leaseToken,
+                level = Telemetry.Level.WARN,
+            )
+            return
+        }
+        guaranteeExternalToolResponse(toolRequest, leaseToken, validatedGeneration)
     }
 
     /**
@@ -318,7 +345,11 @@ class AppServerTurnEngine(
             "phase" to phase,
             level = Telemetry.Level.WARN,
         )
-        inboundControlRegistry.releaseClaim(request.requestId, leaseToken, generation, request.toolCallId)
+        inboundControlRegistry.releaseClaim(
+            InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId),
+            leaseToken,
+            generation,
+        )
         return true
     }
 
@@ -388,7 +419,10 @@ class AppServerTurnEngine(
         requestId: String,
         claimGeneration: Long = connectionGenerationProvider(),
     ) {
-        inboundControlRegistry.markAnswered(requestId, claimGeneration)
+        inboundControlRegistry.markAnswered(
+            InboundControlRequestRegistry.RequestRef(requestId),
+            claimGeneration,
+        )
     }
 
     /** Connection generation snapshot for callers that must capture it before a send. */
@@ -992,23 +1026,7 @@ class AppServerTurnEngine(
                 // it). Reply here — this is the one place the raw frame still
                 // carries request_id (toToolCallDraft discards it) and the client
                 // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
-                (received.frame as? AppServerInboundFrame.ExternalToolCallRequest)?.let { toolRequest ->
-                    // lgns8.22.4.1.2: hand the VALIDATED lease generation to the
-                    // handler so a disconnect racing this frame cannot make it
-                    // execute/claim under the successor generation.
-                    val validatedGeneration = validatedLeaseGeneration(leaseToken)
-                    if (validatedGeneration == null) {
-                        Telemetry.event(
-                            "AppServerTurnEngine", "externalTool.leaseGenerationUnavailable",
-                            "requestId" to toolRequest.requestId,
-                            "toolCallId" to toolRequest.toolCallId,
-                            "leaseToken" to leaseToken,
-                            level = Telemetry.Level.WARN,
-                        )
-                    } else {
-                        guaranteeExternalToolResponse(toolRequest, leaseToken, validatedGeneration)
-                    }
-                }
+                answerExternalToolCallIfPresent(received, leaseToken)
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the
@@ -1394,7 +1412,10 @@ class AppServerTurnEngine(
                 ),
             ),
         )
-        inboundControlRegistry.markAnswered(approval.requestId, claimGeneration)
+        inboundControlRegistry.markAnswered(
+            InboundControlRequestRegistry.RequestRef(approval.requestId),
+            claimGeneration,
+        )
         return true
     }
 
@@ -1682,10 +1703,12 @@ class AppServerTurnEngine(
         // this generation are dropped (approvals and external tools alike).
         // lgns8.22.4.1.3: external-tool identity includes tool_call_id.
         return inboundControlRegistry.tryClaim(
-            requestId,
+            InboundControlRequestRegistry.RequestRef(
+                requestId,
+                (frame as? AppServerInboundFrame.ExternalToolCallRequest)?.toolCallId,
+            ),
             leaseToken,
             connectionGeneration,
-            (frame as? AppServerInboundFrame.ExternalToolCallRequest)?.toolCallId,
         )
     }
 

@@ -168,7 +168,10 @@ class RuntimeEventFanout(
         if (!delivered) return
         val requestId = controlRequestId ?: return
         val generation = controlGeneration ?: return
-        inboundControlRegistry.markDispatched(requestId, generation, controlToolCallId)
+        inboundControlRegistry.markDispatched(
+            InboundControlRequestRegistry.RequestRef(requestId, controlToolCallId),
+            generation,
+        )
     }
 
     private data class RoutePlan(
@@ -288,18 +291,12 @@ class RuntimeEventFanout(
         channel: Channel<AppServerReceivedFrame>,
     ) {
         if (pendingControlFrames.isEmpty()) return
-        val dispatched = mutableListOf<PendingControlFrame>()
-        val iterator = pendingControlFrames.iterator()
-        while (iterator.hasNext()) {
-            val pending = iterator.next()
-            if (pending.runtimeKey != null && pending.runtimeKey != key) continue
-            iterator.remove()
-            // Generation-failed / already-answered frames are dropped here.
-            if (!registerUnscopedControl(pending.received, pending.received.frame.runtime)) continue
-            if (channel.trySend(pending.received).isSuccess) dispatched += pending
-        }
+        val dispatched = takePendingControlForLocked(key, channel)
         dispatched.forEach {
-            inboundControlRegistry.markDispatched(it.requestId, it.generation, it.toolCallId)
+            inboundControlRegistry.markDispatched(
+                InboundControlRequestRegistry.RequestRef(it.requestId, it.toolCallId),
+                it.generation,
+            )
         }
         if (dispatched.isNotEmpty()) {
             Telemetry.event(
@@ -310,6 +307,28 @@ class RuntimeEventFanout(
                 "conversationId" to key.conversationId,
             )
         }
+    }
+
+    /**
+     * Remove every buffered frame addressed to [key] and hand the ones that still
+     * register (i.e. are not generation-failed or already answered) to [channel].
+     * @return the frames actually placed in the channel.
+     */
+    private fun takePendingControlForLocked(
+        key: RuntimeKey,
+        channel: Channel<AppServerReceivedFrame>,
+    ): List<PendingControlFrame> {
+        val dispatched = mutableListOf<PendingControlFrame>()
+        val iterator = pendingControlFrames.iterator()
+        while (iterator.hasNext()) {
+            val pending = iterator.next()
+            if (pending.runtimeKey != null && pending.runtimeKey != key) continue
+            iterator.remove()
+            // Generation-failed / already-answered frames are dropped here.
+            if (!registerUnscopedControl(pending.received, pending.received.frame.runtime)) continue
+            if (channel.trySend(pending.received).isSuccess) dispatched += pending
+        }
+        return dispatched
     }
 
     /** Test/telemetry: control frames retained for a future subscriber. */
