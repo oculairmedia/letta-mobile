@@ -20,7 +20,8 @@ import kotlinx.coroutines.launch
  */
 internal class AdminChatTransportCoordinator(
     private val scope: CoroutineScope,
-    private val isShimBackend: StateFlow<Boolean>,
+    /** Iroh OR shim WS — both surface channel-transport state in the UI. */
+    private val usesChannelTransport: StateFlow<Boolean>,
     private val wsChatBridge: WsChatBridge,
     private val uiState: MutableStateFlow<ChatUiState>,
     /**
@@ -36,7 +37,7 @@ internal class AdminChatTransportCoordinator(
     fun startObserving() {
         startConnectionStateSurfacing()
         scope.launch {
-            combine(isShimBackend, wsChatBridge.connection) { isShim, wsState ->
+            combine(usesChannelTransport, wsChatBridge.connection) { isShim, wsState ->
                 if (!isShim) return@combine ChatTransport.Rest
                 when (wsState) {
                     is WsConnectionState.Idle -> ChatTransport.WsIdle
@@ -74,7 +75,7 @@ internal class AdminChatTransportCoordinator(
                 // Only the live channel transport backs this surface. On a REST
                 // backend the channel transport is inert, and its states must not
                 // be dressed up as chat-connection loss.
-                if (!isShimBackend.value) return@collect
+                if (!usesChannelTransport.value) return@collect
                 when (transportState) {
                     is ChannelTransportState.Connected -> {
                         if (!sawDisconnect) return@collect

@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.repository.api.IMessageRepository
@@ -57,7 +58,7 @@ class AdminChatComposerCoordinatorTest {
             uiState = uiState,
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
-            isShimBackend = { false },
+            backendKind = { BackendKind.REST },
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
@@ -108,7 +109,7 @@ class AdminChatComposerCoordinatorTest {
             uiState = uiState,
             agentId = AgentId("agent_123"),
             explicitConversationId = "conv_123",
-            isShimBackend = { false },
+            backendKind = { BackendKind.REST },
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,

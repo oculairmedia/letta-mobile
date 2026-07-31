@@ -30,7 +30,8 @@ internal class AdminChatGoalCoordinator(
     private val wsChatBridge: WsChatBridge,
     private val uiState: MutableStateFlow<ChatUiState>,
     private val bannerController: ChatBannerController,
-    private val isShimBackend: StateFlow<Boolean>,
+    /** Iroh OR shim WS — /goal rides the frame channel on both. */
+    private val usesChannelTransport: StateFlow<Boolean>,
     private val localRuntimeRouting: () -> LocalRuntimeRouting,
     private val onGoalSlashCommandsDetected: () -> Unit,
 ) {
@@ -43,7 +44,7 @@ internal class AdminChatGoalCoordinator(
             }
         }
         scope.launch {
-            isShimBackend
+            usesChannelTransport
                 .filter { it }
                 .distinctUntilChanged()
                 .collect { refreshGoalStatus() }
@@ -104,7 +105,7 @@ internal class AdminChatGoalCoordinator(
         (uiState.value.conversationState as? ConversationState.Ready)?.conversationId
 
     fun sendGoalCommand(command: String) {
-        if (!isShimBackend.value) return
+        if (!usesChannelTransport.value) return
         scope.launch {
             slashCommandRepository.executeGoalCommand(agentId.value, command)
                 .onSuccess { message ->

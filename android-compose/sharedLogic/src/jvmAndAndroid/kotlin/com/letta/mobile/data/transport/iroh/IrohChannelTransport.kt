@@ -1896,12 +1896,17 @@ class IrohChannelTransport(
             "project.list",
         )
 
-        fun isIrohUrl(url: String?): Boolean {
-            // Handle bare iroh://, https://iroh:// (corrupted saved config), etc.
-            if (url == null) return false
-            val stripped = url.trimStart().removePrefix("https://").removePrefix("http://")
-            return stripped.startsWith(IROH_URL_PREFIX)
-        }
+        /**
+         * Handles bare `iroh://`, `https://iroh://` (corrupted saved config), etc.
+         *
+         * letta-mobile-lgns8.10.4.1: delegates to the commonMain
+         * [com.letta.mobile.data.model.isIrohBackendUrl] so there is exactly ONE
+         * implementation of this classification. Four independent copies used to
+         * exist (here, ShimBackendDetector, ChatSendCoordinator,
+         * AdminChatViewModel) and they were free to drift apart.
+         */
+        fun isIrohUrl(url: String?): Boolean =
+            com.letta.mobile.data.model.isIrohBackendUrl(url)
 
         /**
          * Strips transport-scheme noise off an iroh backend URL and returns the bare

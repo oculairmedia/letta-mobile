@@ -7,7 +7,9 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.session.SessionManager
 import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
+import com.letta.mobile.feature.chat.send.IrohChatSendStrategy
 import com.letta.mobile.feature.chat.send.LocalRuntimeChatSendStrategy
 import com.letta.mobile.feature.chat.send.TimelineChatSendStrategy
 import com.letta.mobile.feature.chat.send.WsChatSendStrategy
@@ -38,7 +40,7 @@ internal class AdminChatSendPipeline(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val composerController: ChatComposerController,
     private val chatBannerController: ChatBannerController,
-    private val isShimBackend: () -> Boolean,
+    private val backendKind: () -> BackendKind,
     private val activeConversationId: () -> String?,
     private val setActiveConversationId: (String?) -> Unit,
     private val startTimelineObserver: (conversationId: String) -> Unit,
@@ -107,11 +109,23 @@ internal class AdminChatSendPipeline(
         LocalRuntimeChatSendStrategy(localRuntimeChatSendCoordinator)
     }
 
+    /**
+     * lgns8.10.4.1: Iroh's own send route. Shares [wsChatSendCoordinator] with
+     * [wsChatSendStrategy] because that coordinator is transport-neutral — it
+     * drives whichever `IChannelTransport` the session graph bound. The types
+     * are distinct so the routing decision (and its telemetry) can never
+     * silently send an Iroh backend down the shim route.
+     */
+    val irohChatSendStrategy: IrohChatSendStrategy by lazy {
+        IrohChatSendStrategy(wsChatSendCoordinator)
+    }
+
     val chatSendStrategySelector: ChatSendStrategySelector by lazy {
         ChatSendStrategySelector(
             timelineStrategy = timelineChatSendStrategy,
             wsStrategy = wsChatSendStrategy,
             localStrategy = localRuntimeChatSendStrategy,
+            irohStrategy = irohChatSendStrategy,
         )
     }
 
@@ -124,7 +138,7 @@ internal class AdminChatSendPipeline(
             uiState = uiState,
             agentId = agentId,
             explicitConversationId = explicitConversationId,
-            isShimBackend = isShimBackend,
+            backendKind = backendKind,
             sessionManager = sessionManager,
             messageRepository = messageRepository,
             slashCommandRepository = slashCommandRepository,
