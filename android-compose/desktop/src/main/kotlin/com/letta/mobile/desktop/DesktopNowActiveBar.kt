@@ -68,6 +68,7 @@ private val NowActiveStatus.label: String
         NowActiveStatus.Idle -> ""
         NowActiveStatus.Thinking -> "thinking…"
         NowActiveStatus.Streaming -> "responding…"
+        NowActiveStatus.Stopping -> "stopping…"
         NowActiveStatus.Error -> "needs attention"
     }
 
@@ -104,6 +105,10 @@ internal fun DesktopNowActiveBarHost(
 ) {
     val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
     val streamingId by chatController.streamingConversationId.collectAsState()
+    // letta-mobile-lgns8.19: an abort was sent but the terminal frame hasn't
+    // landed — the run is still live, so the bar says "stopping…" and the stop
+    // button stays available as the local force-clear escape hatch.
+    val cancellingId by chatController.cancellingConversationId.collectAsState()
     val barConversation = lastPromptedId
         ?.let { id -> chatState.conversations.firstOrNull { it.id == id } }
         ?: chatState.selectedConversation
@@ -123,6 +128,7 @@ internal fun DesktopNowActiveBarHost(
                     streamingId == barConversation.id
                 },
                 hasError = barIsSelected && chatState.errorMessage != null,
+                isStopping = cancellingId == barConversation.id,
             ),
             backgroundWorkAgentName = host.thinkingConversationId
                 ?.takeIf { it != barConversation.id }
@@ -208,8 +214,11 @@ internal fun DesktopNowActiveBar(
                 state.backgroundWorkAgentName?.let { name ->
                     BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
                 }
-                if (state.status == NowActiveStatus.Thinking || state.status == NowActiveStatus.Streaming) {
-                    StopRunButton(onClick = actions.onStopRun)
+                if (state.status == NowActiveStatus.Thinking ||
+                    state.status == NowActiveStatus.Streaming ||
+                    state.status == NowActiveStatus.Stopping
+                ) {
+                    StopRunButton(stopping = state.status == NowActiveStatus.Stopping, onClick = actions.onStopRun)
                 }
                 AvatarCompanionButton(
                     active = state.avatarCompanionActive,
@@ -221,10 +230,10 @@ internal fun DesktopNowActiveBar(
 }
 
 @Composable
-private fun StopRunButton(onClick: () -> Unit) {
+private fun StopRunButton(stopping: Boolean, onClick: () -> Unit) {
     BarIconButton(
         icon = Icons.Outlined.StopCircle,
-        description = "Stop run",
+        description = if (stopping) "Stopping run — click again to force stop" else "Stop run",
         tint = MaterialTheme.colorScheme.error,
         onClick = onClick,
     )

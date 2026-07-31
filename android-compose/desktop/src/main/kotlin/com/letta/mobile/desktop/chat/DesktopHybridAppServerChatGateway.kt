@@ -82,7 +82,30 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         httpGateway.getConversation(conversationId).agentId.value
     },
-) : DesktopChatGateway, ChatGatewayExtras by httpGateway, DesktopApprovalSubmitter, AutoCloseable {
+) : DesktopChatGateway,
+    ChatGatewayExtras by httpGateway,
+    DesktopApprovalSubmitter,
+    DesktopTurnAborter,
+    AutoCloseable {
+
+    /**
+     * conversationId -> the canonical run id most recently seen on that
+     * conversation's in-flight turn. letta-mobile-lgns8.19 addresses the abort at
+     * that run so the server tears down the RIGHT run; a null entry still aborts
+     * (the server then targets whatever run is active for the runtime).
+     */
+    private val activeRunIdByConversation = ConcurrentHashMap<String, String>()
+
+    /**
+     * letta-mobile-lgns8.19: REAL server-side abort for the desktop stop button.
+     * Previously desktop only cancelled its local collect job, so a long tool call
+     * ran to completion and its output later surfaced as a ghost resume.
+     */
+    override suspend fun abortConversationTurn(conversationId: String): Boolean {
+        val engine = turnEngine as? AppServerTurnEngine ?: return false
+        val runId = activeRunIdByConversation[conversationId]
+        return engine.abort(runId) != null
+    }
 
     /**
      * Answer / dismiss a parked runtime approval (e.g. AskUserQuestion) over the
@@ -185,6 +208,11 @@ class DesktopHybridAppServerChatGateway internal constructor(
             var mainReplyCompleted = false
             try {
                 turnEngine.runTurn(command).collect { draft ->
+                    // letta-mobile-lgns8.19: remember the turn's canonical run id
+                    // so a stop can address the abort at the right run.
+                    draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
+                        activeRunIdByConversation[conversationId] = it
+                    }
                     val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
                     if (lifecycle?.status == RuntimeRunStatus.Failed) {
                         // letta-mobile-br5g0: a Failed terminal AFTER the main reply
@@ -226,6 +254,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
                 }
             } finally {
                 activeSendConversations.remove(conversationId)
+                activeRunIdByConversation.remove(conversationId)
             }
         }
     }

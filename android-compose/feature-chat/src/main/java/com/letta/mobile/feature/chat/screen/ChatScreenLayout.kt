@@ -485,6 +485,7 @@ private fun ChatScreenComposerInputSection(
         inputText = composerState.inputText,
         pendingAttachments = composerState.pendingAttachments,
         isStreaming = state.isStreaming,
+        isCancelling = state.isCancellingRun,
         canSendMessages = viewModel.canSendMessages,
         onTextChange = { newText ->
             if (viewModel.handleComposerTextChanged(newText) == ChatComposerEffect.OpenBugReport) {
