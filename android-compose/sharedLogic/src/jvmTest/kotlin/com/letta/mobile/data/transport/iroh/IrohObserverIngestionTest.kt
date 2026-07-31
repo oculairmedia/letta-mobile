@@ -164,7 +164,7 @@ class IrohObserverIngestionTest {
 
             // Start a LOCAL turn on conv-local; activeTurn is set synchronously.
             assertTrue(transport.send("agent-1", "conv-local", "hi", "otid-local", null, false))
-            withTimeout(2.seconds) { while (!engine.isBusy) delay(10.milliseconds) }
+            withTimeout(2.seconds) { while (!engine.isBusy("agent-1", "conv-local")) delay(10.milliseconds) }
 
             // Frames for the ACTIVE-turn conversation arrive on the fanout stream:
             // the engine owns them — observer MUST NOT emit them.
