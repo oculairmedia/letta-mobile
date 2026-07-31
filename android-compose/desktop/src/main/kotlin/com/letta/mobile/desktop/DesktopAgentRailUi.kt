@@ -408,7 +408,11 @@ private fun ColumnScope.AgentRailOrbList(
     LazyColumn(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        // Each 30dp orb already sits in a 34dp slot (2dp slack top and bottom),
+        // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
+        // adjacent orbs. The slot itself stays 34dp — the thinking ring is
+        // exactly that size, so shrinking the slot would crowd it.
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
             AgentRailOrb(
