@@ -42,7 +42,13 @@ ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
   --app-server-url ws://127.0.0.1:4500 \
   --iroh-port 4501 \
   --iroh-secret-key-file /etc/meridian/iroh-secret.key \
-  --pairing-store-file /etc/meridian/paired-peers.json
+  --pairing-store-file /etc/meridian/paired-peers.json \
+  --subagent-registry-file /var/lib/meridian/subagent-registry.json
+
+# Durable state outside the immutable release tree (subagent registry — chips
+# must survive wrapper restarts, letta-mobile-lgns8.22.8). systemd creates and
+# owns /var/lib/meridian via StateDirectory.
+StateDirectory=meridian
 
 Restart=always
 RestartSec=10

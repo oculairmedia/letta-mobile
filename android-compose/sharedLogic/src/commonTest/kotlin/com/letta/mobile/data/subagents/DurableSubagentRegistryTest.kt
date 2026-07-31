@@ -383,6 +383,56 @@ class DurableSubagentRegistryTest {
         assertEquals(5, reg.liveCount())
     }
 
+    /**
+     * PR #1077 review (P2): a burst above the cap is allowed while every chip is
+     * LIVE (live chips are never evicted), but the registry must shrink back to
+     * the cap once those chips settle — even if no new key is ever inserted.
+     * Capacity used to be enforced ONLY on insert, so an oversized burst stayed
+     * oversized forever in memory AND in the durable snapshot.
+     *
+     * FAIL-ON-REVERT: remove the `enforceCapacityLocked()` call from the accepted
+     * -transition branch of `observeLocked` and this test goes red at 5 entries.
+     */
+    @Test
+    fun capacityIsReenforcedWhenLiveChipsBecomeTerminal() {
+        val store = InMemorySubagentRegistryStore()
+        val reg = registry(store, maxEntries = 2)
+        repeat(5) { index ->
+            now += 10
+            reg.observe(observation(toolCallId = "live/$index"))
+        }
+        assertEquals(5, reg.size(), "an all-live burst may exceed the cap")
+
+        // The burst settles. No NEW key is ever observed after this point.
+        repeat(5) { index ->
+            now += 10
+            reg.observe(observation(toolCallId = "live/$index", state = SubagentChipState.COMPLETED))
+        }
+
+        assertEquals(2, reg.size(), "the registry must shrink back to the cap once chips are evictable")
+        assertEquals(2, store.load().size, "the durable snapshot must shrink too")
+    }
+
+    /** The same re-enforcement, but driven by the reconciler orphaning chips. */
+    @Test
+    fun capacityIsReenforcedAfterReconciliationOrphansChips() {
+        val store = InMemorySubagentRegistryStore()
+        val reg = registry(store, maxEntries = 2)
+        repeat(5) { index ->
+            now += 10
+            reg.observe(observation(toolCallId = "live/$index"))
+        }
+        assertEquals(5, reg.size())
+
+        // Reconnect: none of them are live on the server any more.
+        now += 10
+        val result = reg.reconcile(conversationId = "conv-a", liveToolCallIds = emptySet())
+
+        assertEquals(5, result.orphaned.size)
+        assertEquals(2, reg.size(), "orphaning makes chips evictable, so the cap must be re-applied")
+        assertEquals(2, store.load().size)
+    }
+
     // -------------------------------------------------------------- plumbing
 
     @Test

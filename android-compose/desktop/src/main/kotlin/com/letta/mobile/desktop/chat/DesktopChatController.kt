@@ -791,6 +791,18 @@ class DesktopChatController(
      */
     private fun forceLocalStopClear(conversationId: String, reason: String) {
         sendJob?.cancel()
+        // The cancelled send rethrows CancellationException, so runRemoteSendAttempt
+        // never applies a reducer transition — without this the surface stays in
+        // Sending, canSend() stays false, and the composer is dead even though the
+        // stop UI cleared. The send WAS dispatched (we're stopping a live turn), so
+        // sendSucceeded — not sendFailed, which would resurrect the draft + error.
+        _state.update {
+            if (it.runtimeState.isSending) {
+                it.withRuntimeState(ChatSessionReducer.sendSucceeded(it.runtimeState))
+            } else {
+                it
+            }
+        }
         _cancellingConversationId.value = null
         if (_thinkingConversationId.value == conversationId) {
             _thinkingConversationId.value = null

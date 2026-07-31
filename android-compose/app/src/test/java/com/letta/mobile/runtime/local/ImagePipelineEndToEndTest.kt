@@ -554,6 +554,129 @@ class ImagePipelineEndToEndTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────
+    // Bounded-marker data-loss class (PR #1077 review, P1)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * THE BOUNDED-MARKER CORRUPTION CLASS. [BoundedTranscriptReader] replaces
+     * EVERY oversized JSON string value with a short marker — a huge tool
+     * result or a long text part, not only image base64. If the stripper
+     * rebuilds the file from that bounded view, then the moment ANY historical
+     * image is stripped the whole transcript is rewritten and every oversized
+     * NON-image value on every other row is permanently replaced on disk by its
+     * marker. The user's data is destroyed by a pass whose only job was to trim
+     * images.
+     *
+     * FAIL-ON-REVERT: make [LocalImageContextStripper] write rows from the
+     * bounded text again (rebuild-and-join instead of the stream-copy in
+     * `atomicRewrite`) and this test goes red — the tool-result row comes back
+     * carrying `OVERSIZED_VALUE:` instead of its original payload.
+     */
+    @Test
+    fun `oversized non-image rows survive a strip byte-identically`() {
+        val base = tmp.newFolder("store")
+        val dir = conversationDir(base, DEFAULT_CONV_KEY)
+        val transcript = File(dir, "messages.jsonl")
+
+        // A tool result far larger than the injected cap, on a row with NO image.
+        val hugeToolResult = "R".repeat(9000)
+        val toolResultLine =
+            """{"type":"message","id":"m-tool","parentId":null,"timestamp":"2026-07-31T00:00:00.000Z",""" +
+                """"message":{"id":"ui-tool","role":"user","content":[""" +
+                """{"type":"toolResult","toolCallId":"tc-1","output":"$hugeToolResult"}]}}"""
+        val original = listOf(
+            sessionHeader().toString(),
+            toolResultLine,
+            messageEnvelope("m1", userRow("ui-1", imagePartsFlat(SMALL_JPEG_BASE64, "image/jpeg"))).toString(),
+            messageEnvelope("m2", userRow("ui-2", imagePartsFlat(TINY_PNG_BASE64, "image/png"))).toString(),
+        )
+        transcript.writeText(original.joinToString("\n") + "\n")
+
+        // The cap is injected small so the tool result collapses cheaply; in
+        // production the same thing happens at ~8MB with a real tool dump.
+        val cap = 4096
+        assertTrue(
+            "the tool-result row must exceed the cap for this canary to mean anything",
+            BoundedTranscriptReader.readLines(transcript, cap)[1].collapsedValueChars > 0L,
+        )
+
+        val report = LocalImageContextStripper(
+            blobStore = LocalImageBlobStore(dir),
+            maxInlineValueChars = cap,
+        ).stripTranscript(transcript)
+
+        assertTrue("an image must actually have been stripped to trigger the rewrite", report.stripped)
+
+        val after = transcript.readLines().filter { it.isNotBlank() }
+        assertFalse(
+            "a bounded marker must never reach disk",
+            after.any { it.contains(BoundedTranscriptReader.OVERSIZED_VALUE_MARKER_PREFIX) },
+        )
+        assertEquals("the untouched tool-result row is byte-identical", toolResultLine, after[1])
+        assertEquals("the session header is byte-identical", original[0], after[0])
+        assertEquals(
+            "the preserved latest image row is byte-identical",
+            original[3],
+            after[3],
+        )
+    }
+
+    /**
+     * The mixed row: one message carrying BOTH a strippable image AND an
+     * oversized text part. This row IS rewritten, so it cannot simply be
+     * copied — the stripper must re-read it uncapped and strip from the
+     * ORIGINAL bytes, or the text part is written back as a marker.
+     *
+     * FAIL-ON-REVERT: drop the uncapped `readSingleLineFull` re-read in
+     * `planRewrites` and the recovered text becomes `OVERSIZED_VALUE:…`.
+     */
+    @Test
+    fun `a row with both an image and an oversized text part keeps the text`() {
+        val base = tmp.newFolder("store")
+        val dir = conversationDir(base, DEFAULT_CONV_KEY)
+        val transcript = File(dir, "messages.jsonl")
+
+        val hugeText = "T".repeat(9000)
+        val mixedLine =
+            """{"type":"message","id":"m-mixed","parentId":null,"timestamp":"2026-07-31T00:00:00.000Z",""" +
+                """"message":{"id":"ui-mixed","role":"user","content":[""" +
+                """{"type":"text","text":"$hugeText"},""" +
+                """{"type":"image","mimeType":"image/jpeg","data":"$SMALL_JPEG_BASE64"}]}}"""
+        transcript.writeText(
+            listOf(
+                sessionHeader().toString(),
+                mixedLine,
+                // A later image row so the mixed row is NOT the preserved latest one.
+                messageEnvelope("m2", userRow("ui-2", imagePartsFlat(TINY_PNG_BASE64, "image/png"))).toString(),
+            ).joinToString("\n") + "\n",
+        )
+
+        val cap = 4096
+        val report = LocalImageContextStripper(
+            blobStore = LocalImageBlobStore(dir),
+            maxInlineValueChars = cap,
+        ).stripTranscript(transcript)
+
+        assertEquals("the mixed row's image is stripped", 1, report.partsStripped)
+
+        val mixed = transcript.readLines()
+            .filter { it.isNotBlank() }
+            .map { json.parseToJsonElement(it).jsonObject }
+            .single { it["id"]?.jsonPrimitive?.content == "m-mixed" }
+        val parts = mixed["message"]!!.jsonObject["content"]!!.jsonArray
+        val text = parts.first().jsonObject["text"]!!.jsonPrimitive.content
+        assertEquals("the oversized text part keeps its ORIGINAL content", hugeText, text)
+        assertFalse(
+            "no bounded marker survived into the rewritten row",
+            mixed.toString().contains(BoundedTranscriptReader.OVERSIZED_VALUE_MARKER_PREFIX),
+        )
+        assertTrue(
+            "the image part on that same row became a placeholder",
+            parts[1].jsonObject["stripped"]?.jsonPrimitive?.content?.toBoolean() == true,
+        )
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
     // letta.js mirror (ground truth: the 0.29.x bundle — see the class KDoc)
     // ─────────────────────────────────────────────────────────────────────
 

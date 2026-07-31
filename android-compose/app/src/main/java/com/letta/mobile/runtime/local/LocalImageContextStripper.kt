@@ -99,16 +99,12 @@ class LocalImageContextStripper(
         // this bounds the extra memory cost to exactly the one image that
         // must survive, while every other row stays subject to the normal
         // collapsing/stripping behavior below.
-        var latestImageFullLine: String? = null
         val latestImageUserIndex = rows.indexOfLast { row -> row?.isUserImageMessage() == true }
             .let { candidate ->
                 if (candidate >= 0 && boundedLines[candidate].collapsedValueChars > 0L) {
-                    val fullLine = BoundedTranscriptReader.readSingleLineFull(transcript, candidate)
-                    val fullRow = fullLine?.let {
-                        runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull()
-                    }
+                    val fullRow = BoundedTranscriptReader.readSingleLineFull(transcript, candidate)
+                        ?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
                     if (fullRow != null && fullRow.isUserImageMessage()) {
-                        latestImageFullLine = fullLine
                         emitRereadTelemetry(candidate, recovered = true)
                         candidate
                     } else {
@@ -123,58 +119,19 @@ class LocalImageContextStripper(
                 }
             }
 
-        var partsStripped = 0
-        var bytesFreed = 0
-        var changed = false
-        var unparseableRows = 0
+        val plan = planRewrites(transcript, boundedLines, rows, latestImageUserIndex)
 
-        val rebuilt = lines.mapIndexed { index, line ->
-            if (index == latestImageUserIndex) return@mapIndexed (latestImageFullLine ?: line)
-
-            // FAIL-OPEN PER ROW (letta-mobile-6ppdr): a row we cannot parse is
-            // emitted byte-for-byte as it was read. It is never dropped and
-            // never re-serialized from a partial understanding of its shape.
-            val row = rows.getOrNull(index) ?: run {
-                unparseableRows++
-                return@mapIndexed line
-            }
-            // v3 envelope OR legacy flat row — `content` lives on the message
-            // BODY, which for a flat row is the row itself.
-            val body = SessionLogEnvelope.body(row)
-            val content = body["content"] as? JsonArray ?: return@mapIndexed line
-            if (content.none { isStrippableImage(it) }) return@mapIndexed line
-
-            val newContent = buildJsonArray {
-                content.forEach { part ->
-                    val p = part as? JsonObject
-                    if (p != null && isStrippableImage(p)) {
-                        bytesFreed += imageDataLength(p)
-                        partsStripped += 1
-                        changed = true
-                        add(strippedImage(p))
-                    } else {
-                        add(part)
-                    }
-                }
-            }
-            // Preserve EVERYTHING except the content array: the body's own other
-            // fields (id/role/…/unknown) keep their value and position, and the
-            // envelope around it is restored intact.
-            val newBodyMap = LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(body)
-            newBodyMap["content"] = newContent
-            val newBody = JsonObject(newBodyMap)
-            json.encodeToString(JsonObject.serializer(), SessionLogEnvelope.withBody(row, newBody))
-        }
-
-        if (unparseableRows > 0) {
+        if (plan.unparseableRows > 0) {
             Telemetry.event(
                 IMAGE_PIPELINE_TAG,
                 "strip.unparseable_row_passthrough",
-                "rows" to unparseableRows,
+                "rows" to plan.unparseableRows,
                 level = Telemetry.Level.WARN,
             )
         }
-        if (!changed) return StripReport(0, 0)
+        val partsStripped = plan.partsStripped
+        val bytesFreed = plan.bytesFreed
+        if (plan.rewrites.isEmpty()) return StripReport(0, 0)
 
         // letta-mobile-lgns8.20 (data-loss guard): the embedded letta.js node
         // process OWNS this file and can append to it concurrently while we
@@ -197,7 +154,7 @@ class LocalImageContextStripper(
             )
             return StripReport(0, 0)
         }
-        atomicWrite(transcript, rebuilt.joinToString("\n") + "\n")
+        atomicRewrite(transcript, plan.rewrites)
         Telemetry.event(
             IMAGE_PIPELINE_TAG,
             "strip.parts_stripped",
@@ -300,14 +257,126 @@ class LocalImageContextStripper(
     }
 
     /**
-     * Durably and atomically replaces [target] with [contents] (mirrors
-     * BackendOwnershipPreflight/PairedPeerStore's sidecar-write pattern).
-     * Writes a sibling `.tmp`, fsyncs it via [FileChannel.force] so the bytes
-     * survive a crash/power loss, then swaps it in with an ATOMIC_MOVE. A
-     * crash mid-write therefore leaves either the old transcript or the new
-     * one — never a truncated/partial file.
+     * The rows this pass will rewrite, keyed by their zero-based non-blank line
+     * index — plus the running counters. EVERY row not in [rewrites] is copied
+     * verbatim from the original file at write time.
      */
-    private fun atomicWrite(target: File, contents: String) {
+    private data class RewritePlan(
+        val rewrites: Map<Int, String>,
+        val partsStripped: Int,
+        val bytesFreed: Int,
+        val unparseableRows: Int,
+    )
+
+    /**
+     * Decide which rows to rewrite, and build their replacement text.
+     *
+     * DATA-LOSS RULE (PR #1077 review, P1): [BoundedTranscriptReader] replaces
+     * EVERY oversized JSON string value with a marker — not only image data. A
+     * row's bounded text is therefore a LOSSY view, safe to classify from but
+     * never safe to write back. So:
+     *
+     *  - a row we do not strip is never re-serialized at all (it is stream-copied
+     *    from the original bytes by [atomicRewrite]), and
+     *  - a row we DO strip is re-read UNCAPPED first when any of its values were
+     *    collapsed, so a row carrying both an image and an oversized tool result
+     *    keeps that tool result's real content.
+     *
+     * The uncapped re-read is per-row and sequential, so peak memory stays bounded
+     * to one row — the same bound the latest-image re-read already accepted.
+     */
+    private fun planRewrites(
+        transcript: File,
+        boundedLines: List<BoundedTranscriptReader.BoundedLine>,
+        rows: List<JsonObject?>,
+        latestImageUserIndex: Int,
+    ): RewritePlan {
+        val rewrites = LinkedHashMap<Int, String>()
+        var partsStripped = 0
+        var bytesFreed = 0
+        var unparseableRows = 0
+
+        rows.forEachIndexed { index, boundedRow ->
+            if (index == latestImageUserIndex) return@forEachIndexed
+            // FAIL-OPEN PER ROW (letta-mobile-6ppdr): a row we cannot parse is
+            // never rewritten, so it survives byte-for-byte. It is never dropped
+            // and never re-serialized from a partial understanding of its shape.
+            if (boundedRow == null) {
+                unparseableRows++
+                return@forEachIndexed
+            }
+            // v3 envelope OR legacy flat row — `content` lives on the message
+            // BODY, which for a flat row is the row itself.
+            val boundedContent = SessionLogEnvelope.body(boundedRow)["content"] as? JsonArray
+                ?: return@forEachIndexed
+            if (boundedContent.none { isStrippableImage(it) }) return@forEachIndexed
+
+            val sourceRow = if (boundedLines[index].collapsedValueChars > 0L) {
+                val fullRow = BoundedTranscriptReader.readSingleLineFull(transcript, index)
+                    ?.let { runCatching { json.parseToJsonElement(it).jsonObject }.getOrNull() }
+                if (fullRow == null) {
+                    // Original bytes unrecoverable (file changed under us). Leave
+                    // the row ALONE rather than persist the bounded markers over
+                    // the user's data — skipping a strip is recoverable, the
+                    // rewrite is not.
+                    emitLossyRewriteSkipped(index)
+                    return@forEachIndexed
+                }
+                fullRow
+            } else {
+                boundedRow
+            }
+
+            val sourceBody = SessionLogEnvelope.body(sourceRow)
+            val sourceContent = sourceBody["content"] as? JsonArray ?: return@forEachIndexed
+            var strippedHere = 0
+            val newContent = buildJsonArray {
+                sourceContent.forEach { part ->
+                    val p = part as? JsonObject
+                    if (p != null && isStrippableImage(p)) {
+                        bytesFreed += imageDataLength(p)
+                        strippedHere++
+                        add(strippedImage(p))
+                    } else {
+                        add(part)
+                    }
+                }
+            }
+            if (strippedHere == 0) return@forEachIndexed
+            partsStripped += strippedHere
+            // Preserve EVERYTHING except the content array: the body's own other
+            // fields (id/role/…/unknown) keep their value and position, and the
+            // envelope around it is restored intact.
+            val newBodyMap = LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(sourceBody)
+            newBodyMap["content"] = newContent
+            rewrites[index] = json.encodeToString(
+                JsonObject.serializer(),
+                SessionLogEnvelope.withBody(sourceRow, JsonObject(newBodyMap)),
+            )
+        }
+        return RewritePlan(rewrites, partsStripped, bytesFreed, unparseableRows)
+    }
+
+    /** Boundary telemetry for a strip declined to avoid persisting bounded markers. */
+    private fun emitLossyRewriteSkipped(lineIndex: Int) {
+        Telemetry.event(
+            IMAGE_PIPELINE_TAG,
+            "strip.skipped_unrecoverable_row",
+            "lineIndex" to lineIndex,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    /**
+     * Atomically rewrite [target], replacing only the lines in [replacements] and
+     * STREAM-COPYING every other line from the original bytes (the precedent set
+     * by LocalConversationHealer's byte-level copy of kept lines).
+     *
+     * Streaming matters twice over: an untouched row is byte-identical to what the
+     * runtime wrote — markers from the bounded read can never reach disk — and a
+     * multi-MB preserved image row is never materialized as one String.
+     */
+    private fun atomicRewrite(target: File, replacements: Map<Int, String>) {
         val tmp = target.toPath().resolveSibling("${target.name}.strip.tmp")
         java.nio.channels.FileChannel.open(
             tmp,
@@ -315,10 +384,80 @@ class LocalImageContextStripper(
             java.nio.file.StandardOpenOption.WRITE,
             java.nio.file.StandardOpenOption.TRUNCATE_EXISTING,
         ).use { channel ->
-            val buffer = java.nio.ByteBuffer.wrap(contents.toByteArray(Charsets.UTF_8))
-            while (buffer.hasRemaining()) channel.write(buffer)
+            val out = java.io.BufferedWriter(
+                java.nio.channels.Channels.newWriter(channel, Charsets.UTF_8),
+            )
+            copyWithReplacements(target, replacements, out)
+            out.flush()
             channel.force(true)
         }
+        moveIntoPlace(tmp, target)
+    }
+
+    /**
+     * Copy [source] to [out] verbatim, substituting the replacement text for each
+     * non-blank line whose zero-based index appears in [replacements] (the same
+     * indexing [BoundedTranscriptReader.readLines] uses).
+     */
+    private fun copyWithReplacements(source: File, replacements: Map<Int, String>, out: java.io.Writer) {
+        source.bufferedReader().use { reader ->
+            var nonBlankIndex = -1
+            var lineHasContent = false
+            var suppress = false
+            // Leading whitespace is held only until the line's index is known —
+            // bounded by a line's indentation, never by its payload.
+            val pendingIndent = StringBuilder()
+            val buf = CharArray(16 * 1024)
+            var read = reader.read(buf)
+            while (read != -1) {
+                for (i in 0 until read) {
+                    val c = buf[i]
+                    if (c == '\n') {
+                        if (lineHasContent) {
+                            nonBlankIndex++
+                            if (suppress) out.write(replacements.getValue(nonBlankIndex))
+                        } else if (pendingIndent.isNotEmpty()) {
+                            out.write(pendingIndent.toString())
+                        }
+                        out.write('\n'.code)
+                        pendingIndent.setLength(0)
+                        lineHasContent = false
+                        suppress = false
+                        continue
+                    }
+                    if (!lineHasContent) {
+                        if (c.isWhitespace()) {
+                            pendingIndent.append(c)
+                            continue
+                        }
+                        lineHasContent = true
+                        suppress = replacements.containsKey(nonBlankIndex + 1)
+                        if (!suppress) out.write(pendingIndent.toString())
+                        pendingIndent.setLength(0)
+                    }
+                    if (!suppress) out.write(c.code)
+                }
+                read = reader.read(buf)
+            }
+            // EOF without a trailing newline: normalize to one, as the previous
+            // whole-file write did.
+            if (lineHasContent) {
+                nonBlankIndex++
+                if (suppress) out.write(replacements.getValue(nonBlankIndex))
+                out.write('\n'.code)
+            } else if (pendingIndent.isNotEmpty()) {
+                out.write(pendingIndent.toString())
+            }
+        }
+    }
+
+    /**
+     * Swaps the fsynced sidecar in (mirrors BackendOwnershipPreflight /
+     * PairedPeerStore's sidecar-write pattern). The `.tmp` was already forced to
+     * stable storage by [atomicRewrite], so a crash mid-write leaves either the
+     * old transcript or the new one — never a truncated/partial file.
+     */
+    private fun moveIntoPlace(tmp: java.nio.file.Path, target: File) {
         try {
             java.nio.file.Files.move(
                 tmp,

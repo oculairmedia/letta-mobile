@@ -75,6 +75,15 @@ class InboundControlRequestRegistry {
         val toolCallId: String? = null,
         val state: State = State.Pending,
         val leaseToken: Long? = null,
+        /**
+         * lgns8.17(c) / PR #1077 review (P1): the claim is held by an invocation
+         * that deliberately OUTLIVES its turn lease (external tools run on a
+         * detached job so a slow tool cannot stall frame ingestion). A detached
+         * claim must survive [releaseClaimsForLease] — otherwise the turn's
+         * `finally` reopens the request while the tool is still running and a
+         * replay or successor lease executes a non-idempotent tool a second time.
+         */
+        val detached: Boolean = false,
     )
 
     sealed class RegisterResult {
@@ -164,6 +173,48 @@ class InboundControlRequestRegistry {
     }
 
     /**
+     * Pin a Claimed entry to an invocation that outlives its turn lease.
+     *
+     * Returns true when [leaseToken] owned the claim and it is now detached. From
+     * that point [releaseClaimsForLease] leaves it alone, so the request stays
+     * Claimed for exactly as long as the invocation runs; the invocation itself
+     * ends it with [markAnsweredBy] or [releaseClaim].
+     */
+    fun markDetached(
+        ref: RequestRef,
+        leaseToken: Long,
+        connectionGeneration: Long,
+    ): Boolean = synchronized(lock) {
+        val key = EntryKey(ref, connectionGeneration)
+        val entry = entries[key] ?: return false
+        if (entry.state != State.Claimed || entry.leaseToken != leaseToken) return false
+        entries[key] = entry.copy(detached = true)
+        true
+    }
+
+    /**
+     * Retire the identity as answered ONLY if [leaseToken] still owns it.
+     *
+     * A detached invocation can complete long after its turn ended. By then the
+     * entry may legitimately belong to someone else (its claim was released on a
+     * send failure and a successor lease re-claimed it). Retiring blindly would
+     * delete the successor's live claim and strand its response, so this no-ops
+     * unless we are still the owner. Returns true when the entry was retired.
+     */
+    fun markAnsweredBy(
+        ref: RequestRef,
+        leaseToken: Long,
+        connectionGeneration: Long,
+    ): Boolean = synchronized(lock) {
+        val key = EntryKey(ref, connectionGeneration)
+        val entry = entries[key] ?: return false
+        if (entry.leaseToken != leaseToken) return false
+        entries.remove(key)
+        retainCompletedLocked(key, entry.copy(state = State.Answered, detached = false))
+        true
+    }
+
+    /**
      * Retire the identity as answered.
      *
      * lgns8.22.4.1.4: [connectionGeneration] MUST be the generation the request
@@ -193,7 +244,10 @@ class InboundControlRequestRegistry {
             val key = EntryKey(ref, connectionGeneration)
             val entry = entries[key] ?: return
             if (entry.state == State.Claimed && entry.leaseToken == leaseToken) {
-                entries[key] = entry.copy(state = State.Pending, leaseToken = null)
+                // Clearing `detached` too: the invocation that pinned this claim is
+                // done with it, so the entry goes back to being ordinary Pending
+                // work a successor may claim.
+                entries[key] = entry.copy(state = State.Pending, leaseToken = null, detached = false)
             }
         }
     }
@@ -215,7 +269,10 @@ class InboundControlRequestRegistry {
     private fun Entry.shouldReleaseFor(leaseToken: Long, connectionGeneration: Long): Boolean =
         this.connectionGeneration == connectionGeneration &&
             state == State.Claimed &&
-            this.leaseToken == leaseToken
+            this.leaseToken == leaseToken &&
+            // A detached invocation still owns this claim even though its lease is
+            // gone. Reopening it here is exactly the double-execution window.
+            !detached
 
     data class BindRequest(
         val requestId: String,

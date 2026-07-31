@@ -156,6 +156,13 @@ class DurableSubagentRegistry(
 
         val merged = existing.mergedWith(observation, now)
         entries[observation.key] = merged
+        // PR #1077 review (P2): capacity must be re-checked on every ACCEPTED
+        // transition, not only on insert. A burst of >maxEntries simultaneously
+        // live chips is deliberately allowed to exceed the cap (live chips are
+        // never evicted), but once those chips reach a terminal state they become
+        // evictable — and if no new key ever arrives, an insert-only check leaves
+        // both the in-memory map and the durable snapshot oversized forever.
+        enforceCapacityLocked()
         persistLocked()
         return ObserveResult.Accepted(merged)
     }
@@ -262,7 +269,12 @@ class DurableSubagentRegistry(
                 terminalAtEpochMs = record.terminalAtEpochMs ?: now,
             ).also { entries[it.key] = it }
         }
-        if (orphaned.isNotEmpty()) persistLocked()
+        if (orphaned.isNotEmpty()) {
+            // Reconciliation is the other way chips become terminal (and therefore
+            // evictable) without any insert happening — same P2 as above.
+            enforceCapacityLocked()
+            persistLocked()
+        }
         return ReconcileResult(orphaned = orphaned, liveRetained = live.size)
     }
 

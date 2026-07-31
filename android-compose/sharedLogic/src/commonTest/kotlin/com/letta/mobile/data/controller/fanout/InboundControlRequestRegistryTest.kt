@@ -221,6 +221,118 @@ class InboundControlRequestRegistryTest {
         )
         assertTrue(registry.tryClaim(controlRef("perm-1"), leaseToken = 9L, connectionGeneration = 2L))
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Detached external-tool claims (PR #1077 review, P1)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * THE DOUBLE-EXECUTION CLASS. An external tool is invoked on a DETACHED job
+     * so a slow tool cannot stall frame ingestion for every runtime on the
+     * connection. That job outlives its turn — but the turn's `finally` calls
+     * [InboundControlRequestRegistry.releaseClaimsForLease], which used to flip
+     * the still-running request back to Pending. A replay or successor lease
+     * could then claim the same identity and run a NON-IDEMPOTENT tool twice.
+     *
+     * FAIL-ON-REVERT: drop the `!detached` guard in `shouldReleaseFor` and this
+     * test goes red — the entry becomes claimable while the tool is in flight.
+     */
+    @Test
+    fun detachedExternalToolClaimSurvivesItsLeaseRelease() {
+        val registry = InboundControlRequestRegistry()
+        registry.register(
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-1"),
+        )
+        assertTrue(registry.tryClaim(controlRef("ext-1", "tc-1"), leaseToken = 7L, connectionGeneration = 1L))
+        assertTrue(registry.markDetached(controlRef("ext-1", "tc-1"), leaseToken = 7L, connectionGeneration = 1L))
+
+        // The turn ends while the tool is still running.
+        registry.releaseClaimsForLease(leaseToken = 7L, connectionGeneration = 1L)
+
+        assertFalse(
+            registry.isDeliverableTo(controlRef("ext-1", "tc-1"), leaseToken = 8L, connectionGeneration = 1L),
+            "an in-flight detached invocation must not be redelivered",
+        )
+        assertFalse(
+            registry.tryClaim(controlRef("ext-1", "tc-1"), leaseToken = 8L, connectionGeneration = 1L),
+            "a successor lease must not claim a request whose tool is still running",
+        )
+        assertTrue(
+            registry.ownsClaim(controlRef("ext-1", "tc-1"), leaseToken = 7L, connectionGeneration = 1L),
+            "the detached invocation still owns its claim",
+        )
+    }
+
+    /** A non-detached claim is still reopened by its lease exiting (unchanged). */
+    @Test
+    fun undetachedClaimIsStillReleasedWithItsLease() {
+        val registry = InboundControlRequestRegistry()
+        registry.register(
+            registerRequest("ext-2", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-2"),
+        )
+        assertTrue(registry.tryClaim(controlRef("ext-2", "tc-2"), leaseToken = 7L, connectionGeneration = 1L))
+
+        registry.releaseClaimsForLease(leaseToken = 7L, connectionGeneration = 1L)
+
+        assertTrue(
+            registry.tryClaim(controlRef("ext-2", "tc-2"), leaseToken = 8L, connectionGeneration = 1L),
+            "a successor lease must still recover an abandoned claim",
+        )
+    }
+
+    /** Releasing a detached claim (send failed) hands it back to a successor. */
+    @Test
+    fun releasingADetachedClaimClearsDetachment() {
+        val registry = InboundControlRequestRegistry()
+        registry.register(
+            registerRequest("ext-3", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-3"),
+        )
+        registry.tryClaim(controlRef("ext-3", "tc-3"), leaseToken = 7L, connectionGeneration = 1L)
+        registry.markDetached(controlRef("ext-3", "tc-3"), leaseToken = 7L, connectionGeneration = 1L)
+
+        registry.releaseClaim(controlRef("ext-3", "tc-3"), leaseToken = 7L, connectionGeneration = 1L)
+
+        assertTrue(
+            registry.tryClaim(controlRef("ext-3", "tc-3"), leaseToken = 8L, connectionGeneration = 1L),
+            "an explicitly released claim is claimable again",
+        )
+    }
+
+    /**
+     * The other half of the same P1: a detached invocation completing LATE must
+     * not retire an identity that now belongs to someone else. Its send failed,
+     * it released the claim, a successor re-claimed — then the first completion
+     * arrives. Blindly marking answered would delete the successor's live claim
+     * and strand its response.
+     *
+     * FAIL-ON-REVERT: use `markAnswered` instead of `markAnsweredBy` in
+     * `guaranteeExternalToolResponse` and the successor's claim disappears.
+     */
+    @Test
+    fun markAnsweredByDoesNotClobberASuccessorClaim() {
+        val registry = InboundControlRequestRegistry()
+        registry.register(
+            registerRequest("ext-4", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-4"),
+        )
+        registry.tryClaim(controlRef("ext-4", "tc-4"), leaseToken = 7L, connectionGeneration = 1L)
+        registry.markDetached(controlRef("ext-4", "tc-4"), leaseToken = 7L, connectionGeneration = 1L)
+        // Send failed -> claim returned -> a successor lease picks it up.
+        registry.releaseClaim(controlRef("ext-4", "tc-4"), leaseToken = 7L, connectionGeneration = 1L)
+        assertTrue(registry.tryClaim(controlRef("ext-4", "tc-4"), leaseToken = 8L, connectionGeneration = 1L))
+
+        // The original detached invocation finally completes.
+        assertFalse(
+            registry.markAnsweredBy(controlRef("ext-4", "tc-4"), leaseToken = 7L, connectionGeneration = 1L),
+            "a stale detached completion must not retire someone else's claim",
+        )
+        assertTrue(
+            registry.ownsClaim(controlRef("ext-4", "tc-4"), leaseToken = 8L, connectionGeneration = 1L),
+            "the successor still owns its claim",
+        )
+
+        // …and the rightful owner can still answer.
+        assertTrue(registry.markAnsweredBy(controlRef("ext-4", "tc-4"), leaseToken = 8L, connectionGeneration = 1L))
+    }
 }
 
 /** Shorthand for the (request_id, tool_call_id) identity (lgns8.22.4.1.3). */

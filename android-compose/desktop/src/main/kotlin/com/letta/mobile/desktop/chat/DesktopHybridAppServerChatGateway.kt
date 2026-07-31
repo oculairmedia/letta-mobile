@@ -104,7 +104,15 @@ class DesktopHybridAppServerChatGateway internal constructor(
     override suspend fun abortConversationTurn(conversationId: String): Boolean {
         val engine = turnEngine as? AppServerTurnEngine ?: return false
         val runId = activeRunIdByConversation[conversationId]
-        return engine.abort(runId) != null
+        // Keyed abort: with concurrent runtimes the keyless overload targets the
+        // most recently started scope, which can abort the WRONG conversation.
+        val agentId = runCatching { agentIdFor(conversationId) }.getOrNull() ?: return false
+        val response = engine.abort(agentId, conversationId, runId) ?: return false
+        // A response with success=false or aborted=false means no run was torn
+        // down (stale/already-terminal run id): report undelivered so the
+        // controller falls back to its local clear instead of holding the
+        // "stopping" state for the full terminal timeout.
+        return response.success && response.aborted
     }
 
     /**

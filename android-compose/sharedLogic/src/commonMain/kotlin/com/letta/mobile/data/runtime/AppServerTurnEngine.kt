@@ -290,6 +290,13 @@ class AppServerTurnEngine(
             )
             return
         }
+        // PR #1077 review (P1): PIN the claim to this invocation before suspending.
+        // This job runs on [dispatchScope] and deliberately outlives its turn, but
+        // the turn's `finally` calls releaseClaimsForLease — which would flip this
+        // request back to Pending WHILE the tool is still running, letting a replay
+        // or successor lease execute a non-idempotent tool a second time. Detaching
+        // keeps ownership with the invocation until it answers or releases.
+        inboundControlRegistry.markDetached(ref, leaseToken, generation)
         // Fence BEFORE invoking a possibly non-idempotent handler: if the
         // connection died between the claim and here, the tool must not run and
         // this claim is returned so the successor generation's replay can own it.
@@ -314,7 +321,11 @@ class AppServerTurnEngine(
                 AppServerCommand.ExternalToolCallResponse(requestId = request.requestId, result = result),
             )
         }.onSuccess {
-            inboundControlRegistry.markAnswered(ref, generation)
+            // Lease-scoped: if this detached invocation lost the claim (released on
+            // an earlier send failure, then re-claimed by a successor), retiring the
+            // identity here would delete the successor's LIVE claim and strand its
+            // response. markAnsweredBy no-ops unless we still own it.
+            inboundControlRegistry.markAnsweredBy(ref, leaseToken, generation)
             // lgns8.22.4.1.6: the cached result is deliberately RETAINED. A one-way
             // send is an AmbiguousMutation — if the server never received it, it
             // replays the request and the replay must reuse this result rather than
