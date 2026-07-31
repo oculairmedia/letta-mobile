@@ -2,8 +2,12 @@ package com.letta.mobile.data.controller.extras
 
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.reconnect.ExternalToolRegistrar
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolDefinition
+import com.letta.mobile.data.transport.appserver.AppServerExternalToolsGroup
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Registry for controller-owned external tools.
@@ -61,6 +65,39 @@ class ExternalToolRegistry(
      * @return List of advertised tools
      */
     fun listAdvertisedTools(): List<ExternalTool> = advertisedTools
+
+    /**
+     * lgns8.17(a): the wire form of [listAdvertisedTools] for the `external_tools`
+     * field of `runtime_start`.
+     *
+     * THIS IS THE ONLY WAY A REQUEST CAN EVER ARRIVE. letta-code's app-server
+     * emits `external_tool_call_request` **exclusively** for tools registered by
+     * `registerRuntimeExternalTools(...)`, which reads `runtime_start.external_tools`
+     * (see `letta.js`: `registerRuntimeExternalTools(context.runtime, connectionId,
+     * runtimeScope, parsed.external_tools ?? [])`). A controller that never writes
+     * the field therefore never receives a request — and a controller that writes
+     * it MUST answer, because the server parks the tool call on a pending promise
+     * bounded only by its own `EXTERNAL_TOOL_CALL_TIMEOUT_MS` (5 minutes).
+     *
+     * Returns null when nothing is advertised so the command omits the field
+     * entirely rather than sending an empty group (the server treats an empty
+     * group list as "unregister everything", which is the same observable state,
+     * but omitting is the smaller, more obviously-correct frame).
+     */
+    fun advertisedToolsCommandGroups(scopeId: String? = null): List<AppServerExternalToolsGroup>? {
+        val definitions = advertisedTools.map { tool ->
+            AppServerExternalToolDefinition(
+                name = tool.name,
+                description = tool.description,
+                // The server's ExternalToolDefinitionPayload requires a parameters
+                // object; a tool that takes no arguments still needs a valid empty
+                // JSON-Schema object, never a missing/null field.
+                parameters = tool.inputSchema ?: EMPTY_OBJECT_SCHEMA,
+            )
+        }
+        if (definitions.isEmpty()) return null
+        return listOf(AppServerExternalToolsGroup(scopeId = scopeId, tools = definitions))
+    }
 
     /**
      * Invokes a tool by name with the given input arguments.
@@ -127,12 +164,53 @@ class ExternalToolRegistry(
         }
 
         /**
-         * Creates a factory-default registry with no extra tools.
+         * Creates a factory-default registry, which advertises NO external tools.
+         *
+         * lgns8.17(a) — WHY ADVERTISING NOTHING IS THE CORRECT PRODUCTION DEFAULT,
+         * not an oversight:
+         *
+         * 1. `external_tools` is an OPT-IN EXTENSION, not a requirement. letta-code
+         *    runs its own native tool loop for its built-in tools (Bash, Read, Edit,
+         *    …) on the app-server route; `external_tool_call_request` is emitted
+         *    ONLY for names the controller itself registered through
+         *    `runtime_start.external_tools`. Advertising nothing means the server
+         *    can never emit a request, so nothing can go unanswered.
+         * 2. Every tool in [standard] ([ImageHydrationTool], [GoalsTool],
+         *    [SchedulesTool], [SlashCommandsTool], [SubagentChipsTool],
+         *    [ReflectionTool], [SlimAgentsTool]) is an UNIMPLEMENTED STUB whose
+         *    `invoke` returns `ExternalToolResult.Error("… is not yet implemented")`.
+         *    Advertising them would inject always-failing tools into the model's
+         *    tool list — strictly worse than not offering them, because the model
+         *    would select them and burn turns on guaranteed errors. They are gated
+         *    behind [RemoteCapabilities] precisely so an extended (Meridian)
+         *    deployment can light them up once they are real.
+         * 3. lettashim parity: the shim never handled `external_tool_call_request`
+         *    either. Its extra tools were passed to the Letta SDK as the `tools`
+         *    argument on the internal route (`admin-shim/lib/letta-sdk-adapter.ts`),
+         *    a different mechanism entirely. So "advertises none over WS" IS the
+         *    behaviour being superseded, not a regression against it.
+         *
+         * The advertisement PLUMBING is nonetheless live and exercised
+         * ([advertisedToolsCommandGroups] is wired into `runtime_start` in both
+         * `DefaultAppServerController` and `AppServerTurnEngine`): the moment a
+         * capability is enabled and a real tool replaces a stub, it is advertised
+         * with no further wiring — and the engine's answer guarantee already covers
+         * the request it will then receive.
          *
          * @return A registry with no advertised tools
          */
         fun factoryDefault(): ExternalToolRegistry {
             return standard(RemoteCapabilities.FACTORY_DEFAULT)
+        }
+
+        /**
+         * JSON-Schema for a tool that takes no arguments. `parameters` is a
+         * required field of the server's tool payload, so a null [ExternalTool.inputSchema]
+         * must still serialise to a valid empty object schema.
+         */
+        private val EMPTY_OBJECT_SCHEMA: JsonObject = buildJsonObject {
+            put("type", "object")
+            put("properties", buildJsonObject { })
         }
     }
 }
