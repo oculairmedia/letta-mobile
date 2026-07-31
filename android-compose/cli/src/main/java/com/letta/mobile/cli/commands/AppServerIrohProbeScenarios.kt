@@ -175,10 +175,15 @@ internal class NoHttpProbeScenario(
         // lgns8.21.9: sockets are attributed to the WRAPPER service MainPID, not
         // to this probe process — scanning `self` only proved the probe stayed
         // clean while the wrapper could keep dialing LettaShim.
+        // jr5tx: which wrapper that is depends on the declared scan mode —
+        // systemd's MainPID for the deployment gate, the harness-spawned PID for
+        // the hermetic CI run.
         val watch = NoHttpWrapperWatch(
             unit = options.wrapperUnit,
             port = admin.adminPort(),
             explicitPid = options.wrapperPid,
+            mode = options.wrapperScanMode,
+            notApplicableReason = options.wrapperScanNotApplicable,
         )
         watch.start()
         val turnStartedAt = nowMs()
