@@ -7,19 +7,23 @@
       "installed-protocol-v2-inventory.json (pinned @letta-ai/letta-code 0.29.12, lgns8.21.1)",
       "app-server-v2-contract-matrix.json (lgns8.1)",
       "docs/architecture/app-server-rest-admin-audit-fanout.md (ph9ws.14/.15, lgns8.1)",
-      "AdminRpcRegistry.buildRouter registered methods (enumerated by IrohAdminOwnershipMatrixTest)"
+      "AdminRpcRegistry.buildRouter registered methods (enumerated by IrohAdminOwnershipMatrixTest)",
+      "docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md (shim-only surfaces disposition, lgns8.25)"
     ],
     "rules": [
       "The presence of a native v2 command does not by itself transfer ownership; each app_server_v2 row is an explicit adoption decision scoped to a migration slice.",
       "No operation may read or write Letta durable storage directly; every owner routes through a public contract (v2 protocol, bounded service adapter, or controller-owned state).",
       "The Kotlin controller must not become admin-shim v2: admin_rest_service and vibesync_service rows are bounded injected adapters, not REST mirrors grown inside the fanout controller.",
       "capability_gated_unsupported rows fail closed with an explicit capability error after cutover; they must never silently proxy.",
-      "production_first_route and current_backend describe observed production execution order; post_shim_owner/post_shim_fallback are cutover targets and must never be shim_until_cutover."
+      "production_first_route and current_backend describe observed production execution order; post_shim_owner/post_shim_fallback are cutover targets and must never be shim_until_cutover.",
+      "An unrouted_domains row that names shim_routes is a shim-only surface and must carry a disposition plus caller evidence; 'no caller found' is only a valid disposition when the evidence names the window it was measured over."
     ],
     "phase1_synced_at": "2026-07-27",
     "phase2_synced_at": "2026-07-27",
     "phase3_synced_at": "2026-07-27",
-    "phase4_synced_at": "2026-07-27"
+    "phase4_synced_at": "2026-07-27",
+    "shim_only_surfaces_dispositioned_at": "2026-07-31",
+    "shim_only_surfaces_evidence_window": "2026-07-23T14:40Z..2026-07-31T05:48Z lettashim access log (/tmp/admin-shim.log, 70569 logged requests; every request is logged — the 60s healthcheck accounts for the 10925 GET / rows)"
   },
   "enums": {
     "owners": [
@@ -71,6 +75,11 @@
       "deny_fail_closed",
       "adopt_v2",
       "propose_v2"
+    ],
+    "unrouted_dispositions": [
+      "dead_deny_fail_closed",
+      "dead_route_successor_required",
+      "alive_keep_on_shim_until_successor"
     ]
   },
   "operations": [
@@ -1615,6 +1624,64 @@
       "domain": "mcp_catalog",
       "current_state": "only mcp.list exists; no catalog/discovery/install surface over Iroh",
       "decision": "wider MCP catalog admin stays behind the bounded adapter of lgns8.9 or is explicitly denied; not a controller feature"
+    },
+    {
+      "domain": "work_activity_ingest",
+      "shim_routes": [
+        "POST /v1/work-activity",
+        "PATCH /v1/work-activity/{toolCallId}"
+      ],
+      "current_state": "shim-only external work ingest (lcp-zncq): writes third-party step lifecycle into the shim subagent registry under the ext-<source>-<external_id> namespace. No repo reference; the mobile READ side is already native (admin_rpc subagent.list / subagent.todos), so only the write side is unrouted.",
+      "disposition": "alive_keep_on_shim_until_successor",
+      "decision": "ALIVE — a configured live caller exists outside this repo; do not deny yet. Keep the ingest on the shim until a controller-native bounded ingest exists and the caller repoints (letta-mobile-lgns8.25.1). Never expose ingest as a generic admin_rpc write: it must be an explicitly authorized admin_write method with a source allow-list.",
+      "evidence": "vibesync.service (running, MainPID 53871, cwd /opt/stacks/vibesync/.letta/worktrees/bound-project-list) boots WorkActivityReporter (src/orchestration/boot.ts:193-207) whenever VIBESYNC_LETTA_CODE_SHIM_URL is set and VIBESYNC_WORK_ACTIVITY_REPORT != 0; the running process environment has VIBESYNC_LETTA_CODE_SHIM_URL=http://127.0.0.1:8291 and no disable flag. Dormant, not dead: 0 POSTs in the 2026-07-23..2026-07-31 shim access log (70569 logged requests) because no dispatcher/step.* molecule events fired in that window. The 7 logged hits on this path are GET reads from curl.",
+      "successor": "controller-native bounded external-work ingest (proposed subagent.ingest_external), tracked by letta-mobile-lgns8.25.1"
+    },
+    {
+      "domain": "worker_events",
+      "shim_routes": [
+        "POST /v1/worker-events"
+      ],
+      "current_state": "shim-internal child-process lifecycle supervision: the shim's own letta-cli-sdk-wrapper.mjs posts {event:\"child_exit\", taskId, code, signal} on spawn exit so the shim can finalize a stranded running registry entry. Loopback-only, and gated on LETTA_TASK_ID being present in the child environment.",
+      "disposition": "dead_deny_fail_closed",
+      "decision": "DEAD for this repo — deny fail-closed; never becomes an admin_rpc method. Process-exit supervision is an internal concern of whichever component owns the spawn; the Kotlin controller supervises its own App Server sessions and does not need an inbound HTTP lifecycle webhook. This route retires with the shim's runtime role.",
+      "evidence": "Sole poster is /opt/stacks/letta-code-parallel/admin-shim/scripts/letta-cli-sdk-wrapper.mjs:107, inside the shim itself; the post is skipped unless LETTA_TASK_ID is set, which prod does not set. 0 requests in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo; no other /opt/stacks service references the path.",
+      "successor": "none — controller-owned session supervision already covers the sensing need"
+    },
+    {
+      "domain": "usage_summary",
+      "shim_routes": [
+        "GET /shim/v1/usage/summary"
+      ],
+      "current_state": "shim extension (not vanilla Letta) that aggregates the shim's own local run records by agent/conversation/model/day. Not wired to the LiteLLM gateway (:4000), which is the actual accounting source of truth.",
+      "disposition": "dead_deny_fail_closed",
+      "decision": "DEAD — deny fail-closed; do not port and do not proxy. Mobile usage analytics are computed client-side from step records (DashboardUsageCalculator), so nothing regresses. If product ever needs authoritative usage it must come from the LiteLLM gateway through a bounded adapter with its own ownership row, never from a shim aggregate.",
+      "evidence": "0 requests in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo to the path; the only usageSummary symbols are the Dashboard's local calculation (DashboardViewModel.kt:511,555 calling DashboardUsageCalculator.calculate(steps)). No other /opt/stacks service references the path.",
+      "successor": "none — LiteLLM gateway is the accounting authority if this need returns"
+    },
+    {
+      "domain": "permissions_preview",
+      "shim_routes": [
+        "GET /shim/v1/permissions/global",
+        "PUT /shim/v1/permissions/global",
+        "GET /shim/v1/permissions/preview"
+      ],
+      "current_state": "shim-side permission config + dry-run evaluator (lcp-indw). The evaluator still runs in-process for shim-served turns (SHIM_SERVER_PERMISSIONS=1), but the HTTP config/preview surface has no external consumer and overlaps the letta-code 0.29.12 mod permissions.register capability.",
+      "disposition": "dead_deny_fail_closed",
+      "decision": "DEAD as an external surface — deny fail-closed. The Kotlin fail-closed policy layer (lgns8.12) is the sole policy authority after cutover; a second, shim-resident policy store that clients can PUT would be a fail-open bypass of it. Any future preview/dry-run affordance must be a method on the Kotlin policy layer, not a proxy to this route.",
+      "evidence": "0 requests to /shim/v1/permissions/global or /shim/v1/permissions/preview in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo. No other /opt/stacks service references the paths.",
+      "successor": "lgns8.12 Kotlin fail-closed policy layer (already owns evaluation); no new admin_rpc method required"
+    },
+    {
+      "domain": "pool_introspection",
+      "shim_routes": [
+        "GET /shim/pool"
+      ],
+      "current_state": "shim-only diagnostic window into pooled letta-code worker sessions: size, max, idle_evict_sec, queued, in_flight_spawns, per-worker {key, conversation_id, agent_id, ...}, plus perf {event-loop delay percentiles, frame-append counters, rss_bytes}. It is the only window into pooled session state; controller-native introspection currently reports only health.check {status, controller_state, native}.",
+      "disposition": "dead_route_successor_required",
+      "decision": "DEAD as a route (deny fail-closed; never proxied over admin_rpc) but its SENSING value must be replaced before the shim's runtime role retires — losing the only view of pooled session state would be a sensing regression. Proposal: extend controller-native introspection with a read-only admin_read diagnostics method (proposed health.diagnostics) reporting controller session/lease occupancy, queued/in-flight session starts, reconnect state, and a coarse process snapshot. Specified and tracked by letta-mobile-lgns8.25.2; not implemented in this bead.",
+      "evidence": "0 requests in the 2026-07-23..2026-07-31 shim access log (70569 requests). 0 references in this repo. The only referencing consumer anywhere on the host is the shim's own manual maintenance script admin-shim/scripts/prune-transient-agents.mjs (SHIM_POOL_URL default http://127.0.0.1:8291/shim/pool), which is offline-only and is not scheduled by cron or any systemd timer.",
+      "successor": "controller-native health.diagnostics (admin_read, controller_memory) — proposed row spec in letta-mobile-lgns8.25.2"
     }
   ]
 }
