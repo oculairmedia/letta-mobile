@@ -22,6 +22,7 @@ import com.letta.mobile.runtime.TurnCommand
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -90,6 +91,35 @@ class DefaultAppServerController(
 
     init {
         eventRouter.attach(controllerScope, client.events)
+        attachUnleasedExternalToolAnswerer()
+    }
+
+    /**
+     * lgns8.17(d): standing answerer for `external_tool_call_request` frames that
+     * arrive while NO turn holds a lease for their runtime.
+     *
+     * The turn engine can only answer from inside a turn's collect loop, so a
+     * server-initiated or reconnect-replayed request that lands on an idle client
+     * had no observer and blocked the App Server for its full 5-minute
+     * `EXTERNAL_TOOL_CALL_TIMEOUT_MS` — the original lgns8.17 hang class, one level
+     * up from the in-turn case the guarantor already covers.
+     *
+     * Collects `client.events` DIRECTLY rather than subscribing to the fanout: the
+     * fanout is keyed by {agent, conversation} and a runtime-less request belongs
+     * to no subscriber key. [AppServerTurnEngine.answerUnleasedExternalToolCall]
+     * no-ops whenever a lease exists, so this never steals a frame from a live turn,
+     * and the inbound-control registry makes the claim exclusive even if it raced.
+     *
+     * Each answer is launched so a slow tool cannot stall this collector.
+     */
+    private fun attachUnleasedExternalToolAnswerer() {
+        controllerScope.launch {
+            client.events.collect { received ->
+                val request = received.frame as? AppServerInboundFrame.ExternalToolCallRequest
+                    ?: return@collect
+                launch { turnEngine.answerUnleasedExternalToolCall(request) }
+            }
+        }
     }
 
     private val _state = MutableStateFlow<AppServerControllerState>(AppServerControllerState.Connected)
@@ -254,6 +284,13 @@ class DefaultAppServerController(
                     clientInfo = clientInfo,
                     recoverApprovals = recoverApprovals,
                     forceDeviceStatus = forceDeviceStatus,
+                    // lgns8.17(a): ADVERTISE the controller-owned tools. This field
+                    // is the only registration seam the App Server has — it calls
+                    // registerRuntimeExternalTools() with exactly this list and will
+                    // never emit an external_tool_call_request for a name absent
+                    // from it. Re-sent on every runtime_start, which is also how
+                    // reconnect re-advertises (see ExternalToolRegistry.reRegisterAll).
+                    externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
                 ),
             )
         } catch (e: Exception) {

@@ -66,9 +66,12 @@ approval.submit shim-fallback removal at cutover.
   typed capability errors after cutover. Secrets (`secret_list`/`secret_apply`
   are `exposed_sensitive` upstream — plaintext values) are never reachable via
   generic admin_rpc without an explicit lgns8.12 policy.
-- **Skill listings are projections.** `skill_list_command` is absent upstream;
-  the controller derives `skill.list`/`skill.list_agent` from the `sync`
-  snapshot and `skills_updated` events.
+- **Skill listings have no upstream source (lgns8.21.2).** `skill_list_command`
+  is absent, `skills_updated` carries only a timestamp, and
+  `device_status.current_available_skills` is hard-coded `[]` in letta-code
+  0.29.12. `skill.list` serves an authoritative enumeration or reports
+  `capability_unavailable` / `hydrated=false`; it never fabricates one.
+  `skill.list_agent` still denies until agent-scoped assignment state exists.
 - **Crons leave the legacy WS path.** The Iroh transport currently stubs cron
   methods; lgns8.8 exposes native `cron_*` behind policy, and the legacy
   mobile-WS cron/subagent frames retire with the shim in lgns8.11.

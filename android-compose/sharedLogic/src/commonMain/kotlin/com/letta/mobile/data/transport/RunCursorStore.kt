@@ -1,5 +1,8 @@
 package com.letta.mobile.data.transport
 
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
+
 /**
  * Persistent map of `{conversationId -> {runId -> lastSeq}}` for
  * non-terminal mobile WebSocket runs.
@@ -41,13 +44,23 @@ interface RunCursorStore {
     }
 }
 
+/**
+ * In-memory [RunCursorStore].
+ *
+ * Every method is guarded by [lock]: `record` is a read-modify-write
+ * ("keep the highest seq"), so concurrent transport callbacks racing on the
+ * same run would otherwise lose updates and rewind the resume cursor —
+ * replaying frames the client already has. The DataStore-backed production
+ * implementation guards the same way.
+ */
 internal class InMemoryRunCursorStore : RunCursorStore {
+    private val lock = SynchronizedObject()
     private val active = mutableMapOf<String, MutableMap<String, Long>>()
     private val terminal = mutableMapOf<String, MutableSet<String>>()
 
     override fun ensureLoaded() { /* no-op */ }
 
-    override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) {
+    override fun record(conversationId: String, runId: String, seq: Long, isTerminal: Boolean) = synchronized(lock) {
         if (conversationId.isEmpty() || runId.isEmpty() || seq <= 0L) return
         if (isTerminal) {
             active[conversationId]?.remove(runId)
@@ -63,23 +76,29 @@ internal class InMemoryRunCursorStore : RunCursorStore {
         }
     }
 
-    override fun clear(conversationId: String, runId: String) {
+    override fun clear(conversationId: String, runId: String) = synchronized(lock) {
+        clearLocked(conversationId, runId)
+    }
+
+    private fun clearLocked(conversationId: String, runId: String) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
         val perConversation = active[conversationId] ?: return
         if (perConversation.remove(runId) == null) return
         if (perConversation.isEmpty()) active.remove(conversationId)
     }
 
-    override fun clearTerminal(conversationId: String, runId: String) {
+    override fun clearTerminal(conversationId: String, runId: String) = synchronized(lock) {
         if (conversationId.isEmpty() || runId.isEmpty()) return
-        clear(conversationId, runId)
+        clearLocked(conversationId, runId)
         terminal[conversationId]?.remove(runId)
         if (terminal[conversationId]?.isEmpty() == true) terminal.remove(conversationId)
     }
 
-    override fun allActiveRuns(): Map<String, Map<String, Long>> =
+    override fun allActiveRuns(): Map<String, Map<String, Long>> = synchronized(lock) {
         active.mapValues { (_, runs) -> runs.toMap() }
+    }
 
-    override fun activeRuns(conversationId: String): Map<String, Long> =
+    override fun activeRuns(conversationId: String): Map<String, Long> = synchronized(lock) {
         active[conversationId]?.toMap().orEmpty()
+    }
 }

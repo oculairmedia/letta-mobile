@@ -49,7 +49,14 @@ class AppServerTurnEngineExternalToolResponseTest {
     @Test
     fun anUnhandledToolCallGetsAMatchedIsErrorResponseSoTheTurnDoesNotHang() = runTest {
         val client = CapturingClient() // no registry wired
-        val engine = AppServerTurnEngine(client = client, requestIdFactory = { "req" }, turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS)
+        val engine = AppServerTurnEngine(
+            client = client,
+            requestIdFactory = { "req" },
+            // letta-mobile-pr3wf: the idle window is measured on the INJECTED clock,
+            // so a loaded host can no longer trip it mid-assertion.
+            turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS,
+            nowMs = { testScheduler.currentTime },
+        )
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload) // Started
@@ -83,7 +90,9 @@ class AppServerTurnEngineExternalToolResponseTest {
         val engine = AppServerTurnEngine(
             client = client,
             requestIdFactory = { "req" },
+            // letta-mobile-pr3wf: idle window on the injected virtual clock.
             turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS,
+            nowMs = { testScheduler.currentTime },
             externalToolRegistry = registry,
         )
 
@@ -127,7 +136,9 @@ class AppServerTurnEngineExternalToolResponseTest {
         val engine = AppServerTurnEngine(
             client = client,
             requestIdFactory = { "req" },
+            // letta-mobile-pr3wf: idle window on the injected virtual clock.
             turnIdleTimeoutMs = TEST_IDLE_TIMEOUT_MS,
+            nowMs = { testScheduler.currentTime },
             externalToolRegistry = registry,
         )
 
@@ -165,10 +176,14 @@ class AppServerTurnEngineExternalToolResponseTest {
 
     private companion object {
         /**
-         * The idle watchdog reads the WALL CLOCK while runTest skips virtual
-         * delays, so a short window makes these tests race real host scheduling
-         * (they were flaky under load with 50ms). Every test here drives the turn
-         * to an explicit cancel, so the watchdog must simply never fire.
+         * letta-mobile-pr3wf: the watchdog USED to read the wall clock while
+         * runTest skipped virtual delays, so a short window raced real host
+         * scheduling (flaky under load with 50ms) and the window was widened as a
+         * stopgap. The engine clock is now injected (`nowMs`), so the window is
+         * measured on the SAME virtual timeline the test controls — the wide
+         * window is now belt-and-braces rather than the mitigation. Every test
+         * here drives the turn to an explicit cancel and never advances virtual
+         * time, so the watchdog must simply never fire.
          */
         const val TEST_IDLE_TIMEOUT_MS = 60_000L
 

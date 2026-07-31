@@ -144,8 +144,9 @@ Landed in this Phase 2 slice:
 - production CLI no longer wires `LETTA_LOCAL_BACKEND_DIR`;
 - `RuntimeInvalidationPolicy` centralizes restart fields for agent update,
   conversation overrides, and skill mutations;
-- skills use filesystem `skill_enable` / `skill_disable` only; listings come
-  from `NativeSkillsCatalog` (device-status / `skills_updated`);
+- skills use filesystem `skill_enable` / `skill_disable` only; `NativeSkillsCatalog`
+  hydrates only from an authoritative enumeration (`skills_updated` is
+  invalidation-only upstream), otherwise `skill.list` fails closed;
 - native circuit breaker is per-command (not process-wide).
 
 Phase 2 complete for runbook scope. Remaining shim rows (`health` controller-

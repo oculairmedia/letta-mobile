@@ -19,8 +19,10 @@ class ChatBannerControllerTest {
         assertNull(harness.uiState.value.error)
     }
 
+    // letta-mobile-lgns8.19: Stop marks the turn CANCELLING and keeps it
+    // streaming — the terminal frame, not the request, settles the UI.
     @Test
-    fun `interrupt clear resets streaming flags and error`() {
+    fun `begin cancelling keeps streaming and marks the run cancelling`() {
         val harness = Harness(
             initialState = ChatUiState(
                 isStreaming = true,
@@ -29,11 +31,40 @@ class ChatBannerControllerTest {
             )
         )
 
-        harness.controller.clearStreamingAfterInterrupt()
+        harness.controller.beginCancelling()
+
+        assertEquals(true, harness.uiState.value.isStreaming)
+        assertEquals(true, harness.uiState.value.isCancelling)
+        assertEquals(true, harness.uiState.value.isCancellingRun)
+        assertNull(harness.uiState.value.error)
+    }
+
+    @Test
+    fun `force clear resets streaming flags cancelling and error`() {
+        val harness = Harness(
+            initialState = ChatUiState(
+                isStreaming = true,
+                isAgentTyping = true,
+                isCancelling = true,
+                error = "previous",
+            )
+        )
+
+        harness.controller.forceClearStreamingAfterInterrupt()
 
         assertEquals(false, harness.uiState.value.isStreaming)
         assertEquals(false, harness.uiState.value.isAgentTyping)
+        assertEquals(false, harness.uiState.value.isCancelling)
         assertNull(harness.uiState.value.error)
+    }
+
+    @Test
+    fun `clear cancelling drops a stale cancel marker`() {
+        val harness = Harness(initialState = ChatUiState(isCancelling = true))
+
+        harness.controller.clearCancelling()
+
+        assertEquals(false, harness.uiState.value.isCancelling)
     }
 
     @Test

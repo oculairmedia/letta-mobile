@@ -162,12 +162,35 @@ internal class LocalRuntimeChatSendCoordinator(
 
     fun cancel(): Boolean {
         val job = activeJob ?: return false
-        // Cancelling the collection alone leaves the embedded model
-        // generating; ask the runtime to abort too (letta-mobile-p2mmd).
-        scope.launch { runCatching { localBackend()?.interrupt() } }
         job.cancel()
-        finishTurn(error = null)
+        // Cancelling the collection alone leaves the embedded model generating;
+        // ask the runtime to abort too (letta-mobile-p2mmd) — and WAIT for that
+        // delivery (bounded) before finishTurn flips isStreaming=false, because
+        // the stop watcher treats that flip as the authoritative terminal
+        // (letta-mobile-lgns8.19). The embedded backend has no richer ack than
+        // interrupt()'s own return; the timeout keeps a hung interrupt from
+        // wedging "stopping…" forever, telemetered as an assumed terminal.
+        scope.launch {
+            val delivered = kotlinx.coroutines.withTimeoutOrNull(LOCAL_INTERRUPT_ACK_TIMEOUT_MS) {
+                runCatching { localBackend()?.interrupt() }.isSuccess
+            } ?: false
+            if (!delivered) {
+                Telemetry.event(
+                    "AdminChatVM",
+                    "interrupt.localAckTimeoutAssumedTerminal",
+                    "agentId" to agentId,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+            finishTurn(error = null)
+        }
         return true
+    }
+
+    private companion object {
+        // Bounded grace for the embedded runtime to acknowledge interrupt()
+        // before the turn is locally declared terminal.
+        const val LOCAL_INTERRUPT_ACK_TIMEOUT_MS = 3_000L
     }
 
     private suspend fun handleRuntimeEvent(

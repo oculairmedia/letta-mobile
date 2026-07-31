@@ -5,10 +5,12 @@ import com.letta.mobile.ui.markdown.StreamingMarkdownDocumentState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.test.junit4.createComposeRule
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertTrue
@@ -21,28 +23,36 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * Behavioral recomposition gate: verifies streaming markdown blocks don't
- * recompose more than once per streaming tick.
+ * Behavioral recomposition gate: verifies a markdown block stops recomposing
+ * once it has been committed (i.e. once a newer block has displaced it as the
+ * streaming tail).
  *
  * This gate protects against:
- *  - Composition loops (blocks recomposing multiple times per tick)
+ *  - Composition loops (blocks recomposing after their source stopped changing)
  *  - Block key churn causing unnecessary teardown/recreation
  *  - Non-monotone block updates causing layout thrashing
  *
- * NOTE: This test measures composition FREQUENCY, not composition COST.
- * With retainState=true (correct), blocks recompose on each tick but
- * CoreMarkdown caches the parsed tree, making each recomposition fast.
- * With retainState=false (regression), each recomposition triggers a
- * full markdown reparse, causing visible flicker - but this test will
- * STILL PASS because the composition count is the same, just slower.
+ * ## How the measurement works
  *
- * The retainState regression is caught via:
- *  1. Manual device testing (visible flicker during streaming)
- *  2. The structural invariant tests (catch parser bugs that retainState masks)
+ * Each block is rendered through [InstrumentedMarkdownBlock], a *restartable*
+ * composable whose parameters are exactly `(blockKey, source, recorder)`. All
+ * three are stable and compare equal across ticks for a committed block, so
+ * Compose skips the whole call and its `SideEffect` never runs. That makes the
+ * counter measure real recomposition of the block itself rather than
+ * recomposition of the enclosing scope.
  *
- * What this test DOES catch:
- *  - Blocks recomposing MORE than the tick count (composition loop bug)
- *  - Key churn causing extra compositions beyond the streaming cadence
+ * The counter is then split at the moment a block is *committed* (the first
+ * frame in which it is no longer the last block). Compositions before that point
+ * are the block's legitimate active-tail churn - its source genuinely changes on
+ * every tick. Compositions **after** that point are the regression this gate
+ * exists to catch, and are asserted against a small constant that does not scale
+ * with the stream length. A per-tick recomposition regression therefore fails by
+ * an O(N) margin instead of sitting one composition below the limit.
+ *
+ * NOTE: This test measures composition FREQUENCY, not composition COST. The
+ * `retainState` regression in `MarkdownText`/CoreMarkdown (full reparse per
+ * recomposition) is not visible here; it is covered by the structural invariant
+ * tests and by manual device testing.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -62,19 +72,19 @@ class StreamingMarkdownRecompositionGateTest {
         // This ensures we have several committed blocks + an active tail.
         val sourceText = """
             # Analysis Results
-            
+
             The system identified a critical issue: `startup.cold.p95_ms` exceeded the 500ms SLA threshold.
-            
+
             Root causes identified:
-            
+
             - Database connection pool exhaustion
             - Cold-start lambda initialization overhead
             - Inefficient query patterns in the auth layer
-            
+
             Recommendation: implement connection pooling warmup strategy.
         """.trimIndent()
 
-        val blockCompositionCounts = mutableMapOf<String, Int>()
+        val recorder = BlockCompositionRecorder()
         val text = mutableStateOf("")
 
         composeRule.setContent {
@@ -83,7 +93,7 @@ class StreamingMarkdownRecompositionGateTest {
                     Column {
                         StreamingMarkdownTextWithInstrumentation(
                             text = text.value,
-                            blockCompositionCounts = blockCompositionCounts,
+                            recorder = recorder,
                         )
                     }
                 }
@@ -92,11 +102,13 @@ class StreamingMarkdownRecompositionGateTest {
 
         // Drive text char-by-char (sample every 5 chars to keep test fast).
         composeRule.waitForIdle()
+        var tickCount = 0
         for (i in sourceText.indices step 5) {
             composeRule.runOnIdle {
                 text.value = sourceText.substring(0, i + 1)
             }
             composeRule.waitForIdle()
+            tickCount++
         }
 
         // Final frame: text is complete.
@@ -104,25 +116,11 @@ class StreamingMarkdownRecompositionGateTest {
             text.value = sourceText
         }
         composeRule.waitForIdle()
+        tickCount++
 
-        // Assert: committed blocks (those displaced by a newer block) must have
-        // O(1) compositions. We allow <=2 because:
-        //  1. Initial composition when block is created
-        //  2. Possibly one update when it transitions from active -> committed
-        // Any more indicates per-tick recomposition flicker.
-        val finalCounts = blockCompositionCounts.toMap()
-        // With retainState=true, CoreMarkdown caches the parsed tree, so even if
-        // MarkdownText recomposes on every tick, the render is fast (no reparse).
-        // Without retainState, each recomposition triggers a full reparse, causing
-        // visible flicker.
-        //
-        // This test verifies blocks don't recompose MORE than once per tick
-        // (which would indicate a composition loop bug). The proof-of-catch is
-        // that with retainState=false, the render becomes visibly slower/fl ickery.
-        val tickCount = (sourceText.length / 5) + 1
         assertCommittedBlocksStayBounded(
-            finalCounts,
-            maxCompositionsPerBlock = tickCount + 5, // Allow up to tick count + small buffer
+            recorder = recorder,
+            tickCount = tickCount,
             cadence = "per-character (sampled every 5 chars)",
             sourceLength = sourceText.length,
         )
@@ -136,20 +134,20 @@ class StreamingMarkdownRecompositionGateTest {
     fun committedBlocksDoNotRecomposeOnEveryChunkTick() {
         val sourceText = """
             # Performance Report
-            
+
             Measured latency across 1000 requests. The P95 metric `latency.p95_ms` was 245ms.
-            
+
             Key findings:
-            
+
             - Cache hit rate: 87%
             - Database query time: 12ms avg
             - Network overhead: 8ms avg
             - Serialization: 3ms avg
-            
+
             Overall system health is good. No action required.
         """.trimIndent()
 
-        val blockCompositionCounts = mutableMapOf<String, Int>()
+        val recorder = BlockCompositionRecorder()
         val text = mutableStateOf("")
 
         composeRule.setContent {
@@ -158,7 +156,7 @@ class StreamingMarkdownRecompositionGateTest {
                     Column {
                         StreamingMarkdownTextWithInstrumentation(
                             text = text.value,
-                            blockCompositionCounts = blockCompositionCounts,
+                            recorder = recorder,
                         )
                     }
                 }
@@ -169,6 +167,7 @@ class StreamingMarkdownRecompositionGateTest {
         composeRule.waitForIdle()
         val chunkSize = 15
         var offset = 0
+        var tickCount = 0
         while (offset < sourceText.length) {
             val end = minOf(offset + chunkSize, sourceText.length)
             composeRule.runOnIdle {
@@ -176,120 +175,214 @@ class StreamingMarkdownRecompositionGateTest {
             }
             composeRule.waitForIdle()
             offset = end
+            tickCount++
         }
 
-        val tickCount = (sourceText.length / chunkSize) + 1
-        val finalCounts = blockCompositionCounts.toMap()
         assertCommittedBlocksStayBounded(
-            finalCounts,
-            maxCompositionsPerBlock = tickCount + 3, // Allow up to tick count + small buffer
+            recorder = recorder,
+            tickCount = tickCount,
             cadence = "coarse-chunk",
             sourceLength = sourceText.length,
         )
     }
 
     /**
-     * Renders StreamingMarkdownText blocks and instruments each block with a
-     * SideEffect composition counter. Each block key is recorded in
-     * [blockCompositionCounts].
+     * Records per-block composition counts and, for each block, the count at the
+     * instant it was committed (displaced from the tail).
      *
-     * This mirrors the real StreamingMarkdownDocumentBlocks structure: each
-     * block is keyed, and MarkdownText is called with the block's source.
-     * The key() wrapper preserves component identity across ticks, allowing
-     * Compose to skip-recompose unchanged blocks if retainState=true.
+     * Marked [Stable] and always passed as the same instance, so it never itself
+     * defeats skipping of the block it instruments.
      */
-    @androidx.compose.runtime.Composable
+    @Stable
+    private class BlockCompositionRecorder {
+        /** Total compositions observed per block key, in first-seen order. */
+        val totalCompositions = linkedMapOf<String, Int>()
+
+        /**
+         * Composition count of each block as of the last frame in which it was
+         * still the streaming tail.
+         *
+         * Re-taken on every such frame rather than only the first: the parser can
+         * legitimately hand the tail role back to an earlier block (a list block
+         * regains the tail when the speculative block after it merges back in),
+         * and that block's churn while it is the tail again is by design.
+         */
+        private val tailBaseline = linkedMapOf<String, Int>()
+
+        /** Blocks that are still not committed, i.e. the tail of the last frame. */
+        private var currentTailKey: String? = null
+
+        fun recordComposition(blockKey: String) {
+            totalCompositions[blockKey] = (totalCompositions[blockKey] ?: 0) + 1
+        }
+
+        /** Called once per frame, after the block SideEffects for that frame have run. */
+        fun recordFrame(blockKeys: List<String>) {
+            val tail = blockKeys.lastOrNull() ?: return
+            val outgoingTail = currentTailKey
+            if (outgoingTail != null && outgoingTail != tail) {
+                // Commit frame: the outgoing tail may compose one final time here to
+                // apply its closing source (e.g. the newline that seals it). That is
+                // part of committing, not per-tick churn, so it is folded into the
+                // baseline. Everything after this frame is a genuine violation.
+                tailBaseline[outgoingTail] = totalCompositions[outgoingTail] ?: 0
+            }
+            currentTailKey = tail
+            tailBaseline[tail] = totalCompositions[tail] ?: 0
+        }
+
+        /**
+         * Compositions each committed block accrued *after* it last held the tail.
+         * A renderer that skip-recomposes committed blocks keeps these at ~0.
+         *
+         * The final frame's tail is excluded: it never became committed, so its
+         * churn is expected.
+         */
+        fun postCommitCompositions(): Map<String, Int> =
+            totalCompositions.keys
+                .filter { it != currentTailKey }
+                .associateWith { key ->
+                    (totalCompositions[key] ?: 0) - (tailBaseline[key] ?: 0)
+                }
+    }
+
+    /**
+     * Renders StreamingMarkdownText blocks and instruments each block with a
+     * SideEffect composition counter.
+     *
+     * This mirrors the real StreamingMarkdownDocumentBlocks structure: each block
+     * is keyed, and MarkdownText is called with the block's source. The `key()`
+     * wrapper preserves component identity across ticks; the restartable
+     * [InstrumentedMarkdownBlock] lets Compose skip unchanged blocks entirely.
+     */
+    @Composable
     private fun StreamingMarkdownTextWithInstrumentation(
         text: String,
-        blockCompositionCounts: MutableMap<String, Int>,
+        recorder: BlockCompositionRecorder,
     ) {
-        val documentState = androidx.compose.runtime.remember { StreamingMarkdownDocumentState() }
+        val documentState = remember { StreamingMarkdownDocumentState() }
         // Update the document state on each text change, preserving block identity.
         val document = documentState.update(text)
 
         // Use Column (like real StreamingMarkdownText) to ensure proper layout.
         Column {
             document.blocks.forEach { block ->
-                androidx.compose.runtime.key(block.key) {
-                    // SideEffect runs on EVERY composition of this key's block.
-                    // If the block is skip-recomposed, SideEffect doesn't run.
-                    SideEffect {
-                        blockCompositionCounts[block.key] =
-                            blockCompositionCounts.getOrDefault(block.key, 0) + 1
-                    }
-                    MarkdownText(
-                        text = block.source,
-                        textColor = MaterialTheme.colorScheme.onSurface,
+                key(block.key) {
+                    InstrumentedMarkdownBlock(
+                        blockKey = block.key,
+                        source = block.source,
+                        recorder = recorder,
                     )
                 }
             }
         }
+
+        // Emitted after the per-block SideEffects above, so the baselines it
+        // captures already include this frame's compositions.
+        val blockKeys = document.blocks.map { it.key }
+        SideEffect { recorder.recordFrame(blockKeys) }
     }
 
     /**
-     * Asserts that committed blocks (those not at the last index in the final
-     * frame) have composition counts <= [maxCompositionsPerBlock].
+     * Restartable composable wrapping one markdown block. Because every parameter
+     * is stable and compares equal across ticks for an unchanged block, Compose
+     * skips this call outright and the [SideEffect] does not run - which is
+     * exactly the property under test.
+     */
+    @Composable
+    private fun InstrumentedMarkdownBlock(
+        blockKey: String,
+        source: String,
+        recorder: BlockCompositionRecorder,
+    ) {
+        SideEffect { recorder.recordComposition(blockKey) }
+        MarkdownText(
+            text = source,
+            textColor = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+
+    /**
+     * Asserts that once a block is committed (displaced from the streaming tail)
+     * it stops recomposing.
      *
-     * The last block is allowed to recompose frequently (it's the active tail).
-     * All prior blocks are committed and must not recompose per tick.
+     * The bound is an absolute constant, deliberately independent of [tickCount]:
+     * a per-tick recomposition regression overshoots it by O(N), so the gate can
+     * never be tipped either way by a frame or two of scheduling noise on a
+     * loaded CI runner.
      */
     private fun assertCommittedBlocksStayBounded(
-        compositionCounts: Map<String, Int>,
-        maxCompositionsPerBlock: Int,
+        recorder: BlockCompositionRecorder,
+        tickCount: Int,
         cadence: String,
         sourceLength: Int,
     ) {
-        if (compositionCounts.isEmpty()) {
+        val totals = recorder.totalCompositions.toMap()
+        if (totals.isEmpty()) {
             fail("No blocks were rendered; test setup may be broken")
         }
 
-        // The last block key is the active tail; exclude it from the check.
-        val sortedKeys = compositionCounts.keys.sorted()
-        val committedKeys = sortedKeys.dropLast(1)
-        val activeKey = sortedKeys.last()
-
-        if (committedKeys.isEmpty()) {
-            // Only one block throughout the entire stream; nothing to assert.
-            return
+        val postCommit = recorder.postCommitCompositions()
+        if (postCommit.isEmpty()) {
+            fail(
+                "Only one block was ever rendered across $tickCount ticks; the gate " +
+                    "needs at least one committed block to validate. Totals: $totals",
+            )
         }
 
-        val violations = mutableListOf<String>()
-        committedKeys.forEach { key ->
-            val count = compositionCounts[key] ?: 0
-            if (count > maxCompositionsPerBlock) {
-                violations.add("  Block $key: $count compositions (limit=$maxCompositionsPerBlock)")
+        val violations = postCommit
+            .filterValues { it > MAX_POST_COMMIT_COMPOSITIONS }
+            .map { (key, count) ->
+                "  Block $key: $count compositions after commit " +
+                    "(limit=$MAX_POST_COMMIT_COMPOSITIONS, total=${totals[key]})"
             }
-        }
 
         if (violations.isNotEmpty()) {
-            val activeCount = compositionCounts[activeKey] ?: 0
             fail(
                 """
-                |FLICKER DETECTED ($cadence streaming, source length $sourceLength chars):
-                |Committed blocks recomposed too many times. Expected O(1), got O(N) per tick.
+                |FLICKER DETECTED ($cadence streaming, source length $sourceLength chars,
+                |$tickCount streaming ticks):
+                |Committed blocks kept recomposing after they were displaced from the tail.
+                |Expected O(1) post-commit compositions, got O(N) per tick.
                 |
-                |This indicates the markdown renderer is re-parsing/re-emitting committed
-                |blocks on every streaming tick instead of skip-recomposing them.
+                |This indicates the markdown renderer is re-emitting committed blocks on
+                |every streaming tick instead of skip-recomposing them.
                 |
                 |Likely causes:
-                | - retainState=false in MarkdownText.kt (CoreMarkdown)
                 | - Block key churn in StreamingMarkdownDocumentState
-                | - Non-monotone block updates
+                | - Non-monotone block updates (committed block source mutating)
+                | - An unstable parameter reaching the block composable, defeating skipping
                 |
-                |Committed block composition counts:
+                |Post-commit composition counts:
                 |${violations.joinToString("\n")}
                 |
-                |Active tail composition count: $activeCount (OK, tail churns by design)
-                |
-                |All composition counts: $compositionCounts
+                |All total composition counts: $totals
+                |All post-commit composition counts: $postCommit
                 """.trimMargin(),
             )
         }
 
-        // Success: committed blocks stayed O(1) compositions.
+        // Sanity: the stream must actually have churned, otherwise a broken
+        // harness that renders nothing would pass vacuously.
         assertTrue(
-            "Expected at least one committed block to validate the gate",
-            committedKeys.isNotEmpty(),
+            "Expected the stream to produce multiple blocks over $tickCount ticks, got $totals",
+            totals.size >= MIN_EXPECTED_BLOCKS,
         )
+        assertTrue(
+            "Expected the active tail to recompose as the stream advances, got $totals",
+            totals.values.any { it > 1 },
+        )
+    }
+
+    private companion object {
+        /**
+         * Allow a single post-commit composition: the frame that commits a block
+         * may also be the frame that applies its final source (for example the
+         * trailing newline that closes it).
+         */
+        const val MAX_POST_COMMIT_COMPOSITIONS = 1
+
+        /** Both fixtures produce a heading, prose, a list, and a closing paragraph. */
+        const val MIN_EXPECTED_BLOCKS = 4
     }
 }

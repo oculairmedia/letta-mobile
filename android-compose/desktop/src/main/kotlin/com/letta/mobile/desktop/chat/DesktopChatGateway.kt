@@ -26,6 +26,23 @@ interface DesktopApprovalSubmitter {
 }
 
 /**
+ * letta-mobile-lgns8.19: optional capability a [DesktopChatGateway] may implement
+ * to REALLY abort an in-flight server turn (App Server `abort_message`), so the
+ * bottom-bar stop tears the run down server-side instead of merely cancelling
+ * the local collect job. HTTP-only / demo gateways don't implement it, so callers
+ * detect it via `gateway as? DesktopTurnAborter` and fall back to a local clear.
+ */
+interface DesktopTurnAborter {
+    /**
+     * Sends an abort for [conversationId]'s active turn. Returns true when the
+     * abort was actually dispatched to the server (the server then emits its own
+     * terminal frame, which is what releases the UI); false when there was no
+     * live runtime to abort.
+     */
+    suspend fun abortConversationTurn(conversationId: String): Boolean
+}
+
+/**
  * A decision for a parked approval. [reason] carries an AskUserQuestion answer
  * when encoded via [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason];
  * otherwise it's a plain allow/deny message.

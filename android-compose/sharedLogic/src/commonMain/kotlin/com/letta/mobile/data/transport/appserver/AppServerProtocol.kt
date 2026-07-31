@@ -144,15 +144,10 @@ object AppServerProtocol {
         if (parsed.typeName !in KNOWN_INBOUND_MESSAGE_TYPES) {
             return AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
         }
+        // Unknown protocol fields are preserved on AppServerReceivedFrame.raw; typed
+        // frames intentionally model only what upstream actually sends.
         return decodeKnown(parsed) {
-            val decoded = json.decodeFromJsonElement<AppServerInboundFrame>(parsed.raw)
-            if (decoded is AppServerInboundFrame.SkillsUpdated && decoded.skills == null) {
-                // Nested payloads decode with skills=null because unknown keys are
-                // ignored. Preserve those for NativeSkillsCatalog's raw fallback.
-                AppServerInboundFrame.Unknown(type = parsed.typeName, raw = parsed.raw)
-            } else {
-                decoded
-            }
+            json.decodeFromJsonElement<AppServerInboundFrame>(parsed.raw)
         }
     }
 
@@ -674,6 +669,16 @@ sealed interface AppServerInboundFrame {
         override val runtime: AppServerRuntimeScope? = null
     }
 
+    /**
+     * Response to `runtime_start`.
+     *
+     * Note on skills: `runtime_start.skill_sources` is a **request-only** field.
+     * Upstream 0.29.12 validates it on the inbound command
+     * (`isRuntimeStartCommand`) and stores it per conversation in
+     * `applyRuntimeStartState`; `sendRuntimeStartResponse` never echoes it back.
+     * There is therefore no authoritative skill enumeration to read from this
+     * frame — see [com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog].
+     */
     @Serializable
     @SerialName("runtime_start_response")
     data class RuntimeStartResponse(
@@ -857,12 +862,23 @@ sealed interface AppServerInboundFrame {
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
+    /**
+     * Response to `skill_enable`.
+     *
+     * Verified against `@letta-ai/letta-code` 0.29.12 (`letta.js`,
+     * `// src/websocket/listener/commands/skills-agents.ts`): a successful enable
+     * sends `{ type, request_id, success: true, name, skill_path, link_path }`.
+     * Upstream sends `name` — never `skill_name`. These three fields are the only
+     * authoritative skill facts the App Server puts on the wire.
+     */
     @Serializable
     @SerialName("skill_enable_response")
     data class SkillEnableResponse(
         @SerialName("request_id") override val requestId: String,
         val success: Boolean,
-        @SerialName("skill_name") val skillName: String? = null,
+        @SerialName("name") val skillName: String? = null,
+        @SerialName("skill_path") val skillPath: String? = null,
+        @SerialName("link_path") val linkPath: String? = null,
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "skill_enable_response"
@@ -870,11 +886,16 @@ sealed interface AppServerInboundFrame {
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
 
+    /**
+     * Response to `skill_disable`. Upstream 0.29.12 sends
+     * `{ type, request_id, success, name }` on success, `{ ..., error }` otherwise.
+     */
     @Serializable
     @SerialName("skill_disable_response")
     data class SkillDisableResponse(
         @SerialName("request_id") override val requestId: String,
         val success: Boolean,
+        @SerialName("name") val skillName: String? = null,
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "skill_disable_response"
@@ -883,18 +904,24 @@ sealed interface AppServerInboundFrame {
     }
 
     /**
-     * Push update for available skills. Shape is partially specified upstream;
-     * [skills] may be absent when the payload nests under another key — callers
-     * should also inspect [raw] via unknown-key-tolerant decode.
+     * Skill-set invalidation signal.
+     *
+     * Upstream 0.29.12 `emitSkillsUpdated` sends exactly `{ type, timestamp }` —
+     * it carries **no** skill array. Modelling a `skills` payload here previously
+     * let fixture tests pass against a shape upstream never sends; consumers must
+     * treat this frame as "re-read your catalog", never as a snapshot.
+     *
+     * Envelope fields ([runtime], [eventSeq], [emittedAt], [idempotencyKey]) are
+     * optional because the wrapper's own fanout stamps them on replayed frames.
      */
     @Serializable
     @SerialName("skills_updated")
     data class SkillsUpdated(
         override val runtime: AppServerRuntimeScope? = null,
+        val timestamp: Long? = null,
         @SerialName("event_seq") val eventSeq: Long? = null,
         @SerialName("emitted_at") val emittedAt: String? = null,
         @SerialName("idempotency_key") val idempotencyKey: String? = null,
-        val skills: JsonArray? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "skills_updated"
 

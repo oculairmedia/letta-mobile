@@ -82,7 +82,38 @@ class DesktopHybridAppServerChatGateway internal constructor(
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
         httpGateway.getConversation(conversationId).agentId.value
     },
-) : DesktopChatGateway, ChatGatewayExtras by httpGateway, DesktopApprovalSubmitter, AutoCloseable {
+) : DesktopChatGateway,
+    ChatGatewayExtras by httpGateway,
+    DesktopApprovalSubmitter,
+    DesktopTurnAborter,
+    AutoCloseable {
+
+    /**
+     * conversationId -> the canonical run id most recently seen on that
+     * conversation's in-flight turn. letta-mobile-lgns8.19 addresses the abort at
+     * that run so the server tears down the RIGHT run; a null entry still aborts
+     * (the server then targets whatever run is active for the runtime).
+     */
+    private val activeRunIdByConversation = ConcurrentHashMap<String, String>()
+
+    /**
+     * letta-mobile-lgns8.19: REAL server-side abort for the desktop stop button.
+     * Previously desktop only cancelled its local collect job, so a long tool call
+     * ran to completion and its output later surfaced as a ghost resume.
+     */
+    override suspend fun abortConversationTurn(conversationId: String): Boolean {
+        val engine = turnEngine as? AppServerTurnEngine ?: return false
+        val runId = activeRunIdByConversation[conversationId]
+        // Keyed abort: with concurrent runtimes the keyless overload targets the
+        // most recently started scope, which can abort the WRONG conversation.
+        val agentId = runCatching { agentIdFor(conversationId) }.getOrNull() ?: return false
+        val response = engine.abort(agentId, conversationId, runId) ?: return false
+        // A response with success=false or aborted=false means no run was torn
+        // down (stale/already-terminal run id): report undelivered so the
+        // controller falls back to its local clear instead of holding the
+        // "stopping" state for the full terminal timeout.
+        return response.success && response.aborted
+    }
 
     /**
      * Answer / dismiss a parked runtime approval (e.g. AskUserQuestion) over the
@@ -185,6 +216,11 @@ class DesktopHybridAppServerChatGateway internal constructor(
             var mainReplyCompleted = false
             try {
                 turnEngine.runTurn(command).collect { draft ->
+                    // letta-mobile-lgns8.19: remember the turn's canonical run id
+                    // so a stop can address the abort at the right run.
+                    draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
+                        activeRunIdByConversation[conversationId] = it
+                    }
                     val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
                     if (lifecycle?.status == RuntimeRunStatus.Failed) {
                         // letta-mobile-br5g0: a Failed terminal AFTER the main reply
@@ -226,6 +262,7 @@ class DesktopHybridAppServerChatGateway internal constructor(
                 }
             } finally {
                 activeSendConversations.remove(conversationId)
+                activeRunIdByConversation.remove(conversationId)
             }
         }
     }

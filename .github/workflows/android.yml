@@ -295,11 +295,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-project-v1-${{ hashFiles('android-compose/gradle/wrapper/gradle-wrapper.properties', 'android-compose/settings.gradle.kts', 'android-compose/**/*.gradle.kts', 'android-compose/gradle/libs.versions.toml', 'android-compose/gradle.properties') }}-
 
+      # play-release builds only on main pushes: PR validation is covered by
+      # root-debug (same compile surface); the signed R8 release build + size
+      # gate runs post-merge. The matrix leg still reports success on PRs so
+      # the build-apk-pass required aggregator stays satisfied.
       - name: Decode signing keystore
-        if: matrix.variant == 'play-release'
+        if: matrix.variant == 'play-release' && github.event_name != 'pull_request'
         run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 -d > app/letta-release.jks
 
       - name: Build ${{ matrix.variant }} APK
+        if: matrix.variant != 'play-release' || github.event_name != 'pull_request'
         env:
           SIGNING_STORE_FILE: ${{ matrix.variant == 'play-release' && 'letta-release.jks' || '' }}
           SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -318,16 +323,17 @@ jobs:
         run: ./gradlew ${{ matrix.gradle_task }} --build-cache
 
       - name: Validate play-release APK size and R8 config
-        if: matrix.variant == 'play-release'
+        if: matrix.variant == 'play-release' && github.event_name != 'pull_request'
         run: bash ../scripts/ci/validate-android-release-apk.sh
 
       - name: Remove signing keystore
         # Same hygiene as the release workflow -- runner is ephemeral but
         # don't leave the decoded keystore on disk longer than needed.
-        if: always() && matrix.variant == 'play-release'
+        if: always() && matrix.variant == 'play-release' && github.event_name != 'pull_request'
         run: rm -f app/letta-release.jks
 
       - name: Upload ${{ matrix.variant }} APK
+        if: matrix.variant != 'play-release' || github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}-${{ github.run_number }}

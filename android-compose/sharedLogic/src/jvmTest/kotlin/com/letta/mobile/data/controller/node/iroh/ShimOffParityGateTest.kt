@@ -257,7 +257,21 @@ class ShimOffParityGateTest {
             nativeClient = NativeRuntime(),
             shimRetired = true,
             vibesyncBaseUrl = null, // VibeSync not injected
+            // lgns8.21.2: production (AppServerServeIrohCommand) ALWAYS injects the
+            // native catalog's listing source, so the shim-off parity model must too.
+            // Without it skill.list correctly reports capability_unavailable — a
+            // wiring gap in the harness, not a parity gap in the controller.
+            skillsListing = gateSkillsCatalog().asListingSource(),
         )
+
+    /**
+     * The host-enumerated catalog the wrapper hydrates in production. Hydrated
+     * here so the gate asserts the served-natively path, not the fail-closed
+     * unhydrated one (covered by ControlCapabilityHandlersTest).
+     */
+    private fun gateSkillsCatalog() = NativeSkillsCatalog().apply {
+        hydrateFromHost(buildJsonArray { add(buildJsonObject { put("name", "gate-skill") }) })
+    }
 
     private fun params(method: String) = buildJsonObject {
         put("agent_id", "agent-1")
