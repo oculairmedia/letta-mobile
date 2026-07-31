@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventPayload
@@ -62,7 +63,7 @@ suspend fun runAppServerSmokeTurn(
 ) {
     val timeoutMs = spec.timeoutMs
     val httpClient = HttpClient(engineFactory) {
-        install(WebSockets)
+        install(WebSockets) { applyAppServerFrameLimits() }
         install(HttpTimeout) {
             requestTimeoutMillis = timeoutMs
             connectTimeoutMillis = 30_000
