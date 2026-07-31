@@ -11,11 +11,16 @@ import com.letta.mobile.feature.chat.send.ChatSendContext
 import com.letta.mobile.feature.chat.send.ChatSendStrategySelector
 import com.letta.mobile.feature.chat.send.LocalRuntimeRouting
 import com.letta.mobile.feature.chat.state.ChatBannerController
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.GoalStatusUi
 import com.letta.mobile.ui.chat.render.ConversationState
@@ -35,7 +40,17 @@ internal class AdminChatComposerCoordinator(
     private val slashCommandRepository: ISlashCommandRepository,
     private val isStreaming: () -> Boolean,
     private val projectContextAvailable: Boolean,
+    private val nowMs: () -> Long = { System.currentTimeMillis() },
 ) {
+    /**
+     * letta-mobile-lgns8.19: bumped whenever a NEW turn is dispatched from this
+     * composer. The cancel watcher captures the epoch at Stop time and stands
+     * down the moment it changes, so a cancel from a previous turn can never
+     * clear (or suppress frames of) the turn that replaced it.
+     */
+    private var sendEpoch = 0
+    private var cancelWatchJob: Job? = null
+
     val state: StateFlow<ChatComposerState> = composerController.state
 
     fun addAttachment(image: MessageContentPart.Image): Boolean =
@@ -100,7 +115,12 @@ internal class AdminChatComposerCoordinator(
                 ChatComposerEffect.OpenBugReport
             }
             null -> {
-                if (isStreaming()) {
+                if (uiState.value.isCancellingRun) {
+                    // letta-mobile-lgns8.19: sends are REJECTED (not queued)
+                    // while a stop is in flight — matching the existing
+                    // "no free-form steering during an active run" convention.
+                    composerController.setError(STOPPING_SEND_BLOCKED_MESSAGE)
+                } else if (isStreaming()) {
                     composerController.setError(
                         "Letta does not support free-form steering during an active run yet. Stop the run before sending another message."
                     )
@@ -113,6 +133,13 @@ internal class AdminChatComposerCoordinator(
     }
 
     fun sendMessage(text: String) {
+        // letta-mobile-lgns8.19: the stop is not confirmed yet — the server turn
+        // is still live, so a send now is exactly the interleaving the bead
+        // reports. Reject with a specific message rather than queueing.
+        if (uiState.value.isCancellingRun) {
+            chatBannerController.showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
+            return
+        }
         when (uiState.value.conversationState) {
             ConversationState.Loading -> {
                 chatBannerController.showConversationStillLoading()
@@ -141,6 +168,12 @@ internal class AdminChatComposerCoordinator(
         text: String,
         attachments: List<MessageContentPart.Image>,
     ) {
+        // letta-mobile-lgns8.19: a new turn starts here — retire any cancel
+        // bookkeeping from the previous one so "stopping…" can never leak.
+        sendEpoch += 1
+        cancelWatchJob?.cancel()
+        cancelWatchJob = null
+        chatBannerController.clearCancelling()
         val context = chatSendContext()
         chatSendStrategySelector.send(text, attachments, context)
     }
@@ -164,24 +197,133 @@ internal class AdminChatComposerCoordinator(
         tokenBudget = tokenBudget,
     )
 
+    /**
+     * letta-mobile-lgns8.19: Stop.
+     *
+     * The UI no longer goes idle when the cancel is REQUESTED. It enters an
+     * explicit CANCELLING state ([ChatUiState.isCancellingRun]) that holds the
+     * composer blocked and shows "stopping…", and resolves to idle only when the
+     * authoritative terminal frame lands (or the transport's bounded
+     * synthetic-terminal fallback fires). A SECOND Stop press while cancelling is
+     * the escape hatch: it force-clears locally and is telemetered, because the
+     * server turn may still be running at that point.
+     */
     fun interruptRun(clearA2uiThinkingOnResponse: () -> Unit) {
-        if (!uiState.value.isStreaming) return
+        val snapshot = uiState.value
+        if (!snapshot.isStreaming) return
+        if (snapshot.isCancelling) {
+            forceLocalClear(reason = "secondStopPress")
+            return
+        }
         clearA2uiThinkingOnResponse()
         val context = chatSendContext()
+        val requestedAtMs = nowMs()
+        chatBannerController.beginCancelling()
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "interrupt.cancelRequested",
+            "agentId" to agentId.value,
+            "conversationId" to explicitConversationId,
+            "transport" to cancelTransportLabel(context),
+        )
+        watchForCancelTerminal(requestedAtMs)
         scope.launch {
             if (context.isShimBackend || context.isLocalRuntime) {
-                chatBannerController.clearStreamingAfterInterrupt()
                 chatSendStrategySelector.cancel(context)
                 return@launch
             }
             val runIds = activeRunIds().takeIf { it.isNotEmpty() }
-            chatBannerController.clearStreamingAfterInterrupt()
             runCatching {
                 messageRepository.cancelMessage(agentId = agentId, runIds = runIds)
             }.onFailure { e ->
+                // The abort never reached the server: holding "stopping…" would
+                // wedge the composer, so drop to the local escape hatch.
                 chatBannerController.showMappedError(e.asException(), "Failed to stop run")
+                forceLocalClear(reason = "cancelDispatchFailed")
             }
         }
+    }
+
+    /**
+     * Waits for the turn's authoritative terminal — `isStreaming` going false is
+     * emitted only by a terminal lifecycle frame (or the transport's synthetic
+     * fallback) — then retires the cancel marker and guards the immediate
+     * aftermath against ghost resume. Bounded so a terminal that never arrives
+     * cannot wedge the composer forever.
+     */
+    private fun watchForCancelTerminal(requestedAtMs: Long) {
+        val epoch = sendEpoch
+        cancelWatchJob?.cancel()
+        cancelWatchJob = scope.launch {
+            val terminal = withTimeoutOrNull(CANCEL_TERMINAL_TIMEOUT_MS) {
+                uiState.first { !it.isStreaming }
+            }
+            if (epoch != sendEpoch) return@launch
+            if (terminal == null) {
+                Telemetry.event(
+                    TELEMETRY_TAG,
+                    "interrupt.terminalTimeout",
+                    "agentId" to agentId.value,
+                    "conversationId" to explicitConversationId,
+                    durationMs = CANCEL_TERMINAL_TIMEOUT_MS,
+                    level = Telemetry.Level.WARN,
+                )
+                chatBannerController.forceClearStreamingAfterInterrupt()
+                return@launch
+            }
+            Telemetry.event(
+                TELEMETRY_TAG,
+                "interrupt.terminalAfterCancel",
+                "agentId" to agentId.value,
+                "conversationId" to explicitConversationId,
+                durationMs = nowMs() - requestedAtMs,
+            )
+            chatBannerController.clearCancelling()
+            suppressLateFramesAfterTerminal(epoch)
+        }
+    }
+
+    /**
+     * Ghost-resume guard: for a short window after a CANCELLED turn's terminal,
+     * any frame that tries to re-open the streaming UI without a new user send
+     * belongs to the turn that was just killed. Drop it back to idle and
+     * telemeter instead of letting the dead turn's tail render as a live reply.
+     * A real new turn bumps [sendEpoch] and stands this watcher down.
+     */
+    private suspend fun suppressLateFramesAfterTerminal(epoch: Int) {
+        withTimeoutOrNull(LATE_FRAME_SUPPRESSION_WINDOW_MS) {
+            uiState.takeWhile { epoch == sendEpoch }.collect { state ->
+                if (!state.isStreaming) return@collect
+                Telemetry.event(
+                    TELEMETRY_TAG,
+                    "interrupt.lateFrameSuppressed",
+                    "agentId" to agentId.value,
+                    "conversationId" to explicitConversationId,
+                    level = Telemetry.Level.WARN,
+                )
+                chatBannerController.forceClearStreamingAfterInterrupt()
+            }
+        }
+    }
+
+    private fun forceLocalClear(reason: String) {
+        cancelWatchJob?.cancel()
+        cancelWatchJob = null
+        chatBannerController.forceClearStreamingAfterInterrupt()
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "interrupt.forcedLocalClear",
+            "agentId" to agentId.value,
+            "conversationId" to explicitConversationId,
+            "reason" to reason,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    private fun cancelTransportLabel(context: ChatSendContext): String = when {
+        context.isShimBackend -> "shim"
+        context.isLocalRuntime -> "localRuntime"
+        else -> "appServer"
     }
 
     private fun Throwable.asException(): Exception = this as? Exception ?: Exception(this)
@@ -191,4 +333,17 @@ internal class AdminChatComposerCoordinator(
         .mapNotNull { it.runId }
         .distinct()
         .take(1)
+
+    internal companion object {
+        const val STOPPING_SEND_BLOCKED_MESSAGE =
+            "Stopping the current run — wait for it to finish before sending another message."
+
+        /** Upper bound on holding "stopping…" before falling back to a local clear. */
+        const val CANCEL_TERMINAL_TIMEOUT_MS = 30_000L
+
+        /** Ghost-resume guard window after a cancelled turn's terminal frame. */
+        const val LATE_FRAME_SUPPRESSION_WINDOW_MS = 5_000L
+
+        private const val TELEMETRY_TAG = "AdminChatVM"
+    }
 }

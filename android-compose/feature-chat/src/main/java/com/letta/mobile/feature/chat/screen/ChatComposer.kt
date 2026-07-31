@@ -87,6 +87,11 @@ private data class ChatComposerUiModel(
     val inputText: String,
     val pendingAttachments: ImmutableList<MessageContentPart.Image>,
     val isStreaming: Boolean,
+    // letta-mobile-lgns8.19: a stop has been requested but the turn's terminal
+    // frame has not landed yet. The composer stays blocked (isStreaming is still
+    // true) and the action button reads "stopping…" — a second press is the
+    // local force-clear escape hatch.
+    val isCancelling: Boolean,
     val canSendMessages: Boolean,
     val slashCommands: ImmutableList<SlashCommand>,
     val availableTools: List<Tool>,
@@ -135,11 +140,13 @@ internal fun ChatComposer(
     onSlashCommandSelected: (SlashCommand) -> Unit = {},
     onSlashCommandUninstall: (SlashCommand) -> Unit = {},
     availableTools: List<Tool> = emptyList(),
+    isCancelling: Boolean = false,
 ) {
     val model = ChatComposerUiModel(
         inputText = inputText,
         pendingAttachments = pendingAttachments,
         isStreaming = isStreaming,
+        isCancelling = isCancelling,
         canSendMessages = canSendMessages,
         slashCommands = slashCommands,
         availableTools = availableTools,
@@ -329,15 +336,17 @@ private fun ChatComposerInput(
         enabled = model.canSendMessages,
         canSendOverride = if (model.isStreaming) true else canSend,
         actionIcon = if (model.isStreaming) LettaIcons.Close else LettaIcons.Send,
-        actionContentDescription = if (model.isStreaming) {
-            stringResource(R.string.action_stop_run)
-        } else {
-            stringResource(R.string.action_send_message)
+        actionContentDescription = when {
+            model.isCancelling -> stringResource(R.string.action_stopping_run)
+            model.isStreaming -> stringResource(R.string.action_stop_run)
+            else -> stringResource(R.string.action_send_message)
         },
         actionContainerColor = if (model.isStreaming) MaterialTheme.colorScheme.errorContainer else null,
         actionContentColor = if (model.isStreaming) MaterialTheme.colorScheme.onErrorContainer else null,
         actionSizeFraction = if (model.isStreaming) 0.7f else 1f,
-        actionPulse = model.isStreaming,
+        // Stop pulsing once a stop is pending: the button is now "stopping…",
+        // and a second press is the local force-clear escape hatch.
+        actionPulse = model.isStreaming && !model.isCancelling,
         actionVisible = state.showAction || state.voice.enabled,
         hasStagedContent = model.pendingAttachments.isNotEmpty(),
         customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),

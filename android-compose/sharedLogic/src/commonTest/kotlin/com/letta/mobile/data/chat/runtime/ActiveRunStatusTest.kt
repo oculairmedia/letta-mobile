@@ -28,6 +28,34 @@ class ActiveRunStatusTest {
         )
     }
 
+    // letta-mobile-lgns8.19: an unconfirmed abort must read as "stopping",
+    // never as ordinary work — the turn is still live until its terminal frame.
+    @Test
+    fun stoppingOutranksThinkingAndStreaming() {
+        assertEquals(
+            NowActiveStatus.Stopping,
+            nowActiveStatus(
+                isThinking = true,
+                isStreaming = true,
+                hasError = false,
+                isStopping = true,
+            ),
+        )
+    }
+
+    @Test
+    fun errorStillOutranksStopping() {
+        assertEquals(
+            NowActiveStatus.Error,
+            nowActiveStatus(
+                isThinking = false,
+                isStreaming = true,
+                hasError = true,
+                isStopping = true,
+            ),
+        )
+    }
+
     @Test
     fun idleWhenNothingIsHappening() {
         assertEquals(

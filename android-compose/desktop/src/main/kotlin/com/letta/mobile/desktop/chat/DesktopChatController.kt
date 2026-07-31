@@ -27,6 +27,7 @@ import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.ui.chat.render.ChatTimelineProjector
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.desktop.DesktopBootstrapState
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -156,6 +157,19 @@ class DesktopChatController(
 
     // Same stale-guard rationale as thinkingGeneration.
     private var streamingGeneration = 0
+
+    /**
+     * letta-mobile-lgns8.19: conversation whose turn has an abort in flight.
+     * Set when the user presses stop and cleared ONLY when the turn's stream
+     * actually ends (the send job's finally, driven by the server's terminal
+     * frame) — never optimistically. While set, the composer refuses new sends,
+     * so a message can't be interleaved into a turn that is still running.
+     */
+    private val _cancellingConversationId = MutableStateFlow<String?>(null)
+    val cancellingConversationId: StateFlow<String?> = _cancellingConversationId.asStateFlow()
+
+    /** Wall-clock ms of the outstanding cancel request, for terminal-latency telemetry. */
+    private var cancelRequestedAtMs: Long = 0L
 
     /**
      * Shared Timeline→message projection (the same one Android uses). Gives the
@@ -699,23 +713,111 @@ class DesktopChatController(
     /**
      * User-facing interrupt (bottom-bar stop), scoped to [conversationId]:
      * a no-op when the in-flight work belongs to a different conversation, so
-     * an unrelated send can never be cancelled by mistake. The send pipeline's
-     * finally clears the streaming flag on cancellation; thinking is cleared
-     * here because the cancellation path rethrows before failure-path cleanup.
-     * Client-side only — the server turn may still run to completion.
+     * an unrelated send can never be cancelled by mistake.
+     *
+     * letta-mobile-lgns8.19: this is now a REAL server-side abort. The gateway's
+     * [DesktopTurnAborter.abortConversationTurn] sends the App Server
+     * `abort_message` for the conversation's active run; the server tears the run
+     * (and any in-flight tool) down and emits its own terminal frame, which ends
+     * the send flow and releases the UI via [runRemoteSendAttempt]'s finally.
+     * The local job is deliberately NOT cancelled here — cancelling it is what
+     * made the UI go idle while the turn kept running, producing the ghost resume
+     * and message interleaving this bead reports.
+     *
+     * A SECOND stop press while an abort is already outstanding is the escape
+     * hatch: it force-clears locally (cancelling the job) and is telemetered,
+     * because the server turn may still be alive at that point. Gateways that
+     * cannot abort (demo / HTTP-only) fall straight through to that same local
+     * clear rather than pretending to have stopped anything.
      */
     fun stopActiveRun(conversationId: String) {
         if (closed) return
         val active = _streamingConversationId.value ?: _thinkingConversationId.value
         if (active != null && active != conversationId) return
+        if (_cancellingConversationId.value == conversationId) {
+            forceLocalStopClear(conversationId, reason = "secondStopPress")
+            return
+        }
+        val aborter = gateway as? DesktopTurnAborter
+        if (aborter == null) {
+            forceLocalStopClear(conversationId, reason = "gatewayCannotAbort")
+            return
+        }
+        _cancellingConversationId.value = conversationId
+        cancelRequestedAtMs = System.currentTimeMillis()
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "interrupt.cancelRequested",
+            "conversationId" to conversationId,
+            "transport" to "appServer",
+        )
+        scope.launch {
+            val dispatched = runCatching { aborter.abortConversationTurn(conversationId) }
+            val failure = dispatched.exceptionOrNull()
+            if (closed) return@launch
+            // The terminal may have beaten the dispatch home; nothing to do then.
+            if (_cancellingConversationId.value != conversationId) return@launch
+            if (failure != null || dispatched.getOrDefault(false).not()) {
+                // Nothing was aborted server-side, so no terminal frame is
+                // coming — holding "stopping…" would wedge the composer.
+                failure?.let {
+                    Telemetry.error(TELEMETRY_TAG, "interrupt.abortDispatchFailed", it)
+                }
+                forceLocalStopClear(conversationId, reason = "abortNotDispatched")
+                return@launch
+            }
+            // Bounded wait: a terminal that never arrives must not wedge the
+            // composer in "stopping…" forever.
+            val settled = withTimeoutOrNull(CANCEL_TERMINAL_TIMEOUT_MS) {
+                cancellingConversationId.first { it != conversationId }
+                true
+            } ?: false
+            if (closed || settled) return@launch
+            if (_cancellingConversationId.value != conversationId) return@launch
+            Telemetry.event(
+                TELEMETRY_TAG,
+                "interrupt.terminalTimeout",
+                "conversationId" to conversationId,
+                durationMs = CANCEL_TERMINAL_TIMEOUT_MS,
+                level = Telemetry.Level.WARN,
+            )
+            forceLocalStopClear(conversationId, reason = "terminalTimeout")
+        }
+    }
+
+    /**
+     * Local escape hatch: drop the streaming UI without a terminal frame. The
+     * server turn may still be running, hence the WARN-level telemetry.
+     */
+    private fun forceLocalStopClear(conversationId: String, reason: String) {
         sendJob?.cancel()
+        _cancellingConversationId.value = null
         if (_thinkingConversationId.value == conversationId) {
             _thinkingConversationId.value = null
         }
+        if (_streamingConversationId.value == conversationId) {
+            _streamingConversationId.value = null
+        }
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "interrupt.forcedLocalClear",
+            "conversationId" to conversationId,
+            "reason" to reason,
+            level = Telemetry.Level.WARN,
+        )
     }
 
     fun send() {
         if (closed) return
+        // letta-mobile-lgns8.19: a stop is outstanding and unconfirmed — the
+        // server turn is still live, so sending now is the interleaving defect.
+        // Reject (matching mobile) rather than queueing behind an unknown turn.
+        _cancellingConversationId.value?.let { cancelling ->
+            if (cancelling == _state.value.selectedConversationId) {
+                showComposerError(STOPPING_SEND_BLOCKED_MESSAGE)
+                return
+            }
+        }
         val draft = ChatComposerPolicy.beginSend(_state.value.composer) ?: return
         _state.value.selectedConversationId?.let { _lastPromptedConversationId.value = it }
         val loop = activeLoop
@@ -830,6 +932,22 @@ class DesktopChatController(
                 _streamingConversationId.value == attempt.conversationId
             ) {
                 _streamingConversationId.value = null
+            }
+            // letta-mobile-lgns8.19: the stream ending IS the terminal — that is
+            // the only thing allowed to resolve a pending stop back to idle.
+            if (_cancellingConversationId.value == attempt.conversationId) {
+                _cancellingConversationId.value = null
+                // An aborted turn may never produce a reply, so the thinking
+                // indicator has nothing to clear it but this terminal.
+                if (_thinkingConversationId.value == attempt.conversationId) {
+                    _thinkingConversationId.value = null
+                }
+                Telemetry.event(
+                    TELEMETRY_TAG,
+                    "interrupt.terminalAfterCancel",
+                    "conversationId" to attempt.conversationId,
+                    durationMs = System.currentTimeMillis() - cancelRequestedAtMs,
+                )
             }
         }
     }
@@ -1126,6 +1244,16 @@ class DesktopChatController(
 
 /** How long a notification reply waits for the conversation switch to settle. */
 private const val NOTIFICATION_REPLY_SETTLE_TIMEOUT_MS = 5_000L
+
+private const val TELEMETRY_TAG = "DesktopChat"
+
+/** Upper bound on holding "stopping…" before falling back to a local clear. */
+private const val CANCEL_TERMINAL_TIMEOUT_MS = 30_000L
+
+/** letta-mobile-lgns8.19: shown when a send is attempted while a stop is pending. */
+internal const val STOPPING_SEND_BLOCKED_MESSAGE =
+    "Stopping the current run — wait for it to finish before sending another message."
+
 
 /** Conversation-list scope filter, mapped to the `archive_status` query param. */
 enum class ConversationArchiveFilter(val apiValue: String, val label: String) {

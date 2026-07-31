@@ -154,7 +154,10 @@ class AdminChatComposerCoordinatorTest {
         testScope.runCurrent()
         
         verify { clearThinking.invoke() }
-        verify { chatBannerController.clearStreamingAfterInterrupt() }
+        // letta-mobile-lgns8.19: the UI enters CANCELLING — it is NOT optimistically
+        // cleared. The idle transition happens on the terminal frame instead.
+        verify { chatBannerController.beginCancelling() }
+        verify(exactly = 0) { chatBannerController.forceClearStreamingAfterInterrupt() }
         coVerify { messageRepository.cancelMessage(eq(AgentId("agent_123")), any()) }
     }
 }

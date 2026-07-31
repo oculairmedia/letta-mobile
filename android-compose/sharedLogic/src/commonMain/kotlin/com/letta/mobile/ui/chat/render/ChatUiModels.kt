@@ -296,4 +296,23 @@ data class ChatUiState(
     val goalStatus: GoalStatusUi? = null,
     val isGoalStatusLoading: Boolean = false,
     val a2uiFrameCount: Int = 0,
-)
+    /**
+     * letta-mobile-lgns8.19: an abort has been REQUESTED for the in-flight turn
+     * but the authoritative terminal frame has not landed yet.
+     *
+     * This flag is deliberately NOT self-clearing: the run resolves to idle only
+     * when [isStreaming] goes false, which happens exclusively on the terminal
+     * lifecycle frame (or the transport's bounded synthetic-terminal fallback).
+     * Read [isCancellingRun] rather than this raw flag — it is scoped to
+     * [isStreaming] so a stale `true` can never leak "stopping…" onto a fresh
+     * turn, and so cancel state resolves atomically with the terminal.
+     */
+    val isCancelling: Boolean = false,
+) {
+    /**
+     * letta-mobile-lgns8.19: true only while a cancel is outstanding AND the
+     * turn is still streaming. The composer stays blocked for the whole window;
+     * a second Stop press while this is true force-clears locally.
+     */
+    val isCancellingRun: Boolean get() = isStreaming && isCancelling
+}
