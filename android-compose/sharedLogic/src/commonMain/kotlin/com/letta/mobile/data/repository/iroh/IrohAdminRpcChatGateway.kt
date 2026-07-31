@@ -377,21 +377,30 @@ class IrohAdminRpcChatGateway(
                 }
             }
         }
-        // letta-mobile-wxy4s: SECONDARY MASKING FIX. These synthesized heartbeats
-        // used to emit unconditionally, so TimelineSyncLoop's silence watchdog
-        // never cycled even when the transport was long dead — the UI kept being
-        // told "the stream is fine". Gate them on the transport actually being
-        // Connected (same shape as DesktopHybridAppServerChatGateway) so a dead
-        // connection goes silent and the watchdog can do its job.
-        val heartbeats = flow<TimelineStreamFrame> {
-            while (transport.state.value is com.letta.mobile.data.transport.ChannelTransportState.Connected) {
-                delay(heartbeatIntervalMs.milliseconds)
-                if (transport.state.value !is com.letta.mobile.data.transport.ChannelTransportState.Connected) break
-                emit(TimelineStreamFrame.Heartbeat)
-            }
-        }
-        return merge(frames, heartbeats)
+        return merge(frames, connectedHeartbeats())
     }
+
+    /**
+     * letta-mobile-wxy4s: SECONDARY MASKING FIX.
+     *
+     * Iroh emits no idle pings, so these synthesized heartbeats keep
+     * TimelineSyncLoop's silence watchdog from cycling an idle-but-healthy
+     * subscription. They used to emit UNCONDITIONALLY, which also told the loop
+     * "the stream is fine" across a long-dead connection — one of the two masks
+     * that hid the 2026-07-31 outage. Gated on the transport actually being
+     * Connected (same shape as DesktopHybridAppServerChatGateway), a dead
+     * connection now goes silent and the watchdog can do its job.
+     */
+    private fun connectedHeartbeats(): Flow<TimelineStreamFrame> = flow {
+        while (isTransportConnected()) {
+            delay(heartbeatIntervalMs.milliseconds)
+            if (!isTransportConnected()) break
+            emit(TimelineStreamFrame.Heartbeat)
+        }
+    }
+
+    private fun isTransportConnected(): Boolean =
+        transport.state.value is com.letta.mobile.data.transport.ChannelTransportState.Connected
 
     // ------------------------------------------------------------------
     // Internals

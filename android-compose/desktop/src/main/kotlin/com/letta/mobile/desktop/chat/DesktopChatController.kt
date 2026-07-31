@@ -283,88 +283,103 @@ class DesktopChatController(
         connectionJob?.cancel()
         connectionJob = null
         val statusGateway = next as? ConnectionStatusGateway ?: return
+        val outage = OutageTracker()
         connectionJob = scope.launch {
-            val sawDisconnect = java.util.concurrent.atomic.AtomicBoolean(false)
-            // Elapsed-downtime is counted in POLL ticks rather than wall-clock, so
-            // the escalation is driven purely by delay() (virtual-time testable and
-            // immune to clock jumps around suspend/resume).
-            val downTicks = java.util.concurrent.atomic.AtomicInteger(0)
-            val isDown = java.util.concurrent.atomic.AtomicBoolean(false)
-            // ESCALATION (the bead's original "rebuild the gateway" ask). The
-            // supervisor's own backoff redial handles transient drops; only when
-            // the connection stays down past the threshold do we take the heavy
-            // hammer — and EXACTLY ONCE, never in a loop.
-            val escalationWatchdog = launch {
-                while (true) {
-                    delay(CONNECTION_ESCALATION_POLL_MS)
-                    if (!isDown.get()) {
-                        downTicks.set(0)
-                        continue
-                    }
-                    if (outageEscalated) continue
-                    val downMs = downTicks.incrementAndGet() * CONNECTION_ESCALATION_POLL_MS
-                    if (downMs < CONNECTION_ESCALATION_MS) continue
-                    outageEscalated = true
-                    retryConnection()
-                    return@launch
-                }
-            }
+            val escalationWatchdog = launch { watchForSustainedOutage(outage) }
             try {
                 statusGateway.connectionState.collect { transportState ->
                     when (transportState) {
-                        is ChannelTransportState.Connected -> {
-                            isDown.set(false)
-                            downTicks.set(0)
-                            outageEscalated = false
-                            if (!sawDisconnect.compareAndSet(true, false)) return@collect
-                            // AUTO-RECOVER. Deliberately NOT retryConnection():
-                            // that closes the gateway and therefore destroys the
-                            // IrohChannelTransport and its supervisor — throwing
-                            // away the healthy connection we just redialed.
-                            runCatching {
-                                reloadConversationsAndSelect(
-                                    preferConversationId = _state.value.runtimeState.selectedConversationId,
-                                )
-                            }
-                        }
-                        is ChannelTransportState.Disconnected -> {
-                            if (transportState.isAuthFailure) {
-                                // Terminal: the supervisor sets authFailed and stops
-                                // redialing, so there is nothing to auto-recover.
-                                isDown.set(false)
-                                _state.update { current ->
-                                    current.withRuntimeState(
-                                        ChatSessionReducer.conversationLoadFailed(
-                                            state = current.runtimeState,
-                                            errorMessage = transportState.reason.ifBlank { "Authentication failed" },
-                                        ),
-                                    )
-                                }
-                                return@collect
-                            }
-                            sawDisconnect.set(true)
-                            isDown.set(true)
-                            _state.update { current ->
-                                current.withRuntimeState(
-                                    ChatSessionReducer.streamDisconnected(
-                                        state = current.runtimeState,
-                                        generation = current.runtimeState.selectionGeneration,
-                                        errorMessage = transportState.reason.ifBlank { "Connection lost" },
-                                        statusMessage = if (transportState.willReconnect) {
-                                            "Reconnecting…"
-                                        } else {
-                                            "Stream disconnected"
-                                        },
-                                    ),
-                                )
-                            }
-                        }
+                        is ChannelTransportState.Connected -> onTransportConnected(outage)
+                        is ChannelTransportState.Disconnected -> onTransportDisconnected(transportState, outage)
                         else -> Unit
                     }
                 }
             } finally {
                 escalationWatchdog.cancel()
             }
+        }
+    }
+
+    /**
+     * Downtime bookkeeping for one connection watch. Elapsed time is counted in
+     * POLL ticks rather than wall-clock so the escalation is driven purely by
+     * delay() — virtual-time testable and immune to clock jumps across suspend.
+     */
+    private class OutageTracker {
+        val sawDisconnect = java.util.concurrent.atomic.AtomicBoolean(false)
+        val isDown = java.util.concurrent.atomic.AtomicBoolean(false)
+        val downTicks = java.util.concurrent.atomic.AtomicInteger(0)
+
+        fun markUp() {
+            isDown.set(false)
+            downTicks.set(0)
+        }
+    }
+
+    /**
+     * ESCALATION (the bead's original "rebuild the gateway" ask). The supervisor's
+     * own backoff redial handles transient drops; only when the connection stays
+     * down past the threshold do we take the heavy hammer — and EXACTLY ONCE.
+     */
+    private suspend fun watchForSustainedOutage(outage: OutageTracker) {
+        while (true) {
+            delay(CONNECTION_ESCALATION_POLL_MS)
+            if (!outage.isDown.get()) {
+                outage.downTicks.set(0)
+                continue
+            }
+            if (outageEscalated) continue
+            val downMs = outage.downTicks.incrementAndGet() * CONNECTION_ESCALATION_POLL_MS
+            if (downMs < CONNECTION_ESCALATION_MS) continue
+            outageEscalated = true
+            retryConnection()
+            return
+        }
+    }
+
+    private suspend fun onTransportConnected(outage: OutageTracker) {
+        outage.markUp()
+        outageEscalated = false
+        if (!outage.sawDisconnect.compareAndSet(true, false)) return
+        // AUTO-RECOVER. Deliberately NOT retryConnection(): that closes the gateway
+        // and therefore destroys the IrohChannelTransport and its supervisor —
+        // throwing away the healthy connection we just redialed.
+        runCatching {
+            reloadConversationsAndSelect(
+                preferConversationId = _state.value.runtimeState.selectedConversationId,
+            )
+        }
+    }
+
+    private fun onTransportDisconnected(
+        transportState: ChannelTransportState.Disconnected,
+        outage: OutageTracker,
+    ) {
+        if (transportState.isAuthFailure) {
+            // Terminal: the supervisor sets authFailed and stops redialing, so there
+            // is nothing to auto-recover.
+            outage.markUp()
+            _state.update { current ->
+                current.withRuntimeState(
+                    ChatSessionReducer.conversationLoadFailed(
+                        state = current.runtimeState,
+                        errorMessage = transportState.reason.ifBlank { "Authentication failed" },
+                    ),
+                )
+            }
+            return
+        }
+        outage.sawDisconnect.set(true)
+        outage.isDown.set(true)
+        _state.update { current ->
+            current.withRuntimeState(
+                ChatSessionReducer.streamDisconnected(
+                    state = current.runtimeState,
+                    generation = current.runtimeState.selectionGeneration,
+                    errorMessage = transportState.reason.ifBlank { "Connection lost" },
+                    statusMessage = if (transportState.willReconnect) "Reconnecting…" else "Stream disconnected",
+                ),
+            )
         }
     }
 

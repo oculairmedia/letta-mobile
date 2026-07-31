@@ -390,85 +390,113 @@ class IrohChannelTransport(
             "generation" to generation.toString(),
             "intervalMs" to livenessProbeIntervalMs.toString(),
         )
-        livenessProbeJob = livenessProbeScope.launch {
-            var consecutiveFailures = 0
-            while (true) {
-                // Wait one interval, or wake early on a forced probe.
-                val forced = withTimeoutOrNull(livenessProbeIntervalMs.milliseconds) {
-                    livenessProbeWakeups.receive()
-                } != null
-                if (livenessProbeGeneration.value != generation) return@launch
-                // Live stream traffic is already proof of life — never probe (or
-                // escalate) mid-turn. A forced probe (app resume) bypasses this:
-                // "recent" activity may predate a long background window.
-                if (!forced && adminRpcRetryState.millisSinceLastStream() < livenessProbeIntervalMs) {
-                    consecutiveFailures = 0
-                    continue
-                }
-                // TIMEOUT TRAP: health.check is legacy-fallback-safe, so a stream
-                // failure falls back to the control channel with its own 30s
-                // timeout (worst case ~60s per call). The probe MUST bound the
-                // call itself rather than inherit that.
-                var timedOut = false
-                val alive = withTimeoutOrNull(livenessProbeTimeoutMs.milliseconds) {
-                    try {
-                        // ANY response — including success=false — proves the peer
-                        // answered, which is the only thing this probe measures. It
-                        // is a LIVENESS test, not a health test; escalating on an
-                        // unhealthy-but-reachable server would redial pointlessly.
-                        handle.adminRpc(method = "health.check", path = HEALTH_CHECK_PATH, body = null)
-                        true
-                    } catch (cancellation: CancellationException) {
-                        throw cancellation
-                    } catch (error: Throwable) {
-                        // Same rule as adminRpc's request-isolation guard: a decode
-                        // or frame-size rejection is a PAYLOAD fault, which means
-                        // the round trip completed — the path is alive. Likewise any
-                        // error that doesn't look connection-lost (e.g. a method the
-                        // node doesn't implement) came back FROM the peer. Only a
-                        // connection-class error counts against liveness.
-                        val aliveDespiteError =
-                            error.isAdminRpcPayloadError() || !error.isConnectionLostClass()
-                        Telemetry.event(
-                            "IrohLiveness", "probe.error",
-                            "error" to (error.message ?: error.toString()),
-                            "class" to error::class.simpleName,
-                            "aliveDespiteError" to aliveDespiteError,
-                        )
-                        aliveDespiteError
-                    }
-                } ?: run { timedOut = true; false }
-                if (livenessProbeGeneration.value != generation) return@launch
-                if (alive) {
-                    consecutiveFailures = 0
-                    continue
-                }
-                consecutiveFailures += 1
-                Telemetry.event(
-                    "IrohLiveness", "probe.failed",
-                    "sessionId" to handle.sessionId,
-                    "consecutiveFailures" to consecutiveFailures.toString(),
-                    "timedOut" to timedOut,
-                )
-                if (consecutiveFailures < livenessProbeFailuresToDeclareDead) continue
-                Telemetry.event(
-                    "IrohLiveness", "probe.declared_dead",
-                    "sessionId" to handle.sessionId,
-                    "failures" to consecutiveFailures.toString(),
-                )
-                // ATTRIBUTION IS MANDATORY (r3i1z): an unattributed loss report
-                // that lands after a redial destroys the healthy NEW handle. Pass
-                // the handle this loop is pinned to so the supervisor can drop the
-                // report as stale if it has already moved on.
-                supervisor.onConnectionLostAsync(
-                    "liveness_probe_failed: no health.check response in " +
-                        "${livenessProbeTimeoutMs}ms x $consecutiveFailures",
-                    handle,
-                )
-                // The redial produces a fresh Ready, which re-arms a new loop.
-                return@launch
+        livenessProbeJob = livenessProbeScope.launch { runLivenessProbeLoop(handle, generation) }
+    }
+
+    /**
+     * One probe cycle per interval until this loop's [generation] is superseded or
+     * the connection is declared dead (after which the redial's fresh Ready arms a
+     * new loop).
+     */
+    private suspend fun runLivenessProbeLoop(handle: IrohConnectionHandle, generation: Int) {
+        var consecutiveFailures = 0
+        while (true) {
+            val forced = awaitProbeTick()
+            if (livenessProbeGeneration.value != generation) return
+            if (skipProbeForRecentStreamTraffic(forced)) {
+                consecutiveFailures = 0
+                continue
             }
+            val outcome = probeOnce(handle)
+            if (livenessProbeGeneration.value != generation) return
+            if (outcome == ProbeOutcome.ALIVE) {
+                consecutiveFailures = 0
+                continue
+            }
+            consecutiveFailures += 1
+            Telemetry.event(
+                "IrohLiveness", "probe.failed",
+                "sessionId" to handle.sessionId,
+                "consecutiveFailures" to consecutiveFailures.toString(),
+                "timedOut" to (outcome == ProbeOutcome.TIMED_OUT),
+            )
+            if (consecutiveFailures < livenessProbeFailuresToDeclareDead) continue
+            declareConnectionDead(handle, consecutiveFailures)
+            return
         }
+    }
+
+    /** Waits one interval; returns true when woken early by [probeNow]. */
+    private suspend fun awaitProbeTick(): Boolean =
+        withTimeoutOrNull(livenessProbeIntervalMs.milliseconds) {
+            livenessProbeWakeups.receive()
+        } != null
+
+    /**
+     * Live stream traffic is already proof of life — never probe (or escalate)
+     * mid-turn. A forced probe (app resume) bypasses this: "recent" activity may
+     * predate a long background window.
+     */
+    private fun skipProbeForRecentStreamTraffic(forced: Boolean): Boolean =
+        !forced && adminRpcRetryState.millisSinceLastStream() < livenessProbeIntervalMs
+
+    private enum class ProbeOutcome { ALIVE, TIMED_OUT, UNREACHABLE }
+
+    /**
+     * One bounded `health.check` round trip.
+     *
+     * TIMEOUT TRAP: health.check is legacy-fallback-safe, so a stream failure falls
+     * back to the control channel with its own 30s timeout (worst case ~60s per
+     * call). The probe MUST bound the call itself rather than inherit that.
+     */
+    private suspend fun probeOnce(handle: IrohConnectionHandle): ProbeOutcome =
+        withTimeoutOrNull(livenessProbeTimeoutMs.milliseconds) {
+            try {
+                // ANY response — including success=false — proves the peer answered,
+                // which is the only thing this probe measures. It is a LIVENESS test,
+                // not a health test; escalating on an unhealthy-but-reachable server
+                // would redial pointlessly.
+                handle.adminRpc(method = "health.check", path = HEALTH_CHECK_PATH, body = null)
+                ProbeOutcome.ALIVE
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                classifyProbeError(error)
+            }
+        } ?: ProbeOutcome.TIMED_OUT
+
+    /**
+     * Same rule as adminRpc's request-isolation guard: a decode or frame-size
+     * rejection is a PAYLOAD fault, which means the round trip completed — the path
+     * is alive. Likewise any error that doesn't look connection-lost (e.g. a method
+     * the node doesn't implement) came back FROM the peer. Only a connection-class
+     * error counts against liveness.
+     */
+    private fun classifyProbeError(error: Throwable): ProbeOutcome {
+        val alive = error.isAdminRpcPayloadError() || !error.isConnectionLostClass()
+        Telemetry.event(
+            "IrohLiveness", "probe.error",
+            "error" to (error.message ?: error.toString()),
+            "class" to error::class.simpleName,
+            "aliveDespiteError" to alive,
+        )
+        return if (alive) ProbeOutcome.ALIVE else ProbeOutcome.UNREACHABLE
+    }
+
+    private fun declareConnectionDead(handle: IrohConnectionHandle, failures: Int) {
+        Telemetry.event(
+            "IrohLiveness", "probe.declared_dead",
+            "sessionId" to handle.sessionId,
+            "failures" to failures.toString(),
+        )
+        // ATTRIBUTION IS MANDATORY (r3i1z): an unattributed loss report that lands
+        // after a redial destroys the healthy NEW handle. Pass the handle this loop
+        // is pinned to so the supervisor can drop the report as stale if it has
+        // already moved on.
+        supervisor.onConnectionLostAsync(
+            "liveness_probe_failed: no health.check response in ${livenessProbeTimeoutMs}ms x $failures",
+            handle,
+        )
     }
 
     private fun stopLivenessProbe(reason: String) {

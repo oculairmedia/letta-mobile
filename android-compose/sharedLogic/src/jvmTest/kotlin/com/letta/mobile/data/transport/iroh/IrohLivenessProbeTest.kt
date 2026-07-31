@@ -65,55 +65,58 @@ class IrohLivenessProbeTest {
 
     // Compressed cadence: the production defaults (20s/5s) are asserted
     // separately by IrohLivenessProbeWiringTest.
-    private val probeIntervalMs = 300L
     private val probeTimeoutMs = 150L
 
     private data class ProbeCall(val session: String, val method: String, val atMs: Long)
 
     /**
-     * A transport whose dialer hands out numbered sessions. [hangHealthCheckOn]
-     * names the session whose `health.check` BLACK-HOLES (accepts the call and
-     * never answers) — exactly the shape of the production incident: the write
-     * succeeds locally, nothing ever comes back.
+     * One probe scenario: what the dialer hands out and how fast the probe runs.
+     * [hangHealthCheckOn] names the session whose `health.check` BLACK-HOLES
+     * (accepts the call and never answers) — exactly the shape of the production
+     * incident: the write succeeds locally, nothing ever comes back.
      */
-    private fun transportWith(
-        calls: MutableList<ProbeCall>,
-        dials: AtomicInteger,
-        hangHealthCheckOn: String?,
-        observerStream: MutableSharedFlow<AppServerReceivedFrame>? = null,
-        intervalMs: Long = probeIntervalMs,
-    ): IrohChannelTransport = IrohChannelTransport(
-        scope = scope,
-        activeConfigProvider = { config },
-        testDialer = { dialConfig ->
-            val session = "session-${dials.incrementAndGet()}"
-            IrohConnectionHandle(
-                config = dialConfig,
-                ticket = "ticket",
-                sessionId = session,
-                observerStreamFrames = observerStream,
-                adminRpcCall = { method, _, _ ->
-                    calls += ProbeCall(session, method, System.currentTimeMillis())
-                    if (session == hangHealthCheckOn && method == "health.check") {
-                        // Black hole: never completes. The caller MUST impose its
-                        // own bound (the legacy control-channel fallback would
-                        // otherwise stretch this to 30s/60s).
-                        delay(600_000L)
-                    }
-                    AppServerInboundFrame.AdminRpcResponse(
-                        requestId = method,
-                        success = true,
-                        result = JsonPrimitive(session),
-                    )
-                },
-                connectionAlive = { true },
-                close = {},
-            )
-        },
-        livenessProbeIntervalMs = intervalMs,
-        livenessProbeTimeoutMs = probeTimeoutMs,
-        livenessProbeFailuresToDeclareDead = 2,
+    private data class ProbeScenario(
+        val calls: MutableList<ProbeCall>,
+        val dials: AtomicInteger,
+        val hangHealthCheckOn: String? = null,
+        val observerStream: MutableSharedFlow<AppServerReceivedFrame>? = null,
+        val intervalMs: Long = COMPRESSED_PROBE_INTERVAL_MS,
     )
+
+    private fun transportWith(scenario: ProbeScenario): IrohChannelTransport = with(scenario) {
+        IrohChannelTransport(
+            scope = scope,
+            activeConfigProvider = { config },
+            testDialer = { dialConfig ->
+                val session = "session-${dials.incrementAndGet()}"
+                IrohConnectionHandle(
+                    config = dialConfig,
+                    ticket = "ticket",
+                    sessionId = session,
+                    observerStreamFrames = observerStream,
+                    adminRpcCall = { method, _, _ ->
+                        calls += ProbeCall(session, method, System.currentTimeMillis())
+                        if (session == hangHealthCheckOn && method == "health.check") {
+                            // Black hole: never completes. The caller MUST impose its
+                            // own bound (the legacy control-channel fallback would
+                            // otherwise stretch this to 30s/60s).
+                            delay(600_000L)
+                        }
+                        AppServerInboundFrame.AdminRpcResponse(
+                            requestId = method,
+                            success = true,
+                            result = JsonPrimitive(session),
+                        )
+                    },
+                    connectionAlive = { true },
+                    close = {},
+                )
+            },
+            livenessProbeIntervalMs = intervalMs,
+            livenessProbeTimeoutMs = probeTimeoutMs,
+            livenessProbeFailuresToDeclareDead = 2,
+        )
+    }
 
     private suspend fun awaitTrue(timeout: kotlin.time.Duration = 10.seconds, predicate: () -> Boolean): Boolean =
         withTimeoutOrNull(timeout) {
@@ -130,7 +133,7 @@ class IrohLivenessProbeTest {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
         val states = CopyOnWriteArrayList<ChannelTransportState>()
-        val transport = transportWith(calls, dials, hangHealthCheckOn = "session-1")
+        val transport = transportWith(ProbeScenario(calls, dials, hangHealthCheckOn = "session-1"))
         val stateCollector = scope.launch { transport.state.collect { states += it } }
         transport.connect("iroh://ticket", "", "device", "test")
         try {
@@ -163,7 +166,7 @@ class IrohLivenessProbeTest {
     fun probeSuccessDoesNotRedial() = runBlocking {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
-        val transport = transportWith(calls, dials, hangHealthCheckOn = null)
+        val transport = transportWith(ProbeScenario(calls, dials))
         transport.connect("iroh://ticket", "", "device", "test")
         try {
             // Several probe intervals of a healthy peer.
@@ -200,7 +203,13 @@ class IrohLivenessProbeTest {
         // health.check would black-hole if it were ever issued: if the skip is
         // broken, this test redials mid-stream (the regression it guards).
         val transport = transportWith(
-            calls, dials, hangHealthCheckOn = "session-1", observerStream = stream, intervalMs = intervalMs,
+            ProbeScenario(
+                calls = calls,
+                dials = dials,
+                hangHealthCheckOn = "session-1",
+                observerStream = stream,
+                intervalMs = intervalMs,
+            ),
         )
         val observed = AtomicInteger(0)
         val eventCollector = scope.launch { transport.events.collect { observed.incrementAndGet() } }
@@ -243,7 +252,7 @@ class IrohLivenessProbeTest {
     fun probeLossAttributedToOwnHandle() = runBlocking {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
-        val transport = transportWith(calls, dials, hangHealthCheckOn = "session-1")
+        val transport = transportWith(ProbeScenario(calls, dials, hangHealthCheckOn = "session-1"))
         transport.connect("iroh://ticket", "", "device", "test")
         try {
             assertTrue(awaitTrue { dials.get() >= 2 }, "dead session-1 redials to session-2")
@@ -255,7 +264,7 @@ class IrohLivenessProbeTest {
             val session1ProbesAfterRedial = calls.count { it.session == "session-1" && it.method == "health.check" }
             // ...and the superseded loop must be gone, so it can neither probe nor
             // report a loss that would tear down the healthy new connection.
-            delay(probeIntervalMs.milliseconds * 4)
+            delay(COMPRESSED_PROBE_INTERVAL_MS.milliseconds * 4)
             assertEquals(
                 session1ProbesAfterRedial,
                 calls.count { it.session == "session-1" && it.method == "health.check" },
@@ -278,7 +287,7 @@ class IrohLivenessProbeTest {
     fun probeStopsWhenNotReady() = runBlocking {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
-        val transport = transportWith(calls, dials, hangHealthCheckOn = null)
+        val transport = transportWith(ProbeScenario(calls, dials))
         transport.connect("iroh://ticket", "", "device", "test")
         assertTrue(
             awaitTrue { calls.any { it.method == "health.check" } },
@@ -286,7 +295,7 @@ class IrohLivenessProbeTest {
         )
         transport.disconnect()
         val afterDisconnect = calls.count { it.method == "health.check" }
-        delay(probeIntervalMs.milliseconds * 4)
+        delay(COMPRESSED_PROBE_INTERVAL_MS.milliseconds * 4)
         assertEquals(
             afterDisconnect,
             calls.count { it.method == "health.check" },
@@ -303,7 +312,7 @@ class IrohLivenessProbeTest {
     fun probeTimeoutIsBoundedNotLegacyFallback() = runBlocking {
         val calls = CopyOnWriteArrayList<ProbeCall>()
         val dials = AtomicInteger(0)
-        val transport = transportWith(calls, dials, hangHealthCheckOn = "session-1")
+        val transport = transportWith(ProbeScenario(calls, dials, hangHealthCheckOn = "session-1"))
         val startedAt = System.currentTimeMillis()
         transport.connect("iroh://ticket", "", "device", "test")
         try {
@@ -352,7 +361,7 @@ class IrohLivenessProbeTest {
                     close = {},
                 )
             },
-            livenessProbeIntervalMs = probeIntervalMs,
+            livenessProbeIntervalMs = COMPRESSED_PROBE_INTERVAL_MS,
             livenessProbeTimeoutMs = probeTimeoutMs,
             livenessProbeFailuresToDeclareDead = 2,
         )
@@ -395,4 +404,13 @@ class IrohLivenessProbeTest {
 
     private fun assistantDelta(id: String, content: String) =
         """{"message_type": "assistant_message", "id": "$id", "content": "$content"}"""
+
+    private companion object {
+        /**
+         * Compressed cadence so these tests run in milliseconds. The PRODUCTION
+         * defaults (20s/5s) are asserted separately by IrohLivenessProbeWiringTest.
+         */
+        const val COMPRESSED_PROBE_INTERVAL_MS = 300L
+    }
+
 }
