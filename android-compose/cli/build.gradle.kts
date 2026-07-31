@@ -47,6 +47,11 @@ kotlin {
 dependencies {
     implementation(project(":core:data"))
     implementation(project(":sharedLogic"))
+    // letta-mobile-zsgad: `app-server-serve-iroh` now lives in the pure-JVM
+    // :iroh-wrapper-cli module so it can ship as an installable distribution
+    // (this Android library module cannot). The developer `meridian` CLI keeps
+    // exposing the same subcommand by consuming it from there.
+    implementation(project(":iroh-wrapper-cli"))
 
     implementation("com.github.ajalt.clikt:clikt:5.1.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
