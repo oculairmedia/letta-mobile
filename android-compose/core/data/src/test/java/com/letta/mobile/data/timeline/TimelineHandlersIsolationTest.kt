@@ -71,7 +71,8 @@ class TimelineHandlersIsolationTest {
                 id = "tr-1",
                 toolCallId = "call-id-1",
                 toolReturnRaw = JsonPrimitive("success_response"),
-                isErr = false
+                isErr = false,
+                runId = "run-1",
             )
         )
 

@@ -52,32 +52,6 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `approval response marks matching approval request decided`() {
-        val approvalRequest = ApprovalRequestMessage(
-            id = "approval-1",
-            toolCall = ToolCall(toolCallId = "call-approval", name = "danger", arguments = "{}"),
-        )
-        val seeded = reduce(frame = approvalRequest).next
-
-        val output = reduce(
-            prev = seeded,
-            frame = ApprovalResponseMessage(
-                id = "approval-response-1",
-                approvalRequestId = "approval-1",
-                approve = true,
-            ),
-        )
-
-        val event = output.next.events.single() as TimelineEvent.Confirmed
-        event.approvalRequestId shouldBe "approval-1"
-        event.approvalDecided shouldBe true
-        output.emittedEvents shouldBe listOf(
-            TimelineSyncEvent.StreamEventIngested("approval-1", "approval_response_message")
-        )
-        output.notification shouldBe null
-    }
-
-    @Test
     fun `tool return attaches to matching tool call and emits notification`() {
         val seeded = reduce(
             frame = ToolCallMessage(

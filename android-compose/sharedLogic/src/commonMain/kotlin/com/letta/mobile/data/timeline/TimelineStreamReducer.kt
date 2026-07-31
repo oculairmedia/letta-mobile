@@ -62,9 +62,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
     // default; enable Telemetry.chatHotPathDebugEnabled while investigating.
     if (message is ApprovalResponseMessage) {
         val reqId = message.approvalRequestId ?: return output()
-        val match = timeline.events.firstOrNull {
-            it is TimelineEvent.Confirmed && it.approvalRequestId == reqId
-        } as? TimelineEvent.Confirmed ?: return output()
+        val match = timeline.matchingApprovalEvent(message) ?: return output()
         if (match.approvalDecided) {
             hotPathTelemetry(
                 "streamSubscriber.eventDeduped",
@@ -109,7 +107,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                     else fold.contentByCallId + (tcid to "")
                 val body = contentByCallId.getValue(tcid)
                 val updated = match.copy(
-                    approvalDecided = true,
+                    approvalDecided = match.approvalDecided || match.willCompleteWith(tcid),
                     toolReturnContent = body.ifBlank { match.toolReturnContent ?: body },
                     toolReturnIsError = isError,
                     toolReturnContentByCallId = contentByCallId.toTimelinePersistentMap(),
@@ -623,11 +621,7 @@ private fun applyPendingToolReturns(
     pendingToolReturnsByCallId: LinkedHashMap<String, ToolReturnMessage>,
 ): TimelineEvent.Confirmed {
     if (ev.messageType != TimelineMessageType.TOOL_CALL || ev.toolCalls.isEmpty()) return ev
-    val matchingReturns = ev.toolCalls.mapNotNull { toolCall ->
-        val callId = toolCall.effectiveId.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        val toolReturn = pendingToolReturnsByCallId.remove(callId) ?: return@mapNotNull null
-        callId to toolReturn
-    }
+    val matchingReturns = ev.takeMatchingPendingReturns(pendingToolReturnsByCallId)
     if (matchingReturns.isEmpty()) return ev
     val firstReturn = matchingReturns.first().second
     // letta-mobile-fe51r: shared fold keeps projected previews from
@@ -643,7 +637,8 @@ private fun applyPendingToolReturns(
     )
     val firstCallId = matchingReturns.first().first
     return ev.copy(
-        approvalDecided = true,
+        approvalDecided = ev.approvalDecided ||
+            ev.willCompleteWith(matchingReturns.mapTo(mutableSetOf()) { it.first }),
         toolReturnContent = fold.contentByCallId[firstCallId] ?: ev.toolReturnContent,
         toolReturnIsError = firstReturn.isErr == true || firstReturn.status == "error" || ev.toolReturnIsError,
         toolReturnContentByCallId = fold.contentByCallId.toTimelinePersistentMap(),
