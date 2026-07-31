@@ -3,10 +3,12 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.http.LettaHttpChatGateway
+import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.websocket.WebSockets
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 import dev.nucleusframework.nativessl.NativeTrustManager
@@ -56,6 +58,11 @@ fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
     install(ContentNegotiation) {
         json(desktopChatJson)
     }
+    // This client also backs the desktop App Server WebSocket transport
+    // (DesktopAppServerControllerGatewayFactory.buildWebSocketTransport), which
+    // calls httpClient.webSocket(...) — that requires the plugin, and
+    // letta-mobile-lgns8.21.7 requires the inbound frame ceiling with it.
+    install(WebSockets) { applyAppServerFrameLimits() }
     install(HttpTimeout) {
         connectTimeoutMillis = 15_000
         requestTimeoutMillis = 60_000

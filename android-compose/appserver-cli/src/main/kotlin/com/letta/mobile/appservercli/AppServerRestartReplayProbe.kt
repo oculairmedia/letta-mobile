@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartCreateAgen
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeStartCreateConversationOptions
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -165,7 +166,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
         // propagates to the caller's job hierarchy.
         val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val http = HttpClient(CIO) {
-            install(WebSockets)
+            install(WebSockets) { applyAppServerFrameLimits() }
             install(HttpTimeout) {
                 requestTimeoutMillis = TURN_TIMEOUT_MS
                 connectTimeoutMillis = 30_000

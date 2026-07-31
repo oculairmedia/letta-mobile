@@ -6,15 +6,11 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
 const val DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT: Int = 200_000
@@ -36,6 +32,9 @@ class AppServerContextWindowPreflight(
     private val client: AppServerClient,
     private val defaultContextWindowLimit: Int = DEFAULT_APP_SERVER_CONTEXT_WINDOW_LIMIT,
     private val recentMessageLimit: Int = 50,
+    /** Cumulative inspection budget for one message page — see [AppServerPreflightBounds]. */
+    private val maxInspectedBytes: Int = AppServerPreflightBounds.MAX_INSPECTED_BYTES,
+    private val maxMessageInspectedBytes: Int = AppServerPreflightBounds.MAX_MESSAGE_INSPECTED_BYTES,
     private val requestIdFactory: () -> String = {
         "context-preflight-${nextContextPreflightRequestId.incrementAndGet()}"
     },
@@ -43,6 +42,8 @@ class AppServerContextWindowPreflight(
     init {
         require(defaultContextWindowLimit > 0)
         require(recentMessageLimit > 0)
+        require(maxInspectedBytes > 0)
+        require(maxMessageInspectedBytes > 0)
     }
 
     override suspend fun prepare(agentId: String, conversationId: String): TurnContextPreflightResult {
@@ -102,6 +103,16 @@ class AppServerContextWindowPreflight(
         return limit
     }
 
+    /**
+     * letta-mobile-lgns8.21.7: byte-bounded inspection.
+     *
+     * The rows arrive newest-first (`order=desc`) and are inspected in that
+     * order under one shared [BoundedMessageInspector] budget, so the newest
+     * evidence — the only evidence that can trigger compaction — is always the
+     * evidence we can afford. When the budget runs out the remaining (older)
+     * rows are counted as skipped and the pass degrades to "no overflow found"
+     * with WARN telemetry, never a full-materialization retry.
+     */
     private suspend fun recentMessagesOverflow(
         conversationId: String,
         effectiveLimit: Int,
@@ -120,12 +131,36 @@ class AppServerContextWindowPreflight(
         check(messages.success && messages.messages != null) {
             "conversation_messages_list failed: ${messages.error ?: "missing messages"}"
         }
-        val active = messages.messages.filter { it.isActive(activeMessageIds) }
-        if (active.any { it.recordsPoisonedOrTokenOverflow(effectiveLimit) }) return true
-        // Length-stop is only consulted on the newest active assistant so an
-        // older max_tokens/context stop cannot re-trigger compaction every turn.
-        val newestAssistant = active.firstOrNull { it.isAssistantMessage() } ?: return false
-        return newestAssistant.recordsLengthStopNearCapacity(effectiveLimit)
+        val rows = messages.messages
+        val inspector = BoundedMessageInspector(
+            maxTotalBytes = maxInspectedBytes,
+            maxMessageBytes = maxMessageInspectedBytes,
+        )
+        var overflow = false
+        var newestAssistant: PreflightMessageProbe? = null
+        var index = 0
+        while (index < rows.size) {
+            if (inspector.budgetExhausted) break
+            val probe = inspector.inspect(rows[index])
+            index++
+            if (!probe.isActive(activeMessageIds)) continue
+            if (probe.recordsPoisonedOrTokenOverflow(effectiveLimit)) {
+                overflow = true
+                break
+            }
+            // Length-stop is only consulted on the newest active assistant so an
+            // older max_tokens/context stop cannot re-trigger compaction every turn.
+            if (newestAssistant == null && probe.role == "assistant") newestAssistant = probe
+        }
+        // Rows left unread because we already DECIDED are not "skipped" — only
+        // rows the budget refused to look at are.
+        if (!overflow) inspector.skipRemaining(rows.size - index)
+        val result = overflow || newestAssistant?.recordsLengthStopNearCapacity(effectiveLimit) == true
+        val summary = inspector.summary()
+        // A bound hit only degrades the DECISION when we did not already decide
+        // to compact — compaction is the safe side of this branch.
+        summary.emitTelemetry(conversationId = conversationId, decisionDegraded = !result)
+        return result
     }
 
     private suspend fun compactConversation(agentId: String, conversationId: String) {
@@ -166,18 +201,14 @@ private fun JsonObject.activeMessageIds(): Set<String>? {
     return ids.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.toSet()
 }
 
-private fun JsonElement.isActive(activeMessageIds: Set<String>?): Boolean {
+private fun PreflightMessageProbe.isActive(activeMessageIds: Set<String>?): Boolean {
     if (activeMessageIds == null) return true
-    return inspectMessage().id?.let(activeMessageIds::contains) == true
+    return id?.let(activeMessageIds::contains) == true
 }
 
-private fun JsonElement.isAssistantMessage(): Boolean =
-    inspectMessage().role == "assistant"
-
-private fun JsonElement.recordsPoisonedOrTokenOverflow(contextWindowLimit: Int): Boolean {
-    val probe = inspectMessage()
-    val tokens = probe.inputTokens
-    return probe.hasEmptyAssistant || (tokens != null && tokens >= contextWindowLimit.toLong())
+private fun PreflightMessageProbe.recordsPoisonedOrTokenOverflow(contextWindowLimit: Int): Boolean {
+    val tokens = inputTokens
+    return hasEmptyAssistant || (tokens != null && tokens >= contextWindowLimit.toLong())
 }
 
 /**
@@ -186,104 +217,12 @@ private fun JsonElement.recordsPoisonedOrTokenOverflow(contextWindowLimit: Int):
  * a real 128k provider stop under a 200k wrapper default still compacts, while a
  * low-input max_tokens truncation does not.
  */
-private fun JsonElement.recordsLengthStopNearCapacity(contextWindowLimit: Int): Boolean {
-    val probe = inspectMessage()
-    if (!probe.hasLengthStop) return false
+private fun PreflightMessageProbe.recordsLengthStopNearCapacity(contextWindowLimit: Int): Boolean {
+    if (!hasLengthStop) return false
     val nearCapacity = (contextWindowLimit / 2).coerceAtLeast(1)
-    val tokens = probe.inputTokens ?: return false
+    val tokens = inputTokens ?: return false
     return tokens >= nearCapacity.toLong()
 }
 
-/**
- * Single-pass envelope probe for preflight checks. Prefer top-level / usage
- * fields on the message object; only DFS nested objects when scanning for
- * provider stop metadata that may live under a nested assistant payload.
- */
-private data class MessageProbe(
-    val id: String?,
-    val role: String?,
-    val hasEmptyAssistant: Boolean,
-    val hasLengthStop: Boolean,
-    /** Null when the message carries no input token count. */
-    val inputTokens: Long?,
-)
-
-private fun JsonElement.inspectMessage(): MessageProbe {
-    val root = this as? JsonObject
-    val id = root?.string("id")
-    // App Server conversation rows often use message_type=assistant_message
-    // without a role field — treat both shapes as assistant.
-    val messageType = root?.string("message_type") ?: root?.string("messageType")
-    val role = root?.string("role")
-        ?: when (messageType) {
-            "assistant_message" -> "assistant"
-            "user_message" -> "user"
-            "system_message" -> "system"
-            else -> null
-        }
-    val content = root?.get("content") ?: root?.get("parts")
-    val hasEmptyAssistant = role == "assistant" && content.isEmptyMessageContent()
-    val inputTokens = readInputTokens(root)
-    val hasLengthStop = hasProviderLengthStop(this)
-    return MessageProbe(
-        id = id,
-        role = role,
-        hasEmptyAssistant = hasEmptyAssistant,
-        hasLengthStop = hasLengthStop,
-        inputTokens = inputTokens,
-    )
-}
-
-/** True for missing / null / [] / blank-string content payloads. */
-private fun JsonElement?.isEmptyMessageContent(): Boolean = when (this) {
-    null, JsonNull -> true
-    is JsonArray -> isEmpty()
-    is JsonPrimitive -> contentOrNull.isNullOrBlank()
-    else -> false
-}
-
-private fun readInputTokens(root: JsonObject?): Long? {
-    val providerResult = root?.objectValue("provider_result")
-    val usage = root?.objectValue("usage")
-        ?: providerResult?.objectValue("usage")
-        ?: root
-    val input = usage?.long("input")
-        ?: usage?.long("input_tokens")
-        ?: usage?.long("inputTokens")
-        ?: return null
-    val cacheRead = usage?.long("cache_read")
-        ?: usage?.long("cacheRead")
-        ?: 0L
-    return input + cacheRead
-}
-
-private fun hasProviderLengthStop(element: JsonElement): Boolean {
-    when (element) {
-        is JsonObject -> {
-            val stop = element.string("stop_reason") ?: element.string("stopReason")
-            if (stop == "length") return true
-            for ((key, value) in element) {
-                if (shouldWalkForLengthStop(key, value) && hasProviderLengthStop(value)) return true
-            }
-        }
-        is JsonArray -> element.forEach { if (hasProviderLengthStop(it)) return true }
-        else -> Unit
-    }
-    return false
-}
-
-private fun shouldWalkForLengthStop(key: String, value: JsonElement): Boolean {
-    if (value !is JsonObject && value !is JsonArray) return false
-    if (key == "message" || key == "stop" || key == "metadata" ||
-        key == "provider" || key == "provider_result" || key == "response"
-    ) {
-        return true
-    }
-    val obj = value as? JsonObject ?: return false
-    return "stop_reason" in obj || "stopReason" in obj || "role" in obj || "usage" in obj
-}
-
 private fun JsonObject.objectValue(key: String): JsonObject? = this[key] as? JsonObject
-private fun JsonObject.string(key: String): String? = (this[key] as? JsonPrimitive)?.contentOrNull
-private fun JsonObject.long(key: String): Long? = (this[key] as? JsonPrimitive)?.longOrNull
 private fun JsonObject.integer(key: String): Int? = (this[key] as? JsonPrimitive)?.intOrNull
