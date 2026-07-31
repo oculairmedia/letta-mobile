@@ -6,22 +6,33 @@ import java.io.File
  * Per-process TCP socket scan for the `no-http` probe scenario (letta-mobile-qfa81).
  *
  * The headline iroh purity invariant: while the probe runs against an `iroh://`
- * backend, the CLIENT process must open ZERO TCP connections to the admin HTTP
+ * backend, the watched process must open ZERO TCP connections to the admin HTTP
  * port (:8291 by default). `/proc/net/tcp` alone is namespace-wide, so this scan
- * joins it with `/proc/self/fd` socket inodes to count only sockets owned by
- * this process.
+ * joins it with `/proc/<pid>/fd` socket inodes to count only sockets owned by
+ * that process.
  *
- * Returns null on platforms without procfs (macOS, Windows) so callers can
- * degrade to a skip-note instead of a false red.
+ * [pid] defaults to `self` (the probe process) but the shim-off release gate
+ * points it at the WRAPPER service MainPID — scanning `self` only ever proved
+ * the probe stayed clean (letta-mobile-lgns8.21.9). See [WrapperProcessScan].
+ *
+ * Returns null on platforms without procfs (macOS, Windows), or when the target
+ * process's fd directory is unreadable, so callers degrade to a skip-note
+ * instead of a false green.
  */
 object NoHttpSocketScan {
-    fun connectionsToPort(port: Int, procRoot: String = "/proc"): Int? {
-        val fdDir = File(procRoot, "self/fd")
+    /** The probe's own process — the legacy, non-attributable scope. */
+    const val SELF: String = "self"
+
+    fun connectionsToPort(port: Int, pid: String = SELF, procRoot: String = "/proc"): Int? {
+        val fdDir = File(procRoot, "$pid/fd")
         if (!fdDir.isDirectory) return null
-        val inodes = parseSocketInodes(fdDir)
+        // `/proc/<pid>/fd` of another user's process is mode 500: listFiles() returns
+        // null. Counting that as zero would be a FALSE GREEN, so report "unknown".
+        val inodes = parseSocketInodes(fdDir) ?: return null
         val tcpLines = buildList {
             listOf("net/tcp", "net/tcp6").forEach { rel ->
-                val file = File(procRoot, "self/$rel")
+                // Prefer the TARGET process's network namespace view.
+                val file = File(procRoot, "$pid/$rel")
                     .takeIf { it.canRead() }
                     ?: File(procRoot, rel).takeIf { it.canRead() }
                 if (file != null) addAll(runCatching { file.readLines() }.getOrDefault(emptyList()))
@@ -31,8 +42,9 @@ object NoHttpSocketScan {
         return countMatches(inodes, tcpLines, port)
     }
 
-    internal fun parseSocketInodes(fdDir: File): Set<Long> =
-        fdDir.listFiles().orEmpty().mapNotNullTo(mutableSetOf()) { fd ->
+    /** Null when the fd directory cannot be listed (permissions), never a silent empty set. */
+    internal fun parseSocketInodes(fdDir: File): Set<Long>? =
+        fdDir.listFiles()?.mapNotNullTo(mutableSetOf()) { fd ->
             val target = runCatching { java.nio.file.Files.readSymbolicLink(fd.toPath()).toString() }.getOrNull()
             parseSocketInode(target)
         }
@@ -44,7 +56,7 @@ object NoHttpSocketScan {
 
     /**
      * Counts `/proc/net/tcp{,6}` entries whose REMOTE port is [port] and whose
-     * socket inode belongs to this process ([fdSocketInodes]).
+     * socket inode belongs to the watched process ([fdSocketInodes]).
      */
     internal fun countMatches(fdSocketInodes: Set<Long>, procNetTcpLines: List<String>, port: Int): Int =
         procNetTcpLines.count { line ->

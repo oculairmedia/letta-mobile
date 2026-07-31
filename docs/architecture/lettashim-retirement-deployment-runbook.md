@@ -577,8 +577,20 @@ scripts/iroh_probe.sh '<iroh-ticket>' \
   --conversation-id '<conversation-id>' \
   --admin-base-url http://127.0.0.1:9 \
   --scenario admin-rpc \
-  --scenario no-http
+  --scenario no-http \
+  --wrapper-unit meridian-iroh-wrapper
 ```
+
+`--wrapper-unit` (or `--wrapper-pid`) is what makes the no-http result
+attributable (letta-mobile-lgns8.21.9): the scan joins `/proc/<MainPID>/fd`
+with that process's `/proc/net/tcp{,6}`, so it proves the WRAPPER opened zero
+admin-HTTP connections rather than merely that the probe process stayed clean.
+The turn notes carry the evidence — `no_http_wrapper_unit`,
+`no_http_wrapper_pid`, `no_http_wrapper_start`, `no_http_wrapper_window_ms`,
+`no_http_wrapper_sample_interval_ms` — and the gate FAILS
+(`no_http_wrapper_pid_unresolved` / `no_http_wrapper_pid_changed`) when the PID
+cannot be resolved or the service restarts mid-window, so a restarted wrapper
+can never render green.
 
 Run the repository's two-client live-sync probe and every admin parity probe
 added by the migration. Exercise at minimum:
