@@ -60,7 +60,7 @@ class AppServerTurnEngineBusyReleaseTest {
             engine.runTurn(command).collect()
         }
         runCurrent()
-        assertTrue(engine.isBusy, "engine must be busy once the turn is running")
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "engine must be busy once the turn is running")
 
         // Server reports the run terminal (stop_reason -> completed lifecycle).
         client.emit(streamDelta("stop_reason", "run-1"))
@@ -77,7 +77,7 @@ class AppServerTurnEngineBusyReleaseTest {
 
         // The completed run must have released busy ownership by now.
         assertFalse(
-            engine.isBusy,
+            engine.isBusy("agent-1", "conv-1"),
             "completed terminal must release busy ownership; a trickle of later frames must not defer it",
         )
         turn.cancel()
@@ -101,7 +101,7 @@ class AppServerTurnEngineBusyReleaseTest {
         }
 
         // Terminal has fully drained: the engine must be immediately re-sendable.
-        assertFalse(engine.isBusy, "engine must be free right after the completed terminal drains")
+        assertFalse(engine.isBusy("agent-1", "conv-1"), "engine must be free right after the completed terminal drains")
 
         // The immediate next send (same conversation) must be accepted — no false busy.
         engine.runTurn(secondCommand).test {

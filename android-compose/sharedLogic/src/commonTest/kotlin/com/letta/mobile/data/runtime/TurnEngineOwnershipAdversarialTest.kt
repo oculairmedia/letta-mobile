@@ -60,7 +60,7 @@ class TurnEngineOwnershipAdversarialTest {
             }
             runCurrent()
             client.awaitRuntimeStartGate()
-            assertTrue(engine.isBusy, "A must own the lock while hung in runtime_start")
+            assertTrue(engine.isBusy("agent-1", "conv-1"), "A must own the lock while hung in runtime_start")
             assertEquals(null, engine.activeTurnOwner?.runId)
 
             var bAccepted = false
@@ -75,7 +75,7 @@ class TurnEngineOwnershipAdversarialTest {
                 bAccepted,
                 "Preparing lease without run_id must not be stolen via idle run.list",
             )
-            assertTrue(engine.isBusy)
+            assertTrue(engine.isBusy("agent-1", "conv-1"))
             a.cancel()
         }
 
@@ -91,7 +91,7 @@ class TurnEngineOwnershipAdversarialTest {
             runCurrent()
             client.emitAssistant("run-a")
             runCurrent()
-            assertTrue(engine.isBusy)
+            assertTrue(engine.isBusy("agent-1", "conv-1"))
             assertEquals("run-a", engine.activeTurnOwner?.runId)
 
             val bDrafts = mutableListOf<RuntimeEventDraft>()
@@ -108,7 +108,7 @@ class TurnEngineOwnershipAdversarialTest {
             runCurrent()
             advanceUntilIdle()
 
-            assertTrue(engine.isBusy, "replacement owner B must keep its lease after A finishes")
+            assertTrue(engine.isBusy("agent-1", "conv-1"), "replacement owner B must keep its lease after A finishes")
             assertEquals("run-b", engine.activeTurnOwner?.runId)
             b.cancel()
         }
