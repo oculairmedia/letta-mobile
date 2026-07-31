@@ -251,6 +251,32 @@ class IrohAdminOwnershipMatrixTest {
         }
     }
 
+    /**
+     * lgns8.25: surfaces that exist ONLY on lettashim (no admin_rpc method, no repo caller) still
+     * need an owner-or-deny decision, otherwise lgns8.10.3 "fail closed where no approved owner
+     * exists" has nothing to enforce and the shim-off gate cannot assert that nothing calls them.
+     * Every such row must name its shim routes, a disposition from the enum, and caller evidence.
+     */
+    @Test
+    fun everyShimOnlySurfaceCarriesADispositionAndCallerEvidence(): Unit {
+        val unrouted = matrix["unrouted_domains"]!!.jsonArray.map { it.jsonObject }
+        val domains = unrouted.map { it.requiredString("domain") }.toSet()
+        setOf("work_activity_ingest", "worker_events", "usage_summary", "permissions_preview", "pool_introspection")
+            .forEach { required ->
+                assertTrue(required in domains, "Shim-only surface '$required' needs an explicit lgns8.25 disposition")
+            }
+
+        val dispositions = enums.stringSet("unrouted_dispositions")
+        assertTrue(dispositions.isNotEmpty(), "enums.unrouted_dispositions must be declared")
+        unrouted.filter { it.stringSet("shim_routes").isNotEmpty() }.forEach { domain ->
+            val name = domain.requiredString("domain")
+            val disposition = domain.requiredString("disposition")
+            assertTrue(disposition in dispositions, "$name declares unknown disposition '$disposition'")
+            assertTrue(domain.requiredString("evidence").isNotBlank(), "$name must record caller evidence")
+            assertTrue(domain.requiredString("successor").isNotBlank(), "$name must record a successor (or 'none')")
+        }
+    }
+
     private fun fixtureJson(name: String): JsonObject {
         val stream = checkNotNull(javaClass.getResourceAsStream("/appserver/$name")) { "Missing fixture $name" }
         return Json.parseToJsonElement(stream.bufferedReader(Charsets.UTF_8).use { it.readText() }).jsonObject
