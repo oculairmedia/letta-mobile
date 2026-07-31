@@ -1,10 +1,9 @@
 package com.letta.mobile.cli.commands
 
-import com.letta.mobile.cli.probe.NoHttpSocketScan
+import com.letta.mobile.cli.probe.NoHttpWrapperEvidence
+import com.letta.mobile.cli.probe.NoHttpWrapperWatch
 import com.letta.mobile.data.transport.iroh.IrohProbeAssertions
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
-import java.util.Collections
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -173,23 +172,24 @@ internal class NoHttpProbeScenario(
     suspend fun run(target: ProbeTarget): IrohProbeTurnMetrics {
         val scope = newProbeScope()
         var session: ProbeSession? = null
-        val samples: MutableList<Int> = Collections.synchronizedList(mutableListOf())
-        val scanUnsupported = AtomicBoolean(false)
-        fun sample() {
-            when (val count = NoHttpSocketScan.connectionsToPort(admin.adminPort())) {
-                null -> scanUnsupported.set(true)
-                else -> samples += count
-            }
-        }
+        // lgns8.21.9: sockets are attributed to the WRAPPER service MainPID, not
+        // to this probe process — scanning `self` only proved the probe stayed
+        // clean while the wrapper could keep dialing LettaShim.
+        val watch = NoHttpWrapperWatch(
+            unit = options.wrapperUnit,
+            port = admin.adminPort(),
+            explicitPid = options.wrapperPid,
+        )
+        watch.start()
         val turnStartedAt = nowMs()
         val sampler = scope.launch {
             while (true) {
-                sample()
-                delay(100.milliseconds)
+                watch.sample()
+                delay(NoHttpWrapperWatch.DEFAULT_SAMPLE_INTERVAL_MS.milliseconds)
             }
         }
         return try {
-            sample()
+            watch.sample()
             val metrics = withTimeoutOrNull(options.timeoutMs.milliseconds) {
                 val established = fixture.establish(
                     ProbeEstablishRequest(
@@ -201,7 +201,7 @@ internal class NoHttpProbeScenario(
                     ),
                 )
                 session = established
-                sample()
+                watch.sample()
                 val turnMetrics = fixture.sendProbeInput(
                     ProbeSendInputRequest(
                         turn = 1,
@@ -210,7 +210,7 @@ internal class NoHttpProbeScenario(
                         scenario = ProbeScenarioName.NoHttp,
                     ),
                 )
-                sample()
+                watch.sample()
                 turnMetrics
             } ?: IrohProbeTurnMetrics(
                 turn = 1,
@@ -219,23 +219,31 @@ internal class NoHttpProbeScenario(
                 scenarioViolations = listOf("no_http_setup_timeout"),
             )
             sampler.cancelAndJoin()
-            annotateNoHttp(metrics, samples.toList(), scanUnsupported.get())
+            annotateNoHttp(metrics, watch.samples(), watch.finish())
         } finally {
             runCatching { sampler.cancel() }
             fixture.close(session, scope)
         }
     }
 
-    private fun annotateNoHttp(
-        metrics: IrohProbeTurnMetrics,
-        snapshot: List<Int>,
-        scanUnsupported: Boolean,
-    ): IrohProbeTurnMetrics = metrics.copy(
-        scenarioViolations = metrics.scenarioViolations +
-            listOfNotNull(IrohProbeAssertions.classifyNoHttp(snapshot)),
-        notes = metrics.notes +
-            (if (scanUnsupported) listOf("no_http_scan_unsupported_platform") else emptyList()) +
-            "no_http_socket_samples=${snapshot.size} max=${snapshot.maxOrNull() ?: -1}",
-    )
+    companion object {
+        /**
+         * Folds one window's socket samples and wrapper attribution into the turn.
+         * Unattributable evidence (no PID / restart mid-window) is a violation, so
+         * a restarted wrapper can never render green (lgns8.21.9).
+         */
+        internal fun annotateNoHttp(
+            metrics: IrohProbeTurnMetrics,
+            snapshot: List<Int>,
+            evidence: NoHttpWrapperEvidence,
+        ): IrohProbeTurnMetrics = metrics.copy(
+            scenarioViolations = metrics.scenarioViolations +
+                listOfNotNull(IrohProbeAssertions.classifyNoHttp(snapshot)) +
+                evidence.violations(),
+            notes = metrics.notes +
+                (if (evidence.scanUnsupported) listOf("no_http_scan_unsupported_platform") else emptyList()) +
+                evidence.notes(),
+        )
+    }
 }
 

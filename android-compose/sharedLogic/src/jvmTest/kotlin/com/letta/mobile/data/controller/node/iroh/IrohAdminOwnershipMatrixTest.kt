@@ -1,10 +1,11 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrix.requiredString
+import com.letta.mobile.data.controller.node.iroh.IrohAdminOwnershipMatrix.stringSet
 import com.letta.mobile.data.model.SubagentEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -18,10 +19,10 @@ import kotlinx.serialization.json.jsonPrimitive
  * without an ownership decision fails this test.
  */
 class IrohAdminOwnershipMatrixTest {
-    private val matrix = fixtureJson("iroh-admin-ownership-matrix.json")
-    private val inventory = fixtureJson("installed-protocol-v2-inventory.json")
-    private val operations = matrix["operations"]!!.jsonArray.map { it.jsonObject }
-    private val enums = matrix["enums"]!!.jsonObject
+    private val matrix = IrohAdminOwnershipMatrix.root
+    private val inventory = IrohAdminOwnershipMatrix.inventory
+    private val operations = IrohAdminOwnershipMatrix.operations
+    private val enums = IrohAdminOwnershipMatrix.enums
 
     private object EmptySubagentSource : SubagentRegistrySource {
         override suspend fun list(conversationId: String, includeTerminal: Boolean): List<SubagentEntry> = emptyList()
@@ -276,15 +277,4 @@ class IrohAdminOwnershipMatrixTest {
             assertTrue(domain.requiredString("successor").isNotBlank(), "$name must record a successor (or 'none')")
         }
     }
-
-    private fun fixtureJson(name: String): JsonObject {
-        val stream = checkNotNull(javaClass.getResourceAsStream("/appserver/$name")) { "Missing fixture $name" }
-        return Json.parseToJsonElement(stream.bufferedReader(Charsets.UTF_8).use { it.readText() }).jsonObject
-    }
-
-    private fun JsonObject.requiredString(key: String): String =
-        checkNotNull(this[key]?.jsonPrimitive?.content) { "Missing '$key' in $this" }
-
-    private fun JsonObject.stringSet(key: String): Set<String> =
-        this[key]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet() ?: emptySet()
 }

@@ -8,6 +8,7 @@ import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
+import com.letta.mobile.cli.probe.WrapperProcessScan
 import com.letta.mobile.data.transport.iroh.IrohProbeAssertions
 import com.letta.mobile.data.transport.iroh.IrohProbeSummary
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
@@ -76,6 +77,16 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         "--wrapper-restart-cmd",
         help = "Best-effort shell command to restart the wrapper between restart-send turns.",
     )
+    private val wrapperUnit by option(
+        "--wrapper-unit",
+        envvar = "LETTA_IROH_WRAPPER_UNIT",
+        help = "no-http: systemd unit whose MainPID owns the wrapper. The gate attributes admin-HTTP " +
+            "sockets to THAT process, not to this probe.",
+    ).default(WrapperProcessScan.DEFAULT_UNIT)
+    private val wrapperPid by option(
+        "--wrapper-pid",
+        help = "no-http: explicit wrapper PID; bypasses systemd resolution (containers, dev runs).",
+    ).int()
     private val jsonOutput by option("--json", help = "Print machine-readable JSON summary.").flag(default = false)
     private val dumpFramesPath by option(
         "--dump-frames",
@@ -95,6 +106,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         val options = IrohProbeOptions(
             token, adminBaseUrl, agentId, message, seedMessages, payloadBytes, hydrateBudgetMs,
             secondTurnDelayMs, idleMs, timeoutMs, strictRedialDedupe, wrapperRestartCmd, dumpFramesPath,
+            wrapperUnit, wrapperPid,
         )
         val fixture = ProbeSessionFixture(options)
         val admin = ProbeAdminClient(adminBaseUrl)

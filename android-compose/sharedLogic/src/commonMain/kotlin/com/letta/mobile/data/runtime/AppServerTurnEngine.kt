@@ -146,37 +146,73 @@ class AppServerTurnEngine(
         Long,
     ) -> Unit = { _, _, _ -> },
 ) : TurnEngine {
-    /** Owner-token lease — never force-unlocked by a competing send (lgns8.22.2). */
-    private val activeLeaseRef = atomic<TurnLease?>(null)
+    /**
+     * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
+     *
+     * Formerly ONE process-wide `activeLeaseRef` slot, which made every send into
+     * a second conversation fast-fail "iroh_turn_engine_busy" even though the
+     * App Server runs one TurnLifecycle per `{agent_id, conversation_id}` runtime
+     * and executes them in parallel. Same-key exclusion is preserved — that IS
+     * the server contract — but different keys now acquire independently.
+     */
+    private val leases = TurnLeaseRegistry()
     private val leaseTokenSeq = atomic(0L)
-    private var runtime: AppServerRuntimeScope? = null
     private val inboundSource = TurnInboundSource(client, eventRouter)
-    /** Cached external-tool results keyed by requestId for send-retry across generations. */
-    private val externalToolResultCache =
-        mutableMapOf<String, AppServerExternalToolResult>()
+    /**
+     * lgns8.22.4.1.6: computed external-tool results, retained PAST a successful
+     * (one-way, hence ambiguous) send so a reconnect replay reuses the result
+     * instead of re-invoking a non-idempotent tool. Bounded + TTL-expiring so
+     * results the server never replays cannot accumulate. See
+     * [ExternalToolResultCache].
+     *
+     * letta-mobile-8xxzv: concurrent turns on different runtime keys now share
+     * this cache. It is internally lock-guarded and keyed by the request identity
+     * (request_id, tool_call_id) rather than by turn, so it stays correct — a
+     * result belongs to a REQUEST, not to whichever runtime observed it.
+     */
+    private val externalToolResultCache = ExternalToolResultCache()
+
+    private fun slotFor(command: TurnCommand): TurnLeaseSlot =
+        leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
+
+    /** A slot plus the token of the lease this turn owns inside it. */
+    private class LeaseRef(val slot: TurnLeaseSlot, val token: Long) {
+        val key: TurnRuntimeKey get() = slot.key
+        /** The slot still holds OUR lease (not a successor's). */
+        val current: TurnLease? get() = slot.lease?.takeIf { it.token == token }
+    }
 
     /**
      * lgns8.22.4: cancel the active turn immediately when its connection generation
      * is superseded. Must not wait for another inbound frame — a turn parked at a
      * user-input gate pauses the idle watchdog and would otherwise hang forever.
+     *
+     * letta-mobile-8xxzv: applies to EVERY keyed lease — a generation rollover is
+     * connection-wide, so all concurrent runtimes are superseded together.
      */
     fun cancelActiveLeaseForGeneration(failedGeneration: Long, reason: String = "connection generation superseded") {
-        val lease = activeLeaseRef.value ?: return
-        if (lease.connectionGeneration > failedGeneration) return
-        lease.ownerJob?.cancel(CancellationException(reason))
+        // lgns8.22.4.1.6: definitive generation cleanup is the point to drop
+        // external-tool results the server will never replay for.
+        externalToolResultCache.pruneExpired()
+        leases.snapshot().forEach { slot ->
+            val lease = slot.lease ?: return@forEach
+            if (lease.connectionGeneration > failedGeneration) return@forEach
+            lease.ownerJob?.cancel(CancellationException(reason))
+        }
     }
 
     /**
-     * Drops the cached runtime scope so the next turn re-issues runtime_start.
+     * Drops the cached runtime scopes so the next turn re-issues runtime_start.
      * Called on transport disconnect/generation rollover (lgns8.5): a scope
      * minted by a dead generation must never be reused against the next one.
+     * Connection-wide, so every keyed scope is dropped.
      *
      * @param notifyHost when true, also invokes [onRuntimeInvalidated] so a
      *   controller cache cannot undo a mutating preflight. Hosts that already
      *   cleared their own cache (stop/disconnect) pass false.
      */
     suspend fun invalidateRuntime(notifyHost: Boolean = true) {
-        runtime = null
+        leases.snapshot().forEach { it.runtimeScope = null }
         if (notifyHost) onRuntimeInvalidated()
     }
 
@@ -194,8 +230,14 @@ class AppServerTurnEngine(
     private suspend fun guaranteeExternalToolResponse(
         request: AppServerInboundFrame.ExternalToolCallRequest,
         leaseToken: Long,
+        validatedGeneration: Long,
     ) {
-        val generation = connectionGenerationProvider()
+        // lgns8.22.4.1.2: the generation is the one matches() VALIDATED for this
+        // lease, never a fresh read of the live provider. A disconnect racing this
+        // handler must not make us register/claim (and execute) under a successor
+        // generation, poisoning its registry entry and duplicating tool side effects.
+        val generation = validatedGeneration
+        val ref = InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId)
         // Direct client.events path may not have gone through the fanout register.
         inboundControlRegistry.register(
             InboundControlRequestRegistry.RegisterRequest(
@@ -209,42 +251,28 @@ class AppServerTurnEngine(
         )
         // matches() already claimed delivery for this lease; only answer if we own it
         // (or claim here on paths that skipped the registry match branch).
-        if (!inboundControlRegistry.ownsClaim(request.requestId, leaseToken, generation) &&
-            !inboundControlRegistry.tryClaim(request.requestId, leaseToken, generation)
+        if (!inboundControlRegistry.ownsClaim(ref, leaseToken, generation) &&
+            !inboundControlRegistry.tryClaim(ref, leaseToken, generation)
         ) {
             Telemetry.event(
                 "AppServerTurnEngine", "externalTool.claimSkipped",
                 "requestId" to request.requestId,
+                "toolCallId" to request.toolCallId,
                 "leaseToken" to leaseToken,
                 "generation" to generation,
             )
             return
         }
-        val cacheKey = request.requestId
-        // Never re-invoke non-idempotent tools on replay after a failed send —
-        // reuse the cached result computed on the first successful claim. Keyed
-        // by requestId only so successor-generation replays still hit the cache.
-        val result: AppServerExternalToolResult = externalToolResultCache[cacheKey] ?: run {
-            val computed = try {
-                when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
-                    is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
-                    is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
-                    null -> toolResult(
-                        "external tool '${request.toolName}' is not handled by this controller",
-                        isError = true,
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                toolResult(
-                    "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
-                    isError = true,
-                )
-            }
-            externalToolResultCache[cacheKey] = computed
-            computed
-        }
+        // Fence BEFORE invoking a possibly non-idempotent handler: if the
+        // connection died between the claim and here, the tool must not run and
+        // this claim is returned so the successor generation's replay can own it.
+        if (abortStaleExternalTool(request, leaseToken, generation, phase = "beforeInvoke")) return
+        val cached = externalToolResultCache.get(request.resultCacheKey())
+        val result: AppServerExternalToolResult = cached ?: computeAndCacheExternalToolResult(request)
+        // Tool invocation is a suspension point: re-fence before sending so an
+        // old-generation response is not written onto the successor connection.
+        // The result is cached, so the replay answers without re-invoking.
+        if (abortStaleExternalTool(request, leaseToken, generation, phase = "beforeSend")) return
         Telemetry.event(
             "AppServerTurnEngine", "externalTool.responded",
             "requestId" to request.requestId,
@@ -252,21 +280,134 @@ class AppServerTurnEngine(
             "toolName" to request.toolName,
             "isError" to (result.isError == true).toString(),
             "handled" to (externalToolRegistry != null).toString(),
-            "cached" to externalToolResultCache.containsKey(cacheKey).toString(),
+            "cached" to (cached != null).toString(),
         )
         runCatching {
             client.sendExternalToolResponse(
                 AppServerCommand.ExternalToolCallResponse(requestId = request.requestId, result = result),
             )
         }.onSuccess {
-            inboundControlRegistry.markAnswered(request.requestId, generation)
-            externalToolResultCache.remove(cacheKey)
+            inboundControlRegistry.markAnswered(ref, generation)
+            // lgns8.22.4.1.6: the cached result is deliberately RETAINED. A one-way
+            // send is an AmbiguousMutation — if the server never received it, it
+            // replays the request and the replay must reuse this result rather than
+            // re-invoke the tool. The cache expires the entry itself if no replay
+            // ever comes (bounded + TTL).
         }.onFailure {
             Telemetry.error("AppServerTurnEngine", "externalTool.responseSendFailed", it)
             // Keep retriable: server never saw the response and will re-emit.
             // Cached result above prevents re-invoking the tool on replay.
-            inboundControlRegistry.releaseClaim(request.requestId, leaseToken, generation)
+            inboundControlRegistry.releaseClaim(ref, leaseToken, generation)
         }
+    }
+
+    /**
+     * Invoke the wired handler (or synthesize a matched is_error result when none
+     * handles the tool) and cache the outcome.
+     *
+     * lgns8.22.4.1.6: cached by (request_id, tool_call_id) and NOT by connection
+     * generation, so a successor-generation replay reuses it and a non-idempotent
+     * tool never runs twice for one request identity.
+     */
+    private suspend fun computeAndCacheExternalToolResult(
+        request: AppServerInboundFrame.ExternalToolCallRequest,
+    ): AppServerExternalToolResult {
+        val computed = try {
+            when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
+                is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
+                is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
+                null -> toolResult(
+                    "external tool '${request.toolName}' is not handled by this controller",
+                    isError = true,
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            toolResult(
+                "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
+                isError = true,
+            )
+        }
+        externalToolResultCache.put(request.resultCacheKey(), computed)
+        return computed
+    }
+
+    private fun AppServerInboundFrame.ExternalToolCallRequest.resultCacheKey() =
+        ExternalToolResultCache.Key(requestId, toolCallId)
+
+    /**
+     * Answer [received] when it is an external_tool_call_request.
+     *
+     * lgns8.22.4.1.2: hands the VALIDATED lease generation to the handler so a
+     * disconnect racing this frame cannot make it execute/claim under the
+     * successor generation.
+     */
+    private suspend fun answerExternalToolCallIfPresent(
+        received: AppServerReceivedFrame,
+        lease: LeaseRef,
+    ) {
+        val toolRequest = received.frame as? AppServerInboundFrame.ExternalToolCallRequest ?: return
+        val validatedGeneration = validatedLeaseGeneration(lease)
+        if (validatedGeneration == null) {
+            Telemetry.event(
+                "AppServerTurnEngine", "externalTool.leaseGenerationUnavailable",
+                "requestId" to toolRequest.requestId,
+                "toolCallId" to toolRequest.toolCallId,
+                "leaseToken" to lease.token,
+                "key" to lease.key.toString(),
+                level = Telemetry.Level.WARN,
+            )
+            return
+        }
+        guaranteeExternalToolResponse(toolRequest, lease.token, validatedGeneration)
+    }
+
+    /**
+     * lgns8.22.4.1.2 fence. Returns true (and releases the claim) when the live
+     * connection generation has moved past the generation this external-tool
+     * request was validated/claimed on.
+     */
+    private fun abortStaleExternalTool(
+        request: AppServerInboundFrame.ExternalToolCallRequest,
+        leaseToken: Long,
+        generation: Long,
+        phase: String,
+    ): Boolean {
+        if (connectionGenerationProvider() == generation) return false
+        Telemetry.event(
+            "AppServerTurnEngine", "externalTool.staleGenerationAborted",
+            "requestId" to request.requestId,
+            "toolCallId" to request.toolCallId,
+            "toolName" to request.toolName,
+            "claimGeneration" to generation,
+            "liveGeneration" to connectionGenerationProvider(),
+            "phase" to phase,
+            level = Telemetry.Level.WARN,
+        )
+        inboundControlRegistry.releaseClaim(
+            InboundControlRequestRegistry.RequestRef(request.requestId, request.toolCallId),
+            leaseToken,
+            generation,
+        )
+        return true
+    }
+
+    /**
+     * The connection generation matches() validated for [lease], or null when that
+     * lease is gone / superseded. Read-only over the lease.
+     *
+     * letta-mobile-8xxzv: SCOPED to the runtime key that owns this turn. lgns8.22.4.1.2
+     * read the one process-wide activeLeaseRef; with concurrent turns that would
+     * validate an external-tool request belonging to conversation A against
+     * whichever runtime happened to hold "the" lease. [LeaseRef.current] resolves
+     * this turn's OWN slot and returns null unless the slot still holds our token,
+     * so a superseded turn can never execute a tool under a live sibling's lease.
+     */
+    private fun validatedLeaseGeneration(lease: LeaseRef): Long? {
+        val current = lease.current ?: return null
+        if (current.connectionGeneration != connectionGenerationProvider()) return null
+        return current.connectionGeneration
     }
 
     private fun toolResult(text: String, isError: Boolean) = AppServerExternalToolResult(
@@ -275,21 +416,20 @@ class AppServerTurnEngine(
     )
 
     /**
-     * letta-mobile-kyqdt: TELEMETRY snapshot of who owns the active lease.
-     * Derived from [activeLeaseRef] — never force-unlocks exclusion.
-     */
-    private val activeTurnOwnerRef = atomic<ActiveTurnOwner?>(null)
-    private val runIdGate = TurnRunIdGate(activeLeaseRef, activeTurnOwnerRef)
-
-    /**
      * letta-mobile-vilsn: tool_call_id -> real approval id (the can_use_tool
      * control-request request_id, e.g. `perm-call_…`) for surfaced runtime
      * user-input approvals. Populated when the approval is emitted; consumed by
      * [userInputApprovalId] when the client submits the answer, so the
      * ApprovalResponse targets the gate letta-code actually parked on (the id is
      * NOT derivable from the tool_call_id — `call_…` vs `toolu_…`).
+     *
+     * letta-mobile-8xxzv: this map now lives on the per-key [TurnLeaseSlot] so a
+     * gate parked in conversation A cannot pause conversation B's idle watchdog
+     * and B's terminal cannot clear A's gate. tool_call_ids are globally unique,
+     * so the by-id lookups below simply search every slot.
      */
-    private val userInputApprovalIdsRef = atomic<Map<String, String>>(emptyMap())
+    private fun approvalSlotFor(toolCallId: String): TurnLeaseSlot? =
+        leases.snapshot().firstOrNull { it.approvalIds.containsKey(toolCallId) }
 
     /**
      * READ the recorded real approval id for [toolCallId] without removing it, or
@@ -302,43 +442,124 @@ class AppServerTurnEngine(
      * permanently unanswerable. [clearUserInputApprovalId] removes it only after
      * the response is actually sent.
      */
-    fun userInputApprovalId(toolCallId: String): String? = userInputApprovalIdsRef.value[toolCallId]
+    fun userInputApprovalId(toolCallId: String): String? =
+        approvalSlotFor(toolCallId)?.approvalIds?.get(toolCallId)
 
     fun clearUserInputApprovalId(toolCallId: String, requestId: String) {
-        userInputApprovalIdsRef.update { current ->
-            if (current[toolCallId] == requestId) current - toolCallId else current
+        leases.snapshot().forEach { slot ->
+            slot.updateApprovalIds { current ->
+                if (current[toolCallId] == requestId) current - toolCallId else current
+            }
         }
     }
 
-    /** Mark an inbound control/approval request answered after a successful send. */
-    fun markInboundControlAnswered(requestId: String) {
-        inboundControlRegistry.markAnswered(requestId, connectionGenerationProvider())
+    /**
+     * Mark an inbound control/approval request answered after a successful send.
+     *
+     * lgns8.22.4.1.4: [claimGeneration] MUST be captured BEFORE the send, not read
+     * afterwards. If a disconnect advanced the generation mid-send, the recovery
+     * replay is already registered under the successor generation and marking THAT
+     * entry answered would silently drop a decision the server may never have
+     * received. Passing the claim generation makes the stale mark a no-op instead.
+     * Defaults to the live generation for callers that send synchronously.
+     */
+    fun markInboundControlAnswered(
+        requestId: String,
+        claimGeneration: Long = connectionGenerationProvider(),
+    ) {
+        inboundControlRegistry.markAnswered(
+            InboundControlRequestRegistry.RequestRef(requestId),
+            claimGeneration,
+        )
+    }
+
+    /** Connection generation snapshot for callers that must capture it before a send. */
+    fun currentConnectionGeneration(): Long = connectionGenerationProvider()
+
+    /**
+     * letta-mobile-8xxzv: owner metadata for ONE runtime key (telemetry only).
+     * This is what a busy rejection must report — the owner of the lease the
+     * INCOMING send collides with, not "whoever happens to hold a lease".
+     */
+    fun activeTurnOwnerFor(agentId: String, conversationId: String): ActiveTurnOwner? =
+        leases.peek(TurnRuntimeKey(agentId, conversationId))?.owner
+
+    /**
+     * Aggregate owner accessor for call sites that hold no key (telemetry).
+     * Returns the most recently acquired live owner, else null when idle.
+     */
+    val activeTurnOwner: ActiveTurnOwner?
+        get() = leases.snapshot().mapNotNull { it.owner }.maxByOrNull { it.acquiredAtMs }
+
+    /**
+     * true when a turn lease is held (Preparing through Streaming/Retiring) FOR
+     * THIS {agentId, conversationId} runtime — the App Server's own unit of turn
+     * exclusion. A lease on another runtime never makes this one busy.
+     */
+    fun isBusy(agentId: String, conversationId: String): Boolean =
+        leases.peek(TurnRuntimeKey(agentId, conversationId))?.isBusy == true
+
+    /**
+     * true when ANY runtime key holds a lease. Aggregate — use [isBusy] for a
+     * send/routing decision; this exists for whole-engine liveness assertions
+     * (mirrors hasAnyActiveChatTurn vs hasActiveChatTurn from letta-mobile-or40x).
+     */
+    val isAnyBusy: Boolean get() = leases.busySlots().isNotEmpty()
+
+    /** Runtime keys currently holding a lease (telemetry / diagnostics). */
+    fun busyRuntimeKeys(): List<TurnRuntimeKey> = leases.busySlots().map { it.key }
+
+    /**
+     * SENSING (a, letta-mobile-8xxzv): two or more leases are active at once.
+     * Impossible before this bead (one global slot) and the whole point of it —
+     * so the concurrency must be observable, with the exact key set, rather than
+     * inferred from the absence of busy errors.
+     */
+    private fun noteConcurrentLeases(acquired: TurnLeaseSlot) {
+        val busy = busyRuntimeKeys()
+        if (busy.size < 2) return
+        Telemetry.event(
+            "AppServerTurnEngine", "activeTurn.concurrentLeases",
+            "count" to busy.size,
+            "keys" to busy.joinToString(",") { it.toString() },
+            "acquiredKey" to acquired.key.toString(),
+        )
     }
 
     /**
-     * Pure read accessor for the current active-turn owner (telemetry).
-     * Null when idle.
-     */
-    val activeTurnOwner: ActiveTurnOwner? get() = activeTurnOwnerRef.value
-
-    /**
-     * true when a turn lease is held (Preparing through Streaming/Retiring).
-     */
-    val isBusy: Boolean
-        get() {
-            val lease = activeLeaseRef.value ?: return false
-            return lease.phase != TurnLeasePhase.Terminal
-        }
-
-    /**
-     * Sends an `abort_message` for the active runtime so the server tears down
+     * Sends an `abort_message` for the given runtime so the server tears down
      * the in-flight run and emits its own terminal frame. Returns null when no
      * runtime has been started yet (nothing to abort). [runId] should be the
      * canonical (promoted) run id of the turn being cancelled; a null run id asks
      * the server to abort whatever run is currently active for the runtime.
+     *
+     * letta-mobile-8xxzv: KEYED. Aborting conversation A must never be sent
+     * against conversation B's runtime scope, which is exactly what the single
+     * cached scope would have done once turns run concurrently.
+     */
+    suspend fun abort(
+        agentId: String,
+        conversationId: String,
+        runId: String?,
+    ): AppServerInboundFrame.AbortMessageResponse? {
+        val key = TurnRuntimeKey(agentId, conversationId)
+        val scope = leases.peek(key)?.runtimeScope
+            ?: AppServerRuntimeScope(agentId = agentId, conversationId = conversationId)
+        return client.abort(
+            AppServerCommand.AbortMessage(
+                runtime = scope,
+                requestId = requestIdFactory(),
+                runId = runId,
+            ),
+        )
+    }
+
+    /**
+     * Keyless abort for hosts that have no {agent, conversation} in hand. Uses
+     * the most recently started runtime scope; prefer the keyed overload.
      */
     suspend fun abort(runId: String?): AppServerInboundFrame.AbortMessageResponse? {
-        val scope = runtime ?: return null
+        val scope = leases.snapshot().asReversed().firstNotNullOfOrNull { it.runtimeScope } ?: return null
         return client.abort(
             AppServerCommand.AbortMessage(
                 runtime = scope,
@@ -354,14 +575,18 @@ class AppServerTurnEngine(
      * cancelling+joining that owner's job — never by Mutex.force-unlock.
      * Preparing/Starting leases without a run_id are locally alive: idle
      * run.list must not steal them.
+     *
+     * letta-mobile-8xxzv: operates on ONE [TurnLeaseSlot]. A reconciler run for
+     * conversation A can only ever probe and release A's own lease; B's lease is
+     * not reachable from here.
      */
-    private suspend fun reconcileOwnerLivenessAndMaybeRelease(): Boolean {
-        val ownerLease = activeLeaseRef.value ?: return false
+    private suspend fun reconcileOwnerLivenessAndMaybeRelease(slot: TurnLeaseSlot): Boolean {
+        val ownerLease = slot.lease ?: return false
         if (ownerLease.phase == TurnLeasePhase.Retiring || ownerLease.phase == TurnLeasePhase.Terminal) {
             return false
         }
         val runId = ownerLease.runId?.takeIf { it.isNotBlank() }
-            ?: activeTurnOwnerRef.value?.runId?.takeIf { it.isNotBlank() }
+            ?: slot.owner?.runId?.takeIf { it.isNotBlank() }
         val dead = try {
             withTimeout(LIVENESS_PROBE_TIMEOUT_MS.milliseconds) {
                 when {
@@ -379,34 +604,47 @@ class AppServerTurnEngine(
                 "activeTurn.reconcileLivenessTimedOut",
                 "runId" to (runId ?: "<none>"),
                 "timeoutMs" to LIVENESS_PROBE_TIMEOUT_MS,
+                "key" to slot.key.toString(),
                 level = Telemetry.Level.WARN,
             )
             return false
         } catch (t: Throwable) {
-            Telemetry.error("AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t, "runId" to (runId ?: "<none>"))
+            Telemetry.error(
+                "AppServerTurnEngine", "activeTurn.reconcileLivenessFailed", t,
+                "runId" to (runId ?: "<none>"),
+                "key" to slot.key.toString(),
+            )
             return false
         }
         if (!dead) {
-            Telemetry.event("AppServerTurnEngine", "activeTurn.reconciledAlive", "runId" to (runId ?: "<none>"))
+            Telemetry.event(
+                "AppServerTurnEngine", "activeTurn.reconciledAlive",
+                "runId" to (runId ?: "<none>"),
+                "key" to slot.key.toString(),
+            )
             return false
         }
-        return releaseDeadOwnerLease(ownerLease, runId)
+        return releaseDeadOwnerLease(slot, ownerLease, runId)
     }
 
-    private suspend fun releaseDeadOwnerLease(owner: TurnLease, runId: String?): Boolean {
+    private suspend fun releaseDeadOwnerLease(
+        slot: TurnLeaseSlot,
+        owner: TurnLease,
+        runId: String?,
+    ): Boolean {
         val retiring = owner.copy(phase = TurnLeasePhase.Retiring)
-        if (!activeLeaseRef.compareAndSet(owner, retiring)) return false
+        if (!slot.casLease(owner, retiring)) return false
         // Cancel and join the owning structured scope before admitting a successor.
         runCatching { owner.ownerJob?.cancelAndJoin() }
         // Owner's finally may already have cleared the retiring lease via token match.
-        activeLeaseRef.update { cur ->
+        slot.updateLease { cur ->
             when {
                 cur == null -> null
                 cur.token == owner.token -> null
                 else -> cur // successor already installed
             }
         }
-        activeTurnOwnerRef.update { telemetry ->
+        slot.updateOwner { telemetry ->
             if (telemetry == null) null
             else if (
                 telemetry.runtimeId == owner.runtimeId &&
@@ -418,14 +656,27 @@ class AppServerTurnEngine(
                 telemetry
             }
         }
-        val admitted = activeLeaseRef.value?.token != owner.token
+        val admitted = slot.lease?.token != owner.token
         Telemetry.event(
             "AppServerTurnEngine", "activeTurn.reconciledDead",
             "runId" to (runId ?: "<none>"),
             "agentId" to (owner.agentId ?: ""),
             "conversationId" to (owner.conversationId ?: ""),
+            "key" to slot.key.toString(),
             "leaseToken" to owner.token,
             "reason" to if (runId != null) "run_provably_dead" else "conversation_has_no_active_run",
+        )
+        // SENSING (b, letta-mobile-8xxzv): this lease ended via the liveness
+        // reconciler, NOT via a terminal frame. Scoped to ONE key so it also
+        // proves the reconciler never reaches across runtimes.
+        Telemetry.event(
+            "AppServerTurnEngine", "activeTurn.releasedByReconciler",
+            "key" to slot.key.toString(),
+            "leaseToken" to owner.token,
+            "runId" to (runId ?: "<none>"),
+            "lastTerminal" to (owner.lastTerminal ?: "<none>"),
+            "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }.joinToString(",") { it.toString() },
+            level = Telemetry.Level.WARN,
         )
         return admitted
     }
@@ -505,6 +756,8 @@ class AppServerTurnEngine(
         val acquiredAtMs = currentTimeMs()
         val ownerProcessRole = permissionModeProvider(command).name
         val leaseToken = leaseTokenSeq.incrementAndGet()
+        val slot = slotFor(command)
+        val leaseRef = LeaseRef(slot, leaseToken)
         var lease = TurnLease(
             token = leaseToken,
             runtimeId = command.runtimeId.value,
@@ -518,20 +771,40 @@ class AppServerTurnEngine(
             settleDeadlineMs = terminalSettleQuietMs,
             watchdogDeadlineMs = turnIdleTimeoutMs,
         )
-        if (!activeLeaseRef.compareAndSet(null, lease)) {
-            if (reconcileOwnerLivenessAndMaybeRelease() && activeLeaseRef.compareAndSet(null, lease)) {
+        if (!slot.casLease(null, lease)) {
+            if (reconcileOwnerLivenessAndMaybeRelease(slot) && slot.casLease(null, lease)) {
                 // Reconciled a dead owner; acquired successor lease.
             } else {
-                throw IllegalStateException("An App Server turn is already active for ${command.runtimeId.value}.")
+                // SENSING (c, letta-mobile-8xxzv): the LEGITIMATE busy — a second
+                // turn for the SAME {agent, conversation} runtime. letta-code
+                // permits at most one active turn per runtime, so this rejection
+                // preserves the server contract rather than serializing the app.
+                val holder = slot.lease
+                Telemetry.event(
+                    "AppServerTurnEngine", "activeTurn.rejectedSameKey",
+                    "key" to slot.key.toString(),
+                    "rejectedLeaseToken" to leaseToken,
+                    "ownerLeaseToken" to holder?.token,
+                    "ownerPhase" to holder?.phase?.name,
+                    "ownerRunId" to (holder?.runId ?: "<none>"),
+                    "ownerHeldForMs" to holder?.acquiredAtMs?.let { acquiredAtMs - it },
+                    "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }
+                        .joinToString(",") { it.toString() },
+                    level = Telemetry.Level.WARN,
+                )
+                throw IllegalStateException(
+                    "An App Server turn is already active for ${command.agentId.value}" +
+                        "/${command.conversationId.value}.",
+                )
             }
         }
         // Re-bind ownerJob after CAS in case a recovery path raced.
-        activeLeaseRef.update { cur ->
+        slot.updateLease { cur ->
             if (cur?.token == leaseToken) cur.copy(ownerJob = coroutineContext[Job]) else cur
         }
-        lease = activeLeaseRef.value?.takeIf { it.token == leaseToken } ?: lease
+        lease = leaseRef.current ?: lease
 
-        activeTurnOwnerRef.value = ActiveTurnOwner(
+        slot.owner = ActiveTurnOwner(
             runId = null,
             runtimeId = command.runtimeId.value,
             agentId = command.agentId.value,
@@ -547,30 +820,32 @@ class AppServerTurnEngine(
             "runtimeId" to command.runtimeId.value,
             "agentId" to command.agentId.value,
             "conversationId" to command.conversationId.value,
+            "key" to slot.key.toString(),
             "acquiredAtMs" to acquiredAtMs,
             "processRole" to ownerProcessRole,
             "leaseToken" to leaseToken,
             "settleDeadlineMs" to terminalSettleQuietMs,
             "watchdogDeadlineMs" to turnIdleTimeoutMs,
         )
+        noteConcurrentLeases(slot)
 
         var collector: Job? = null
         var releaseReason = "normal_completion"
         try {
             val turnPermissionMode = permissionModeProvider(command)
             prepareContextIfNeeded(command)
-            activeLeaseRef.update { cur ->
+            slot.updateLease { cur ->
                 if (cur?.token == leaseToken) cur.copy(phase = TurnLeasePhase.Starting) else cur
             }
             Telemetry.event("IrohTurn", "ensureRuntime.begin", "agent" to command.agentId.value)
-            val scope = ensureRuntime(command, turnPermissionMode)
+            val scope = ensureRuntime(command, turnPermissionMode, slot)
             Telemetry.event("IrohTurn", "ensureRuntime.ok", "scopeAgent" to scope.agentId, "scopeConv" to scope.conversationId)
             send(command.startedDraft())
 
             val collectorReady = CompletableDeferred<Unit>()
             collector = launch {
                 try {
-                    activeLeaseRef.update { cur ->
+                    slot.updateLease { cur ->
                         if (cur?.token == leaseToken) cur.copy(phase = TurnLeasePhase.Streaming) else cur
                     }
                     collectTurnWithIdleWatchdog(
@@ -578,7 +853,7 @@ class AppServerTurnEngine(
                         command,
                         turnPermissionMode,
                         collectorReady,
-                        leaseToken,
+                        leaseRef,
                     ) { draft -> send(draft) }
                 } catch (completed: TurnCompletedMarker) {
                     releaseReason = "normal_completion"
@@ -587,7 +862,7 @@ class AppServerTurnEngine(
                     Telemetry.event(
                         "IrohTurn", "turn.idle_timeout", "agent" to command.agentId.value, "idleMs" to turnIdleTimeoutMs,
                     )
-                    noteOwnerTerminal(RuntimeRunStatus.Failed, source = "idle_timeout", leaseToken = leaseToken)
+                    noteOwnerTerminal(RuntimeRunStatus.Failed, source = "idle_timeout", lease = leaseRef)
                     send(command.failedDraft("App Server turn idle for ${turnIdleTimeoutMs}ms (no terminal stop_reason)"))
                 } catch (cancellation: CancellationException) {
                     releaseReason = "cancellation"
@@ -604,22 +879,40 @@ class AppServerTurnEngine(
         } finally {
             withContext(NonCancellable) {
                 collector?.cancelAndJoin()
-                // Token-validated release: a successor lease is never cleared by us.
-                val releasedOwner = activeTurnOwnerRef.value
-                val releasedLease = activeLeaseRef.value
+                // Token-validated release: a successor lease is never cleared by
+                // us — and, letta-mobile-8xxzv, only OUR key's slot is touched, so
+                // one conversation's teardown can never free another's lease.
+                val releasedOwner = slot.owner
+                val releasedLease = slot.lease
                 if (releasedLease?.token == leaseToken) {
                     inboundControlRegistry.releaseClaimsForLease(
                         leaseToken = leaseToken,
                         connectionGeneration = releasedLease.connectionGeneration,
                     )
-                    activeLeaseRef.compareAndSet(releasedLease, null)
-                    activeTurnOwnerRef.compareAndSet(releasedOwner, null)
+                    slot.casLease(releasedLease, null)
+                    slot.casOwner(releasedOwner, null)
+                }
+                // SENSING (b, letta-mobile-8xxzv): the lease ended WITHOUT ever
+                // observing a terminal — watchdog timeout, cancellation, or a
+                // stream error freed it instead of the server.
+                if (releasedOwner?.lastTerminal == null || releaseReason != "normal_completion") {
+                    Telemetry.event(
+                        "AppServerTurnEngine", "activeTurn.releasedWithoutTerminal",
+                        "key" to slot.key.toString(),
+                        "leaseToken" to leaseToken,
+                        "releaseReason" to releaseReason,
+                        "lastTerminal" to (releasedOwner?.lastTerminal ?: "<none>"),
+                        "otherBusyKeys" to busyRuntimeKeys().filter { it != slot.key }
+                            .joinToString(",") { it.toString() },
+                        level = Telemetry.Level.WARN,
+                    )
                 }
                 Telemetry.event(
                     "AppServerTurnEngine", "activeTurn.released",
                     "runtimeId" to command.runtimeId.value,
                     "agentId" to command.agentId.value,
                     "conversationId" to command.conversationId.value,
+                    "key" to slot.key.toString(),
                     "leaseToken" to leaseToken,
                     "acquiredAtMs" to (releasedOwner?.acquiredAtMs),
                     "heldMs" to (releasedOwner?.acquiredAtMs?.let { currentTimeMs() - it }),
@@ -707,9 +1000,10 @@ class AppServerTurnEngine(
         command: TurnCommand,
         turnPermissionMode: AppServerPermissionMode,
         collectorReady: CompletableDeferred<Unit>,
-        leaseToken: Long,
+        lease: LeaseRef,
         emitDraft: suspend (RuntimeEventDraft) -> Unit,
     ) = coroutineScope {
+        val slot = lease.slot
         val lastFrameAt = atomic(currentTimeMs())
         // letta-mobile-vilsn.6: the idle watchdog is PAUSED while ANY surfaced
         // (non-auto-approved) runtime user-input approval gate is outstanding
@@ -724,7 +1018,7 @@ class AppServerTurnEngine(
         // arbitrary inbound frame: a side-channel status frame (UpdateDeviceStatus /
         // UpdateQueue / UpdateSubagentState) that merely passes matches(scope) must
         // never resume the watchdog while the user still owes an answer.
-        fun hasOutstandingUserInputGate(): Boolean = userInputApprovalIdsRef.value.isNotEmpty()
+        fun hasOutstandingUserInputGate(): Boolean = slot.approvalIds.isNotEmpty()
         val watchdog = this.launch {
             // Short recheck cadence while paused so the watchdog resumes PROMPTLY
             // once the last gate clears (from ANY source — collect-loop tool_return,
@@ -778,7 +1072,7 @@ class AppServerTurnEngine(
             // ANY parked user-input approval gate — clear every outstanding gate so
             // the watchdog resumes normal behavior and no stale gate leaks into a
             // later turn.
-            userInputApprovalIdsRef.update { emptyMap() }
+            slot.updateApprovalIds { emptyMap() }
             pendingStop?.let { emitDraft(it) }
             pendingStop = null
             pendingUsage?.let { emitDraft(it) }
@@ -833,7 +1127,7 @@ class AppServerTurnEngine(
                     source = "completed_settle",
                     seq = pendingCompletedSeq,
                     scopeMatched = true,
-                    leaseToken = leaseToken,
+                    lease = lease,
                 )
                 emitDraft(terminal)
                 throw TurnCompleted
@@ -843,12 +1137,12 @@ class AppServerTurnEngine(
         var turnEndReason: String? = null
         // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
         // prior ids are superseded and must not complete/mutate this lease.
-        runIdGate.beginLease(leaseToken)
+        slot.runIdGate.beginLease(lease.token)
         val (fanoutSubscriberId, inboundEvents) = inboundSource.subscribe(scope)
         try {
             collectorReady.complete(Unit)
             inboundEvents.collect { received ->
-                if (isConnectionGenerationSuperseded(leaseToken)) {
+                if (isConnectionGenerationSuperseded(lease)) {
                     // Settle before TurnCompleted — clean-completion markers skip
                     // the cancel/finally settlement path intentionally.
                     // Transport generation rolled over mid-turn — end immediately
@@ -867,11 +1161,11 @@ class AppServerTurnEngine(
                     )
                     throw TurnCompleted
                 }
-                if (received.isStaleGenerationForLease(leaseToken)) {
+                if (received.isStaleGenerationForLease(lease)) {
                     return@collect
                 }
-                if (!received.matches(scope, leaseToken)) {
-                    handleScopeRejectedFrame(received, scope, leaseToken)?.let { status ->
+                if (!received.matches(scope, lease)) {
+                    handleScopeRejectedFrame(received, scope, lease)?.let { status ->
                         // Same abnormal-terminal settlement as the exact-scope path:
                         // TurnCompleted skips cancel/finally settlement intentionally.
                         settleDanglingToolCalls(
@@ -892,7 +1186,7 @@ class AppServerTurnEngine(
                     }
                     return@collect
                 }
-                if (!runIdGate.accepts(received, leaseToken)) {
+                if (!slot.runIdGate.accepts(received, lease.token)) {
                     return@collect
                 }
                 lastFrameAt.value = currentTimeMs()
@@ -913,8 +1207,7 @@ class AppServerTurnEngine(
                 // it). Reply here — this is the one place the raw frame still
                 // carries request_id (toToolCallDraft discards it) and the client
                 // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
-                (received.frame as? AppServerInboundFrame.ExternalToolCallRequest)
-                    ?.let { guaranteeExternalToolResponse(it, leaseToken) }
+                answerExternalToolCallIfPresent(received, lease)
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the
@@ -923,7 +1216,7 @@ class AppServerTurnEngine(
                 val frameSeq = received.eventSeqOrNull()
                 val drafts = mapper.map(command, received)
                 drafts.firstOrNull { it.runId != null }?.runId?.value?.let { newRunId ->
-                    runIdGate.promote(newRunId, leaseToken)
+                    slot.runIdGate.promote(newRunId, lease.token)
                 }
                 drafts.forEach { draft ->
                     val autoApproved = autoApprovedToolCallDraft(scope, turnPermissionMode, command, draft)
@@ -970,7 +1263,7 @@ class AppServerTurnEngine(
                                 // close the gate against THIS id, which is not derivable
                                 // from the tool_call_id across LLM providers (call_… vs
                                 // toolu_…).
-                                userInputApprovalIdsRef.update { map ->
+                                slot.updateApprovalIds { map ->
                                     map + (payload.request.callId.value to payload.request.approvalId.value)
                                 }
                             }
@@ -981,7 +1274,7 @@ class AppServerTurnEngine(
                             // user-input tool_call_id genuinely resolves THAT gate —
                             // lift the pause for this specific id (no-op if the submit
                             // path already consumed it).
-                            userInputApprovalIdsRef.update { it - payload.toolCallId.value }
+                            slot.updateApprovalIds { it - payload.toolCallId.value }
                         }
                         is RuntimeEventPayload.RemoteStreamFrame -> {
                             // Extract tool_call_id from tool_call_message and approval_request_message frames
@@ -992,7 +1285,7 @@ class AppServerTurnEngine(
                                     returnedToolCallIds.add(it)
                                     // letta-mobile-vilsn.6: a streamed tool_return
                                     // resolves that specific outstanding gate.
-                                    userInputApprovalIdsRef.update { map -> map - it }
+                                    slot.updateApprovalIds { map -> map - it }
                                 }
                             }
                             // letta-mobile-vilsn.7: some App Server transports deliver
@@ -1013,7 +1306,7 @@ class AppServerTurnEngine(
                                     callId != null &&
                                     RuntimeUserInputTools.requiresUserInput(approval.toolName)
                                 ) {
-                                    userInputApprovalIdsRef.update { map ->
+                                    slot.updateApprovalIds { map ->
                                         map + (callId to approval.requestId)
                                     }
                                 }
@@ -1090,7 +1383,7 @@ class AppServerTurnEngine(
                             draft = draft,
                             command = command,
                             frameSeq = frameSeq,
-                            leaseToken = leaseToken,
+                            lease = lease,
                         )
                         emitDraft(draft)
                         throw TurnCompleted
@@ -1135,7 +1428,7 @@ class AppServerTurnEngine(
             // timeout, cancellation, or stream error) — clear every outstanding
             // user-input gate so none leaks into a later turn and keeps a fresh
             // watchdog wrongly paused.
-            userInputApprovalIdsRef.update { emptyMap() }
+            slot.updateApprovalIds { emptyMap() }
             fanoutSubscriberId?.let { subId ->
                 withContext(NonCancellable) {
                     inboundSource.unsubscribe(subId)
@@ -1153,18 +1446,18 @@ class AppServerTurnEngine(
     private fun handleScopeRejectedFrame(
         received: AppServerReceivedFrame,
         scope: AppServerRuntimeScope,
-        leaseToken: Long,
+        lease: LeaseRef,
     ): RuntimeRunStatus? {
         if (!received.carriesLifecycleTerminal()) return null
         // Superseded run IDs must not complete the active lease via the
         // same-conversation mismatch fallback (exact-scope path already gates
         // through runIdGate.accepts).
-        if (!runIdGate.accepts(received, leaseToken)) return null
+        if (!lease.slot.runIdGate.accepts(received, lease.token)) return null
         noteOwnerScopeDecision(
             scopeMatched = false,
             source = "scope_rejected_terminal",
             seq = received.eventSeqOrNull(),
-            leaseToken = leaseToken,
+            lease = lease,
         )
         Telemetry.event(
             "AppServerTurnEngine", "terminal.scope_rejected",
@@ -1183,26 +1476,24 @@ class AppServerTurnEngine(
             source = "authoritative_terminal_scope_mismatched",
             seq = received.eventSeqOrNull(),
             scopeMatched = false,
-            leaseToken = leaseToken,
+            lease = lease,
         )
         return status
     }
 
-    private fun isConnectionGenerationSuperseded(leaseToken: Long): Boolean {
-        val lease = activeLeaseRef.value ?: return false
-        return lease.token == leaseToken &&
-            lease.connectionGeneration != connectionGenerationProvider()
+    private fun isConnectionGenerationSuperseded(lease: LeaseRef): Boolean {
+        val current = lease.current ?: return false
+        return current.connectionGeneration != connectionGenerationProvider()
     }
 
     /**
      * Drop frames stamped for a prior reconnect generation before
      * [handleScopeRejectedFrame] can treat their terminals as authoritative.
      */
-    private fun AppServerReceivedFrame.isStaleGenerationForLease(leaseToken: Long): Boolean {
-        val lease = activeLeaseRef.value ?: return false
-        if (lease.token != leaseToken) return false
+    private fun AppServerReceivedFrame.isStaleGenerationForLease(lease: LeaseRef): Boolean {
+        val current = lease.current ?: return false
         val frameGeneration = connectionGeneration ?: return false
-        return frameGeneration != lease.connectionGeneration
+        return frameGeneration != current.connectionGeneration
     }
 
     private fun TurnCommand.draftForScopeRejectedTerminal(status: RuntimeRunStatus): RuntimeEventDraft =
@@ -1283,6 +1574,12 @@ class AppServerTurnEngine(
             "tool" to (approval.toolName ?: ""),
             "source" to approval.source,
         )
+        // lgns8.22.4.1.4: capture the generation the approval is being ANSWERED ON
+        // before the send. Reading it back after client.input() would attribute the
+        // answer to whatever generation a mid-send disconnect installed, marking a
+        // successor-generation recovery replay answered by a decision the server
+        // may never have received.
+        val claimGeneration = connectionGenerationProvider()
         client.input(
             AppServerCommand.Input(
                 runtime = scope,
@@ -1295,8 +1592,8 @@ class AppServerTurnEngine(
             ),
         )
         inboundControlRegistry.markAnswered(
-            approval.requestId,
-            connectionGenerationProvider(),
+            InboundControlRequestRegistry.RequestRef(approval.requestId),
+            claimGeneration,
         )
         return true
     }
@@ -1340,12 +1637,21 @@ class AppServerTurnEngine(
 
     private fun JsonObject.string(key: String): String? = this[key]?.jsonPrimitive?.contentOrNull
 
-    private suspend fun ensureRuntime(command: TurnCommand, turnPermissionMode: AppServerPermissionMode): AppServerRuntimeScope {
+    /**
+     * letta-mobile-8xxzv: the started-runtime cache is KEYED. It used to be one
+     * `runtime` field, so two concurrent conversations would evict each other's
+     * scope on every turn (and an abort could be addressed to the wrong runtime).
+     */
+    private suspend fun ensureRuntime(
+        command: TurnCommand,
+        turnPermissionMode: AppServerPermissionMode,
+        slot: TurnLeaseSlot,
+    ): AppServerRuntimeScope {
         runtimeScopeResolver(command)?.let { resolved ->
-            runtime = resolved
+            slot.runtimeScope = resolved
             return resolved
         }
-        runtime?.let { cached ->
+        slot.runtimeScope?.let { cached ->
             if (cached.matches(command)) return cached
         }
         val generationAtStart = connectionGenerationProvider()
@@ -1368,10 +1674,10 @@ class AppServerTurnEngine(
         // Disconnect may have rolled the generation while this RPC was in flight —
         // never keep or publish a dead-generation scope.
         if (connectionGenerationProvider() != generationAtStart) {
-            runtime = null
+            slot.runtimeScope = null
             error("Connection generation superseded during runtime_start")
         }
-        runtime = returnedRuntime
+        slot.runtimeScope = returnedRuntime
         onRuntimeEnsured(command, response, generationAtStart)
         return returnedRuntime
     }
@@ -1534,10 +1840,9 @@ class AppServerTurnEngine(
 
     private fun AppServerReceivedFrame.matches(
         scope: AppServerRuntimeScope,
-        leaseToken: Long,
+        leaseRef: LeaseRef,
     ): Boolean {
-        val lease = activeLeaseRef.value
-        if (lease == null || lease.token != leaseToken) return false
+        val lease = leaseRef.current ?: return false
         // Reject delayed frames stamped for a prior reconnect generation even when
         // the live provider has already advanced (or a new lease shares the runtime).
         val frameGeneration = connectionGeneration
@@ -1554,7 +1859,7 @@ class AppServerTurnEngine(
             return when (val f = frame) {
                 is AppServerInboundFrame.ExternalToolCallRequest,
                 is AppServerInboundFrame.ControlRequest,
-                -> claimInboundControlDelivery(f, leaseToken, lease.connectionGeneration)
+                -> claimInboundControlDelivery(f, leaseRef.token, lease.connectionGeneration)
                 else -> false
             }
         }
@@ -1569,7 +1874,7 @@ class AppServerTurnEngine(
         if (control is AppServerInboundFrame.ControlRequest ||
             control is AppServerInboundFrame.ExternalToolCallRequest
         ) {
-            return claimInboundControlDelivery(control, leaseToken, lease.connectionGeneration)
+            return claimInboundControlDelivery(control, leaseRef.token, lease.connectionGeneration)
         }
         return true
     }
@@ -1579,14 +1884,22 @@ class AppServerTurnEngine(
         leaseToken: Long,
         connectionGeneration: Long,
     ): Boolean {
-        registerInboundControl(frame)
+        registerInboundControl(frame, connectionGeneration)
         val requestId = frame.requestId ?: return false
-        // First observer claims delivery; later replays of the same request_id
-        // in this generation are dropped (approvals and external tools alike).
-        return inboundControlRegistry.tryClaim(requestId, leaseToken, connectionGeneration)
+        // First observer claims delivery; later replays of the same identity in
+        // this generation are dropped (approvals and external tools alike).
+        // lgns8.22.4.1.3: external-tool identity includes tool_call_id.
+        return inboundControlRegistry.tryClaim(
+            InboundControlRequestRegistry.RequestRef(
+                requestId,
+                (frame as? AppServerInboundFrame.ExternalToolCallRequest)?.toolCallId,
+            ),
+            leaseToken,
+            connectionGeneration,
+        )
     }
 
-    private fun registerInboundControl(frame: AppServerInboundFrame) {
+    private fun registerInboundControl(frame: AppServerInboundFrame, connectionGeneration: Long) {
         val requestId = frame.requestId ?: return
         val kind = when (frame) {
             is AppServerInboundFrame.ExternalToolCallRequest ->
@@ -1600,7 +1913,9 @@ class AppServerTurnEngine(
             InboundControlRequestRegistry.RegisterRequest(
                 requestId = requestId,
                 kind = kind,
-                connectionGeneration = connectionGenerationProvider(),
+                // The lease's VALIDATED generation, not a fresh live read
+                // (lgns8.22.4.1.2).
+                connectionGeneration = connectionGeneration,
                 agentId = frame.runtime?.agentId
                     ?: (frame as? AppServerInboundFrame.ControlRequest)?.agentId,
                 conversationId = frame.runtime?.conversationId
@@ -1791,25 +2106,26 @@ class AppServerTurnEngine(
         source: String? = null,
         seq: Long? = null,
         scopeMatched: Boolean? = null,
-        leaseToken: Long,
+        lease: LeaseRef,
     ) {
-        if (activeLeaseRef.value?.token != leaseToken) return
-        val current = activeTurnOwnerRef.value ?: return
-        activeTurnOwnerRef.value = current.copy(
+        if (lease.current == null) return
+        val slot = lease.slot
+        val current = slot.owner ?: return
+        slot.owner = current.copy(
             lastTerminal = status.name,
             lastTerminalSource = source ?: current.lastTerminalSource,
             lastTerminalAtMs = currentTimeMs(),
             lastTerminalSeq = seq ?: current.lastTerminalSeq,
             lastTerminalScopeMatched = scopeMatched ?: current.lastTerminalScopeMatched,
         )
-        activeLeaseRef.update { lease ->
-            if (lease?.token != leaseToken) lease
-            else lease.copy(
+        slot.updateLease { held ->
+            if (held?.token != lease.token) held
+            else held.copy(
                 lastTerminal = status.name,
-                lastTerminalSource = source ?: lease.lastTerminalSource,
+                lastTerminalSource = source ?: held.lastTerminalSource,
                 lastTerminalAtMs = currentTimeMs(),
-                lastTerminalSeq = seq ?: lease.lastTerminalSeq,
-                lastTerminalScopeMatched = scopeMatched ?: lease.lastTerminalScopeMatched,
+                lastTerminalSeq = seq ?: held.lastTerminalSeq,
+                lastTerminalScopeMatched = scopeMatched ?: held.lastTerminalScopeMatched,
             )
         }
     }
@@ -1824,11 +2140,11 @@ class AppServerTurnEngine(
         scopeMatched: Boolean,
         source: String,
         seq: Long?,
-        leaseToken: Long,
+        lease: LeaseRef,
     ) {
-        if (activeLeaseRef.value?.token != leaseToken) return
-        val current = activeTurnOwnerRef.value ?: return
-        activeTurnOwnerRef.value = current.copy(
+        if (lease.current == null) return
+        val current = lease.slot.owner ?: return
+        lease.slot.owner = current.copy(
             lastTerminalScopeMatched = scopeMatched,
             lastTerminalSource = source,
             lastTerminalAtMs = currentTimeMs(),
@@ -1844,7 +2160,7 @@ class AppServerTurnEngine(
         draft: RuntimeEventDraft,
         command: TurnCommand,
         frameSeq: Long?,
-        leaseToken: Long,
+        lease: LeaseRef,
     ) {
         val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged ?: return
         noteOwnerTerminal(
@@ -1852,12 +2168,13 @@ class AppServerTurnEngine(
             source = "terminal_lifecycle",
             seq = frameSeq,
             scopeMatched = true,
-            leaseToken = leaseToken,
+            lease = lease,
         )
         if (lifecycle.status == RuntimeRunStatus.Failed ||
             lifecycle.status == RuntimeRunStatus.Cancelled
         ) {
             logSanitizedTerminalFailure(
+                owner = lease.slot.owner,
                 status = lifecycle.status,
                 reason = lifecycle.reason,
                 runId = draft.runId?.value,
@@ -1876,6 +2193,7 @@ class AppServerTurnEngine(
      * never the raw provider reason text (may contain secrets / prompt content).
      */
     private fun logSanitizedTerminalFailure(
+        owner: ActiveTurnOwner?,
         status: RuntimeRunStatus,
         reason: String?,
         runId: String?,
@@ -1883,7 +2201,6 @@ class AppServerTurnEngine(
         conversationId: String,
         modelHandle: String? = null,
     ) {
-        val owner = activeTurnOwnerRef.value
         val handle = modelHandle?.takeIf { it.isNotBlank() }
         val provider = handle?.let { ModelCatalogNormalizer.providerPrefix(it) }?.ifBlank { null }
         Telemetry.event(

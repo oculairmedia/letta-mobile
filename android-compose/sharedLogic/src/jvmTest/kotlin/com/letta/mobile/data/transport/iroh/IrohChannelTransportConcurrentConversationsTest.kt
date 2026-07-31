@@ -126,7 +126,7 @@ class IrohChannelTransportConcurrentConversationsTest {
         frames: List<ServerFrame>,
     ): String {
         assertTrue(transport.send(AGENT, CONV_A, "hi A", "otid-a", null, false))
-        withTimeout(10.seconds) { while (!engine.isBusy) delay(10.milliseconds) }
+        withTimeout(10.seconds) { while (!engine.isBusy(AGENT, CONV_A)) delay(10.milliseconds) }
         withTimeout(10.seconds) { while (!client.inputReceived) delay(10.milliseconds) }
         // TWO subscribers must be live before the test drives any frame: the
         // observer collector AND the engine's runTurn collector. Gating on ">0"
@@ -140,21 +140,32 @@ class IrohChannelTransportConcurrentConversationsTest {
     }
 
     /**
-     * Sends into conversation B while A streams. The engine serializes turns, so
-     * B's turn resolves fast with a busy failure — but the transport-level turn
-     * for B is created, registered and torn down, which is precisely the sequence
-     * that used to evict A from the single global slot.
+     * Sends into conversation B while A streams.
+     *
+     * letta-mobile-8xxzv: B now runs CONCURRENTLY. The engine keys its turn lease
+     * by {agentId, conversationId} — the App Server's own unit of exclusion — so
+     * B is admitted and starts its own turn instead of being fast-failed with
+     * `iroh_turn_engine_busy`. The transport-level turn for B is still created
+     * and registered, which is the sequence that used to evict A from the single
+     * global slot.
      */
     private suspend fun sendIntoBWhileAStreams(
         transport: IrohChannelTransport,
+        engine: AppServerTurnEngine,
         frames: List<ServerFrame>,
     ) {
         assertTrue(transport.send(AGENT, CONV_B, "hi B", "otid-b", null, false))
         withTimeout(10.seconds) {
-            while (frames.none { it is ServerFrame.Error && it.conversationId == CONV_B }) delay(10.milliseconds)
+            while (frames.none { it is ServerFrame.TurnStarted && it.conversationId == CONV_B }) {
+                delay(10.milliseconds)
+            }
         }
-        // Let B's turn finish tearing down (job completion callback).
-        delay(200.milliseconds)
+        withTimeout(10.seconds) { while (!engine.isBusy(AGENT, CONV_B)) delay(10.milliseconds) }
+        assertTrue(
+            frames.none { it is ServerFrame.Error && it.code == "iroh_turn_engine_busy" },
+            "a send into another conversation must NOT be refused as engine-busy",
+        )
+        assertTrue(engine.isBusy(AGENT, CONV_A), "A's lease survives B starting")
     }
 
     // ------------------------------------------------------------------ (1)
@@ -174,14 +185,17 @@ class IrohChannelTransportConcurrentConversationsTest {
                 "presence must be scoped: B has no turn while only A streams",
             )
 
-            sendIntoBWhileAStreams(transport, frames)
+            sendIntoBWhileAStreams(transport, engine, frames)
 
             assertTrue(
                 transport.hasActiveChatTurn(CONV_A),
                 "A's turn must survive B's turn: starting B must not evict A from the transport's turn state",
             )
-            assertFalse(transport.hasActiveChatTurn(CONV_B), "B's turn already settled")
-            assertTrue(transport.hasAnyActiveChatTurn, "the transport as a whole is still busy with A")
+            assertTrue(
+                transport.hasActiveChatTurn(CONV_B),
+                "letta-mobile-8xxzv: B runs concurrently now instead of being busy-rejected",
+            )
+            assertTrue(transport.hasAnyActiveChatTurn, "the transport as a whole is busy with A and B")
         } finally {
             collector.cancel()
             transport.disconnect()
@@ -198,7 +212,7 @@ class IrohChannelTransportConcurrentConversationsTest {
         val collector = collectEvents(transport, frames)
         try {
             val turnIdA = startStreamingTurnOnA(transport, engine, client, frames)
-            sendIntoBWhileAStreams(transport, frames)
+            sendIntoBWhileAStreams(transport, engine, frames)
 
             val terminalsBefore = frames.filterIsInstance<ServerFrame.TurnDone>().size
 
@@ -223,7 +237,10 @@ class IrohChannelTransportConcurrentConversationsTest {
             assertEquals(1, terminalsForA.size, "the terminal must carry A's own turn id")
             assertEquals("completed", terminalsForA.single().status)
             assertFalse(transport.hasActiveChatTurn(CONV_A), "A's turn state must clear on its terminal")
-            assertFalse(transport.hasAnyActiveChatTurn, "no turn is live once A settled")
+            assertTrue(
+                transport.hasActiveChatTurn(CONV_B),
+                "A's terminal must settle A only — B's concurrent turn is untouched",
+            )
         } finally {
             collector.cancel()
             transport.disconnect()
@@ -240,7 +257,7 @@ class IrohChannelTransportConcurrentConversationsTest {
         val collector = collectEvents(transport, frames)
         try {
             startStreamingTurnOnA(transport, engine, client, frames)
-            sendIntoBWhileAStreams(transport, frames)
+            sendIntoBWhileAStreams(transport, engine, frames)
 
             // A is STILL streaming. Its frames must remain engine-owned: the
             // observer collector reads the very same flow, so an ownership flip
