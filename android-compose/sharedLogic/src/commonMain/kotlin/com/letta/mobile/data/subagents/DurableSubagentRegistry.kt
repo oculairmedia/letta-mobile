@@ -240,29 +240,33 @@ class DurableSubagentRegistry(
         liveToolCallIds: Set<String>,
         generation: Long = 0,
     ): ReconcileResult {
+        val result = synchronized(lock) { reconcileLocked(conversationId, liveToolCallIds, generation) }
+        reportReconciled(conversationId, generation, result)
+        return result
+    }
+
+    private fun reconcileLocked(
+        conversationId: String,
+        liveToolCallIds: Set<String>,
+        generation: Long,
+    ): ReconcileResult {
         val now = clock()
-        val result = synchronized(lock) {
-            val scoped = entries.values.filter { it.conversationId == conversationId }
-            val orphaned = mutableListOf<SubagentChipRecord>()
-            var live = 0
-            for (record in scoped) {
-                if (record.toolCallId in liveToolCallIds) {
-                    if (!record.state.isTerminal) live++
-                    continue
-                }
-                if (record.state.isTerminal) continue
-                val next = record.copy(
-                    state = SubagentChipState.ORPHANED,
-                    generation = maxOf(record.generation, generation),
-                    lastSeenEpochMs = now,
-                    terminalAtEpochMs = record.terminalAtEpochMs ?: now,
-                )
-                entries[next.key] = next
-                orphaned += next
-            }
-            if (orphaned.isNotEmpty()) persistLocked()
-            ReconcileResult(orphaned = orphaned, liveRetained = live)
+        val scoped = entries.values.filter { it.conversationId == conversationId }
+        val (live, missing) = scoped.filter { !it.state.isTerminal }
+            .partition { it.toolCallId in liveToolCallIds }
+        val orphaned = missing.map { record ->
+            record.copy(
+                state = SubagentChipState.ORPHANED,
+                generation = maxOf(record.generation, generation),
+                lastSeenEpochMs = now,
+                terminalAtEpochMs = record.terminalAtEpochMs ?: now,
+            ).also { entries[it.key] = it }
         }
+        if (orphaned.isNotEmpty()) persistLocked()
+        return ReconcileResult(orphaned = orphaned, liveRetained = live.size)
+    }
+
+    private fun reportReconciled(conversationId: String, generation: Long, result: ReconcileResult) {
         result.orphaned.forEach { record ->
             Telemetry.event(
                 TAG,
@@ -275,17 +279,15 @@ class DurableSubagentRegistry(
                 level = Telemetry.Level.WARN,
             )
         }
-        if (result.orphaned.isNotEmpty() || result.liveRetained > 0) {
-            Telemetry.event(
-                TAG,
-                "reconciled",
-                "conversationId" to conversationId,
-                "orphaned" to result.orphaned.size,
-                "liveRetained" to result.liveRetained,
-                "generation" to generation,
-            )
-        }
-        return result
+        if (result.orphaned.isEmpty() && result.liveRetained == 0) return
+        Telemetry.event(
+            TAG,
+            "reconciled",
+            "conversationId" to conversationId,
+            "orphaned" to result.orphaned.size,
+            "liveRetained" to result.liveRetained,
+            "generation" to generation,
+        )
     }
 
     /**
