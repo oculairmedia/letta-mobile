@@ -11,6 +11,7 @@ import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.attachment.AttachmentLimits
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.health.ShimBackendDetector
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ChatTimelineMode
@@ -197,8 +198,16 @@ internal class AdminChatViewModel @Inject constructor(
 
     private val explicitNewChat: Boolean
         get() = routeArgs.explicitNewChat
-    private val isShimBackend: StateFlow<Boolean> = shimBackendDetector.activeIsShimBackend
-        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveIsShimBackend())
+    /**
+     * lgns8.10.4.1: the chat screen's real question is "is this backend served
+     * by a frame channel?" (Iroh **or** shim WS) — not "is this the shim?".
+     * The detector answers both separately now; the old `activeIsShimBackend`
+     * returned true for Iroh, which is exactly the inversion this bead fixes.
+     */
+    private val usesChannelTransport: StateFlow<Boolean> = shimBackendDetector.activeUsesChannelTransport
+        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveUsesChannelTransport())
+    private val backendKind: StateFlow<BackendKind> = shimBackendDetector.activeBackendKind
+        .stateIn(viewModelScope, SharingStarted.Eagerly, shimBackendDetector.cachedActiveBackendKind())
     private var followingDuplicateInitialMessageInFlight = false
     val conversationId: ConversationId?
         get() = chatConversationCoordinator.conversationId(false)?.let { ConversationId(it) }
@@ -267,13 +276,9 @@ internal class AdminChatViewModel @Inject constructor(
             uiState = _uiState,
             composerController = composerController,
             chatBannerController = chatBannerController,
-            isShimBackend = {
-                isShimBackend.value || settingsRepository.activeConfig.value?.serverUrl
-                    ?.trimStart()
-                    ?.removePrefix("https://")
-                    ?.removePrefix("http://")
-                    ?.startsWith("iroh://") == true
-            },
+            // lgns8.10.4.1: config truth, resolved once in ShimBackendDetector.
+            // The inline iroh:// URL sniff that used to live here is gone.
+            backendKind = { backendKind.value },
             activeConversationId = { chatConversationCoordinator.activeConversationId },
             setActiveConversationId = chatConversationCoordinator::setActiveConversationId,
             startTimelineObserver = ::startTimelineObserver,
@@ -303,7 +308,7 @@ internal class AdminChatViewModel @Inject constructor(
             wsChatBridge = wsChatBridge,
             uiState = _uiState,
             bannerController = chatBannerController,
-            isShimBackend = isShimBackend,
+            usesChannelTransport = usesChannelTransport,
             localRuntimeRouting = ::localRuntimeRouting,
             onGoalSlashCommandsDetected = ::refreshGoalStatus,
         )
@@ -325,7 +330,7 @@ internal class AdminChatViewModel @Inject constructor(
     private val transportCoordinator: AdminChatTransportCoordinator by lazy {
         AdminChatTransportCoordinator(
             scope = viewModelScope,
-            isShimBackend = isShimBackend,
+            usesChannelTransport = usesChannelTransport,
             wsChatBridge = wsChatBridge,
             uiState = _uiState,
             updateSessionState = ::updateSessionState,

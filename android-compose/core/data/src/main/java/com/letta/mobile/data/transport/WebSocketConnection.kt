@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport
 
 import android.util.Log
+import com.letta.mobile.data.model.isIrohBackendUrl
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -19,6 +20,10 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Encapsulates low-level OkHttp WebSocket client requests, listener wiring,
  * thread-safe reference management, and active reconnect jobs.
+ *
+ * This is the LEGACY LettaShim mobile channel (`/shim/v1/mobile`). It is
+ * reachable only for explicitly shim-configured backends
+ * (letta-mobile-lgns8.10.4.1).
  */
 internal class WebSocketConnection(
     private val scope: CoroutineScope,
@@ -69,6 +74,14 @@ internal class WebSocketConnection(
         clientVersion: String,
         listener: WebSocketListener,
     ) {
+        // letta-mobile-lgns8.10.4.1: an Iroh-configured client must open ZERO
+        // connections to the LettaShim. `SessionGraphFactory` already binds
+        // `IrohChannelTransport` for `iroh://` configs, so reaching here with
+        // an Iroh URL means the transport binding and the routing decision
+        // have diverged. Fail loudly instead of silently dialing :8291.
+        require(!isIrohBackendUrl(baseShimUrl)) {
+            "Refusing to dial the legacy shim WS (/shim/v1/mobile) for an iroh backend: $baseShimUrl"
+        }
         lastConnectionConfig = ConnectionConfig(
             baseShimUrl = baseShimUrl,
             token = token,

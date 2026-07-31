@@ -1,6 +1,7 @@
 package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.GoalStatus
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UiMessage
@@ -34,7 +35,7 @@ internal class AdminChatComposerCoordinator(
     private val uiState: MutableStateFlow<ChatUiState>,
     private val agentId: AgentId,
     private val explicitConversationId: String?,
-    private val isShimBackend: () -> Boolean,
+    private val backendKind: () -> BackendKind,
     private val sessionManager: SessionManager,
     private val messageRepository: IMessageRepository,
     private val slashCommandRepository: ISlashCommandRepository,
@@ -93,7 +94,7 @@ internal class AdminChatComposerCoordinator(
     fun submitComposer(text: String = state.value.inputText): ChatComposerEffect? {
         val trimmed = text.trim()
         val firstToken = trimmed.substringBefore(' ').substringBefore('\n')
-        if (firstToken == "/goal" && isShimBackend()) {
+        if (firstToken == "/goal" && backendKind().usesChannelTransport) {
             composerController.clearText()
             scope.launch {
                 slashCommandRepository.executeGoalCommand(agentId.value, trimmed)
@@ -181,7 +182,7 @@ internal class AdminChatComposerCoordinator(
     fun chatSendContext() = ChatSendContext(
         isClientModeEnabled = false,
         explicitConversationId = explicitConversationId,
-        isShimBackend = isShimBackend(),
+        backendKind = backendKind(),
         isLocalRuntime = LocalRuntimeRouting.shouldUseLocalRuntime(
             sessionHasLocalRuntimeBackend = sessionManager.current.localRuntimeBackend != null,
             agentId = agentId.value,
@@ -228,7 +229,7 @@ internal class AdminChatComposerCoordinator(
         )
         watchForCancelTerminal(requestedAtMs)
         scope.launch {
-            if (context.isShimBackend || context.isLocalRuntime) {
+            if (context.usesChannelTransport || context.isLocalRuntime) {
                 chatSendStrategySelector.cancel(context)
                 return@launch
             }
@@ -321,8 +322,9 @@ internal class AdminChatComposerCoordinator(
     }
 
     private fun cancelTransportLabel(context: ChatSendContext): String = when {
-        context.isShimBackend -> "shim"
         context.isLocalRuntime -> "localRuntime"
+        context.backendKind == BackendKind.IROH -> "iroh"
+        context.backendKind == BackendKind.SHIM_WS -> "shim"
         else -> "appServer"
     }
 

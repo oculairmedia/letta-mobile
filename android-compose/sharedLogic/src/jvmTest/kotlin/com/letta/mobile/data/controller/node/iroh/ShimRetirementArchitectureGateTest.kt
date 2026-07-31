@@ -110,7 +110,101 @@ class ShimRetirementArchitectureGateTest {
             )
         }
 
+        findings += scanIrohRoutingViolations()
+
         return findings.sortedBy { it.id }
+    }
+
+    /**
+     * letta-mobile-lgns8.10.4.1 — keep the Iroh routing decision structural.
+     *
+     * Two regressions this catches:
+     *
+     *  1. A new copy of the `iroh://`-prefix heuristic. Four independent copies
+     *     existed before this bead and drifted: one of them (ShimBackendDetector)
+     *     reported Iroh backends as *shim* backends, which is how the production
+     *     transport ended up selecting the shim-shaped send strategy. There is
+     *     now exactly one implementation, in [BACKEND_KIND_FILE]; everything else
+     *     must route through `backendKind()` / `isIrohBackendUrl()`.
+     *  2. A new production dial of the legacy `/shim/v1/mobile` channel. Only the
+     *     two known shim transports (plus the CLI's shim recorder) may name it.
+     */
+    private fun scanIrohRoutingViolations(): List<Violation> {
+        val findings = mutableListOf<Violation>()
+        val heuristic = Regex("""startsWith\(\s*(?:"iroh://"|IROH_URL_PREFIX)\s*\)""")
+
+        productionKotlinSources().forEach { file ->
+            val relPath = rel(file)
+            val text = file.readText()
+            if (heuristic.containsMatchIn(text) && relPath != BACKEND_KIND_FILE) {
+                findings += Violation(
+                    "routing.duplicate_iroh_url_heuristic",
+                    relPath,
+                    "re-implements the iroh:// backend heuristic; call backendKind()/isIrohBackendUrl() instead",
+                )
+            }
+            if (text.contains(SHIM_MOBILE_WS_PATH) && relPath !in SHIM_MOBILE_WS_ALLOWED) {
+                findings += Violation(
+                    "routing.new_shim_mobile_ws_reference",
+                    relPath,
+                    "names the legacy $SHIM_MOBILE_WS_PATH channel; it is reachable only from the known shim transports",
+                )
+            }
+        }
+        return findings
+    }
+
+    /**
+     * Production (non-test) Kotlin across the client modules. Test sources are
+     * excluded deliberately: fixtures legitimately spell out shim URLs.
+     */
+    private fun productionKotlinSources(): List<Path> {
+        val modules = listOf(
+            "android-compose/app/src/main",
+            "android-compose/core",
+            "android-compose/feature-chat/src/main",
+            "android-compose/feature-editagent/src/main",
+            "android-compose/sharedLogic/src/commonMain",
+            "android-compose/sharedLogic/src/jvmAndAndroid",
+            "android-compose/sharedLogic/src/androidMain",
+            "android-compose/desktop/src/main",
+        )
+        return modules
+            .map { repoRoot.resolve(it) }
+            .filter { Files.isDirectory(it) }
+            .flatMap { root ->
+                Files.walk(root).use { stream ->
+                    stream.filter { it.isRegularFile() && it.pathString.endsWith(".kt") }
+                        .filter { !it.pathString.contains("/build/") }
+                        .filter { !SRC_TEST_DIR.containsMatchIn(it.pathString) }
+                        .toList()
+                }
+            }
+    }
+
+    private companion object {
+        const val BACKEND_KIND_FILE =
+            "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/model/BackendKind.kt"
+        const val SHIM_MOBILE_WS_PATH = "/shim/v1/mobile"
+
+        /**
+         * The only production files allowed to name the legacy shim mobile
+         * channel. Each is either the shim transport itself (reachable only for
+         * an explicitly shim-configured backend) or documentation on the
+         * abstraction that transport implements.
+         */
+        val SHIM_MOBILE_WS_ALLOWED = setOf(
+            // The Android shim WS transport + its own doc comment.
+            "android-compose/core/data/src/main/java/com/letta/mobile/data/transport/WebSocketConnection.kt",
+            "android-compose/core/data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt",
+            // The desktop shim WS transport.
+            "android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopWsChannelTransport.kt",
+            // Wire-shape contracts / renderer docs that describe the protocol.
+            "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/transport/MobileWsFrames.kt",
+            "android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/ui/chat/render/ChatUiModels.kt",
+        )
+
+        val SRC_TEST_DIR = Regex("""/src/[A-Za-z]*[Tt]est[A-Za-z]*/""")
     }
 
     private fun rel(path: Path): String = repoRoot.relativize(path).pathString.replace('\\', '/')

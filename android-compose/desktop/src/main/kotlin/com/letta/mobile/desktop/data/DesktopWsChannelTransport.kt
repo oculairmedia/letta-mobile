@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportDefaults
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -98,6 +99,13 @@ class DesktopWsChannelTransport(
         deviceId: String,
         clientVersion: String,
     ) {
+        // letta-mobile-lgns8.10.4.1: the legacy `/shim/v1/mobile` channel is
+        // for explicitly shim-configured backends only. An Iroh desktop client
+        // must open ZERO connections to the LettaShim, so refuse the dial
+        // rather than silently opening one.
+        require(!isIrohBackendUrl(baseShimUrl)) {
+            "Refusing to dial the legacy shim WS (/shim/v1/mobile) for an iroh backend: $baseShimUrl"
+        }
         connectJob?.cancel()
         connectJob = scope.launch { runSocket(baseShimUrl, token, deviceId, clientVersion) }
     }
