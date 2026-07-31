@@ -394,8 +394,13 @@ class LettaCodeLocalBackendStore @Inject constructor(
         if (!transcript.isFile) return@withContext emptyMap()
         transcript.useLines { lines ->
             lines.filter { it.isNotBlank() }.mapNotNull { line ->
-                val row = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
+                val rawRow = runCatching { json.parseToJsonElement(line).jsonObject }.getOrNull()
                     ?: return@mapNotNull null
+                // Envelope-aware (letta-mobile-6ppdr): letta-code 0.29.x wraps
+                // every row in a session-log v3 envelope, so role/toolCallId/
+                // content live on the message BODY. Legacy flat rows are their
+                // own body, so both shapes read identically here.
+                val row = SessionLogEnvelope.body(rawRow)
                 if (row.stringField("role") != "toolResult") return@mapNotNull null
                 val callId = row.stringField("toolCallId") ?: return@mapNotNull null
                 val body = (row["content"] as? JsonArray)
