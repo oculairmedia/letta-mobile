@@ -37,6 +37,12 @@ class ExternalToolDispatcherTest {
 
     private val runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-1")
 
+    /** Live connection generation; a test moves it past [CLAIM_GENERATION] to fence. */
+    private var liveGeneration = CLAIM_GENERATION
+
+    /** Shared so a second dispatch pass sees the first pass's computed result. */
+    private val resultCache = ExternalToolResultCache()
+
     @Test
     fun answersWithSynthesizedErrorWhenNoRegistryHandlesTheTool() = runTest {
         val client = RecordingClient()
@@ -105,8 +111,8 @@ class ExternalToolDispatcherTest {
             client,
             registry = registryOf(EchoTool { invocations += 1; ExternalToolResult.Success("ok") }),
             controlRegistry = controlRegistry,
-            generation = { 1L },
         )
+        liveGeneration = CLAIM_GENERATION + 1
 
         dispatcher.answerRequest()
 
@@ -119,13 +125,12 @@ class ExternalToolDispatcherTest {
     fun aReplayReusesTheCachedResultInsteadOfReInvokingTheTool() = runTest {
         val client = RecordingClient()
         var invocations = 0
-        val cache = ExternalToolResultCache()
         val registry = registryOf(EchoTool { invocations += 1; ExternalToolResult.Success("once") })
 
         // Two independent dispatch passes sharing the cache — the reconnect replay
         // shape, where the second answer must not re-run a non-idempotent tool.
-        dispatcher(client, registry, cache = cache).answerRequest()
-        dispatcher(client, registry, cache = cache).answerRequest(leaseToken = 2L)
+        dispatcher(client, registry).answerRequest()
+        dispatcher(client, registry).answerRequest(leaseToken = 2L)
 
         assertEquals(1, invocations)
         assertEquals(2, client.responses.size)
@@ -197,14 +202,12 @@ class ExternalToolDispatcherTest {
         client: AppServerClient,
         registry: ExternalToolRegistry?,
         controlRegistry: InboundControlRequestRegistry = InboundControlRequestRegistry(),
-        generation: () -> Long = { 0L },
-        cache: ExternalToolResultCache = ExternalToolResultCache(),
     ) = ExternalToolDispatcher(
         client = client,
         externalToolRegistry = registry,
         inboundControlRegistry = controlRegistry,
-        connectionGenerationProvider = generation,
-        resultCache = cache,
+        connectionGenerationProvider = { liveGeneration },
+        resultCache = resultCache,
     )
 
     private fun registryOf(tool: ExternalTool) =

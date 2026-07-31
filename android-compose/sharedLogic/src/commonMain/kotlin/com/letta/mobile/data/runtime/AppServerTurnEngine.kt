@@ -907,6 +907,107 @@ class AppServerTurnEngine(
     }
 
     /**
+     * letta-mobile-oqfbj + vilsn.6/vilsn.7 bookkeeping for ONE mapped draft:
+     * record the tool_call_ids this turn emitted/returned, and open or resolve
+     * the user-input approval gate that pauses the idle watchdog.
+     *
+     * lgns8.22.5: lifted out of `collectTurnWithIdleWatchdog`, which was already a
+     * complexity hotspot. Pure move — the branch bodies are unchanged.
+     */
+    private fun trackToolCallAndApprovalIds(
+        draft: RuntimeEventDraft,
+        key: TurnRuntimeKey,
+        ledger: ToolCallLedger,
+    ) {
+        when (val payload = draft.payload) {
+            is RuntimeEventPayload.ToolCallObserved -> ledger.emitted.add(payload.toolCallId.value)
+            is RuntimeEventPayload.ApprovalRequested -> {
+                ledger.emitted.add(payload.request.callId.value)
+                // letta-mobile-vilsn.6: this ApprovalRequested reached
+                // the collect body, which means it was NOT auto-approved
+                // (auto-approved drafts are swallowed above via
+                // autoApprovedToolCallDraft). If it is a runtime
+                // user-input tool (AskUserQuestion / ExitPlanMode) the
+                // turn is now parked awaiting the user's answer — record
+                // an outstanding gate so the idle watchdog is paused and
+                // the unanswered question does not synthesize a Failed
+                // idle timeout.
+                if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
+                    // letta-mobile-vilsn: record the REAL approval id
+                    // (the can_use_tool control-request request_id, e.g.
+                    // perm-call_...) keyed by tool_call_id. This map is
+                    // BOTH the submit path's source (submitApproval
+                    // clears it after a successful response) AND the
+                    // watchdog's outstanding-gate set (vilsn.6): a non-empty
+                    // map pauses the idle watchdog. Interactive answers must
+                    // close the gate against THIS id, which is not derivable
+                    // from the tool_call_id across LLM providers (call_… vs
+                    // toolu_…).
+                    approvals.record(
+                        key,
+                        ApprovalRegistry.Gate(
+                            toolCallId = payload.request.callId.value,
+                            approvalId = payload.request.approvalId.value,
+                        ),
+                    )
+                }
+            }
+            is RuntimeEventPayload.ToolReturnObserved -> {
+                ledger.returned.add(payload.toolCallId.value)
+                // letta-mobile-vilsn.6: a tool_return for a parked
+                // user-input tool_call_id genuinely resolves THAT gate —
+                // lift the pause for this specific id (no-op if the submit
+                // path already consumed it).
+                approvals.resolve(key, payload.toolCallId.value)
+            }
+            is RuntimeEventPayload.RemoteStreamFrame -> {
+                // Extract tool_call_id from tool_call_message and approval_request_message frames
+                extractToolCallId(payload.body)?.let { ledger.emitted.add(it) }
+                // Extract returned tool_call_id from tool_return_message frames
+                if (payload.messageType == "tool_return_message") {
+                    extractToolCallId(payload.body)?.let {
+                        ledger.returned.add(it)
+                        // letta-mobile-vilsn.6: a streamed tool_return
+                        // resolves that specific outstanding gate.
+                        approvals.resolve(key, it)
+                    }
+                }
+                // letta-mobile-vilsn.7: some App Server transports deliver
+                // the tool-call approval as a StreamDelta
+                // approval_request_message (RemoteStreamFrame) rather than
+                // a ControlRequest (which maps to ApprovalRequested above).
+                // That path bypassed gate registration entirely, so a
+                // parked AskUserQuestion/ExitPlanMode arriving this way was
+                // never added to the [ApprovalRegistry]: the idle watchdog
+                // was not paused (vilsn.6) and the submit path could not
+                // recover the real can_use_tool request id via
+                // userInputApprovalId. Register it here exactly like
+                // the ApprovalRequested branch does.
+                if (payload.messageType == "approval_request_message") {
+                    val approval = draft.toApprovalAutoAllowRequest()
+                    val callId = approval?.toolCallId
+                    if (approval != null &&
+                        callId != null &&
+                        RuntimeUserInputTools.requiresUserInput(approval.toolName)
+                    ) {
+                        approvals.record(
+                            key,
+                            ApprovalRegistry.Gate(callId, approval.requestId),
+                        )
+                    }
+                }
+            }
+            else -> {}
+        }
+    }
+
+    /** tool_call_ids observed for one turn (letta-mobile-oqfbj settlement). */
+    private class ToolCallLedger {
+        val emitted = mutableSetOf<String>()
+        val returned = mutableSetOf<String>()
+    }
+
+    /**
      * Collects turn events, resetting a [turnIdleTimeoutMs] watchdog on every
      * matching frame. A parallel watchdog job throws [TurnIdleTimedOut] (by
      * cancelling the collect scope) if the connection is silent for longer than
@@ -985,8 +1086,9 @@ class AppServerTurnEngine(
         var pendingCompletedSeq: Long? = null
         
         // letta-mobile-oqfbj: track emitted and returned tool_call_ids for settlement
-        val emittedToolCallIds = mutableSetOf<String>()
-        val returnedToolCallIds = mutableSetOf<String>()
+        val ledger = ToolCallLedger()
+        val emittedToolCallIds = ledger.emitted
+        val returnedToolCallIds = ledger.returned
 
         suspend fun flushTail() {
             // letta-mobile-vilsn.6: a terminal/settle path is a definitive end to
@@ -1171,86 +1273,7 @@ class AppServerTurnEngine(
                     }
                     
                     // letta-mobile-oqfbj: track tool_call emissions and returns
-                    when (val payload = draft.payload) {
-                        is RuntimeEventPayload.ToolCallObserved -> emittedToolCallIds.add(payload.toolCallId.value)
-                        is RuntimeEventPayload.ApprovalRequested -> {
-                            emittedToolCallIds.add(payload.request.callId.value)
-                            // letta-mobile-vilsn.6: this ApprovalRequested reached
-                            // the collect body, which means it was NOT auto-approved
-                            // (auto-approved drafts are swallowed above via
-                            // autoApprovedToolCallDraft). If it is a runtime
-                            // user-input tool (AskUserQuestion / ExitPlanMode) the
-                            // turn is now parked awaiting the user's answer — record
-                            // an outstanding gate so the idle watchdog is paused and
-                            // the unanswered question does not synthesize a Failed
-                            // idle timeout.
-                            if (RuntimeUserInputTools.requiresUserInput(payload.request.toolName.value)) {
-                                // letta-mobile-vilsn: record the REAL approval id
-                                // (the can_use_tool control-request request_id, e.g.
-                                // perm-call_...) keyed by tool_call_id. This map is
-                                // BOTH the submit path's source (submitApproval
-                                // clears it after a successful response) AND the
-                                // watchdog's outstanding-gate set (vilsn.6): a non-empty
-                                // map pauses the idle watchdog. Interactive answers must
-                                // close the gate against THIS id, which is not derivable
-                                // from the tool_call_id across LLM providers (call_… vs
-                                // toolu_…).
-                                approvals.record(
-                                    slot.key,
-                                    ApprovalRegistry.Gate(
-                                        toolCallId = payload.request.callId.value,
-                                        approvalId = payload.request.approvalId.value,
-                                    ),
-                                )
-                            }
-                        }
-                        is RuntimeEventPayload.ToolReturnObserved -> {
-                            returnedToolCallIds.add(payload.toolCallId.value)
-                            // letta-mobile-vilsn.6: a tool_return for a parked
-                            // user-input tool_call_id genuinely resolves THAT gate —
-                            // lift the pause for this specific id (no-op if the submit
-                            // path already consumed it).
-                            approvals.resolve(slot.key, payload.toolCallId.value)
-                        }
-                        is RuntimeEventPayload.RemoteStreamFrame -> {
-                            // Extract tool_call_id from tool_call_message and approval_request_message frames
-                            extractToolCallId(payload.body)?.let { emittedToolCallIds.add(it) }
-                            // Extract returned tool_call_id from tool_return_message frames
-                            if (payload.messageType == "tool_return_message") {
-                                extractToolCallId(payload.body)?.let {
-                                    returnedToolCallIds.add(it)
-                                    // letta-mobile-vilsn.6: a streamed tool_return
-                                    // resolves that specific outstanding gate.
-                                    approvals.resolve(slot.key, it)
-                                }
-                            }
-                            // letta-mobile-vilsn.7: some App Server transports deliver
-                            // the tool-call approval as a StreamDelta
-                            // approval_request_message (RemoteStreamFrame) rather than
-                            // a ControlRequest (which maps to ApprovalRequested above).
-                            // That path bypassed gate registration entirely, so a
-                            // parked AskUserQuestion/ExitPlanMode arriving this way was
-                            // never added to the [ApprovalRegistry]: the idle watchdog
-                            // was not paused (vilsn.6) and the submit path could not
-                            // recover the real can_use_tool request id via
-                            // userInputApprovalId. Register it here exactly like
-                            // the ApprovalRequested branch does.
-                            if (payload.messageType == "approval_request_message") {
-                                val approval = draft.toApprovalAutoAllowRequest()
-                                val callId = approval?.toolCallId
-                                if (approval != null &&
-                                    callId != null &&
-                                    RuntimeUserInputTools.requiresUserInput(approval.toolName)
-                                ) {
-                                    approvals.record(
-                                        slot.key,
-                                        ApprovalRegistry.Gate(callId, approval.requestId),
-                                    )
-                                }
-                            }
-                        }
-                        else -> {}
-                    }
+                    trackToolCallAndApprovalIds(draft, slot.key, ledger)
                     
                     // letta-mobile-c4igq.6: a tool_call / tool_return / assistant
                     // frame arriving after we speculatively armed a post-tool usage
