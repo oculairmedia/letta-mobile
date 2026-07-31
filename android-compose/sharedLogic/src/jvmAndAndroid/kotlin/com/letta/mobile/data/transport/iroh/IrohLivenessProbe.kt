@@ -125,30 +125,40 @@ internal class IrohLivenessProbe(
      */
     private suspend fun runLoop(handle: IrohConnectionHandle, armed: Int) {
         var consecutiveFailures = 0
-        while (true) {
-            val forced = awaitTick()
-            if (generation.value != armed) return
-            if (skipForRecentStreamTraffic(forced)) {
-                consecutiveFailures = 0
-                continue
-            }
-            val outcome = probeOnce(handle)
-            if (generation.value != armed) return
+        while (generation.value == armed) {
+            val outcome = awaitNextOutcome(handle, armed)
             if (outcome == ProbeOutcome.ALIVE) {
                 consecutiveFailures = 0
                 continue
             }
             consecutiveFailures += 1
-            Telemetry.event(
-                "IrohLiveness", "probe.failed",
-                "sessionId" to handle.sessionId,
-                "consecutiveFailures" to consecutiveFailures.toString(),
-                "timedOut" to (outcome == ProbeOutcome.TIMED_OUT),
-            )
+            recordFailure(handle, outcome, consecutiveFailures)
             if (consecutiveFailures < failuresToDeclareDead) continue
             declareDead(handle, consecutiveFailures)
             return
         }
+    }
+
+    /**
+     * One tick of the loop: wait the interval, then either skip (recent stream
+     * traffic already proves life) or run a bounded probe. A superseded generation
+     * reports ALIVE so the caller's loop condition ends it without side effects.
+     */
+    private suspend fun awaitNextOutcome(handle: IrohConnectionHandle, armed: Int): ProbeOutcome {
+        val forced = awaitTick()
+        if (generation.value != armed) return ProbeOutcome.ALIVE
+        if (skipForRecentStreamTraffic(forced)) return ProbeOutcome.ALIVE
+        val outcome = probeOnce(handle)
+        return if (generation.value == armed) outcome else ProbeOutcome.ALIVE
+    }
+
+    private fun recordFailure(handle: IrohConnectionHandle, outcome: ProbeOutcome, consecutiveFailures: Int) {
+        Telemetry.event(
+            "IrohLiveness", "probe.failed",
+            "sessionId" to handle.sessionId,
+            "consecutiveFailures" to consecutiveFailures.toString(),
+            "timedOut" to (outcome == ProbeOutcome.TIMED_OUT),
+        )
     }
 
     /** Waits one interval; returns true when woken early by [probeNow]. */
