@@ -1170,10 +1170,7 @@
       "current_backend": "controller catalog (NativeSkillsCatalog) hydrated only from an authoritative enumeration; hydrated=false until one is observed",
       "owner": "controller_native",
       "public_contract": "authoritative catalog with explicit hydrated/stale/catalog_source provenance",
-      "native_contract": [
-        "sync",
-        "skills_updated"
-      ],
+      "native_contract": [],
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
       "fallback": "none",
