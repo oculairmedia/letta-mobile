@@ -1,6 +1,10 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -533,6 +537,13 @@ internal fun LettaDesktopApp(
                       }
                   },
           ) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+            // Responsive shell: below the breakpoint the conversation sidebar
+            // collapses away and the chat takes the full width — a narrow
+            // window shows a single column (rail + chat) instead of squeezing
+            // three panes into unusable slivers. The 56dp rail stays as the
+            // navigation affordance.
+            val compactShell = maxWidth < CompactShellWidthBreakpoint
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -559,7 +570,14 @@ internal fun LettaDesktopApp(
                     ),
                 )
                 RailDivider()
-                // Agent sidebar: agent header + nav + conversations.
+                // Agent sidebar: agent header + nav + conversations. Collapses
+                // horizontally in the compact shell.
+                AnimatedVisibility(
+                    visible = !compactShell,
+                    enter = expandHorizontally(),
+                    exit = shrinkHorizontally(),
+                ) {
+                Row(Modifier.fillMaxHeight()) {
                 DesktopAgentSidebar(
                     state = DesktopAgentSidebarState(
                         agentName = selectedAgentName,
@@ -597,6 +615,8 @@ internal fun LettaDesktopApp(
                     ),
                 )
                 RailDivider()
+                }
+                }
                 // Main content pane.
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
                     val editing = editAgentId
@@ -776,6 +796,7 @@ internal fun LettaDesktopApp(
                     )
                 }
             }
+            }
             DesktopAppOverlays(
                 visibility = overlays,
                 data = DesktopOverlayData(
@@ -915,3 +936,8 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
  * tools and default memory blocks (model/embedding default to the active
  * agent's config so the new agent is valid for this backend).
  */
+
+// Below this window width the conversation sidebar collapses and the chat
+// takes the full width (single-column shell). Chosen so the 231dp sidebar
+// only survives when the chat pane still gets a comfortable ~550dp+.
+private val CompactShellWidthBreakpoint = 840.dp

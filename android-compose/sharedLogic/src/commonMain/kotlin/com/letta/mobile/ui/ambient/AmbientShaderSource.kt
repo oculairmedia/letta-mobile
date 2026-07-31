@@ -37,7 +37,7 @@ float noise(float2 p) {
     );
 }
 
-half4 main(float2 fragCoord) {
+half4 ambientColor(float2 fragCoord) {
     float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
     float aspect = uSize.x / max(uSize.y, 1.0);
     float2 p = float2((uv.x - 0.50) * aspect, uv.y - 0.82);
@@ -59,3 +59,18 @@ half4 main(float2 fragCoord) {
     return half4(uColor.rgb, alpha);
 }
 """
+
+/**
+ * Platform `main` suffixes. [ambientColor] returns an UNPREMULTIPLIED color;
+ * the two runtimes disagree about what a shader must output:
+ * - Android AGSL expects unpremultiplied → identity main.
+ * - Skia RuntimeEffect expects PREMULTIPLIED → without multiplying rgb by
+ *   alpha, a faint glow renders as a full-opacity color flood.
+ * SkSL has no preprocessor, so the convention is appended as a tiny main
+ * instead of #defined.
+ */
+const val AMBIENT_GLOW_MAIN_UNPREMULTIPLIED: String =
+    "\nhalf4 main(float2 fragCoord) { return ambientColor(fragCoord); }\n"
+
+const val AMBIENT_GLOW_MAIN_PREMULTIPLIED: String =
+    "\nhalf4 main(float2 fragCoord) { half4 c = ambientColor(fragCoord); return half4(c.rgb * c.a, c.a); }\n"

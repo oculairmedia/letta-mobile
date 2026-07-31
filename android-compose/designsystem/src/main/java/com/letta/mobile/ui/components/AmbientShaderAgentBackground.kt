@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_UNPREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
@@ -193,7 +194,7 @@ private fun AmbientCanvas(
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val shader = remember { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE) }
+        val shader = remember { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
         val shaderBrush = remember { ShaderBrush(shader) }
         Canvas(modifier = modifier.fillMaxSize()) {
             shader.setFloatUniform("uTime", phase)

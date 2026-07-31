@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
@@ -135,7 +136,7 @@ internal fun DesktopAmbientChatBackground(
     // allocates. Drawn via the native Skia canvas because this Compose
     // version's Shader type does not accept a raw skia Shader.
     val shaderBuilder = remember {
-        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(AMBIENT_GLOW_SHADER_SOURCE)) }
+        runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED)) }
             .getOrNull()
     }
     val shaderPaint = remember { SkiaPaint() }
