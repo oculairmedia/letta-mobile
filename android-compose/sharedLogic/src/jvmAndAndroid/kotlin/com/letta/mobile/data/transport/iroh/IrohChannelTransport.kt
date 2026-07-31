@@ -265,7 +265,9 @@ class IrohChannelTransport(
     }
 
     private var explicitConfig: IrohConnectConfig? = null
-    private val supervisor = IrohConnectionSupervisor(
+    // Explicit type: this field and `livenessProbe` reference each other through
+    // their lambdas, which defeats type inference.
+    private val supervisor: IrohConnectionSupervisor = IrohConnectionSupervisor(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
@@ -292,7 +294,7 @@ class IrohChannelTransport(
                 // black-holed peer (the unacked keepalive datagram keeps resetting
                 // the idle timer), so a periodic health.check over a FRESH bidi
                 // stream is the only thing that actually tests the path.
-                startLivenessProbe(supervisorState.handle)
+                livenessProbe.start(supervisorState.handle)
             } else {
                 // Snapshot turn identity before a degraded handle is closed and
                 // its send jobs drop their entries from activeTurns. Intentional
@@ -309,204 +311,32 @@ class IrohChannelTransport(
                 stopObserverIngest("state:${supervisorState::class.simpleName}")
                 // letta-mobile-wxy4s: the probe is pinned to a Ready handle; any
                 // non-Ready transition disarms it. A fresh Ready re-arms it above.
-                stopLivenessProbe("state:${supervisorState::class.simpleName}")
+                livenessProbe.stop("state:${supervisorState::class.simpleName}")
             }
         },
     )
 
-    // letta-mobile-wxy4s: APPLICATION-LEVEL LIVENESS PROBE.
-    //
-    // ROOT CAUSE it exists for (production incident 2026-07-31): the peer can
-    // vanish without ever sending a CONNECTION_CLOSE (host reboot / NAT rebind /
-    // black-hole). Neither of IrohAppServerTransport's loss reporters can fire
-    // then — and its 15s UNACKED keepalive datagram makes it worse, because
-    // sendDatagram succeeds locally regardless of peer liveness and keeps
-    // resetting the local QUIC idle timer (RFC 9000 §10.1), so the idle timeout
-    // that would otherwise have killed the connection never fires. The keepalive
-    // actively MASKS the death. Both clients therefore sat on dead connections
-    // for ~40 minutes showing cached data.
-    //
-    // The probe issues `health.check` through the HANDLE's adminRpc — which lands
-    // on IrohAppServerTransport.adminRpcOverStream, whose first act is
-    // connection.openBi(). Opening a fresh QUIC bidi stream is precisely the
-    // operation that fails on a black-holed path and that an unacked datagram can
-    // never test. It deliberately does NOT go through this class's adminRpc(),
-    // which would run the retry/escalate ladder and pollute the
-    // recordViewedConversationFrom bookkeeping.
-    private val livenessProbeGeneration = atomic(0)
-    @Volatile
-    private var livenessProbeJob: Job? = null
-
     /**
-     * The probe runs on its OWN wall-clock scope, not the transport's [scope].
-     *
-     * Two reasons, both load-bearing:
-     *  1. Liveness must be measured in real elapsed time. Parented to a caller's
-     *     scope, a virtual-time test clock (`runTest` + `advanceUntilIdle`) would
-     *     fast-forward the interval indefinitely and spin the probe/redial cycle at
-     *     CPU speed — which is exactly what it did before this was split out.
-     *  2. It is an endless supervision loop, so it must never count as outstanding
-     *     structured-concurrency work for whoever owns [scope].
-     * Its lifetime is still explicit: every job is cancelled by [stopLivenessProbe]
-     * on any non-Ready transition and on [disconnect].
+     * letta-mobile-wxy4s: application-level connection liveness. QUIC state alone
+     * cannot detect a black-holed peer — the transport's unacked keepalive datagram
+     * keeps resetting the idle timer — so [IrohLivenessProbe] periodically opens a
+     * fresh bidi stream instead. See that class for the full root cause.
      */
-    private val livenessProbeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val livenessProbe = IrohLivenessProbe(
+        intervalMs = livenessProbeIntervalMs,
+        timeoutMs = livenessProbeTimeoutMs,
+        failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
+        millisSinceLastStream = { adminRpcRetryState.millisSinceLastStream() },
+        // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
+        // after a redial destroys the healthy NEW handle.
+        reportConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
+    )
 
-    /**
-     * Forced-probe wakeup. Conflated: many resume events collapse into one
-     * immediate probe rather than queueing a burst.
-     */
-    private val livenessProbeWakeups =
-        kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    /** Test/wiring visibility: is the liveness probe currently armed? */
+    internal val isLivenessProbeArmed: Boolean get() = livenessProbe.isArmed
 
-    /** Test/wiring visibility: is a probe loop currently armed? */
-    internal val isLivenessProbeArmed: Boolean
-        get() = livenessProbeJob?.isActive == true
+    override fun probeNow() = livenessProbe.probeNow()
 
-    /**
-     * letta-mobile-wxy4s (d): force one immediate probe and restart the interval.
-     * The periodic loop is not reliable while an Android app is backgrounded
-     * (doze), so a returning user gets sub-second detection instead of waiting a
-     * full interval. Safe to call when no probe is armed (the signal is dropped).
-     */
-    override fun probeNow() {
-        livenessProbeWakeups.trySend(Unit)
-        Telemetry.event("IrohLiveness", "probe.forced")
-    }
-
-    private fun startLivenessProbe(handle: IrohConnectionHandle) {
-        if (livenessProbeIntervalMs <= 0L || livenessProbeTimeoutMs <= 0L) {
-            stopLivenessProbe("probe_disabled")
-            Telemetry.event("IrohLiveness", "probe.disabled", "intervalMs" to livenessProbeIntervalMs.toString())
-            return
-        }
-        // Mirror the observer-ingest pattern: exactly one probe loop is ever live
-        // and it is pinned to this handle's connection generation.
-        val generation = livenessProbeGeneration.incrementAndGet()
-        livenessProbeJob?.cancel()
-        Telemetry.event(
-            "IrohLiveness", "probe.start",
-            "sessionId" to handle.sessionId,
-            "generation" to generation.toString(),
-            "intervalMs" to livenessProbeIntervalMs.toString(),
-        )
-        livenessProbeJob = livenessProbeScope.launch { runLivenessProbeLoop(handle, generation) }
-    }
-
-    /**
-     * One probe cycle per interval until this loop's [generation] is superseded or
-     * the connection is declared dead (after which the redial's fresh Ready arms a
-     * new loop).
-     */
-    private suspend fun runLivenessProbeLoop(handle: IrohConnectionHandle, generation: Int) {
-        var consecutiveFailures = 0
-        while (true) {
-            val forced = awaitProbeTick()
-            if (livenessProbeGeneration.value != generation) return
-            if (skipProbeForRecentStreamTraffic(forced)) {
-                consecutiveFailures = 0
-                continue
-            }
-            val outcome = probeOnce(handle)
-            if (livenessProbeGeneration.value != generation) return
-            if (outcome == ProbeOutcome.ALIVE) {
-                consecutiveFailures = 0
-                continue
-            }
-            consecutiveFailures += 1
-            Telemetry.event(
-                "IrohLiveness", "probe.failed",
-                "sessionId" to handle.sessionId,
-                "consecutiveFailures" to consecutiveFailures.toString(),
-                "timedOut" to (outcome == ProbeOutcome.TIMED_OUT),
-            )
-            if (consecutiveFailures < livenessProbeFailuresToDeclareDead) continue
-            declareConnectionDead(handle, consecutiveFailures)
-            return
-        }
-    }
-
-    /** Waits one interval; returns true when woken early by [probeNow]. */
-    private suspend fun awaitProbeTick(): Boolean =
-        withTimeoutOrNull(livenessProbeIntervalMs.milliseconds) {
-            livenessProbeWakeups.receive()
-        } != null
-
-    /**
-     * Live stream traffic is already proof of life — never probe (or escalate)
-     * mid-turn. A forced probe (app resume) bypasses this: "recent" activity may
-     * predate a long background window.
-     */
-    private fun skipProbeForRecentStreamTraffic(forced: Boolean): Boolean =
-        !forced && adminRpcRetryState.millisSinceLastStream() < livenessProbeIntervalMs
-
-    private enum class ProbeOutcome { ALIVE, TIMED_OUT, UNREACHABLE }
-
-    /**
-     * One bounded `health.check` round trip.
-     *
-     * TIMEOUT TRAP: health.check is legacy-fallback-safe, so a stream failure falls
-     * back to the control channel with its own 30s timeout (worst case ~60s per
-     * call). The probe MUST bound the call itself rather than inherit that.
-     */
-    private suspend fun probeOnce(handle: IrohConnectionHandle): ProbeOutcome =
-        withTimeoutOrNull(livenessProbeTimeoutMs.milliseconds) {
-            try {
-                // ANY response — including success=false — proves the peer answered,
-                // which is the only thing this probe measures. It is a LIVENESS test,
-                // not a health test; escalating on an unhealthy-but-reachable server
-                // would redial pointlessly.
-                handle.adminRpc(method = "health.check", path = HEALTH_CHECK_PATH, body = null)
-                ProbeOutcome.ALIVE
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (error: Throwable) {
-                classifyProbeError(error)
-            }
-        } ?: ProbeOutcome.TIMED_OUT
-
-    /**
-     * Same rule as adminRpc's request-isolation guard: a decode or frame-size
-     * rejection is a PAYLOAD fault, which means the round trip completed — the path
-     * is alive. Likewise any error that doesn't look connection-lost (e.g. a method
-     * the node doesn't implement) came back FROM the peer. Only a connection-class
-     * error counts against liveness.
-     */
-    private fun classifyProbeError(error: Throwable): ProbeOutcome {
-        val alive = error.isAdminRpcPayloadError() || !error.isConnectionLostClass()
-        Telemetry.event(
-            "IrohLiveness", "probe.error",
-            "error" to (error.message ?: error.toString()),
-            "class" to error::class.simpleName,
-            "aliveDespiteError" to alive,
-        )
-        return if (alive) ProbeOutcome.ALIVE else ProbeOutcome.UNREACHABLE
-    }
-
-    private fun declareConnectionDead(handle: IrohConnectionHandle, failures: Int) {
-        Telemetry.event(
-            "IrohLiveness", "probe.declared_dead",
-            "sessionId" to handle.sessionId,
-            "failures" to failures.toString(),
-        )
-        // ATTRIBUTION IS MANDATORY (r3i1z): an unattributed loss report that lands
-        // after a redial destroys the healthy NEW handle. Pass the handle this loop
-        // is pinned to so the supervisor can drop the report as stale if it has
-        // already moved on.
-        supervisor.onConnectionLostAsync(
-            "liveness_probe_failed: no health.check response in ${livenessProbeTimeoutMs}ms x $failures",
-            handle,
-        )
-    }
-
-    private fun stopLivenessProbe(reason: String) {
-        val job = livenessProbeJob ?: return
-        livenessProbeJob = null
-        // Invalidate the generation so an in-flight iteration drops its result.
-        livenessProbeGeneration.incrementAndGet()
-        job.cancel()
-        Telemetry.event("IrohLiveness", "probe.stop", "reason" to reason)
-    }
 
     // letta-mobile-r3i1z: OBSERVER INGESTION.
     //
@@ -1617,24 +1447,10 @@ class IrohChannelTransport(
 
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
-    /**
-     * k7yyc: true when [this] (or any cause in its chain) is a frame codec
-     * decode/size rejection — a per-request payload fault that must fail only
-     * the request, never trigger a transport reconnect.
-     */
-    private fun Throwable.isAdminRpcPayloadError(): Boolean {
-        var current: Throwable? = this
-        while (current != null) {
-            if (current is IrohFrameCodec.ProtocolException) return true
-            current = current.cause
-        }
-        return false
-    }
-
     override suspend fun disconnect() {
         interruptedTurns.clear()
         stopObserverIngest("disconnect")
-        stopLivenessProbe("disconnect")
+        livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
@@ -1709,11 +1525,6 @@ class IrohChannelTransport(
         is IrohConnectionState.Degraded -> ChannelTransportState.Disconnected(0, reason, willReconnect = true)
         is IrohConnectionState.AuthFailed -> ChannelTransportState.Disconnected(4001, reason, isAuthFailure = true, willReconnect = false)
         IrohConnectionState.Closed -> ChannelTransportState.Disconnected(1000, "closed")
-    }
-
-    private fun Throwable.isConnectionLostClass(): Boolean {
-        val text = listOfNotNull(message, this::class.simpleName).joinToString(" ").lowercase()
-        return listOf("closed", "timeout", "timed out", "reset", "broken pipe", "connection", "stream").any { it in text }
     }
 
     // lgns8: cron scheduling over admin_rpc. The native CronAdminHandlers already
@@ -2042,15 +1853,10 @@ class IrohChannelTransport(
         // letta-mobile-34xoj: admin_rpc retry thresholds
         private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
         private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
-        // letta-mobile-wxy4s: liveness probe cadence. Interval is deliberately
-        // LONGER than IrohAppServerTransport's 15s keepalive (the probe is the
-        // real liveness signal; the keepalive only masks death). One tiny bidi
-        // stream per interval => 3 RPCs/min steady state, worst-case detection
-        // ~interval + failures x timeout (~45s).
-        internal const val LIVENESS_PROBE_INTERVAL_MS = 20_000L
-        internal const val LIVENESS_PROBE_TIMEOUT_MS = 5_000L
-        internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = 2
-        internal const val HEALTH_CHECK_PATH = "/v1/health"
+        // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
+        internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
+        internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
+        internal const val LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD = IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD
         // Debug override for local Iroh testing. MUST stay blank in committed
         // code — a non-blank value forces EVERY backend through Iroh regardless
         // of the active config (breaks REST/local-runtime selection). Set it
