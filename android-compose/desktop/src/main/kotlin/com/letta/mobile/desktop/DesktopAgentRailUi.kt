@@ -1,11 +1,13 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,7 +46,12 @@ import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -82,25 +89,53 @@ internal fun RailDivider() {
     )
 }
 
-/** Pulsing teal ring used as the agent "thinking" indicator. */
+/** Orbiting comet ring used as the agent "thinking" indicator. */
 @Composable
 private fun ThinkingRing(
     diameter: Dp,
-    cornerRadius: Dp,
     modifier: Modifier = Modifier,
 ) {
+    // Orbiting comet, not a blinking border: a sweep-gradient tail circling
+    // the orb with a bright head over a faint static track. Continuous motion
+    // with direction reads as "working"; the old alpha-pulsed rounded-square
+    // border just read as a blinking box.
     val transition = rememberInfiniteTransition(label = "thinking")
-    val alpha by transition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-        label = "thinkingAlpha",
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
+        label = "thinkingOrbit",
     )
-    Box(
-        modifier = modifier
-            .size(diameter)
-            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = alpha), RoundedCornerShape(cornerRadius)),
-    )
+    val primary = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier.size(diameter)) {
+        val strokeWidth = 2.dp.toPx()
+        val radius = (size.minDimension - strokeWidth) / 2f
+        // Faint full track so the indicator reads as a ring, not a flying dash.
+        drawCircle(
+            color = primary.copy(alpha = 0.18f),
+            radius = radius,
+            style = Stroke(width = strokeWidth),
+        )
+        rotate(angle) {
+            // Tail: transparent at the seam's far side building to full primary
+            // at the head. The hard sweep seam IS the comet head edge.
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0.0f to Color.Transparent,
+                    0.35f to Color.Transparent,
+                    1.0f to primary,
+                ),
+                radius = radius,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+            // Rounded head cap at the seam (0° = +x axis in canvas space).
+            drawCircle(
+                color = primary,
+                radius = strokeWidth * 0.9f,
+                center = Offset(center.x + radius, center.y),
+            )
+        }
+    }
 }
 
 @Immutable
@@ -369,7 +404,7 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (flags.thinking) {
-                ThinkingRing(diameter = 32.dp, cornerRadius = 9.dp)
+                ThinkingRing(diameter = 32.dp)
             }
             AgentOrb(index = target.orbStyle, size = 28.dp, cornerRadius = 8.dp) {
                 Text(
@@ -522,7 +557,7 @@ private fun AgentRailOrbContent(
         if (flags.thinking) {
             // Concentric with the 30dp orb (2dp gap) and sized to fit the
             // slot so it doesn't crowd neighbouring orbs.
-            ThinkingRing(diameter = 34.dp, cornerRadius = 9.dp)
+            ThinkingRing(diameter = 34.dp)
         }
         AgentOrb(
             index = target.orbStyle,

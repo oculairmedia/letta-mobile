@@ -329,6 +329,16 @@ internal class DesktopNucleusController(
     private val toastTagCounter = java.util.concurrent.atomic.AtomicLong()
 
     /**
+     * Activation fallback for a toast whose tag has no registered handler.
+     * Reply handlers live in THIS process's memory, so any toast posted before
+     * the last restart (still sitting in the Action Center) can never match —
+     * without a fallback, clicking it silently did nothing. Any click on any
+     * Letta toast should at minimum bring the app forward.
+     */
+    @Volatile
+    var onToastActivationFallback: (() -> Unit)? = null
+
+    /**
      * Handlers now survive TIMED_OUT (Action-Center clicks arrive after it),
      * so never-clicked toasts would otherwise accumulate forever. Tags carry a
      * monotonic counter — evict the oldest beyond the cap; a notification that
@@ -345,8 +355,17 @@ internal class DesktopNucleusController(
 
     private val windowsToastListener = object : ToastNotificationListener {
         override fun onActivated(tag: String, group: String, arguments: String, userInputs: Map<String, String>) {
-            val handler = toastReplyHandlers.remove(tag) ?: return
-            handler(userInputs[TOAST_REPLY_INPUT_ID]?.takeIf { it.isNotBlank() })
+            val handler = toastReplyHandlers.remove(tag)
+            println("[toast] onActivated tag=$tag handler=${handler != null} args='$arguments' inputs=${userInputs.keys}")
+            if (handler != null) {
+                handler(userInputs[TOAST_REPLY_INPUT_ID]?.takeIf { it.isNotBlank() })
+            } else {
+                // No handler: the toast predates this process (handlers are
+                // in-memory), so the click can't be routed to a conversation —
+                // but it must still bring the app forward. Silently ignoring
+                // it is how "clicking the notification does nothing" happens.
+                onToastActivationFallback?.invoke()
+            }
         }
 
         override fun onDismissed(tag: String, group: String, reason: DismissalReason) {

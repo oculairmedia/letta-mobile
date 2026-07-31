@@ -188,6 +188,14 @@ internal fun DesktopNucleusEffects(
     val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
 
+    // Route toast clicks that no longer match an in-memory reply handler
+    // (toasts posted by a previous process instance, still in the Action
+    // Center) to plain window activation instead of a silent no-op.
+    DisposableEffect(bindings.controller, window) {
+        bindings.controller.onToastActivationFallback = activate
+        onDispose { bindings.controller.onToastActivationFallback = null }
+    }
+
     DesktopTray(
         applicationScope = applicationScope,
         isAgentWorking = state.isAgentWorking,
