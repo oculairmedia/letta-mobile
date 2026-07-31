@@ -1,5 +1,6 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -10,6 +11,14 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.time.Instant
+
+/**
+ * Telemetry tag shared by every image send/receive boundary (letta-mobile-iej8j).
+ * Kept identical to [com.letta.mobile.runtime.local.LocalImageContextStripper.IMAGE_PIPELINE_TAG]
+ * so one logcat/telemetry filter shows the whole pipe: persist → cap → re-read
+ * → strip → hydrate.
+ */
+internal const val IMAGE_PIPELINE_TAG = "ImagePipeline"
 
 /** The per-conversation sidecar maps joined into each projected message. */
 internal data class MessageSidecars(
@@ -107,7 +116,20 @@ internal class LocalBackendMessageProjection(private val support: LocalBackendSt
     private fun normalizeImagePart(o: JsonObject): JsonObject? {
         if (o["type"]?.stringOrNull() != "image") return null
         val source = o["source"] as? JsonObject
-        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: return null
+        val data = source?.get("data")?.stringOrNull() ?: o["data"]?.stringOrNull() ?: run {
+            // Boundary telemetry (letta-mobile-iej8j): an image part that
+            // reaches hydration with no resolvable base64 is a SILENT user-
+            // visible loss (the image just isn't there on re-entry). The
+            // image pipeline previously had no observable failure signal at
+            // all — a break was only detectable by manual device testing.
+            Telemetry.event(
+                IMAGE_PIPELINE_TAG,
+                "hydrate.image_dropped",
+                "reason" to if (o["image_ref"] != null) "image_ref_pointer" else "no_base64_data",
+                level = Telemetry.Level.WARN,
+            )
+            return null
+        }
         val mediaType = source?.get("media_type")?.stringOrNull()
             ?: o["mimeType"]?.stringOrNull()
             ?: "image/jpeg"
