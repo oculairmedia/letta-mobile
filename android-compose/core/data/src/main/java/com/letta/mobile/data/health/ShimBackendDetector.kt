@@ -106,7 +106,7 @@ class ShimBackendDetector internal constructor(
         // dial at `config.serverUrl`, which is precisely the shim traffic this
         // bead removes from the Iroh path. `false` here means "not a shim",
         // which is the correct answer for both.
-        if (config.mode == LettaConfig.Mode.LOCAL || config.isIrohBackend() || config.forcedIroh()) {
+        if (config.isProbeExempt()) {
             _states.value += (config.id to false)
             Telemetry.event(
                 "Backend", "shim_probe.skipped",
@@ -148,6 +148,14 @@ class ShimBackendDetector internal constructor(
 
     fun cachedActiveBackendKind(): BackendKind = kindOf(activeConfig.value)
 }
+
+/**
+ * Configs whose kind is decided by config truth alone, so probing them would be
+ * pure network cost — and, for an Iroh config, an HTTP dial at the shim's own
+ * address, which is exactly what lgns8.10.4.1 removes.
+ */
+private fun LettaConfig.isProbeExempt(): Boolean =
+    mode == LettaConfig.Mode.LOCAL || isIrohBackend() || forcedIroh()
 
 /**
  * lgns8.10.4.1: classification must agree with the transport binding.

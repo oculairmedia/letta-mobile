@@ -48,26 +48,22 @@ class CronAdminRpcRoutingTest {
                 cron = "0 3 * * *",
             ),
         )
-        val deleted = repository.deleteSchedule(agentId = "agent-1", taskId = "task-1")
+        val deleted = repository.deleteSchedule(agentId = "agent-1", taskId = TASK_ID)
 
         assertTrue(listed.isSuccess)
         assertTrue(added.isSuccess)
         assertTrue(deleted.isSuccess)
         assertEquals(listOf("cron.list", "cron.add", "cron.delete"), transport.adminRpcMethods)
-        // The repository must not reach for any other transport verb: no shim
-        // chat/control frame may be emitted to service a cron operation.
-        assertTrue(transport.otherVerbs.isEmpty())
     }
 
     /**
      * Shaped like `IrohChannelTransport`: each cron method is expressed as a
-     * `cron.*` admin_rpc call. Everything the legacy shim path would use
-     * (`send`, `subscribe`, `cancel`) is recorded so the test can assert it
-     * stays untouched.
+     * `cron.*` admin_rpc call. Everything else inherits `NoOpChannelTransport`,
+     * whose remaining cron members throw — so a repository that reached for an
+     * un-bridged cron verb would fail rather than silently pass.
      */
     private class AdminRpcBridgingTransport : NoOpChannelTransport() {
         val adminRpcMethods = mutableListOf<String>()
-        val otherVerbs = mutableListOf<String>()
 
         override suspend fun adminRpc(
             method: String,
@@ -75,7 +71,7 @@ class CronAdminRpcRoutingTest {
             body: String?,
         ): AppServerInboundFrame.AdminRpcResponse {
             adminRpcMethods += method
-            return AppServerInboundFrame.AdminRpcResponse(requestId = "rpc-1", success = true)
+            return AppServerInboundFrame.AdminRpcResponse(requestId = REQUEST_ID, success = true)
         }
 
         override suspend fun sendCronList(
@@ -87,12 +83,13 @@ class CronAdminRpcRoutingTest {
             return ServerFrame.CronListResponse(
                 id = "f1",
                 ts = TS,
-                requestId = "rpc-1",
+                requestId = REQUEST_ID,
                 success = true,
                 tasks = emptyList(),
             )
         }
 
+        @Suppress("LongParameterList") // Signature is fixed by IChannelTransport.
         override suspend fun sendCronAdd(
             agentId: String,
             name: String,
@@ -110,53 +107,35 @@ class CronAdminRpcRoutingTest {
             return ServerFrame.CronAddResponse(
                 id = "f2",
                 ts = TS,
-                requestId = "rpc-1",
+                requestId = REQUEST_ID,
                 success = true,
-                task = CronTask(
-                    id = "task-1",
-                    agentId = agentId,
-                    conversationId = conversationId.orEmpty(),
-                    name = name,
-                    description = description,
-                    cron = cron.orEmpty(),
-                    timezone = timezone.orEmpty(),
-                    recurring = recurring,
-                    prompt = prompt,
-                    status = "active",
-                    createdAt = TS,
-                ),
+                task = task(agentId = agentId, name = name, prompt = prompt),
             )
         }
 
         override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse {
             adminRpc("cron.delete", "", null)
-            return ServerFrame.CronDeleteResponse(id = "f3", ts = TS, requestId = "rpc-1", success = true)
+            return ServerFrame.CronDeleteResponse(id = "f3", ts = TS, requestId = REQUEST_ID, success = true)
         }
 
-        override fun send(
-            agentId: String,
-            conversationId: String,
-            text: String,
-            otid: String?,
-            contentParts: kotlinx.serialization.json.JsonArray?,
-            startNewConversation: Boolean,
-        ): Boolean {
-            otherVerbs += "send"
-            return false
-        }
+        private fun task(agentId: String, name: String, prompt: String) = CronTask(
+            id = TASK_ID,
+            agentId = agentId,
+            conversationId = "",
+            name = name,
+            description = "",
+            cron = "",
+            timezone = "",
+            recurring = true,
+            prompt = prompt,
+            status = "active",
+            createdAt = TS,
+        )
+    }
 
-        override fun subscribe(runId: String, cursor: Long): Boolean {
-            otherVerbs += "subscribe"
-            return false
-        }
-
-        override fun cancel(conversationId: String): Boolean {
-            otherVerbs += "cancel"
-            return false
-        }
-
-        private companion object {
-            const val TS = "2026-07-31T00:00:00Z"
-        }
+    private companion object {
+        const val TASK_ID = "task-1"
+        const val REQUEST_ID = "rpc-1"
+        const val TS = "2026-07-31T00:00:00Z"
     }
 }
