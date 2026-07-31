@@ -338,6 +338,21 @@ class IrohChannelTransport(
     private var livenessProbeJob: Job? = null
 
     /**
+     * The probe runs on its OWN wall-clock scope, not the transport's [scope].
+     *
+     * Two reasons, both load-bearing:
+     *  1. Liveness must be measured in real elapsed time. Parented to a caller's
+     *     scope, a virtual-time test clock (`runTest` + `advanceUntilIdle`) would
+     *     fast-forward the interval indefinitely and spin the probe/redial cycle at
+     *     CPU speed — which is exactly what it did before this was split out.
+     *  2. It is an endless supervision loop, so it must never count as outstanding
+     *     structured-concurrency work for whoever owns [scope].
+     * Its lifetime is still explicit: every job is cancelled by [stopLivenessProbe]
+     * on any non-Ready transition and on [disconnect].
+     */
+    private val livenessProbeScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /**
      * Forced-probe wakeup. Conflated: many resume events collapse into one
      * immediate probe rather than queueing a burst.
      */
@@ -375,7 +390,7 @@ class IrohChannelTransport(
             "generation" to generation.toString(),
             "intervalMs" to livenessProbeIntervalMs.toString(),
         )
-        livenessProbeJob = scope.launch {
+        livenessProbeJob = livenessProbeScope.launch {
             var consecutiveFailures = 0
             while (true) {
                 // Wait one interval, or wake early on a forced probe.
