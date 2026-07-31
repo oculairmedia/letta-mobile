@@ -58,6 +58,17 @@ internal fun activateDesktopWindow(window: Window) {
         if (window is Frame) {
             window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
         }
+        // Windows focus-stealing prevention: toFront()/requestFocus() from a
+        // background process (e.g. a toast-activation callback, where the
+        // shell is foreground) is denied and degrades to a taskbar flash. A
+        // momentary always-on-top toggle forces the window to the top of the
+        // z-order regardless, so the focus request lands on a window that is
+        // actually frontmost. Skipped when the window is deliberately
+        // always-on-top, so we never switch that off.
+        if (!window.isAlwaysOnTop && window.isAlwaysOnTopSupported) {
+            window.isAlwaysOnTop = true
+            window.isAlwaysOnTop = false
+        }
         window.toFront()
         window.requestFocus()
     }

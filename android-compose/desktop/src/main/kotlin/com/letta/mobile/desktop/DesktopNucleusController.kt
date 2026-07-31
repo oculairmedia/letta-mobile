@@ -302,6 +302,7 @@ internal class DesktopNucleusController(
     ) {
         val tag = "letta-finished-${toastTagCounter.incrementAndGet()}"
         toastReplyHandlers[tag] = onReply
+        evictStaleReplyHandlers()
         val content = toast {
             visual {
                 text(agentName)
@@ -327,6 +328,21 @@ internal class DesktopNucleusController(
     private val toastReplyHandlers = ConcurrentHashMap<String, (String?) -> Unit>()
     private val toastTagCounter = java.util.concurrent.atomic.AtomicLong()
 
+    /**
+     * Handlers now survive TIMED_OUT (Action-Center clicks arrive after it),
+     * so never-clicked toasts would otherwise accumulate forever. Tags carry a
+     * monotonic counter — evict the oldest beyond the cap; a notification that
+     * old has scrolled out of the Action Center anyway.
+     */
+    private fun evictStaleReplyHandlers() {
+        val excess = toastReplyHandlers.size - MAX_PENDING_TOAST_HANDLERS
+        if (excess <= 0) return
+        toastReplyHandlers.keys
+            .sortedBy { it.substringAfterLast('-').toLongOrNull() ?: Long.MAX_VALUE }
+            .take(excess)
+            .forEach(toastReplyHandlers::remove)
+    }
+
     private val windowsToastListener = object : ToastNotificationListener {
         override fun onActivated(tag: String, group: String, arguments: String, userInputs: Map<String, String>) {
             val handler = toastReplyHandlers.remove(tag) ?: return
@@ -334,6 +350,14 @@ internal class DesktopNucleusController(
         }
 
         override fun onDismissed(tag: String, group: String, reason: DismissalReason) {
+            // TIMED_OUT is not a terminal dismissal: the banner has slid into
+            // the Action Center, where the user can STILL click it — and that
+            // late click arrives as onActivated with this same tag. Removing
+            // the handler here made every notification-pane click a silent
+            // no-op (banners time out after ~5s, so this was the COMMON path,
+            // not an edge case). Handlers parked for never-clicked toasts are
+            // bounded by the eviction in showWindowsReplyToast.
+            if (reason == DismissalReason.TIMED_OUT) return
             toastReplyHandlers.remove(tag)
         }
 
@@ -388,3 +412,4 @@ internal class DesktopNucleusController(
 private const val TOAST_REPLY_INPUT_ID = "letta-toast-reply"
 private const val TOAST_REPLY_ARGUMENT = "letta-reply"
 private const val TOAST_GROUP = "letta-agent-finished"
+private const val MAX_PENDING_TOAST_HANDLERS = 64
