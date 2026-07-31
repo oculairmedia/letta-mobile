@@ -1,6 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import com.letta.mobile.data.storage.ImageBlobStore
+import com.letta.mobile.util.Telemetry
 import java.io.File
 import java.util.Base64
 import kotlinx.serialization.json.Json
@@ -41,6 +42,15 @@ import kotlinx.serialization.json.jsonObject
 class LocalImageContextStripper(
     private val blobStore: ImageBlobStore? = null,
     private val json: Json = Json { ignoreUnknownKeys = true },
+    /**
+     * Per-JSON-string-value cap handed to [BoundedTranscriptReader].
+     * Injectable ONLY so tests can trip the cap cheaply (same rationale as
+     * `LocalBackendMessageReader.maxTranscriptBytes`): exercising the
+     * collapse → targeted-uncapped-re-read path at the real ~8MB default
+     * costs tens of MB of heap churn per test, which starves the shared unit-
+     * test JVM. Production always uses the default.
+     */
+    private val maxInlineValueChars: Int = BoundedTranscriptReader.DEFAULT_MAX_INLINE_VALUE_CHARS,
 ) {
     data class StripReport(val partsStripped: Int, val bytesFreed: Int) {
         val stripped: Boolean get() = partsStripped > 0
@@ -55,9 +65,11 @@ class LocalImageContextStripper(
         // OOM on an oversized line the way a plain readLines()/full parse did.
         val snapshotLength = transcript.length()
         val snapshotModified = transcript.lastModified()
-        val boundedLines = BoundedTranscriptReader.readLines(transcript)
+        val boundedLines = BoundedTranscriptReader.readLines(transcript, maxInlineValueChars)
         if (boundedLines.isEmpty()) return StripReport(0, 0)
         val lines = boundedLines.map { it.text }
+
+        emitCollapseTelemetry(boundedLines)
 
         // Pre-parse to locate the most-recent image-bearing user message —
         // that row is preserved so follow-up turns can still reason about the
@@ -83,8 +95,10 @@ class LocalImageContextStripper(
                     }
                     if (fullRow != null && fullRow.isUserImageMessage()) {
                         latestImageFullLine = fullLine
+                        emitRereadTelemetry(candidate, recovered = true)
                         candidate
                     } else {
+                        emitRereadTelemetry(candidate, recovered = false)
                         // Couldn't recover full data (e.g. file changed
                         // concurrently) — fall back to an earlier,
                         // non-collapsed image row like before.
@@ -135,9 +149,25 @@ class LocalImageContextStripper(
         // meantime. Abort instead: skip this pass and let the NEXT pre-turn
         // pass (which will see the now-current file) retry.
         if (transcript.length() != snapshotLength || transcript.lastModified() != snapshotModified) {
+            // Boundary telemetry (letta-mobile-iej8j / lgns8.20): the abort
+            // that PREVENTS the data loss. Silent aborts made the data-loss
+            // window invisible; this makes the guard observable.
+            Telemetry.event(
+                IMAGE_PIPELINE_TAG,
+                "strip.aborted_stale_snapshot",
+                "snapshotLength" to snapshotLength,
+                "currentLength" to transcript.length(),
+                level = Telemetry.Level.WARN,
+            )
             return StripReport(0, 0)
         }
         atomicWrite(transcript, rebuilt.joinToString("\n") + "\n")
+        Telemetry.event(
+            IMAGE_PIPELINE_TAG,
+            "strip.parts_stripped",
+            "parts" to partsStripped,
+            "bytesFreed" to bytesFreed,
+        )
         return StripReport(partsStripped, bytesFreed)
     }
 
@@ -276,6 +306,46 @@ class LocalImageContextStripper(
         return content.any { isStrippableImage(it) }
     }
 
+    /**
+     * Boundary telemetry (letta-mobile-iej8j): the cap hit is the exact event
+     * that silently ate the just-shared image in the #1017 → #1021 regression.
+     * Emitting it makes the break observable from telemetry instead of only
+     * from a human noticing the model went blind.
+     */
+    private fun emitCollapseTelemetry(boundedLines: List<BoundedTranscriptReader.BoundedLine>) {
+        val collapsedRows = boundedLines.count { it.collapsedValueChars > 0L }
+        if (collapsedRows == 0) return
+        Telemetry.event(
+            IMAGE_PIPELINE_TAG,
+            "transcript.value_collapsed",
+            "rows" to collapsedRows,
+            "chars" to boundedLines.sumOf { it.collapsedValueChars },
+            "capChars" to maxInlineValueChars,
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    /** Boundary telemetry for the #1021 targeted uncapped re-read of the latest image row. */
+    private fun emitRereadTelemetry(lineIndex: Int, recovered: Boolean) {
+        Telemetry.event(
+            IMAGE_PIPELINE_TAG,
+            "latest_image.uncapped_reread",
+            "lineIndex" to lineIndex,
+            "recovered" to recovered,
+            level = if (recovered) Telemetry.Level.INFO else Telemetry.Level.WARN,
+        )
+    }
+
     private fun kotlinx.serialization.json.JsonElement.jsonStr(): String? =
         (this as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+    companion object {
+        /**
+         * Telemetry tag shared by every image send/receive boundary
+         * (letta-mobile-iej8j) — persist → cap → re-read → strip → hydrate.
+         * Matches the hydration-side tag in LocalBackendMessageProjection so
+         * one filter shows the whole pipe.
+         */
+        const val IMAGE_PIPELINE_TAG = "ImagePipeline"
+    }
 }
