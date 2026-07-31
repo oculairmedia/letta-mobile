@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.ConversationId
+import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -77,6 +78,22 @@ class RuntimeEventFanout(
      */
     private val subscribers = mutableMapOf<String, SubscriberSlot>()
 
+    /**
+     * lgns8.22.4.1.1: server-initiated control / external-tool frames that arrived
+     * while NO subscriber was attached.
+     *
+     * The reconnect path (`ReconnectCoordinator.reconnectRuntime` →
+     * `sync(recoverApprovals = true)`) deliberately replays still-pending approvals
+     * and external-tool requests AFTER the disconnected lease unsubscribed and
+     * BEFORE its successor subscribes. Dropping those frames leaves the request
+     * unanswered and the server turn blocked forever, so they are retained here and
+     * flushed into the first successor subscriber that matches their scope.
+     *
+     * Bounded ([MAX_PENDING_CONTROL_FRAMES], oldest-first eviction with telemetry):
+     * a control frame nobody ever subscribes for must not grow the fanout.
+     */
+    private val pendingControlFrames = ArrayDeque<PendingControlFrame>()
+
     /** Exposed for TurnEngine / controller correlation (same instance). */
     fun inboundControlRegistry(): InboundControlRequestRegistry = inboundControlRegistry
 
@@ -112,6 +129,9 @@ class RuntimeEventFanout(
             capacity = SUBSCRIBER_BUFFER_CAPACITY,
         )
         subscribers[subscriberId] = SubscriberSlot(key = key, channel = channel)
+        // lgns8.22.4.1.1: hand recovery control frames buffered during the
+        // no-subscriber window to this successor before it starts collecting.
+        flushPendingControlLocked(key, channel)
         subscriberId to channel.receiveAsFlow()
     }
 
@@ -148,13 +168,26 @@ class RuntimeEventFanout(
         if (!delivered) return
         val requestId = controlRequestId ?: return
         val generation = controlGeneration ?: return
-        inboundControlRegistry.markDispatched(requestId, generation)
+        inboundControlRegistry.markDispatched(
+            InboundControlRequestRegistry.RequestRef(requestId, controlToolCallId),
+            generation,
+        )
     }
 
     private data class RoutePlan(
         val channels: List<Channel<AppServerReceivedFrame>>,
         val controlRequestId: String? = null,
         val controlGeneration: Long? = null,
+        val controlToolCallId: String? = null,
+    )
+
+    private data class PendingControlFrame(
+        val received: AppServerReceivedFrame,
+        /** Null for unscoped control frames — deliverable to any subscriber. */
+        val runtimeKey: RuntimeKey?,
+        val requestId: String,
+        val toolCallId: String?,
+        val generation: Long,
     )
 
     private fun planRoute(received: AppServerReceivedFrame): RoutePlan {
@@ -173,12 +206,16 @@ class RuntimeEventFanout(
     private fun planUnscopedControl(received: AppServerReceivedFrame): RoutePlan {
         if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(emptyList())
         val targets = subscribers.values.map { it.channel }
-        if (targets.isEmpty()) return RoutePlan(emptyList())
+        if (targets.isEmpty()) {
+            bufferPendingControlLocked(received, runtimeKey = null)
+            return RoutePlan(emptyList())
+        }
         if (!registerUnscopedControl(received, runtime = null)) return RoutePlan(emptyList())
         return RoutePlan(
             channels = targets,
             controlRequestId = received.frame.requestId,
             controlGeneration = frameGeneration(received),
+            controlToolCallId = received.controlToolCallId(),
         )
     }
 
@@ -189,13 +226,114 @@ class RuntimeEventFanout(
         val key = RuntimeKey(runtime.agentId, runtime.conversationId)
         val targets = subscribers.values.filter { it.key == key }.map { it.channel }
         if (!received.frame.isServerInitiatedControlFrame()) return RoutePlan(targets)
-        if (targets.isEmpty()) return RoutePlan(emptyList())
+        if (targets.isEmpty()) {
+            bufferPendingControlLocked(received, runtimeKey = key)
+            return RoutePlan(emptyList())
+        }
         if (!registerUnscopedControl(received, runtime)) return RoutePlan(emptyList())
         return RoutePlan(
             channels = targets,
             controlRequestId = received.frame.requestId,
             controlGeneration = frameGeneration(received),
+            controlToolCallId = received.controlToolCallId(),
         )
+    }
+
+    /**
+     * Retain a control frame that had no subscriber to deliver to. Registration is
+     * deliberately DEFERRED to [flushPendingControlLocked] so the registry state
+     * machine sees exactly one registration at the moment of real delivery (a
+     * frame buffered and then dropped by generation failure never leaves a
+     * phantom Pending entry behind).
+     */
+    private fun bufferPendingControlLocked(
+        received: AppServerReceivedFrame,
+        runtimeKey: RuntimeKey?,
+    ) {
+        val requestId = received.frame.requestId ?: return
+        val toolCallId = received.controlToolCallId()
+        val generation = frameGeneration(received)
+        val duplicate = pendingControlFrames.any {
+            it.requestId == requestId && it.toolCallId == toolCallId && it.generation == generation
+        }
+        if (duplicate) return
+        pendingControlFrames.addLast(
+            PendingControlFrame(
+                received = received,
+                runtimeKey = runtimeKey,
+                requestId = requestId,
+                toolCallId = toolCallId,
+                generation = generation,
+            ),
+        )
+        while (pendingControlFrames.size > MAX_PENDING_CONTROL_FRAMES) {
+            val evicted = pendingControlFrames.removeFirst()
+            Telemetry.event(
+                "RuntimeEventFanout",
+                "pendingControl.evicted",
+                "requestId" to evicted.requestId,
+                "toolCallId" to (evicted.toolCallId ?: ""),
+                "generation" to evicted.generation,
+                "cap" to MAX_PENDING_CONTROL_FRAMES,
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
+
+    /**
+     * Deliver every buffered control frame addressed to [key] (or unscoped) into
+     * a freshly-created subscriber channel. Called under [stateLock] from
+     * [subscribe] before the caller can collect, so the frame is buffered in the
+     * channel and cannot be lost in the subscribe→collect handoff.
+     */
+    private fun flushPendingControlLocked(
+        key: RuntimeKey,
+        channel: Channel<AppServerReceivedFrame>,
+    ) {
+        if (pendingControlFrames.isEmpty()) return
+        val dispatched = takePendingControlForLocked(key, channel)
+        dispatched.forEach {
+            inboundControlRegistry.markDispatched(
+                InboundControlRequestRegistry.RequestRef(it.requestId, it.toolCallId),
+                it.generation,
+            )
+        }
+        if (dispatched.isNotEmpty()) {
+            Telemetry.event(
+                "RuntimeEventFanout",
+                "pendingControl.flushed",
+                "count" to dispatched.size,
+                "agentId" to key.agentId,
+                "conversationId" to key.conversationId,
+            )
+        }
+    }
+
+    /**
+     * Remove every buffered frame addressed to [key] and hand the ones that still
+     * register (i.e. are not generation-failed or already answered) to [channel].
+     * @return the frames actually placed in the channel.
+     */
+    private fun takePendingControlForLocked(
+        key: RuntimeKey,
+        channel: Channel<AppServerReceivedFrame>,
+    ): List<PendingControlFrame> {
+        val dispatched = mutableListOf<PendingControlFrame>()
+        val iterator = pendingControlFrames.iterator()
+        while (iterator.hasNext()) {
+            val pending = iterator.next()
+            if (pending.runtimeKey != null && pending.runtimeKey != key) continue
+            iterator.remove()
+            // Generation-failed / already-answered frames are dropped here.
+            if (!registerUnscopedControl(pending.received, pending.received.frame.runtime)) continue
+            if (channel.trySend(pending.received).isSuccess) dispatched += pending
+        }
+        return dispatched
+    }
+
+    /** Test/telemetry: control frames retained for a future subscriber. */
+    suspend fun pendingControlFrameCount(): Int = synchronized(stateLock) {
+        pendingControlFrames.size
     }
 
     private suspend fun deliverToChannels(
@@ -357,12 +495,26 @@ class RuntimeEventFanout(
          */
         const val SUBSCRIBER_BUFFER_CAPACITY = 256
 
+        /**
+         * Bound on control frames retained while no subscriber exists
+         * (lgns8.22.4.1.1). Sized for a full recovery replay burst; eviction is
+         * recorded at WARN because it means a server request will go unanswered.
+         */
+        const val MAX_PENDING_CONTROL_FRAMES = 64
+
         private val nextSubscriberId = atomic(0)
 
         private fun generateSubscriberId(): String =
             "subscriber-${nextSubscriberId.incrementAndGet()}"
     }
 }
+
+/**
+ * lgns8.22.4.1.3: external-tool registry identity is (request_id, tool_call_id).
+ * Approvals carry no tool_call_id at this layer.
+ */
+private fun AppServerReceivedFrame.controlToolCallId(): String? =
+    (frame as? AppServerInboundFrame.ExternalToolCallRequest)?.toolCallId
 
 private fun AppServerInboundFrame.isServerInitiatedControlFrame(): Boolean =
     this is AppServerInboundFrame.ExternalToolCallRequest ||
