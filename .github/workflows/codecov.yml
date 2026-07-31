@@ -1,9 +1,11 @@
 name: Codecov
 
+# Per-PR runs removed 2026-07-31 (CI-time diet): the codecov job re-ran the
+# full aggregated test suite (~10 min) that the required `test` job already
+# runs. Coverage now tracks main; it is no longer a required PR check
+# (branch protection updated in lockstep with this change).
 on:
   push:
-    branches: [main]
-  pull_request:
     branches: [main]
   workflow_dispatch:
 
