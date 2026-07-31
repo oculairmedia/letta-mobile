@@ -2,6 +2,10 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.subagents.DurableSubagentRegistry
+import com.letta.mobile.data.subagents.InMemorySubagentRegistryStore
+import com.letta.mobile.data.subagents.SubagentChipSource
+import com.letta.mobile.data.subagents.SubagentChipState
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.test.runTest
@@ -101,8 +105,13 @@ class ControllerSubagentRegistrySourceTest {
         assertEquals(SubagentStatus.FAILED, failed.status)
     }
 
+    /**
+     * lgns8.22.8: a chip absent from the newest authoritative snapshot is
+     * RECONCILED to orphaned, not deleted. Before this bead it was removed
+     * outright, which is how a live worker's chip could silently vanish.
+     */
     @Test
-    fun laterUpdateSubagentStateReplacesPriorSnapshotIdentities() = runTest {
+    fun laterUpdateSubagentStateOrphansPriorSnapshotIdentitiesInsteadOfDeletingThem() = runTest {
         val source = ControllerSubagentRegistrySource()
         source.ingest(
             AppServerInboundFrame.UpdateSubagentState(
@@ -133,7 +142,73 @@ class ControllerSubagentRegistrySourceTest {
                 ),
             ),
         )
-        val entries = source.list("conv-a", includeTerminal = true)
-        assertEquals(listOf("tool/new"), entries.map { it.toolCallId })
+
+        assertEquals(listOf("tool/new"), source.list("conv-a", includeTerminal = false).map { it.toolCallId })
+        val all = source.list("conv-a", includeTerminal = true)
+        assertEquals(setOf("sa-old", "tool/new"), all.map { it.toolCallId }.toSet())
+        assertEquals(SubagentStatus.CANCELLED, all.single { it.toolCallId == "sa-old" }.status)
+        assertEquals(
+            SubagentChipState.ORPHANED,
+            source.registry.record("conv-a", "agent-1", "sa-old")?.state,
+        )
+    }
+
+    /** lgns8.22.8: a durable-store-backed source rehydrates across a restart. */
+    @Test
+    fun sourceRehydratesChipsAcrossAControllerRestart() = runTest {
+        val store = InMemorySubagentRegistryStore()
+        val before = ControllerSubagentRegistrySource(DurableSubagentRegistry(store = store))
+        before.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-a"),
+                eventSeq = 1,
+                emittedAt = "t1",
+                idempotencyKey = "k1",
+                subagents = listOf(
+                    buildJsonObject {
+                        put("toolCallId", "tool/1")
+                        put("status", SubagentStatus.RUNNING)
+                    },
+                ),
+            ),
+        )
+
+        val after = ControllerSubagentRegistrySource(DurableSubagentRegistry(store = store))
+
+        assertEquals(listOf("tool/1"), after.list("conv-a", includeTerminal = false).map { it.toolCallId })
+        assertEquals(listOf("tool/1"), after.replaySnapshot("conv-a").map { it.toolCallId })
+    }
+
+    /** letta-mobile-7vs4s: a weaker source cannot overwrite controller-native truth. */
+    @Test
+    fun httpAndCorrelatorSourcesCannotOverwriteControllerNativeChips() = runTest {
+        val source = ControllerSubagentRegistrySource()
+        source.ingest(
+            AppServerInboundFrame.UpdateSubagentState(
+                runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-a"),
+                eventSeq = 1,
+                emittedAt = "t1",
+                idempotencyKey = "k1",
+                subagents = listOf(
+                    buildJsonObject {
+                        put("toolCallId", "tool/1")
+                        put("status", SubagentStatus.COMPLETED)
+                    },
+                ),
+            ),
+        )
+
+        source.ingestFromSource(
+            conversationId = "conv-a",
+            agentId = "agent-1",
+            entries = listOf(SubagentEntry(toolCallId = "tool/1", status = SubagentStatus.RUNNING)),
+            source = SubagentChipSource.HTTP_REGISTRY,
+        )
+
+        assertTrue(source.list("conv-a", includeTerminal = false).isEmpty())
+        assertEquals(
+            SubagentChipState.COMPLETED,
+            source.registry.record("conv-a", "agent-1", "tool/1")?.state,
+        )
     }
 }
