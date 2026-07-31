@@ -84,13 +84,19 @@ internal fun MessageList(
         null
     }
 
-    // The LazyColumn is laid out as [ "__today__" header, ...renderItems,
+    // Consecutive tool-only messages fold into one collapsed "N tool calls"
+    // row — six near-identical Bash cards with six timestamps drowned the
+    // agent's prose. Folded HERE (not in the column) because the scroll
+    // arithmetic below must count the rows the LazyColumn actually holds.
+    val rows = remember(renderItems) { groupDesktopChatRows(renderItems) }
+
+    // The LazyColumn is laid out as [ "__today__" header, ...rows,
     // ("__thinking__" while sending)? ]. The leading header offsets every render
-    // row by one, so the last row is at index renderItems.size (not size - 1),
+    // row by one, so the last row is at index rows.size (not size - 1),
     // and the thinking row at size + 1. The scroll targets below must use this
-    // header-aware index — latestIndex(renderItems.size) landed one row short,
+    // header-aware index — latestIndex(rows.size) landed one row short,
     // which is why a fresh prompt/reply needed a manual nudge to the bottom.
-    val chatBottomIndex = (renderItems.size + if (isSending) 1 else 0).coerceAtLeast(0)
+    val chatBottomIndex = (rows.size + if (isSending) 1 else 0).coerceAtLeast(0)
     val tailContentLength = remember(renderItems) { renderItems.tailContentLength() }
 
     MessageListFollowEffects(
@@ -127,7 +133,7 @@ internal fun MessageList(
             MessageListColumn(
                 MessageListColumnParams(
                     listState = listState,
-                    renderItems = renderItems,
+                    rows = rows,
                     streamingMessageId = streamingMessageId,
                     isSending = isSending,
                 ),
@@ -227,7 +233,7 @@ private fun MessageListFollowEffects(params: MessageListFollowParams) {
 
 private data class MessageListColumnParams(
     val listState: LazyListState,
-    val renderItems: List<ChatRenderItem>,
+    val rows: List<DesktopChatRow>,
     val streamingMessageId: StreamingMessageId?,
     val isSending: Boolean,
 )
@@ -239,7 +245,7 @@ private fun ChatRenderItem.isUserPrompt(): Boolean =
 @Composable
 private fun MessageListColumn(params: MessageListColumnParams) {
     val listState = params.listState
-    val renderItems = params.renderItems
+    val rows = params.rows
     val streamingMessageId = params.streamingMessageId
     val isSending = params.isSending
     val selectionColors = TextSelectionColors(
@@ -272,9 +278,30 @@ private fun MessageListColumn(params: MessageListColumnParams) {
             // User prompts are sticky headers: the question stays pinned to the
             // top of the viewport while its (usually much taller) answer scrolls
             // underneath, so you never lose track of what was asked. Everything
-            // else is an ordinary row. Item count is unchanged — one lazy item
-            // per render item — so the bottom-index arithmetic above still holds.
-            renderItems.forEach { item ->
+            // else is an ordinary row. Rows arrive pre-folded (see MessageList):
+            // consecutive tool-only messages render as one collapsed "N tool
+            // calls" card instead of a stack of near-identical Bash cards.
+            rows.forEach { row ->
+                if (row is DesktopChatRow.ToolGroup) {
+                    item(key = row.key) {
+                        Column(modifier = Modifier.widthIn(max = ChatColumnMaxWidth).fillMaxWidth()) {
+                            DesktopToolGroupCard(row)
+                            // One clock for the whole group, matching the
+                            // per-item label style below.
+                            messageClockLabel(row.boundaryTimestamp)?.let { clock ->
+                                Text(
+                                    text = clock,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f),
+                                    textAlign = TextAlign.Start,
+                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 2.dp),
+                                )
+                            }
+                        }
+                    }
+                    return@forEach
+                }
+                val item = (row as DesktopChatRow.Item).item
                 if (item.isUserPrompt()) {
                     stickyHeader(key = item.key) {
                         // No backdrop fill: an opaque strip here would paint over
