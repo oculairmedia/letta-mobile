@@ -1246,7 +1246,10 @@ class ChatSendCoordinator(
     }
 
     private fun healStaleVisualPresence() {
-        if (wsChatBridge.hasActiveChatTurn) return
+        // letta-mobile-or40x PR1: behavior-preserving rename only. This read was
+        // (and still is) unscoped; scoping it to the coordinator's conversation is
+        // PR2's job, together with the coordinator's own single-turn state.
+        if (wsChatBridge.hasAnyActiveChatTurn) return
         if (!ui.isStreaming() && !ui.isAgentTyping()) return
         ui.onTurnVisuallyComplete()
         clearActiveTurnState()

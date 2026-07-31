@@ -491,11 +491,16 @@ internal class AdminChatViewModel @Inject constructor(
         uiState = _uiState,
         isClientModeStreamInFlight = { false },
         // letta-mobile-c4igq.7: hold presence across inter-round gaps of a
-        // multi-tool turn. wsChatBridge.hasActiveChatTurn is true from turn start
-        // until the real terminal (spans all tool rounds), so the thinking/
-        // streaming indicator and send button stay steady instead of flickering
-        // / looking finished between rounds.
-        hasActiveChatTurn = { wsChatBridge.hasActiveChatTurn },
+        // multi-tool turn. wsChatBridge.hasActiveChatTurn(conversationId) is true
+        // from turn start until the real terminal (spans all tool rounds), so the
+        // thinking/streaming indicator and send button stay steady instead of
+        // flickering / looking finished between rounds.
+        //
+        // letta-mobile-or40x: SCOPED to THIS observer's own conversation. The
+        // unscoped read made a background conversation's in-flight turn render a
+        // thinking indicator on every other open chat surface. No conversation yet
+        // (pre-hydrate) means no turn this surface can own — false.
+        hasActiveChatTurn = { conversationId?.value?.let { wsChatBridge.hasActiveChatTurn(it) } ?: false },
         a2uiThinkingStartMessageCount = { adminChatA2uiCoordinator.getA2uiThinkingStartMessageCount() },
         clearA2uiThinkingOnResponse = { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() },
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },

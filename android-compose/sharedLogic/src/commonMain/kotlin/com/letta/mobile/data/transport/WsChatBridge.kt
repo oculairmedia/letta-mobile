@@ -126,8 +126,15 @@ class WsChatBridge(
         )
     }
 
-    /** Authoritative transport ownership; UI presence must never outlive this. */
-    val hasActiveChatTurn: Boolean get() = transport.hasActiveChatTurn
+    /**
+     * Authoritative transport ownership FOR [conversationId]; UI presence must
+     * never outlive this. letta-mobile-or40x: keyed — a turn on one conversation
+     * must never light up another conversation's surface.
+     */
+    fun hasActiveChatTurn(conversationId: String): Boolean = transport.hasActiveChatTurn(conversationId)
+
+    /** Transport-wide "any turn at all" ownership. Never use for per-conversation UI. */
+    val hasAnyActiveChatTurn: Boolean get() = transport.hasAnyActiveChatTurn
 
     fun cancel(conversationId: String): Boolean = transport.cancel(conversationId)
     fun bye(): Boolean = transport.bye()

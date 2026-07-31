@@ -18,6 +18,12 @@ import org.junit.Test
  * transport — otherwise it inherits IChannelTransport's default (false) and
  * swallows the real Iroh/WS ownership signal, making ChatSendCoordinator's
  * stale-presence self-heal fire on every send (the "legacy WS misclassification").
+ *
+ * letta-mobile-or40x: the signal is now KEYED BY conversationId, and BOTH the
+ * keyed query and the unscoped `hasAnyActiveChatTurn` must pass through. A
+ * wrapper that dropped the keyed form would report "no turn" for a genuinely
+ * streaming conversation; one that dropped the key would report every
+ * conversation as streaming whenever any one of them is.
  */
 class SessionScopedChannelTransportOwnershipTest {
 
@@ -35,24 +41,52 @@ class SessionScopedChannelTransportOwnershipTest {
 
     @Test
     fun `hasActiveChatTurn reflects the wrapped transport when a turn is active`() = runTest {
-        val fake = FakeChannelTransport().apply { hasActiveChatTurn = true }
+        val fake = FakeChannelTransport().apply { activeChatTurnConversations += "conv-a" }
         val wrapper = wrapperOver(fake)
-        assertTrue("wrapper must delegate the live transport's active-turn ownership", wrapper.hasActiveChatTurn)
+        assertTrue(
+            "wrapper must delegate the live transport's active-turn ownership",
+            wrapper.hasActiveChatTurn("conv-a"),
+        )
+        assertTrue("unscoped query must also pass through", wrapper.hasAnyActiveChatTurn)
     }
 
     @Test
     fun `hasActiveChatTurn is false when the wrapped transport has no active turn`() = runTest {
-        val fake = FakeChannelTransport().apply { hasActiveChatTurn = false }
+        val fake = FakeChannelTransport()
         val wrapper = wrapperOver(fake)
-        assertFalse("wrapper must reflect the live transport reporting no active turn", wrapper.hasActiveChatTurn)
+        assertFalse(
+            "wrapper must reflect the live transport reporting no active turn",
+            wrapper.hasActiveChatTurn("conv-a"),
+        )
+        assertFalse(wrapper.hasAnyActiveChatTurn)
     }
 
     @Test
     fun `hasActiveChatTurn tracks live changes on the wrapped transport`() = runTest {
-        val fake = FakeChannelTransport().apply { hasActiveChatTurn = false }
+        val fake = FakeChannelTransport()
         val wrapper = wrapperOver(fake)
-        assertFalse("delegation is by-getter, so it must see the current live value", wrapper.hasActiveChatTurn)
-        fake.hasActiveChatTurn = true
-        assertTrue(wrapper.hasActiveChatTurn)
+        assertFalse(
+            "delegation is by-getter, so it must see the current live value",
+            wrapper.hasActiveChatTurn("conv-a"),
+        )
+        fake.activeChatTurnConversations += "conv-a"
+        assertTrue(wrapper.hasActiveChatTurn("conv-a"))
+    }
+
+    /**
+     * letta-mobile-or40x: the presence-bleed regression at the wrapper edge. With
+     * conversation A streaming, the wrapper must report B as idle. A wrapper (or a
+     * fake) that collapses ownership to one boolean cannot distinguish these.
+     */
+    @Test
+    fun `an active turn on one conversation does not report presence on another`() = runTest {
+        val fake = FakeChannelTransport().apply { activeChatTurnConversations += "conv-a" }
+        val wrapper = wrapperOver(fake)
+        assertTrue(wrapper.hasActiveChatTurn("conv-a"))
+        assertFalse(
+            "conversation B must NOT report an active turn while only A is streaming",
+            wrapper.hasActiveChatTurn("conv-b"),
+        )
+        assertTrue("but the transport as a whole IS busy", wrapper.hasAnyActiveChatTurn)
     }
 }

@@ -11,6 +11,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.JsonArray
+import java.util.concurrent.ConcurrentHashMap
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -38,7 +39,19 @@ class FakeChannelTransport(
 
     // dir4k (z5vfy PR-2): settable active-turn ownership so tests can assert the
     // SessionScopedChannelTransport wrapper delegates it through to the live transport.
-    override var hasActiveChatTurn: Boolean = false
+    //
+    // letta-mobile-or40x: ownership is PER CONVERSATION, so the fake models a SET
+    // of active conversations rather than one boolean. A single flag cannot
+    // express "A is streaming, B is idle" — the exact two-conversation state the
+    // presence-bleed regression lives in — which would make any test written
+    // against it vacuous.
+    val activeChatTurnConversations: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    override fun hasActiveChatTurn(conversationId: String): Boolean =
+        conversationId in activeChatTurnConversations
+
+    override val hasAnyActiveChatTurn: Boolean
+        get() = activeChatTurnConversations.isNotEmpty()
 
     val cronListCalls = mutableListOf<CronListCall>()
     val cronAddCalls = mutableListOf<CronAddCall>()

@@ -21,8 +21,26 @@ interface IChannelTransport {
     val events: SharedFlow<ServerFrame>
     val frameEvents: SharedFlow<TransportFrameEvent>
 
-    /** True only while this transport owns a live, non-terminal chat turn. */
-    val hasActiveChatTurn: Boolean get() = false
+    /**
+     * letta-mobile-or40x: True only while this transport owns a live,
+     * non-terminal chat turn FOR [conversationId].
+     *
+     * Turn ownership is per conversation: two conversations can stream
+     * concurrently, and a turn on one must never report presence on another.
+     * Every presence consumer that renders a per-conversation surface (thinking
+     * indicator, send button, streaming state) MUST use this keyed query —
+     * an unscoped read bleeds one conversation's work onto every open surface.
+     */
+    fun hasActiveChatTurn(conversationId: String): Boolean = false
+
+    /**
+     * letta-mobile-or40x: True while this transport owns ANY live, non-terminal
+     * chat turn, on any conversation. Deliberately named so it can never be
+     * mistaken for the conversation-scoped [hasActiveChatTurn]. Only correct for
+     * transport-wide questions ("is this connection doing anything at all"),
+     * never for rendering a single conversation's presence.
+     */
+    val hasAnyActiveChatTurn: Boolean get() = false
 
     suspend fun connect(
         baseShimUrl: String,
