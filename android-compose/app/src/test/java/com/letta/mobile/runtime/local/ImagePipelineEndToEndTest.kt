@@ -517,14 +517,18 @@ class ImagePipelineEndToEndTest {
 
         val report = LocalImageContextStripper(blobStore = LocalImageBlobStore(dir)).stripTranscript(transcript)
 
-        assertEquals("FIXED (6ppdr): both v3 image parts are stripped", 2, report.partsStripped)
+        // Exactly ONE part strips: the LATEST user image row is deliberately
+        // preserved for the turn in flight (the 87itk / PR #481 policy). This
+        // asserts that policy survives the envelope unwrap — the pass is no
+        // longer inert on v3, and it still does not eat the just-shared image.
+        assertEquals("FIXED (6ppdr): the older v3 image part is stripped", 1, report.partsStripped)
         assertTrue("stripping frees transcript bytes", report.bytesFreed > 0)
         assertNotEquals("the transcript is rewritten, not left byte-identical", v3, transcript.readText())
         val stripEvent = Telemetry.snapshot().single { it.name == "strip.parts_stripped" }
-        assertEquals(2, stripEvent.attrs["parts"])
+        assertEquals(1, stripEvent.attrs["parts"])
 
-        // The envelope survives the rewrite and the image parts became
-        // placeholders INSIDE message.content — no provider image_url is left.
+        // The envelope survives the rewrite and the stripped image became a
+        // placeholder INSIDE message.content.
         val rows = transcript.readLines()
             .filter { it.isNotBlank() }
             .map { json.parseToJsonElement(it).jsonObject }
@@ -534,18 +538,19 @@ class ImagePipelineEndToEndTest {
             assertEquals("message", row["type"]!!.jsonPrimitive.content)
             assertEquals("user", body["role"]!!.jsonPrimitive.content)
         }
-        val urls = messageRows
-            .mapNotNull { (_, body) -> body["content"] as? JsonArray }
-            .flatMap { LettaJs.providerImageUrls(it) }
-        assertEquals("no base64 image_url survives the strip", 0, urls.size)
+        val contents = messageRows.mapNotNull { (_, body) -> body["content"] as? JsonArray }
 
-        // …and the bytes are not lost: the blob store holds each image so the
-        // hydration path can put it back.
-        val placeholders = messageRows
-            .mapNotNull { (_, body) -> body["content"] as? JsonArray }
+        // Only the PRESERVED latest image is still a provider image_url — and it
+        // is still schema-valid, so bloat protection cannot regress correctness.
+        val urls = contents.flatMap { LettaJs.providerImageUrls(it) }
+        assertEquals("only the latest image survives as a provider image_url", 1, urls.size)
+        urls.forEach { assertValidProviderImageUrl(it) }
+
+        val placeholders = contents
             .flatMap { parts -> parts.mapNotNull { it as? JsonObject } }
             .filter { it["stripped"]?.jsonPrimitive?.content?.toBoolean() == true }
-        assertEquals("each stripped image left a placeholder", 2, placeholders.size)
+        assertEquals("the stripped image left a placeholder", 1, placeholders.size)
+        assertTrue(placeholders.single()["text"]!!.jsonPrimitive.content.contains("image omitted"))
     }
 
     // ─────────────────────────────────────────────────────────────────────
