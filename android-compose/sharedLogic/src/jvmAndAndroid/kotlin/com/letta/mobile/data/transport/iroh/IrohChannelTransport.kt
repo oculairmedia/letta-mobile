@@ -899,13 +899,22 @@ class IrohChannelTransport(
                 return@launch
             }
             val engine = handle.turnEngine ?: error("Iroh send requested without turn engine")
-            if (engine.isBusy) {
+            // letta-mobile-8xxzv: SCOPED busy gate. The engine keys its turn
+            // lease by {agentId, conversationId} — the App Server's own unit of
+            // turn exclusion — so a live turn in ANOTHER conversation must not
+            // fast-fail this send. Only a second turn into the SAME runtime is
+            // rejected, which is the documented letta-code contract (one active
+            // turn per {agent_id, conversation_id} runtime, parallel across them).
+            if (engine.isBusy(agentId, conversationId)) {
                 // letta-mobile-kyqdt: TELEMETRY-ONLY. Read the engine's owner
                 // metadata (pure getter, no lock) so this busy rejection can
                 // prove WHO holds the engine — the owning run/agent/conversation,
                 // when it acquired the lock (+ how long ago), and its last-seen
                 // terminal — alongside the incoming (rejected) send's identity.
-                val owner = engine.activeTurnOwner
+                // letta-mobile-8xxzv: report the owner of the lease this send
+                // actually collided with (our own key), not "whoever holds a
+                // lease" — with concurrent turns those differ.
+                val owner = engine.activeTurnOwnerFor(agentId, conversationId)
                 val ownerAcquiredAtMs = owner?.acquiredAtMs
                 Telemetry.event(
                     "IrohTransport", "turn.busy",
@@ -932,6 +941,11 @@ class IrohChannelTransport(
                     "ownerWatchdogDeadlineMs" to owner?.watchdogDeadlineMs,
                     "ownerProcessRole" to owner?.processRole,
                     "ownerReleaseReason" to owner?.releaseReason,
+                    // Every OTHER runtime key running concurrently right now:
+                    // proof that this rejection is same-key, not global.
+                    "otherBusyKeys" to engine.busyRuntimeKeys()
+                        .filter { it.conversationId != conversationId || it.agentId != agentId }
+                        .joinToString(",") { it.toString() },
                 )
                 emitTurnFrame(
                     turn,
@@ -1223,7 +1237,13 @@ class IrohChannelTransport(
             //    the runtime.
             runCatching {
                 val handle = supervisor.ready()
-                handle.turnEngine?.abort(turn.runId.takeUnless { it.isIrohSyntheticRunId() })
+                // letta-mobile-8xxzv: keyed abort — a cancel for THIS conversation
+                // must be addressed to THIS conversation's runtime scope.
+                handle.turnEngine?.abort(
+                    agentId = turn.agentId,
+                    conversationId = turn.conversationId,
+                    runId = turn.runId.takeUnless { it.isIrohSyntheticRunId() },
+                )
             }.onFailure { error ->
                 if (error is CancellationException) throw error
                 Telemetry.event(

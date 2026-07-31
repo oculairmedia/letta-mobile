@@ -1,5 +1,6 @@
 package com.letta.mobile.cli.commands
 
+import com.letta.mobile.cli.probe.WrapperProcessScan
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerEndpoint
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
@@ -43,6 +44,10 @@ internal data class IrohProbeOptions(
     val strictRedialDedupe: Boolean,
     val wrapperRestartCmd: String?,
     val dumpFramesPath: String?,
+    /** systemd unit whose MainPID the `no-http` gate attributes sockets to (lgns8.21.9). */
+    val wrapperUnit: String = WrapperProcessScan.DEFAULT_UNIT,
+    /** Explicit wrapper PID; overrides systemd resolution when the wrapper is not a unit. */
+    val wrapperPid: Int? = null,
 ) {
     fun dumpPath(): ProbeDumpPath? = dumpFramesPath?.let(::ProbeDumpPath)
 }
