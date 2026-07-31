@@ -711,18 +711,29 @@ class ChatSendCoordinatorCleanupTest {
         data class Reconcile(val conversationId: String, val reason: String, val forceRefresh: Boolean)
     }
 
+    /**
+     * letta-mobile-or40x PR2: the fake now answers turn ownership PER
+     * CONVERSATION (mirroring the keyed transport from PR1), so tests can put
+     * conversation B's turn in flight without claiming conversation A is busy.
+     * [activeChatTurn] stays as the "every conversation is busy" shorthand the
+     * older single-conversation tests use.
+     */
     private class FakeChannelTransport(
         val sendResults: MutableList<Boolean>,
         var activeChatTurn: Boolean = false,
+        val activeChatTurnConversations: MutableSet<String> = mutableSetOf(),
     ) : IChannelTransport {
         override val state: StateFlow<ChannelTransportState> = MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
         override val events = MutableSharedFlow<ServerFrame>()
         override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
-        override fun hasActiveChatTurn(conversationId: String): Boolean = activeChatTurn
-        override val hasAnyActiveChatTurn: Boolean get() = activeChatTurn
+        override fun hasActiveChatTurn(conversationId: String): Boolean =
+            activeChatTurn || conversationId in activeChatTurnConversations
+        override val hasAnyActiveChatTurn: Boolean
+            get() = activeChatTurn || activeChatTurnConversations.isNotEmpty()
         val sentTexts = mutableListOf<String>()
+        val sentConversationIds = mutableListOf<String>()
         override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
-        override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; return sendResults.removeFirstOrNull() ?: true }
+        override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; sentConversationIds += conversationId; return sendResults.removeFirstOrNull() ?: true }
         override fun cancel(conversationId: String): Boolean = true
         override fun bye(): Boolean = true
         override suspend fun disconnect() = Unit

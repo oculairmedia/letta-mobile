@@ -80,34 +80,28 @@ class ChatSendCoordinator(
     private val recordRuntimeEvent: suspend (event: WsTimelineEvent, conversationIdOverride: String?) -> Unit =
         { _, _ -> },
 ) {
-    @Volatile private var activeWsConversationId: String? = null
-    @Volatile private var activeWsOtid: String? = null
-    @Volatile private var activeWsLocalConversationId: String? = null
-    // letta-mobile-i8iw: lcp-cv3 contract — stop_reason and usage_statistics
-    // are first-wins per turn on the shim. We capture once and drop later
-    // duplicates defensively (drop with telemetry rather than overwriting).
-    @Volatile private var activeWsTurnId: String? = null
-    @Volatile private var activeWsRunId: String? = null
     // Send acceptance, transport events, and cleanup all mutate one ownership graph. Serializing
     // their suspend paths makes the lifecycle decision and the matching UI/OTID mutation atomic.
     private val turnStateMutex = Mutex()
-    private val turnIdentity = TurnIdentityLifecycle()
-    private val activeAssistantMessageRunIds = linkedSetOf<String>()
-    @Volatile private var stopReasonForTurn: String? = null
-    @Volatile private var usageRecordedForTurn: Boolean = false
-    // lcp-axv: failed turns emit `error` THEN `turn_done(status="failed")`
-    // in lock-step. We buffer the error message and only flip UI state when
-    // TurnDone arrives, so the "agent typing" indicator clears in sync with
-    // the actual end-of-turn signal.
-    @Volatile private var bufferedErrorMessage: String? = null
-    // letta-mobile-br5g0 (codex review): the mapper's Error frame already
-    // carries the sanitized failure family in `code`; reclassifying the fixed
-    // copy in `message` downgraded content_filter to provider_error. Buffer the
-    // wire family (when it is a known one) alongside the message.
-    @Volatile private var bufferedErrorKind: String? = null
-    // letta-mobile-br5g0: set when this turn ingested assistant content. Drives
-    // the dead-turn vs delivered-then-failed split in [finishActiveTurn].
-    @Volatile private var deliveredAssistantContentThisTurn: Boolean = false
+
+    // letta-mobile-or40x PR2: turn identity is PER CONVERSATION.
+    //
+    // This used to be ONE process-wide set of `activeWs*` fields plus a single
+    // [TurnIdentityLifecycle]. With conversation A streaming, a send into
+    // conversation B overwrote A's otid/turn/run identity, and A's terminal then
+    // wiped B's in-flight send identity — the observed "both conversations
+    // freeze" defect. Every one of those fields now lives inside a
+    // [ConversationTurnState] keyed by conversationId, and each conversation
+    // owns its own terminal fence ([TurnIdentityLifecycle]).
+    private val turnStateLock = SynchronizedObject()
+    private val turnStates = linkedMapOf<String, ConversationTurnState>()
+
+    // Genuinely ambiguous fallback: TurnDone/SubscribeDone/StopReason frames carry
+    // no conversationId. When neither the turn id nor the run id identifies an
+    // owner we fall back to the conversation that most recently owned turn
+    // activity — the honest approximation of the old single global, used ONLY
+    // where the wire gives us nothing to key on (see [resolveStateByTurnId]).
+    @Volatile private var lastActiveConversationId: String? = null
     private val preConversationMessageDeltas = ArrayDeque<WsTimelineEvent.MessageDelta>()
     private val pendingSendLock = SynchronizedObject()
     private val pendingSends = ArrayDeque<PendingWsSend>()
@@ -125,6 +119,160 @@ class ChatSendCoordinator(
         scope.launch {
             wsChatBridge.redialWhileTurnActive.collect { event -> handleRedialWhileTurnActive(event) }
         }
+    }
+
+    /**
+     * All per-turn state for ONE conversation. Mutations are serialized by
+     * [turnStateMutex] (every send / transport-event / redial entry point takes
+     * it); the fields are volatile so a read from another dispatcher thread
+     * still observes the published value.
+     */
+    private class ConversationTurnState(val conversationId: String) {
+        /** Terminal fence + generation ownership for THIS conversation only. */
+        val identity = TurnIdentityLifecycle()
+        @Volatile var otid: String? = null
+        @Volatile var localConversationId: String? = null
+
+        // letta-mobile-i8iw: lcp-cv3 contract — stop_reason and usage_statistics
+        // are first-wins per turn on the shim. We capture once and drop later
+        // duplicates defensively (drop with telemetry rather than overwriting).
+        @Volatile var turnId: String? = null
+        @Volatile var runId: String? = null
+        val activeAssistantMessageRunIds = linkedSetOf<String>()
+        @Volatile var stopReason: String? = null
+        @Volatile var usageRecorded: Boolean = false
+
+        // lcp-axv: failed turns emit `error` THEN `turn_done(status="failed")`
+        // in lock-step. We buffer the error message and only flip UI state when
+        // TurnDone arrives, so the "agent typing" indicator clears in sync with
+        // the actual end-of-turn signal.
+        @Volatile var bufferedErrorMessage: String? = null
+
+        // letta-mobile-br5g0 (codex review): the mapper's Error frame already
+        // carries the sanitized failure family in `code`; reclassifying the fixed
+        // copy in `message` downgraded content_filter to provider_error. Buffer the
+        // wire family (when it is a known one) alongside the message.
+        @Volatile var bufferedErrorKind: String? = null
+
+        // letta-mobile-br5g0: set when this turn ingested assistant content. Drives
+        // the dead-turn vs delivered-then-failed split in [finishActiveTurn].
+        @Volatile var deliveredAssistantContent: Boolean = false
+
+        /** Set on the terminal path so a clear can tell "settled" from "evicted". */
+        @Volatile var reachedTerminal: Boolean = false
+
+        /** True while this conversation owns a send or a turn that has not settled. */
+        val isTracking: Boolean
+            get() = identity.active != null || otid != null || turnId != null
+    }
+
+    private fun stateFor(conversationId: String): ConversationTurnState = synchronized(turnStateLock) {
+        val state = turnStates.getOrPut(conversationId) { ConversationTurnState(conversationId) }
+        evictOverflowStatesLocked(keep = conversationId)
+        state
+    }
+
+    private fun peekState(conversationId: String?): ConversationTurnState? =
+        conversationId?.let { synchronized(turnStateLock) { turnStates[it] } }
+
+    private fun snapshotStates(): List<ConversationTurnState> =
+        synchronized(turnStateLock) { turnStates.values.toList() }
+
+    private fun trackedConversationCount(): Int = synchronized(turnStateLock) { turnStates.size }
+
+    /**
+     * SENSING (letta-mobile-or40x): a turn entry that is dropped while it still
+     * owns a send/turn is exactly the clobber this PR exists to kill, so it is
+     * never silent.
+     */
+    private fun evictOverflowStatesLocked(keep: String) {
+        while (turnStates.size > MAX_TRACKED_CONVERSATION_TURN_STATES) {
+            val victimKey = turnStates.keys.firstOrNull { it != keep } ?: return
+            val victim = turnStates.remove(victimKey) ?: return
+            if (victim.isTracking && !victim.reachedTerminal) {
+                Telemetry.event(
+                    "AdminChatVM", "ws.turnState.evictedBeforeTerminal",
+                    "conversationId" to victim.conversationId,
+                    "turnId" to (victim.turnId ?: ""),
+                    "otid" to (victim.otid ?: ""),
+                    "tracked" to turnStates.size,
+                )
+            }
+        }
+    }
+
+    /**
+     * Only for frames that carry NO conversation key at all. Prefers the most
+     * recently active conversation, then the single tracked conversation.
+     */
+    private fun fallbackState(): ConversationTurnState? = synchronized(turnStateLock) {
+        lastActiveConversationId?.let { turnStates[it] } ?: turnStates.values.singleOrNull()
+    }
+
+    /**
+     * Resolves the conversation that owns a turn-keyed frame.
+     *
+     * Exact turn match wins. Failing that, an accepted send that has not yet seen
+     * its `TurnStarted` is the only entry the frame can belong to — but only when
+     * exactly ONE such entry exists, otherwise we would be guessing across
+     * conversations (which is the bug). When some other conversation already owns
+     * an identified turn and nothing here matches, the frame is foreign: return
+     * null so the caller can drop it instead of clobbering an unrelated turn.
+     */
+    private fun resolveStateByTurnId(turnId: String?): ConversationTurnState? {
+        val key = turnId?.takeIf { it.isNotBlank() }
+        val states = snapshotStates()
+        if (key != null) {
+            states.firstOrNull { it.turnId == key }?.let { return it }
+            val awaitingTurnStarted = states.filter { it.turnId == null && it.identity.active != null }
+            if (awaitingTurnStarted.size == 1) return awaitingTurnStarted.single()
+            if (states.any { it.turnId != null }) return null
+        }
+        return fallbackState()
+    }
+
+    /** Run-keyed variant for frames (SubscribeDone) that carry a run id but no turn id. */
+    private fun resolveStateByRunId(runId: String?): ConversationTurnState? {
+        val key = runId?.takeIf { it.isNotBlank() } ?: return fallbackState()
+        val states = snapshotStates()
+        states.firstOrNull { it.runId == key }?.let { return it }
+        val awaitingTurnStarted = states.filter { it.runId == null && it.identity.active != null }
+        if (awaitingTurnStarted.size == 1) return awaitingTurnStarted.single()
+        if (states.any { it.runId != null }) return null
+        return fallbackState()
+    }
+
+    /**
+     * SENSING (letta-mobile-or40x): a send starting for one conversation while
+     * ANOTHER conversation's identity is still non-terminal is precisely the
+     * overlap that used to evict state. Legal now — but recorded.
+     */
+    private fun reportCrossConversationSend(conversationId: String) {
+        val others = snapshotStates().filter {
+            it.conversationId != conversationId && it.isTracking && !it.reachedTerminal
+        }
+        if (others.isEmpty()) return
+        Telemetry.event(
+            "AdminChatVM", "ws.send.crossConversationOverlap",
+            "conversationId" to conversationId,
+            "otherConversations" to others.size,
+            "otherTurnIds" to others.joinToString(",") { it.turnId ?: "<awaiting-turn-started>" },
+        )
+    }
+
+    /**
+     * SENSING (letta-mobile-or40x): a frame that matches no tracked conversation
+     * entry. Before keying, these silently landed on whatever the single global
+     * happened to hold — i.e. they were misattributed rather than dropped.
+     */
+    private fun reportUnmatchedFrame(event: WsTimelineEvent, turnId: String?, runId: String?) {
+        Telemetry.event(
+            "AdminChatVM", "ws.event.unmatchedConversation",
+            "eventType" to (event::class.simpleName ?: ""),
+            "turnId" to (turnId ?: ""),
+            "runId" to (runId ?: ""),
+            "trackedConversations" to trackedConversationCount(),
+        )
     }
 
     fun send(
@@ -162,7 +310,7 @@ class ChatSendCoordinator(
         // visually active after Iroh has already reached terminal. Before a
         // sequential send, heal that impossible state from transport ownership
         // so the new message is dispatched instead of queued behind a ghost turn.
-        healStaleVisualPresence()
+        healStaleVisualPresence(targetConversationId)
         Telemetry.event(
             "IrohTrace", "coordinator.send.begin",
             "agentId" to agentId,
@@ -218,8 +366,10 @@ class ChatSendCoordinator(
                 return
             }
         }
+        stateFor(conversationId)
+        reportCrossConversationSend(conversationId)
         if (!startNewConversation) {
-            activeWsConversationId = conversationId
+            lastActiveConversationId = conversationId
             setActiveConversationId(conversationId)
             startTimelineObserver(conversationId)
         }
@@ -263,7 +413,7 @@ class ChatSendCoordinator(
     }
 
     fun cancel(): Boolean {
-        val conversationId = activeConversationId() ?: activeWsConversationId ?: return false
+        val conversationId = activeConversationId() ?: lastActiveConversationId ?: return false
         val accepted = wsChatBridge.cancel(conversationId)
         if (accepted) {
             val dropped = removePendingSends(conversationId)
@@ -285,7 +435,8 @@ class ChatSendCoordinator(
             "otid" to pending.otid,
             "appendOptimisticLocal" to appendOptimisticLocal,
         )
-        val accepted = turnIdentity.acceptSend(
+        val state = stateFor(pending.conversationId)
+        val accepted = state.identity.acceptSend(
             conversationId = pending.conversationId,
             send = {
                 wsChatBridge.send(
@@ -298,9 +449,10 @@ class ChatSendCoordinator(
                 )
             },
             onAccepted = {
-                activeWsOtid = pending.otid
-                activeWsLocalConversationId = pending.conversationId.takeIf { it.isNotBlank() }
-                activeWsConversationId = pending.conversationId.takeIf { it.isNotBlank() }
+                state.otid = pending.otid
+                state.localConversationId = pending.conversationId.takeIf { it.isNotBlank() }
+                state.reachedTerminal = false
+                pending.conversationId.takeIf { it.isNotBlank() }?.let { lastActiveConversationId = it }
             },
         )
         Telemetry.event(
@@ -514,13 +666,13 @@ class ChatSendCoordinator(
         // GLOBAL flow — every per-(agentId,conversationId) coordinator collects
         // it, so a frame for one agent reaches every coordinator. When two
         // agents share the bare conversation id "default" (main + a subagent),
-        // a foreign agent's TurnStarted would otherwise set THIS coordinator's
-        // activeWsConversationId and its deltas would ingest into our timeline —
-        // the cross-conversation leak. Drop any event that carries an explicit
-        // agentId not matching ours BEFORE it can mutate active-turn state.
+        // a foreign agent's TurnStarted would otherwise open a turn entry in THIS
+        // coordinator and its deltas would ingest into our timeline — the
+        // cross-conversation leak. Drop any event that carries an explicit
+        // agentId not matching ours BEFORE it can mutate any turn entry.
         // (MessageDelta/StopReason/etc. carry no agentId; they are scoped
-        // transitively because activeWsConversationId is only ever set by a
-        // TurnStarted that passed this gate.)
+        // transitively because a conversation entry only ever gains a turn id
+        // from a TurnStarted that passed this gate.)
         val eventAgentId: String? = when (event) {
             is WsTimelineEvent.TurnStarted -> event.agentId
             is WsTimelineEvent.AgentUpdated -> event.agentId
@@ -538,14 +690,14 @@ class ChatSendCoordinator(
         Telemetry.event(
             "IrohTrace", "coordinator.event",
             "type" to (event::class.simpleName ?: ""),
-            "activeConversationId" to activeWsConversationId,
-            "activeTurnId" to activeWsTurnId,
+            "lastActiveConversationId" to lastActiveConversationId,
+            "trackedConversations" to trackedConversationCount(),
         )
         if (dropDuplicateBridgeEvent(event)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
             is WsTimelineEvent.MessageDelta -> {
-                val conversationId = event.conversationId ?: activeWsConversationId ?: activeConversationId()
+                val conversationId = event.conversationId ?: lastActiveConversationId ?: activeConversationId()
                 Telemetry.event(
                     "IrohGate", "gate3.coordinatorMessageDelta",
                     "resolvedConversationId" to conversationId,
@@ -559,6 +711,7 @@ class ChatSendCoordinator(
                 }
                 recordRuntimeEvent(event, conversationId)
                 rememberActiveAssistantMessageRunId(
+                    state = peekState(conversationId),
                     message = event.message,
                     frameConversationId = event.conversationId,
                     isReplay = event.isReplay,
@@ -570,23 +723,33 @@ class ChatSendCoordinator(
                 }
             }
             is WsTimelineEvent.StopReason -> {
-                recordRuntimeEvent(event, activeWsConversationId)
-                if (ignoreForeignTurnStop(event)) return
-                recordStopReasonForTurn(event)
-                markTurnVisuallyComplete(reason = "stopReason")
+                val state = resolveStateByTurnId(event.turnId)
+                if (state == null) {
+                    reportUnmatchedFrame(event, event.turnId, event.runId)
+                    return
+                }
+                recordRuntimeEvent(event, state.conversationId)
+                if (ignoreForeignTurnStop(state, event)) return
+                recordStopReasonForTurn(state, event)
+                markTurnVisuallyComplete(state, reason = "stopReason")
             }
             is WsTimelineEvent.UsageStatistics -> {
-                recordRuntimeEvent(event, activeWsConversationId)
+                val state = resolveStateByTurnId(event.turnId)
+                if (state == null) {
+                    reportUnmatchedFrame(event, event.turnId, event.runId)
+                    return
+                }
+                recordRuntimeEvent(event, state.conversationId)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
                 // on the shim. Multi-step turns may produce per-step usage; the
                 // run-level record reflects the first. Drop subsequent ones.
-                if (usageRecordedForTurn) {
+                if (state.usageRecorded) {
                     Telemetry.event(
                         "AdminChatVM", "ws.usage.duplicate",
                         "turnId" to event.turnId,
                     )
                 } else {
-                    usageRecordedForTurn = true
+                    state.usageRecorded = true
                     ui.onUsage(
                         promptTokens = event.promptTokens.toInt(),
                         completionTokens = event.completionTokens.toInt(),
@@ -603,12 +766,18 @@ class ChatSendCoordinator(
                 }
             }
             is WsTimelineEvent.TurnDone -> {
-                // Lifecycle ownership is the terminal fence. It rejects delayed
-                // terminals from older generations without touching the accepted
-                // send or the newer turn that currently owns UI presence.
-                if (isStaleTerminalForOlderTurn(event.turnId)) {
+                // Lifecycle ownership is the terminal fence, now resolved to the
+                // OWNING conversation first. It rejects delayed terminals from
+                // older generations without touching the accepted send or the
+                // newer turn that currently owns UI presence — and, since PR2,
+                // without touching a DIFFERENT conversation's live turn.
+                val owner = resolveStateByTurnId(event.turnId)
+                if (owner == null || !owner.identity.acceptsTerminal(event.turnId)) {
+                    if (owner == null) reportUnmatchedFrame(event, event.turnId, event.runId)
                     if (event.status == "failed" || event.status == "cancelled") {
-                        val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+                        val conversationId = (owner ?: fallbackState())?.conversationId
+                            ?: lastActiveConversationId
+                            ?: defaultShimConversationId(agentId)
                         cleanupAbandonedAssistantFragmentsSafely(
                             conversationId = conversationId,
                             runId = event.runId,
@@ -623,13 +792,15 @@ class ChatSendCoordinator(
                         "AdminChatVM", "ws.turnDone.staleIgnored",
                         "incomingTurnId" to event.turnId,
                         "incomingRunId" to event.runId,
-                        "activeTurnId" to (activeWsTurnId ?: ""),
-                        "activeRunId" to (activeWsRunId ?: ""),
+                        "ownerConversationId" to (owner?.conversationId ?: ""),
+                        "activeTurnId" to (owner?.turnId ?: ""),
+                        "activeRunId" to (owner?.runId ?: ""),
                         "status" to event.status,
                     )
                     return
                 }
                 finishActiveTurn(
+                    state = owner,
                     status = event.status,
                     runId = event.runId,
                     turnId = event.turnId,
@@ -640,11 +811,15 @@ class ChatSendCoordinator(
                 )
             }
             is WsTimelineEvent.SubscribeDone -> {
-                if (activeWsOtid != null || ui.isStreaming()) {
+                // SubscribeDone carries a run id only; resolve the owning
+                // conversation from it before finalizing anything.
+                val state = resolveStateByRunId(event.runId)
+                if (state != null && (state.otid != null || ui.isStreaming())) {
                     finishActiveTurn(
+                        state = state,
                         status = event.status,
                         runId = event.runId,
-                        turnId = activeWsTurnId.orEmpty(),
+                        turnId = state.turnId.orEmpty(),
                         lossy = false,
                         dropCount = 0L,
                         reason = "subscribeDone",
@@ -654,7 +829,7 @@ class ChatSendCoordinator(
             }
             is WsTimelineEvent.Error -> {
                 if (event.code == CURSOR_EXPIRED_ERROR_CODE) {
-                    val conversationId = event.conversationId ?: activeWsConversationId ?: activeConversationId()
+                    val conversationId = event.conversationId ?: lastActiveConversationId ?: activeConversationId()
                     if (conversationId != null) {
                         runCatching {
                             timelineRepository.repairExpiredConversationCursorScoped(
@@ -681,29 +856,33 @@ class ChatSendCoordinator(
                         return
                     }
                 }
-                // Ignore Error frames for other conversations/turns so a foreign
-                // failure cannot poison this turn's buffered reason.
-                if (event.conversationId != null &&
-                    activeWsConversationId != null &&
-                    event.conversationId != activeWsConversationId
-                ) {
+                // An Error frame belongs to the conversation it names. Buffering
+                // it into THAT conversation's state (instead of a single global)
+                // is what stops a foreign failure from poisoning another
+                // conversation's turn.
+                val state = resolveStateForError(event)
+                if (state == null) {
+                    reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
+                // Still ignore a frame for a different TURN inside the same
+                // conversation so a superseded turn cannot poison the live one.
                 if (event.turnId != null &&
-                    activeWsTurnId != null &&
-                    event.turnId != activeWsTurnId
+                    state.turnId != null &&
+                    event.turnId != state.turnId
                 ) {
                     return
                 }
-                recordRuntimeEvent(event, activeWsConversationId)
+                recordRuntimeEvent(event, state.conversationId)
                 // lcp-axv: stash the error and wait for the immediately-
                 // following TurnDone to flip the UI. Surfacing the error
                 // here would race with TurnDone and could leave isStreaming
                 // / isAgentTyping stuck if TurnDone is delayed.
-                bufferedErrorMessage = event.message.ifBlank { event.code }
-                bufferedErrorKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }
+                state.bufferedErrorMessage = event.message.ifBlank { event.code }
+                state.bufferedErrorKind = event.code.takeIf { TurnFailureNotices.isKnownKind(it) }
                 Telemetry.event(
                     "AdminChatVM", "ws.error.buffered",
+                    "conversationId" to state.conversationId,
                     "code" to event.code,
                     "message" to (event.message),
                     "turnId" to (event.turnId ?: ""),
@@ -717,14 +896,15 @@ class ChatSendCoordinator(
                         "code" to event.code,
                         "attempt" to event.reconnectAttempt,
                     )
-                    ui.onTransientDisconnect(hasActiveSend = activeWsOtid != null)
+                    ui.onTransientDisconnect(hasActiveSend = snapshotStates().any { it.otid != null })
                     return
                 }
                 failActiveTurnForDisconnect(event)
             }
             is WsTimelineEvent.GoalsUpdated -> Unit
             is WsTimelineEvent.AgentUpdated -> Unit
-            is WsTimelineEvent.UserActionOutcome -> recordRuntimeEvent(event, activeWsConversationId)
+            is WsTimelineEvent.UserActionOutcome ->
+                recordRuntimeEvent(event, event.conversationId ?: lastActiveConversationId)
         }
     }
 
@@ -734,9 +914,10 @@ class ChatSendCoordinator(
 
     private suspend fun handleRedialWhileTurnActiveLocked(event: RedialWhileTurnActive) {
         if (event.agentId != agentId) return
-        val activeConversation = activeWsConversationId ?: activeConversationId()
-        if (activeConversation != event.conversationId) return
-        if (activeWsOtid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
+        // Redial recovery is conversation-scoped on the wire; only the named
+        // conversation's own turn state may be finalized by it.
+        val state = peekState(event.conversationId) ?: return
+        if (state.otid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
         runCatching {
             timelineRepository.reconcileRecentMessages(
                 agentId = agentId,
@@ -753,6 +934,7 @@ class ChatSendCoordinator(
             )
         }
         finishActiveTurn(
+            state = state,
             status = "completed",
             runId = event.runId,
             turnId = event.turnId,
@@ -768,7 +950,8 @@ class ChatSendCoordinator(
     }
 
     private suspend fun handleTurnStarted(event: WsTimelineEvent.TurnStarted) {
-        val identityTransition = turnIdentity.turnStarted(
+        val state = stateFor(event.conversationId)
+        val identityTransition = state.identity.turnStarted(
             conversationId = event.conversationId,
             turnId = event.turnId,
             runId = event.runId,
@@ -780,28 +963,31 @@ class ChatSendCoordinator(
         // assistant run-id set) mid-turn corrupted post-tool
         // settlement and contributed to the flicker. Update the run id
         // and keep the turn state intact.
-        val exactActiveTurn = event.turnId == activeWsTurnId &&
-            event.conversationId == activeWsConversationId
+        // Conversation equality is now implicit: `state` IS this conversation's entry.
+        val exactActiveTurn = event.turnId == state.turnId
         if (identityTransition is TurnIdentityTransition.SameTurn && exactActiveTurn) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnStarted.runPromoted",
+                "conversationId" to event.conversationId,
                 "turnId" to event.turnId,
-                "previousRunId" to (activeWsRunId ?: ""),
+                "previousRunId" to (state.runId ?: ""),
                 "runId" to event.runId,
             )
-            activeWsRunId = event.runId
+            state.runId = event.runId
             return
         }
         // dir4k (z5vfy PR-3): optimistic-local / OTID settlement. A new
         // turn is starting while a PREVIOUS turn's optimistic-local user
-        // bubble may still be unsettled (activeWsOtid set, no terminal
+        // bubble may still be unsettled (this conversation's otid set, no terminal
         // reconciled it). If we adopt the new turn without settling the
         // old otid, the orphaned pending-local row keeps the coordinator
         // believing a send is in flight and re-latches Thinking. Since a
         // fresh server turn is proceeding, the prior local send did land:
         // settle it as sent before adopting the new turn identity.
-        activeWsOtid?.let { staleOtid ->
-            val staleLocalConv = activeWsLocalConversationId ?: activeWsConversationId ?: event.conversationId
+        // PR2: only THIS conversation's unsettled otid is settled here. The old
+        // global read settled (and then dropped) another conversation's live send.
+        state.otid?.let { staleOtid ->
+            val staleLocalConv = state.localConversationId ?: event.conversationId
             scope.launch {
                 runCatching {
                     timelineRepository.markExternalTransportLocalSent(agentId, staleLocalConv, staleOtid)
@@ -814,20 +1000,21 @@ class ChatSendCoordinator(
                 "conversationId" to event.conversationId,
             )
         }
-        activeWsConversationId = event.conversationId
-        activeWsTurnId = event.turnId
-        activeWsRunId = event.runId
-        activeAssistantMessageRunIds.clear()
-        stopReasonForTurn = null
-        usageRecordedForTurn = false
-        bufferedErrorMessage = null
-        bufferedErrorKind = null
-        deliveredAssistantContentThisTurn = false
+        lastActiveConversationId = event.conversationId
+        state.turnId = event.turnId
+        state.runId = event.runId
+        state.reachedTerminal = false
+        state.activeAssistantMessageRunIds.clear()
+        state.stopReason = null
+        state.usageRecorded = false
+        state.bufferedErrorMessage = null
+        state.bufferedErrorKind = null
+        state.deliveredAssistantContent = false
         // letta-mobile-dangling-tool: a fresh turn on this conversation
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
         runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
-        recordRuntimeEvent(event, activeWsConversationId)
+        recordRuntimeEvent(event, event.conversationId)
         setActiveConversationId(event.conversationId)
         startTimelineObserver(event.conversationId)
         ui.onTurnStarted(event.conversationId)
@@ -886,7 +1073,9 @@ class ChatSendCoordinator(
     private fun bridgeEventKey(event: WsTimelineEvent): String? = when (event) {
         is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}"
         is WsTimelineEvent.MessageDelta -> {
-            val conversationId = activeWsConversationId ?: activeConversationId().orEmpty()
+            val conversationId = event.conversationId
+                ?: lastActiveConversationId
+                ?: activeConversationId().orEmpty()
             val message = event.message
             "message|$conversationId|${message.id}|${message.messageType}|${message.runId.orEmpty()}|${messageContentForDedupe(message)}"
         }
@@ -996,22 +1185,25 @@ class ChatSendCoordinator(
      * delivered reply without one still counts as delivered.
      */
     private fun countsAsActiveTurnDelivery(
+        state: ConversationTurnState,
         message: AssistantMessage,
         frameConversationId: String?,
         isReplay: Boolean,
     ): Boolean {
         if (isReplay) return false
-        if (activeWsTurnId == null) return false
+        if (state.turnId == null) return false
         if (message.content.isBlank()) return false
-        if (!frameConversationMatchesActive(frameConversationId)) return false
-        return runMatchesActiveTurn(message.runId)
+        if (!frameConversationMatchesActive(state, frameConversationId)) return false
+        return runMatchesActiveTurn(state, message.runId)
     }
 
     /** Untagged frames (r3i1z) fall back to active-turn scoping. */
-    private fun frameConversationMatchesActive(frameConversationId: String?): Boolean {
-        val active = activeWsConversationId ?: return true
+    private fun frameConversationMatchesActive(
+        state: ConversationTurnState,
+        frameConversationId: String?,
+    ): Boolean {
         val tagged = frameConversationId ?: return true
-        return tagged == active
+        return tagged == state.conversationId
     }
 
     /**
@@ -1019,27 +1211,29 @@ class ChatSendCoordinator(
      * promotion may not have landed yet); a message without a run id falls
      * back to active-turn scoping.
      */
-    private fun runMatchesActiveTurn(runId: String?): Boolean {
+    private fun runMatchesActiveTurn(state: ConversationTurnState, runId: String?): Boolean {
         val messageRunId = runId?.takeIf { it.isNotBlank() } ?: return true
-        val activeRun = activeWsRunId ?: return true
+        val activeRun = state.runId ?: return true
         if (IROH_SYNTHETIC_RUN_ID_PREFIXES.any { activeRun.startsWith(it) }) return true
         return messageRunId == activeRun
     }
 
     private fun rememberActiveAssistantMessageRunId(
+        state: ConversationTurnState?,
         message: LettaMessage,
         frameConversationId: String?,
         isReplay: Boolean,
     ) {
+        if (state == null) return
         if (message !is AssistantMessage) return
-        if (countsAsActiveTurnDelivery(message, frameConversationId, isReplay)) {
-            deliveredAssistantContentThisTurn = true
+        if (countsAsActiveTurnDelivery(state, message, frameConversationId, isReplay)) {
+            state.deliveredAssistantContent = true
         }
         val messageRunId = message.runId?.takeIf { it.isNotBlank() }
         if (messageRunId == null) return
-        activeAssistantMessageRunIds += messageRunId
-        while (activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
-            activeAssistantMessageRunIds.remove(activeAssistantMessageRunIds.first())
+        state.activeAssistantMessageRunIds += messageRunId
+        while (state.activeAssistantMessageRunIds.size > MAX_ACTIVE_ASSISTANT_RUN_IDS) {
+            state.activeAssistantMessageRunIds.remove(state.activeAssistantMessageRunIds.first())
         }
     }
 
@@ -1065,9 +1259,6 @@ class ChatSendCoordinator(
         }
     }
 
-    private fun isStaleTerminalForOlderTurn(incomingTurnId: String): Boolean =
-        !turnIdentity.acceptsTerminal(incomingTurnId)
-
     /**
      * lcp-cv3: stop_reason is first-wins for telemetry, but intermediate stops
      * (requires_approval) may still be followed by a completed main-reply stop —
@@ -1079,11 +1270,15 @@ class ChatSendCoordinator(
      * evidence — a foreign completed stop would suppress the active turn's
      * failure notice.
      */
-    private fun ignoreForeignTurnStop(event: WsTimelineEvent.StopReason): Boolean {
-        val activeTurn = activeWsTurnId ?: return false
+    private fun ignoreForeignTurnStop(
+        state: ConversationTurnState,
+        event: WsTimelineEvent.StopReason,
+    ): Boolean {
+        val activeTurn = state.turnId ?: return false
         if (event.turnId.isBlank() || event.turnId == activeTurn) return false
         Telemetry.event(
             "AdminChatVM", "ws.stopReason.foreignTurnIgnored",
+            "conversationId" to state.conversationId,
             "received" to event.stopReason,
             "turnId" to event.turnId,
             "activeTurnId" to activeTurn,
@@ -1091,11 +1286,14 @@ class ChatSendCoordinator(
         return true
     }
 
-    private fun recordStopReasonForTurn(event: WsTimelineEvent.StopReason) {
-        val previous = stopReasonForTurn
+    private fun recordStopReasonForTurn(
+        state: ConversationTurnState,
+        event: WsTimelineEvent.StopReason,
+    ) {
+        val previous = state.stopReason
         when {
             previous == null -> {
-                stopReasonForTurn = event.stopReason
+                state.stopReason = event.stopReason
                 Telemetry.event(
                     "AdminChatVM", "ws.stopReason",
                     "value" to event.stopReason,
@@ -1105,7 +1303,7 @@ class ChatSendCoordinator(
             }
             TurnFailureNotices.isCompletedMainReplyStopReason(event.stopReason) &&
                 !TurnFailureNotices.isCompletedMainReplyStopReason(previous) -> {
-                stopReasonForTurn = event.stopReason
+                state.stopReason = event.stopReason
                 Telemetry.event(
                     "AdminChatVM", "ws.stopReason.upgraded",
                     "previous" to previous,
@@ -1125,6 +1323,7 @@ class ChatSendCoordinator(
     }
 
     private suspend fun finishActiveTurn(
+        state: ConversationTurnState,
         status: String,
         runId: String,
         turnId: String,
@@ -1133,20 +1332,21 @@ class ChatSendCoordinator(
         reason: String,
         recordEvent: WsTimelineEvent.TurnDone?,
     ) {
-        val conversationId = activeWsConversationId ?: defaultShimConversationId(agentId)
+        val conversationId = state.conversationId.takeIf { it.isNotBlank() }
+            ?: defaultShimConversationId(agentId)
         // letta-mobile-br5g0: a Failed terminal has two very different user
         // meanings. Only a turn that delivered NO completed assistant reply is a
         // dead turn worth a hard error state; a Failed terminal that lands after
         // the reply completed (non-error stop_reason) is a trailing aux-step
         // failure and must not be painted like a dead turn.
-        val mainReplyCompleted = deliveredAssistantContentThisTurn &&
-            TurnFailureNotices.isCompletedMainReplyStopReason(stopReasonForTurn)
+        val mainReplyCompleted = state.deliveredAssistantContent &&
+            TurnFailureNotices.isCompletedMainReplyStopReason(state.stopReason)
         val failureNotice = if (status == "failed") {
             TurnFailureNotices.forFailedTerminal(
-                reason = bufferedErrorMessage,
-                deliveredAssistantContent = deliveredAssistantContentThisTurn,
+                reason = state.bufferedErrorMessage,
+                deliveredAssistantContent = state.deliveredAssistantContent,
                 mainReplyCompleted = mainReplyCompleted,
-                kindHint = bufferedErrorKind,
+                kindHint = state.bufferedErrorKind,
             )
         } else {
             null
@@ -1161,7 +1361,7 @@ class ChatSendCoordinator(
                 runId = runId,
                 turnId = turnId,
                 reason = "turn_done_$status",
-                candidateRunIds = activeCleanupCandidateRunIds(runId),
+                candidateRunIds = activeCleanupCandidateRunIds(state, runId),
             )
         }
         if (recordEvent != null) {
@@ -1174,7 +1374,7 @@ class ChatSendCoordinator(
                 "turnId" to turnId,
                 "runId" to runId,
             )
-            activeWsOtid?.let { otid ->
+            state.otid?.let { otid ->
                 timelineRepository.reconcileExternalTransportSend(
                     conversationId = conversationId,
                     agentId = agentId,
@@ -1189,42 +1389,43 @@ class ChatSendCoordinator(
                 "turnId" to turnId,
                 "runId" to runId,
                 // Sanitized family only — never the raw reason (letta-mobile-o0atv).
-                "reasonKind" to (bufferedErrorKind ?: terminalReasonKind(bufferedErrorMessage) ?: "<none>"),
+                "reasonKind" to (state.bufferedErrorKind ?: terminalReasonKind(state.bufferedErrorMessage) ?: "<none>"),
             )
         }
         failureNotice?.let { notice ->
             appendTurnFailureNotice(conversationId, runId, turnId, notice)
         }
-        activeWsOtid?.let { otid ->
-            val localConversationId = activeWsLocalConversationId ?: conversationId
+        state.otid?.let { otid ->
+            val localConversationId = state.localConversationId ?: conversationId
             if (deadTurn) {
                 timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
             } else {
                 timelineRepository.markExternalTransportLocalSent(agentId, localConversationId, otid)
             }
         }
-        val stopReasonError = stopReasonForTurn.equals("error", ignoreCase = true)
+        val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
         val nextError = when (status) {
-            "completed" -> bufferedErrorMessage
+            "completed" -> state.bufferedErrorMessage
                 ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
             "cancelled" -> ui.currentError()
             // Delivered-then-failed keeps whatever error state was already on
             // screen (normally none) — the user got their answer.
             "failed" -> if (deadTurn) {
-                bufferedErrorMessage ?: failureNotice!!.message
+                state.bufferedErrorMessage ?: failureNotice!!.message
             } else {
                 ui.currentError()
             }
-            else -> bufferedErrorMessage
+            else -> state.bufferedErrorMessage
                 ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly ($status)"
         }
         ui.onTurnFinished(nextError)
         Telemetry.event(
             "AdminChatVM", "ws.turnComplete",
+            "conversationId" to conversationId,
             "status" to status,
             "turnId" to turnId,
             "runId" to runId,
-            "stopReason" to (stopReasonForTurn ?: ""),
+            "stopReason" to (state.stopReason ?: ""),
             "lossy" to lossy,
             "reason" to reason,
         )
@@ -1240,91 +1441,138 @@ class ChatSendCoordinator(
         // cancelled) needs exactly this unconditional reschedule or it would
         // never resolve.
         runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
-        clearActiveTurnState()
+        state.reachedTerminal = true
+        clearActiveTurnState(state, reason = "turnFinished")
         timelineRepository.clearExternalTransportActive(conversationId)
         drainPendingSend()
     }
 
-    private fun healStaleVisualPresence() {
-        // letta-mobile-or40x PR1: behavior-preserving rename only. This read was
-        // (and still is) unscoped; scoping it to the coordinator's conversation is
-        // PR2's job, together with the coordinator's own single-turn state.
-        if (wsChatBridge.hasAnyActiveChatTurn) return
+    /**
+     * letta-mobile-or40x PR2: SCOPED to the conversation whose presence is being
+     * healed. The unscoped `hasAnyActiveChatTurn` read meant conversation B's live
+     * turn suppressed conversation A's self-heal, so an evicted or orphaned A
+     * presence was never recovered. Only a send with no known target (a brand-new
+     * conversation) still falls back to the any-turn question.
+     */
+    private fun healStaleVisualPresence(conversationId: String?) {
+        val transportOwnsTurn = if (conversationId != null) {
+            wsChatBridge.hasActiveChatTurn(conversationId)
+        } else {
+            wsChatBridge.hasAnyActiveChatTurn
+        }
+        if (transportOwnsTurn) return
         if (!ui.isStreaming() && !ui.isAgentTyping()) return
         ui.onTurnVisuallyComplete()
-        clearActiveTurnState()
-        Telemetry.event("IrohTrace", "coordinator.send.stalePresenceHealed")
+        peekState(conversationId)?.let { clearActiveTurnState(it, reason = "stalePresenceHealed") }
+        Telemetry.event(
+            "IrohTrace", "coordinator.send.stalePresenceHealed",
+            "conversationId" to conversationId,
+        )
     }
 
-    private fun clearActiveTurnState() {
-        activeWsOtid = null
-        turnIdentity.clear()
-        activeWsLocalConversationId = null
-        activeWsTurnId = null
-        activeWsRunId = null
-        activeAssistantMessageRunIds.clear()
-        stopReasonForTurn = null
-        usageRecordedForTurn = false
-        bufferedErrorMessage = null
-        bufferedErrorKind = null
-        deliveredAssistantContentThisTurn = false
+    /**
+     * Clears ONE conversation's turn state. Callers must pass the entry they own —
+     * the old unkeyed version wiped every conversation's identity, which is how
+     * conversation A's terminal froze conversation B's in-flight send.
+     */
+    private fun clearActiveTurnState(state: ConversationTurnState, reason: String) {
+        // SENSING (letta-mobile-or40x): an entry dropped before its terminal.
+        if (state.isTracking && !state.reachedTerminal) {
+            Telemetry.event(
+                "AdminChatVM", "ws.turnState.clearedBeforeTerminal",
+                "conversationId" to state.conversationId,
+                "reason" to reason,
+                "turnId" to (state.turnId ?: ""),
+                "runId" to (state.runId ?: ""),
+                "otid" to (state.otid ?: ""),
+            )
+        }
+        state.otid = null
+        state.identity.clear()
+        state.localConversationId = null
+        state.turnId = null
+        state.runId = null
+        state.activeAssistantMessageRunIds.clear()
+        state.stopReason = null
+        state.usageRecorded = false
+        state.bufferedErrorMessage = null
+        state.bufferedErrorKind = null
+        state.deliveredAssistantContent = false
     }
 
     private suspend fun failActiveTurnForDisconnect(event: WsTimelineEvent.Disconnected) {
-        val conversationId = activeWsConversationId ?: activeConversationId()
-        activeWsOtid?.let { otid ->
-            val localConversationId = activeWsLocalConversationId ?: conversationId
-            if (localConversationId != null) {
-                timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
-            } else {
-                Telemetry.event(
-                    "AdminChatVM", "ws.activeSend.failedWithoutConversation",
-                    "otid" to otid,
-                    "disconnectCode" to event.code,
-                )
-            }
-        }
+        // A terminal disconnect kills EVERY conversation's turn, so this is the
+        // one path that legitimately walks all entries — each is failed against
+        // its own conversation id instead of one guessed global.
+        val states = snapshotStates()
         preConversationMessageDeltas.clear()
         clearPendingSends("disconnect")
-        if (conversationId != null) {
-            val cleanupRunId = activeWsRunId
-            val cleanupTurnId = activeWsTurnId
-            if (activeWsOtid != null || cleanupRunId != null || cleanupTurnId != null) {
-                cleanupAbandonedAssistantFragmentsSafely(
-                    conversationId = conversationId,
-                    runId = cleanupRunId,
-                    turnId = cleanupTurnId,
-                    reason = "disconnect",
-                    candidateRunIds = activeCleanupCandidateRunIds(cleanupRunId),
-                )
+        for (state in states) {
+            val conversationId = state.conversationId.takeIf { it.isNotBlank() } ?: activeConversationId()
+            state.otid?.let { otid ->
+                val localConversationId = state.localConversationId ?: conversationId
+                if (localConversationId != null) {
+                    timelineRepository.markExternalTransportLocalFailed(agentId, localConversationId, otid)
+                } else {
+                    Telemetry.event(
+                        "AdminChatVM", "ws.activeSend.failedWithoutConversation",
+                        "otid" to otid,
+                        "disconnectCode" to event.code,
+                    )
+                }
             }
-            timelineRepository.clearExternalTransportActive(conversationId)
-            // letta-mobile-dangling-tool: an abnormal end (not a clean
-            // completion) — this turn's OWN calls are already settled
-            // synchronously by AppServerTurnEngine on disconnect/cancel/error
-            // paths, so they won't show up as unresolved here. Still call
-            // turnEnded unconditionally (Codex #902 review finding 3): a
-            // DIFFERENT, earlier turn's dangling card may have had its sweep
-            // cancelled by this turn's turnStarted() and needs this call to
-            // reschedule it, or it would spin forever.
-            runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
+            if (conversationId != null) {
+                val cleanupRunId = state.runId
+                val cleanupTurnId = state.turnId
+                if (state.otid != null || cleanupRunId != null || cleanupTurnId != null) {
+                    cleanupAbandonedAssistantFragmentsSafely(
+                        conversationId = conversationId,
+                        runId = cleanupRunId,
+                        turnId = cleanupTurnId,
+                        reason = "disconnect",
+                        candidateRunIds = activeCleanupCandidateRunIds(state, cleanupRunId),
+                    )
+                }
+                timelineRepository.clearExternalTransportActive(conversationId)
+                // letta-mobile-dangling-tool: an abnormal end (not a clean
+                // completion) — this turn's OWN calls are already settled
+                // synchronously by AppServerTurnEngine on disconnect/cancel/error
+                // paths, so they won't show up as unresolved here. Still call
+                // turnEnded unconditionally (Codex #902 review finding 3): a
+                // DIFFERENT, earlier turn's dangling card may have had its sweep
+                // cancelled by this turn's turnStarted() and needs this call to
+                // reschedule it, or it would spin forever.
+                runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
+            }
+            state.reachedTerminal = true
+            clearActiveTurnState(state, reason = "disconnect")
+        }
+        if (states.isEmpty()) {
+            // Nothing was tracked, but the visible conversation still needs its
+            // transport-active flag and dangling-tool sweep reset.
+            activeConversationId()?.let { conversationId ->
+                timelineRepository.clearExternalTransportActive(conversationId)
+                runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = false) }
+            }
         }
         ui.onDisconnectFailure(event.reason.ifBlank { "WebSocket disconnected" })
-        clearActiveTurnState()
     }
 
-    private fun activeCleanupCandidateRunIds(primaryRunId: String?): Set<String> = buildSet {
+    private fun activeCleanupCandidateRunIds(
+        state: ConversationTurnState,
+        primaryRunId: String?,
+    ): Set<String> = buildSet {
         primaryRunId?.takeIf { it.isNotBlank() }?.let(::add)
-        activeWsRunId?.takeIf { it.isNotBlank() }?.let(::add)
-        activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
+        state.runId?.takeIf { it.isNotBlank() }?.let(::add)
+        state.activeAssistantMessageRunIds.mapNotNullTo(this) { it.takeIf(String::isNotBlank) }
     }
 
-    private suspend fun markTurnVisuallyComplete(reason: String) {
-        val conversationId = activeWsConversationId
+    private suspend fun markTurnVisuallyComplete(state: ConversationTurnState, reason: String) {
+        val conversationId = state.conversationId.takeIf { it.isNotBlank() }
             ?: activeConversationId()
             ?: defaultShimConversationId(agentId)
-        activeWsOtid?.let { otid ->
-            timelineRepository.markExternalTransportLocalSent(agentId, activeWsLocalConversationId ?: conversationId, otid)
+        state.otid?.let { otid ->
+            timelineRepository.markExternalTransportLocalSent(agentId, state.localConversationId ?: conversationId, otid)
         }
         timelineRepository.clearExternalTransportActive(agentId, conversationId)
         ui.onTurnVisuallyComplete()
@@ -1332,15 +1580,28 @@ class ChatSendCoordinator(
             "AdminChatVM", "ws.turnVisuallyComplete",
             "conversationId" to conversationId,
             "reason" to reason,
-            "turnId" to (activeWsTurnId ?: ""),
+            "turnId" to (state.turnId ?: ""),
         )
     }
 
+    /**
+     * An Error frame that names a conversation belongs to that conversation's
+     * entry (created if this is the first thing we have seen for it — buffering
+     * there is harmless and strictly better than poisoning a live turn). Untagged
+     * frames fall back to turn-id resolution.
+     */
+    private fun resolveStateForError(event: WsTimelineEvent.Error): ConversationTurnState? {
+        event.conversationId?.takeIf { it.isNotBlank() }?.let { return stateFor(it) }
+        return resolveStateByTurnId(event.turnId)
+    }
+
     private suspend fun drainPreConversationMessages(conversationId: String) {
+        val state = peekState(conversationId)
         while (true) {
             val delta = preConversationMessageDeltas.removeFirstOrNull() ?: return
             recordRuntimeEvent(delta, conversationId)
             rememberActiveAssistantMessageRunId(
+                state = state,
                 message = delta.message,
                 frameConversationId = delta.conversationId,
                 isReplay = delta.isReplay,
@@ -1357,6 +1618,11 @@ class ChatSendCoordinator(
         private val sharedMessageEventKeys = ArrayDeque<String>()
         private val sharedMessageEventKeySet = mutableSetOf<String>()
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
+
+        // letta-mobile-or40x PR2: bound on per-conversation turn entries. Real
+        // usage keeps a handful live; the cap only stops an unbounded map when
+        // frames arrive for many conversations. Overflow eviction is telemetered.
+        private const val MAX_TRACKED_CONVERSATION_TURN_STATES = 32
         private const val DEQUEUE_RETRY_DELAY_MS = 50L
         internal var postSendReconcileDelaysMs = longArrayOf(750L, 2_500L, 6_000L)
         private const val BARE_STOP_REASON_ERROR_MESSAGE =
