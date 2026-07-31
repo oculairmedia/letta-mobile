@@ -48,6 +48,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Job
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
@@ -171,6 +174,15 @@ class AppServerTurnEngine(
      * result belongs to a REQUEST, not to whichever runtime observed it.
      */
     private val externalToolResultCache = ExternalToolResultCache()
+
+    /**
+     * lgns8.17(c): per-invocation deadline for [ExternalTool.invoke].
+     *
+     * NOT a constructor parameter on purpose — it is a protocol-derived constant,
+     * not a per-host tuning knob, and the value must stay strictly inside the
+     * server's own window.
+     */
+    private val externalToolTimeoutMs: Long = EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS
 
     private fun slotFor(command: TurnCommand): TurnLeaseSlot =
         leases.slotFor(TurnRuntimeKey(command.agentId.value, command.conversationId.value))
@@ -313,7 +325,30 @@ class AppServerTurnEngine(
         request: AppServerInboundFrame.ExternalToolCallRequest,
     ): AppServerExternalToolResult {
         val computed = try {
-            when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
+            // lgns8.17(c): BOUND the invocation. ExternalTool.invoke is arbitrary
+            // controller code; without a deadline the only bound is the turn idle
+            // watchdog, which a parked approval can pause indefinitely. On expiry we
+            // synthesize a matched is_error so the turn still terminates.
+            val outcome = if (externalToolRegistry == null) {
+                null
+            } else {
+                withTimeoutOrNull(externalToolTimeoutMs.milliseconds) {
+                    externalToolRegistry.invoke(request.toolName, request.input)
+                } ?: run {
+                    Telemetry.event(
+                        "AppServerTurnEngine", "externalTool.invocationTimedOut",
+                        "requestId" to request.requestId,
+                        "toolCallId" to request.toolCallId,
+                        "toolName" to request.toolName,
+                        "timeoutMs" to externalToolTimeoutMs,
+                        level = Telemetry.Level.WARN,
+                    )
+                    ExternalToolResult.Error(
+                        "external tool '${request.toolName}' timed out after ${externalToolTimeoutMs}ms",
+                    )
+                }
+            }
+            when (outcome) {
                 is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
                 is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
                 null -> toolResult(
@@ -343,9 +378,10 @@ class AppServerTurnEngine(
      * disconnect racing this frame cannot make it execute/claim under the
      * successor generation.
      */
-    private suspend fun answerExternalToolCallIfPresent(
+    private fun answerExternalToolCallIfPresent(
         received: AppServerReceivedFrame,
         lease: LeaseRef,
+        dispatchScope: CoroutineScope,
     ) {
         val toolRequest = received.frame as? AppServerInboundFrame.ExternalToolCallRequest ?: return
         val validatedGeneration = validatedLeaseGeneration(lease)
@@ -360,7 +396,72 @@ class AppServerTurnEngine(
             )
             return
         }
-        guaranteeExternalToolResponse(toolRequest, lease.token, validatedGeneration)
+        // lgns8.17(c): DO NOT await the tool on the collect loop.
+        //
+        // ExternalTool.invoke used to run inline here. The fanout delivers to each
+        // subscriber over a BOUNDED channel and awaits every send
+        // (RuntimeEventFanout.deliverToChannels), so once a slow tool filled this
+        // turn's buffer the fanout's single collector on client.events blocked and
+        // frame ingestion stalled for EVERY runtime on the connection — a 2-minute
+        // tool in conversation A froze conversation B.
+        //
+        // The job is launched on [dispatchScope], which shares this turn's
+        // dispatcher but NOT its Job, so a turn that terminates (or is cancelled)
+        // while a tool is in flight still delivers the response the App Server is
+        // blocking on. That is deliberate: the response guarantee outranks tidy
+        // shutdown, and it is bounded by [externalToolTimeoutMs] plus the
+        // generation fences inside the handler, which prevent an old-generation
+        // response from ever being written onto a successor connection.
+        dispatchScope.launch {
+            guaranteeExternalToolResponse(toolRequest, lease.token, validatedGeneration)
+        }
+    }
+
+    /**
+     * lgns8.17(d): answer an `external_tool_call_request` that NO turn lease owns.
+     *
+     * The original hang class. Every answer path in this engine hangs off a turn's
+     * collect loop, which only exists while a lease is held. A request that arrives
+     * with no active turn for its runtime key — server-initiated, replayed after a
+     * reconnect into an idle client, or racing the end of a turn — therefore had no
+     * observer at all and blocked the App Server for its full 5-minute
+     * `EXTERNAL_TOOL_CALL_TIMEOUT_MS`.
+     *
+     * Safe to call for every inbound request: it NO-OPS when a lease exists for the
+     * request's runtime key, leaving the turn's collect loop to answer (which also
+     * preserves the UI ToolCallObserved draft that path emits). Even if both raced,
+     * [InboundControlRequestRegistry] grants the claim to exactly one and the
+     * [ExternalToolResultCache] makes a second answer idempotent.
+     *
+     * @return true when this call took ownership and answered.
+     */
+    suspend fun answerUnleasedExternalToolCall(
+        request: AppServerInboundFrame.ExternalToolCallRequest,
+    ): Boolean {
+        val runtime = request.runtime
+        val leaseHeld = if (runtime != null) {
+            leases.peek(TurnRuntimeKey(runtime.agentId, runtime.conversationId))?.lease != null
+        } else {
+            // Runtime-less request: any live turn's collect loop can claim it
+            // (matches() treats runtime-less control frames as claimable), so defer.
+            leases.snapshot().any { it.lease != null }
+        }
+        if (leaseHeld) return false
+        Telemetry.event(
+            "AppServerTurnEngine", "externalTool.unleasedAnswer",
+            "requestId" to request.requestId,
+            "toolCallId" to request.toolCallId,
+            "toolName" to request.toolName,
+            "agentId" to (runtime?.agentId ?: ""),
+            "conversationId" to (runtime?.conversationId ?: ""),
+            level = Telemetry.Level.WARN,
+        )
+        guaranteeExternalToolResponse(
+            request,
+            leaseToken = UNLEASED_LEASE_TOKEN,
+            validatedGeneration = connectionGenerationProvider(),
+        )
+        return true
     }
 
     /**
@@ -1135,6 +1236,17 @@ class AppServerTurnEngine(
         }
 
         var turnEndReason: String? = null
+        // lgns8.17(c): external-tool invocations run HERE, not on the collect loop.
+        // Same dispatcher as the turn (so a virtual-time test still drives them
+        // deterministically) but a detached SupervisorJob, so:
+        //  - a slow tool cannot back-pressure the fanout and stall frame ingestion
+        //    for every other runtime on this connection, and
+        //  - a turn that terminates mid-invocation still delivers the response the
+        //    App Server is blocking on.
+        // Deliberately NOT cancelled when the turn ends: each job is bounded by
+        // EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS and fenced by connection generation.
+        val externalToolDispatchScope =
+            CoroutineScope(coroutineContext.minusKey(Job) + SupervisorJob())
         // lgns8.22.4: when the server reassigns run id mid-turn (tool continuation),
         // prior ids are superseded and must not complete/mutate this lease.
         slot.runIdGate.beginLease(lease.token)
@@ -1207,7 +1319,7 @@ class AppServerTurnEngine(
                 // it). Reply here — this is the one place the raw frame still
                 // carries request_id (toToolCallDraft discards it) and the client
                 // is in scope. Runs BEFORE the mapper so the UI draft is unchanged.
-                answerExternalToolCallIfPresent(received, lease)
+                answerExternalToolCallIfPresent(received, lease, externalToolDispatchScope)
                 // letta-mobile-kyqdt: P1b RUN-ID PROMOTION (TELEMETRY-ONLY).
                 // Once the mapper reveals the server run id for this active turn,
                 // promote it into the owner via a pure copy(runId=…). This is the
@@ -1664,6 +1776,13 @@ class AppServerTurnEngine(
                 clientInfo = clientInfo,
                 recoverApprovals = true,
                 forceDeviceStatus = true,
+                // lgns8.17(a): the engine issues runtime_start only when no
+                // controller scope was resolvable, so it must advertise the same
+                // external tools the controller would have — otherwise the tool set
+                // the App Server registers depends on which code path opened the
+                // runtime. Absent/empty => the field is omitted and the server can
+                // never emit an external_tool_call_request.
+                externalTools = externalToolRegistry?.advertisedToolsCommandGroups(),
             ),
         )
         Telemetry.event("IrohTurn", "runtimeStart.response", "success" to response.success, "hasRuntime" to (response.runtime != null), "error" to response.error)
@@ -2242,7 +2361,9 @@ class AppServerTurnEngine(
 
     private fun currentTimeMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
-    private companion object {
+    // lgns8.17(c): internal (was private) so the external-tool deadline regression
+    // test asserts against the real constant instead of a copied literal.
+    internal companion object {
         private var nextRequestId = 0
 
         // 90s idle window: long enough for a slow first token / tool round-trip,
@@ -2251,6 +2372,29 @@ class AppServerTurnEngine(
         // turn never trips. Tunable via the ctor param.
         const val DEFAULT_TURN_IDLE_TIMEOUT_MS: Long = 300_000L
         const val DEFAULT_TERMINAL_SETTLE_QUIET_MS: Long = 1_500L
+        /**
+         * lgns8.17(c): deadline for ONE [ExternalTool.invoke].
+         *
+         * Chosen against the server's own bound, not picked for feel: letta-code's
+         * app-server parks an external tool call on a pending promise with
+         * `EXTERNAL_TOOL_CALL_TIMEOUT_MS = 5 * 60 * 1000` and rejects the tool call
+         * when it lapses. Our deadline must fire COMFORTABLY FIRST so the App
+         * Server receives a matched `is_error` response (the turn then terminates
+         * cleanly and the model sees a real tool result) rather than the server
+         * self-rejecting on a timeout it attributes to a dead controller. 120s
+         * leaves 3 minutes of slack for the send and any queuing, and is also well
+         * inside [DEFAULT_TURN_IDLE_TIMEOUT_MS] so a hung tool can never be the
+         * thing that trips the idle watchdog.
+         */
+        const val EXTERNAL_TOOL_INVOCATION_TIMEOUT_MS: Long = 120_000L
+
+        /**
+         * lgns8.17(d): sentinel lease token for an answer taken with NO turn lease.
+         * Real tokens come from `leaseTokenSeq.incrementAndGet()` and start at 1, so
+         * a negative value can never collide with a live lease's claim.
+         */
+        internal const val UNLEASED_LEASE_TOKEN: Long = -1L
+
         /** Fail-fast budget for busy-path run.get / run.list liveness probes. */
         const val LIVENESS_PROBE_TIMEOUT_MS: Long = 3_000L
         /** Aggregate budget for turn-context preflight while activeTurn is held. */
