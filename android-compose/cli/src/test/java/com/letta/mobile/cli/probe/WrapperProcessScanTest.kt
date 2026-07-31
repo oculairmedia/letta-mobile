@@ -47,6 +47,48 @@ class WrapperProcessScanTest {
         assertEquals("meridian-iroh-wrapper", WrapperProcessScan.DEFAULT_UNIT)
     }
 
+    /**
+     * jr5tx — the deployment gate must never be handed a "no wrapper here" escape
+     * hatch; that is exactly the false-green lgns8.21.9 removed.
+     */
+    @Test
+    fun `deployment mode rejects a not-applicable declaration`() {
+        val error = WrapperProcessScan.validateScanOptions(
+            WrapperScanMode.DEPLOYMENT,
+            pid = null,
+            notApplicableReason = "no systemd on this host",
+        )
+        assertTrue(error != null && error.contains("hermetic"), "expected a usage error, got $error")
+    }
+
+    @Test
+    fun `deployment mode needs no extra flags`() {
+        assertNull(WrapperProcessScan.validateScanOptions(WrapperScanMode.DEPLOYMENT, pid = null, notApplicableReason = null))
+        assertNull(WrapperProcessScan.validateScanOptions(WrapperScanMode.DEPLOYMENT, pid = 42, notApplicableReason = null))
+    }
+
+    /** Hermetic runs cannot resolve a unit, so they must name what they scan. */
+    @Test
+    fun `hermetic mode requires a pid or an explicit not-applicable reason`() {
+        assertTrue(
+            WrapperProcessScan.validateScanOptions(WrapperScanMode.HERMETIC, pid = null, notApplicableReason = null) != null,
+        )
+        assertNull(WrapperProcessScan.validateScanOptions(WrapperScanMode.HERMETIC, pid = 777, notApplicableReason = null))
+        assertNull(WrapperProcessScan.validateScanOptions(WrapperScanMode.HERMETIC, pid = null, notApplicableReason = "no wrapper"))
+        assertTrue(
+            WrapperProcessScan.validateScanOptions(WrapperScanMode.HERMETIC, pid = 777, notApplicableReason = "no wrapper") != null,
+            "a pid and a not-applicable reason contradict each other",
+        )
+    }
+
+    @Test
+    fun `scan mode is parsed from the cli and defaults nowhere`() {
+        assertEquals(WrapperScanMode.DEPLOYMENT, WrapperScanMode.fromCli("deployment"))
+        assertEquals(WrapperScanMode.HERMETIC, WrapperScanMode.fromCli(" HERMETIC "))
+        assertNull(WrapperScanMode.fromCli("auto"))
+        assertEquals(listOf("deployment", "hermetic"), WrapperScanMode.CLI_VALUES)
+    }
+
     @Test
     fun `liveness follows the proc directory`() {
         org.junit.jupiter.api.Assumptions.assumeTrue(java.io.File("/proc/self").isDirectory, "procfs required")
