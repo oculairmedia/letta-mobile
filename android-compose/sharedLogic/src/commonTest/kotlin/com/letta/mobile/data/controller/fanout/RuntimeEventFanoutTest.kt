@@ -549,6 +549,8 @@ class RuntimeEventFanoutTest {
                 requestId = "ext-1",
                 leaseToken = 1L,
                 connectionGeneration = 0L,
+                // lgns8.22.4.1.3: external-tool identity is (request_id, tool_call_id).
+                toolCallId = "tc-1",
             ),
         )
         fanout.route(received(request))
