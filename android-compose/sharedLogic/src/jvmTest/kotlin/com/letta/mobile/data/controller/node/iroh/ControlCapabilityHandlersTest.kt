@@ -171,7 +171,7 @@ class ControlCapabilityHandlersTest {
     @Test
     fun skillListProjectsFromInjectedCatalogWithoutShim() = runTest {
         val catalog = NativeSkillsCatalog()
-        catalog.replace(
+        catalog.hydrateFromHost(
             buildJsonArray {
                 add(buildJsonObject { put("name", "demo") })
             },
@@ -180,10 +180,7 @@ class ControlCapabilityHandlersTest {
         SkillAdminHandlers.register(
             r,
             nativeClient = FakeControlClient(),
-            skillsListing = object : SkillsListingSource {
-                override fun currentSkills() = catalog.snapshot()
-                override fun isHydrated() = catalog.isHydrated()
-            },
+            skillsListing = catalog.asListingSource(),
         )
         val listed = dispatch(r, "skill.list", emptyMap())
         assertTrue(listed.contains("\"success\":true") && listed.contains("demo"))
@@ -197,17 +194,48 @@ class ControlCapabilityHandlersTest {
     fun skillListReturnsEmptyUntilCatalogHydrated() = runTest {
         val catalog = NativeSkillsCatalog()
         val r = AdminRpcRouter()
-        SkillAdminHandlers.register(
-            r,
-            skillsListing = object : SkillsListingSource {
-                override fun currentSkills() = catalog.snapshot()
-                override fun isHydrated() = catalog.isHydrated()
-            },
-        )
+        SkillAdminHandlers.register(r, skillsListing = catalog.asListingSource())
         val listed = dispatch(r, "skill.list", emptyMap())
         assertTrue(listed.contains("\"success\":true"))
         assertTrue(listed.contains("\"hydrated\":false"))
         assertTrue(listed.contains("\"skills\":[]"))
+    }
+
+    /**
+     * lgns8.21.2 regression. `hydrated` was emitted as the literal `true` on the
+     * non-cold-start branch, so any listing source — including one that had never
+     * observed an authoritative enumeration — was reported as an authoritative
+     * catalog. Reverting `put("hydrated", hydrated)` to `put("hydrated", true)`
+     * fails this test.
+     */
+    @Test
+    fun skillListNeverFabricatesHydratedTrueForUnhydratedSource() = runTest {
+        val unhydrated = object : SkillsListingSource {
+            // Returns a non-null (but non-authoritative) array, exercising the
+            // branch that previously hard-coded hydrated=true.
+            override fun currentSkills() = buildJsonArray { }
+        }
+        val r = AdminRpcRouter()
+        SkillAdminHandlers.register(r, skillsListing = unhydrated)
+        val listed = dispatch(r, "skill.list", emptyMap())
+        assertTrue(listed.contains("\"success\":true"))
+        assertFalse(listed.contains("\"hydrated\":true"), "must not claim an authoritative catalog: $listed")
+        assertTrue(listed.contains("\"hydrated\":false"))
+        assertTrue(listed.contains("\"catalog_source\":\"unavailable\""))
+    }
+
+    /**
+     * lgns8.21.2 regression. With no listing source at all there is no possible
+     * authoritative catalog, so `skill.list` must fail closed rather than return
+     * an empty list marked hydrated.
+     */
+    @Test
+    fun skillListWithoutAnySourceReportsCapabilityUnavailable() = runTest {
+        val r = AdminRpcRouter()
+        SkillAdminHandlers.register(r, nativeClient = FakeControlClient())
+        val listed = dispatch(r, "skill.list", emptyMap())
+        assertTrue(listed.contains("\"success\":false"))
+        assertTrue(listed.contains("capability_unavailable"))
     }
 
     @Test

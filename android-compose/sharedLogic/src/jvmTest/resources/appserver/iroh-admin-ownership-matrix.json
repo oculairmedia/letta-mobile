@@ -1167,9 +1167,9 @@
     {
       "method": "skill.list",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "controller projection from device_status / skills_updated (NativeSkillsCatalog); empty skills + hydrated=false until first event",
+      "current_backend": "controller catalog (NativeSkillsCatalog) hydrated only from an authoritative enumeration; hydrated=false until one is observed",
       "owner": "app_server_v2",
-      "public_contract": "sync snapshot + skills_updated projection",
+      "public_contract": "authoritative catalog with explicit hydrated/stale/catalog_source provenance",
       "native_contract": [
         "sync",
         "skills_updated"
@@ -1178,7 +1178,7 @@
       "data_store": "letta_local_backend",
       "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "Phase 2: skill_list_command absent; listings derived from update_device_status.current_available_skills and skills_updated. Cold start returns {skills:[], hydrated:false} until first hydration event.",
+      "notes": "lgns8.21.2: verified against letta-code 0.29.12 (letta.js) the App Server advertises NO skill enumeration - skills_updated is {type,timestamp}, device_status.current_available_skills is hard-coded [], there is no skill_list command, and runtime_start.skill_sources is request-only. skills_updated is treated as invalidation; skill_enable_response/skill_disable_response apply authoritative deltas. skill.list returns capability_unavailable with no source and {skills:[],hydrated:false} while unhydrated - never a fabricated hydrated empty catalog.",
       "production_first_route": "controller_native",
       "post_shim_owner": "controller_native",
       "post_shim_fallback": "none"
@@ -1576,7 +1576,7 @@
         "skill.list",
         "skill.list_agent"
       ],
-      "policy": "skill.list projects from sync/skills_updated; skill.list_agent denies until agent-scoped assignment exists"
+      "policy": "skill.list serves only an authoritative enumeration (capability_unavailable / hydrated=false otherwise); skill.list_agent denies until agent-scoped assignment exists"
     }
   ],
   "unrouted_domains": [
