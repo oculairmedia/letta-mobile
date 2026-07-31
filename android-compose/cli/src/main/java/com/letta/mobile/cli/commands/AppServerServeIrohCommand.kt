@@ -61,6 +61,13 @@ import kotlin.time.Duration.Companion.seconds
 internal fun buildProductionAdminRouter(
     controller: DefaultAppServerController,
     subagentRegistrySource: SubagentRegistrySource? = null,
+    /**
+     * lgns8.22.8: when set, the controller-native subagent registry is backed by
+     * this JSON file, so chips survive a controller restart and are reconciled
+     * against live state on the next authoritative snapshot. Unset keeps the
+     * previous in-memory-only behaviour.
+     */
+    subagentRegistryFile: String? = null,
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
@@ -70,8 +77,13 @@ internal fun buildProductionAdminRouter(
     eventScope: CoroutineScope? = null,
 ): AdminRpcRouter {
     val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
+    val subagentStore = subagentRegistryFile
+        ?.let { com.letta.mobile.data.subagents.FileSubagentRegistryStore(java.nio.file.Path.of(it)) }
+        ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()
     val subagentSource = subagentRegistrySource
-        ?: com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource().also { source ->
+        ?: com.letta.mobile.data.controller.node.iroh.ControllerSubagentRegistrySource(
+            com.letta.mobile.data.subagents.DurableSubagentRegistry(store = subagentStore),
+        ).also { source ->
             if (nativeClient != null && eventScope != null) {
                 source.start(eventScope, nativeClient.events)
             }
@@ -144,6 +156,14 @@ internal class AppServerServeIrohCommand : CliktCommand(
         help = "Path to the paired-peer JSON store (d6e8g.5). When set, paired NodeIds " +
             "authenticate without a token and one-time invites can be minted via " +
             "pair.invite.create; redeem with an 'invite:<secret>' auth token.",
+    )
+
+    private val subagentRegistryFile by option(
+        "--subagent-registry-file",
+        envvar = "LETTA_SUBAGENT_REGISTRY_STORE",
+        help = "Path to the durable subagent-chip registry JSON store (lgns8.22.8). When set, " +
+            "chips survive a controller restart and are reconciled against live state on the " +
+            "next authoritative subagent snapshot (orphans become terminal, never spinners).",
     )
 
     private val allowInsecureAnonymousIroh by option(
@@ -237,6 +257,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
                 pairingService = pairingService,
                 nativeClient = nativeAdminClient,
                 vibesyncBaseUrl = vibesyncBaseUrl,
+                subagentRegistryFile = subagentRegistryFile,
                 eventScope = scope,
             )
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
