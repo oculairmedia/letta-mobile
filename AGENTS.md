@@ -2,6 +2,13 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
+**Letta behavior questions:** don't guess — look them up. `docs.letta.com` publishes
+a machine-readable index at `https://docs.letta.com/llms.txt`, and every page has
+canonical markdown at `<page>/index.md`. See
+[docs/reference/letta-docs.md](docs/reference/letta-docs.md) for the page map
+(App Server protocol, MemFS, memory blocks, skills, schedules, channels). Docs are
+fetched on demand, not vendored — they'd go stale in-tree.
+
 ## Quick Reference
 
 ```bash
