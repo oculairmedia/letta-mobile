@@ -22,6 +22,7 @@ import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
+import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpTimeout
@@ -337,7 +338,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
         scope: CoroutineScope,
     ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient> {
         val httpClient = HttpClient(OkHttp) {
-            install(WebSockets)
+            install(WebSockets) { applyAppServerFrameLimits() }
             install(HttpTimeout) {
                 this.requestTimeoutMillis = requestTimeoutMs
                 this.connectTimeoutMillis = 30_000
@@ -409,7 +410,7 @@ internal class AppServerServeIrohCommand : CliktCommand(
         scope: CoroutineScope,
     ): Pair<DefaultAppServerController, com.letta.mobile.data.transport.appserver.AppServerClient?> {
         val httpClient = HttpClient(OkHttp) {
-            install(WebSockets)
+            install(WebSockets) { applyAppServerFrameLimits() }
         }
         val transport = KtorAppServerWebSocketTransport(
             httpClient = httpClient,
