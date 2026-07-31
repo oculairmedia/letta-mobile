@@ -145,6 +145,21 @@ class AppServerTurnEngine(
         AppServerInboundFrame.RuntimeStartResponse,
         Long,
     ) -> Unit = { _, _, _ -> },
+    /**
+     * letta-mobile-465hq / pr3wf / 1rekc: injectable millisecond time source.
+     *
+     * EVERY wall-clock read in this engine (idle-watchdog deadlines, lease
+     * `acquiredAtMs` / held-duration telemetry, terminal timestamps) goes through
+     * this lambda. The default is the system clock, so production behaviour is
+     * byte-for-byte unchanged.
+     *
+     * Tests pass `{ testScheduler.currentTime }` so the watchdog measures the SAME
+     * virtual timeline that `delay()` advances under `runTest`. Without this the
+     * watchdog compared wall time against virtually-advanced delays, which is why
+     * the timing tests had to escape to `Dispatchers.Default` and race real
+     * elapsed time — the documented flake source.
+     */
+    private val nowMs: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
 ) : TurnEngine {
     /**
      * letta-mobile-8xxzv: owner-token leases KEYED BY {agentId, conversationId}.
@@ -2240,7 +2255,7 @@ class AppServerTurnEngine(
         return match?.groupValues?.getOrNull(1)?.take(120)
     }
 
-    private fun currentTimeMs(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
+    private fun currentTimeMs(): Long = nowMs()
 
     private companion object {
         private var nextRequestId = 0

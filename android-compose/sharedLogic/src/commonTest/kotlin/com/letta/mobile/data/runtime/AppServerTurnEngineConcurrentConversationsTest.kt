@@ -53,8 +53,9 @@ import kotlinx.serialization.json.put
  * are asserted here: different keys run concurrently, the SAME key is refused.
  *
  * Determinism: virtual time only (UnconfinedTestDispatcher + runCurrent /
- * advanceUntilIdle) and frame-driven awaits — never a wall-clock sleep. See
- * letta-mobile-465hq for the wall-clock watchdog flake this deliberately avoids.
+ * advanceUntilIdle) and frame-driven awaits — never a wall-clock sleep. Cases
+ * that need the idle watchdog inject the engine clock (`nowMs`) so the watchdog
+ * runs on the SAME virtual timeline — see case (6) and letta-mobile-465hq.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineConcurrentConversationsTest {
@@ -311,6 +312,62 @@ class AppServerTurnEngineConcurrentConversationsTest {
             live.cancel()
         }
 
+    // ------------------------------------------------------------------ (6)
+
+    @Test
+    fun idleWatchdogFailsOnlyTheIdleConversationAndLeavesTheActiveOneRunning() =
+        runTest(UnconfinedTestDispatcher()) {
+            // letta-mobile-465hq: previously impossible — the watchdog read the wall
+            // clock, so it could not be driven from virtual time. With the injected
+            // clock the watchdog measures the SAME timeline `advanceTimeBy` moves,
+            // so per-key watchdog isolation is now assertable deterministically.
+            val client = ConcurrentClient()
+            val engine = AppServerTurnEngine(
+                client = client,
+                turnIdleTimeoutMs = IDLE_WINDOW_MS,
+                nowMs = { testScheduler.currentTime },
+            )
+            val draftsA = mutableListOf<RuntimeEventDraft>()
+            val draftsB = mutableListOf<RuntimeEventDraft>()
+
+            backgroundScope.launch { runCatching { engine.runTurn(commandA).collect { draftsA += it } } }
+            runCurrent()
+            backgroundScope.launch { runCatching { engine.runTurn(commandB).collect { draftsB += it } } }
+            runCurrent()
+            assertTrue(engine.isBusy(AGENT, CONV_A) && engine.isBusy(AGENT, CONV_B))
+
+            // Halfway through the window B streams (resetting only B's idle timer)
+            // while A stays silent.
+            advanceTimeBy(IDLE_WINDOW_MS / 2)
+            client.emit(delta(CONV_B, "assistant_message", "run-b", content = "B reply", seq = 1))
+            runCurrent()
+
+            // Past A's window, still inside B's refreshed one.
+            advanceTimeBy(IDLE_WINDOW_MS / 2 + IDLE_WINDOW_MS / 4)
+            runCurrent()
+
+            assertTrue(
+                terminalStatuses(draftsA).contains(RuntimeRunStatus.Failed),
+                "A's idle watchdog must force-fail A; got ${terminalStatuses(draftsA)}",
+            )
+            assertFalse(engine.isBusy(AGENT, CONV_A), "A's lease is released by its own watchdog")
+            assertTrue(
+                terminalStatuses(draftsB).isEmpty(),
+                "B's turn must be untouched by A's watchdog; got ${terminalStatuses(draftsB)}",
+            )
+            assertTrue(engine.isBusy(AGENT, CONV_B), "B keeps its lease while it is still streaming")
+
+            // B still settles on its own terminal afterwards.
+            client.emit(delta(CONV_B, "stop_reason", "run-b", seq = 2))
+            advanceTimeBy(DEFAULT_SETTLE_DRAIN_MS)
+            runCurrent()
+            assertTrue(
+                terminalStatuses(draftsB).contains(RuntimeRunStatus.Completed),
+                "B must reach its own Completed terminal; got ${terminalStatuses(draftsB)}",
+            )
+            assertFalse(engine.isAnyBusy, "both leases are released once both turns end")
+        }
+
     // ---------------------------------------------------------------- helpers
 
     private fun terminalStatuses(drafts: List<RuntimeEventDraft>): List<RuntimeRunStatus> =
@@ -328,6 +385,9 @@ class AppServerTurnEngineConcurrentConversationsTest {
     private companion object {
         /** Comfortably longer than the engine's 1.5s terminal-settle window. */
         const val DEFAULT_SETTLE_DRAIN_MS = 5_000L
+
+        /** Idle window used by the watchdog-isolation case (virtual ms). */
+        const val IDLE_WINDOW_MS = 4_000L
         const val AGENT = "agent-1"
         const val CONV_A = "conv-a"
         const val CONV_B = "conv-b"
