@@ -50,7 +50,9 @@ import kotlinx.serialization.json.put
  * replayed `client_message_id`.
  *
  * JVM-only by construction (ProcessBuilder). No credentials are hardcoded: the
- * OpenRouter key and letta-code paths come from the environment via [Config.fromEnv].
+ * provider key, letta-code paths, and the provider HOME come from the environment
+ * via [Config.fromEnv]. See `appserver-cli/README.md` ("Regenerating the
+ * restart/replay evidence") for the exact regeneration recipe.
  */
 class AppServerRestartReplayProbe(private val config: Config) {
 
@@ -61,6 +63,21 @@ class AppServerRestartReplayProbe(private val config: Config) {
         val model: String,
         val backendDir: Path,
         val port: Int,
+        /**
+         * HOME handed to the spawned app-server. letta-code resolves its persisted
+         * provider config (`letta connect …`) relative to HOME, so pointing this at a
+         * throwaway dir keeps a regeneration run from reading — or writing — the
+         * operator's live `~/.letta`. Defaults to the real home for back-compat.
+         */
+        val home: Path,
+        /**
+         * Optional `providers/auth.json` copied into the fresh backend dir before the
+         * first launch. With the local backend, `letta connect` persists provider auth
+         * under the BACKEND dir (not HOME), so a probe run against a throwaway backend
+         * has no provider at all unless it is seeded — every turn then fails and commits
+         * no assistant message.
+         */
+        val providerAuthSeed: Path?,
     ) {
         companion object {
             /** Resolves config from env, or null when prerequisites are absent (test should skip). */
@@ -73,7 +90,13 @@ class AppServerRestartReplayProbe(private val config: Config) {
                 if (!lettaJs.exists()) return null
                 val model = System.getenv("LETTA_CODE_PROBE_MODEL")?.takeIf { it.isNotBlank() }
                     ?: "openrouter/nvidia/nemotron-nano-9b-v2:free"
-                return Config(node, lettaJs, key, model, backendDir, port)
+                val home = System.getenv("LETTA_CODE_PROBE_HOME")?.takeIf { it.isNotBlank() }
+                    ?.let { Path.of(it) }
+                    ?: Path.of(System.getProperty("user.home"))
+                val providerAuthSeed = System.getenv("LETTA_CODE_PROBE_PROVIDER_AUTH")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { Path.of(it) }
+                return Config(node, lettaJs, key, model, backendDir, port, home, providerAuthSeed)
             }
         }
     }
@@ -89,6 +112,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
 
     suspend fun run(): Observation {
         val cmid = "probe-${UUID.randomUUID()}"
+        seedProviderAuth()
         // ---- Phase 1: fresh process, create a local agent + conversation, run one turn.
         var process = launchServer()
         val scope: AppServerRuntimeScope = try {
@@ -101,6 +125,13 @@ class AppServerRestartReplayProbe(private val config: Config) {
             stopServer(process)
         }
         check(transcriptUserOtidCount(cmid) == 1) { "expected the created turn to commit exactly one user message" }
+        // A turn that ends on an error stop_reason still commits the user message and still
+        // reports a terminal frame, so without this check the whole probe passes green while
+        // no model ever answered — the evidence would then be regenerated from a dead run.
+        check(transcriptAssistantCount() >= 1) {
+            "no assistant message committed: the model turn never completed (check the provider " +
+                "config in LETTA_CODE_PROBE_HOME and that LETTA_CODE_PROBE_MODEL is reachable)"
+        }
 
         // ---- Phase 2: restart the process against the SAME backend dir, reattach, resend the SAME cmid.
         process = launchServer()
@@ -227,7 +258,14 @@ class AppServerRestartReplayProbe(private val config: Config) {
     }
 
     /** Count committed USER messages whose otid == [clientMessageId] across the on-disk transcript. */
-    private fun transcriptUserOtidCount(clientMessageId: String): Int {
+    private fun transcriptUserOtidCount(clientMessageId: String): Int =
+        countCommittedMessages { role, otid -> role == "user" && otid == clientMessageId }
+
+    /** Count committed ASSISTANT messages across the on-disk transcript. */
+    private fun transcriptAssistantCount(): Int =
+        countCommittedMessages { role, _ -> role == "assistant" }
+
+    private fun countCommittedMessages(predicate: (role: String?, otid: String?) -> Boolean): Int {
         val conversationsDir = config.backendDir.resolve("conversations")
         if (!conversationsDir.exists()) return 0
         var count = 0
@@ -236,7 +274,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
                 val messages = conv.resolve("messages.jsonl")
                 if (messages.exists()) {
                     Files.newBufferedReader(messages).use { reader ->
-                        count += countUserOtidInStream(reader, clientMessageId)
+                        count += countInStream(reader, predicate)
                     }
                 }
             }
@@ -244,7 +282,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
         return count
     }
 
-    private fun countUserOtidInStream(reader: BufferedReader, clientMessageId: String): Int {
+    private fun countInStream(reader: BufferedReader, predicate: (role: String?, otid: String?) -> Boolean): Int {
         var count = 0
         reader.lineSequence().forEach { line ->
             val trimmed = line.trim()
@@ -253,9 +291,18 @@ class AppServerRestartReplayProbe(private val config: Config) {
                 ?.get("message") as? JsonObject ?: return@forEach
             val role = message["role"]?.jsonPrimitive?.contentOrNull
             val otid = message["otid"]?.jsonPrimitive?.contentOrNull
-            if (role == "user" && otid == clientMessageId) count++
+            if (predicate(role, otid)) count++
         }
         return count
+    }
+
+    /** Copy the operator-supplied provider auth into the throwaway backend dir, if configured. */
+    private fun seedProviderAuth() {
+        val seed = config.providerAuthSeed ?: return
+        check(seed.exists()) { "LETTA_CODE_PROBE_PROVIDER_AUTH does not exist: $seed" }
+        val target = config.backendDir.resolve("providers").resolve("auth.json")
+        Files.createDirectories(target.parent)
+        Files.copy(seed, target)
     }
 
     private fun launchServer(): Process {
@@ -268,7 +315,7 @@ class AppServerRestartReplayProbe(private val config: Config) {
         )
         builder.redirectErrorStream(true)
         builder.environment().apply {
-            put("HOME", System.getProperty("user.home"))
+            put("HOME", config.home.toString())
             put("LETTA_LOCAL_BACKEND_EXPERIMENTAL", "1")
             put("LETTA_LOCAL_BACKEND_DIR", config.backendDir.toString())
             put("OPENROUTER_API_KEY", config.openRouterApiKey)

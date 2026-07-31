@@ -16,7 +16,9 @@ import org.junit.jupiter.api.Test
  * regenerates the headline observations behind `restart-replay-evidence.json`
  * and asserts they still hold, keeping the committed evidence honest rather than
  * hand-authored. Set OPENROUTER_API_KEY (and optionally LETTA_CODE_NODE /
- * LETTA_CODE_JS / LETTA_CODE_PROBE_MODEL) to enable it.
+ * LETTA_CODE_JS / LETTA_CODE_PROBE_MODEL / LETTA_CODE_PROBE_HOME /
+ * LETTA_CODE_PROBE_PROVIDER_AUTH) to enable it. The full recipe lives in
+ * `appserver-cli/README.md` under "Regenerating the restart/replay evidence".
  */
 class AppServerRestartReplayProbeTest {
     @Test
