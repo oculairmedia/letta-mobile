@@ -128,6 +128,10 @@ The **backend dir is always a fresh `Files.createTempDirectory("lgns815-probe")`
 Never point a regeneration run at a live store — two writers on one local backend
 corrupt it.
 
+Run the probe on an otherwise idle machine. It waits 30s for each server's
+`Listening on` banner, and a competing Gradle build is enough to blow that budget
+on the phase-2 relaunch — a timeout there is load, not a contract regression.
+
 The probe fails loudly if no assistant message commits. That check exists because
 an errored model turn still commits the user message and still emits a terminal
 `stop_reason`, which used to let the probe pass green against a misconfigured
@@ -142,6 +146,7 @@ observed:
 - `source.version`, `source.node`, `source.model`, `source.provider`
 - `durability` / `identity_scopes` if the observed behaviour actually changed
 - bump `AppServerRestartReplayEvidence.PINNED_LETTA_CODE_VERSION` to the same version
+  (it must match `source.version`; the always-on gate fails otherwise)
 
 Inspect the probe's temp backend dir (`/tmp/lgns815-probe*`) to re-derive the
 observations: `conversations/<base64 id>/messages.jsonl` is the committed
