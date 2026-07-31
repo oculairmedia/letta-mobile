@@ -1168,7 +1168,7 @@
       "method": "skill.list",
       "handler": "SkillAdminHandlers.kt",
       "current_backend": "controller catalog (NativeSkillsCatalog) hydrated only from an authoritative enumeration; hydrated=false until one is observed",
-      "owner": "app_server_v2",
+      "owner": "controller_native",
       "public_contract": "authoritative catalog with explicit hydrated/stale/catalog_source provenance",
       "native_contract": [
         "sync",
