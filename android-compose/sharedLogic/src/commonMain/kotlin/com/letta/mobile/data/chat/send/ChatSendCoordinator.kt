@@ -232,9 +232,26 @@ class ChatSendCoordinator(
     /**
      * Only for frames that carry NO conversation key at all. Prefers the most
      * recently active conversation, then the single tracked conversation.
+     *
+     * When NOTHING is tracked yet there is no cross-conversation victim to
+     * protect, so dropping the frame would be strictly worse than the old
+     * behavior: a terminal that arrives before this coordinator ever saw a send
+     * (a turn started by a previous process, a replayed terminal after a state
+     * reset) would leave the UI streaming forever with nothing left to clear it.
+     * That case keeps the legacy target — this coordinator's own conversation,
+     * or the synthesized default — and materializes an entry for it.
      */
-    private fun fallbackState(): ConversationTurnState? = synchronized(turnStateLock) {
-        lastActiveConversationId?.let { turnStates[it] } ?: turnStates.values.singleOrNull()
+    private fun fallbackState(): ConversationTurnState? {
+        synchronized(turnStateLock) {
+            lastActiveConversationId?.let { turnStates[it] }?.let { return it }
+            turnStates.values.singleOrNull()?.let { return it }
+            // Several conversations are tracked and none of them is an
+            // unambiguous owner: guessing here is the defect, so drop instead.
+            if (turnStates.isNotEmpty()) return null
+        }
+        val ownConversationId = activeConversationId()?.takeIf { it.isNotBlank() }
+            ?: defaultShimConversationId(agentId)
+        return stateFor(ownConversationId)
     }
 
     /**
@@ -1512,7 +1529,7 @@ class ChatSendCoordinator(
             // Delivered-then-failed keeps whatever error state was already on
             // screen (normally none) — the user got their answer.
             "failed" -> if (deadTurn) {
-                state.bufferedErrorMessage ?: failureNotice!!.message
+                state.bufferedErrorMessage ?: failureNotice.message
             } else {
                 ui.currentError()
             }
