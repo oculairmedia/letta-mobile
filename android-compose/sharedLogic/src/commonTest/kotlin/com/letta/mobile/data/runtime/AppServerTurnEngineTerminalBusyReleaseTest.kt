@@ -47,7 +47,7 @@ class AppServerTurnEngineTerminalBusyReleaseTest {
 
         val first = launch { runCatching { engine.runTurn(command).collect() } }
         runCurrent()
-        assertTrue(engine.isBusy, "engine must be busy once the turn is running")
+        assertTrue(engine.isBusy("agent-1", "conv-1"), "engine must be busy once the turn is running")
 
         // The QUIC/App Server stream dies mid-turn (no terminal lifecycle frame).
         client.killStream(RuntimeException("iroh stream reset mid-turn"))
@@ -55,7 +55,7 @@ class AppServerTurnEngineTerminalBusyReleaseTest {
         first.join()
 
         assertFalse(
-            engine.isBusy,
+            engine.isBusy("agent-1", "conv-1"),
             "stream-death terminal must release the busy lock; otherwise every later send is wedged until a manual restart",
         )
 
