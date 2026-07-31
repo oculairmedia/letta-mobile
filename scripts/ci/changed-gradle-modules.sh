@@ -53,6 +53,7 @@ while IFS= read -r file; do
     android-compose/desktop/*) TASKS[":desktop:test"]=1 ;;
     android-compose/cli/*) TASKS[":cli:testDebugUnitTest"]=1 ;;
     android-compose/appserver-cli/*) TASKS[":appserver-cli:test"]=1 ;;
+    android-compose/iroh-wrapper-cli/*) TASKS[":iroh-wrapper-cli:test"]=1 ;;
   esac
 done <<<"$DIFF_FILES"
 
@@ -63,6 +64,7 @@ ORDERED=(
   ":desktop:test"
   ":cli:testDebugUnitTest"
   ":appserver-cli:test"
+  ":iroh-wrapper-cli:test"
 )
 OUT=()
 for task in "${ORDERED[@]}"; do

@@ -55,8 +55,19 @@ class ShimRetirementArchitectureGateTest {
 
     private fun scanViolations(): List<Violation> {
         val findings = mutableListOf<Violation>()
+        // letta-mobile-zsgad moved the production wrapper command out of the
+        // Android `:cli` module into the pure-JVM `:iroh-wrapper-cli` module so
+        // it could ship as an installable distribution. This gate follows the
+        // file: it must scan whatever the deployed wrapper actually runs, so a
+        // missing file has to fail loudly rather than silently scanning nothing.
         val cli = repoRoot.resolve(
-            "android-compose/cli/src/main/java/com/letta/mobile/cli/commands/AppServerServeIrohCommand.kt",
+            "android-compose/iroh-wrapper-cli/src/main/kotlin/com/letta/mobile/cli/commands/" +
+                "AppServerServeIrohCommand.kt",
+        )
+        assertTrue(
+            cli.isRegularFile(),
+            "shim-retirement gate cannot find the wrapper command at ${rel(cli)}; " +
+                "if it moved again, update this path instead of deleting the check",
         )
         val cliText = cli.readText()
         if (cliText.contains("http://127.0.0.1:8291")) {

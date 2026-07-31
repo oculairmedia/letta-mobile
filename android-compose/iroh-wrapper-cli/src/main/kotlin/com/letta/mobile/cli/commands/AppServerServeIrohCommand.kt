@@ -58,7 +58,7 @@ import kotlin.time.Duration.Companion.seconds
  * [iroh-app-server] Listening on Iroh... (Ctrl+C to stop)
  * ```
  */
-internal fun buildProductionAdminRouter(
+fun buildProductionAdminRouter(
     controller: DefaultAppServerController,
     subagentRegistrySource: SubagentRegistrySource? = null,
     /**
@@ -102,7 +102,7 @@ internal fun buildProductionAdminRouter(
     )
 }
 
-internal class AppServerServeIrohCommand : CliktCommand(
+class AppServerServeIrohCommand : CliktCommand(
     name = "app-server-serve-iroh",
 ) {
     private val appServerUrl by option(
