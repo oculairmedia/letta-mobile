@@ -1035,7 +1035,7 @@ class AppServerTurnEngineTest {
         // metadata MUST be present — there is no "busy but unknown owner" window.
         // (The finally clears the owner strictly AFTER unlock, so busy implies a
         // non-null owner.)
-        if (engine.isBusy) {
+        if (engine.isAnyBusy) {
             assertNotNull(engine.activeTurnOwner)
         }
 
@@ -1047,7 +1047,7 @@ class AppServerTurnEngineTest {
     }
 
     @Test
-    fun runTurnRejectsConcurrentTurnsForSameEngine() = runTest {
+    fun runTurnRejectsConcurrentTurnsForSameRuntimeKey() = runTest {
         val client = FakeAppServerClient()
         val engine = AppServerTurnEngine(client = client)
 
