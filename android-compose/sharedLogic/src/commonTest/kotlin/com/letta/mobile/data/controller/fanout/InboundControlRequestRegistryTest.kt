@@ -11,22 +11,12 @@ class InboundControlRequestRegistryTest {
     fun registerAcceptsFirstRequestIdAndDeduplicates() {
         val registry = InboundControlRequestRegistry()
         val first = registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 1L,
-                toolCallId = "tc-1",
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-1"),
         )
         assertIs<InboundControlRequestRegistry.RegisterResult.Accepted>(first)
 
         val second = registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 1L,
-                toolCallId = "tc-1",
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-1"),
         )
         assertIs<InboundControlRequestRegistry.RegisterResult.Duplicate>(second)
         assertEquals(1, registry.pendingCount())
@@ -36,11 +26,7 @@ class InboundControlRequestRegistryTest {
     fun tryClaimIsExclusivePerRequestId() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 2L,
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 2L),
         )
         assertTrue(registry.tryClaim(controlRef("ext-1"), leaseToken = 10L, connectionGeneration = 2L))
         assertFalse(registry.tryClaim(controlRef("ext-1"), leaseToken = 11L, connectionGeneration = 2L))
@@ -53,32 +39,20 @@ class InboundControlRequestRegistryTest {
     fun failGenerationRemovesEntriesSoSameRequestIdCanReregister() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "perm-1",
-                kind = InboundControlRequestRegistry.Kind.Approval,
-                connectionGeneration = 3L,
-            ),
+            registerRequest("perm-1", InboundControlRequestRegistry.Kind.Approval, 3L),
         )
         registry.failGeneration(3L)
         assertEquals(0, registry.pendingCount())
         assertFalse(registry.tryClaim(controlRef("perm-1"), leaseToken = 1L, connectionGeneration = 3L))
         assertIs<InboundControlRequestRegistry.RegisterResult.GenerationFailed>(
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "perm-2",
-                    kind = InboundControlRequestRegistry.Kind.Approval,
-                    connectionGeneration = 3L,
-                ),
+                registerRequest("perm-2", InboundControlRequestRegistry.Kind.Approval, 3L),
             ),
         )
         // Same request_id on the successor generation must be accepted.
         assertIs<InboundControlRequestRegistry.RegisterResult.Accepted>(
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "perm-1",
-                    kind = InboundControlRequestRegistry.Kind.Approval,
-                    connectionGeneration = 4L,
-                ),
+                registerRequest("perm-1", InboundControlRequestRegistry.Kind.Approval, 4L),
             ),
         )
     }
@@ -87,11 +61,7 @@ class InboundControlRequestRegistryTest {
     fun releaseClaimAllowsRetryAfterFailedSend() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 1L,
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L),
         )
         assertTrue(registry.tryClaim(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L))
         registry.releaseClaim(controlRef("ext-1"), leaseToken = 7L, connectionGeneration = 1L)
@@ -106,11 +76,7 @@ class InboundControlRequestRegistryTest {
     fun dispatchedRemainsDeliverableAndClaimableUntilAnswered() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 5L,
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 5L),
         )
         registry.markDispatched(controlRef("ext-1"), connectionGeneration = 5L)
         assertTrue(registry.isDeliverableTo(controlRef("ext-1"), leaseToken = 1L, connectionGeneration = 5L))
@@ -130,22 +96,12 @@ class InboundControlRequestRegistryTest {
         val registry = InboundControlRequestRegistry()
         assertIs<InboundControlRequestRegistry.RegisterResult.Accepted>(
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "ext-shared",
-                    kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                    connectionGeneration = 1L,
-                    toolCallId = "tc-a",
-                ),
+                registerRequest("ext-shared", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-a"),
             ),
         )
         assertIs<InboundControlRequestRegistry.RegisterResult.Accepted>(
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "ext-shared",
-                    kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                    connectionGeneration = 1L,
-                    toolCallId = "tc-b",
-                ),
+                registerRequest("ext-shared", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-b"),
             ),
         )
         assertEquals(2, registry.pendingCount())
@@ -165,19 +121,11 @@ class InboundControlRequestRegistryTest {
     fun approvalEntriesRemainRequestIdKeyed() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "perm-1",
-                kind = InboundControlRequestRegistry.Kind.Approval,
-                connectionGeneration = 1L,
-            ),
+            registerRequest("perm-1", InboundControlRequestRegistry.Kind.Approval, 1L),
         )
         assertIs<InboundControlRequestRegistry.RegisterResult.Duplicate>(
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "perm-1",
-                    kind = InboundControlRequestRegistry.Kind.Approval,
-                    connectionGeneration = 1L,
-                ),
+                registerRequest("perm-1", InboundControlRequestRegistry.Kind.Approval, 1L),
             ),
         )
         assertTrue(registry.tryClaim(controlRef("perm-1"), leaseToken = 1L, connectionGeneration = 1L))
@@ -194,12 +142,7 @@ class InboundControlRequestRegistryTest {
         val total = InboundControlRequestRegistry.MAX_COMPLETED_HISTORY * 2
         repeat(total) { index ->
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "ext-$index",
-                    kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                    connectionGeneration = 1L,
-                    toolCallId = "tc-$index",
-                ),
+                registerRequest("ext-$index", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-$index"),
             )
             registry.markAnswered(controlRef("ext-$index", "tc-$index"), connectionGeneration = 1L)
         }
@@ -223,22 +166,12 @@ class InboundControlRequestRegistryTest {
     fun answeredRequestIsNotRedeliveredWhileInsideTheDedupWindow() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 1L,
-                toolCallId = "tc-1",
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-1"),
         )
         registry.markAnswered(controlRef("ext-1", "tc-1"), connectionGeneration = 1L)
 
         val replay = registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 1L,
-                toolCallId = "tc-1",
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-1"),
         )
         val duplicate = assertIs<InboundControlRequestRegistry.RegisterResult.Duplicate>(replay)
         assertEquals(InboundControlRequestRegistry.State.Answered, duplicate.entry.state)
@@ -249,24 +182,14 @@ class InboundControlRequestRegistryTest {
     fun failGenerationAlsoClearsTheAnsweredDedupWindow() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "ext-1",
-                kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                connectionGeneration = 1L,
-                toolCallId = "tc-1",
-            ),
+            registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 1L, "tc-1"),
         )
         registry.markAnswered(controlRef("ext-1", "tc-1"), connectionGeneration = 1L)
         registry.failGeneration(1L)
         assertEquals(0, registry.completedHistoryCount())
         assertIs<InboundControlRequestRegistry.RegisterResult.Accepted>(
             registry.register(
-                InboundControlRequestRegistry.RegisterRequest(
-                    requestId = "ext-1",
-                    kind = InboundControlRequestRegistry.Kind.ExternalTool,
-                    connectionGeneration = 2L,
-                    toolCallId = "tc-1",
-                ),
+                registerRequest("ext-1", InboundControlRequestRegistry.Kind.ExternalTool, 2L, "tc-1"),
             ),
         )
     }
@@ -281,19 +204,11 @@ class InboundControlRequestRegistryTest {
     fun markAnsweredOnTheClaimGenerationLeavesTheSuccessorReplayDeliverable() {
         val registry = InboundControlRequestRegistry()
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "perm-1",
-                kind = InboundControlRequestRegistry.Kind.Approval,
-                connectionGeneration = 1L,
-            ),
+            registerRequest("perm-1", InboundControlRequestRegistry.Kind.Approval, 1L),
         )
         // Reconnect: the server replays the still-pending approval on generation 2.
         registry.register(
-            InboundControlRequestRegistry.RegisterRequest(
-                requestId = "perm-1",
-                kind = InboundControlRequestRegistry.Kind.Approval,
-                connectionGeneration = 2L,
-            ),
+            registerRequest("perm-1", InboundControlRequestRegistry.Kind.Approval, 2L),
         )
 
         // The in-flight send from the dead connection completes and marks answered
@@ -311,3 +226,19 @@ class InboundControlRequestRegistryTest {
 /** Shorthand for the (request_id, tool_call_id) identity (lgns8.22.4.1.3). */
 private fun controlRef(requestId: String, toolCallId: String? = null) =
     InboundControlRequestRegistry.RequestRef(requestId, toolCallId)
+
+/**
+ * Every test here registers the same shape of request; only the identity, kind
+ * and generation vary. One builder keeps the intent of each test visible.
+ */
+private fun registerRequest(
+    requestId: String,
+    kind: InboundControlRequestRegistry.Kind,
+    connectionGeneration: Long,
+    toolCallId: String? = null,
+) = InboundControlRequestRegistry.RegisterRequest(
+    requestId = requestId,
+    kind = kind,
+    connectionGeneration = connectionGeneration,
+    toolCallId = toolCallId,
+)

@@ -50,6 +50,9 @@ import kotlinx.serialization.json.put
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppServerTurnEngineExternalToolGenerationTest {
 
+    /** One inbound request identity: the App Server v2 (request_id, tool_call_id) pair. */
+    private data class ToolCall(val requestId: String, val toolCallId: String)
+
     @Test
     fun aDisconnectDuringToolExecutionAbortsTheResponseInsteadOfAnsweringAcrossGenerations() = runTest {
         var generation = 0L
@@ -71,7 +74,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitExternalToolCallRequest("ext-1", "tc-1")
+            client.emitExternalToolCallRequest(ToolCall("ext-1", "tc-1"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -103,7 +106,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitExternalToolCallRequest("ext-1", "tc-1")
+            client.emitExternalToolCallRequest(ToolCall("ext-1", "tc-1"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -112,7 +115,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
         // Reconnect: the server replays the still-blocking request on generation 1.
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitExternalToolCallRequest("ext-1", "tc-1")
+            client.emitExternalToolCallRequest(ToolCall("ext-1", "tc-1"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -137,7 +140,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitExternalToolCallRequest("ext-1", "tc-1")
+            client.emitExternalToolCallRequest(ToolCall("ext-1", "tc-1"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -150,7 +153,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
         generation = 1L
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitExternalToolCallRequest("ext-1", "tc-1")
+            client.emitExternalToolCallRequest(ToolCall("ext-1", "tc-1"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -176,9 +179,9 @@ class AppServerTurnEngineExternalToolGenerationTest {
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitExternalToolCallRequest("ext-shared", "tc-a")
+            client.emitExternalToolCallRequest(ToolCall("ext-shared", "tc-a"))
             runCurrent()
-            client.emitExternalToolCallRequest("ext-shared", "tc-b")
+            client.emitExternalToolCallRequest(ToolCall("ext-shared", "tc-b"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -221,7 +224,7 @@ class AppServerTurnEngineExternalToolGenerationTest {
 
         engine.runTurn(command).test {
             assertIs<RuntimeEventPayload.RunLifecycleChanged>(awaitItem().payload)
-            client.emitApprovalControlRequest("approval-1", "tool-call-1")
+            client.emitApprovalControlRequest(ToolCall("approval-1", "tool-call-1"))
             runCurrent()
             cancelAndIgnoreRemainingEvents()
         }
@@ -345,7 +348,9 @@ class AppServerTurnEngineExternalToolGenerationTest {
             externalResponses += command
         }
 
-        fun emitExternalToolCallRequest(requestId: String, toolCallId: String) {
+        fun emitExternalToolCallRequest(call: ToolCall) {
+            val requestId = call.requestId
+            val toolCallId = call.toolCallId
             eventFlow.tryEmit(
                 AppServerReceivedFrame(
                     channel = AppServerChannel.Control,
@@ -361,7 +366,9 @@ class AppServerTurnEngineExternalToolGenerationTest {
             )
         }
 
-        fun emitApprovalControlRequest(requestId: String, toolCallId: String) {
+        fun emitApprovalControlRequest(call: ToolCall) {
+            val requestId = call.requestId
+            val toolCallId = call.toolCallId
             eventFlow.tryEmit(
                 AppServerReceivedFrame(
                     channel = AppServerChannel.Control,

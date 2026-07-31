@@ -239,32 +239,8 @@ class AppServerTurnEngine(
         // connection died between the claim and here, the tool must not run and
         // this claim is returned so the successor generation's replay can own it.
         if (abortStaleExternalTool(request, leaseToken, generation, phase = "beforeInvoke")) return
-        val cacheKey = ExternalToolResultCache.Key(request.requestId, request.toolCallId)
-        // Never re-invoke non-idempotent tools on replay — reuse the cached result
-        // computed on the first claim. Keyed by (requestId, toolCallId) and NOT by
-        // generation, so successor-generation replays still hit the cache.
-        val cached = externalToolResultCache.get(cacheKey)
-        val result: AppServerExternalToolResult = cached ?: run {
-            val computed = try {
-                when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
-                    is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
-                    is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
-                    null -> toolResult(
-                        "external tool '${request.toolName}' is not handled by this controller",
-                        isError = true,
-                    )
-                }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                toolResult(
-                    "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
-                    isError = true,
-                )
-            }
-            externalToolResultCache.put(cacheKey, computed)
-            computed
-        }
+        val cached = externalToolResultCache.get(request.resultCacheKey())
+        val result: AppServerExternalToolResult = cached ?: computeAndCacheExternalToolResult(request)
         // Tool invocation is a suspension point: re-fence before sending so an
         // old-generation response is not written onto the successor connection.
         // The result is cached, so the replay answers without re-invoking.
@@ -296,6 +272,41 @@ class AppServerTurnEngine(
             inboundControlRegistry.releaseClaim(ref, leaseToken, generation)
         }
     }
+
+    /**
+     * Invoke the wired handler (or synthesize a matched is_error result when none
+     * handles the tool) and cache the outcome.
+     *
+     * lgns8.22.4.1.6: cached by (request_id, tool_call_id) and NOT by connection
+     * generation, so a successor-generation replay reuses it and a non-idempotent
+     * tool never runs twice for one request identity.
+     */
+    private suspend fun computeAndCacheExternalToolResult(
+        request: AppServerInboundFrame.ExternalToolCallRequest,
+    ): AppServerExternalToolResult {
+        val computed = try {
+            when (val outcome = externalToolRegistry?.invoke(request.toolName, request.input)) {
+                is ExternalToolResult.Success -> toolResult(outcome.content, isError = false)
+                is ExternalToolResult.Error -> toolResult(outcome.error, isError = true)
+                null -> toolResult(
+                    "external tool '${request.toolName}' is not handled by this controller",
+                    isError = true,
+                )
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            toolResult(
+                "external tool '${request.toolName}' failed: ${e.message ?: e::class.simpleName}",
+                isError = true,
+            )
+        }
+        externalToolResultCache.put(request.resultCacheKey(), computed)
+        return computed
+    }
+
+    private fun AppServerInboundFrame.ExternalToolCallRequest.resultCacheKey() =
+        ExternalToolResultCache.Key(requestId, toolCallId)
 
     /**
      * Answer [received] when it is an external_tool_call_request.
