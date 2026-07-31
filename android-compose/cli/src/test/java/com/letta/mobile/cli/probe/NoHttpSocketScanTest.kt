@@ -69,6 +69,16 @@ class NoHttpSocketScanTest {
         assertEquals(0, NoHttpSocketScan.connectionsToPort(8291, pid = "self", procRoot = root.path))
     }
 
+    /**
+     * `/proc/<pid>/fd` of another user's process lists as null. Treating that as
+     * an empty inode set would report ZERO connections — a false green — so the
+     * scan must report "unknown" instead.
+     */
+    @Test
+    fun `unlistable fd directory is unknown not zero`(@TempDir root: File) {
+        assertNull(NoHttpSocketScan.parseSocketInodes(File(root, "regular-file").apply { writeText("x") }))
+    }
+
     @Test
     fun `missing pid directory degrades to null instead of a false green`(@TempDir root: File) {
         FakeProcRoot.write(root, pid = "4242", socketInodes = listOf(111_111L), tcpLines = tcpLines)

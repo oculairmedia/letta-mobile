@@ -67,13 +67,7 @@ internal class NoHttpWrapperWatch(
     fun finish(): NoHttpWrapperEvidence {
         windowEndMs = nowMs()
         val started = info
-        if (started != null && explicitPid == null) {
-            val current = resolve(unit)
-            if (current == null || current.pid != started.pid || current.startTimestamp != started.startTimestamp) {
-                pidChanged.set(true)
-            }
-        }
-        if (started != null && !WrapperProcessScan.isAlive(started.pid, procRoot)) pidChanged.set(true)
+        if (started != null && !stillTheSameWrapper(started)) pidChanged.set(true)
         val snapshot = samples.toList()
         return NoHttpWrapperEvidence(
             unit = unit,
@@ -87,6 +81,14 @@ internal class NoHttpWrapperWatch(
             pidChanged = pidChanged.get(),
             scanUnsupported = scanUnsupported.get(),
         )
+    }
+
+    /** The watched process must still be alive AND still be the unit's MainPID. */
+    private fun stillTheSameWrapper(started: WrapperProcessInfo): Boolean {
+        if (!WrapperProcessScan.isAlive(started.pid, procRoot)) return false
+        if (explicitPid != null) return true
+        val current = resolve(unit) ?: return false
+        return current.pid == started.pid && current.startTimestamp == started.startTimestamp
     }
 
     fun samples(): List<Int> = samples.toList()

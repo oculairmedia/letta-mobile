@@ -90,9 +90,15 @@ data class NoHttpWrapperEvidence(
      * fails the gate rather than passing it — the whole point of the bead.
      */
     fun violations(): List<String> = buildList {
-        if (pid == null) add("no_http_wrapper_pid_unresolved:$unit")
         if (pidChanged) add("no_http_wrapper_pid_changed:$unit")
-        if (pid != null && !scanUnsupported && sampleCount == 0) add("no_http_wrapper_no_samples:$unit")
+        when {
+            // No attributable process at all.
+            pid == null -> add("no_http_wrapper_pid_unresolved:$unit")
+            // We identified the wrapper but could not read its sockets (procfs absent
+            // or `/proc/<pid>/fd` unreadable) — unverifiable, therefore not green.
+            scanUnsupported -> add("no_http_wrapper_scan_unavailable:$unit")
+            sampleCount == 0 -> add("no_http_wrapper_no_samples:$unit")
+        }
     }
 
     fun notes(): List<String> = listOf(

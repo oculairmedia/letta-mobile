@@ -26,7 +26,9 @@ object NoHttpSocketScan {
     fun connectionsToPort(port: Int, pid: String = SELF, procRoot: String = "/proc"): Int? {
         val fdDir = File(procRoot, "$pid/fd")
         if (!fdDir.isDirectory) return null
-        val inodes = parseSocketInodes(fdDir)
+        // `/proc/<pid>/fd` of another user's process is mode 500: listFiles() returns
+        // null. Counting that as zero would be a FALSE GREEN, so report "unknown".
+        val inodes = parseSocketInodes(fdDir) ?: return null
         val tcpLines = buildList {
             listOf("net/tcp", "net/tcp6").forEach { rel ->
                 // Prefer the TARGET process's network namespace view.
@@ -40,8 +42,9 @@ object NoHttpSocketScan {
         return countMatches(inodes, tcpLines, port)
     }
 
-    internal fun parseSocketInodes(fdDir: File): Set<Long> =
-        fdDir.listFiles().orEmpty().mapNotNullTo(mutableSetOf()) { fd ->
+    /** Null when the fd directory cannot be listed (permissions), never a silent empty set. */
+    internal fun parseSocketInodes(fdDir: File): Set<Long>? =
+        fdDir.listFiles()?.mapNotNullTo(mutableSetOf()) { fd ->
             val target = runCatching { java.nio.file.Files.readSymbolicLink(fd.toPath()).toString() }.getOrNull()
             parseSocketInode(target)
         }
