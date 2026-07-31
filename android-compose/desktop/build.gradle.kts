@@ -211,6 +211,16 @@ tasks.register<JavaExec>("runPetSpike") {
     providers.gradleProperty("petVrm").orNull?.let { args(it) }
 }
 
+// Realtime lookdev for the ambient agent-status shader: live-editable SkSL,
+// uniform sliders, and production AmbientMotion presets over a fake chat
+// column — same Skia pipeline as the app, so what you tune is what ships.
+tasks.register<JavaExec>("runShaderLookdev") {
+    group = "application"
+    description = "Runs the ambient-shader lookdev window (live SkSL editing + uniform sliders)."
+    mainClass.set("com.letta.mobile.desktop.lookdev.ShaderLookdevMainKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+}
+
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
 // transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
 // Jewel UI dependency ships class-file version 69 (Java 25), so running the app
