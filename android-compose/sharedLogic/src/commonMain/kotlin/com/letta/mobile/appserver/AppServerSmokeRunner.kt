@@ -16,6 +16,7 @@ import io.ktor.client.engine.HttpClientEngineFactory
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.websocket.WebSockets
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeout
 
@@ -101,6 +102,94 @@ suspend fun runAppServerSmokeTurn(
                     ).collect { event ->
                         emit(event.payload.toCliLine())
                     }
+                } finally {
+                    transport.close()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * letta-mobile-8xxzv: E2E probe for the KEYED turn lease.
+ *
+ * Drives TWO turns through ONE [AppServerTurnEngine] on ONE `/ws` connection,
+ * on two different `{agent_id, conversation_id}` runtimes, CONCURRENTLY. Before
+ * the keyed lease the second turn could not even start: the engine held a single
+ * process-wide lease and threw "An App Server turn is already active". letta-code
+ * (0.29.9 / 0.29.12) keeps a per-conversation TurnLifecycle and runs runtimes in
+ * parallel, so both turns must stream and both must reach a terminal lifecycle.
+ *
+ * Each emitted line is prefixed with the conversation it belongs to, so the
+ * transcript itself proves the interleaving and the two terminals.
+ *
+ * @param spec host + first conversation (its [AppServerSmokeSpec.conversationId]).
+ * @param secondConversationId the second runtime's conversation id.
+ * @param secondAgentId agent for the second runtime (defaults to the first).
+ */
+suspend fun runAppServerConcurrentSmokeTurns(
+    engineFactory: HttpClientEngineFactory<*>,
+    identityPrefix: String,
+    spec: AppServerSmokeSpec,
+    secondConversationId: String,
+    secondAgentId: String = spec.agentId,
+    newToken: () -> String,
+    emit: (String) -> Unit,
+) {
+    val timeoutMs = spec.timeoutMs
+    val httpClient = HttpClient(engineFactory) {
+        install(WebSockets)
+        install(HttpTimeout) {
+            requestTimeoutMillis = timeoutMs
+            connectTimeoutMillis = 30_000
+            socketTimeoutMillis = timeoutMs
+        }
+    }
+
+    httpClient.use {
+        withTimeout(timeoutMs.milliseconds) {
+            coroutineScope {
+                val transport = KtorAppServerWebSocketTransport(
+                    httpClient = httpClient,
+                    baseUrl = spec.url,
+                    scope = this,
+                    bearerToken = spec.token,
+                )
+                val engine = AppServerTurnEngine(
+                    client = DefaultAppServerClient(transport, requestTimeoutMs = timeoutMs),
+                    requestIdFactory = { "$identityPrefix-${newToken()}" },
+                )
+
+                fun command(agentId: String, conversationId: String) = TurnCommand(
+                    backendId = BackendId("app-server-$identityPrefix"),
+                    runtimeId = RuntimeId("app-server-$identityPrefix"),
+                    agentId = AgentId(agentId),
+                    conversationId = ConversationId(conversationId),
+                    input = TurnInput.UserMessage(
+                        localMessageId = "$identityPrefix-${newToken()}",
+                        text = spec.message,
+                    ),
+                )
+
+                suspend fun drive(label: String, agentId: String, conversationId: String) {
+                    runCatching {
+                        engine.runTurn(command(agentId, conversationId)).collect { event ->
+                            emit("[$label] ${event.payload.toCliLine()}")
+                        }
+                    }.onFailure { error ->
+                        emit("[$label] [error] ${error::class.simpleName}: ${error.message}")
+                        throw error
+                    }
+                }
+
+                try {
+                    emit("[app-server] connect ${spec.url}")
+                    emit("[app-server] concurrent runtimes: ${spec.agentId}/${spec.conversationId} + $secondAgentId/$secondConversationId")
+                    val first = async { drive("conv-1", spec.agentId, spec.conversationId) }
+                    val second = async { drive("conv-2", secondAgentId, secondConversationId) }
+                    first.await()
+                    second.await()
+                    emit("[app-server] both concurrent turns reached a terminal")
                 } finally {
                     transport.close()
                 }
