@@ -32,10 +32,17 @@ import java.util.concurrent.TimeUnit
  * → wait → destroyForcibly → wait) plus a shutdown hook at the call site. A robust fix
  * for the hard-kill window — whole-tree teardown via ProcessHandle.descendants(), or a
  * kernel-level process-group `kill(-pgid)` / PR_SET_PDEATHSIG so the child dies WITH the
- * parent — is NOT available here: this module is Android-targeted and android.jar exposes
- * neither java.lang.ProcessHandle nor prctl, and expressing a process group needs native
- * (JNI/FFI) code. We deliberately do NOT fake it. On the systemd server the unit's cgroup
- * reaps the whole tree on stop, which covers the deployment that matters.
+ * parent — was NOT available while this file lived in the Android-targeted `:cli` module:
+ * android.jar exposes neither java.lang.ProcessHandle nor prctl, and expressing a process
+ * group needs native (JNI/FFI) code. We deliberately did NOT fake it. On the systemd
+ * server the unit's cgroup reaps the whole tree on stop, which covers the deployment that
+ * matters.
+ *
+ * letta-mobile-zsgad moved this file into `:iroh-wrapper-cli`, a JVM-only module with no
+ * android.jar on its compile classpath, so `ProcessHandle` / `ProcessHandle.descendants()`
+ * ARE now reachable and lgns8.18's FU1 is unblocked. FU1 is intentionally still not
+ * implemented — zsgad only removed the platform blocker; implementing descendant teardown
+ * is a separate change with its own test surface.
  */
 class OwnedAppServerProcess private constructor(
     val process: Process,

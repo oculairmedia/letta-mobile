@@ -235,32 +235,50 @@ Still open inside Phase 4:
 
 - legacy mobile WS shim connector deletion (item 6) — tracked as follow-up.
 
-### Phase 5: Package the wrapper
+### Phase 5: Package the wrapper — DONE (code), deploy pending
 
-Create a dedicated JVM application distribution for the Iroh wrapper. Preferred
-shape:
+Delivered by `letta-mobile-zsgad`. The module exists at the preferred path:
 
 ```text
 android-compose/iroh-wrapper-cli/
   build.gradle.kts
-  src/main/...
+  src/main/kotlin/com/letta/mobile/wrapper/Main.kt          (entrypoint)
+  src/main/kotlin/com/letta/mobile/cli/commands/AppServerServeIrohCommand.kt
+  src/main/kotlin/com/letta/mobile/cli/appserver/OwnedAppServerProcess.kt
+  src/test/kotlin/...
 ```
 
-It may extract/reuse the current command implementation, but the release
-artifact must not depend on Android unit-test outputs.
+#### Why a new module rather than packaging `:cli`
 
-Required Gradle behavior:
+`:cli` is an `com.android.library` module. AGP publishes no runnable JVM runtime
+classpath for it, so there was nothing for `installDist` to consume — which is
+precisely why the interim launcher captured a resolved classpath out of `/proc`
+into `/etc/meridian/iroh-wrapper-classpath.txt`.
 
-- JVM application plugin;
-- Java/JVM target compatible with Iroh, currently Java 21;
-- main class that exposes `app-server-serve-iroh` or runs that server directly;
-- `installDist` and `distZip`;
-- start script with `--enable-native-access=ALL-UNNAMED`;
-- reproducible dependency lock/version catalog use;
-- artifact version containing the git commit;
-- smoke test that launches `--help` from the installed distribution.
+Everything the wrapper command actually needs already lives in `:sharedLogic`,
+which is KMP with a `jvm()` target (the Iroh binding is in the `jvmAndAndroid`
+source set shared by the `jvm` and `android` targets). So the wrapper sources
+were **moved, not duplicated**, into a pure-JVM module, and `:cli` now depends on
+`:iroh-wrapper-cli` for the `app-server-serve-iroh` command. `meridian
+app-server-serve-iroh` in the developer CLI is unchanged.
 
-Expected build interface:
+The release artifact therefore depends on no Android output at all — in
+particular not on the Android unit-test outputs the interim classpath pointed at.
+
+#### Requirements status
+
+| Requirement | Status |
+|---|---|
+| JVM `application` plugin | done |
+| Java/JVM target 21 (Iroh) | done — `jvmTarget = 21`, `sourceCompatibility = 21` |
+| Main class exposing `app-server-serve-iroh` | done — `com.letta.mobile.wrapper.Main`, subcommand name unchanged |
+| `installDist` and `distZip` | done (`distTar` too, via the plugin) |
+| Start script with `--enable-native-access=ALL-UNNAMED` | done via `applicationDefaultJvmArgs` |
+| Artifact version containing the git commit | done — `version` is `git rev-parse --short=12 HEAD`, falling back to `dev` outside a checkout |
+| Smoke test launching `--help` from the installed distribution | done, recorded in the zsgad PR body |
+| Reproducible dependency lock/version catalog | **NOT done** — this repository pins versions as literals in each `build.gradle.kts` and has no version catalog. `:iroh-wrapper-cli` follows the existing convention (matching `:appserver-cli`). Introducing a catalog is a repo-wide change and is out of scope here. |
+
+#### Build interface
 
 ```bash
 cd android-compose
@@ -272,8 +290,97 @@ ANDROID_HOME="${ANDROID_HOME:-$HOME/Android/Sdk}" \
   :iroh-wrapper-cli:distZip
 ```
 
-If the implementing agent chooses a different module name, update this runbook,
-the systemd unit template, CI, and release artifact paths in the same PR.
+The installed tree is `iroh-wrapper-cli/build/install/meridian-iroh-wrapper/`
+(`bin/meridian-iroh-wrapper` + `lib/` — 87 real jars, including
+`iroh-1.0.0.jar`, versus the interim launcher's 280 build-intermediate and
+Gradle-cache paths).
+
+#### JNI depth of the smoke
+
+`--help` does not touch JNI. The deeper headless smoke that does — and that does
+**not** bind the production port — is:
+
+```bash
+<installDir>/bin/meridian-iroh-wrapper app-server-serve-iroh \
+  --iroh-port 0 \
+  --iroh-secret-key-file /tmp/smoke-iroh.key \
+  --allow-insecure-anonymous-iroh
+```
+
+`--iroh-port 0` binds an ephemeral UDP port instead of 4501, so it is safe to run
+on the production host alongside the live service. Success looks like
+`endpoint.status status=online nodeId=<64 hex>` plus a printed ticket, which
+proves `libiroh_ffi` loaded from the distribution's own `lib/`. Kill it with
+Ctrl-C. `IrohWrapperCliWiringTest` additionally asserts `computer.iroh.Endpoint`
+resolves on the module runtime classpath, so CI catches a missing JNI jar without
+opening a socket.
+
+Note: iroh-ffi emits three benign Rust `there is no reactor running` panics on
+the watcher threads during startup. They are pre-existing upstream noise, present
+under the interim launcher too, and the endpoint reaches `online` after them.
+
+#### Side effect: lgns8.18 FU1 becomes possible
+
+FU1 (process-group SIGKILL of orphaned App Server children) was declined because
+`android.jar` exposes neither `java.lang.ProcessHandle` nor `prctl`. With
+`OwnedAppServerProcess` now living in a JVM-only module, `ProcessHandle` and
+`ProcessHandle.descendants()` are available. FU1 is **not** implemented by zsgad;
+the module only removes the blocker.
+
+#### Migration from the captured-classpath launcher
+
+The wrapper's argument vector is unchanged, so migration is executable-swap only.
+
+1. Build and install the release (see "Artifact Preparation" and "Host Layout").
+2. Split `/etc/meridian/iroh-wrapper.env` out of `/etc/meridian/appserver.env`
+   using `scripts/deploy/iroh-wrapper.env.example`.
+3. Record the current state for rollback:
+   ```bash
+   systemctl cat meridian-iroh-wrapper > /root/meridian-iroh-wrapper.pre-zsgad.unit
+   cp /etc/meridian/run-iroh-cli.sh /root/run-iroh-cli.sh.pre-zsgad
+   cp /etc/meridian/iroh-wrapper-classpath.txt /root/iroh-wrapper-classpath.txt.pre-zsgad
+   systemctl show -p MainPID meridian-iroh-wrapper
+   ```
+4. Install the unit template and restart:
+   ```bash
+   install -m 0644 scripts/deploy/meridian-iroh-wrapper.service \
+     /etc/systemd/system/meridian-iroh-wrapper.service
+   systemctl daemon-reload
+   systemctl restart meridian-iroh-wrapper
+   ```
+5. Verify the NodeID is **unchanged** (the secret-key file is outside the release
+   directory, so it must survive):
+   ```bash
+   journalctl -u meridian-iroh-wrapper -n 50 --no-pager | grep -E 'Node ID|endpoint.status'
+   ss -lunp | grep 4501
+   ```
+   A changed NodeID means the key file was not picked up — roll back before any
+   device re-pairs against the new identity.
+6. Only after the service is confirmed healthy, retire the interim launcher:
+   ```bash
+   rm /etc/meridian/run-iroh-cli.sh /etc/meridian/iroh-wrapper-classpath.txt
+   ```
+   Until this step, `.letta/worktrees/meridian-deploy` in the repo checkout is
+   still load-bearing for the live service and must not be deleted.
+
+#### Rollback
+
+```bash
+install -m 0644 /root/meridian-iroh-wrapper.pre-zsgad.unit \
+  /etc/systemd/system/meridian-iroh-wrapper.service
+systemctl daemon-reload && systemctl restart meridian-iroh-wrapper
+```
+
+Once a second release exists, prefer rolling the symlink instead:
+
+```bash
+ln -sfn /opt/meridian/iroh-wrapper/releases/<PREVIOUS_SHA>/<dist-root> \
+  /opt/meridian/iroh-wrapper/current
+systemctl restart meridian-iroh-wrapper
+```
+
+Keys, pairing state, and env files live outside the release directory, so either
+rollback preserves paired peers and the NodeID.
 
 ## Pre-Merge Verification
 
@@ -440,8 +547,14 @@ Provider credentials belong to Letta App Server, not the Iroh wrapper.
 
 ## Systemd Unit
 
-Install a repository-owned unit template during the implementation. The final
-unit should be equivalent to:
+The repository-owned template is committed at
+`scripts/deploy/meridian-iroh-wrapper.service` (and the environment template at
+`scripts/deploy/iroh-wrapper.env.example`). Install those rather than
+hand-transcribing the block below.
+
+Note that `app-server-serve-iroh` is a **subcommand** of the packaged CLI and
+must appear before the options; an earlier draft of this section omitted it. The
+final unit is equivalent to:
 
 ```ini
 [Unit]
@@ -455,6 +568,7 @@ Type=simple
 EnvironmentFile=/etc/meridian/iroh-wrapper.env
 ExecStartPre=/bin/bash -c 'for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/4500) 2>/dev/null && exit 0; sleep 1; done; exit 1'
 ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
+  app-server-serve-iroh \
   --app-server-url ws://127.0.0.1:4500 \
   --iroh-port 4501 \
   --iroh-secret-key-file /etc/meridian/iroh-secret.key \

@@ -1,0 +1,60 @@
+# Meridian Iroh QUIC wrapper — repository-owned systemd unit template.
+# letta-mobile-zsgad. See docs/architecture/lettashim-retirement-deployment-runbook.md
+# ("Phase 5: Package the wrapper", "Host Layout", "Systemd Unit").
+#
+# THIS FILE IS A TEMPLATE, NOT THE LIVE UNIT. Installing it is a separate,
+# signed-off deploy step:
+#
+#   install -m 0644 scripts/deploy/meridian-iroh-wrapper.service \
+#     /etc/systemd/system/meridian-iroh-wrapper.service
+#   systemctl daemon-reload && systemctl restart meridian-iroh-wrapper
+#
+# It replaces the captured-classpath launcher (/etc/meridian/run-iroh-cli.sh +
+# /etc/meridian/iroh-wrapper-classpath.txt, 280 entries pointing into gitignored
+# build/intermediates/ directories of a git worktree). Nothing under this unit
+# references a worktree, a Gradle cache, or Gradle itself.
+
+[Unit]
+Description=Meridian Iroh QUIC wrapper (bridges Iroh <-> App Server WS 127.0.0.1:4500)
+After=meridian-appserver.service network-online.target
+Requires=meridian-appserver.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Wrapper-only environment. Deliberately NOT /etc/meridian/appserver.env: the
+# wrapper must not inherit provider credentials or LETTA_LOCAL_BACKEND_* — those
+# belong to the App Server. See the runbook's "Wrapper Environment" section.
+EnvironmentFile=/etc/meridian/iroh-wrapper.env
+
+# The release tree is self-contained; the launcher script sets its own classpath
+# from the sibling lib/ directory. WorkingDirectory is only a safe neutral cwd.
+WorkingDirectory=/opt/meridian/iroh-wrapper/current
+
+# Wait for the App Server WS to accept connections before dialing it.
+ExecStartPre=/bin/bash -c 'for i in $(seq 1 60); do (echo > /dev/tcp/127.0.0.1/4500) 2>/dev/null && exit 0; sleep 1; done; echo "app-server 4500 not up"; exit 1'
+
+# `app-server-serve-iroh` is a SUBCOMMAND of the packaged CLI, kept at the same
+# name the captured-classpath launcher used, so the option vector below is
+# byte-identical to the one the pre-zsgad unit passed.
+ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
+  app-server-serve-iroh \
+  --app-server-url ws://127.0.0.1:4500 \
+  --iroh-port 4501 \
+  --iroh-secret-key-file /etc/meridian/iroh-secret.key \
+  --pairing-store-file /etc/meridian/paired-peers.json
+
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+NoNewPrivileges=true
+PrivateTmp=true
+
+# KillMode=control-group (the default) reaps the whole cgroup, which covers any
+# App Server child the wrapper might own. Do not weaken it.
+
+StandardOutput=append:/var/log/meridian-iroh-wrapper.log
+StandardError=append:/var/log/meridian-iroh-wrapper.log
+
+[Install]
+WantedBy=multi-user.target
