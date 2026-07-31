@@ -104,6 +104,11 @@ jobs:
         with:
           cache-read-only: ${{ github.event_name == 'pull_request' }}
 
+      # The harness declares `--wrapper-scan-mode hermetic` and passes the PID of
+      # the stub it spawned, so the no-http gate still attributes admin-HTTP
+      # sockets to the process serving Iroh (letta-mobile-jr5tx). There is no
+      # `meridian-iroh-wrapper` systemd unit on a GitHub runner; the deployment
+      # gate keeps the strict systemd path where a missing unit is fatal.
       - name: Hermetic probe (all scenarios)
         run: scripts/iroh_probe_hermetic.sh --scenario all --idle-ms 2000 --timeout-ms 90000
 

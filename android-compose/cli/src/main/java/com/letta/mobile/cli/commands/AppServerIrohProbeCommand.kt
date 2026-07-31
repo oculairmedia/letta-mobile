@@ -9,6 +9,7 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.probe.WrapperProcessScan
+import com.letta.mobile.cli.probe.WrapperScanMode
 import com.letta.mobile.data.transport.iroh.IrohProbeAssertions
 import com.letta.mobile.data.transport.iroh.IrohProbeSummary
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
@@ -87,6 +88,19 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         "--wrapper-pid",
         help = "no-http: explicit wrapper PID; bypasses systemd resolution (containers, dev runs).",
     ).int()
+    private val wrapperScanMode by option(
+        "--wrapper-scan-mode",
+        envvar = "LETTA_IROH_WRAPPER_SCAN_MODE",
+        help = "no-http: which shim-off run this is — 'deployment' (default; the wrapper scan is " +
+            "REQUIRED and an unresolvable unit fails the gate) or 'hermetic' (CI; the harness owns " +
+            "the wrapper and must pass --wrapper-pid, or --wrapper-scan-not-applicable when it " +
+            "spawns no wrapper process). Never inferred — a missing unit in production stays fatal.",
+    ).default(WrapperScanMode.DEPLOYMENT.cliValue)
+    private val wrapperScanNotApplicable by option(
+        "--wrapper-scan-not-applicable",
+        help = "no-http, hermetic mode only: reason why this run has no wrapper process to scan. " +
+            "Records a distinct not-applicable evidence state; rejected in deployment mode.",
+    )
     private val jsonOutput by option("--json", help = "Print machine-readable JSON summary.").flag(default = false)
     private val dumpFramesPath by option(
         "--dump-frames",
@@ -96,6 +110,10 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
 
     override fun run() = runBlocking {
         validateOptions()
+        val scanMode = WrapperScanMode.fromCli(wrapperScanMode)
+            ?: throw UsageError("--wrapper-scan-mode must be one of ${WrapperScanMode.CLI_VALUES.joinToString(", ")}")
+        WrapperProcessScan.validateScanOptions(scanMode, wrapperPid, wrapperScanNotApplicable)
+            ?.let { throw UsageError(it) }
         val requested = scenarios.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
         val unsupported = requested - SUPPORTED_SCENARIOS
         if (unsupported.isNotEmpty()) throw UsageError("Unsupported --scenario: ${unsupported.joinToString(",")}")
@@ -106,7 +124,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         val options = IrohProbeOptions(
             token, adminBaseUrl, agentId, message, seedMessages, payloadBytes, hydrateBudgetMs,
             secondTurnDelayMs, idleMs, timeoutMs, strictRedialDedupe, wrapperRestartCmd, dumpFramesPath,
-            wrapperUnit, wrapperPid,
+            wrapperUnit, wrapperPid, scanMode, wrapperScanNotApplicable,
         )
         val fixture = ProbeSessionFixture(options)
         val admin = ProbeAdminClient(adminBaseUrl)
