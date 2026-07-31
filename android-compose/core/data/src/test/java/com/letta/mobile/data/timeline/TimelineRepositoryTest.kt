@@ -164,6 +164,7 @@ class TimelineRepositoryTest {
         api.awaitActive("conv-shared")
         val agentA = repository.getOrCreate("agent-a", "conv-shared")
         val agentB = repository.getOrCreate("agent-b", "conv-shared")
+        api.awaitActiveCount("conv-shared", 2)
 
         assertTrue("first scoped caller should claim the unscoped loop", unscoped === agentA)
         assertFalse("different scoped agents must remain isolated", agentA === agentB)
@@ -181,6 +182,7 @@ class TimelineRepositoryTest {
         api.awaitActive("conv-shared")
         val unscoped = repository.getOrCreate("conv-shared")
         val agentB = repository.getOrCreate("agent-b", "conv-shared")
+        api.awaitActiveCount("conv-shared", 2)
 
         assertTrue("unscoped observer should follow the first scoped writer", agentA === unscoped)
         assertFalse("later different scoped agent should get a fresh loop", agentA === agentB)
@@ -268,6 +270,10 @@ private class CancellableStreamApi : MessageApi(mockk(relaxed = true)) {
 
     suspend fun awaitActive(conversationId: String) = withTimeout(5.seconds) {
         while (!isActive(conversationId)) delay(10.milliseconds)
+    }
+
+    suspend fun awaitActiveCount(conversationId: String, expected: Int) = withTimeout(5.seconds) {
+        while (activeCount(conversationId) < expected) delay(10.milliseconds)
     }
 
     suspend fun awaitClosed(conversationId: String) = withTimeout(5.seconds) {

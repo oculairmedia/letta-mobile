@@ -207,7 +207,12 @@ class ChatSendCoordinatorCleanupTest {
         // per-family copy instead of the bare "Turn failed".
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, ui.currentError())
         assertFalse(ui.isStreaming())
-        assertEquals(listOf("conv-1"), timeline.clearedActiveConversations)
+        // Two clears: the second send's stale-presence heal (the fake transport
+        // reports no live turn while the UI still shows streaming) now settles the
+        // orphaned row AND clears the transport-active marker — PR2 review finding
+        // 5, previously it dropped the state and left the marker set — followed by
+        // the terminal's own clear.
+        assertEquals(listOf("conv-1", "conv-1"), timeline.clearedActiveConversations)
         assertEquals(1, transport.sentTexts.count { it == "second" })
     }
 
@@ -711,18 +716,29 @@ class ChatSendCoordinatorCleanupTest {
         data class Reconcile(val conversationId: String, val reason: String, val forceRefresh: Boolean)
     }
 
+    /**
+     * letta-mobile-or40x PR2: the fake now answers turn ownership PER
+     * CONVERSATION (mirroring the keyed transport from PR1), so tests can put
+     * conversation B's turn in flight without claiming conversation A is busy.
+     * [activeChatTurn] stays as the "every conversation is busy" shorthand the
+     * older single-conversation tests use.
+     */
     private class FakeChannelTransport(
         val sendResults: MutableList<Boolean>,
         var activeChatTurn: Boolean = false,
+        val activeChatTurnConversations: MutableSet<String> = mutableSetOf(),
     ) : IChannelTransport {
         override val state: StateFlow<ChannelTransportState> = MutableStateFlow(ChannelTransportState.Connected("server", "session", "device"))
         override val events = MutableSharedFlow<ServerFrame>()
         override val frameEvents = MutableSharedFlow<TransportFrameEvent>()
-        override fun hasActiveChatTurn(conversationId: String): Boolean = activeChatTurn
-        override val hasAnyActiveChatTurn: Boolean get() = activeChatTurn
+        override fun hasActiveChatTurn(conversationId: String): Boolean =
+            activeChatTurn || conversationId in activeChatTurnConversations
+        override val hasAnyActiveChatTurn: Boolean
+            get() = activeChatTurn || activeChatTurnConversations.isNotEmpty()
         val sentTexts = mutableListOf<String>()
+        val sentConversationIds = mutableListOf<String>()
         override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) = Unit
-        override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; return sendResults.removeFirstOrNull() ?: true }
+        override fun send(agentId: String, conversationId: String, text: String, otid: String?, contentParts: JsonArray?, startNewConversation: Boolean): Boolean { sentTexts += text; sentConversationIds += conversationId; return sendResults.removeFirstOrNull() ?: true }
         override fun cancel(conversationId: String): Boolean = true
         override fun bye(): Boolean = true
         override suspend fun disconnect() = Unit
