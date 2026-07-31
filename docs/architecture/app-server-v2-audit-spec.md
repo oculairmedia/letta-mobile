@@ -279,8 +279,15 @@ Messages:
 
 `skill_enable_response`, `skill_disable_response`, `skills_updated`
 
-Skill hydration is projected from
-`update_device_status.device_status.current_available_skills`.
+Skill hydration has **no upstream source**. Verified against `@letta-ai/letta-code`
+0.29.12 (`letta.js`): `emitSkillsUpdated` sends exactly `{ type, timestamp }`,
+`buildDeviceStatus` hard-codes `current_available_skills: []` in both branches,
+there is no `skill_list` command, and `runtime_start.skill_sources` is a
+request-only field that `runtime_start_response` never echoes. `skills_updated`
+is therefore an invalidation signal, and the only authoritative skill facts on
+the wire are `skill_enable_response.{name,skill_path,link_path}` and
+`skill_disable_response.name`. `skill.list` reports `capability_unavailable`
+(no source) or `hydrated=false` until a genuine enumeration is injected.
 
 ### 7. Crons
 
@@ -694,9 +701,12 @@ Residual inconsistencies after Phases 1–4 (not accepted end state):
 4. **`skill.list_agent` is intentionally unavailable.** Process-global
    availability must not be presented as per-agent install state. Reintroduce
    only with a real assignment projection.
-5. **Skills catalog hydration is event-driven.** `skill.list` can return an
-   empty success before the first `update_device_status` / `skills_updated`
-   snapshot arrives; clients should treat empty-as-pending or trigger sync.
+5. **Skills catalog has no authoritative upstream enumeration (lgns8.21.2).**
+   `skill.list` never claims `hydrated=true` over an invented catalog: with no
+   listing source it returns `capability_unavailable`, and while unhydrated it
+   returns `{skills: [], hydrated: false, stale, catalog_source}`. A real
+   listing needs a host-side skill-root enumerator injected via
+   `NativeSkillsCatalog.hydrateFromHost`.
 6. **Model list wire shape still needs projection.** Native `list_models`
    entries are not yet fully mapped into the mobile `LlmModel` catalog schema.
 7. **Message get has a searchable window ceiling.** `message.get` /

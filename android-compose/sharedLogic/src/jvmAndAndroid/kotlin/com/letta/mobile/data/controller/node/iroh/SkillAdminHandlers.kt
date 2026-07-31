@@ -13,8 +13,11 @@ import kotlinx.serialization.json.put
  * Phase 2 semantic model (native App Server v2):
  * - Enable/disable is filesystem-scoped (`skill_enable` / `skill_disable`), not
  *   the retired shim agent-scoped install REST.
- * - Listings are projections from [skillsListing] (device-status /
- *   `skills_updated`); there is no upstream `skill_list` command.
+ * - Listings come only from an authoritative [SkillsListingSource]. There is no
+ *   upstream `skill_list` command, `skills_updated` carries only a timestamp, and
+ *   `device_status.current_available_skills` is hard-coded `[]` in 0.29.12, so an
+ *   absent or unhydrated source yields `capability_unavailable` / `hydrated=false`
+ *   rather than a fabricated empty catalog.
  * - Skill enable/disable is process-global; after mutation every cached runtime
  *   is evicted so agents reseed their toolset on the next turn.
  */
@@ -80,19 +83,28 @@ object SkillAdminHandlers {
     }
 
     private fun listSkills(skillsListing: SkillsListingSource?): JsonObjectEnvelope {
-        val hydrated = skillsListing?.isHydrated() != false
-        // Cold start: return an empty listing with hydrated=false so UI can wait
-        // without treating the absence of the first device-status frame as an error.
-        if (!hydrated) {
-            return buildJsonObject {
-                put("skills", JsonArray(emptyList()))
-                put("hydrated", false)
-            }
+        if (skillsListing == null) {
+            adminError(
+                "capability_unavailable: skill.list has no authoritative catalog source. " +
+                    "letta-code 0.29.12 advertises no skill enumeration " +
+                    "(skills_updated is {type,timestamp}; device_status.current_available_skills " +
+                    "is hard-coded []; there is no skill_list command). Inject a " +
+                    "SkillsListingSource backed by host skill-root enumeration to enable this method.",
+            )
         }
-        val skills = skillsListing?.currentSkills() ?: JsonArray(emptyList())
+        val hydrated = skillsListing.isHydrated()
+        // Cold start: report an explicitly non-authoritative empty listing so the
+        // UI can wait, instead of claiming hydrated=true over an invented catalog.
+        val skills = if (hydrated) {
+            skillsListing.currentSkills() ?: JsonArray(emptyList())
+        } else {
+            JsonArray(emptyList())
+        }
         return buildJsonObject {
             put("skills", skills)
-            put("hydrated", true)
+            put("hydrated", hydrated)
+            put("stale", skillsListing.isStale())
+            put("catalog_source", skillsListing.catalogSource())
         }
     }
 

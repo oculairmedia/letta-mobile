@@ -345,9 +345,10 @@
         "skill_disable_response",
         "skills_updated"
       ],
-      "hydration": "update_device_status.device_status.current_available_skills",
+      "hydration": "none advertised: device_status.current_available_skills is hard-coded [] and skills_updated is {type,timestamp} (letta-code 0.29.12)",
       "absent_operations": [
-        "skill_list_command"
+        "skill_list_command",
+        "skill_enumeration_in_runtime_start_response"
       ]
     },
     {

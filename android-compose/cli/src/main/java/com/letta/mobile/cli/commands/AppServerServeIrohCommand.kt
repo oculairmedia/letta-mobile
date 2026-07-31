@@ -17,7 +17,6 @@ import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
-import com.letta.mobile.data.controller.node.iroh.SkillsListingSource
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
@@ -86,10 +85,7 @@ internal fun buildProductionAdminRouter(
         nativeClient = nativeClient,
         vibesyncBaseUrl = vibesyncBaseUrl,
         adminRestBaseUrl = adminRestBaseUrl,
-        skillsListing = object : SkillsListingSource {
-            override fun currentSkills() = skillsCatalog.snapshot()
-            override fun isHydrated() = skillsCatalog.isHydrated()
-        },
+        skillsListing = skillsCatalog.asListingSource(),
     )
 }
 
