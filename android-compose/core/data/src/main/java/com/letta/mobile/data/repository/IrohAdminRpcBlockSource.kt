@@ -116,9 +116,9 @@ class IrohAdminRpcBlockSource(
      * Pages `block.list` with a limit/offset cursor.
      *
      * letta-mobile post-cutover regression (2026-08-01): the store tier serves
-     * block.list as the union of every agent's memory files — 1447 blocks /
-     * ~1.83 MB on the live host — and a single unwindowed response exceeds the
-     * 1 MiB Iroh admin_rpc frame cap, so the Block Library rendered nothing.
+     * block.list as the union of every agent's memory files — 1439 blocks /
+     * 2,394,364 bytes measured on the live host — and one unwindowed response
+     * exceeds the 1 MiB admin_rpc frame cap, so the Block Library rendered nothing.
      * This mirrors [IrohAdminRpcAgentSource.listAgents]: small pages, dedup by id,
      * hard iteration cap so a backend that ignores `offset` cannot spin.
      *
@@ -130,21 +130,29 @@ class IrohAdminRpcBlockSource(
         val merged = mutableListOf<Block>()
         val seenIds = HashSet<String>()
         var offset = 0
-        var iterations = 0
-        while (iterations < MAX_BLOCK_LIST_PAGES) {
-            iterations++
+        repeat(MAX_BLOCK_LIST_PAGES) {
             val page = fetchPage(offset, BLOCK_LIST_PAGE_SIZE, label, isTemplate)
-            if (page.blocks.isEmpty()) break
-            // A backend that ignores BOTH limit and offset re-serves page 1
-            // forever; contributing nothing new is the stop signal.
             val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
-            if (fresh.isEmpty()) break
             merged += fresh
-            val hasMore = page.hasMore ?: (page.blocks.size >= BLOCK_LIST_PAGE_SIZE)
-            if (!hasMore) break
+            if (!shouldContinueAfter(page, fresh)) return merged
             offset += page.blocks.size
         }
         return merged
+    }
+
+    /**
+     * Whether the sweep should ask for another page.
+     *
+     * Three stop conditions, in the order they can occur: an empty page (end of
+     * set); a page that contributed nothing NEW, which means the backend ignored
+     * `offset` and re-served page 1 — the exact pre-fix behaviour, and a signal to
+     * stop rather than spin; and the server's own `has_more`, preferred over the
+     * page-size heuristic (the heuristic only applies to a legacy bare array,
+     * where a bare array already means "this is the full set").
+     */
+    private fun shouldContinueAfter(page: BlockPage, fresh: List<Block>): Boolean {
+        if (page.blocks.isEmpty() || fresh.isEmpty()) return false
+        return page.hasMore ?: (page.blocks.size >= BLOCK_LIST_PAGE_SIZE)
     }
 
     private suspend fun fetchPage(
