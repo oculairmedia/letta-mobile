@@ -205,6 +205,15 @@ class AppServerServeIrohCommand : CliktCommand(
             "SHIM_CHANNELS_ENABLED=0 — running both hosts double-starts accounts.",
     ).flag(default = false)
 
+    /**
+     * o5bqk: process-lifetime cache of the last-known enabled channel accounts, so
+     * every reconnect can re-wire channel ingress in its first round trip instead
+     * of after a full enumeration. Held here (not in the coordinator) because a
+     * fresh coordinator is built per App Server generation.
+     */
+    private val channelAccountCache =
+        com.letta.mobile.data.controller.channels.InMemoryChannelAccountCache()
+
     private val lettaCommand by option(
         "--letta-command",
         envvar = "LETTA_COMMAND",
@@ -504,6 +513,11 @@ class AppServerServeIrohCommand : CliktCommand(
         val result = com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator(
             client = client,
             log = { System.err.println("[iroh-app-server] $it") },
+            // o5bqk: ONE cache for the whole process. The coordinator is rebuilt
+            // per generation (it binds to that generation's client), so this is
+            // what lets a reconnect re-wire ingress in the first round trip
+            // instead of after a full channels/accounts enumeration.
+            accountCache = channelAccountCache,
         ).restore()
         // Identifiers + counts only: channel account config carries cleartext
         // plugin credentials and must never reach a log sink (lgns8.23 landmine 2).

@@ -314,10 +314,195 @@ class ChannelRestoreCoordinatorTest {
         }
     }
 
-    private fun coordinator(client: AppServerClient) = ChannelRestoreCoordinator(
+    // ---------------------------------------------------------------------
+    // letta-mobile-o5bqk: the ingress re-wire window.
+    //
+    // Ingress binds to the socket that issued channel_start. Anything inbound
+    // between socket-open and the re-issue is enqueued against the DEAD socket
+    // and never runs (measured: typing indicator, then silence, then a late
+    // lossy drain). We cannot close the window from here, but we can make it one
+    // round trip instead of 1 + 1 + <channel count>.
+    // ---------------------------------------------------------------------
+
+    /**
+     * FAIL-ON-REVERT: after a reconnect, `channel_start` for the accounts we
+     * already knew about must be the FIRST frame on the new socket — ahead of
+     * `channels_list` and every `channel_accounts_list`. Removing the fast path
+     * (or moving it after the enumeration) puts a listing frame first and fails
+     * this test.
+     */
+    @Test
+    fun reconnectReWiresCachedAccountsInTheFirstRoundTripBeforeEnumeration() = runTest {
+        val cache = InMemoryChannelAccountCache()
+        val boot = ScriptedChannelClient(
+            channels = listOf(summary("matrix"), summary("mobile")),
+            accounts = mapOf(
+                "matrix" to listOf(matrixAccount()),
+                "mobile" to listOf(matrixAccount(accountId = "mobile-default").copy(channelId = "mobile")),
+            ),
+        )
+        coordinator(boot, cache).restore()
+        // Boot has no cache to work from: it must enumerate first.
+        assertEquals("channels_list", boot.commandLog.first())
+
+        // The reconnect generation gets a fresh client (a new socket) and a fresh
+        // coordinator — only the cache survives.
+        val reconnect = ScriptedChannelClient(
+            channels = listOf(summary("matrix"), summary("mobile")),
+            accounts = mapOf(
+                "matrix" to listOf(matrixAccount(running = true)),
+                "mobile" to listOf(
+                    matrixAccount(accountId = "mobile-default", running = true).copy(channelId = "mobile"),
+                ),
+            ),
+        )
+
+        val result = coordinator(reconnect, cache).restore()
+
+        assertEquals(
+            listOf("channel_start:matrix/lettabot", "channel_start:mobile/mobile-default"),
+            reconnect.commandLog.take(2),
+            "both known accounts must be re-wired before any enumeration frame",
+        )
+        assertTrue(
+            reconnect.commandLog.indexOf("channels_list") > 1,
+            "channels_list must not gate the re-wire: ${reconnect.commandLog}",
+        )
+        assertEquals(2, result.startedAccounts)
+    }
+
+    /**
+     * FAIL-ON-REVERT: the fast path re-wires, the enumeration confirms — but the
+     * account must not be started twice, because each `channel_start` is a real
+     * stop+start and costs the adapter another sync bounce.
+     */
+    @Test
+    fun fastPathAccountIsNotStartedAgainByTheEnumeration() = runTest {
+        val cache = InMemoryChannelAccountCache()
+        val accounts = mapOf("matrix" to listOf(matrixAccount()))
+        coordinator(
+            ScriptedChannelClient(channels = listOf(summary("matrix")), accounts = accounts),
+            cache,
+        ).restore()
+        val reconnect = ScriptedChannelClient(channels = listOf(summary("matrix")), accounts = accounts)
+
+        val result = coordinator(reconnect, cache).restore()
+
+        assertEquals(listOf("matrix/lettabot"), reconnect.starts, "exactly one start per account per pass")
+        assertEquals(1, result.startedAccounts)
+    }
+
+    /**
+     * FAIL-ON-REVERT for landmine 1 inside the fast path: a failed `channel_start`
+     * persists `enabled:false` upstream, so a fast-path failure that skipped the
+     * re-assertion would make the enumeration *in the same pass* see a disabled
+     * account and skip it — one transient blip, one entirely dark generation.
+     */
+    @Test
+    fun fastPathFailureReassertsEnabledAndFallsThroughToTheRetryingPath() = runTest {
+        val cache = InMemoryChannelAccountCache()
+        val accounts = mapOf("matrix" to listOf(matrixAccount()))
+        coordinator(
+            ScriptedChannelClient(channels = listOf(summary("matrix")), accounts = accounts),
+            cache,
+        ).restore()
+        // First start on the new socket fails; the enumeration path must recover it.
+        val reconnect = ScriptedChannelClient(
+            channels = listOf(summary("matrix")),
+            accounts = accounts,
+            startFailures = 1,
+        )
+
+        val result = coordinator(reconnect, cache).restore()
+
+        assertEquals(
+            listOf("channel_start:matrix/lettabot", "channel_account_update:matrix/lettabot"),
+            reconnect.commandLog.take(2),
+            "a failed fast-path start must re-assert enabled=true immediately",
+        )
+        assertEquals(listOf("matrix/lettabot:true"), reconnect.enableReasserts)
+        assertEquals(2, reconnect.starts.size, "the enumeration path owns the retry budget")
+        assertEquals(1, result.startedAccounts)
+        assertTrue(result.isFullySuccessful)
+    }
+
+    /**
+     * The fast path's residual risk, made loud: an account disabled between
+     * generations is started once from the cache before the enumeration can
+     * contradict it. There is no `channel_stop` on this client, so the contract
+     * is a WARN — never a silent resurrection.
+     */
+    @Test
+    fun fastPathStartOfAnAccountDisabledSinceLastPassIsWarnedAboutAndDroppedFromTheCache() = runTest {
+        Telemetry.clear()
+        val cache = InMemoryChannelAccountCache()
+        coordinator(
+            ScriptedChannelClient(
+                channels = listOf(summary("matrix")),
+                accounts = mapOf("matrix" to listOf(matrixAccount())),
+            ),
+            cache,
+        ).restore()
+        Telemetry.clear()
+        val logged = mutableListOf<String>()
+        val reconnect = ScriptedChannelClient(
+            channels = listOf(summary("matrix")),
+            accounts = mapOf("matrix" to listOf(matrixAccount(enabled = false))),
+        )
+
+        ChannelRestoreCoordinator(
+            client = reconnect,
+            requestIdFactory = { "req" },
+            sleep = {},
+            log = { logged += it },
+            accountCache = cache,
+        ).restore()
+
+        assertTrue(
+            Telemetry.events.value.any { it.name == "fast_path_started_stale_account" },
+            "a stale fast-path start must be reported, not swallowed",
+        )
+        assertTrue(logged.any { "WARN fast-path started matrix/lettabot" in it })
+        assertEquals(emptyList(), cache.lastKnownEnabled(), "the disabled account must leave the cache")
+        Telemetry.clear()
+    }
+
+    /** A failed enumeration must not clear the cache — the next reconnect still needs it. */
+    @Test
+    fun channelsListFailureLeavesTheCacheIntactForTheNextReconnect() = runTest {
+        val cache = InMemoryChannelAccountCache()
+        coordinator(
+            ScriptedChannelClient(
+                channels = listOf(summary("matrix")),
+                accounts = mapOf("matrix" to listOf(matrixAccount())),
+            ),
+            cache,
+        ).restore()
+        // channel_start still works on the new socket; only the enumeration is broken.
+        val broken = ScriptedChannelClient(
+            channels = listOf(summary("matrix")),
+            accounts = mapOf("matrix" to listOf(matrixAccount())),
+            channelsListError = "boom",
+        )
+
+        val result = coordinator(broken, cache).restore()
+
+        assertEquals(listOf("matrix/lettabot"), broken.starts, "the re-wire still happens")
+        assertEquals(1, result.startedAccounts)
+        assertEquals(
+            listOf(ChannelAccountRef("matrix", "lettabot")),
+            cache.lastKnownEnabled(),
+        )
+    }
+
+    private fun coordinator(
+        client: AppServerClient,
+        cache: ChannelAccountCache = InMemoryChannelAccountCache(),
+    ) = ChannelRestoreCoordinator(
         client = client,
         requestIdFactory = { "req" },
         sleep = {},
+        accountCache = cache,
     )
 
     private fun summary(id: String, configured: Boolean = true) = AppServerChannelSummary(
@@ -345,6 +530,8 @@ private class ScriptedChannelClient(
 ) : AppServerClient {
     override val events: Flow<AppServerReceivedFrame> = emptyFlow()
 
+    /** Every command in issue order — the restore SEQUENCE is load-bearing (o5bqk). */
+    val commandLog = mutableListOf<String>()
     val accountListings = mutableListOf<String>()
     val starts = mutableListOf<String>()
     val enableReasserts = mutableListOf<String>()
@@ -373,16 +560,20 @@ private class ScriptedChannelClient(
 
     override suspend fun channelsList(
         command: AppServerCommand.ChannelsList,
-    ): AppServerInboundFrame.ChannelsListResponse = AppServerInboundFrame.ChannelsListResponse(
-        requestId = command.requestId,
-        success = channelsListError == null,
-        channels = channels,
-        error = channelsListError,
-    )
+    ): AppServerInboundFrame.ChannelsListResponse {
+        commandLog += "channels_list"
+        return AppServerInboundFrame.ChannelsListResponse(
+            requestId = command.requestId,
+            success = channelsListError == null,
+            channels = channels,
+            error = channelsListError,
+        )
+    }
 
     override suspend fun channelAccountsList(
         command: AppServerCommand.ChannelAccountsList,
     ): AppServerInboundFrame.ChannelAccountsListResponse {
+        commandLog += "channel_accounts_list:${command.channelId}"
         accountListings += command.channelId
         val error = accountsListErrors[command.channelId]
         return AppServerInboundFrame.ChannelAccountsListResponse(
@@ -398,6 +589,7 @@ private class ScriptedChannelClient(
         command: AppServerCommand.ChannelStart,
     ): AppServerInboundFrame.ChannelStartResponse {
         val key = "${command.channelId}/${command.accountId}"
+        commandLog += "channel_start:$key"
         starts += key
         if (throwOnStart) throw IllegalStateException("socket closed")
         val remaining = failuresLeft.getOrPut(key) { startFailures }
@@ -419,8 +611,9 @@ private class ScriptedChannelClient(
     override suspend fun channelAccountUpdate(
         command: AppServerCommand.ChannelAccountUpdate,
     ): AppServerInboundFrame.ChannelAccountUpdateResponse {
+        commandLog += "channel_account_update:${command.channelId}/${command.accountId}"
         updateCommands += command
-        enableReasserts += "${command.channelId}/${command.accountId}:${command.patch.enabled}"
+        enableReasserts +="${command.channelId}/${command.accountId}:${command.patch.enabled}"
         return AppServerInboundFrame.ChannelAccountUpdateResponse(
             requestId = command.requestId,
             success = true,
