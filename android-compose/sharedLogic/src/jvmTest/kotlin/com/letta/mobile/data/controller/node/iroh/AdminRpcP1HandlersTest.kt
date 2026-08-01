@@ -3,7 +3,9 @@ package com.letta.mobile.data.controller.node.iroh
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
@@ -31,72 +33,73 @@ class AdminRpcP1HandlersTest {
         AdminProxyClient.defaultTransportFactory = originalFactory
     }
 
+    /**
+     * lgns8.9: the block / tool / passage / agent-context admin REST proxies are
+     * GONE. Each of those methods now has an explicit non-shim owner (native
+     * command, read-only store, controller catalog) or a fail-closed denial, so
+     * the characterization here is the SUCCESSOR contract: with no store, no
+     * native client, and no VibeSync, none of them may dial the admin proxy —
+     * they either deny or answer from a controller-owned constant.
+     *
+     * Each of these paths also 404s in admin-shim itself, so denial is parity.
+     */
     @Test
-    fun `block handlers proxy PATCH method and expected core memory paths`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
+    fun `block tool passage and context methods never dial an admin rest proxy`() = runTest {
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
-        router.dispatchResult("block.attach", params("agent_id" to "agent-1", "block_id" to "block-1"))
-        router.dispatchResult("block.detach", params("agent_id" to "agent-1", "block_id" to "block-1"))
-        router.dispatchResult("block.update_agent", params("agent_id" to "agent-1", "label" to "persona", "value" to "updated"))
-
-        assertEquals(
-            listOf(
-                ProxyCall("PATCH", "http://admin.test/v1/agents/agent-1/core-memory/blocks/attach/block-1", "{}"),
-                ProxyCall("PATCH", "http://admin.test/v1/agents/agent-1/core-memory/blocks/detach/block-1", "{}"),
-                ProxyCall("PATCH", "http://admin.test/v1/agents/agent-1/core-memory/blocks/persona", "{\"value\":\"updated\"}"),
-            ),
-            calls,
+        val denied = listOf(
+            "block.attach" to params("agent_id" to "agent-1", "block_id" to "block-1"),
+            "block.detach" to params("agent_id" to "agent-1", "block_id" to "block-1"),
+            "block.create" to params("label" to "persona", "value" to "v"),
+            "block.update" to params("block_id" to "block-1", "value" to "v"),
+            "block.delete" to params("block_id" to "block-1"),
+            "tool.attach" to params("agent_id" to "agent-1", "tool_id" to "tool-1"),
+            "tool.detach" to params("agent_id" to "agent-1", "tool_id" to "tool-1"),
+            "tool.create" to params("name" to "t"),
+            "tool.update" to params("tool_id" to "tool-1"),
+            "tool.delete" to params("tool_id" to "tool-1"),
+            "passage.create" to params("agent_id" to "agent-1", "text" to "remember this"),
+            "passage.delete" to params("agent_id" to "agent-1", "passage_id" to "passage-1"),
+            "passage.list" to params("agent_id" to "agent-1"),
         )
+        denied.forEach { (method, p) ->
+            val response = router.dispatch("test-request", method, p)
+            assertTrue(response.contains("\"success\":false"), "$method must fail closed: $response")
+            assertTrue(response.contains("capability_unavailable"), "$method must deny typed: $response")
+        }
+
+        // Store-owned and native-owned rows fail closed too when unwired, but
+        // never by dialing HTTP.
+        listOf(
+            "block.list" to params(),
+            "block.get" to params("block_id" to "block-1"),
+            "block.update_agent" to params("agent_id" to "agent-1", "label" to "persona", "value" to "updated"),
+            "agent.context" to params("agent_id" to "agent-1", "conversation_id" to "conversation-1"),
+        ).forEach { (method, p) ->
+            val response = router.dispatch("test-request", method, p)
+            assertTrue(response.contains("\"success\":false"), "$method must fail closed unwired: $response")
+        }
+
+        assertEquals(emptyList(), calls, "no admin REST surface may remain: $calls")
     }
 
+    /** The controller-owned constant catalogs answer without any datastore. */
     @Test
-    fun `tool handlers proxy PATCH method and expected attach detach paths`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
+    fun `tool catalog reads are served from the controller without a proxy`() = runTest {
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
-        router.dispatchResult("tool.attach", params("agent_id" to "agent-1", "tool_id" to "tool-1"))
-        router.dispatchResult("tool.detach", params("agent_id" to "agent-1", "tool_id" to "tool-1"))
+        val list = router.dispatchResult("tool.list", params()).jsonArray
+        assertTrue(list.isNotEmpty(), "the builtin tool catalog must not be empty")
+        val toolId = list.first().jsonObject.getValue("id").jsonPrimitive.content
+        val tool = router.dispatchResult("tool.get", params("tool_id" to toolId)).jsonObject
+        assertEquals(toolId, tool.getValue("id").jsonPrimitive.content)
 
-        assertEquals(
-            listOf(
-                ProxyCall("PATCH", "http://admin.test/v1/agents/agent-1/tools/attach/tool-1", "{}"),
-                ProxyCall("PATCH", "http://admin.test/v1/agents/agent-1/tools/detach/tool-1", "{}"),
-            ),
-            calls,
-        )
-    }
-
-    @Test
-    fun `passage handlers proxy POST DELETE and expected archival memory paths`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
-
-        router.dispatchResult("passage.create", params("agent_id" to "agent-1", "text" to "remember this"))
-        router.dispatchResult("passage.delete", params("agent_id" to "agent-1", "passage_id" to "passage-1"))
-
-        assertEquals(
-            listOf(
-                ProxyCall("POST", "http://admin.test/v1/agents/agent-1/archival-memory", "{\"text\":\"remember this\"}"),
-                ProxyCall("DELETE", "http://admin.test/v1/agents/agent-1/archival-memory/passage-1", null),
-            ),
-            calls,
-        )
-    }
-
-    @Test
-    fun `agent context handler proxies GET with conversation id query`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
-
-        val result = router.dispatchResult("agent.context", params("agent_id" to "agent-1", "conversation_id" to "conversation-1"))
-
-        assertEquals(
-            listOf(ProxyCall("GET", "http://admin.test/v1/agents/agent-1/context?conversation_id=conversation-1", null)),
-            calls,
-        )
-        assertTrue(result.jsonObject.containsKey("ok"))
+        assertEquals(emptyList(), calls, "catalog reads must not dial a proxy: $calls")
     }
 
     @Test
     fun `project handlers accept project_id alias and prefer identifier`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("project.get", params("project_id" to "legacy-proj"))
         router.dispatchResult(
@@ -120,7 +123,7 @@ class AdminRpcP1HandlersTest {
 
     @Test
     fun `project handlers proxy existing api project endpoints`() = runTest {
-        val router = AdminRpcRegistry.buildRouter("http://admin.test", adminRestBaseUrl = "http://admin.test", vibesyncBaseUrl = "http://admin.test")
+        val router = AdminRpcRegistry.buildRouter("http://admin.test", vibesyncBaseUrl = "http://admin.test")
 
         router.dispatchResult("project.list", params("limit" to "1"))
         router.dispatchResult("project.get", params("identifier" to "vibesync"))

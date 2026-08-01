@@ -49,6 +49,7 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.CronUpdateResponse,
             is AppServerInboundFrame.CronDeleteResponse,
             is AppServerInboundFrame.CronDeleteAllResponse,
+            is AppServerInboundFrame.WriteMemoryFileResponse,
             is AppServerInboundFrame.GetReflectionSettingsResponse,
             is AppServerInboundFrame.SetReflectionSettingsResponse,
             // Channels host (lgns8.23): controller-initiated, correlated by the

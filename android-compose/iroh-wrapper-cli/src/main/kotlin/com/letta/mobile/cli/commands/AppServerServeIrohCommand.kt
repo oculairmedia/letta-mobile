@@ -71,9 +71,13 @@ fun buildProductionAdminRouter(
     pairingService: com.letta.mobile.data.controller.node.iroh.IrohPairingService? = null,
     nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
     vibesyncBaseUrl: String? = null,
-    // Phase 3: bounded admin REST must be an explicit service URL — never the
-    // LettaShim :8291 default. Unset => capability_unavailable for those methods.
-    adminRestBaseUrl: String? = System.getenv("LETTA_IROH_ADMIN_REST_BASE_URL"),
+    /**
+     * lgns8.9: the letta-code on-disk backend root. Admin READS the App Server
+     * exposes no command for (run/step history, agent context, memory blocks)
+     * are served READ-ONLY from it — the same directory lettashim read. Unset =>
+     * those methods fail closed; there is no HTTP admin fallback any more.
+     */
+    localBackendDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
     eventScope: CoroutineScope? = null,
 ): AdminRpcRouter {
     val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
@@ -97,7 +101,7 @@ fun buildProductionAdminRouter(
         pairingService = pairingService,
         nativeClient = nativeClient,
         vibesyncBaseUrl = vibesyncBaseUrl,
-        adminRestBaseUrl = adminRestBaseUrl,
+        localBackendDir = localBackendDir,
         skillsListing = skillsCatalog.asListingSource(),
     )
 }

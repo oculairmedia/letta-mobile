@@ -47,19 +47,7 @@ class AdminHandlerRefactorCharacterizationTest {
         val transport = FakeTransport()
         AdminProxyClient.defaultTransportFactory = { transport }
 
-        val router = AdminRpcRegistry.buildRouter(
-            adminBaseUrl = "http://test",
-            adminRestBaseUrl = "http://test",
-        )
-
-        suspend fun check(method: String, params: kotlinx.serialization.json.JsonObject?, expectedMethod: String, expectedUrl: String) {
-            transport.lastMethod = null
-            transport.lastUrl = null
-            val response = router.dispatch("req", method, params)
-            assertTrue(response.contains("\"success\":true"), "Expected success for $method, got $response")
-            assertEquals(expectedMethod, transport.lastMethod, "Method mismatch for $method")
-            assertEquals(expectedUrl, transport.lastUrl, "Url mismatch for $method")
-        }
+        val router = AdminRpcRegistry.buildRouter(adminBaseUrl = "http://test")
 
         suspend fun checkNativeFailClosed(method: String, params: kotlinx.serialization.json.JsonObject?) {
             transport.lastMethod = null
@@ -69,6 +57,9 @@ class AdminHandlerRefactorCharacterizationTest {
             assertTrue(response.contains("capability_unavailable") || response.contains("app_server_error"), response)
             assertEquals(null, transport.lastMethod, "$method must not dial admin proxy")
         }
+
+        suspend fun checkNativeWithoutProxy(method: String, params: kotlinx.serialization.json.JsonObject?) =
+            router.assertServedNatively(transport, method, params)
 
         checkNativeFailClosed("agent.get", buildJsonObject { put("agent_id", "ag-1") })
         checkNativeFailClosed("approval.submit", buildJsonObject {
@@ -90,11 +81,36 @@ class AdminHandlerRefactorCharacterizationTest {
         checkNativeFailClosed("goal.get", buildJsonObject { put("agent_id", "ag-1") })
         checkNativeFailClosed("slash_command.list", null)
 
-        check("archive.list", null, "GET", "http://test/v1/archives")
-        check("identity.list", null, "GET", "http://test/v1/identities")
-        check("mcp.list", null, "GET", "http://test/v1/mcp/servers")
-        check("run.list", null, "GET", "http://test/v1/runs")
-        check("schedule.list", null, "GET", "http://test/v1/schedules")
-        check("tool.list", null, "GET", "http://test/v1/tools")
+        // lgns8.9: there is no admin REST proxy left. The former admin_rest rows
+        // now answer from a controller-owned constant (empty-by-contract lists and
+        // the builtin tool catalog) or fail closed — and NONE of them dial HTTP.
+        checkNativeWithoutProxy("archive.list", null)
+        checkNativeWithoutProxy("identity.list", null)
+        checkNativeWithoutProxy("mcp.list", null)
+        checkNativeWithoutProxy("folder.list", buildJsonObject { put("agent_id", "ag-1") })
+        checkNativeWithoutProxy("group.list", null)
+        checkNativeWithoutProxy("job.list", null)
+        checkNativeWithoutProxy("tool.list", null)
+        checkNativeWithoutProxy("model.list.embedding", null)
+        checkNativeWithoutProxy("provider.list", null)
+
+        // Store-owned reads and native-owned schedule writes fail closed when
+        // unwired — again without a proxy dial.
+        checkNativeFailClosed("run.list", null)
+        checkNativeFailClosed("schedule.list", null)
+        checkNativeFailClosed("agent.context", buildJsonObject { put("agent_id", "ag-1") })
+    }
+
+    /** Serves successfully from controller-owned state, and never dials the proxy. */
+    private suspend fun AdminRpcRouter.assertServedNatively(
+        transport: FakeTransport,
+        method: String,
+        params: kotlinx.serialization.json.JsonObject?,
+    ) {
+        transport.lastMethod = null
+        transport.lastUrl = null
+        val response = dispatch("req", method, params)
+        assertTrue(response.contains("\"success\":true"), "Expected controller-native success for $method, got $response")
+        assertEquals(null, transport.lastMethod, "$method must not dial admin proxy")
     }
 }

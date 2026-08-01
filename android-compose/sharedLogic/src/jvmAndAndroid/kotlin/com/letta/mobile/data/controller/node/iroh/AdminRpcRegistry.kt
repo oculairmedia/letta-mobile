@@ -3,11 +3,20 @@ package com.letta.mobile.data.controller.node.iroh
 import com.letta.mobile.data.controller.AppServerController
 
 /**
- * Native App Server client for runtime-owned admin handlers.
- * Phase 2 removed the optional on-disk backend read tier from production routing.
+ * The two non-shim read sources available to admin handlers.
+ *
+ *  - [nativeClient]: the App Server v2 protocol — the owner of every
+ *    runtime-scoped operation and of every admin WRITE that has a native
+ *    command.
+ *  - [localBackendStore]: a READ-ONLY reader over the letta-code on-disk
+ *    backend (lgns8.9). It is the owner for admin READS the App Server exposes
+ *    no command for and that lettashim itself served by reading this same
+ *    store (runs/steps, agent context, memory blocks). Never used for writes:
+ *    the epic forbids a second writer against one local-backend root.
  */
 data class NativeReadTiers(
     val nativeClient: com.letta.mobile.data.transport.appserver.AppServerClient? = null,
+    val localBackendStore: LocalBackendAdminStore? = null,
 )
 
 object AdminRpcRegistry {
@@ -70,40 +79,49 @@ object AdminRpcRegistry {
          */
         vibesyncBaseUrl: String? = null,
         /**
-         * Bounded admin_rest_service adapters (runs, archives, identities,
-         * embedding models, schedules, tools, blocks, mcp). When null those
-         * methods return capability-unavailable. Must be an explicitly owned
-         * service URL — never implicitly the LettaShim :8291 base.
+         * lgns8.9 retired the generic admin REST adapter: every former
+         * admin_rest_service method now has an explicit owner (App Server v2
+         * command, read-only local-backend store, controller-native catalog, or
+         * fail-closed denial). Retained, ignored, so older call sites compile —
+         * production must never reintroduce an admin REST base.
          */
-        adminRestBaseUrl: String? = null,
+        @Suppress("UNUSED_PARAMETER") adminRestBaseUrl: String? = null,
         /**
-         * Ignored since Phase 2. Direct Letta backend reads are not an accepted
-         * production route; retained only so older call sites compile.
+         * lgns8.9: the letta-code on-disk backend root (`LETTA_LOCAL_BACKEND_DIR`).
+         * When set, admin READS the App Server exposes no command for — run/step
+         * history, agent context, memory blocks — are served from it directly,
+         * which is what lettashim did with the same directory. When null those
+         * methods fail closed with a typed capability error; they never dial a
+         * REST admin host.
          */
-        @Suppress("UNUSED_PARAMETER") localBackendDir: String? = null,
+        localBackendDir: String? = null,
         /**
          * Optional skills listing projection (device-status / skills_updated).
          * When null, skill.list returns an empty skills array until a catalog is wired.
          */
         skillsListing: SkillsListingSource? = null,
     ): AdminRpcRouter {
-        val adminRestBase = adminRestBaseUrl?.trimEnd('/')
         val router = AdminRpcRouter()
 
-        val tiers = NativeReadTiers(nativeClient)
+        // Constructed only when a backend root is explicitly configured, and
+        // read-only by construction (see LocalBackendAdminStore).
+        val localBackendStore = localBackendDir
+            ?.takeIf { it.isNotBlank() }
+            ?.let { runCatching { LocalBackendAdminStore(java.io.File(it)) }.getOrNull() }
+        val tiers = NativeReadTiers(nativeClient, localBackendStore)
 
         HealthAdminHandlers.register(router, controller)
-        AgentAdminHandlers.register(router, controller, tiers, adminRestBase)
+        AgentAdminHandlers.register(router, controller, tiers)
         SubagentAdminHandlers.register(router, subagentRegistrySource)
         ConversationAdminHandlers.register(router, tiers, controller = controller)
         ProjectAdminHandlers.register(router, vibesyncBaseUrl?.trimEnd('/'))
-        RunAdminHandlers.register(router, adminRestBase)
-        ArchiveAdminHandlers.register(router, adminRestBase)
-        IdentityAdminHandlers.register(router, adminRestBase)
-        ModelAdminHandlers.register(router, adminRestBase, nativeClient)
-        ScheduleAdminHandlers.register(router, adminRestBase)
-        ToolAdminHandlers.register(router, adminRestBase)
-        McpAdminHandlers.register(router, adminRestBase)
+        RunAdminHandlers.register(router, localBackendStore)
+        ArchiveAdminHandlers.register(router)
+        IdentityAdminHandlers.register(router)
+        ModelAdminHandlers.register(router, nativeClient)
+        ScheduleAdminHandlers.register(router, nativeClient)
+        ToolAdminHandlers.register(router, localBackendStore, nativeClient)
+        McpAdminHandlers.register(router)
         // Phase 3: shim-era goal/slash surfaces are product-removed.
         GoalAdminHandlers.register(router, adminBaseUrl = null)
         SlashCommandAdminHandlers.register(router, adminBaseUrl = null)

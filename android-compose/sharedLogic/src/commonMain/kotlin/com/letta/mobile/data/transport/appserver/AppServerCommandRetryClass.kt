@@ -89,6 +89,9 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.CronUpdate -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.CronDelete -> AmbiguousMutation(dedupKey = null)
             is AppServerCommand.CronDeleteAll -> AmbiguousMutation(dedupKey = null)
+            // Memory-file write: content-addressed by path, but a blind re-send
+            // could clobber a concurrent edit, so it stays an ambiguous mutation.
+            is AppServerCommand.WriteMemoryFile -> AmbiguousMutation(dedupKey = null)
 
             is AppServerCommand.GetReflectionSettings -> SafeRead
             is AppServerCommand.SetReflectionSettings -> AmbiguousMutation(dedupKey = null)

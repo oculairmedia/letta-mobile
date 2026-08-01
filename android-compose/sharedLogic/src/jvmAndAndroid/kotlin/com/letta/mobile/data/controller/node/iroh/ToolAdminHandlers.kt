@@ -1,91 +1,140 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+
+/**
+ * lgns8.9 disposition for the tool-library and memory-block domains.
+ *
+ * ## Tools — controller-native constant catalog
+ * admin-shim's `GET /v1/tools` and `/v1/tools/{id}` return
+ * `BUILTIN_TOOL_DEFINITIONS.map(vanillaTool)`: a hard-coded 14-entry list of
+ * letta-code's client-side tools. No datastore is involved, so the catalog moves
+ * into the controller verbatim ([NativeAdminCatalogs.toolCatalog]).
+ *
+ * Tool CRUD (`PUT /v1/tools`, `PATCH|DELETE /v1/tools/{id}`) and agent
+ * attach/detach do not exist in admin-shim — those paths 404 — because
+ * letta-code tools are code-defined, not user-authored records. The pinned v2
+ * inventory's `update_toolset` is the RUNTIME toolset for a live session, not an
+ * admin mutation of a tool library, and conflating them would silently reshape
+ * turn behaviour. All six therefore fail closed.
+ *
+ * ## Blocks — store reads, native writes, denied where neither exists
+ * Blocks are `memfs/<agentId>/memory/system/<label>.md` files:
+ *  - `block.list` / `block.get` read them via [LocalBackendBlockReader], exactly
+ *    as admin-shim did (`handleBlocksList` / `handleBlockDetail`);
+ *  - `block.update_agent` (agent + label, the memory editor's write) maps 1:1
+ *    onto the native `write_memory_file` command, so the App Server — the
+ *    store's single writer — performs the write. The controller never writes the
+ *    local-backend root itself (epic constraint: one writer per root);
+ *  - `block.create`, `block.update`, `block.delete`, `block.attach` and
+ *    `block.detach` address a block by a GLOBAL id that admin-shim synthesises
+ *    (`sha256(agentId:label)`) and no native command accepts. Global creation and
+ *    attach/detach have no meaning at all in a per-agent memory filesystem, and
+ *    admin-shim 404s every one of these routes. They fail closed.
+ */
 object ToolAdminHandlers {
-    fun register(router: AdminRpcRouter, adminBaseUrl: String?) {
-        // lgns8.9: no admin-rest service injected -> capability-unavailable
-        // (never a shim dial). Bounded admin adapter degrades gracefully.
-        if (adminBaseUrl == null) {
-            CapabilityUnavailable.register(router, METHODS, service = "admin_rest")
+    internal fun register(
+        router: AdminRpcRouter,
+        store: LocalBackendAdminStore?,
+        nativeClient: AppServerClient?,
+    ) {
+        registerToolMethods(router)
+        registerBlockReads(router, store)
+        registerBlockWrites(router, nativeClient)
+    }
+
+    private fun registerToolMethods(router: AdminRpcRouter) {
+        router.register("tool.list") { NativeAdminCatalogs.toolCatalog() }
+        router.register("tool.get") { params ->
+            val toolId = params.requireParam(AdminParamKey("tool_id"))
+            NativeAdminCatalogs.tool(toolId) ?: adminError("tool $toolId not found")
+        }
+        CapabilityUnavailable.denyFailClosed(
+            router,
+            TOOL_WRITE_METHODS,
+            reason = "letta-code tools are code-defined, not user-authored records: admin-shim 404s " +
+                "every tool CRUD/attach route, and the pinned App Server v2 inventory has no tool-library " +
+                "command (update_toolset is the live-session toolset, not admin CRUD); upstream must expose one",
+        )
+    }
+
+    private fun registerBlockReads(router: AdminRpcRouter, store: LocalBackendAdminStore?) {
+        if (store == null) {
+            CapabilityUnavailable.register(router, BLOCK_READ_METHODS, service = "local_backend_store")
             return
         }
-        val api = AdminHandlerSupport(AdminProxyClient(adminBaseUrl))
-        router.register("tool.list") { p ->
-            api.get(AdminPath.v1("tools")) {
-                query("limit", param(p, AdminParamKey("limit")))
-                query("offset", param(p, AdminParamKey("offset")))
-            }
+        router.register("block.list") {
+            store.listBlocksProjected() ?: adminError("block.list could not read the local backend memory store")
         }
-        router.register("tool.get") { p ->
-            val toolId = p.requireParam(AdminParamKey("tool_id"))
-            api.get(AdminPath.v1("tools", toolId))
-        }
-        router.register("tool.create") { p -> api.put(AdminPath.v1("tools"), body = p?.toString() ?: "{}") }
-        router.register("tool.update") { p ->
-            val toolId = p.requireParam(AdminParamKey("tool_id"))
-            api.patch(AdminPath.v1("tools", toolId), body = p.toString())
-        }
-        router.register("tool.delete") { p ->
-            val toolId = p.requireParam(AdminParamKey("tool_id"))
-            api.delete(AdminPath.v1("tools", toolId))
-        }
-        router.register("tool.attach") { p ->
-            val agentId = p.requireParam(AdminParamKey("agent_id"))
-            val toolId = p.requireParam(AdminParamKey("tool_id"))
-            api.patch(AdminPath.v1("agents", agentId, "tools", "attach", toolId), body = "{}")
-        }
-        router.register("tool.detach") { p ->
-            val agentId = p.requireParam(AdminParamKey("agent_id"))
-            val toolId = p.requireParam(AdminParamKey("tool_id"))
-            api.patch(AdminPath.v1("agents", agentId, "tools", "detach", toolId), body = "{}")
-        }
-        router.register("block.list") { api.get(AdminPath.v1("blocks")) }
-        router.register("block.get") { p ->
-            val blockId = p.requireParam(AdminParamKey("block_id"))
-            api.get(AdminPath.v1("blocks", blockId))
-        }
-        router.register("block.create") { p -> api.post(AdminPath.v1("blocks"), body = p?.toString() ?: "{}") }
-        router.register("block.update") { p ->
-            val blockId = p.requireParam(AdminParamKey("block_id"))
-            api.patch(AdminPath.v1("blocks", blockId), body = p.toString())
-        }
-        router.register("block.delete") { p ->
-            val blockId = p.requireParam(AdminParamKey("block_id"))
-            api.delete(AdminPath.v1("blocks", blockId))
-        }
-        router.register("block.attach") { p ->
-            val agentId = p.requireParam(AdminParamKey("agent_id"))
-            val blockId = p.requireParam(AdminParamKey("block_id"))
-            api.patch(AdminPath.v1("agents", agentId, "core-memory", "blocks", "attach", blockId), body = "{}")
-        }
-        router.register("block.detach") { p ->
-            val agentId = p.requireParam(AdminParamKey("agent_id"))
-            val blockId = p.requireParam(AdminParamKey("block_id"))
-            api.patch(AdminPath.v1("agents", agentId, "core-memory", "blocks", "detach", blockId), body = "{}")
-        }
-        router.register("block.update_agent") { p ->
-            val agentId = p.requireParam(AdminParamKey("agent_id"))
-            val label = p.requireParam(AdminParamKey("label"))
-            api.patch(
-                AdminPath.v1("agents", agentId, "core-memory", "blocks", label),
-                body = passthroughBody(p, listOf(AdminParamKey("agent_id"), AdminParamKey("label"))),
-            )
+        router.register("block.get") { params ->
+            val blockId = params.requireParam(AdminParamKey("block_id"))
+            store.getBlockProjected(blockId) ?: adminError("block $blockId not found")
         }
     }
-    val METHODS: Set<String> = setOf(
-        "tool.list",
-        "tool.get",
+
+    private fun registerBlockWrites(router: AdminRpcRouter, nativeClient: AppServerClient?) {
+        CapabilityUnavailable.denyFailClosed(
+            router,
+            BLOCK_DENIED_METHODS,
+            reason = "the letta-code local backend has no globally addressable block entity — blocks are " +
+                "per-agent memfs files, so global create and agent attach/detach have no meaning and " +
+                "admin-shim 404s those routes; use block.update_agent (agent_id + label), which the App " +
+                "Server owns natively",
+        )
+        router.register("block.update_agent") { params ->
+            val agentId = params.requireParam(AdminParamKey("agent_id"))
+            val label = params.requireParam(AdminParamKey("label"))
+            val value = param(params, AdminParamKey("value"))
+                ?: adminError("value required: block.update_agent writes the memory file contents")
+            val client = nativeClient
+                ?: adminError("capability_unavailable: block.update_agent requires the native App Server client")
+            val response = client.writeMemoryFile(
+                AppServerCommand.WriteMemoryFile(
+                    requestId = NativeAdmin.requestId(),
+                    agentId = agentId,
+                    path = memoryPathFor(label),
+                    content = value,
+                    commitMessage = "block.update_agent: $label",
+                ),
+            )
+            if (!response.success) adminError(response.error ?: "write_memory_file failed")
+            // Echo the post-write block using the SAME projection block.get serves,
+            // so the client decodes one shape regardless of which route it used.
+            LocalBackendBlockReader.projectBlock(agentId, label, value)
+        }
+    }
+
+    /** MemFS path for a core-memory block label, mirroring `memory/system/<label>.md`. */
+    private fun memoryPathFor(label: String): String = "system/$label.md"
+
+    /** Constant catalog reads (no datastore). */
+    val TOOL_CATALOG_METHODS: Set<String> = setOf("tool.list", "tool.get")
+
+    /** Permanently denied: no admin tool-library surface exists anywhere. */
+    val TOOL_WRITE_METHODS: Set<String> = setOf(
         "tool.create",
         "tool.update",
         "tool.delete",
         "tool.attach",
         "tool.detach",
-        "block.list",
-        "block.get",
+    )
+
+    /** Served from the on-disk memfs memory files. */
+    val BLOCK_READ_METHODS: Set<String> = setOf("block.list", "block.get")
+
+    /** Served by the native `write_memory_file` command. */
+    val BLOCK_NATIVE_WRITE_METHODS: Set<String> = setOf("block.update_agent")
+
+    /** Permanently denied: no global block entity, no native command. */
+    val BLOCK_DENIED_METHODS: Set<String> = setOf(
         "block.create",
         "block.update",
         "block.delete",
         "block.attach",
         "block.detach",
-        "block.update_agent",
     )
+
+    val METHODS: Set<String> = TOOL_CATALOG_METHODS + TOOL_WRITE_METHODS +
+        BLOCK_READ_METHODS + BLOCK_NATIVE_WRITE_METHODS + BLOCK_DENIED_METHODS
 }

@@ -170,14 +170,30 @@ class ShimOffParityGateTest {
         override suspend fun skillDisable(command: AppServerCommand.SkillDisable) =
             AppServerInboundFrame.SkillDisableResponse(command.requestId, true)
 
+        /** A native CronTask, the shape `schedule.*` projects to ScheduledMessage. */
+        private fun cronTask() = buildJsonObject {
+            put("id", "t-1")
+            put("agent_id", "agent-1")
+            put("conversation_id", "conv-1")
+            put("name", "demo")
+            put("description", "demo")
+            put("cron", "0 0 * * *")
+            put("recurring", true)
+            put("prompt", "hi")
+        }
+
         override suspend fun cronList(command: AppServerCommand.CronList) =
-            AppServerInboundFrame.CronListResponse(command.requestId, true, JsonArray(emptyList()))
+            AppServerInboundFrame.CronListResponse(command.requestId, true, buildJsonArray { add(cronTask()) })
 
         override suspend fun cronAdd(command: AppServerCommand.CronAdd) =
-            AppServerInboundFrame.CronAddResponse(command.requestId, true)
+            AppServerInboundFrame.CronAddResponse(command.requestId, true, cronTask())
 
         override suspend fun cronGet(command: AppServerCommand.CronGet) =
-            AppServerInboundFrame.CronGetResponse(command.requestId, true)
+            AppServerInboundFrame.CronGetResponse(command.requestId, true, found = true, task = cronTask())
+
+        // lgns8.9: block.update_agent is a NATIVE write (memfs memory file).
+        override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile) =
+            AppServerInboundFrame.WriteMemoryFileResponse(command.requestId, true, command.agentId, command.path)
 
         override suspend fun cronRuns(command: AppServerCommand.CronRuns) =
             AppServerInboundFrame.CronRunsResponse(command.requestId, true)
@@ -189,7 +205,7 @@ class ShimOffParityGateTest {
             AppServerInboundFrame.CronUpdateResponse(command.requestId, true)
 
         override suspend fun cronDelete(command: AppServerCommand.CronDelete) =
-            AppServerInboundFrame.CronDeleteResponse(command.requestId, true)
+            AppServerInboundFrame.CronDeleteResponse(command.requestId, true, found = true)
 
         override suspend fun cronDeleteAll(command: AppServerCommand.CronDeleteAll) =
             AppServerInboundFrame.CronDeleteAllResponse(command.requestId, true)
@@ -248,7 +264,10 @@ class ShimOffParityGateTest {
         save(PairedPeer(nodeId = PEER_NODE_ID, name = "gate-peer", pairedAtMs = 1))
     }
 
-    private fun productionRouter(controller: AppServerController? = GateController()): AdminRpcRouter =
+    private fun productionRouter(
+        controller: AppServerController? = GateController(),
+        localBackendDir: String? = null,
+    ): AdminRpcRouter =
         AdminRpcRegistry.buildRouter(
             adminBaseUrl = "http://127.0.0.1:9", // shim host — but transport is forced to fail
             controller = controller,
@@ -262,6 +281,10 @@ class ShimOffParityGateTest {
             // Without it skill.list correctly reports capability_unavailable — a
             // wiring gap in the harness, not a parity gap in the controller.
             skillsListing = gateSkillsCatalog().asListingSource(),
+            // lgns8.9: the read-only on-disk tier. Left OUT by default so the
+            // store-owned rows are asserted to FAIL CLOSED without it; the
+            // store-injected run is a separate, explicit expectation.
+            localBackendDir = localBackendDir,
         )
 
     /**
@@ -272,6 +295,10 @@ class ShimOffParityGateTest {
     private fun gateSkillsCatalog() = NativeSkillsCatalog().apply {
         hydrateFromHost(buildJsonArray { add(buildJsonObject { put("name", "gate-skill") }) })
     }
+
+    /** A tool id the controller-native catalog actually holds (tool.get must resolve). */
+    private val firstCatalogToolId: String =
+        NativeAdminCatalogs.toolCatalog().first().jsonObject.getValue("id").jsonPrimitive.content
 
     private fun params(method: String) = buildJsonObject {
         put("agent_id", "agent-1")
@@ -288,6 +315,18 @@ class ShimOffParityGateTest {
         put("capabilities", "chat.read")
         put("trigger", "manual")
         put("step_count", "5")
+        // lgns8.9 addressable rows: a schedule (cron task), a catalog tool, and
+        // the ids the fixture store holds for the local_backend_store bucket.
+        put("schedule_id", "t-1")
+        put("tool_id", firstCatalogToolId)
+        put("run_id", LocalBackendFixtureStore.RUN_ID)
+        put("block_id", LocalBackendFixtureStore.blockId)
+        put("label", LocalBackendFixtureStore.BLOCK_LABEL)
+        put("value", "updated by the parity gate")
+        if (method == "schedule.create") {
+            put("messages", Json.parseToJsonElement("""[{"role":"user","content":"hi"}]"""))
+            put("schedule", Json.parseToJsonElement("""{"type":"recurring","cron_expression":"0 0 * * *"}"""))
+        }
         // native opt-ins / skill path installs
         if (method == "skill.install") put("skill_path", "/skills/demo")
         if (method == "approval.submit") {
@@ -415,7 +454,8 @@ class ShimOffParityGateTest {
         val router = productionRouter()
         val covered = IrohAdminOwnershipMatrix.shimFreeNativeMethods() +
             IrohAdminOwnershipMatrix.capabilityGatedMethods() +
-            IrohAdminOwnershipMatrix.boundedServiceMethods()
+            IrohAdminOwnershipMatrix.boundedServiceMethods() +
+            IrohAdminOwnershipMatrix.localBackendStoreMethods()
         assertEquals(
             emptySet(),
             router.registeredMethods - covered.toSet(),
@@ -427,6 +467,53 @@ class ShimOffParityGateTest {
             covered.toSet().size,
             "a method may not appear in two gate expectation buckets",
         )
+    }
+
+    /**
+     * lgns8.9: with NO local backend root configured, every store-owned row must
+     * deny with the typed capability contract — never throw, never hang, and
+     * above all never dial an admin HTTP host as a fallback.
+     */
+    @Test
+    fun localBackendStoreOwnedOpsFailClosedWithoutAStore() = runTest {
+        val router = productionRouter()
+        val storeOwned = IrohAdminOwnershipMatrix.localBackendStoreMethods()
+        assertTrue(storeOwned.isNotEmpty(), "ownership matrix declares no local_backend_store methods")
+        storeOwned.forEach { method ->
+            val obj = dispatch(router, method)
+            assertEquals("false", obj["success"]?.jsonPrimitive?.content, "$method")
+            assertTrue(
+                obj["error"]?.jsonPrimitive?.content?.contains("capability_unavailable") == true,
+                "$method without a store must deny with capability_unavailable: $obj",
+            )
+        }
+        assertEquals(0, proxyDialCount.get(), "an absent store must never fall back to an admin HTTP host")
+    }
+
+    /**
+     * lgns8.9 FAIL-ON-REVERT: with the store wired, every store-owned row serves
+     * from disk. If `buildRouter` ever ignores `localBackendDir` again (the
+     * regression this slice repaired), these rows go back to
+     * capability_unavailable and this test fails.
+     */
+    @Test
+    fun localBackendStoreOwnedOpsServeFromTheStoreWhenInjected() = runTest {
+        val root = kotlin.io.path.createTempDirectory("lgns8-9-gate-store").toFile()
+        LocalBackendFixtureStore.create(root)
+        val router = productionRouter(localBackendDir = root.absolutePath)
+
+        val failures = mutableListOf<String>()
+        IrohAdminOwnershipMatrix.localBackendStoreMethods().forEach { method ->
+            val obj = dispatch(router, method)
+            if (obj["success"]?.jsonPrimitive?.content != "true") failures += "$method -> $obj"
+        }
+        assertEquals(
+            emptyList(),
+            failures,
+            "local_backend_store rows must serve from the injected store — a router that ignores " +
+                "localBackendDir regresses them to capability_unavailable",
+        )
+        assertEquals(0, proxyDialCount.get(), "store-served rows must never dial an admin HTTP host")
     }
 
     /**

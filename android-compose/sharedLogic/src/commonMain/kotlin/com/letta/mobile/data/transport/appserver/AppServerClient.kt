@@ -85,6 +85,10 @@ interface AppServerClient {
     suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         throw UnsupportedOperationException("skill_disable is not supported by this client")
 
+    /** lgns8.9: native owner of agent memory-block writes (`block.update_agent`). */
+    suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile): AppServerInboundFrame.WriteMemoryFileResponse =
+        throw UnsupportedOperationException("WriteMemoryFile is not supported by this client")
+
     suspend fun cronList(command: AppServerCommand.CronList): AppServerInboundFrame.CronListResponse =
         throw UnsupportedOperationException("CronList is not supported by this client")
 
@@ -268,6 +272,9 @@ class DefaultAppServerClient(
 
     override suspend fun skillDisable(command: AppServerCommand.SkillDisable): AppServerInboundFrame.SkillDisableResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SkillDisableResponse }) { transport.sendControl(command) }
+
+    override suspend fun writeMemoryFile(command: AppServerCommand.WriteMemoryFile): AppServerInboundFrame.WriteMemoryFileResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.WriteMemoryFileResponse }) { transport.sendControl(command) }
 
     override suspend fun cronList(command: AppServerCommand.CronList): AppServerInboundFrame.CronListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.CronListResponse }) { transport.sendControl(command) }
