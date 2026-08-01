@@ -9,6 +9,10 @@ import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -156,24 +160,104 @@ class IrohAdminRpcAgentSource(
                 body = params.toString(),
             )
             if (!response.success) error(response.error ?: "Iroh admin_rpc agent.list failed")
-            val result = response.result ?: break
+            val result = response.result
+            if (result == null) {
+                // letta-mobile-z5lqt: telemetry only — the break is unchanged.
+                RosterNameTelemetry.sweepStopped(
+                    stop = RosterNameTelemetry.SweepStop.NO_RESULT,
+                    offset = offset,
+                    pageSize = 0,
+                    mergedSize = merged.size,
+                    source = TELEMETRY_SOURCE,
+                )
+                break
+            }
             val page = json.decodeFromJsonElement(ListSerializer(Agent.serializer()), result)
-            if (page.isEmpty()) break
+            if (page.isEmpty()) {
+                RosterNameTelemetry.sweepStopped(
+                    stop = RosterNameTelemetry.SweepStop.EMPTY_PAGE,
+                    offset = offset,
+                    pageSize = 0,
+                    mergedSize = merged.size,
+                    source = TELEMETRY_SOURCE,
+                )
+                break
+            }
             val fresh = page.filter { seenIds.add(it.id.value) }
             // Server ignored offset / returned an already-seen page: stop rather
             // than spin. Returns what we have so far (still better than page 1).
-            if (fresh.isEmpty()) break
+            if (fresh.isEmpty()) {
+                RosterNameTelemetry.sweepStopped(
+                    stop = RosterNameTelemetry.SweepStop.NO_FRESH_IGNORED_OFFSET,
+                    offset = offset,
+                    pageSize = page.size,
+                    mergedSize = merged.size,
+                    source = TELEMETRY_SOURCE,
+                )
+                break
+            }
             merged += fresh
-            if (page.size < AGENT_LIST_PAGE_SIZE) break
+            if (page.size < AGENT_LIST_PAGE_SIZE) {
+                RosterNameTelemetry.sweepStopped(
+                    stop = RosterNameTelemetry.SweepStop.SHORT_PAGE,
+                    offset = offset,
+                    pageSize = page.size,
+                    mergedSize = merged.size,
+                    source = TELEMETRY_SOURCE,
+                )
+                break
+            }
             offset += page.size
+            if (iterations >= MAX_AGENT_LIST_PAGES) {
+                // Loop is about to end on the cap with pages still full: the
+                // roster is almost certainly truncated. WARN.
+                RosterNameTelemetry.sweepStopped(
+                    stop = RosterNameTelemetry.SweepStop.PAGE_CAP_EXHAUSTED,
+                    offset = offset,
+                    pageSize = page.size,
+                    mergedSize = merged.size,
+                    source = TELEMETRY_SOURCE,
+                )
+            }
         }
+        reportRosterCompleteness(merged.size)
         return merged
+    }
+
+    /**
+     * letta-mobile-z5lqt: compare the swept roster against the authoritative
+     * `agent.count`. Observation only — the swept list is returned unchanged
+     * whatever this reports, and a failure to measure is recorded as UNKNOWN
+     * rather than being swallowed.
+     */
+    private suspend fun reportRosterCompleteness(sweptSize: Int) {
+        val authoritative = runCatching { fetchAuthoritativeAgentCount() }
+        RosterNameTelemetry.rosterCompleteness(
+            outcome = RosterNameTelemetry.classifyCompleteness(sweptSize, authoritative),
+            source = TELEMETRY_SOURCE,
+        )
+    }
+
+    /** @return the server-reported total, or null when it is unavailable. */
+    private suspend fun fetchAuthoritativeAgentCount(): Int? {
+        val response = channelTransport.adminRpc(
+            method = "agent.count",
+            path = "/v1/agents/count",
+            body = "{}",
+        )
+        if (!response.success) return null
+        val result = response.result ?: return null
+        // `/v1/agents/count` returns a bare number; tolerate a `{"count": n}`
+        // envelope too rather than misreporting a shape change as a mismatch.
+        return (result as? JsonPrimitive)?.intOrNull
+            ?: (result as? JsonObject)?.get("count")?.jsonPrimitive?.intOrNull
     }
 
     private companion object {
         // Kept modest so a single page stays comfortably under the ~1MB
         // unchunked Iroh frame cap even for agents with sizeable metadata
         // (Codex review on #818 — the same cap that broke message.list before).
+        const val TELEMETRY_SOURCE = "IrohAdminRpcAgentSource"
         const val AGENT_LIST_PAGE_SIZE = 50
         // Belt-and-braces bound: 50 pages * 50 = 2500 agents, far above realistic
         // fleets; prevents an unbounded loop if the server misbehaves on offset.

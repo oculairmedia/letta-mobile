@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.RosterNameTelemetry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
@@ -266,6 +267,7 @@ internal class ChatConversationCoordinator(
             )
         } else {
             val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
+            reportNameFallbackIfUnresolved(cachedAgent?.name)
             val summary = ChatConversationSummary(
                 id = conversationId,
                 title = cachedAgent?.name ?: uiState.value.agentName,
@@ -283,6 +285,21 @@ internal class ChatConversationCoordinator(
         consumeInitialMessageIfPresent(stageFreshClientModeDuplicate = false)?.let { message ->
             sendMessageViaTimeline(message)
         }
+    }
+
+    /**
+     * letta-mobile-z5lqt: telemetry only. Records that the cached agent had no
+     * name and the `?: uiState.value.agentName` fallback is about to be taken.
+     * The fallback expressions themselves are untouched.
+     */
+    private fun reportNameFallbackIfUnresolved(resolvedName: String?) {
+        if (resolvedName != null) return
+        RosterNameTelemetry.nameFallback(
+            site = RosterNameTelemetry.NameFallbackSite.CHAT_COORDINATOR,
+            agentId = agentId,
+            fallbackKind = RosterNameTelemetry.FallbackKind.PREVIOUS_UI_NAME,
+            rosterSize = agentRepository.agents.value.size,
+        )
     }
 
     private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
@@ -309,6 +326,7 @@ internal class ChatConversationCoordinator(
         }
         if (localRuntimeRouting() == LocalRuntimeRouting.LocalBound) {
             val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
+            reportNameFallbackIfUnresolved(cachedAgent?.name)
             if (requestedConversationId == currentConversationId) {
                 val summary = ChatConversationSummary(
                     id = requestedConversationId,

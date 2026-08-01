@@ -234,7 +234,22 @@ open class AgentRepository(
         return fullList
     }
 
-    override fun getCachedAgent(id: AgentId): Agent? = _agents.value.find { it.id == id }
+    override fun getCachedAgent(id: AgentId): Agent? {
+        val cache = _agents.value
+        val hit = cache.find { it.id == id }
+        if (hit == null) {
+            // letta-mobile-z5lqt: telemetry only. A miss previously returned
+            // null with no signal at all, so a truncated roster was invisible
+            // here. Stays pure and non-suspending: no fetch, no retry, and the
+            // null return is unchanged.
+            RosterNameTelemetry.cacheMiss(
+                agentId = id.value,
+                cacheSize = cache.size,
+                source = "AgentRepository",
+            )
+        }
+        return hit
+    }
 
     fun hasFreshAgents(maxAgeMs: Long): Boolean {
         return _agents.value.isNotEmpty() && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
