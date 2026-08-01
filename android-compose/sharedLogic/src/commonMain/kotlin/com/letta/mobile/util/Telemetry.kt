@@ -74,6 +74,13 @@ object Telemetry {
     // Per-gate Iroh frame-flow content-length diagnostic (see IrohFrameFlowDiagnostics).
     val frameFlowDiagEnabled = TelemetryFlag(false)
 
+    // letta-mobile-z5lqt: roster-completeness probe. When on, a finished agent
+    // roster sweep additionally reads the authoritative `agent.count` purely so
+    // the swept size can be compared against it (RosterNameTelemetry). The
+    // probe never influences the roster that is returned; this flag exists so
+    // the extra read can be switched off without touching resolution code.
+    val rosterCompletenessProbeEnabled = TelemetryFlag(true)
+
     private const val TIMELINE_DUMP_TAG = "LettaTimelineDump"
     private const val CHAT_HOT_PATH_DEBUG_TAG = "LettaChatHotPath"
     private const val TIMELINE_SYNC_GATE_DEBUG_TAG = "LettaTimelineSyncGate"
