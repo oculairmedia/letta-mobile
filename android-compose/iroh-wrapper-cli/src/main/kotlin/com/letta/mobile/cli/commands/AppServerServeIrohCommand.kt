@@ -367,54 +367,11 @@ class AppServerServeIrohCommand : CliktCommand(
         var controllerRef: DefaultAppServerController? = null
         var coordinatorRef: ReconnectCoordinator? = null
         val reconnectingClient = ReconnectingAppServerClient(
-            connect = {
-                val generationJob = Job(scope.coroutineContext.job)
-                val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
-                val transport = KtorAppServerWebSocketTransport(
-                    httpClient = httpClient,
-                    baseUrl = appServerUrl,
-                    scope = generationScope,
-                    bearerToken = null,
-                )
-                AppServerClientGeneration(
-                    client = DefaultAppServerClient(
-                        transport,
-                        requestTimeoutMs = requestTimeoutMs,
-                        parentScope = generationScope,
-                    ),
-                    connectionState = transport.connectionState,
-                    close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
-                )
-            },
-            listener = object : ReconnectingClientListener {
-                override suspend fun onDisconnected(reason: String?) {
-                    println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
-                    controllerRef?.onTransportDisconnected(reason)
-                }
-
-                override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
-                    val result = coordinatorRef?.reconnect()
-                    if (result != null && result.errors.isNotEmpty()) {
-                        result.errors.forEach {
-                            System.err.println("[iroh-app-server] reattach failed: ${it.message}")
-                        }
-                    }
-                    // lgns8.23: restore channel accounts on THIS generation's client.
-                    // Must run on every generation-ready (not just the first): a
-                    // repeat channel_start re-wires ingress to the live socket, which
-                    // a reconnect otherwise leaves pointed at the dead one.
-                    restoreChannels(client)
-                    controllerRef?.markConnected()
-                    println(
-                        "[iroh-app-server] App Server connection recovered " +
-                            "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
-                    )
-                }
-
-                override suspend fun onGaveUp(reason: String?) {
-                    System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
-                }
-            },
+            connect = { mintGeneration(httpClient, appServerUrl, requestTimeoutMs, scope) },
+            listener = recoveryListener(
+                controller = { controllerRef },
+                coordinator = { coordinatorRef },
+            ),
         )
         val controller = DefaultAppServerController(
             client = reconnectingClient,
@@ -426,6 +383,73 @@ class AppServerServeIrohCommand : CliktCommand(
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
         reconnectingClient.start(scope)
         return controller to reconnectingClient
+    }
+
+    /**
+     * Mint one connection generation: a fresh WS transport + client on a job
+     * child of [scope], closable independently of its successors.
+     */
+    private fun mintGeneration(
+        httpClient: HttpClient,
+        appServerUrl: String,
+        requestTimeoutMs: Long,
+        scope: CoroutineScope,
+    ): AppServerClientGeneration {
+        val generationJob = Job(scope.coroutineContext.job)
+        val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
+        val transport = KtorAppServerWebSocketTransport(
+            httpClient = httpClient,
+            baseUrl = appServerUrl,
+            scope = generationScope,
+            bearerToken = null,
+        )
+        return AppServerClientGeneration(
+            client = DefaultAppServerClient(
+                transport,
+                requestTimeoutMs = requestTimeoutMs,
+                parentScope = generationScope,
+            ),
+            connectionState = transport.connectionState,
+            close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
+        )
+    }
+
+    /**
+     * Post-connect recovery sequence, run on every generation-ready: reattach
+     * runtimes, then restore channel accounts (lgns8.23), then mark connected.
+     *
+     * The controller and coordinator are read through suppliers because both are
+     * constructed AFTER the reconnecting client they are wired into.
+     */
+    private fun recoveryListener(
+        controller: () -> DefaultAppServerController?,
+        coordinator: () -> ReconnectCoordinator?,
+    ): ReconnectingClientListener = object : ReconnectingClientListener {
+        override suspend fun onDisconnected(reason: String?) {
+            println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
+            controller()?.onTransportDisconnected(reason)
+        }
+
+        override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+            val result = coordinator()?.reconnect()
+            result?.errors?.forEach {
+                System.err.println("[iroh-app-server] reattach failed: ${it.message}")
+            }
+            // lgns8.23: restore channel accounts on THIS generation's client.
+            // Must run on every generation-ready (not just the first): a repeat
+            // channel_start re-wires ingress to the live socket, which a reconnect
+            // otherwise leaves pointed at the dead one.
+            restoreChannels(client)
+            controller()?.markConnected()
+            println(
+                "[iroh-app-server] App Server connection recovered " +
+                    "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
+            )
+        }
+
+        override suspend fun onGaveUp(reason: String?) {
+            System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
+        }
     }
 
     /**
