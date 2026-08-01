@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -231,6 +232,7 @@ class IrohAdminRpcAgentSource(
      * rather than being swallowed.
      */
     private suspend fun reportRosterCompleteness(sweptSize: Int) {
+        if (!Telemetry.rosterCompletenessProbeEnabled.get()) return
         val authoritative = runCatching { fetchAuthoritativeAgentCount() }
         RosterNameTelemetry.rosterCompleteness(
             outcome = RosterNameTelemetry.classifyCompleteness(sweptSize, authoritative),
