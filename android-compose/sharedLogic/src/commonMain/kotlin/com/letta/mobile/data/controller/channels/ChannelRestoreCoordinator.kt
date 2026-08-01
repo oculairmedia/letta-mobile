@@ -103,7 +103,8 @@ class ChannelRestoreCoordinator(
         var started = 0
         for (channelId in channelIds) {
             for (account in listEnabledAccounts(channelId, failures)) {
-                if (startAccountWithRetries(channelId, account.accountId, failures)) started++
+                val ref = ChannelAccountRef(channelId, account.accountId)
+                if (startAccountWithRetries(ref, failures)) started++
             }
         }
         Telemetry.event(
@@ -124,13 +125,12 @@ class ChannelRestoreCoordinator(
         val response = try {
             client.channelsList(AppServerCommand.ChannelsList(requestId = requestIdFactory()))
         } catch (e: Exception) {
-            failures += ChannelRestoreFailure(null, null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
+            failures += ChannelRestoreFailure(null, ChannelRestorePhase.LIST_CHANNELS, e.messageOrClass())
             warn("list_channels_failed", "reason" to e.messageOrClass())
             return null
         }
         if (!response.success) {
             failures += ChannelRestoreFailure(
-                null,
                 null,
                 ChannelRestorePhase.LIST_CHANNELS,
                 response.error ?: "channels_list reported failure",
@@ -161,14 +161,17 @@ class ChannelRestoreCoordinator(
                 ),
             )
         } catch (e: Exception) {
-            failures += ChannelRestoreFailure(channelId, null, ChannelRestorePhase.LIST_ACCOUNTS, e.messageOrClass())
+            failures += ChannelRestoreFailure(
+                ChannelAccountRef(channelId, accountId = null),
+                ChannelRestorePhase.LIST_ACCOUNTS,
+                e.messageOrClass(),
+            )
             warn("list_accounts_failed", "channelId" to channelId, "reason" to e.messageOrClass())
             return emptyList()
         }
         if (!response.success) {
             failures += ChannelRestoreFailure(
-                channelId,
-                null,
+                ChannelAccountRef(channelId, accountId = null),
                 ChannelRestorePhase.LIST_ACCOUNTS,
                 response.error ?: "channel_accounts_list reported failure",
             )
@@ -189,55 +192,54 @@ class ChannelRestoreCoordinator(
      * @return true when the account reached a successful start.
      */
     private suspend fun startAccountWithRetries(
-        channelId: String,
-        accountId: String,
+        ref: ChannelAccountRef,
         failures: MutableList<ChannelRestoreFailure>,
     ): Boolean {
         var lastError = "unknown"
         for (attempt in 0 until maxAttemptsPerAccount) {
-            val outcome = attemptStart(channelId, accountId)
+            val outcome = attemptStart(ref)
             if (outcome == null) {
                 Telemetry.event(
                     TELEMETRY_TAG,
                     "account_started",
-                    "channelId" to channelId,
-                    "accountId" to accountId,
+                    "channelId" to ref.channelId,
+                    "accountId" to ref.accountId,
                     "attempt" to attempt,
                 )
-                log("[channels] started $channelId/$accountId (attempt ${attempt + 1})")
+                log("[channels] started $ref (attempt ${attempt + 1})")
                 return true
             }
             lastError = outcome
             // Landmine 1: a FAILED channel_start persists enabled:false. Re-assert
             // before the next attempt AND after the final one, so giving up never
             // leaves the account permanently disabled.
-            reassertEnabled(channelId, accountId)
+            reassertEnabled(ref)
             if (attempt < maxAttemptsPerAccount - 1) {
                 sleep(backoffMs(attempt))
             }
         }
-        failures += ChannelRestoreFailure(channelId, accountId, ChannelRestorePhase.START_ACCOUNT, lastError)
+        failures += ChannelRestoreFailure(ref, ChannelRestorePhase.START_ACCOUNT, lastError)
         warn(
             "account_start_gave_up",
-            "channelId" to channelId,
-            "accountId" to accountId,
+            "channelId" to ref.channelId,
+            "accountId" to ref.accountId,
             "attempts" to maxAttemptsPerAccount,
             "reason" to lastError,
         )
         log(
-            "[channels] gave up starting $channelId/$accountId after $maxAttemptsPerAccount attempts " +
+            "[channels] gave up starting $ref after $maxAttemptsPerAccount attempts " +
                 "(enabled re-asserted); retry on next reconnect",
         )
         return false
     }
 
     /** @return null on success, else a bounded error string (never a config echo). */
-    private suspend fun attemptStart(channelId: String, accountId: String): String? = try {
+    private suspend fun attemptStart(ref: ChannelAccountRef): String? = try {
         val response = client.channelStart(
             AppServerCommand.ChannelStart(
                 requestId = requestIdFactory(),
-                channelId = channelId,
-                accountId = accountId,
+                channelId = ref.channelId,
+                accountId = ref.accountId,
             ),
         )
         if (response.success) null else (response.error ?: "channel_start reported failure")
@@ -252,32 +254,26 @@ class ChannelRestoreCoordinator(
      * Best-effort — a failure here is logged, not fatal, since the next reconnect
      * re-runs the whole restore.
      */
-    private suspend fun reassertEnabled(channelId: String, accountId: String) {
-        try {
+    private suspend fun reassertEnabled(ref: ChannelAccountRef) {
+        val reason = try {
             val response = client.channelAccountUpdate(
                 AppServerCommand.ChannelAccountUpdate(
                     requestId = requestIdFactory(),
-                    channelId = channelId,
-                    accountId = accountId,
+                    channelId = ref.channelId,
+                    accountId = requireNotNull(ref.accountId),
                     patch = AppServerChannelAccountPatch(enabled = true),
                 ),
             )
-            if (!response.success) {
-                warn(
-                    "reassert_enabled_failed",
-                    "channelId" to channelId,
-                    "accountId" to accountId,
-                    "reason" to (response.error ?: "unknown"),
-                )
-            }
+            if (response.success) return else (response.error ?: "unknown")
         } catch (e: Exception) {
-            warn(
-                "reassert_enabled_failed",
-                "channelId" to channelId,
-                "accountId" to accountId,
-                "reason" to e.messageOrClass(),
-            )
+            e.messageOrClass()
         }
+        warn(
+            "reassert_enabled_failed",
+            "channelId" to ref.channelId,
+            "accountId" to ref.accountId,
+            "reason" to reason,
+        )
     }
 
     /** Capped exponential backoff: base * 2^attempt, clamped to [maxBackoffMs]. */
@@ -318,15 +314,31 @@ enum class ChannelRestorePhase {
 }
 
 /**
+ * Identifies one channel account. Exists so the restore path passes a single
+ * typed reference instead of loose (channelId, accountId) string pairs, and so
+ * every diagnostic renders it the same way. [accountId] is null when the
+ * reference is channel-wide (e.g. an accounts-listing failure).
+ */
+data class ChannelAccountRef(
+    val channelId: String,
+    val accountId: String?,
+) {
+    override fun toString(): String = "$channelId/${accountId ?: "-"}"
+}
+
+/**
  * One restore failure. Carries identifiers and the server's error string only —
  * never account config (see landmine 2 in [ChannelRestoreCoordinator]).
  */
 data class ChannelRestoreFailure(
-    val channelId: String?,
-    val accountId: String?,
+    val account: ChannelAccountRef?,
     val phase: ChannelRestorePhase,
     val reason: String,
-)
+) {
+    val channelId: String? get() = account?.channelId
+
+    val accountId: String? get() = account?.accountId
+}
 
 /** Outcome of one [ChannelRestoreCoordinator.restore] pass. */
 data class ChannelRestoreResult(

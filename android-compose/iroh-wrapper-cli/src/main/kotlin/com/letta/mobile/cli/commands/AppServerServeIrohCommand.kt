@@ -285,13 +285,7 @@ class AppServerServeIrohCommand : CliktCommand(
                     "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
             )
 
-            if (channelsHost) {
-                println(
-                    "[iroh-app-server] channels-host ENABLED (lgns8.23): enabled channel accounts are " +
-                        "restored on every App Server connect/reconnect. lettashim MUST run with " +
-                        "SHIM_CHANNELS_ENABLED=0 — two hosts double-start the same accounts.",
-                )
-            }
+            printChannelsHostBanner()
 
             // Start accepting connections
             irohEndpoint.start(controller)
@@ -455,6 +449,16 @@ class AppServerServeIrohCommand : CliktCommand(
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
         reconnectingClient.start(scope)
         return controller to reconnectingClient
+    }
+
+    /** lgns8.23: announce channels-host ownership so a double-host misconfig is visible at start. */
+    private fun printChannelsHostBanner() {
+        if (!channelsHost) return
+        println(
+            "[iroh-app-server] channels-host ENABLED (lgns8.23): enabled channel accounts are " +
+                "restored on every App Server connect/reconnect. lettashim MUST run with " +
+                "SHIM_CHANNELS_ENABLED=0 — two hosts double-start the same accounts.",
+        )
     }
 
     /**
