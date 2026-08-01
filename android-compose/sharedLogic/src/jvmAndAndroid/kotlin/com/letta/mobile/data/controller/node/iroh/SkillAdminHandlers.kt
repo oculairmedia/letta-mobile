@@ -32,14 +32,25 @@ object SkillAdminHandlers {
             listSkills(skillsListing)
         }
         router.register("skill.list_agent") { params ->
-            // Agent-scoped assignment state is not projected yet. Returning the
-            // process-global catalog would mark every available skill as installed
-            // on every agent in Desktop. Fail closed until a real assignment source exists.
+            // 2026-08-01 live evidence (meridian-iroh-wrapper.log): the desktop
+            // Skills surface CALLS this on every load — loadSkillsSnapshot issues
+            // listSkills() + listAgentSkills(agentId) together — so the previous
+            // deny threw out of the snapshot loader and broke the whole screen,
+            // not just the per-agent column.
+            //
+            // Skill enable/disable in App Server v2 IS process-global
+            // (`skill_enable`/`skill_disable` operate on the filesystem skill root,
+            // and RuntimeInvalidationPolicy evicts EVERY runtime after a mutation),
+            // so the process-global catalog is the honest answer today. It is
+            // labelled `process_global: true` rather than served as if it were a
+            // per-agent assignment projection: when upstream grows real per-agent
+            // assignment the field flips false and clients can tell the difference.
             params.requireParam(AdminParamKey("agent_id"))
-            adminError(
-                "capability_unavailable: skill.list_agent requires agent-scoped assignment " +
-                    "projection; use skill.list for process-global availability",
-            )
+            val listing = listSkills(skillsListing)
+            buildJsonObject {
+                listing.forEach { (key, value) -> put(key, value) }
+                put("process_global", true)
+            }
         }
         router.register("skill.install") { params ->
             val skillPath = resolveSkillPath(params)

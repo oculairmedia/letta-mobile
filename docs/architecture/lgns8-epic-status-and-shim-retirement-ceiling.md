@@ -87,11 +87,20 @@ the memfs file `memory/system/<label>.md`, so it maps 1:1 onto
 | `run.get` | `runs/<id>/run.json`, archive-resolving | `admin_read` |
 | `step.list` | `runs/<id>/steps.jsonl` | `admin_read` |
 | `agent.context` | agent record + `system-prompt.json` + transcript | `admin_read` |
-| `block.list` | the agent's `memfs` system memory files, unioned | `admin_read` |
+| `block.list` | the agent's `memfs` system memory files, unioned, **paged** by `limit`/`offset` | `admin_read` |
 | `block.get` | the same files, by synthesised id | `admin_read` |
 
-Gated on `LETTA_LOCAL_BACKEND_DIR`; unset means a typed capability error, never
-an HTTP fallback.
+Gated on the wrapper's `--local-backend-dir` (`LETTA_LOCAL_BACKEND_DIR`); unset
+means a typed capability error, never an HTTP fallback. **2026-08-01:** the flag
+exists because the wrapper env template forbids inheriting
+`LETTA_LOCAL_BACKEND_DIR` from `appserver.env`, so after the cutover this tier ran
+UNSET in production and all six methods denied. The wrapper now declares its own
+READ-ONLY root in the unit file and prints it at startup.
+
+`block.list` is paged: the unwindowed union measured 1447 blocks / ~1.83 MB on the
+live host, over the 1 MiB admin_rpc frame cap. Default page 50, max 200; the
+windowed response is `{blocks, total, offset, limit, has_more}`, and a bare array
+still means the complete set.
 
 ### `controller_native` — constants and empty-by-contract (10)
 

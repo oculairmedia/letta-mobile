@@ -47,7 +47,9 @@ ExecStart=/opt/meridian/iroh-wrapper/current/bin/meridian-iroh-wrapper \
   --iroh-port 4501 \
   --iroh-secret-key-file /etc/meridian/iroh-secret.key \
   --pairing-store-file /etc/meridian/paired-peers.json \
-  --subagent-registry-file /var/lib/meridian/subagent-registry.json
+  --subagent-registry-file /var/lib/meridian/subagent-registry.json \
+  --local-backend-dir /root/.letta/lc-local-backend \
+  --skills-dir /opt/skills
 
 # Durable state outside the immutable release tree (subagent registry — chips
 # must survive wrapper restarts, letta-mobile-lgns8.22.8). systemd creates and

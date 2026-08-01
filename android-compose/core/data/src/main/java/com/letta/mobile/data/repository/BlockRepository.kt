@@ -29,7 +29,17 @@ class BlockRepository @Inject constructor(
         return blockApi.retrieveBlock(blockId)
     }
 
+    /**
+     * In iroh:// mode the HTTP admin route is hard-failed at the LettaApiClient
+     * choke-point, so this must go through admin_rpc. The paged `block.list`
+     * envelope carries an authoritative `total`, which is a truthful exact count —
+     * unlike inferring one from however many rows a pager managed to accumulate.
+     */
     override suspend fun countBlocks(): Int {
+        val irohSource = irohBlockSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.countBlocks()
+        }
         return blockApi.countBlocks()
     }
 

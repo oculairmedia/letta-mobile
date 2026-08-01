@@ -14,6 +14,7 @@ import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
 import com.letta.mobile.data.controller.node.iroh.FilePairedPeerStore
+import com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicy
 import com.letta.mobile.data.controller.node.iroh.IrohAuthPolicyResolution
 import com.letta.mobile.data.controller.node.iroh.IrohPairingService
@@ -78,9 +79,38 @@ fun buildProductionAdminRouter(
      * those methods fail closed; there is no HTTP admin fallback any more.
      */
     localBackendDir: String? = System.getenv("LETTA_LOCAL_BACKEND_DIR"),
+    /**
+     * letta-mobile-7dm1q / lgns8.21.2: the letta-code skills root. letta-code
+     * 0.29.12 advertises no skill enumeration on the wire, so without a host-side
+     * enumerator `skill.list` answers `hydrated=false` forever and the Skills
+     * screen stays empty. Enumerating this directory at startup is that missing
+     * authoritative source. Unset => `LETTA_SKILLS_DIR` => `~/.letta/skills`.
+     */
+    skillsDir: String? = null,
     eventScope: CoroutineScope? = null,
 ): AdminRpcRouter {
     val skillsCatalog = com.letta.mobile.data.controller.node.iroh.NativeSkillsCatalog()
+    // Cold-start discovery: hydrate BEFORE the router is built, so the very first
+    // skill.list after a restart is already authoritative (lgns8.21.2 AC:
+    // "discovery at cold start" + "preserved across restart" — the skills root is
+    // on disk, so re-enumerating on every boot preserves it by construction).
+    val resolvedSkillsDir = com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator
+        .resolveSkillsDir(skillsDir)
+    com.letta.mobile.data.controller.node.iroh.HostSkillsEnumerator.enumerate(resolvedSkillsDir)
+        ?.let { enumerated ->
+            skillsCatalog.hydrateFromHost(enumerated)
+            com.letta.mobile.util.Telemetry.event(
+                "SkillsCatalog",
+                "host.hydrated",
+                "skillsDir" to resolvedSkillsDir,
+                "skills" to enumerated.size.toString(),
+            )
+        }
+        ?: com.letta.mobile.util.Telemetry.event(
+            "SkillsCatalog",
+            "host.root_missing",
+            "skillsDir" to resolvedSkillsDir,
+        )
     val subagentStore = subagentRegistryFile
         ?.let { com.letta.mobile.data.subagents.FileSubagentRegistryStore(java.nio.file.Path.of(it)) }
         ?: com.letta.mobile.data.subagents.InMemorySubagentRegistryStore()
@@ -206,6 +236,42 @@ class AppServerServeIrohCommand : CliktCommand(
     ).flag(default = false)
 
     /**
+     * letta-mobile-7dm1q: the letta-code skills root, enumerated at startup to
+     * hydrate the native skills catalog. Without it `skill.list` reports
+     * `hydrated=false` forever, because letta-code 0.29.12 exposes no skill
+     * enumeration on the wire.
+     */
+    private val skillsDir by option(
+        "--skills-dir",
+        envvar = HostSkillsEnumerator.SKILLS_DIR_ENV,
+        help = "letta-code skills root to enumerate for skill.list " +
+            "(one directory per skill, each with a SKILL.md). " +
+            "Defaults to ~/.letta/skills.",
+    )
+
+    /**
+     * lgns8.9 made `local_backend_store` the declared owner of six READ-ONLY admin
+     * reads (run/step history, agent context, memory blocks), but the shim-free
+     * deployment template forbids `LETTA_LOCAL_BACKEND_DIR` in the wrapper env
+     * (correctly — the wrapper must not inherit `appserver.env`). The result after
+     * the 2026-08-01 cutover was that those six methods denied with
+     * `capability_unavailable: no injected 'local_backend_store' service` in
+     * production — observed live for `agent.context` and, with it, `block.list`,
+     * which is why the memory surfaces went blank.
+     *
+     * An explicit flag resolves both constraints: the wrapper declares its own
+     * read-only root in the committable unit file instead of inheriting the App
+     * Server's environment. Reads only — this process never opens the root for
+     * writing (the epic's one-writer-per-root constraint).
+     */
+    private val localBackendDir by option(
+        "--local-backend-dir",
+        envvar = "LETTA_LOCAL_BACKEND_DIR",
+        help = "READ-ONLY letta-code local-backend root for the store-tier admin reads " +
+            "(block.list/get, agent.context, run/step history). Unset => those methods fail closed.",
+    )
+
+    /**
      * o5bqk: process-lifetime cache of the last-known enabled channel accounts, so
      * every reconnect can re-wire channel ingress in its first round trip instead
      * of after a full enumeration. Held here (not in the coordinator) because a
@@ -266,6 +332,8 @@ class AppServerServeIrohCommand : CliktCommand(
                 nativeClient = nativeAdminClient,
                 vibesyncBaseUrl = vibesyncBaseUrl,
                 subagentRegistryFile = subagentRegistryFile,
+                skillsDir = skillsDir,
+                localBackendDir = localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"),
                 eventScope = scope,
             )
             irohEndpoint.adminRpcRouter.copyHandlersFrom(adminRpcRouter)
@@ -273,6 +341,13 @@ class AppServerServeIrohCommand : CliktCommand(
                 "[iroh-app-server] admin_rpc handlers registered " +
                     "(methods: ${adminRpcRouter.methodCount}, " +
                     "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
+            )
+            // The two wirings whose ABSENCE silently blanked the memory and skills
+            // surfaces after the 2026-08-01 cutover. Print them so a deploy can be
+            // verified from the log instead of from a client round trip.
+            println(
+                "[iroh-app-server] local_backend_store: " +
+                    (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR") ?: "UNSET (block.list/agent.context fail closed)"),
             )
 
             printChannelsHostBanner()

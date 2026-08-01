@@ -65,7 +65,10 @@ class LocalBackendAdminStore(
     ): JsonArray? = messageReader.listMessagesProjected(conversationId, agentId, page)
 
     /** See [LocalBackendBlockReader.listAllBlocks]. */
-    fun listBlocksProjected(): JsonArray? = blockReader.listAllBlocks()
+    fun listBlocksProjected(limit: Int?, offset: Int?): JsonArray? = blockReader.listAllBlocks(limit, offset)
+
+    /** See [LocalBackendBlockReader.blockCount]. */
+    fun blockCountProjected(): Int = blockReader.blockCount()
 
     /** See [LocalBackendBlockReader.getBlock]. */
     fun getBlockProjected(blockId: String): JsonObject? = blockReader.getBlock(blockId)
