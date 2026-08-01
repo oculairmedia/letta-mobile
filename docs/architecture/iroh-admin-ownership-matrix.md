@@ -70,8 +70,36 @@ approval.submit shim-fallback removal at cutover.
   is absent, `skills_updated` carries only a timestamp, and
   `device_status.current_available_skills` is hard-coded `[]` in letta-code
   0.29.12. `skill.list` serves an authoritative enumeration or reports
-  `capability_unavailable` / `hydrated=false`; it never fabricates one.
-  `skill.list_agent` still denies until agent-scoped assignment state exists.
+  `capability_unavailable` / `hydrated=false`; it never fabricates one. Since
+  2026-08-01 that enumeration exists: `HostSkillsEnumerator` reads the letta-code
+  skills root (`--skills-dir` / `LETTA_SKILLS_DIR`, default `~/.letta/skills`; one
+  directory per skill, each with a `SKILL.md`) at startup and hydrates the catalog
+  through `NativeSkillsCatalog.hydrateFromHost` (`letta-mobile-7dm1q`).
+  `skill.list_agent` no longer denies. That denial was reversed on live evidence:
+  the desktop Skills surface issues `listSkills()` **and** `listAgentSkills(agentId)`
+  in one snapshot load, so the typed capability error threw out of the loader and
+  broke the entire screen rather than degrading the per-agent column. Because
+  skill enable/disable in App Server v2 is genuinely process-global
+  (`skill_enable`/`skill_disable` act on the filesystem skill root and every
+  runtime is evicted afterwards), the global catalog is the honest answer today —
+  served with an explicit `process_global: true` so a client can tell availability
+  from assignment, and that flips false when upstream grows real per-agent
+  assignment.
+- **The store tier must be wired explicitly (2026-08-01).** `local_backend_store`
+  owns six read-only methods, but the wrapper deployment template forbids
+  inheriting `LETTA_LOCAL_BACKEND_DIR` from `appserver.env`. After the cutover the
+  wrapper therefore ran with the root UNSET, and `block.list` / `agent.context`
+  denied with `capability_unavailable` in production — which is what blanked the
+  memory surfaces. The wrapper now takes an explicit `--local-backend-dir`, so it
+  declares its own READ-ONLY root in the committable unit file, and logs the
+  resolved value at startup.
+- **`block.list` is paged (2026-08-01).** The union of every agent's memory files
+  measured 1447 blocks / ~1.83 MB on the live host — larger than
+  `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1 MiB), so even once wired the
+  response could not be delivered. The store tier honours `limit`/`offset`
+  (default 50, max 200) over a deterministic flat index, and answers
+  `{blocks, total, offset, limit, has_more}` when it windows; a bare array still
+  means "this is the complete set", which keeps older clients working.
 - **Crons leave the legacy WS path.** The Iroh transport currently stubs cron
   methods; lgns8.8 exposes native `cron_*` behind policy, and the legacy
   mobile-WS cron/subagent frames retire with the shim in lgns8.11.

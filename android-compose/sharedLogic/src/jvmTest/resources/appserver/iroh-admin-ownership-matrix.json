@@ -1208,17 +1208,17 @@
     {
       "method": "skill.list_agent",
       "handler": "SkillAdminHandlers.kt",
-      "current_backend": "capability_unavailable until agent-scoped assignment projection exists",
-      "owner": "capability_gated_unsupported",
-      "public_contract": "typed denial: global availability is not agent assignment state",
+      "current_backend": "host skill-root enumeration (HostSkillsEnumerator), projected process-globally",
+      "owner": "controller_native",
+      "public_contract": "the process-global catalog, explicitly labelled process_global:true",
       "authorization_class": "admin_read",
       "data_store": "letta_local_backend",
-      "fallback": "deny_fail_closed",
+      "fallback": "none",
       "migration_slice": "lgns8.8",
-      "notes": "Fail closed so Desktop does not treat process-global skill.list as per-agent installs. Use skill.list for availability.",
-      "production_first_route": "capability_unavailable",
-      "post_shim_owner": "capability_gated_unsupported",
-      "post_shim_fallback": "deny_fail_closed"
+      "notes": "2026-08-01 REVERSED from deny_fail_closed on live evidence: the desktop Skills surface issues listSkills()+listAgentSkills(agentId) together (DesktopAppBootstrap.loadSkillsSnapshot), so the typed denial threw out of the snapshot loader and broke the WHOLE screen, not just the per-agent column (handler.error observed in meridian-iroh-wrapper.log). Skill enable/disable in App Server v2 IS process-global - skill_enable/skill_disable operate on the filesystem skill root and every runtime is evicted after a mutation - so the global catalog is the honest projection today. It carries process_global:true so a client can tell this is availability, not assignment; the field flips false when upstream grows real per-agent assignment.",
+      "production_first_route": "controller_native",
+      "post_shim_owner": "controller_native",
+      "post_shim_fallback": "none"
     },
     {
       "method": "skill.install",
@@ -1595,10 +1595,9 @@
       "operation": "skill_list_command",
       "capability": "skills",
       "affected_methods": [
-        "skill.list",
-        "skill.list_agent"
+        "skill.list"
       ],
-      "policy": "skill.list serves only an authoritative enumeration (capability_unavailable / hydrated=false otherwise); skill.list_agent denies until agent-scoped assignment exists"
+      "policy": "upstream advertises no skill_list command, so the authoritative enumeration comes from the host skill root (HostSkillsEnumerator, letta-mobile-7dm1q): skill.list serves that catalog, or hydrated=false while no enumeration exists - never a fabricated one. skill.list_agent projects the same catalog with process_global:true (2026-08-01: the previous denial broke the desktop Skills screen outright)."
     }
   ],
   "unrouted_domains": [

@@ -2,6 +2,8 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * lgns8.9 disposition for the tool-library and memory-block domains.
@@ -64,8 +66,38 @@ object ToolAdminHandlers {
             CapabilityUnavailable.register(router, BLOCK_READ_METHODS, service = "local_backend_store")
             return
         }
-        router.register("block.list") {
-            store.listBlocksProjected() ?: adminError("block.list could not read the local backend memory store")
+        router.register("block.list") { params ->
+            // letta-mobile post-cutover regression (2026-08-01): the union of every
+            // agent's memory files is ~1.83 MB on the live host, over the 1 MiB
+            // admin_rpc frame cap, so an unwindowed block.list could not be
+            // delivered at all. limit/offset mirror agent.list exactly: an absent
+            // limit means DEFAULT_BLOCK_LIST_LIMIT (not "everything"), because a
+            // default of "everything" is what broke.
+            val limit = param(params, AdminParamKey("limit"))?.toIntOrNull()
+                ?.coerceIn(1, MAX_BLOCK_LIST_LIMIT)
+                ?: DEFAULT_BLOCK_LIST_LIMIT
+            val offset = param(params, AdminParamKey("offset"))?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+            val page = store.listBlocksProjected(limit, offset)
+                ?: adminError("block.list could not read the local backend memory store")
+            val total = store.blockCountProjected()
+            // Dual shape, mirroring MessageListPageGuard: a bare array when the
+            // FULL set was delivered (byte-identical to the pre-paging contract,
+            // so an older client is unaffected), an envelope carrying an
+            // authoritative `total`/`has_more` whenever it was not. The client
+            // must never have to infer "more exists" from page size — inferring it
+            // is what produced a wrong exact count against a backend that ignored
+            // limit/offset entirely.
+            if (offset == 0 && page.size >= total) {
+                page
+            } else {
+                buildJsonObject {
+                    put("blocks", page)
+                    put("total", total)
+                    put("offset", offset)
+                    put("limit", limit)
+                    put("has_more", offset + page.size < total)
+                }
+            }
         }
         router.register("block.get") { params ->
             val blockId = params.requireParam(AdminParamKey("block_id"))
@@ -122,6 +154,16 @@ object ToolAdminHandlers {
 
     /** Served from the on-disk memfs memory files. */
     val BLOCK_READ_METHODS: Set<String> = setOf("block.list", "block.get")
+
+    /**
+     * Page size when the caller sends no `limit`. Blocks are capped at
+     * [LocalBackendBlockReader.BLOCK_VALUE_LIMIT] chars, so 50 x ~5 KB worst case
+     * stays an order of magnitude under the 1 MiB admin_rpc frame cap.
+     */
+    const val DEFAULT_BLOCK_LIST_LIMIT: Int = 50
+
+    /** Hard ceiling so a client cannot request its way back over the frame cap. */
+    const val MAX_BLOCK_LIST_LIMIT: Int = 200
 
     /** Served by the native `write_memory_file` command. */
     val BLOCK_NATIVE_WRITE_METHODS: Set<String> = setOf("block.update_agent")

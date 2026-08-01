@@ -184,10 +184,16 @@ class ControlCapabilityHandlersTest {
         )
         val listed = dispatch(r, "skill.list", emptyMap())
         assertTrue(listed.contains("\"success\":true") && listed.contains("demo"))
+        // 2026-08-01: skill.list_agent no longer denies — the desktop Skills
+        // surface calls it on every load, so the deny broke the whole screen. It
+        // serves the process-global catalog LABELLED as such.
         val agentListed = dispatch(r, "skill.list_agent", mapOf("agent_id" to "agent-1"))
-        assertTrue(agentListed.contains("\"success\":false"))
-        assertTrue(agentListed.contains("capability_unavailable"))
-        assertFalse(agentListed.contains("demo"), "must not present global catalog as agent installs")
+        assertTrue(agentListed.contains("\"success\":true"))
+        assertTrue(agentListed.contains("demo"))
+        assertTrue(
+            agentListed.contains("\"process_global\":true"),
+            "the projection is global, and must say so rather than pose as per-agent install state",
+        )
     }
 
     @Test

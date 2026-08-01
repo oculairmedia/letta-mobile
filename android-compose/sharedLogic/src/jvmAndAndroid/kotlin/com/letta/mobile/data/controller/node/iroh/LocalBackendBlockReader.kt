@@ -33,21 +33,78 @@ import java.io.File
  */
 internal class LocalBackendBlockReader(private val support: LocalBackendStoreSupport) {
 
-    /** Port of `GET /v1/blocks`: union of `readBlocksForAgent` over every agent. */
-    fun listAllBlocks(): JsonArray? = runCatching {
+    /**
+     * Port of `GET /v1/blocks`: union of `readBlocksForAgent` over every agent,
+     * **windowed** by [offset]/[limit].
+     *
+     * letta-mobile post-cutover regression (2026-08-01): the unpaged union on the
+     * live host is 153 agents x 1447 memory files = ~1.83 MB of JSON, which is
+     * larger than `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1 MiB). A peer without
+     * the `frame_part` capability got the typed "response too large" envelope and
+     * the Block Library rendered nothing; a peer with it paid multi-MB of relayed
+     * QUIC per refresh. The window is therefore mandatory, and the caller pages
+     * (see `IrohAdminRpcBlockSource.listAllBlocks`).
+     *
+     * The window is applied over the FLAT (agentId, label) index — enumerating
+     * labels never reads file contents — so only the blocks actually served are
+     * read off disk. Ordering is the same deterministic mtime-desc agent order the
+     * agent list serves, with labels sorted inside each agent, so a cursor sweep
+     * over successive offsets is stable.
+     */
+    fun listAllBlocks(limit: Int?, offset: Int?): JsonArray? = runCatching {
+        val index = blockIndex()
+        val from = (offset ?: 0).coerceAtLeast(0)
+        val window = if (from >= index.size) {
+            emptyList()
+        } else {
+            val end = if (limit != null) (from + limit.coerceAtLeast(0)).coerceAtMost(index.size) else index.size
+            index.subList(from, end)
+        }
         buildJsonArray {
-            agentIds().forEach { agentId ->
-                blocksForAgent(agentId).forEach { add(it) }
+            window.forEach { (agentId, label) ->
+                add(projectBlock(agentId, label, readBlockValue(agentId, label)))
             }
         }
     }.getOrNull()
 
-    /** Port of `GET /v1/blocks/{id}`: first agent whose synthesised block id matches. */
+    /**
+     * Port of `GET /v1/blocks/{id}`: first agent whose synthesised block id matches.
+     *
+     * Resolved against the flat index so exactly ONE memory file is read — the id
+     * is `sha256("<agentId>:<label>")`, which needs no file contents to compute.
+     */
     fun getBlock(blockId: String): JsonObject? = runCatching {
-        agentIds().firstNotNullOfOrNull { agentId ->
-            blocksForAgent(agentId).firstOrNull { (it as? JsonObject)?.get("id")?.stringOrNull() == blockId }
-        } as? JsonObject
+        blockIndex()
+            .firstOrNull { (agentId, label) -> blockIdFor(agentId, label) == blockId }
+            ?.let { (agentId, label) -> projectBlock(agentId, label, readBlockValue(agentId, label)) }
     }.getOrNull()
+
+    /** Total number of blocks the union would contain; used for paging metadata. */
+    fun blockCount(): Int = runCatching { blockIndex().size }.getOrDefault(0)
+
+    /**
+     * Flat (agentId, label) enumeration in serve order. Contents are NOT read.
+     *
+     * Memoised for [INDEX_TTL_MS] because a cursor sweep would otherwise re-parse
+     * every agent record under `agents/` once per page (1147 files x 29 pages on
+     * the live host). The TTL is deliberately short: block values are always read
+     * fresh, so a stale index can only delay a newly created label by seconds.
+     */
+    private fun blockIndex(): List<Pair<String, String>> {
+        val cached = indexCache
+        val now = System.currentTimeMillis()
+        if (cached != null && now - cached.builtAtMs < INDEX_TTL_MS) return cached.entries
+        val entries = agentIds().flatMap { agentId ->
+            labelsForAgent(agentId).map { label -> agentId to label }
+        }
+        indexCache = BlockIndex(entries, now)
+        return entries
+    }
+
+    @Volatile
+    private var indexCache: BlockIndex? = null
+
+    private class BlockIndex(val entries: List<Pair<String, String>>, val builtAtMs: Long)
 
     /** Port of `store.ts:readBlocksForAgent` — one Block per `memory/system/<label>.md` file. */
     fun blocksForAgent(agentId: String): JsonArray = buildJsonArray {
@@ -86,6 +143,9 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
         /** admin-shim's synthesised block value limit. */
         const val BLOCK_VALUE_LIMIT: Int = 5000
         private const val BLOCK_ID_HASH_CHARS = 24
+
+        /** Memoisation window for the flat (agentId, label) index. */
+        private const val INDEX_TTL_MS: Long = 5_000
 
         /**
          * The wire Block admin-shim synthesises for one memory file. Exposed so a
