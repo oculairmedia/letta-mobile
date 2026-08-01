@@ -79,4 +79,15 @@ object AmbientMotion {
             settleMillis = 2400,
         )
     }
+
+    /**
+     * How long a host must HOLD a transient status before returning to Idle.
+     *
+     * Both chat hosts used a hard-coded 1400 ms, which cut Completed's 2400 ms
+     * decay off at 58%: the envelope was still falling when Idle took over and
+     * animated it back up, so the promised decay-to-afterglow read as a brief
+     * intensity rebound. The hold has to come from the same table as the decay
+     * it is waiting on, or the two drift by construction.
+     */
+    fun holdMillis(status: AmbientMotionStatus): Int = spec(status).settleMillis
 }

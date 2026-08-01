@@ -53,6 +53,8 @@ import com.letta.mobile.data.onboarding.OnboardingTask
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.desktop.DesktopButtonContent
 import com.letta.mobile.desktop.DesktopDefaultButton
+import com.letta.mobile.ui.ambient.AmbientMotion
+import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.theme.customColors
 import kotlinx.coroutines.delay
 
@@ -111,7 +113,11 @@ internal fun ChatDetailPane(
             }
             hadActiveRun -> {
                 ambientStatus = DesktopAmbientStatus.Completed
-                delay(1400.milliseconds)
+                // Held for exactly as long as the shared table says the
+                // Completed decay runs: a shorter hold cancels the decay
+                // mid-flight and Idle animates the envelope back UP, which
+                // reads as a rebound rather than an afterglow.
+                delay(AmbientMotion.holdMillis(AmbientMotionStatus.Completed).milliseconds)
                 hadActiveRun = false
                 ambientStatus = DesktopAmbientStatus.Idle
             }

@@ -66,4 +66,20 @@ class AmbientMotionTest {
         val completed = AmbientMotion.spec(AmbientMotionStatus.Completed)
         assertTrue(failed.settledEnvelope > completed.settledEnvelope)
     }
+
+    @Test
+    fun aTransientStatusIsHeldForItsWholeDecay() {
+        // Both hosts hard-coded a 1400 ms hold, which cancelled Completed's
+        // decay at 58% — Idle then animated the envelope back UP, so the
+        // afterglow read as a rebound. The hold must come from the same table
+        // as the decay it waits on.
+        AmbientMotionStatus.entries.filter { AmbientMotion.spec(it).isTransient }.forEach { status ->
+            assertEquals(
+                AmbientMotion.spec(status).settleMillis,
+                AmbientMotion.holdMillis(status),
+                "$status must be held for its full settle",
+            )
+            assertTrue(AmbientMotion.holdMillis(status) > 0, "$status decays, so it needs a hold")
+        }
+    }
 }
