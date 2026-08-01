@@ -61,8 +61,18 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
             index.subList(from, end)
         }
         buildJsonArray {
-            window.forEach { (agentId, label) ->
-                add(projectBlock(agentId, label, readBlockValue(agentId, label)))
+            var budget = PAGE_BYTE_BUDGET
+            for ((agentId, label) in window) {
+                val value = readBlockValue(agentId, label)
+                // Block VALUES are whole files and are not truncated on read: one
+                // page of 50 measured 394 KB on the live store, so a pathological
+                // page could still cross the 1 MiB frame cap on count alone. Stop
+                // short rather than emit an undeliverable frame — the handler's
+                // has_more is computed from the page LENGTH, so a short page pages
+                // correctly instead of silently dropping the remainder.
+                if (budget <= 0) break
+                add(projectBlock(agentId, label, value))
+                budget -= value.length + PROJECTION_OVERHEAD_BYTES
             }
         }
     }.getOrNull()
@@ -146,6 +156,15 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
 
         /** Memoisation window for the flat (agentId, label) index. */
         private const val INDEX_TTL_MS: Long = 5_000
+
+        /**
+         * Soft byte budget per page, ~half the 1 MiB frame cap so the JSON
+         * envelope and escaping cannot push a page over it.
+         */
+        private const val PAGE_BYTE_BUDGET: Int = 512 * 1024
+
+        /** Rough constant cost of the surrounding Block projection fields. */
+        private const val PROJECTION_OVERHEAD_BYTES: Int = 400
 
         /**
          * The wire Block admin-shim synthesises for one memory file. Exposed so a

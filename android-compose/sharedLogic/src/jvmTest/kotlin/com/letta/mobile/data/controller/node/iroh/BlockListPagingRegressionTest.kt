@@ -53,13 +53,25 @@ class BlockListPagingRegressionTest {
     }
 
     @Test
-    fun unwindowedUnionExceedsTheOneMebibyteFrameCapWhichIsWhyPagingIsMandatory() {
+    fun theFullUnionExceedsTheFrameCapWhileEveryPageStaysUnderIt() {
         val (store, total) = oversizedStore()
-        val everything = assertNotNull(store.listBlocksProjected(limit = null, offset = null))
-        assertEquals(total, everything.size)
+
+        var unionBytes = 0
+        var offset = 0
+        while (true) {
+            val page = assertNotNull(store.listBlocksProjected(limit = 50, offset = offset))
+            if (page.isEmpty()) break
+            val bytes = page.toString().encodeToByteArray().size
+            // THE property: no single response may exceed what the frame layer
+            // can deliver. This is what the unwindowed union violated.
+            assertTrue(bytes < FRAME_CAP_BYTES, "page at offset=$offset was $bytes bytes")
+            unionBytes += bytes
+            offset += page.size
+        }
+        assertEquals(total, offset, "the sweep must still reach every block")
         assertTrue(
-            everything.toString().encodeToByteArray().size > FRAME_CAP_BYTES,
-            "fixture must reproduce the regression: an unwindowed block.list is larger than the frame cap",
+            unionBytes > FRAME_CAP_BYTES,
+            "fixture must reproduce the regression: the union does NOT fit in one frame ($unionBytes bytes)",
         )
     }
 
@@ -95,6 +107,30 @@ class BlockListPagingRegressionTest {
     }
 
     @Test
+    fun aPageOfHugeBlocksIsTrimmedToStayUnderTheFrameCap() {
+        // Block values are whole files and are NOT truncated on read, so a page
+        // bounded only by COUNT can still exceed the frame cap. Live measurement:
+        // one 50-block page was already 394 KB.
+        val root = Files.createTempDirectory("block-paging-huge").toFile().also { roots += it }
+        val huge = "y".repeat(64 * 1024)
+        LocalBackendFixtureStore.writeAgent(root, "agent-huge", name = "Huge")
+        repeat(40) { LocalBackendFixtureStore.writeBlock(root, "agent-huge", "label-$it", huge) }
+        val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
+
+        val page = assertNotNull(store.listBlocksProjected(limit = 40, offset = 0))
+
+        assertTrue(page.size < 40, "an oversized page must be trimmed, not served whole")
+        assertTrue(
+            page.toString().encodeToByteArray().size < FRAME_CAP_BYTES,
+            "a trimmed page must fit in one admin_rpc frame",
+        )
+        // And the remainder must still be reachable by advancing the cursor.
+        val next = assertNotNull(store.listBlocksProjected(limit = 40, offset = page.size))
+        assertTrue(next.isNotEmpty(), "the trimmed remainder must still be pageable")
+        assertTrue(idsOf(page).intersect(idsOf(next)).isEmpty())
+    }
+
+    @Test
     fun offsetPastTheEndIsAnEmptyPageNotAnError() {
         val (store, total) = oversizedStore()
         assertEquals(0, assertNotNull(store.listBlocksProjected(limit = 50, offset = total + 500)).size)
@@ -124,9 +160,17 @@ class BlockListPagingRegressionTest {
 
     @Test
     fun handlerCapsAnOverlargeRequestedLimit() = runTest {
-        val (store, _) = oversizedStore()
+        // Small values, so the COUNT ceiling is what binds rather than the byte
+        // budget — a client must not be able to request its way past either.
+        val root = Files.createTempDirectory("block-paging-many").toFile().also { roots += it }
+        repeat(20) { a ->
+            LocalBackendFixtureStore.writeAgent(root, "agent-$a", name = "Agent $a")
+            repeat(50) { l -> LocalBackendFixtureStore.writeBlock(root, "agent-$a", "label-$l", "tiny") }
+        }
+        val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
         val router = AdminRpcRouter()
         ToolAdminHandlers.register(router, store, nativeClient = null)
+
         val result = dispatchResult(router, buildJsonObject { put("limit", "100000") })
         val blocks = (result as JsonObject).getValue("blocks") as JsonArray
         assertEquals(ToolAdminHandlers.MAX_BLOCK_LIST_LIMIT, blocks.size)
