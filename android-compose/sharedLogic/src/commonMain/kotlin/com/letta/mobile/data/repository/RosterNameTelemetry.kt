@@ -299,8 +299,13 @@ class RosterNameResolver<T>(
     private val mutex = Mutex()
     private val completed = mutableMapOf<String, T>()
     private val inFlight = mutableMapOf<String, CompletableDeferred<Result<T?>>>()
+    private var resolveCallsCount = 0
+
+    /** Visible-for-test counter: every call to [resolve] increments this. */
+    fun resolveCallsForTest(): Int = resolveCallsCount
 
     suspend fun resolve(agentId: String): T? {
+        mutex.withLock { resolveCallsCount += 1 }
         var owner = false
         val request = mutex.withLock {
             completed[agentId]?.let { return it }

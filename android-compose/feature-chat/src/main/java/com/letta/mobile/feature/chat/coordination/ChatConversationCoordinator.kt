@@ -311,6 +311,8 @@ internal class ChatConversationCoordinator(
 
     private suspend fun resolveMissingAgentName() = rosterNameResolver.resolve(agentId)
 
+    internal val rosterNameResolverForTest get() = rosterNameResolver
+
     private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
         return chatSessionResolver.resolveMostRecentConversation(agentId, maxAgeMs)
             ?.also { setRouteConversationId(it) }
