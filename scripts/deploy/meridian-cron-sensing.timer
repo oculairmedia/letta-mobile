@@ -1,0 +1,23 @@
+# Meridian cron sensing check timer — repository-owned systemd unit template.
+# letta-mobile-lgns8.24.2 / lgns8.24.3. Install instructions live in the
+# companion meridian-cron-sensing.service template.
+#
+# 15 minutes is chosen against the live schedule set: the only enabled recurring
+# task is a */30 heartbeat, whose failure budget is 2 x 30min + slack, so a
+# 15-minute cadence detects a dark scheduler within one budget window. Tighten
+# it if a shorter schedule is ever added; do not loosen it past half the
+# shortest enabled cadence.
+
+[Unit]
+Description=Run the Meridian cron/scheduler sensing check every 15 minutes
+Documentation=file:///opt/stacks/letta-mobile/docs/architecture/lettashim-retirement-deployment-runbook.md
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=1min
+Persistent=true
+Unit=meridian-cron-sensing.service
+
+[Install]
+WantedBy=timers.target
