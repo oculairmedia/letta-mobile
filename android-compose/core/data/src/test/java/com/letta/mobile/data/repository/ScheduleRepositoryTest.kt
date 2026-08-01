@@ -96,6 +96,41 @@ class ScheduleRepositoryTest {
     }
 
     @Test
+    fun `getSchedule in iroh mode routes via admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t"
+            )
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val expected = sampleScheduledMessage()
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("schedule.get", method)
+            assertEquals("/v1/schedules/s1", path)
+            assertEquals("{\"schedule_id\":\"s1\",\"agent_id\":\"a1\"}", body)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ScheduledMessage.serializer(), expected),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcScheduleSource(transport, settings)
+        val apiThatThrows = object : FakeScheduleApi() {
+            override suspend fun retrieveSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = ScheduleRepository(apiThatThrows, irohSource)
+
+        val result = repo.getSchedule("a1", "s1")
+
+        assertEquals(expected, result)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
     fun `refreshSchedules in iroh mode routes via admin_rpc`() = runTest {
         val settings = com.letta.mobile.testutil.FakeSettingsRepository(
             initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
