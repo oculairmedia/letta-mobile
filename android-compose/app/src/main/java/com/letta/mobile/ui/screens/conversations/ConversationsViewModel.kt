@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
+import com.letta.mobile.data.repository.RosterNameTelemetry
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
@@ -411,11 +412,25 @@ class ConversationsViewModel @Inject constructor(
         }
     }
 
-    private fun Conversation.toDisplay() = ConversationDisplay(
-        conversation = this,
-        agentName = agentNameCache[agentId] ?: agentId.value.take(8),
-        isPinned = id in pinnedConversationIds,
-    )
+    private fun Conversation.toDisplay(): ConversationDisplay {
+        val resolved = agentNameCache[agentId]
+        if (resolved == null) {
+            // letta-mobile-z5lqt: telemetry only. The `agentId.take(8)`
+            // fallback below is deliberately left exactly as it was; this
+            // just makes it visible when the roster failed to resolve a name.
+            RosterNameTelemetry.nameFallback(
+                site = RosterNameTelemetry.NameFallbackSite.CONVERSATION_LIST,
+                agentId = agentId.value,
+                fallbackKind = RosterNameTelemetry.FallbackKind.ID_PREFIX,
+                rosterSize = agentNameCache.size,
+            )
+        }
+        return ConversationDisplay(
+            conversation = this,
+            agentName = resolved ?: agentId.value.take(8),
+            isPinned = id in pinnedConversationIds,
+        )
+    }
 
     private fun displayAgents(
         agents: List<Agent>,
