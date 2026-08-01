@@ -28,6 +28,7 @@ import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
+import com.letta.mobile.util.Telemetry
 import org.jetbrains.skia.Paint as SkiaPaint
 import org.jetbrains.skia.Rect as SkiaRect
 import org.jetbrains.skia.RuntimeEffect
@@ -135,8 +136,21 @@ internal fun DesktopAmbientChatBackground(
     // frames (uniform writes overwrite) — only the per-frame Shader handle
     // allocates. Drawn via the native Skia canvas because this Compose
     // version's Shader type does not accept a raw skia Shader.
+    //
+    // The failure branch is LOUD on purpose: a broken SkSL edit and "this GPU
+    // cannot run the shader" otherwise look identical from the outside — a
+    // subtly flatter glow that could ship unnoticed. Degradation is
+    // safe-direction, but it must still be greppable.
     val shaderBuilder = remember {
         runCatching { RuntimeShaderBuilder(RuntimeEffect.makeForShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED)) }
+            .onFailure { failure ->
+                Telemetry.event(
+                    AMBIENT_TELEMETRY_TAG,
+                    "shader.compileFailed",
+                    "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                    level = Telemetry.Level.WARN,
+                )
+            }
             .getOrNull()
     }
     val shaderPaint = remember { SkiaPaint() }
@@ -151,13 +165,20 @@ internal fun DesktopAmbientChatBackground(
                     shaderBuilder.uniform("uAgitation", agitation)
                     shaderBuilder.uniform("uEnvelope", intensity)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
-                    shaderPaint.shader = shaderBuilder.makeShader(null)
+                    // One native Shader per frame is unavoidable (uniforms bake
+                    // in at makeShader time), but leaving it to the cleaner is
+                    // not: a long turn draws ~60/s, so the handles must be
+                    // released as soon as the draw that used them returns.
+                    val frameShader = shaderBuilder.makeShader(null)
+                    shaderPaint.shader = frameShader
                     drawIntoCanvas { canvas ->
                         canvas.nativeCanvas.drawRect(
                             SkiaRect.makeWH(size.width, size.height),
                             shaderPaint,
                         )
                     }
+                    shaderPaint.shader = null
+                    frameShader.close()
                 } else {
                     // Same floats as the shader path — parity by construction.
                     val breath = 0.5f + 0.5f * sin(phase)
@@ -182,6 +203,7 @@ internal fun DesktopAmbientChatBackground(
     }
 }
 
+private const val AMBIENT_TELEMETRY_TAG = "DesktopAmbient"
 private const val HiddenAlpha = 0.001f
 private const val IdentityBlend = 0.35f
 private const val BaseRadiansPerSecond =

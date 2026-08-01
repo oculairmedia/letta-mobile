@@ -386,20 +386,10 @@ private fun PreviewPane(
             .fillMaxWidth()
             .background(Color(0xFF0A0A0A)),
     ) {
-        // Fake chat content so glow strength is judged against readability.
-        Column(Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-            repeat(8) { index ->
-                Text(
-                    text = if (index % 3 == 2) {
-                        "The quick brown fox verified the wire contract and reported 14 memory blocks."
-                    } else {
-                        "Assistant narration line $index — glow must never wash this out while streaming."
-                    },
-                    color = Color(0xFFB8C2C4),
-                    fontSize = 14.sp,
-                )
-            }
-        }
+        // Glow FIRST, text over it — the same order production uses
+        // (DesktopAmbientChatBackground draws its canvas before `content()`).
+        // Painting the shader last made the lookdev overstate text tinting, so
+        // opacity picked here would have read differently in the shipped chat.
         Canvas(Modifier.fillMaxSize()) {
             val active = builder() ?: return@Canvas
             active.uniform("uSize", size.width, size.height)
@@ -413,8 +403,25 @@ private fun PreviewPane(
             if (state.source.contains("uniform float uScale")) {
                 active.uniform("uScale", state.scale)
             }
-            paint.shader = active.makeShader(null)
+            val frameShader = active.makeShader(null)
+            paint.shader = frameShader
             drawIntoCanvas { it.nativeCanvas.drawRect(SkiaRect.makeWH(size.width, size.height), paint) }
+            paint.shader = null
+            frameShader.close()
+        }
+        // Fake chat content so glow strength is judged against readability.
+        Column(Modifier.fillMaxSize().padding(40.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            repeat(8) { index ->
+                Text(
+                    text = if (index % 3 == 2) {
+                        "The quick brown fox verified the wire contract and reported 14 memory blocks."
+                    } else {
+                        "Assistant narration line $index — glow must never wash this out while streaming."
+                    },
+                    color = Color(0xFFB8C2C4),
+                    fontSize = 14.sp,
+                )
+            }
         }
     }
 }

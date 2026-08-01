@@ -70,7 +70,7 @@ float2 ringGrid(float2 gridUv, float t) {
     return float2(clamp(c, 0.0, 1.0), r);
 }
 
-// Circuit: sparse grid bus-lines with warm impulses travelling along them —
+// Circuit: sparse grid bus-lines with warm impulses travelling along them â€”
 // the vibe of the fractal-bus Shadertoy, rebuilt without dynamic loops (Skia
 // runtime effects cannot run its while(true) path walker). Lines carry the
 // tint dimly; impulses glow warm. Invert flips lines <-> cells.

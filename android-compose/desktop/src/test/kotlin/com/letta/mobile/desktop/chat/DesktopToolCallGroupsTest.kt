@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
@@ -21,6 +22,18 @@ class DesktopToolCallGroupsTest {
             ),
             groupPosition = GroupPosition.None,
         )
+
+    /** A call that has actually finished: `status` is non-null once a result lands. */
+    private fun doneToolMessage(id: String, tool: String = "Bash", status: String = "success") =
+        toolMessage(id, tool).let { single ->
+            single.copy(
+                message = single.message.copy(
+                    toolCalls = single.message.toolCalls.orEmpty().map { it.copy(result = "ok", status = status) },
+                ),
+            )
+        }
+
+    private fun sampleImageAttachment() = UiImageAttachment(base64 = "aGVsbG8=", mediaType = "image/png")
 
     private fun proseMessage(id: String, content: String = "Here is what I found.") =
         ChatRenderItem.Single(
@@ -87,6 +100,50 @@ class DesktopToolCallGroupsTest {
             listOf(toolMessage("1", timestamp = "2026-07-31T01:01:00Z"), toolMessage("2", timestamp = "2026-07-31T01:05:00Z")),
         ).single() as DesktopChatRow.ToolGroup
         assertEquals("2026-07-31T01:05:00Z", group.boundaryTimestamp)
+    }
+
+    @Test
+    fun finishedSuccessfulCallsFoldAwayCollapsed() {
+        val group = groupDesktopChatRows(
+            listOf(doneToolMessage("1"), doneToolMessage("2")),
+        ).single() as DesktopChatRow.ToolGroup
+        assertTrue(!group.startsExpanded, "a quiet, finished run is exactly what folding is for")
+    }
+
+    @Test
+    fun aFailedMemberKeepsTheGroupOpen() {
+        // Folding must never hide a failure behind a disclosure click — the
+        // ungrouped ToolCard would have opened itself and shown the error card.
+        val group = groupDesktopChatRows(
+            listOf(doneToolMessage("1"), doneToolMessage("2", status = "error")),
+        ).single() as DesktopChatRow.ToolGroup
+        assertTrue(group.startsExpanded)
+    }
+
+    @Test
+    fun anInFlightMemberKeepsTheGroupOpen() {
+        // status == null means "no result yet" (TimelineEventToUiMessage), i.e.
+        // the call is still running; progress stays visible.
+        val group = groupDesktopChatRows(
+            listOf(doneToolMessage("1"), toolMessage("2")),
+        ).single() as DesktopChatRow.ToolGroup
+        assertTrue(group.startsExpanded)
+    }
+
+    @Test
+    fun aGeneratedImageKeepsTheGroupOpen() {
+        val withImage = doneToolMessage("2").let { single ->
+            single.copy(
+                message = single.message.copy(
+                    toolCalls = single.message.toolCalls.orEmpty().map {
+                        it.copy(generatedImageAttachments = listOf(sampleImageAttachment()))
+                    },
+                ),
+            )
+        }
+        val group = groupDesktopChatRows(listOf(doneToolMessage("1"), withImage))
+            .single() as DesktopChatRow.ToolGroup
+        assertTrue(group.startsExpanded, "the generated image IS the result — it must not be two clicks away")
     }
 
     @Test

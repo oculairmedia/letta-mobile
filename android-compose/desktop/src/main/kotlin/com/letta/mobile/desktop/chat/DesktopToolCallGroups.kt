@@ -69,6 +69,19 @@ sealed interface DesktopChatRow {
 
         /** Newest member timestamp — the group's single clock label. */
         val boundaryTimestamp: String = singles.maxOf { it.boundaryTimestamp }
+
+        /**
+         * Folding must never hide a signal the ungrouped rows would have shown.
+         * A single [ToolCard] opens itself when its call is still running,
+         * failed, or carries a generated image ([shouldInitiallyExpand]); the
+         * group inherits that rule, so an in-flight call, a failure, or a
+         * generated image is never a collapsed line the user has to discover by
+         * clicking. Quiet, finished, successful runs still fold — that is the
+         * whole point of the group.
+         */
+        val startsExpanded: Boolean = singles.any { single ->
+            single.message.toolCalls.orEmpty().any { it.shouldInitiallyExpand() }
+        }
     }
 }
 
@@ -133,7 +146,7 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
     // Plain remember keyed on the group: matches ToolCard's own disclosure
     // pattern in this package. Scrolling far away resets to collapsed, which
     // is the desired default anyway.
-    var expanded by remember(group.key) { mutableStateOf(false) }
+    var expanded by remember(group.key) { mutableStateOf(group.startsExpanded) }
     val summary = remember(group) { group.toolNameSummary() }
     Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
         Row(
@@ -181,11 +194,10 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 group.singles.forEach { single ->
-                    single.message.toolCalls.orEmpty().forEachIndexed { index, toolCall ->
-                        ToolCard(
-                            toolCall = toolCall,
-                            disclosureKey = toolCall.toolCallId ?: "${single.message.id}:$index",
-                        )
+                    single.message.toolCalls.orEmpty().forEach { toolCall ->
+                        // Same disclosure key the ungrouped row uses, so a card's
+                        // open/closed state survives grouping flipping on or off.
+                        ToolCard(toolCall = toolCall)
                     }
                 }
             }
