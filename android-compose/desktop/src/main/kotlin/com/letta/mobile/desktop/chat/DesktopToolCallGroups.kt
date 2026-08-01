@@ -1,22 +1,20 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -121,9 +119,14 @@ fun groupDesktopChatRows(renderItems: List<ChatRenderItem>): List<DesktopChatRow
 }
 
 /**
- * The collapsed "N tool calls" card. Collapsed by default — the count keeps
+ * The collapsed "N tool calls" row. Collapsed by default — the count keeps
  * ticking up while a turn streams, which is still live feedback; expanding
  * shows the full [ToolCard] per call, exactly what ungrouped rendering showed.
+ *
+ * Styled as the SAME flat activity row as a single [ToolCard] header — same
+ * paddings, glyph size, and type ramp. Tool activity is deliberately a quiet
+ * log, not a stack of panels (see ToolCard's doc); a bordered card here made
+ * the group visually inconsistent with the singles around it.
  */
 @Composable
 internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
@@ -132,60 +135,57 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
     // is the desired default anyway.
     var expanded by remember(group.key) { mutableStateOf(false) }
     val summary = remember(group) { group.toolNameSummary() }
-    Surface(
-        modifier = Modifier.fillMaxWidth().animateContentSize(),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-    ) {
-        Column {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Terminal,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(15.dp),
-                )
-                Text(
-                    text = "${group.toolCallCount} tool calls",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
+    Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(horizontal = 10.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Terminal,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(13.dp),
+            )
+            Text(
+                text = "${group.toolCallCount} tool calls",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (!expanded) {
                 Text(
                     text = summary,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Icon(
-                    imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                    contentDescription = if (expanded) "Collapse tool calls" else "Expand tool calls",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp),
-                )
+            } else {
+                Spacer(Modifier.weight(1f))
             }
-            if (expanded) {
-                Column(
-                    modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 10.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    group.singles.forEach { single ->
-                        single.message.toolCalls.orEmpty().forEachIndexed { index, toolCall ->
-                            ToolCard(
-                                toolCall = toolCall,
-                                disclosureKey = toolCall.toolCallId ?: "${single.message.id}:$index",
-                            )
-                        }
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse tool calls" else "Expand tool calls",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(14.dp),
+            )
+        }
+        if (expanded) {
+            Column(
+                modifier = Modifier.padding(start = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                group.singles.forEach { single ->
+                    single.message.toolCalls.orEmpty().forEachIndexed { index, toolCall ->
+                        ToolCard(
+                            toolCall = toolCall,
+                            disclosureKey = toolCall.toolCallId ?: "${single.message.id}:$index",
+                        )
                     }
                 }
             }
