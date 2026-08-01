@@ -15,12 +15,14 @@ import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -124,6 +126,32 @@ class AdminChatParityTest {
 
         // Verify state is completely unchanged
         assertEquals(current, next)
+    }
+
+    @Test
+    fun `cache miss resolves agent name into chat header state`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        runCurrent()
+
+        assertEquals("Ada", harness.uiState.value.agentName)
+        verify(exactly = 1) { harness.agentRepository.getAgent(AgentId("agent-1")) }
+    }
+
+    @Test
+    fun `cached agent paints header without per id fetch`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+        every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
+            TestData.agent(id = "agent-1", name = "Cached Ada")
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        runCurrent()
+
+        assertEquals("Cached Ada", harness.uiState.value.agentName)
+        verify(exactly = 0) { harness.agentRepository.getAgent(AgentId("agent-1")) }
     }
 
     private class Harness(scope: CoroutineScope) {

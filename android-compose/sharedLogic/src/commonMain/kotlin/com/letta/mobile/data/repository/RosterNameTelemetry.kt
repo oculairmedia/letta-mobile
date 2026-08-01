@@ -1,6 +1,9 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.util.Telemetry
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Roster/name-resolution telemetry (letta-mobile-z5lqt).
@@ -19,6 +22,12 @@ import com.letta.mobile.util.Telemetry
  */
 object RosterNameTelemetry {
     const val CATEGORY = "RosterName"
+
+    enum class ResolveOutcome(val wireName: String) {
+        SUCCESS("success"),
+        FAILURE("failure"),
+        NOT_FOUND("notFound"),
+    }
 
     /**
      * Why an agent-roster paging sweep stopped.
@@ -229,6 +238,19 @@ object RosterNameTelemetry {
         )
     }
 
+    /** Record the result of an event-driven single-agent name resolve. */
+    fun resolveOutcome(agentId: String, outcome: ResolveOutcome, source: String, errorType: String? = null) {
+        Telemetry.event(
+            CATEGORY,
+            "name.resolveOutcome",
+            "agentId" to agentId,
+            "outcome" to outcome.wireName,
+            "source" to source,
+            "errorType" to errorType,
+            level = if (outcome == ResolveOutcome.SUCCESS) Telemetry.Level.INFO else Telemetry.Level.WARN,
+        )
+    }
+
     /** Where a display-name fallback was taken. */
     enum class NameFallbackSite(val wireName: String) {
         /** Conversation list row: name degraded to `agentId.take(8)`. */
@@ -263,5 +285,59 @@ object RosterNameTelemetry {
     object FallbackKind {
         const val ID_PREFIX = "idPrefix"
         const val PREVIOUS_UI_NAME = "previousUiName"
+    }
+}
+
+/**
+ * Platform-neutral per-agent resolve policy. Concurrent callers for the same id
+ * share one request; a successful resolve remains completed until invalidated.
+ */
+class RosterNameResolver<T>(
+    private val fetch: suspend (String) -> T?,
+    private val source: String,
+) {
+    private val mutex = Mutex()
+    private val completed = mutableMapOf<String, T>()
+    private val inFlight = mutableMapOf<String, CompletableDeferred<Result<T?>>>()
+
+    suspend fun resolve(agentId: String): T? {
+        var owner = false
+        val request = mutex.withLock {
+            completed[agentId]?.let { return it }
+            inFlight[agentId] ?: CompletableDeferred<Result<T?>>().also {
+                inFlight[agentId] = it
+                owner = true
+            }
+        }
+        if (owner) {
+            val result = runCatching { fetch(agentId) }
+            mutex.withLock {
+                result.getOrNull()?.let { completed[agentId] = it }
+                inFlight.remove(agentId)
+                request.complete(result)
+            }
+            result.fold(
+                onSuccess = { value ->
+                    RosterNameTelemetry.resolveOutcome(
+                        agentId,
+                        if (value == null) RosterNameTelemetry.ResolveOutcome.NOT_FOUND else RosterNameTelemetry.ResolveOutcome.SUCCESS,
+                        source,
+                    )
+                },
+                onFailure = { error ->
+                    RosterNameTelemetry.resolveOutcome(
+                        agentId,
+                        RosterNameTelemetry.ResolveOutcome.FAILURE,
+                        source,
+                        error::class.simpleName,
+                    )
+                },
+            )
+        }
+        return request.await().getOrNull()
+    }
+
+    suspend fun invalidate(agentId: String) {
+        mutex.withLock { completed.remove(agentId) }
     }
 }
