@@ -103,6 +103,40 @@ class DesktopToolCallGroupsTest {
     }
 
     @Test
+    fun theRowKeySurvivesTheOneToTwoTransition() {
+        // The moment a lone tool row becomes a pair is when a remount is most
+        // visible — mid-stream, with the row on screen. The group takes the
+        // first member's key verbatim so Compose keeps the same slot.
+        val one = groupDesktopChatRows(listOf(toolMessage("1"))).single()
+        val two = groupDesktopChatRows(listOf(toolMessage("1"), toolMessage("2"))).single()
+        assertEquals(one.key, two.key)
+    }
+
+    @Test
+    fun adjacentToolMessagesFromDifferentRunsDoNotMerge() {
+        // Concurrent/background runs interleave here. Folding across a run
+        // boundary would present two runs as one burst of work under one
+        // timestamp.
+        val runA = listOf(toolMessage("1"), toolMessage("2")).map { it.copy(stableRunId = "run-a") }
+        val runB = listOf(toolMessage("3"), toolMessage("4")).map { it.copy(stableRunId = "run-b") }
+        val rows = groupDesktopChatRows(runA + runB)
+        assertEquals(2, rows.size)
+        assertEquals(listOf("1", "2"), (rows[0] as DesktopChatRow.ToolGroup).singles.map { it.message.id })
+        assertEquals(listOf("3", "4"), (rows[1] as DesktopChatRow.ToolGroup).singles.map { it.message.id })
+    }
+
+    @Test
+    fun aRunBoundaryCanLeaveBothSidesUngrouped() {
+        val rows = groupDesktopChatRows(
+            listOf(
+                toolMessage("1").copy(stableRunId = "run-a"),
+                toolMessage("2").copy(stableRunId = "run-b"),
+            ),
+        )
+        assertTrue(rows.all { it is DesktopChatRow.Item }, "one row per run is not a group")
+    }
+
+    @Test
     fun finishedSuccessfulCallsFoldAwayCollapsed() {
         val group = groupDesktopChatRows(
             listOf(doneToolMessage("1"), doneToolMessage("2")),

@@ -60,10 +60,13 @@ sealed interface DesktopChatRow {
             require(singles.size >= 2) { "ToolGroup needs at least 2 items; got ${singles.size}" }
         }
 
-        // Keyed off the FIRST member: the group grows at the tail while a turn
-        // streams, so the head is the stable end. Prefixed so it can never
-        // collide with the member's own key if grouping flips off for a frame.
-        override val key: String = "toolgroup-${singles.first().key}"
+        // The FIRST member's key verbatim: the group grows at the tail while a
+        // turn streams, so the head is the stable end. Not prefixed — a prefix
+        // would change the key at the exact moment a lone tool row becomes a
+        // pair, unmounting and remounting the visible row (losing disclosure
+        // state and the LazyColumn anchor) for a collision that cannot happen:
+        // the group REPLACES that first single, so the two never coexist.
+        override val key: String = singles.first().key
 
         val toolCallCount: Int = singles.sumOf { it.message.toolCalls.orEmpty().size }
 
@@ -118,8 +121,19 @@ fun groupDesktopChatRows(renderItems: List<ChatRenderItem>): List<DesktopChatRow
             i++
             continue
         }
+        // A group is one run's mechanics. Payload shape alone is not enough:
+        // concurrent/background runs interleave in this list, and merging two
+        // runs into one card with one timestamp would claim they were one
+        // burst of work. The shared projection already treats a run-id change
+        // as a boundary; this honours the same boundary.
+        val runId = (renderItems[i] as ChatRenderItem.Single).stableRunId
         var j = i
-        while (j < renderItems.size && renderItems[j].isToolOnlySingle()) j++
+        while (j < renderItems.size &&
+            renderItems[j].isToolOnlySingle() &&
+            (renderItems[j] as ChatRenderItem.Single).stableRunId == runId
+        ) {
+            j++
+        }
         if (j - i >= 2) {
             @Suppress("UNCHECKED_CAST")
             out.add(DesktopChatRow.ToolGroup(renderItems.subList(i, j).map { it as ChatRenderItem.Single }))
