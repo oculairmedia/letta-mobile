@@ -48,10 +48,8 @@ class IrohAdminRpcConversationListSource(
         return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
     }
 
-    // letta-mobile-qfa81 (P4 rows 3-6): conversation B-tier reads/writes whose
-    // server handlers already exist (ConversationAdminHandlers). Client wiring
-    // only. summary-update + fork are C-tier (no handler) and stay on the HTTP
-    // path where the LettaApiClient choke point hard-fails them in iroh:// mode.
+    // letta-mobile-qfa81 (P4 rows 3-6): conversation reads/writes whose
+    // server handlers already exist (ConversationAdminHandlers).
 
     suspend fun getConversation(id: ConversationId): Conversation {
         val response = channelTransport.adminRpc(
@@ -76,6 +74,18 @@ class IrohAdminRpcConversationListSource(
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.create failed")
         val result = response.result ?: error("Iroh admin_rpc conversation.create returned no result")
+        return json.decodeFromJsonElement(Conversation.serializer(), result)
+    }
+
+    suspend fun updateConversation(id: ConversationId, summary: String): Conversation {
+        val body = buildJsonObject { put("summary", summary) }
+        val response = channelTransport.adminRpc(
+            method = "conversation.update",
+            path = "/v1/conversations/${id.value}",
+            body = body.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc conversation.update failed")
+        val result = response.result ?: error("Iroh admin_rpc conversation.update returned no result")
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 

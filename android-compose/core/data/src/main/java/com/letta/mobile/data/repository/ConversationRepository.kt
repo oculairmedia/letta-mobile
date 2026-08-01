@@ -164,8 +164,12 @@ open class ConversationRepository(
         writeAgentConversations(agentId, optimisticList, System.currentTimeMillis())
 
         try {
-            val params = ConversationUpdateParams(summary = summary)
-            val updated = conversationApi.updateConversation(id, params)
+            val irohSource = irohConversationListSource
+            val updated = if (irohSource?.shouldUseIroh() == true) {
+                irohSource.updateConversation(id, summary)
+            } else {
+                conversationApi.updateConversation(id, ConversationUpdateParams(summary = summary))
+            }
             writeAgentConversations(
                 agentId = agentId,
                 conversations = optimisticList.map { if (it.id == updated.id) updated else it },
