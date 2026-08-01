@@ -42,6 +42,16 @@ class SlashCommandRepository @Inject constructor(
         fetch("/v1/agents/$agentId/slash-commands", method = "slash_command.list_agent", agentId = agentId)
 
     override suspend fun installToAgent(agentId: String, skillName: String): Result<Unit> = runCatching {
+        if (shouldUseIroh()) {
+            mutateSkillOverIroh(
+                method = "skill.install",
+                path = "/v1/agents/$agentId/skills",
+                agentId = agentId,
+                skillName = skillName,
+            )
+            return@runCatching Unit
+        }
+
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/v1/agents/$agentId/skills") {
             contentType(ContentType.Application.Json)
@@ -54,6 +64,16 @@ class SlashCommandRepository @Inject constructor(
     }.onFailure { if (it is CancellationException) throw it }
 
     override suspend fun uninstallFromAgent(agentId: String, skillName: String): Result<Unit> = runCatching {
+        if (shouldUseIroh()) {
+            mutateSkillOverIroh(
+                method = "skill.uninstall",
+                path = "/v1/agents/$agentId/skills/$skillName",
+                agentId = agentId,
+                skillName = skillName,
+            )
+            return@runCatching Unit
+        }
+
         val (client, baseUrl) = apiClient.session()
         val encoded = skillName.encodeURLPathPart()
         val response = client.delete("$baseUrl/v1/agents/$agentId/skills/$encoded")
@@ -119,19 +139,38 @@ class SlashCommandRepository @Inject constructor(
         (body?.get("message") as? JsonPrimitive)?.contentOrNull ?: "Goal command executed."
     }.onFailure { if (it is CancellationException) throw it }
 
+    private suspend fun mutateSkillOverIroh(
+        method: String,
+        path: String,
+        agentId: String,
+        skillName: String,
+    ) {
+        ensureConnectedForAdminRpc()
+        val body = JsonObject(
+            mapOf(
+                "agent_id" to JsonPrimitive(agentId),
+                "name" to JsonPrimitive(skillName),
+            ),
+        ).toString()
+        val response = channelTransport.adminRpc(method = method, path = path, body = body)
+        if (!response.success) {
+            throw IllegalStateException(response.error ?: "Iroh admin_rpc $method failed")
+        }
+    }
+
     private fun shouldUseIroh(): Boolean =
         IrohChannelTransport.shouldUseIroh(settingsRepository.activeConfig.value?.serverUrl)
 
     private suspend fun ensureConnectedForAdminRpc() {
         if (channelTransport.state.value is ChannelTransportState.Connected) return
         val config = settingsRepository.activeConfig.value
-            ?: error("Iroh goal admin_rpc requested with no active backend config")
+            ?: error("Iroh admin_rpc requested with no active backend config")
         val serverUrl = config.serverUrl
         if (!IrohChannelTransport.shouldUseIroh(serverUrl)) {
-            error("Iroh goal admin_rpc requested while backend is not iroh://")
+            error("Iroh admin_rpc requested while backend is not iroh://")
         }
         Telemetry.event(
-            "IrohTransport", "goal.ensureConnected",
+            "IrohTransport", "adminRpc.ensureConnected",
             "serverUrl" to serverUrl,
             "state" to channelTransport.state.value::class.simpleName,
         )
@@ -139,10 +178,10 @@ class SlashCommandRepository @Inject constructor(
             baseShimUrl = serverUrl,
             token = config.accessToken.orEmpty(),
             deviceId = "android-letta-mobile",
-            clientVersion = "android-iroh-goal-admin-rpc",
+            clientVersion = "android-iroh-admin-rpc",
         )
         if (channelTransport.state.value !is ChannelTransportState.Connected) {
-            error("Iroh goal admin_rpc could not connect transport")
+            error("Iroh admin_rpc could not connect transport")
         }
     }
 
