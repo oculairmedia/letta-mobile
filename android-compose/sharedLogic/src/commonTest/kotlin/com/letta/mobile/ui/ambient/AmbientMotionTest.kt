@@ -68,6 +68,21 @@ class AmbientMotionTest {
     }
 
     @Test
+    fun idleNeverBrightensTheGlowOnTheWayOut() {
+        // Idle is where every transient status ENDS, and the tint fade takes
+        // longer than the envelope retarget. An Idle envelope above the value
+        // it is fading FROM makes the glow brighten as it disappears — the
+        // rebound the settle timing was supposed to remove.
+        val idle = AmbientMotion.spec(AmbientMotionStatus.Idle)
+        AmbientMotionStatus.entries.map { AmbientMotion.spec(it) }.filter { it.isTransient }.forEach { transient ->
+            assertTrue(
+                idle.settledEnvelope <= transient.settledEnvelope,
+                "idle ${idle.settledEnvelope} must not exceed a transient settle of ${transient.settledEnvelope}",
+            )
+        }
+    }
+
+    @Test
     fun aTransientStatusIsHeldForItsWholeDecay() {
         // Both hosts hard-coded a 1400 ms hold, which cancelled Completed's
         // decay at 58% — Idle then animated the envelope back UP, so the

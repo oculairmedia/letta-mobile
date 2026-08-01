@@ -36,12 +36,19 @@ object AmbientMotion {
     const val BASE_PERIOD_MILLIS: Int = 6000
 
     fun spec(status: AmbientMotionStatus): AmbientMotionSpec = when (status) {
-        // Nearly still — presence, not activity.
+        // Nearly still — presence, not activity. The envelope sits at the
+        // afterglow level rather than full, and that is load-bearing: Idle is
+        // where every transient status ENDS, and the tint fade out of
+        // Completed/Failed takes ~600ms while the envelope retargets in 300ms.
+        // An Idle envelope above the settled value it is fading FROM would
+        // brighten the glow on its way out — the rebound this table exists to
+        // prevent. Idle's envelope must not exceed any transient status's
+        // settled envelope (asserted in AmbientMotionTest).
         AmbientMotionStatus.Idle -> AmbientMotionSpec(
             speed = 0.35f,
             agitation = 0.4f,
-            bloomEnvelope = 1f,
-            settledEnvelope = 1f,
+            bloomEnvelope = COMPLETED_AFTERGLOW,
+            settledEnvelope = COMPLETED_AFTERGLOW,
             settleMillis = 0,
         )
         // Fast and noisy: visibly *working*.
@@ -75,10 +82,13 @@ object AmbientMotion {
             speed = 0.45f,
             agitation = 0.5f,
             bloomEnvelope = 1.5f,
-            settledEnvelope = 0.3f,
+            settledEnvelope = COMPLETED_AFTERGLOW,
             settleMillis = 2400,
         )
     }
+
+    /** The faint glow a finished turn decays to, and where Idle sits. */
+    private const val COMPLETED_AFTERGLOW = 0.3f
 
     /**
      * How long a host must HOLD a transient status before returning to Idle.
