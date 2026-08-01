@@ -8,6 +8,7 @@ import com.letta.mobile.data.repository.api.SubagentParentScope
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -55,9 +56,11 @@ internal fun defaultSubagentScope(): CoroutineScope =
  *  - On WS reconnect (`Disconnected → Connected`) the snapshot is refreshed so
  *    the UI doesn't keep showing a stale list after a dropped socket.
  *
- * letta-mobile-sqdqe: push/refresh snapshots can be transiently incomplete, so
- * replacement is conservative: running entries survive omission until the shim
- * sends an explicit terminal state.
+ * letta-mobile-sqdqe: INCREMENTAL push snapshots can be transiently
+ * incomplete, so replacement is conservative: running entries survive omission
+ * until the shim sends an explicit terminal state or absence exceeds a bound.
+ * AUTHORITATIVE (refresh) snapshots are ground truth — a running entry omitted
+ * from a full subagent_list response is EVICTED immediately.
  */
 open class SubagentRepository(
     private val transport: IChannelTransport,
@@ -73,6 +76,15 @@ open class SubagentRepository(
     // Whether the initial subagent_list has been dispatched. Repeated
     // subscribe/unsubscribe must not duplicate the initial fetch.
     private val initialized = atomic(false)
+    // Track when a running entry was first noticed absent from an INCREMENTAL
+    // push so absence-bound eviction can fire later.
+    //
+    // Held as an immutable map behind an atomic reference: `mergeSnapshot` is
+    // reached concurrently from `pushJob` (observePushEvents) and `refresh()`,
+    // both on Dispatchers.Default, so a bare mutable map could be structurally
+    // mutated from two threads at once. Each merge reads one consistent
+    // snapshot, mutates a private local copy, and publishes it once.
+    private val runningAbsentSince = atomic<Map<String, Long>>(emptyMap())
 
     private val pushJob = scope.launch { observePushEvents() }
     private val reconnectJob = scope.launch { observeReconnects() }
@@ -122,7 +134,7 @@ open class SubagentRepository(
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "subagent_list failed")
             }
-            val subagents = mergeSnapshot(response.subagents)
+            val subagents = mergeSnapshot(response.subagents, kind = SnapshotKind.AUTHORITATIVE)
             state.value = subagents
             subagents
         }
@@ -146,28 +158,138 @@ open class SubagentRepository(
         response.todos
     }
 
+    enum class SnapshotKind { AUTHORITATIVE, INCREMENTAL }
+
     private fun mergeSnapshot(
         incoming: List<SubagentEntry>,
         terminal: SubagentEntry? = null,
+        kind: SnapshotKind,
     ): List<SubagentEntry> {
+        val now = clock()
         val stampedTerminal = terminal
             ?.takeIf { it.status in TERMINAL_STATUSES }
-            ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: clock()) }
+            ?.let { entry -> entry.copy(terminalAtEpochMs = entry.terminalAtEpochMs ?: now) }
         val completeIncoming = if (stampedTerminal == null) incoming else incoming + stampedTerminal
         val incomingByKey = completeIncoming.associateBy { it.cacheKey() }
         val terminalKey = stampedTerminal?.cacheKey()
-        val retained = state.value.filter { previous ->
-            val key = previous.cacheKey()
-            previous.status == SubagentStatus.RUNNING &&
-                key !in incomingByKey &&
-                key != terminalKey
+
+        // One consistent read of the absence clock for the whole merge; all
+        // mutations below go to this private local copy and are published once
+        // at the end, so no other thread can observe a half-updated map.
+        val absence = runningAbsentSince.value.toMutableMap()
+
+        // Clear absence tracking for entries that ARE present in this snapshot.
+        incomingByKey.keys.forEach { key -> absence.remove(key) }
+
+        val absentRunning = absentRunningEntries(incomingByKey, terminalKey)
+        val retained = when (kind) {
+            SnapshotKind.AUTHORITATIVE -> {
+                emitDeltaRunningCount(incoming)
+                evictAbsentRunning(absentRunning, absence, kind)
+                emptyList()
+            }
+            SnapshotKind.INCREMENTAL -> retainWithinLinger(absentRunning, absence, now, kind)
         }
+
+        // Publish the absence clock once, after every branch above has settled.
+        runningAbsentSince.value = absence.toMap()
+
         val previousTerminals = state.value.filter { previous ->
             previous.status in TERMINAL_STATUSES &&
                 previous.cacheKey() !in incomingByKey &&
-                previous.terminalAtEpochMs?.let { clock() - it < TERMINAL_LINGER_MS } == true
+                previous.terminalAtEpochMs?.let { now - it < TERMINAL_LINGER_MS } == true
         }
         return (completeIncoming + retained + previousTerminals).distinctBy { it.cacheKey() }
+    }
+
+    /** Locally-RUNNING entries that this snapshot did not mention. */
+    private fun absentRunningEntries(
+        incomingByKey: Map<String, SubagentEntry>,
+        terminalKey: String?,
+    ): List<SubagentEntry> = state.value.filter { previous ->
+        val key = previous.cacheKey()
+        previous.status == SubagentStatus.RUNNING &&
+            key !in incomingByKey &&
+            key != terminalKey
+    }
+
+    /** Delta signal: AUTHORITATIVE snapshot count disagrees with local. */
+    private fun emitDeltaRunningCount(incoming: List<SubagentEntry>) {
+        val localRunning = state.value.count { it.status == SubagentStatus.RUNNING }
+        val incomingRunning = incoming.count { it.status == SubagentStatus.RUNNING }
+        if (localRunning == incomingRunning) return
+        Telemetry.event(
+            "SubagentRepo",
+            "merge.deltaRunningCount",
+            "localRunning" to localRunning,
+            "incomingRunning" to incomingRunning,
+            "delta" to (localRunning - incomingRunning),
+        )
+    }
+
+    /**
+     * Ground truth: running entries omitted from a full subagent_list
+     * response are EVICTED immediately.
+     */
+    private fun evictAbsentRunning(
+        absentRunning: List<SubagentEntry>,
+        absence: MutableMap<String, Long>,
+        kind: SnapshotKind,
+    ) {
+        absentRunning.forEach { entry ->
+            val key = entry.cacheKey()
+            absence.remove(key)
+            Telemetry.event(
+                "SubagentRepo",
+                "merge.evictRunning",
+                "cacheKey" to key,
+                "status" to entry.status,
+                "kind" to kind.name,
+                "reason" to "absent-from-authoritative-snapshot",
+            )
+        }
+    }
+
+    /**
+     * Conservative: retain running entries omitted from a push, bounded by
+     * absence linger to prevent unbounded retention.
+     */
+    private fun retainWithinLinger(
+        absentRunning: List<SubagentEntry>,
+        absence: MutableMap<String, Long>,
+        now: Long,
+        kind: SnapshotKind,
+    ): List<SubagentEntry> = absentRunning.filter { previous ->
+        val key = previous.cacheKey()
+        val absentSince = absence[key]
+        if (absentSince == null) {
+            absence[key] = now
+            Telemetry.event(
+                "SubagentRepo",
+                "merge.retainRunning",
+                "cacheKey" to key,
+                "status" to previous.status,
+                "ageMs" to 0L,
+                "kind" to kind.name,
+                "reason" to "absent-from-push-retained",
+            )
+            return@filter true
+        }
+        val ageMs = now - absentSince
+        if (ageMs < RUNNING_ABSENCE_LINGER_MS) {
+            return@filter true
+        }
+        absence.remove(key)
+        Telemetry.event(
+            "SubagentRepo",
+            "merge.evictRunning",
+            "cacheKey" to key,
+            "status" to previous.status,
+            "ageMs" to ageMs,
+            "kind" to kind.name,
+            "reason" to "absent-from-push-exceeded-linger",
+        )
+        false
     }
 
     private fun SubagentEntry.cacheKey(): String = listOf(
@@ -190,7 +312,7 @@ open class SubagentRepository(
             // Mark initialized so a later first-subscriber doesn't kick off a
             // redundant subagent_list (the cache is already warm).
             initialized.value = true
-            state.value = mergeSnapshot(frame.subagentsActive, terminal = frame.subagent)
+            state.value = mergeSnapshot(frame.subagentsActive, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
         }
     }
 
@@ -209,6 +331,7 @@ open class SubagentRepository(
 
     companion object {
         private const val TERMINAL_LINGER_MS = 8_000L
+        private const val RUNNING_ABSENCE_LINGER_MS = 60_000L
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,
