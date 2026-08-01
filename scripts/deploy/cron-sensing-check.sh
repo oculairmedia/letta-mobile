@@ -1,6 +1,18 @@
 #!/usr/bin/env bash
 # Cron / scheduler sensing check — letta-mobile-lgns8.24.2 / .24.3 mitigation.
 #
+# INSTALLED ON THE MERIDIAN HOST 2026-08-01 as meridian-cron-sensing.{service,
+# timer}, 15-minute cadence, logging to /var/log/meridian-cron-sensing.log.
+# Verified live the same day: the first systemd run exited 0 against production
+# — the scheduler lease held by pid 2796361 passed all four process-identity
+# checks (non-null owner, pid alive, /proc start-ticks matching the recorded
+# process_start_ticks, boot_id matching the running boot), and
+# letta-mobile-pm-30m's last transcript fire was 796s old against a 3900s
+# budget. Every FAIL path (null owner, dead pid, tightened cadence, missing fire
+# marker) was exercised against synthetic crons.json copies with the live file
+# untouched. Install recipe and FAIL triage: "Cron sensing check" in
+# docs/architecture/lettashim-retirement-deployment-runbook.md.
+#
 # WHY THIS EXISTS
 # The App Server's own cron surfaces cannot tell a live scheduler from a dead
 # one. Measured 2026-08-01 (see docs/testing/lgns8-acceptance-evidence-ledger.md
