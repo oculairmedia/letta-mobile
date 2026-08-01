@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -154,6 +155,17 @@ internal fun DesktopAmbientChatBackground(
             .getOrNull()
     }
     val shaderPaint = remember { SkiaPaint() }
+    // The builder outlives individual frames, but not the composition: leaving
+    // and returning to Conversations disposes and recreates this pane, and each
+    // mount compiles another native-backed effect. Released explicitly rather
+    // than left to the cleaner, for the same reason the per-frame handles are.
+    DisposableEffect(shaderBuilder, shaderPaint) {
+        onDispose {
+            shaderPaint.shader = null
+            shaderPaint.close()
+            shaderBuilder?.close()
+        }
+    }
 
     Box(modifier = modifier) {
         if (visible) {

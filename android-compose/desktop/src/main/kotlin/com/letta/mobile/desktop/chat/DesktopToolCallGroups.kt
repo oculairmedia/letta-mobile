@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -161,6 +162,15 @@ internal fun DesktopToolGroupCard(group: DesktopChatRow.ToolGroup) {
     // pattern in this package. Scrolling far away resets to collapsed, which
     // is the desired default anyway.
     var expanded by remember(group.key) { mutableStateOf(group.startsExpanded) }
+    // The initial value only covers the calls present at mount. A streaming
+    // turn appends to the SAME group (the key is the first member's, so it
+    // deliberately does not change), so a call that later starts running or
+    // fails would otherwise stay hidden behind a collapsed row. One-way on
+    // purpose: attention re-opens the group, but nothing ever collapses it
+    // back under the user.
+    LaunchedEffect(group.key, group.startsExpanded) {
+        if (group.startsExpanded) expanded = true
+    }
     val summary = remember(group) { group.toolNameSummary() }
     Column(modifier = Modifier.fillMaxWidth().animateContentSize()) {
         Row(
