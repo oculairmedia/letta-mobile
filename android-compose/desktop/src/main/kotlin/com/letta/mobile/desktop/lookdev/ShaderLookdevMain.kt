@@ -101,13 +101,71 @@ internal fun ShaderLookdevWindow() {
     }
 }
 
+/**
+ * PROPOSED desktop tuning, preloaded so the window opens showing a living glow
+ * instead of near-black. The production source has a fatal band overlap: the
+ * blob is anchored at uv.y=0.82 but upperFade zeroes everything above
+ * uv.y=0.78 — the glow's own center sits in the killed zone, and the usable
+ * band peaks at ~2-5% of an already-0.18 alpha (effective ~0.005: invisible
+ * everywhere, phone included). This variant uses one bottom-weighted vertical
+ * shape instead of two fighting bands, and a livable base intensity.
+ * Reset to production via the button; port back to AmbientShaderSource.kt
+ * once a look is approved.
+ */
+private val PROPOSED_DESKTOP_SKSL = """
+uniform float2 uSize;
+uniform float uTime;
+uniform float uAgitation;
+uniform float uEnvelope;
+uniform vec4 uColor;
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i + float2(0.0, 0.0)), hash(i + float2(1.0, 0.0)), u.x),
+        mix(hash(i + float2(0.0, 1.0)), hash(i + float2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
+    float aspect = uSize.x / max(uSize.y, 1.0);
+    float2 p = float2((uv.x - 0.50) * aspect, uv.y - 0.95);
+
+    float breath = 0.5 + 0.5 * sin(uTime);
+    float2 warp = float2(
+        noise(uv * 3.1 + float2(uTime * 0.11, 0.0)),
+        noise(uv * 3.7 + float2(0.0, -uTime * 0.07))
+    );
+    float2 driftUv = float2(uv.x * 2.2 + uTime * 0.08, uv.y * 1.6 - uTime * 0.05)
+        + (warp - 0.5) * (0.9 * uAgitation);
+    float drift = 0.65 * noise(driftUv) + 0.35 * noise(driftUv * 2.4 + warp * 1.7);
+    float radius = mix(0.55, 0.75, breath) + (drift - 0.5) * (0.10 + 0.08 * uAgitation);
+    float glow = 1.0 - smoothstep(0.0, radius, length(p));
+
+    // One bottom-weighted shape: full strength at the composer, gone by ~55%
+    // up the pane. No second band fighting it.
+    float verticalShape = smoothstep(0.45, 0.95, uv.y);
+    float alpha = glow * verticalShape * 0.38 * uEnvelope * uColor.a;
+    half4 c = half4(uColor.rgb, alpha);
+    return half4(c.rgb * c.a, c.a);
+}
+"""
+
 private class LookdevState {
     var speed by mutableFloatStateOf(1.7f)
     var agitation by mutableFloatStateOf(1.6f)
     var envelope by mutableFloatStateOf(1f)
     var alpha by mutableFloatStateOf(1f)
     var tint by mutableStateOf(Color(0xFF3FE0C0))
-    var source by mutableStateOf(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED)
+    var source by mutableStateOf(PROPOSED_DESKTOP_SKSL)
     var compileError by mutableStateOf<String?>(null)
 }
 
@@ -150,6 +208,13 @@ private fun ControlsColumn(state: LookdevState) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        Text("Source", style = MaterialTheme.typography.labelLarge)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Button(onClick = { state.source = PROPOSED_DESKTOP_SKSL }) { Text("Proposed", fontSize = 10.sp) }
+            Button(onClick = {
+                state.source = AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED
+            }) { Text("Production (near-invisible)", fontSize = 10.sp) }
+        }
         Text("Status presets (production AmbientMotion values)", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             AmbientMotionStatus.entries.forEach { status ->
