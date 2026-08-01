@@ -135,7 +135,10 @@ fun AppNavGraph(
             )
         }
         hasConfig && fallbackAgentId != null -> AgentChatRoute(agentId = fallbackAgentId)
-        hasConfig -> HomeRoute
+        // Default landing surface is Conversations, not the Projects home —
+        // opening the app should drop the user into their chats (2026-08-01,
+        // user-requested; Projects stays one tap away on the nav rail).
+        hasConfig -> ConversationsRoute
         else -> ConfigRoute()
     }
 
