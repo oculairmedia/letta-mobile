@@ -1,0 +1,41 @@
+# Meridian cron sensing check — repository-owned systemd unit template.
+# letta-mobile-lgns8.24.2 / lgns8.24.3. See
+# docs/architecture/lettashim-retirement-deployment-runbook.md ("Cron sensing check").
+#
+# THIS FILE IS A TEMPLATE, NOT THE LIVE UNIT. Install it together with the
+# timer and the script it runs:
+#
+#   install -D -m 0755 scripts/deploy/cron-sensing-check.sh \
+#     /opt/meridian/bin/cron-sensing-check.sh
+#   install -m 0644 scripts/deploy/meridian-cron-sensing.service \
+#     /etc/systemd/system/meridian-cron-sensing.service
+#   install -m 0644 scripts/deploy/meridian-cron-sensing.timer \
+#     /etc/systemd/system/meridian-cron-sensing.timer
+#   systemctl daemon-reload && systemctl enable --now meridian-cron-sensing.timer
+#
+# WHY A TIMER AND NOT AN IN-PROCESS HEALTH CHECK: the thing being sensed is the
+# App Server's own cron scheduler, whose surfaces report "ok" through a total
+# outage (ledger section 8, 3b). The sensor must live outside that process.
+
+[Unit]
+Description=Meridian cron/scheduler sensing check (transcript-based, read-only)
+Documentation=file:///opt/stacks/letta-mobile/docs/architecture/lettashim-retirement-deployment-runbook.md
+After=meridian-appserver.service
+# Deliberately NOT Requires=: the check must still run — and fail loudly — when
+# the App Server is down. That is the outage it exists to detect.
+
+[Service]
+Type=oneshot
+ExecStart=/opt/meridian/bin/cron-sensing-check.sh
+
+# Read-only sensor. It must never be able to repair, rotate, or write the store.
+ProtectSystem=strict
+ReadOnlyPaths=/root/.letta
+ReadWritePaths=/var/log
+PrivateTmp=true
+NoNewPrivileges=true
+
+# Appended, not journal-only: journalctl is empty for the Meridian units on this
+# host (they all use append:), so keep one greppable place for cron evidence.
+StandardOutput=append:/var/log/meridian-cron-sensing.log
+StandardError=append:/var/log/meridian-cron-sensing.log

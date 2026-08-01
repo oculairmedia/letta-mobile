@@ -118,15 +118,23 @@ rollback option, and a verified redeploy inside one day.
 | **Scope shrank on inspection.** letta-code 0.29.12 ships cron natively and first-class: the full `Cron{List,Add,Get,Runs,Trigger,Update,Delete,DeleteAll}Command` protocol plus `CronsUpdatedMessage`, and *real execution* — `startConnectedListenerRuntime()` calls `startScheduler()` when `shouldStartCronScheduler`, and the app-server listen path passes `startCronScheduler: true` (kill switch `LETTA_DISABLE_CRON_SCHEDULER=1`, set nowhere in this repo or the shim). `cron` is a first-class `QueueItemSource`, so a fired cron enters the same turn queue as user or channel input. The shim does **not** own a separate cron model — `admin-shim/lib/cron-scheduler.ts` says so explicitly: it shares `crons.json` with the bundled letta cron CLI, byte-for-byte. | PROVEN-HARNESS (source-verified on the pin) |
 | **Execution PROVEN on the harness, 2026-08-01** (`lgns8.24` probe, third throwaway env: no shim anywhere, own HOME/backend/port, live `crons.json` and the `*/30` PM schedule untouched). **(1) The lease is claimed by the app-server process itself — at FIRST WS CONNECT, not at boot.** `crons.json` did not exist after 12s of idle listening; `scheduler_owner` appeared only once a client attached (`attachOpenListenerSocket({startCronScheduler:true})`), carrying the `--listen` PID. Confirmed again across a restart with the new PID. **(2)** `cron_add` takes a real cron expression; `* * * * *` is the floor (`TICK_INTERVAL_MS` = 60000) and was accepted over a bare WS. **(3) Three consecutive 1-minute fires really executed** — proven by the committed transcript (`messages.jsonl`), not the run log: three `user` fire-prompts at exactly 60s spacing, each answered by the agent against a real provider. `cron_delete` takes effect immediately with no leaked timer. | PROVEN-HARNESS |
 | **Four defects the same probe measured, all of which shape the cutover.** **(3b) The run log cannot discriminate.** Every entry — executed and dark alike — reads `status:"ok", outcome:"queued", reason:"scheduled_time_matched"`; there is no terminal executed/succeeded outcome written at all. **Any gate or alert built on cron run-log outcomes is inert; only the conversation transcript or an external heartbeat can tell a live scheduler from a dead one.** **(3c) Zero-client ticks are dark** (settles `lgns8.24.1` empirically): with the client disconnected the scheduler keeps ticking and enqueueing, but `scheduleQueuePump` bails on the closed transport and no turn runs. **(3d) The drain on reconnect is LOSSY — this corrects the bead's own "everything drains at once" note.** Three buffered dark fires produced exactly ONE turn on reconnect, carrying the OLDEST occurrence's (3-minute-stale) timestamp; the other two were silently discarded with no error, no `failed_count`, and run-log entries still reading `ok`. For a `*/30` heartbeat: hours dark → one late, mislabelled run → no signal that the rest were lost. **(4) Missed-tick policy on restart is silent skip, with no accounting.** A clean SIGTERM releases the lease; the minutes the server was down produced no run-log entry, no turn, and `missed_count` stayed 0 (`shouldFireTask()` is a pure `cronMatchesTime` check; missed accounting exists only for one-shot tasks). **(4b) The startup tick never fires** (2/2 reproducible): the first fire is always exactly +60s after the lease, so a restart costs at least one tick — the real skip window is downtime *plus* the remainder of the restart minute. | PROVEN-HARNESS (defects) |
-| The production handover itself: lettashim currently holds the live lease and nothing yet releases it. Acceptance is unchanged — a 1-minute schedule surviving a controller restart, in production — but (3c)+(3d) add a hard requirement the bead did not have: **the controller must keep a WS connection attached at all times, or every tick is dark and "it catches up later" is false.** `letta-mobile-lgns8.24` (P0), catch-up regression tracked as `lgns8.24.2`. | **PENDING-OPS** |
+| **THE PRODUCTION HANDOVER, EXECUTED 2026-08-01 01:05** (user-authorized maintenance window). lettashim and its watchdog stopped; `meridian-appserver` restarted and **claimed the scheduler lease on its first WS connect** — `/root/.letta/crons.json` `scheduler_owner.pid = 2796361`, identical to the unit's `MainPID`. A `* * * * *` probe schedule added over the App Server WS **fired and executed against the production agent**: `CRONFIRE-PROD-PROOF` is in the production conversation transcript at `01:05:46` (the transcript is the sensor; the run log is inert per 3b). `cron_delete` clean. lettashim was then restored and **the lease stayed App-Server-owned** (still pid `2796361` with lettashim running) — the ownership transfer is durable across a shim restart, and cron execution is permanently retired from the shim. `letta-mobile-lgns8.24`. | **PROVEN-LIVE** |
+| **The sensing the defects force is INSTALLED, not merely specified** (2026-08-01). `scripts/deploy/cron-sensing-check.sh` plus `meridian-cron-sensing.{service,timer}` run every 15 minutes on the Meridian host, logging to `/var/log/meridian-cron-sensing.log`. Two halves, both required: (i) the lease is held by a live process that really is the process it claims to be — non-null `scheduler_owner`, pid alive, `/proc` start-ticks equal to the recorded `process_start_ticks` (a recycled pid fails), `boot_id` equal to the running one (a previous-boot lease fails); (ii) every enabled recurring task has a `Scheduled task "<name>" is firing` prompt in its **conversation transcript** newer than `2 x cadence + 5min`, else FAIL. An un-parseable cadence is reported UNSENSED, never a silent pass. First live run under systemd exited 0 against production: lease `pid 2796361` verified on all four identity checks, `letta-mobile-pm-30m` last fired `2026-08-01T05:01:04.999Z`, 796s old against a 3900s budget. This is detection, not recovery — the two defects it senses are upstream. | **PROVEN-LIVE** |
+| **The two client-unfixable defects are filed upstream with the measured evidence.** (4)/(4b) — silent missed ticks, no catch-up, no `missed_count`, and a startup-tick gap that costs one tick on every restart — is `letta-mobile-mocf1`, asking for either replay from a persisted `last_tick_at` or an explicit missed-count. The lease loser giving up permanently after 3x30s with only a `console.error`, its budget spent from first-WS-connect rather than boot, is `letta-mobile-xsxwd`, asking for backoff retry and/or a structured, queryable give-up signal. Both are scheduler internals inside letta.js; neither is reachable from the client. `lgns8.24.2` and `lgns8.24.3` close as **measured + mitigated + upstream-referenced**. | PROVEN-HARNESS (defects, upstream-blocked) |
 
 Execution is no longer the unknown — a bare `letta app-server --listen` with no
 shim claims the scheduler lease itself and really runs the fired turn end to
-end. What replaced that unknown is worse-shaped and now measured: cron failure
-is **invisible from the cron surfaces themselves**. A silent scheduler was
-always the risk; (3b) proves the run log will report `ok` throughout one.
-Post-cutover sensing must therefore be built on the conversation transcript or
-an external heartbeat, and the cutover checklist says so explicitly.
+end, and since 2026-08-01 the production App Server does exactly that. What
+replaced that unknown is worse-shaped and now measured: cron failure is
+**invisible from the cron surfaces themselves**. A silent scheduler was always
+the risk; (3b) proves the run log will report `ok` throughout one. That is why
+this row is only PROVEN-LIVE *with* the external sensor: the handover alone
+would have moved the scheduler onto a surface where its own death is
+unobservable. The sensor reads the conversation transcript because nothing
+inside cron discriminates, and it fails closed — nonzero exit, no self-healing,
+a human decides. Recovery from the two sensed defects requires upstream
+(`letta-mobile-mocf1`, `letta-mobile-xsxwd`); detection does not, and is
+installed.
 
 ---
 
@@ -155,28 +163,26 @@ the PR shipped a test that was demonstrated to fail without the fix.
 | #1082 | `lgns8.9` | Admin REST adapter retired with real per-method owners; reintroduction fails a test. |
 | #1083 | `lgns8.23` | Controller-native channel restore behind `--channels-host`; three guards each verified fail-on-revert. |
 | #1084 | `vnp3q` | Real-engine WS connect regression test + OkHttp negative control — closes the gap that let #1064→#1077 ship. |
-| *(this PR)* | `o5bqk` | Channel ingress re-wired in the first round trip after a reconnect: `channel_start` for cached accounts precedes `channels_list`. Removing the fast path fails four tests; removing the start-once-per-pass dedup fails a fifth. |
+| #1085 | `o5bqk` | Channel ingress re-wired in the first round trip after a reconnect: `channel_start` for cached accounts precedes `channels_list`. Removing the fast path fails four tests; removing the start-once-per-pass dedup fails a fifth. |
+| *(this PR)* | `lgns8.24.2`, `lgns8.24.3` | Cron sensing installed on the production host: transcript-based check plus a 15-minute systemd timer. Docs-and-scripts only — the defects it senses are upstream (`mocf1`, `xsxwd`). |
 
 ---
 
 ## What is still open
 
-Three rows, and only three, stand between this ledger and a closed `lgns8.10` —
-the fourth (`lgns8.23.1`'s inbound probe) was executed on 2026-08-01 and is now
-a PROVEN-HARNESS row in §7, having produced `o5bqk` on the way:
+Two rows, and only two, stand between this ledger and a closed `lgns8.10`. Of
+the four that stood here on 2026-08-01, `lgns8.23.1`'s inbound probe was
+executed (now a PROVEN-HARNESS row in §7, having produced `o5bqk` on the way)
+and the `lgns8.24` cron handover was executed in production (now a PROVEN-LIVE
+row in §8, with its sensing installed):
 
 1. **PENDING-INTERACTIVE — device protocol steps 1–3.** Concurrent conversations
    (UI half), Stop button (`lgns8.19` device evidence, including the first-ever
    real Desktop abort), and the image pipeline (`iej8j` device half). Protocol:
    `docs/testing/lgns8-e2e-device-protocol.md`.
-2. **PENDING-OPS — `lgns8.24` cron handover.** Execution itself is now proven on
-   the harness (§8); what remains is the production lease handover, the
-   always-attached-client requirement that (3c)/(3d) imposes, and **an external
-   sensing check, because the cron run log reports `ok` through a total
-   outage.**
-3. **PENDING-OPS — `d7uls` channels cutover.** The maintenance-window flag flip,
+2. **PENDING-OPS — `d7uls` channels cutover.** The maintenance-window flag flip,
    in the mandatory stop-before-start order, now also carrying the cron sensing
    step and a post-restart inbound re-check.
 
-Everything else in this document is proven, and §1, §2, §4, §5, §6 and §7 each
-carry at least one PROVEN-LIVE row.
+Everything else in this document is proven, and §1, §2, §4, §5, §6, §7 and §8
+each carry at least one PROVEN-LIVE row.

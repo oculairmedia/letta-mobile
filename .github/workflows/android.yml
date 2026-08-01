@@ -18,11 +18,17 @@ on:
       # never report, and branch protection leaves it BLOCKED forever.
       # Same for tooling-smoke / architecture-stack scripts: those PRs must still
       # report the required Android contexts or they stay BLOCKED forever.
+      # scripts/deploy/** is listed for the same reason (letta-mobile-lgns8.24):
+      # host unit templates and the cron sensing check land as scripts+docs PRs
+      # that would otherwise never report test/build-apk-pass/
+      # shared-multiplatform. perf-gate needs no entry — android-perf.yml has no
+      # pull_request paths filter and always runs.
       - ".github/workflows/**"
       - "android-compose/**"
       - "third_party/overmorrow/**"
       - "scripts/ci/**"
       - "scripts/tests/**"
+      - "scripts/deploy/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
       - "tools/architecture_query/**"
