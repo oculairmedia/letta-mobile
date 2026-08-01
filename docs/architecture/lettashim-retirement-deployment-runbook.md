@@ -54,26 +54,27 @@ wrapper-only environment file and the NodeId and pairing store verified
 unchanged. Deploy, incident, rollback option and verified redeploy are all on
 record — see `docs/testing/lgns8-acceptance-evidence-ledger.md` §6.
 
-Four items remain before `letta-mobile-lgns8.11` (production cutover and
-lettashim retirement) can close. None of them is implementation.
+Four rows remain before `letta-mobile-lgns8.11` (production cutover and
+lettashim retirement) can close — and row 4 is now only a live re-check, its
+offline half having been measured on 2026-08-01. None of them is
+implementation.
 
 | # | Item | Bead | Where |
 |---|---|---|---|
 | 1 | Device protocol steps 1–3 — concurrent conversations (UI half), Stop button (incl. the first real Desktop abort), image pipeline | `lgns8.19`, `iej8j`, `eaczz.10` | `docs/testing/lgns8-e2e-device-protocol.md` |
-| 2 | Cron/scheduler execution handover — schedules must still fire with lettashim stopped | `lgns8.24` (P0) | below, "Cron handover" |
+| 2 | Cron/scheduler execution handover — schedules must still fire with lettashim stopped | `lgns8.24` (P0) | below, "Cron handover (`lgns8.24`)" |
 | 3 | Channels-host live cutover — flag on, `SHIM_CHANNELS_ENABLED=0`, **in that order** | `d7uls` (P1) | "Channels-host cutover (lgns8.23)" |
-| 4 | Inbound channel delivery after a reconnect with no re-issued `channel_start` | `lgns8.23.1` | folded into item 3's window |
+| 4 | ~~Inbound channel delivery after a reconnect with no re-issued `channel_start`~~ — **measured 2026-08-01**: inbound is enqueued but never runs against the dead socket. Mitigated client-side (`o5bqk`); the residual window is a live re-check, folded into item 3 | `lgns8.23.1` (closed) | item 3's window, step 8 |
 
 Two things about this list are easy to get wrong:
 
-- **Item 2 is not solved by "letta-code has cron".** 0.29.12 does ship cron
-  natively and does execute it (`startScheduler()` under the listen path), and
-  the shim shares `crons.json` with the bundled CLI byte-for-byte. But CRUD
-  coverage is not execution coverage. `PM-letta-mobile` runs on a `*/30`
-  schedule; a silently stopped scheduler is a silent failure. **Acceptance: a
-  1-minute test schedule fires across a controller restart, with an explicit and
-  logged missed-tick policy, and schedule state survives the restart.** Do this
-  before the shim goes down, not after.
+- **Item 2 is not solved by "letta-code has cron".** Execution is no longer the
+  unknown — the 2026-08-01 `lgns8.24` probe measured a bare `--listen` claiming
+  the scheduler lease itself and really running three consecutive 1-minute fires
+  end to end. What the probe replaced it with is worse-shaped: **cron failure is
+  invisible from the cron surfaces themselves.** See "Cron handover
+  (`lgns8.24`)" below before touching the live scheduler. `PM-letta-mobile` runs
+  on a `*/30` schedule; do this before the shim goes down, not after.
 - **Item 3's double-host guard is an announcement, not a detection.** Nothing
   checks whether lettashim is concurrently hosting the same account, and both
   hosts live means every account double-starts against the same homeserver. The
@@ -600,6 +601,55 @@ LETTA_IROH_VIBESYNC_BASE_URL=http://127.0.0.1:3099
 Add domain-specific bounded-service URLs only for services approved by the
 ownership matrix.
 
+### Cron handover (`lgns8.24`) — deferred to the maintenance window
+
+Measured 2026-08-01 on a throwaway env with no shim anywhere (live `crons.json`
+and the `*/30` PM schedule untouched). Full transcript on the bead; the four
+facts that change how you run the cutover:
+
+1. **The scheduler lease is claimed by the App Server process at the FIRST WS
+   connection, not at boot.** `crons.json` did not exist after 12s of idle
+   listening. So "the App Server is up" does not mean "cron is running" — a
+   client must attach. Today lettashim holds the live lease; it is released
+   cleanly on `SIGTERM` (`scheduler_owner` → null), so the ordering is: stop the
+   lease holder, then let the wrapper attach and claim it.
+2. **A tick with no attached client is dark.** The scheduler keeps ticking and
+   enqueueing with zero clients, but the queue pump bails on the closed
+   transport and no turn runs. **The channels/cron host must hold a WS
+   connection at all times.**
+3. **The drain on reconnect is lossy.** Three buffered dark fires produced
+   exactly ONE turn on reconnect, stamped with the oldest (3-minute-stale)
+   occurrence; the other two vanished with no error and no `failed_count`.
+   "It will catch up when it reconnects" is false — plan for loss, not backlog.
+4. **A restart silently skips ticks, and always costs at least one.** Recurring
+   tasks have no missed accounting at all (`missed_count` stays 0), and the
+   startup tick never fires — the first fire is always exactly +60s after the
+   lease is claimed. The real skip window is downtime *plus* the remainder of
+   the restart minute.
+
+> **SENSING WARNING — a post-cutover cron outage is invisible to the run log.**
+> `~/.letta/runs/<task>.jsonl` records `status:"ok", outcome:"queued",
+> reason:"scheduled_time_matched"` for *every* tick, executed and dark alike.
+> There is no terminal executed/succeeded outcome. A run log that looks perfectly
+> healthy is exactly what a totally dead scheduler produces. **Do not verify the
+> cutover, and do not build any alert, on cron run-log outcomes.**
+
+Cutover checklist additions that follow from that warning — all mandatory:
+
+- **Before the flip**, record a baseline: for one live recurring schedule, the
+  last assistant message timestamp in its conversation transcript (NOT its run
+  log), plus `fire_count`.
+- **After the flip**, wait out at least two full periods of a short schedule and
+  confirm **new assistant turns in the conversation transcript** (or an external
+  heartbeat — an out-of-band check that the scheduled agent actually acted).
+  Transcript growth is the only in-band signal that discriminates.
+- Add the same transcript/heartbeat check to the go/no-go criteria and to
+  whatever monitors the wrapper long-term: **at least one external heartbeat on
+  a real schedule**, alerting on absence. Nothing inside cron will tell you.
+- Expect a one-tick gap around every wrapper or App Server restart (fact 4) and
+  do not treat it as a failure; treat *two consecutive* missing occurrences as
+  one.
+
 ### Channels-host cutover (lgns8.23) — deferred to the maintenance window
 
 `LETTA_CHANNELS_HOST` (equivalently `--channels-host`) is **absent/false in
@@ -619,6 +669,20 @@ App Server connect and reconnect: `channels_list` → `channel_accounts_list` �
 defensive: `channel_start` re-wires channel ingress to the **issuing socket**,
 so after a wrapper↔App-Server reconnect the adapter keeps syncing but inbound
 points at the dead socket until a fresh `channel_start` re-binds it.
+
+**The re-wire window (`letta-mobile-o5bqk`), measured 2026-08-01.** Inbound that
+lands *before* the re-issue is not simply dropped — it is received, a typing
+indicator is posted to the room, the route resolves and the item is **enqueued**,
+but the turn never runs, because upstream's pump bails on the dead socket it
+captured. No error, no channel-side notice: the room shows typing and then
+silence, and the item drains only on a later connect (and lossily, exactly like
+the cron drain above). The wrapper mitigates by issuing `channel_start` for the
+accounts it already knows about **before** `channels_list`, from a cache that
+outlives the socket, so the window is one round trip rather than
+`1 + 1 + <channel count>`. **It is shortened, not closed** — the silent drop
+lives inside upstream's ingress closure. In practice: after any App Server
+restart, an inbound message sent within the first moment may show typing and no
+reply; re-send it. Do not read that as a routing or identity failure.
 
 Cutover, in a maintenance window, in this order:
 
@@ -641,8 +705,18 @@ Cutover, in a maintenance window, in this order:
 7. Send one inbound Matrix message and confirm it reaches the owning agent, and
    one outbound reply and confirm it posts under the agent's own identity.
 8. Force one wrapper↔App-Server reconnect (restart the App Server) and repeat
-   step 7 — this is the ingress re-wire check, and it is the one behaviour the
-   lgns8.23.1 probe could not measure offline.
+   step 7 — this is the ingress re-wire check. Expect the wrapper log to show
+   `fast-path re-wire: attempted=<n> rewired=<n>` *before* the enumeration line
+   on that reconnect (on the very first connect of a process there is nothing
+   cached, so the line reports 0 or is absent). Send the test message a few
+   seconds after the reconnect, not instantly: an event inside the surviving
+   window is enqueued against the dead socket and will look like typing-then-
+   silence (`o5bqk`, above).
+9. If the wrapper log ever shows `WARN fast-path started <channel>/<account> but
+   the enumeration no longer reports it enabled`, an account was disabled between
+   generations and the fast path started it once anyway. There is no
+   `channel_stop` on this path — stop it manually if it must be off now. It will
+   not be started again after the next wrapper restart.
 
 Rollback is the exact inverse: stop the wrapper, unset `LETTA_CHANNELS_HOST`,
 restore `SHIM_CHANNELS_ENABLED=1`, restart lettashim, restart the wrapper.

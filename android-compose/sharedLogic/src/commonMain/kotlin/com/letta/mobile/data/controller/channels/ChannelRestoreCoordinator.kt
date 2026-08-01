@@ -63,17 +63,44 @@ import kotlinx.coroutines.sync.withLock
  *   Iroh viewers: `RuntimeEventFanout.planUnscopedControl` drops unscoped frames
  *   that are not server-initiated control requests, which these are not.
  *
+ * ## Landmine 3 — the re-wire window (letta-mobile-o5bqk)
+ *
+ * Re-issuing `channel_start` is the re-wire, but it is not instant, and the
+ * adapter keeps syncing throughout. Probe #4 (2026-08-01) measured what happens
+ * to an inbound event that lands BEFORE the re-issue: the old socket-bound
+ * ingress closure still fires — the event is received, a typing indicator is
+ * posted to the room, the route resolves, and the item is enqueued — but
+ * `scheduleQueuePump` bails because `isListenerTransportOpen(<dead socket>)` is
+ * false. No error, no channel-side failure notice; the room shows typing and then
+ * nothing, and the item drains only on a LATER connect (lossily, per the cron
+ * drain finding in lgns8.24 (3d)).
+ *
+ * That silent-drop is upstream behaviour and cannot be fixed from here: the
+ * enqueue happens inside letta-code, in a closure we do not own, and the socket
+ * it captured is chosen by upstream, not by us. What IS client-side achievable is
+ * making the window as short as the transport allows — one round trip instead of
+ * `1 + 1 + <channel count>`. Hence the fast path below: on any restore after the
+ * first, `channel_start` for every account the previous enumeration found enabled
+ * is issued IMMEDIATELY, before `channels_list`, from a cache that outlives the
+ * socket ([ChannelAccountCache]). The enumeration then runs as before and is the
+ * authority; accounts it re-confirms are not started twice.
+ *
  * ## Sequence (per generation-ready / connect)
  *
  * ```
+ * channel_start × cached enabled accounts        (fast path; skipped on the first pass)
+ *   └─ on failure: channel_account_update{enabled:true}, then fall through to the retrying path
  * channels_list
  *   └─ per configured channel: channel_accounts_list
- *        └─ per enabled account: channel_start          (unconditional; re-wires ingress)
+ *        └─ per enabled account NOT already started above: channel_start
  *             └─ on failure: channel_account_update{enabled:true} + capped backoff retry
  * ```
  *
  * @param client the generation client to issue on. Pass the client handed to
  *   `ReconnectingClientListener.onRecovered` so ingress binds to the live socket.
+ * @param accountCache shared across generations. The default is a private
+ *   instance, which disables the fast path — the channels host must pass ONE
+ *   long-lived cache to every coordinator it builds.
  */
 class ChannelRestoreCoordinator(
     private val client: AppServerClient,
@@ -88,6 +115,7 @@ class ChannelRestoreCoordinator(
      * Defaults to a no-op so library use is silent; the CLI passes a printer.
      */
     private val log: (String) -> Unit = {},
+    private val accountCache: ChannelAccountCache = InMemoryChannelAccountCache(),
 ) {
     private val restoreMutex = Mutex()
 
@@ -98,24 +126,112 @@ class ChannelRestoreCoordinator(
      */
     suspend fun restore(): ChannelRestoreResult = restoreMutex.withLock {
         val failures = mutableListOf<ChannelRestoreFailure>()
+        // Landmine 3: re-wire the accounts we already know about in the first
+        // round trip, BEFORE any enumeration, so the ingress window is as short
+        // as the transport allows.
+        val rewired = fastPathRewire()
+        var started = rewired.size
         val channelIds = listConfiguredChannels(failures)
-            ?: return ChannelRestoreResult(emptyList(), 0, failures)
-        var started = 0
+            ?: return ChannelRestoreResult(emptyList(), started, failures)
+        val enabled = mutableListOf<ChannelAccountRef>()
         for (channelId in channelIds) {
             for (account in listEnabledAccounts(channelId, failures)) {
                 val ref = ChannelAccountRef(channelId, account.accountId)
+                enabled += ref
+                // Already started on THIS socket a moment ago: ingress is wired,
+                // and a second start would cost the account another sync bounce.
+                if (ref in rewired) continue
                 if (startAccountWithRetries(ref, failures)) started++
             }
         }
+        reportStaleFastPath(rewired, enabled)
+        accountCache.record(enabled)
         Telemetry.event(
             TELEMETRY_TAG,
             "restore_complete",
             "channels" to channelIds.size,
             "started" to started,
+            "rewired" to rewired.size,
             "failed" to failures.size,
         )
-        log("[channels] restore complete: channels=${channelIds.size} started=$started failed=${failures.size}")
+        log(
+            "[channels] restore complete: channels=${channelIds.size} started=$started " +
+                "rewired=${rewired.size} failed=${failures.size}",
+        )
         ChannelRestoreResult(channelIds, started, failures)
+    }
+
+    /**
+     * FIRST-ROUND-TRIP re-wire (letta-mobile-o5bqk). Issues `channel_start` for
+     * every account the previous enumeration found enabled, before `channels_list`
+     * so nothing gates it.
+     *
+     * One attempt each, no backoff: this path exists to be fast. Anything that
+     * fails here falls through to [startAccountWithRetries] during the
+     * enumeration below, which owns the retry budget.
+     *
+     * A failure still has to re-assert `enabled=true` immediately (landmine 1) —
+     * otherwise the failed start's persisted `enabled:false` would make the
+     * enumeration that follows *within this same pass* skip the account entirely,
+     * turning a transient blip into a whole dark generation.
+     *
+     * @return the accounts that reached a successful start, so the enumeration
+     *   does not start them a second time.
+     */
+    private suspend fun fastPathRewire(): Set<ChannelAccountRef> {
+        val cached = accountCache.lastKnownEnabled()
+        if (cached.isEmpty()) return emptySet()
+        val rewired = LinkedHashSet<ChannelAccountRef>()
+        for (ref in cached) {
+            if (ref.accountId == null) continue
+            val error = attemptStart(ref)
+            if (error == null) {
+                rewired += ref
+                continue
+            }
+            reassertEnabled(ref)
+            warn(
+                "fast_path_start_failed",
+                "channelId" to ref.channelId,
+                "accountId" to ref.accountId,
+                "reason" to error,
+            )
+        }
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "fast_path_complete",
+            "attempted" to cached.size,
+            "rewired" to rewired.size,
+        )
+        log("[channels] fast-path re-wire: attempted=${cached.size} rewired=${rewired.size}")
+        return rewired
+    }
+
+    /**
+     * Sensing for the fast path's one real risk: an account disabled between
+     * generations is started once by the cache before the enumeration can say so.
+     * We cannot un-start it — the App Server WS exposes no `channel_stop` to this
+     * client — so the honest response is a loud, actionable warning rather than a
+     * silent resurrection.
+     */
+    private fun reportStaleFastPath(
+        rewired: Set<ChannelAccountRef>,
+        enabled: List<ChannelAccountRef>,
+    ) {
+        val stillEnabled = enabled.toSet()
+        for (ref in rewired) {
+            if (ref in stillEnabled) continue
+            warn(
+                "fast_path_started_stale_account",
+                "channelId" to ref.channelId,
+                "accountId" to ref.accountId,
+            )
+            log(
+                "[channels] WARN fast-path started $ref but the enumeration no longer reports it " +
+                    "enabled — it will not be started again after the next restart; stop it manually " +
+                    "if it must be off now",
+            )
+        }
     }
 
     /** `channels_list` → the ids of channels that have any configuration at all. */
