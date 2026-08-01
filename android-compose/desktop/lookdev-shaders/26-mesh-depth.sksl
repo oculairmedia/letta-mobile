@@ -1,0 +1,95 @@
+uniform float2 uSize;
+uniform float uTime;
+uniform float uAgitation;
+uniform float uEnvelope;
+uniform vec4 uColor;
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i + float2(0.0, 0.0)), hash(i + float2(1.0, 0.0)), u.x),
+        mix(hash(i + float2(0.0, 1.0)), hash(i + float2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+float2 rot(float2 p, float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return float2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+float fbm(float2 p) {
+    float v = 0.0;
+    float amp = 0.52;
+    for (int i = 0; i < 4; i++) {
+        v += amp * noise(p);
+        p = rot(p, 0.62) * 2.03 + 17.3;
+        amp *= 0.55;
+    }
+    return v;
+}
+
+float dither(float2 fragCoord) {
+    return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
+}
+
+// Indigo -> teal -> gold (the mesh family palette).
+float3 palB(float t) {
+    return float3(0.45, 0.40, 0.42)
+         + float3(0.50, 0.42, 0.40) * cos(6.28318 * (float3(0.9, 1.0, 1.0) * t + float3(0.55, 0.30, 0.05)));
+}
+
+// Violet -> cyan -> magenta (cooler partner palette).
+float3 palA(float t) {
+    return float3(0.55, 0.42, 0.75)
+         + float3(0.45, 0.45, 0.35) * cos(6.28318 * (float3(1.0, 0.9, 0.7) * t + float3(0.70, 0.35, 0.15)));
+}
+
+// Mesh-depth: two parallax layers - broad slow background washes, smaller
+// brighter foreground blobs drifting faster, plus fine haze grain.
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
+    float aspect = uSize.x / max(uSize.y, 1.0);
+    float2 p = float2((uv.x - 0.5) * aspect, uv.y);
+    float t = uTime * 0.10;
+
+    float3 acc = float3(0.0);
+    float wsum = 0.0;
+    // Background: three huge dim washes, near-static.
+    for (int i = 0; i < 3; i++) {
+        float fi = float(i);
+        float2 c = float2(
+            (0.5 + 0.40 * sin(t * 0.30 + fi * 2.1) - 0.5) * aspect,
+            0.90 + 0.18 * sin(t * 0.22 + fi * 1.5)
+        );
+        float w = exp(-pow(length(p - c) / 0.60, 2.0)) * 0.55;
+        acc += palB(fi * 0.30 + 0.10) * w;
+        wsum += w;
+    }
+    // Foreground: four smaller saturated blobs, faster, agitation-wobbled.
+    for (int i = 0; i < 4; i++) {
+        float fi = float(i) + 3.0;
+        float wob = 0.05 * (fbm(float2(fi * 3.1, uTime * 0.15)) - 0.5) * uAgitation;
+        float2 c = float2(
+            (0.5 + 0.34 * sin(t * (0.7 + 0.13 * fi) + fi * 2.4) + wob - 0.5) * aspect,
+            0.82 + 0.22 * sin(t * (0.55 + 0.10 * fi) + fi * 1.8)
+        );
+        float w = exp(-pow(length(p - c) / 0.26, 2.0));
+        acc += palA(fi * 0.17 + t * 0.06) * w * 1.15;
+        wsum += w;
+    }
+    float haze = fbm(p * 3.0 + t) * 0.10;
+    float3 rgb = mix((acc + uColor.rgb * haze) / max(wsum + haze, 0.001), uColor.rgb, 0.20);
+    float aRaw = clamp(wsum * 0.85 + haze, 0.0, 1.5) * smoothstep(0.30, 0.88, uv.y) * 0.40;
+
+    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.92);
+    alpha = max(alpha + dither(fragCoord), 0.0);
+    return half4(rgb * alpha, alpha);
+}
