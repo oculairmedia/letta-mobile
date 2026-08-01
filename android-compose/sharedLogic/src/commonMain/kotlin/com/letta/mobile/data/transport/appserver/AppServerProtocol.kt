@@ -75,6 +75,10 @@ object AppServerProtocol {
         "conversation_update_response",
         "conversation_messages_list_response",
         "conversation_compact_response",
+        "channels_list_response",
+        "channel_accounts_list_response",
+        "channel_start_response",
+        "channel_account_update_response",
     )
 
     private val redactedPrimitive = JsonPrimitive(REDACTED_PLACEHOLDER)
@@ -576,6 +580,126 @@ sealed interface AppServerCommand {
         val settings: JsonObject,
         val scope: String? = null,
     ) : AppServerCommand
+
+    // Channels host ownership (lgns8.23). The App Server accepts these on a bare
+    // socket with NO handshake (empirically proven on the 0.29.12 pin), and the
+    // registry is NOT restored at boot under `--listen` — so the controller
+    // re-asserts enabled accounts itself. See ChannelRestoreCoordinator.
+    //
+    // CONTROLLER-INTERNAL: responses carry plugin account config verbatim
+    // (Matrix accessToken / syncAccessToken in cleartext). They are never fanned
+    // out to Iroh viewers (RuntimeEventFanout drops unscoped non-server-initiated
+    // frames) and must never be logged, telemetered, or persisted.
+
+    @Serializable
+    @SerialName("channels_list")
+    data class ChannelsList(
+        @SerialName("request_id") val requestId: String,
+    ) : AppServerCommand
+
+    @Serializable
+    @SerialName("channel_accounts_list")
+    data class ChannelAccountsList(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("channel_id") val channelId: String,
+    ) : AppServerCommand
+
+    /**
+     * Starts (or restarts) one channel account. A repeated `channel_start` is a
+     * clean stop+start, not a no-op — safe to issue on every reconnect, at the
+     * cost of one sync bounce. It also re-wires channel ingress to the ISSUING
+     * socket, which is why the restore must re-run after every generation flip.
+     */
+    @Serializable
+    @SerialName("channel_start")
+    data class ChannelStart(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("channel_id") val channelId: String,
+        @SerialName("account_id") val accountId: String? = null,
+    ) : AppServerCommand
+
+    /**
+     * Patches one channel account. Deliberately models ONLY the policy fields —
+     * never `config` — so the controller can re-assert `enabled` after a failed
+     * start (which upstream persists as `enabled:false`) without ever echoing
+     * plugin secrets back over the wire.
+     */
+    @Serializable
+    @SerialName("channel_account_update")
+    data class ChannelAccountUpdate(
+        @SerialName("request_id") val requestId: String,
+        @SerialName("channel_id") val channelId: String,
+        @SerialName("account_id") val accountId: String,
+        val patch: AppServerChannelAccountPatch,
+    ) : AppServerCommand
+}
+
+/**
+ * Patch body for [AppServerCommand.ChannelAccountUpdate]. Upstream validates
+ * with `hasOnlyFields(patch, CHANNEL_ACCOUNT_UPDATE_FIELDS)`, so every field
+ * here must stay within {display_name, enabled, dm_policy, allowed_users,
+ * config}; `config` is intentionally absent (see the command doc).
+ */
+@Serializable
+data class AppServerChannelAccountPatch(
+    val enabled: Boolean? = null,
+    @SerialName("display_name") val displayName: String? = null,
+    @SerialName("dm_policy") val dmPolicy: String? = null,
+    @SerialName("allowed_users") val allowedUsers: List<String>? = null,
+)
+
+/**
+ * One channel as reported by `channels_list` / `channel_start` (upstream
+ * `mapChannelSummary`). Unknown additive keys are tolerated by
+ * [AppServerProtocol.json]; the raw envelope is preserved on
+ * [AppServerReceivedFrame.raw].
+ */
+@Serializable
+data class AppServerChannelSummary(
+    @SerialName("channel_id") val channelId: String,
+    @SerialName("display_name") val displayName: String? = null,
+    val configured: Boolean = false,
+    val enabled: Boolean = false,
+    val running: Boolean = false,
+    @SerialName("dm_policy") val dmPolicy: String? = null,
+    @SerialName("pending_pairings_count") val pendingPairingsCount: Int? = null,
+    @SerialName("approved_users_count") val approvedUsersCount: Int? = null,
+    @SerialName("routes_count") val routesCount: Int? = null,
+    @SerialName("config_schema") val configSchema: JsonElement? = null,
+)
+
+/**
+ * One channel account as reported by `channel_accounts_list` (upstream
+ * `mapChannelAccount`).
+ *
+ * SECURITY (lgns8.23 landmine 2): [config] is the plugin's account config
+ * VERBATIM — for the Matrix plugin that includes `accessToken` and
+ * `syncAccessToken` in cleartext. [toString] is overridden so an accidental
+ * string interpolation of this object (or of any frame containing it) can never
+ * leak a credential; use [redactedConfig] when a diagnostic genuinely needs the
+ * shape.
+ */
+@Serializable
+data class AppServerChannelAccount(
+    @SerialName("channel_id") val channelId: String,
+    @SerialName("account_id") val accountId: String,
+    @SerialName("display_name") val displayName: String? = null,
+    val enabled: Boolean = false,
+    val configured: Boolean = false,
+    val running: Boolean = false,
+    @SerialName("dm_policy") val dmPolicy: String? = null,
+    @SerialName("allowed_users") val allowedUsers: List<String>? = null,
+    val config: JsonObject? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+    @SerialName("updated_at") val updatedAt: String? = null,
+) {
+    /** Credential-redacted view of [config], for diagnostics that need shape. */
+    fun redactedConfig(): JsonElement? = config?.let(AppServerProtocol::redactCredentials)
+
+    override fun toString(): String =
+        "AppServerChannelAccount(channelId=$channelId, accountId=$accountId, " +
+            "enabled=$enabled, configured=$configured, running=$running, " +
+            "config=<${config?.size ?: 0} keys withheld>)"
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -1084,6 +1208,63 @@ sealed interface AppServerInboundFrame {
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "set_reflection_settings_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    // Channels host ownership (lgns8.23). CONTROLLER-INTERNAL — see the command
+    // block for the credential-handling contract.
+
+    @Serializable
+    @SerialName("channels_list_response")
+    data class ChannelsListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val channels: List<AppServerChannelSummary> = emptyList(),
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "channels_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("channel_accounts_list_response")
+    data class ChannelAccountsListResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("channel_id") val channelId: String? = null,
+        val accounts: List<AppServerChannelAccount> = emptyList(),
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "channel_accounts_list_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("channel_start_response")
+    data class ChannelStartResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val channel: AppServerChannelSummary? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "channel_start_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    @Serializable
+    @SerialName("channel_account_update_response")
+    data class ChannelAccountUpdateResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("channel_id") val channelId: String? = null,
+        val account: AppServerChannelAccount? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "channel_account_update_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }

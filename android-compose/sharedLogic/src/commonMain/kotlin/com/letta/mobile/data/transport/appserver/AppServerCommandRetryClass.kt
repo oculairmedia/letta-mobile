@@ -95,6 +95,17 @@ sealed interface AppServerCommandRetryClass {
 
             is AppServerCommand.GetReflectionSettings -> SafeRead
             is AppServerCommand.SetReflectionSettings -> AmbiguousMutation(dedupKey = null)
+
+            // Channels host (lgns8.23). Listings are pure reads. channel_start is
+            // deliberately NOT SafeRead for blind replay: a repeat is a full
+            // stop+start with a sync bounce, so re-issuing is a decision the
+            // ChannelRestoreCoordinator makes explicitly per generation, not
+            // something a generic retry path should do behind its back.
+            // channel_account_update is an accounts.json write.
+            is AppServerCommand.ChannelsList -> SafeRead
+            is AppServerCommand.ChannelAccountsList -> SafeRead
+            is AppServerCommand.ChannelStart -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.ChannelAccountUpdate -> AmbiguousMutation(dedupKey = null)
         }
 
         /** True if this command may be re-sent verbatim after a reconnect. */

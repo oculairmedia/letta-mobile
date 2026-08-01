@@ -545,6 +545,67 @@ LETTA_IROH_VIBESYNC_BASE_URL=http://127.0.0.1:3099
 Add domain-specific bounded-service URLs only for services approved by the
 ownership matrix.
 
+### Channels-host cutover (lgns8.23) — deferred to the maintenance window
+
+`LETTA_CHANNELS_HOST` (equivalently `--channels-host`) is **absent/false in
+every environment above** and must stay that way until the cutover step below.
+lettashim is still the channels host (`SHIM_CHANNELS_ENABLED=1`): it imports
+`~/.letta/channels/{matrix,mobile}/plugin.mjs` and drives the Matrix adapters.
+Running both hosts double-starts the same accounts against the same homeserver
+— two sync loops, duplicated inbound, ping-pong risk.
+
+Why the wrapper can take this over at all: under a bare `letta app-server
+--listen`, upstream's `initializeChannels()` is unreachable (its only call site
+is the `--channels` CLI branch, which `--listen` forbids), so enabled accounts
+in `accounts.json` are never auto-restored at boot. With the flag on, the
+wrapper's `ChannelRestoreCoordinator` performs that restore itself on every
+App Server connect and reconnect: `channels_list` → `channel_accounts_list` →
+`channel_start` per enabled account. The re-issue on reconnect is mandatory, not
+defensive: `channel_start` re-wires channel ingress to the **issuing socket**,
+so after a wrapper↔App-Server reconnect the adapter keeps syncing but inbound
+points at the dead socket until a fresh `channel_start` re-binds it.
+
+Cutover, in a maintenance window, in this order:
+
+1. Verify the wrapper build contains the flag: `app-server-serve-iroh --help`
+   lists `--channels-host`.
+2. Quiesce Matrix traffic (announce, or accept a brief gap — the switch bounces
+   every adapter's sync loop once).
+3. Stop the wrapper.
+4. Set `SHIM_CHANNELS_ENABLED=0` in the lettashim environment and restart
+   lettashim. Confirm from its log that no channel plugin is imported and no
+   `[matrix:*] started` line appears.
+5. Add `LETTA_CHANNELS_HOST=true` to the wrapper environment and start the
+   wrapper.
+6. Verify from the wrapper log: the `channels-host ENABLED (lgns8.23)` banner on
+   start, then `channels-host restore: channels=<n> started=<n> failed=0` after
+   the App Server connection reaches Ready. Confirm the App Server log shows
+   `[matrix:<account>] started` **exactly once per account** — a second
+   `started` without a preceding `stopped` means both hosts are live; roll back
+   immediately.
+7. Send one inbound Matrix message and confirm it reaches the owning agent, and
+   one outbound reply and confirm it posts under the agent's own identity.
+8. Force one wrapper↔App-Server reconnect (restart the App Server) and repeat
+   step 7 — this is the ingress re-wire check, and it is the one behaviour the
+   lgns8.23.1 probe could not measure offline.
+
+Rollback is the exact inverse: stop the wrapper, unset `LETTA_CHANNELS_HOST`,
+restore `SHIM_CHANNELS_ENABLED=1`, restart lettashim, restart the wrapper.
+
+Operational notes:
+
+- A **failed** `channel_start` persists `"enabled": false` into `accounts.json`
+  upstream. The coordinator re-asserts `enabled=true` after every failed attempt
+  (including the last before it gives up), so a homeserver outage degrades to
+  "not running until the next reconnect" rather than "silently disabled
+  forever". If you ever see an account flip to `enabled: false` on disk, that is
+  a bug in the restore path, not expected behaviour.
+- `channel_accounts_list` returns plugin account config **in cleartext**
+  (Matrix `accessToken`, `syncAccessToken`). Channel frames are
+  controller-internal: they are never fanned out to Iroh viewers and never
+  logged. Do not add debug logging to this path, and do not attach
+  `channel_accounts_list` output to an incident ticket.
+
 The wrapper environment must not contain:
 
 ```text

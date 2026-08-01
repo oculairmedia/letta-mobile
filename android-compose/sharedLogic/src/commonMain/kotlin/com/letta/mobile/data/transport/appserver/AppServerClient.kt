@@ -118,6 +118,26 @@ interface AppServerClient {
 
     suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
         throw UnsupportedOperationException("SetReflectionSettings is not supported by this client")
+
+    // Channels host ownership (lgns8.23). CONTROLLER-INTERNAL: only
+    // ChannelRestoreCoordinator calls these; the responses carry cleartext
+    // plugin credentials and are never surfaced to viewers or diagnostics.
+
+    suspend fun channelsList(command: AppServerCommand.ChannelsList): AppServerInboundFrame.ChannelsListResponse =
+        throw UnsupportedOperationException("channels_list is not supported by this client")
+
+    suspend fun channelAccountsList(
+        command: AppServerCommand.ChannelAccountsList,
+    ): AppServerInboundFrame.ChannelAccountsListResponse =
+        throw UnsupportedOperationException("channel_accounts_list is not supported by this client")
+
+    suspend fun channelStart(command: AppServerCommand.ChannelStart): AppServerInboundFrame.ChannelStartResponse =
+        throw UnsupportedOperationException("channel_start is not supported by this client")
+
+    suspend fun channelAccountUpdate(
+        command: AppServerCommand.ChannelAccountUpdate,
+    ): AppServerInboundFrame.ChannelAccountUpdateResponse =
+        throw UnsupportedOperationException("channel_account_update is not supported by this client")
 }
 
 class DefaultAppServerClient(
@@ -285,4 +305,20 @@ class DefaultAppServerClient(
 
     override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SetReflectionSettingsResponse }) { transport.sendControl(command) }
+
+    override suspend fun channelsList(command: AppServerCommand.ChannelsList): AppServerInboundFrame.ChannelsListResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelsListResponse }) { transport.sendControl(command) }
+
+    override suspend fun channelAccountsList(
+        command: AppServerCommand.ChannelAccountsList,
+    ): AppServerInboundFrame.ChannelAccountsListResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelAccountsListResponse }) { transport.sendControl(command) }
+
+    override suspend fun channelStart(command: AppServerCommand.ChannelStart): AppServerInboundFrame.ChannelStartResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelStartResponse }) { transport.sendControl(command) }
+
+    override suspend fun channelAccountUpdate(
+        command: AppServerCommand.ChannelAccountUpdate,
+    ): AppServerInboundFrame.ChannelAccountUpdateResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelAccountUpdateResponse }) { transport.sendControl(command) }
 }

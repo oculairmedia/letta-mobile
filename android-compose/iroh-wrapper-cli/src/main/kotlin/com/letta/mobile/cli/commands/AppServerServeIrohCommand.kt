@@ -187,6 +187,24 @@ class AppServerServeIrohCommand : CliktCommand(
             "there). Overrides --app-server-url when set.",
     ).flag(default = false)
 
+    /**
+     * lgns8.23: take channels-host ownership in the controller.
+     *
+     * OFF by default because production still runs lettashim as the channels
+     * host (SHIM_CHANNELS_ENABLED=1). Enabling both hosts would double-start the
+     * same accounts against the same homeserver. Cutover is a single maintenance
+     * step: set SHIM_CHANNELS_ENABLED=0 on lettashim, then start the wrapper with
+     * --channels-host. See docs/architecture/lettashim-retirement-deployment-runbook.md.
+     */
+    private val channelsHost by option(
+        "--channels-host",
+        envvar = "LETTA_CHANNELS_HOST",
+        help = "lgns8.23: restore enabled channel accounts (channels_list -> " +
+            "channel_accounts_list -> channel_start) on every App Server connect and " +
+            "reconnect, making this controller the channels host. Requires lettashim's " +
+            "SHIM_CHANNELS_ENABLED=0 — running both hosts double-starts accounts.",
+    ).flag(default = false)
+
     private val lettaCommand by option(
         "--letta-command",
         envvar = "LETTA_COMMAND",
@@ -217,31 +235,8 @@ class AppServerServeIrohCommand : CliktCommand(
             )
             irohEndpoint.create()
             
-            // Get the dialable information
-            val nodeId = irohEndpoint.nodeIdHex()
-            val ticket = irohEndpoint.ticketString()
-            
-            // Print the dialable information
-            println("[iroh-app-server] Node ID: $nodeId")
-            println("[iroh-app-server] Ticket: $ticket")
-            // Short human-friendly dial form: iroh://<node-id>@<host:port>[,...]
-            // Only meaningful when the port is pinned; with a random port it
-            // rotates like the ticket does.
-            val port = irohPort.toIntOrNull() ?: 0
-            if (port > 0) {
-                val lanAddrs = try {
-                    java.net.NetworkInterface.getNetworkInterfaces().asSequence()
-                        .filter { it.isUp && !it.isLoopback }
-                        .flatMap { it.inetAddresses.asSequence() }
-                        .filterIsInstance<java.net.Inet4Address>()
-                        .map { "${it.hostAddress}:$port" }
-                        .toList()
-                } catch (_: Exception) { emptyList() }
-                if (lanAddrs.isNotEmpty()) {
-                    println("[iroh-app-server] Short URL: iroh://$nodeId@${lanAddrs.joinToString(",")}")
-                }
-            }
-            
+            printDialInfo(irohEndpoint)
+
             // lgns8.18 (Path A, desktop): optionally spawn + OWN the App Server child
             // on an ephemeral loopback port, instead of connecting to an external URL.
             val ownedServer = maybeSpawnOwnedAppServer(scope)
@@ -270,6 +265,8 @@ class AppServerServeIrohCommand : CliktCommand(
                     "(methods: ${adminRpcRouter.methodCount}, " +
                     "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
             )
+
+            printChannelsHostBanner()
 
             // Start accepting connections
             irohEndpoint.start(controller)
@@ -374,49 +371,11 @@ class AppServerServeIrohCommand : CliktCommand(
         var controllerRef: DefaultAppServerController? = null
         var coordinatorRef: ReconnectCoordinator? = null
         val reconnectingClient = ReconnectingAppServerClient(
-            connect = {
-                val generationJob = Job(scope.coroutineContext.job)
-                val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
-                val transport = KtorAppServerWebSocketTransport(
-                    httpClient = httpClient,
-                    baseUrl = appServerUrl,
-                    scope = generationScope,
-                    bearerToken = null,
-                )
-                AppServerClientGeneration(
-                    client = DefaultAppServerClient(
-                        transport,
-                        requestTimeoutMs = requestTimeoutMs,
-                        parentScope = generationScope,
-                    ),
-                    connectionState = transport.connectionState,
-                    close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
-                )
-            },
-            listener = object : ReconnectingClientListener {
-                override suspend fun onDisconnected(reason: String?) {
-                    println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
-                    controllerRef?.onTransportDisconnected(reason)
-                }
-
-                override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
-                    val result = coordinatorRef?.reconnect()
-                    if (result != null && result.errors.isNotEmpty()) {
-                        result.errors.forEach {
-                            System.err.println("[iroh-app-server] reattach failed: ${it.message}")
-                        }
-                    }
-                    controllerRef?.markConnected()
-                    println(
-                        "[iroh-app-server] App Server connection recovered " +
-                            "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
-                    )
-                }
-
-                override suspend fun onGaveUp(reason: String?) {
-                    System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
-                }
-            },
+            connect = { mintGeneration(httpClient, appServerUrl, requestTimeoutMs, scope) },
+            listener = recoveryListener(
+                controller = { controllerRef },
+                coordinator = { coordinatorRef },
+            ),
         )
         val controller = DefaultAppServerController(
             client = reconnectingClient,
@@ -428,6 +387,136 @@ class AppServerServeIrohCommand : CliktCommand(
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
         reconnectingClient.start(scope)
         return controller to reconnectingClient
+    }
+
+    /**
+     * Mint one connection generation: a fresh WS transport + client on a job
+     * child of [scope], closable independently of its successors.
+     */
+    private fun mintGeneration(
+        httpClient: HttpClient,
+        appServerUrl: String,
+        requestTimeoutMs: Long,
+        scope: CoroutineScope,
+    ): AppServerClientGeneration {
+        val generationJob = Job(scope.coroutineContext.job)
+        val generationScope = CoroutineScope(scope.coroutineContext + generationJob)
+        val transport = KtorAppServerWebSocketTransport(
+            httpClient = httpClient,
+            baseUrl = appServerUrl,
+            scope = generationScope,
+            bearerToken = null,
+        )
+        return AppServerClientGeneration(
+            client = DefaultAppServerClient(
+                transport,
+                requestTimeoutMs = requestTimeoutMs,
+                parentScope = generationScope,
+            ),
+            connectionState = transport.connectionState,
+            close = { reason -> generationJob.cancel(kotlinx.coroutines.CancellationException(reason)) },
+        )
+    }
+
+    /**
+     * Post-connect recovery sequence, run on every generation-ready: reattach
+     * runtimes, then restore channel accounts (lgns8.23), then mark connected.
+     *
+     * The controller and coordinator are read through suppliers because both are
+     * constructed AFTER the reconnecting client they are wired into.
+     */
+    private fun recoveryListener(
+        controller: () -> DefaultAppServerController?,
+        coordinator: () -> ReconnectCoordinator?,
+    ): ReconnectingClientListener = object : ReconnectingClientListener {
+        override suspend fun onDisconnected(reason: String?) {
+            println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
+            controller()?.onTransportDisconnected(reason)
+        }
+
+        override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+            val result = coordinator()?.reconnect()
+            result?.errors?.forEach {
+                System.err.println("[iroh-app-server] reattach failed: ${it.message}")
+            }
+            // lgns8.23: restore channel accounts on THIS generation's client.
+            // Must run on every generation-ready (not just the first): a repeat
+            // channel_start re-wires ingress to the live socket, which a reconnect
+            // otherwise leaves pointed at the dead one.
+            restoreChannels(client)
+            controller()?.markConnected()
+            println(
+                "[iroh-app-server] App Server connection recovered " +
+                    "(reattached runtimes: ${result?.reconnectedCount ?: 0})",
+            )
+        }
+
+        override suspend fun onGaveUp(reason: String?) {
+            System.err.println("[iroh-app-server] App Server reconnect gave up: ${reason ?: "unknown"}")
+        }
+    }
+
+    /**
+     * Print the dialable NodeID/ticket, plus the short `iroh://<node-id>@<host:port>`
+     * form. The short form is only meaningful when the port is pinned; with a
+     * random port it rotates like the ticket does.
+     */
+    private fun printDialInfo(irohEndpoint: IrohNodeEndpoint) {
+        val nodeId = irohEndpoint.nodeIdHex()
+        println("[iroh-app-server] Node ID: $nodeId")
+        println("[iroh-app-server] Ticket: ${irohEndpoint.ticketString()}")
+        val port = irohPort.toIntOrNull() ?: 0
+        if (port <= 0) return
+        val lanAddrs = lanAddresses(port)
+        if (lanAddrs.isNotEmpty()) {
+            println("[iroh-app-server] Short URL: iroh://$nodeId@${lanAddrs.joinToString(",")}")
+        }
+    }
+
+    private fun lanAddresses(port: Int): List<String> = try {
+        java.net.NetworkInterface.getNetworkInterfaces().asSequence()
+            .filter { it.isUp && !it.isLoopback }
+            .flatMap { it.inetAddresses.asSequence() }
+            .filterIsInstance<java.net.Inet4Address>()
+            .map { "${it.hostAddress}:$port" }
+            .toList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    /** lgns8.23: announce channels-host ownership so a double-host misconfig is visible at start. */
+    private fun printChannelsHostBanner() {
+        if (!channelsHost) return
+        println(
+            "[iroh-app-server] channels-host ENABLED (lgns8.23): enabled channel accounts are " +
+                "restored on every App Server connect/reconnect. lettashim MUST run with " +
+                "SHIM_CHANNELS_ENABLED=0 — two hosts double-start the same accounts.",
+        )
+    }
+
+    /**
+     * lgns8.23: flag-gated channels-host restore. No-op unless --channels-host is
+     * set, so the default deployment keeps lettashim as the sole channels host.
+     * Never fails recovery — a channel outage must not block runtime reattach.
+     */
+    private suspend fun restoreChannels(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+        if (!channelsHost) return
+        val result = com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator(
+            client = client,
+            log = { System.err.println("[iroh-app-server] $it") },
+        ).restore()
+        // Identifiers + counts only: channel account config carries cleartext
+        // plugin credentials and must never reach a log sink (lgns8.23 landmine 2).
+        println(
+            "[iroh-app-server] channels-host restore: channels=${result.channelIds.size} " +
+                "started=${result.startedAccounts} failed=${result.failures.size}",
+        )
+        result.failures.forEach {
+            System.err.println(
+                "[iroh-app-server] channel restore failed: " +
+                    "${it.channelId ?: "-"}/${it.accountId ?: "-"} phase=${it.phase} reason=${it.reason}",
+            )
+        }
     }
 
     private fun createStubController(

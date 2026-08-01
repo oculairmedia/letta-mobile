@@ -75,6 +75,25 @@ approval.submit shim-fallback removal at cutover.
 - **Crons leave the legacy WS path.** The Iroh transport currently stubs cron
   methods; lgns8.8 exposes native `cron_*` behind policy, and the legacy
   mobile-WS cron/subagent frames retire with the shim in lgns8.11.
+- **Channels become controller-native behind a flag, not an admin_rpc surface
+  (lgns8.23).** The `channels` unrouted row moves from "capability-gated future
+  work" to a decided successor: `ChannelRestoreCoordinator` in `sharedLogic`
+  issues `channels_list` → `channel_accounts_list` → `channel_start` for every
+  enabled account on each generation-ready, closing upstream's boot-restore gap
+  (`initializeChannels()` is unreachable under `--listen`). The re-issue on every
+  reconnect is required because `channel_start` re-wires channel ingress to the
+  issuing socket. This is **empirically grounded**, not source-read: the
+  lgns8.23.1 probe (2026-07-31, letta-code 0.29.12) measured plugin discovery,
+  `running=true` with a live sync, the absent boot restore, and the clean
+  stop+start on repeat. Two constraints ride with it: a **failed** `channel_start`
+  persists `enabled:false` upstream, so the coordinator re-asserts `enabled` after
+  every failure; and `channel_accounts_list` returns account config — including
+  `accessToken`/`syncAccessToken` — in **cleartext**, so these frames stay
+  controller-internal, are never fanned out to viewers, and are never logged. Any
+  VIEWER-facing channel surface still needs the lgns8.12 sensitive-capability
+  policy. Ships OFF (`--channels-host` / `LETTA_CHANNELS_HOST`); lettashim remains
+  the host until the maintenance-window cutover documented in the retirement
+  runbook — running both double-starts accounts.
 
 ## Scope revisions for .7/.8/.9
 
