@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeSettingsRepository
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -75,7 +76,10 @@ class IrohAdminRpcAgentSourceTest {
         }
         val agents = source(transport).listAgents()
 
-        val call = transport.adminRpcCalls.single()
+        // letta-mobile-z5lqt: scope to agent.list. The roster-completeness
+        // probe issues a separate agent.count read purely for telemetry; the
+        // paging behaviour asserted here is unchanged.
+        val call = transport.adminRpcCalls.single { it.method == "agent.list" }
         assertEquals("agent.list", call.method)
         assertTrue("path should carry pagination", call.path.contains("limit=") && call.path.contains("offset="))
         assertEquals(2, agents.size)
@@ -99,6 +103,99 @@ class IrohAdminRpcAgentSourceTest {
 
         assertEquals(51, agents.size)
         assertTrue("second page agent must be included", agents.any { it.id.value == "agent-51" })
-        assertEquals(2, transport.adminRpcCalls.size)
+        assertEquals(2, transport.adminRpcCalls.count { it.method == "agent.list" })
+    }
+
+    // --- letta-mobile-z5lqt: roster/name telemetry ---
+
+    @Test
+    fun `sweep emits a short page stop and a matching completeness outcome`() = runTest {
+        Telemetry.delegate = null
+        Telemetry.clear()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                if (method == "agent.count") ok("2")
+                else ok("""[{"id":"agent-1","name":"Lester"},{"id":"agent-2","name":"BMO"}]""")
+            }
+        }
+
+        val agents = source(transport).listAgents()
+        assertEquals(2, agents.size)
+
+        val stop = Telemetry.snapshot().first { it.name == "roster.sweepStopped" }
+        assertEquals("shortPage", stop.attrs["stop"])
+        assertEquals(2, stop.attrs["mergedSize"])
+
+        val completeness = Telemetry.snapshot().first { it.name == "roster.completeness" }
+        assertEquals("match", completeness.attrs["completeness"])
+        assertEquals(2, completeness.attrs["sweptSize"])
+        assertEquals(2, completeness.attrs["authoritativeCount"])
+        Telemetry.clear()
+    }
+
+    @Test
+    fun `truncated sweep against a larger authoritative count reports a mismatch`() = runTest {
+        Telemetry.delegate = null
+        Telemetry.clear()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                if (method == "agent.count") ok("131")
+                else ok("""[{"id":"agent-1","name":"Lester"}]""")
+            }
+        }
+
+        val agents = source(transport).listAgents()
+        assertEquals(1, agents.size)
+
+        val completeness = Telemetry.snapshot().first { it.name == "roster.completeness" }
+        assertEquals("mismatch", completeness.attrs["completeness"])
+        assertEquals(131, completeness.attrs["authoritativeCount"])
+        assertEquals(-130, completeness.attrs["delta"])
+        Telemetry.clear()
+    }
+
+    @Test
+    fun `unavailable authoritative count reports unknown rather than match or mismatch`() = runTest {
+        Telemetry.delegate = null
+        Telemetry.clear()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                if (method == "agent.count") {
+                    AppServerInboundFrame.AdminRpcResponse(requestId = "req", success = false, error = "boom")
+                } else {
+                    ok("""[{"id":"agent-1","name":"Lester"}]""")
+                }
+            }
+        }
+
+        // Resolution is untouched: the roster is still returned in full.
+        val agents = source(transport).listAgents()
+        assertEquals(1, agents.size)
+
+        val completeness = Telemetry.snapshot().first { it.name == "roster.completeness" }
+        assertEquals("unknown", completeness.attrs["completeness"])
+        assertEquals("unknown", completeness.attrs["authoritativeCount"])
+        Telemetry.clear()
+    }
+
+    @Test
+    fun `a server that ignores offset emits the distinct no fresh stop`() = runTest {
+        Telemetry.delegate = null
+        Telemetry.clear()
+        val fullPage = (1..50).joinToString(",", "[", "]") { """{"id":"agent-$it","name":"A$it"}""" }
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, _, _ ->
+                if (method == "agent.count") ok("131") else ok(fullPage)
+            }
+        }
+
+        val agents = source(transport).listAgents()
+        assertEquals(50, agents.size)
+
+        val stop = Telemetry.snapshot().first { it.name == "roster.sweepStopped" }
+        assertEquals("noFreshIgnoredOffset", stop.attrs["stop"])
+        assertEquals(50, stop.attrs["pageSize"])
+        assertEquals(50, stop.attrs["mergedSize"])
+        Telemetry.clear()
     }
 }
