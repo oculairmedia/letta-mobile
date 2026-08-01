@@ -204,6 +204,7 @@ private class LookdevState {
     var source by mutableStateOf(PROPOSED_DESKTOP_SKSL)
     var compileError by mutableStateOf<String?>(null)
     var variants by mutableStateOf(listOf<ShaderVariant>())
+    var invert by mutableFloatStateOf(0f)
     var selectedVariant by mutableStateOf<String?>(null)
 }
 
@@ -256,51 +257,77 @@ private fun LookdevRoot() {
     }
 }
 
+/** Compact dev-tool chip: 22dp tall, quiet colors — not a Material pill. */
+@Composable
+private fun Chip(label: String, selected: Boolean = false, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(5.dp),
+        color = if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
+        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+        )
+    }
+}
+
 @Composable
 private fun ControlsColumn(state: LookdevState) {
     Column(
         modifier = Modifier
-            .width(400.dp)
+            .width(360.dp)
             .fillMaxHeight()
             .verticalScroll(rememberScrollState())
-            .padding(14.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             "Variants — drop .sksl files into desktop/lookdev-shaders/ (live)",
             style = MaterialTheme.typography.labelLarge,
         )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        // Diagnostic: which folder is actually being watched, and what it sees.
+        Text(
+            text = "watching: ${resolveVariantDir()?.absolutePath ?: "NO FOLDER RESOLVED"} · ${state.variants.size} variants",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             items(state.variants, key = { it.name }) { variant ->
-                val selected = state.selectedVariant == variant.name
-                Button(onClick = {
+                Chip(
+                    label = variant.name,
+                    selected = state.selectedVariant == variant.name,
+                ) {
                     state.selectedVariant = variant.name
                     state.source = variant.source
-                }) {
-                    Text(if (selected) "▶ ${variant.name}" else variant.name, fontSize = 10.sp)
                 }
             }
         }
-        Text("Built-in sources", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button(onClick = {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Chip("proposed") {
                 state.selectedVariant = null
                 state.source = PROPOSED_DESKTOP_SKSL
-            }) { Text("Proposed", fontSize = 10.sp) }
-            Button(onClick = {
+            }
+            Chip("production") {
                 state.selectedVariant = null
                 state.source = AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED
-            }) { Text("Production (near-invisible)", fontSize = 10.sp) }
+            }
+            Chip(if (state.invert > 0.5f) "mask: inverted" else "mask: normal", selected = state.invert > 0.5f) {
+                state.invert = if (state.invert > 0.5f) 0f else 1f
+            }
         }
-        Text("Status presets (production AmbientMotion values)", style = MaterialTheme.typography.labelLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Status presets", style = MaterialTheme.typography.labelSmall)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             AmbientMotionStatus.entries.forEach { status ->
-                Button(onClick = {
+                Chip(status.name.lowercase()) {
                     val spec = AmbientMotion.spec(status)
                     state.speed = spec.speed
                     state.agitation = spec.agitation
                     state.envelope = spec.bloomEnvelope
-                }) { Text(status.name, fontSize = 10.sp) }
+                }
             }
         }
         LabeledSlider("speed", state.speed, 0f..4f) { state.speed = it }
@@ -308,7 +335,7 @@ private fun ControlsColumn(state: LookdevState) {
         LabeledSlider("envelope (uEnvelope)", state.envelope, 0f..3f) { state.envelope = it }
         LabeledSlider("tint alpha (uColor.a)", state.alpha, 0f..1f) { state.alpha = it }
 
-        Text("Tint", style = MaterialTheme.typography.labelLarge)
+        Text("Tint", style = MaterialTheme.typography.labelSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf(
                 Color(0xFF3FE0C0), // teal (running)
@@ -327,7 +354,7 @@ private fun ControlsColumn(state: LookdevState) {
             }
         }
 
-        Text("SkSL (recompiles as you type)", style = MaterialTheme.typography.labelLarge)
+        Text("SkSL (recompiles as you type)", style = MaterialTheme.typography.labelSmall)
         state.compileError?.let { error ->
             Text(
                 text = error.take(600),
@@ -378,6 +405,9 @@ private fun PreviewPane(
             active.uniform("uAgitation", state.agitation)
             active.uniform("uEnvelope", state.envelope)
             active.uniform("uColor", state.tint.red, state.tint.green, state.tint.blue, state.alpha)
+            if (state.source.contains("uniform float uInvert")) {
+                active.uniform("uInvert", state.invert)
+            }
             paint.shader = active.makeShader(null)
             drawIntoCanvas { it.nativeCanvas.drawRect(SkiaRect.makeWH(size.width, size.height), paint) }
         }
@@ -392,7 +422,7 @@ private fun LabeledSlider(
     onChange: (Float) -> Unit,
 ) {
     Column {
-        Text("$label = ${"%.2f".format(value)}", style = MaterialTheme.typography.bodySmall)
+        Text("$label = ${"%.2f".format(value)}", fontSize = 10.sp)
         Slider(value = value, onValueChange = onChange, valueRange = range)
     }
 }
