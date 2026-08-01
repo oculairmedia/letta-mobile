@@ -205,6 +205,7 @@ private class LookdevState {
     var compileError by mutableStateOf<String?>(null)
     var variants by mutableStateOf(listOf<ShaderVariant>())
     var invert by mutableFloatStateOf(0f)
+    var scale by mutableFloatStateOf(1f)
     var selectedVariant by mutableStateOf<String?>(null)
 }
 
@@ -334,6 +335,7 @@ private fun ControlsColumn(state: LookdevState) {
         LabeledSlider("agitation (uAgitation)", state.agitation, 0f..3f) { state.agitation = it }
         LabeledSlider("envelope (uEnvelope)", state.envelope, 0f..3f) { state.envelope = it }
         LabeledSlider("tint alpha (uColor.a)", state.alpha, 0f..1f) { state.alpha = it }
+        LabeledSlider("overlay scale (uScale)", state.scale, 0.25f..3f) { state.scale = it }
 
         Text("Tint", style = MaterialTheme.typography.labelSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -407,6 +409,9 @@ private fun PreviewPane(
             active.uniform("uColor", state.tint.red, state.tint.green, state.tint.blue, state.alpha)
             if (state.source.contains("uniform float uInvert")) {
                 active.uniform("uInvert", state.invert)
+            }
+            if (state.source.contains("uniform float uScale")) {
+                active.uniform("uScale", state.scale)
             }
             paint.shader = active.makeShader(null)
             drawIntoCanvas { it.nativeCanvas.drawRect(SkiaRect.makeWH(size.width, size.height), paint) }

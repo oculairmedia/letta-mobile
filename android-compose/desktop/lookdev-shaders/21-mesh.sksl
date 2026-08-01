@@ -3,6 +3,7 @@ uniform float uTime;
 uniform float uAgitation;
 uniform float uEnvelope;
 uniform vec4 uColor;
+uniform float uScale;
 
 float hash(float2 p) {
     return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
@@ -40,25 +41,19 @@ float dither(float2 fragCoord) {
     return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
 }
 
-// Cinematic cosine palette (IQ): deep violet -> electric cyan -> hot magenta.
-float3 palA(float t) {
-    return float3(0.55, 0.42, 0.75)
-         + float3(0.45, 0.45, 0.35) * cos(6.28318 * (float3(1.0, 0.9, 0.7) * t + float3(0.70, 0.35, 0.15)));
-}
-
-// Ember palette: deep indigo -> teal -> gold.
+// Indigo -> teal -> gold (the mesh family palette).
 float3 palB(float t) {
     return float3(0.45, 0.40, 0.42)
          + float3(0.50, 0.42, 0.40) * cos(6.28318 * (float3(0.9, 1.0, 1.0) * t + float3(0.55, 0.30, 0.05)));
 }
 
-// Bloomed point light: tight bright core plus wide soft halo (additive).
-float bloom(float d, float core, float halo) {
-    return exp(-d * d / (core * core)) + 0.55 * exp(-d * d / (halo * halo));
+// Violet -> cyan -> magenta (cooler partner palette).
+float3 palA(float t) {
+    return float3(0.55, 0.42, 0.75)
+         + float3(0.45, 0.45, 0.35) * cos(6.28318 * (float3(1.0, 0.9, 0.7) * t + float3(0.70, 0.35, 0.15)));
 }
 
-// Mesh: five drifting color fields, additively blended - the premium
-// gradient-mesh background, alive but slow.
+// Mesh: five drifting color fields, additively blended (scale-aware).
 half4 main(float2 fragCoord) {
     float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
     float aspect = uSize.x / max(uSize.y, 1.0);
@@ -73,7 +68,7 @@ half4 main(float2 fragCoord) {
             (0.5 + 0.42 * sin(t * (0.5 + 0.13 * fi) + fi * 2.4) - 0.5) * aspect,
             0.80 + 0.26 * sin(t * (0.4 + 0.11 * fi) + fi * 1.7)
         );
-        float r = 0.34 + 0.10 * sin(t * 0.7 + fi * 2.0);
+        float r = (0.34 + 0.10 * sin(t * 0.7 + fi * 2.0)) * max(uScale, 0.05);
         float w = exp(-pow(length(p - c) / r, 2.0));
         acc += palB(fi * 0.21 + t * 0.05) * w;
         wsum += w;

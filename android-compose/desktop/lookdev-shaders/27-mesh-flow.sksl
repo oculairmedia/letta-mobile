@@ -3,6 +3,7 @@ uniform float uTime;
 uniform float uAgitation;
 uniform float uEnvelope;
 uniform vec4 uColor;
+uniform float uScale;
 
 float hash(float2 p) {
     return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
@@ -71,7 +72,7 @@ half4 main(float2 fragCoord) {
         float2 d = p - c;
         d.x *= 0.38;
         d.y *= 1.9 - 0.6 * sin(t * 0.5 + fi);
-        float w = exp(-dot(d, d) / 0.055);
+        float w = exp(-dot(d, d) / (0.028 * uScale * uScale));
         acc += palB(fi * 0.19 + uv.x * 0.25 + t * 0.05) * w;
         wsum += w;
     }
