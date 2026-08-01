@@ -705,15 +705,22 @@ Residual inconsistencies after Phases 1–4 (not accepted end state):
 3. **Upstream exposure exceeds Kotlin support.** The pinned upstream protocol
    has 91 commands and 100 messages; Kotlin types only the adopted subset.
    Unknown-frame preservation is not equivalent to supported behavior.
-4. **`skill.list_agent` is intentionally unavailable.** Process-global
-   availability must not be presented as per-agent install state. Reintroduce
-   only with a real assignment projection.
-5. **Skills catalog has no authoritative upstream enumeration (lgns8.21.2).**
-   `skill.list` never claims `hydrated=true` over an invented catalog: with no
-   listing source it returns `capability_unavailable`, and while unhydrated it
-   returns `{skills: [], hydrated: false, stale, catalog_source}`. A real
-   listing needs a host-side skill-root enumerator injected via
-   `NativeSkillsCatalog.hydrateFromHost`.
+4. **`skill.list_agent` serves a process-global projection (revised 2026-08-01).**
+   The original disposition was a typed denial, so that global availability could
+   not be mistaken for per-agent install state. Live evidence reversed it: the
+   desktop Skills surface loads `skill.list` and `skill.list_agent` together, so
+   the denial threw out of the snapshot loader and broke the whole screen. It now
+   returns the global catalog with an explicit `process_global: true` — which is
+   accurate, since v2 skill enable/disable is itself process-global. A real
+   per-agent assignment projection is still owed upstream; the flag is the seam.
+5. **Skills catalog is hydrated from the host skill root (lgns8.21.2 /
+   letta-mobile-7dm1q, closed 2026-08-01).** Upstream still advertises no
+   enumeration, and `skill.list` still never claims `hydrated=true` over an
+   invented catalog. The authoritative source is now `HostSkillsEnumerator`,
+   which reads the configured skills root (`--skills-dir` / `LETTA_SKILLS_DIR`,
+   default `~/.letta/skills`) at startup and injects it via
+   `NativeSkillsCatalog.hydrateFromHost`. A missing root still leaves the catalog
+   unhydrated rather than publishing an empty one as authoritative.
 6. **Model list wire shape still needs projection.** Native `list_models`
    entries are not yet fully mapped into the mobile `LlmModel` catalog schema.
 7. **Message get has a searchable window ceiling.** `message.get` /

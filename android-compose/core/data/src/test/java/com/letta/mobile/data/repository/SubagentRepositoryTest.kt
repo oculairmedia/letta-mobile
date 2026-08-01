@@ -143,7 +143,7 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun `refresh partial snapshot retains existing running entries`() = runTest {
+    fun `refresh authoritative snapshot evicts omitted running entries`() = runTest {
         transport.enqueueSubagentList(
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_2"))),
@@ -153,8 +153,8 @@ class SubagentRepositoryTest {
 
         repo.refresh().getOrThrow()
 
-        val after = repo.activeSubagentsFlow(parentScope).first { it.size == 2 }
-        assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
+        val after = repo.currentActiveSubagents(parentScope)
+        assertEquals(listOf("toolu_2"), after.map { it.toolCallId })
     }
 
     @Test
@@ -331,6 +331,91 @@ class SubagentRepositoryTest {
         assertTrue("First caller should succeed", res1.isSuccess)
         assertTrue("Second caller should succeed", res2.isSuccess)
         assertEquals(1, transport.subagentListCalls.size)
+    }
+
+    @Test
+    fun `authoritative empty snapshot evicts seeded running entry`() = runTest {
+        transport.enqueueSubagentList(
+            successList(listOf(running("toolu_1"))),
+            successList(emptyList()),
+        )
+        val repo = SubagentRepository(transport, backgroundScope)
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+
+        repo.refresh().getOrThrow()
+
+        val after = repo.currentActiveSubagents(parentScope)
+        assertEquals(emptyList<SubagentEntry>(), after)
+    }
+
+    @Test
+    fun `incremental push omitting running entry retains it`() = runTest {
+        transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
+        val repo = SubagentRepository(transport, backgroundScope)
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+
+        // INCREMENTAL push omits toolu_1 — it must be RETAINED (sqdqe guard).
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "u-1",
+                ts = "t",
+                reason = "registry-gap",
+                subagent = running("toolu_2"),
+                subagentsActive = listOf(running("toolu_2")),
+                at = "t",
+            )
+        )
+
+        val after = withTimeout(2.seconds) {
+            repo.activeSubagentsFlow(parentScope).first { it.size >= 2 }
+        }
+        assertEquals(setOf("toolu_1", "toolu_2"), after.map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `incremental absence bound evicts running entry after linger`() = runTest {
+        var now = 1_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
+        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+
+        // First INCREMENTAL push omits toolu_1 — retained with absence timestamp.
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "u-1",
+                ts = "t",
+                reason = "registry-gap",
+                subagent = running("toolu_2"),
+                subagentsActive = listOf(running("toolu_2")),
+                at = "t",
+            )
+        )
+
+        val afterFirst = withTimeout(2.seconds) {
+            repo.activeSubagentsFlow(parentScope).first { it.size >= 2 }
+        }
+        assertEquals(setOf("toolu_1", "toolu_2"), afterFirst.map { it.toolCallId }.toSet())
+
+        // Advance clock past the 60s absence linger bound.
+        now += 61_000L
+
+        // Second INCREMENTAL push still omits toolu_1 — should be EVICTED now.
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "u-2",
+                ts = "t",
+                reason = "registry-gap",
+                subagent = running("toolu_3"),
+                subagentsActive = listOf(running("toolu_2"), running("toolu_3")),
+                at = "t",
+            )
+        )
+
+        // Wait for the second push to be processed — toolu_3 must appear.
+        val afterSecond = withTimeout(2.seconds) {
+            repo.activeSubagentsFlow(parentScope).first { it.any { e -> e.toolCallId == "toolu_3" } }
+        }
+        assertEquals(setOf("toolu_2", "toolu_3"), afterSecond.map { it.toolCallId }.toSet())
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────

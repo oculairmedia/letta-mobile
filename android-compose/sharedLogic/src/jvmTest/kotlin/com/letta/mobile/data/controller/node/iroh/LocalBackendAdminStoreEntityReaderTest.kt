@@ -148,7 +148,7 @@ class LocalBackendAdminStoreEntityReaderTest {
         LocalBackendFixtureStore.writeAgent(root, "agent-2", name = "Second")
         LocalBackendFixtureStore.writeBlock(root, "agent-2", "human", "someone")
 
-        val blocks = assertNotNull(store.listBlocksProjected()).map { it.jsonObject }
+        val blocks = assertNotNull(store.listBlocksProjected(null, null)).map { it.jsonObject }
         assertEquals(
             setOf(LocalBackendFixtureStore.BLOCK_LABEL, "human"),
             blocks.map { it.getValue("label").jsonPrimitive.content }.toSet(),
@@ -158,7 +158,7 @@ class LocalBackendAdminStoreEntityReaderTest {
     @Test
     fun blockIdIsTheLockedSha256OfAgentAndLabel() {
         val (store, _) = store()
-        val block = assertNotNull(store.listBlocksProjected()).first().jsonObject
+        val block = assertNotNull(store.listBlocksProjected(null, null)).first().jsonObject
         assertEquals(LocalBackendFixtureStore.blockId, block.getValue("id").jsonPrimitive.content)
         assertTrue(
             block.getValue("id").jsonPrimitive.content.startsWith("block-"),
@@ -178,7 +178,7 @@ class LocalBackendAdminStoreEntityReaderTest {
     @Test
     fun blockProjectionMatchesTheAgentListProjectionForTheSameFile() {
         val (store, _) = store()
-        val fromBlockList = assertNotNull(store.listBlocksProjected()).first().jsonObject
+        val fromBlockList = assertNotNull(store.listBlocksProjected(null, null)).first().jsonObject
         val fromAgentList = assertNotNull(store.listAgentsProjected(null, null))
             .first().jsonObject.getValue("blocks").jsonArray.first().jsonObject
         assertEquals(
@@ -239,7 +239,7 @@ class LocalBackendAdminStoreEntityReaderTest {
         val missing = LocalBackendAdminStore(File("/nonexistent/lgns8-9-store"), lmstudioBaseUrl = "http://e/v1")
         assertEquals(0, assertNotNull(missing.listRunsProjected(RunQuery())).size)
         assertNull(missing.getRunProjected("run-1"))
-        assertEquals(0, assertNotNull(missing.listBlocksProjected()).size)
+        assertEquals(0, assertNotNull(missing.listBlocksProjected(null, null)).size)
         assertNull(missing.getBlockProjected("block-1"))
         assertNull(missing.agentContextProjected("agent-1", null))
         assertTrue(!missing.runExists("run-1"))

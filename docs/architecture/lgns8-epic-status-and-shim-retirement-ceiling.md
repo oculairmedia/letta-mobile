@@ -87,11 +87,20 @@ the memfs file `memory/system/<label>.md`, so it maps 1:1 onto
 | `run.get` | `runs/<id>/run.json`, archive-resolving | `admin_read` |
 | `step.list` | `runs/<id>/steps.jsonl` | `admin_read` |
 | `agent.context` | agent record + `system-prompt.json` + transcript | `admin_read` |
-| `block.list` | the agent's `memfs` system memory files, unioned | `admin_read` |
+| `block.list` | the agent's `memfs` system memory files, unioned, **paged** by `limit`/`offset` | `admin_read` |
 | `block.get` | the same files, by synthesised id | `admin_read` |
 
-Gated on `LETTA_LOCAL_BACKEND_DIR`; unset means a typed capability error, never
-an HTTP fallback.
+Gated on the wrapper's `--local-backend-dir` (`LETTA_LOCAL_BACKEND_DIR`); unset
+means a typed capability error, never an HTTP fallback. **2026-08-01:** the flag
+exists because the wrapper env template forbids inheriting
+`LETTA_LOCAL_BACKEND_DIR` from `appserver.env`, so after the cutover this tier ran
+UNSET in production and all six methods denied. The wrapper now declares its own
+READ-ONLY root in the unit file and prints it at startup.
+
+`block.list` is paged: the unwindowed union measured 1447 blocks / ~1.83 MB on the
+live host, over the 1 MiB admin_rpc frame cap. Default page 50, max 200; the
+windowed response is `{blocks, total, offset, limit, has_more}`, and a bare array
+still means the complete set.
 
 ### `controller_native` — constants and empty-by-contract (10)
 
@@ -409,6 +418,13 @@ failing, not merely green.
 
 ## 5. What `lgns8.11` still needs
 
+> **Superseded by "lgns8.11 close-out — 2026-08-01" below.** Items 2, 3 and 4 of
+> this table were all executed in production during the night of 2026-08-01;
+> item 1 is the only row that survives, and it needs a human at a device rather
+> than a maintenance window. The table is kept unedited because it is the
+> pre-cutover record, and rewriting it would erase what the cutover was actually
+> gated on.
+
 Cutover is gated on four items, all of them runs rather than code. They are the
 PENDING rows of the evidence ledger:
 
@@ -426,3 +442,98 @@ like a solved problem. It is not: **CRUD coverage is not execution coverage.**
 `PM-letta-mobile` runs on a `*/30` schedule and a silently stopped scheduler is a
 silent failure. Prove a 1-minute test schedule firing across a controller
 restart before the shim goes down.
+
+---
+
+# lgns8.11 close-out — 2026-08-01
+
+`letta-mobile-lgns8.11` ("production cutover and lettashim retirement with
+rollback") is **CLOSED** as of this section. This is the record it is closed
+against.
+
+The objective was never "kill a process". It was: **remove lettashim from every
+role it held in the production path, with a rollback for each, and prove it
+against production rather than against CI.** That objective is met to the
+documented ceiling. What remains of lettashim is a single dormant ingest
+endpoint with a named successor bead, and stopping the service is that
+successor's final step — see "Why the service is still running" below.
+
+## Role-by-role retirement record
+
+| Role lettashim held | Owner now | Status | Evidence |
+|---|---|---|---|
+| **Runtime** — chat, turns, streaming, tools, approvals | App Server v2 under the Kotlin controller | **RETIRED** (long since) | The whole epic; ledger §1–§4. Concurrent-conversation E2E on the live appserver 2026-08-01 00:58 (`concurrentLeases count=2`, `terminal.scope_rejected`, both `Completed`). |
+| **Admin REST** — the 36 `admin_rest_service` methods | `app_server_v2` (5) / `local_backend_store` (6) / `controller_native` (10) / fail-closed denial (15) | **RETIRED** | `lgns8.9`, PR #1082. The wrapper declares **zero** `admin_rest_service` rows and no longer consumes `LETTA_IROH_ADMIN_REST_BASE_URL`; `AdminRestServiceInjectionTest` fails if either returns. Ceiling §1–§2 above. |
+| **Client transport** — the mobile app dialing `:8291` | Iroh QUIC → controller → App Server | **RETIRED**, and now measured on hardware | `lgns8.10.4.1` / PR #1081 made routing key on `BackendKind`; the device proof it explicitly deferred was taken 2026-08-01: **zero established `:8291` connections from the shipping client on the Pixel.** The earlier non-zero readings were a mis-scoped measurement against a six-week-old sibling package, not a failing fix. Ledger §5. |
+| **Cron / scheduler execution** | The App Server process itself, lease-owned | **RETIRED**, sensed | Handover executed 2026-08-01 01:05 in a user-authorized window: lettashim **and its watchdog stopped**, `meridian-appserver` claimed the lease on its first WS connect (`crons.json scheduler_owner.pid` == the unit's `MainPID`), a `* * * * *` probe fired and **executed** against a production agent (`CRONFIRE-PROD-PROOF` in the transcript at `01:05:46` — the transcript, because the run log is inert), and the lease **stayed App-Server-owned after lettashim was restored**. `PM-30m` now fires natively. Ledger §8, `lgns8.24`. |
+| **Channels host** — `mobile`, and the `matrix` plugin | The Kotlin controller (`--channels-host` / `LETTA_CHANNELS_HOST`) | **RETIRED** | Cutover executed 2026-08-01 ~01:5x on release `5311f99cd`, in the mandatory stop-before-start order: `SHIM_CHANNELS_ENABLED=0` + shim restart first, then the flag + wrapper restart. Shim log shows **zero** adapter starts; controller reports `restore_complete channels=2 started=2 failed=0`, `attempt=0`. The patched identity `plugin.mjs` runs under the upstream host as a fresh import. Ledger §7, `d7uls`. |
+| **Work-activity ingest** — `POST /v1/work-activity` | still lettashim | **NOT retired** — successor filed | Found ALIVE by the 70,569-request live-traffic disposition (`lgns8.25`, PR #1060): `vibesync.service` calls it from the same host, configured and enabled but idle. Successor: `letta-mobile-lgns8.25.1`. |
+
+Cron execution and channels hosting were the two roles that could have taken
+production down silently if the shim had simply been stopped. Both were found by
+the 2026-07-30 shim-route cross-audit **because CRUD coverage is not execution
+coverage**, and both are now transferred with live proof rather than inference.
+
+## Why the service is still running, and whose step it is to stop it
+
+lettashim is `RUNNING` on the Meridian host and its port is bound. That is not
+an unfinished cutover; it is the documented ceiling. **Every role in the table
+above except work-activity ingest is retired**, and the host-side evidence
+matches: `:8291` is `LISTEN` but carries no device traffic, only a loopback
+lease ping.
+
+The service-stop is deliberately **not** `lgns8.11`'s final step. Stopping it
+today would take `vibesync.service`'s ingest with it — a live caller with no
+successor yet — which is precisely the class of silent breakage this epic spent
+its last week hunting. The stop belongs to `letta-mobile-lgns8.25.1`
+(controller-native external work ingest), as that bead's last action, once the
+successor endpoint exists and `vibesync.service` points at it.
+`letta-mobile-lgns8.25.2` (controller-native pool/session diagnostics, replacing
+`GET /shim/pool`) removes the remaining sensing reason to keep it.
+
+Closing `.11` on a running-but-roleless shim is the honest grade. Holding it
+open until a process disappears would have made the bead track an operational
+chore rather than the retirement it actually recorded.
+
+## Rollback inventory
+
+Every role transferred above has a rollback, and none of them requires a rebuild.
+
+| What | How to roll back | Notes |
+|---|---|---|
+| **Wrapper release** | Re-point `/opt/meridian/iroh-wrapper/current` at a prior `releases/<sha>` directory and restart the unit. Current release: `5311f99cd`. | NodeId and pairing state live **outside** the release dir (`/etc/meridian/iroh-secret.key`, pairing store), so paired peers survive a roll in either direction. Proven in anger on 2026-07-31 (§4 / ledger §6). |
+| **Pre-train launcher snapshot** | `/root/meridian-rollback-pretrain` plus the captured-classpath launcher `/etc/meridian/run-iroh-cli.sh` + `iroh-wrapper-classpath.txt`, built from the `meridian-deploy` worktree at `1606b4d2d`. | Last-resort path only. Do **not** delete the `meridian-deploy` worktree — it is the only artifact predating the frame-ceiling regression class. |
+| **Channels host** | `LETTA_CHANNELS_HOST=0` in `/etc/meridian/iroh-wrapper.env` + wrapper restart; then `SHIM_CHANNELS_ENABLED=1` in the shim's `channels.conf` + shim restart. | **Inverse order, and never both hosts live.** The double-host guard is an announcement, not a detection. A rollback-and-retry must re-honour stop-before-start. |
+| **Channel plugin** | The pre-patch `plugin.mjs` backup under `/root/.letta/channels/matrix/`. | The patched copy is the one that passes per-agent sender identity; reverting it collapses every Matrix reply to the account default. |
+| **Cron lease re-claim** | Order matters: stop `meridian-appserver` (a clean SIGTERM releases the lease), **then** start lettashim so it claims. Never start a second claimant against a live holder. | The lease is claimed at **first WS connect**, not at boot — "the app server is up" does not mean "cron is running". A restart always costs ≥1 tick (the startup tick never fires), so treat only **two** consecutive missing occurrences as a failure. |
+| **Cron sensing** | `systemctl disable --now meridian-cron-sensing.timer`. | Read-only sensor; disabling it removes detection, never function. |
+
+## Surviving tracked debt
+
+Nothing below blocks the retirement; all of it is filed, prioritised and owned.
+
+**Internal, P2 — the TurnEngine convergence program.**
+`letta-mobile-lgns8.22.7` (converge all hosts on the shared coordinator and
+reduce `TurnEngine` to orchestration) and `letta-mobile-o97nk.1` (extract the
+turn lifecycle into an explicit state machine). This is the architectural
+follow-through of the epic, not a defect backlog.
+
+**Upstream asks — filed with measured evidence and a concrete request.**
+
+| Bead | Ask |
+|---|---|
+| `letta-mobile-mocf1` | Recurring cron ticks missed across a restart are skipped silently — no catch-up, no `missed_count`, plus the startup-tick gap. Asks for replay from a persisted `last_tick_at` or explicit missed accounting. |
+| `letta-mobile-xsxwd` | The cron scheduler lease loser gives up permanently after 3×30s with only a `console.error`, its budget spent from first-WS-connect. Asks for backoff retry and/or a structured, queryable give-up signal. |
+| `letta-mobile-yoa82` | An inbound channel event enqueued against a dead socket runs no turn and emits no failure signal (`o5bqk`'s upstream half). |
+| `letta-mobile-q2b9z` | Let `app-server --listen` initialize the channel registry at boot. **P3 nicety** since #1083 solved boot-restore controller-side. |
+| `letta-mobile-z0bi7` | A `--stdio` app-server mode, which would unblock `lgns8.18` Path B (true no-socket IPC). |
+
+**Successors.** `letta-mobile-lgns8.25.1` (work-activity ingest — owns the
+lettashim service-stop), `letta-mobile-lgns8.25.2` (pool/session diagnostics),
+`letta-mobile-7dm1q` (host skill-root enumerator, unblocks `skill.list`).
+
+**Still open above `.11`, deliberately.** `letta-mobile-lgns8.10` (the
+acceptance gate) and the `letta-mobile-lgns8` epic remain open on the
+interactive device rows — `lgns8.19` (Stop button), `iej8j` (image pipeline) and
+the concurrent-conversation UI presence check. Those need a human holding the
+Pixel, and no amount of production evidence substitutes for them.

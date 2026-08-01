@@ -54,16 +54,21 @@ wrapper-only environment file and the NodeId and pairing store verified
 unchanged. Deploy, incident, rollback option and verified redeploy are all on
 record — see `docs/testing/lgns8-acceptance-evidence-ledger.md` §6.
 
-Four rows remain before `letta-mobile-lgns8.11` (production cutover and
-lettashim retirement) can close — and row 4 is now only a live re-check, its
-offline half having been measured on 2026-08-01. None of them is
+**All operational rows are now EXECUTED.** Rows 2, 3 and 4 were performed in
+production during the night of 2026-08-01; row 1 remains and needs a human at a
+device, not a maintenance window. `letta-mobile-lgns8.11` is **CLOSED** against
+that state — see the "lgns8.11 close-out — 2026-08-01" section of
+`docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md` for the
+role-by-role retirement record, the rollback inventory, and why the lettashim
+**service-stop** belongs to `letta-mobile-lgns8.25.1` rather than to `.11`.
+`letta-mobile-lgns8.10` stays open on row 1. None of these rows is
 implementation.
 
 | # | Item | Bead | Where |
 |---|---|---|---|
 | 1 | Device protocol steps 1–3 — concurrent conversations (UI half), Stop button (incl. the first real Desktop abort), image pipeline | `lgns8.19`, `iej8j`, `eaczz.10` | `docs/testing/lgns8-e2e-device-protocol.md` |
-| 2 | Cron/scheduler execution handover — schedules must still fire with lettashim stopped | `lgns8.24` (P0) | below, "Cron handover (`lgns8.24`)" |
-| 3 | Channels-host live cutover — flag on, `SHIM_CHANNELS_ENABLED=0`, **in that order** | `d7uls` (P1) | "Channels-host cutover (lgns8.23)" |
+| 2 | ~~Cron/scheduler execution handover~~ — **DONE 2026-08-01 01:05**: the App Server claimed the lease, a probe schedule fired and executed in the production transcript, and the lease stayed App-Server-owned after lettashim was restored. Sensing installed as a 15-min systemd timer | `lgns8.24` (closed) | below, "Cron handover (`lgns8.24`)" and "Cron sensing check" |
+| 3 | ~~Channels-host live cutover~~ — **DONE 2026-08-01 ~01:5x** on release `5311f99cd`, in the mandatory order: `SHIM_CHANNELS_ENABLED=0` + shim restart **first**, then `LETTA_CHANNELS_HOST=1` + wrapper restart. Shim log shows zero adapter starts; controller reported `restore_complete channels=2 started=2 failed=0`, `attempt=0`. Only the passive step-8 re-wire observation is outstanding | `d7uls` (closed) | "Channels-host cutover (lgns8.23)" |
 | 4 | ~~Inbound channel delivery after a reconnect with no re-issued `channel_start`~~ — **measured 2026-08-01**: inbound is enqueued but never runs against the dead socket. Mitigated client-side (`o5bqk`); the residual window is a live re-check, folded into item 3 | `lgns8.23.1` (closed) | item 3's window, step 8 |
 
 Two things about this list are easy to get wrong:
@@ -73,14 +78,18 @@ Two things about this list are easy to get wrong:
   the scheduler lease itself and really running three consecutive 1-minute fires
   end to end. What the probe replaced it with is worse-shaped: **cron failure is
   invisible from the cron surfaces themselves.** See "Cron handover
-  (`lgns8.24`)" below before touching the live scheduler. `PM-letta-mobile` runs
-  on a `*/30` schedule; do this before the shim goes down, not after.
+  (`lgns8.24`)" below. That is why the handover shipped with an **external**
+  sensor rather than a cron-surface check — see "Cron sensing check" below.
+  `PM-letta-mobile` runs on a `*/30` schedule and is the task that sensor
+  watches.
 - **Item 3's double-host guard is an announcement, not a detection.** Nothing
   checks whether lettashim is concurrently hosting the same account, and both
   hosts live means every account double-starts against the same homeserver. The
   stop-before-start ordering is mandatory: `SHIM_CHANNELS_ENABLED=0` and restart
   lettashim first, verify no plugin import, *then* start the wrapper with
-  `--channels-host`. Never the reverse, never both in one window.
+  `--channels-host`. Never the reverse, never both in one window. **The
+  2026-08-01 cutover honoured this order**, and the rule still binds any
+  rollback-and-retry.
 
 Scope note that shrinks item 3 considerably: **the shim never hosted Matrix in
 production.** `/tmp/admin-shim.log` has zero `[matrix` lines — live Matrix runs
@@ -601,11 +610,26 @@ LETTA_IROH_VIBESYNC_BASE_URL=http://127.0.0.1:3099
 Add domain-specific bounded-service URLs only for services approved by the
 ownership matrix.
 
-### Cron handover (`lgns8.24`) — deferred to the maintenance window
+### Cron handover (`lgns8.24`) — DONE, executed 2026-08-01 01:05
 
-Measured 2026-08-01 on a throwaway env with no shim anywhere (live `crons.json`
-and the `*/30` PM schedule untouched). Full transcript on the bead; the four
-facts that change how you run the cutover:
+The handover was performed in the maintenance window and the App Server now
+owns the scheduler lease in production. Sequence, and the evidence each step
+produced:
+
+1. lettashim and its watchdog stopped; `meridian-appserver` restarted.
+2. It claimed the lease on its first WS connect — `/root/.letta/crons.json`
+   `scheduler_owner.pid = 2796361`, identical to the unit's `MainPID`.
+3. A `* * * * *` probe schedule added over the App Server WS **fired and
+   executed**: `CRONFIRE-PROD-PROOF` appears in the production transcript at
+   `01:05:46`. The transcript is the sensor; the run log is inert (below).
+4. `cron_delete` clean.
+5. lettashim restored — **the lease stayed with the App Server** (still pid
+   `2796361` with lettashim running again). The transfer is durable, and cron
+   execution is permanently retired from the shim.
+
+The four facts below were measured 2026-08-01 on a throwaway env with no shim
+anywhere (live `crons.json` and the `*/30` PM schedule untouched). Full
+transcript on the bead; they still govern how you operate the scheduler:
 
 1. **The scheduler lease is claimed by the App Server process at the FIRST WS
    connection, not at boot.** `crons.json` did not exist after 12s of idle
@@ -650,11 +674,119 @@ Cutover checklist additions that follow from that warning — all mandatory:
   do not treat it as a failure; treat *two consecutive* missing occurrences as
   one.
 
-### Channels-host cutover (lgns8.23) — deferred to the maintenance window
+### Cron sensing check — INSTALLED 2026-08-01
 
-`LETTA_CHANNELS_HOST` (equivalently `--channels-host`) is **absent/false in
-every environment above** and must stay that way until the cutover step below.
-lettashim is still the channels host (`SHIM_CHANNELS_ENABLED=1`): it imports
+The external heartbeat the section above demands is now a committed script and
+a systemd timer, installed on the Meridian host. It is the operational
+mitigation for `lgns8.24.2` (silent missed ticks) and `lgns8.24.3` (silent
+lease give-up) — neither of which is fixable from the client; both are filed
+upstream as `letta-mobile-mocf1` and `letta-mobile-xsxwd`.
+
+| File | Role |
+|---|---|
+| `scripts/deploy/cron-sensing-check.sh` | the check itself; read-only on the store |
+| `scripts/deploy/meridian-cron-sensing.service` | `Type=oneshot` unit template |
+| `scripts/deploy/meridian-cron-sensing.timer` | 15-minute cadence template |
+
+**What it checks.** Two independent halves, both of which must pass:
+
+1. **The lease is held by a live process that really is the process it claims
+   to be.** `scheduler_owner` non-null (a null owner means *nothing will
+   fire*), the pid alive, its `/proc/<pid>/stat` start-ticks equal to the
+   recorded `process_start_ticks` (so a **recycled pid** cannot pass), and the
+   recorded `boot_id` equal to the running one (so a **previous-boot lease**
+   cannot pass). A `started_at` in the future fails; the holder not looking
+   like an `app-server` process warns.
+2. **Every enabled recurring task has actually executed recently.** For each
+   task it parses the cadence, locates the conversation directory
+   (`base64("conversation:<conv_id>")` under the local backend store), and
+   finds the newest `Scheduled task "<name>" is firing` prompt in
+   `messages.jsonl`. If that fire is older than `2 x cadence + 5min` the check
+   **fails**. Cadence parsing is deliberately minimal — `*/N * * * *`,
+   `M * * * *` (hourly), `M */N * * *`, `M H * * *` (daily). Anything more
+   exotic is reported as **UNSENSED** (a warning), never as a silent pass.
+
+**Why the transcript and not the obvious surfaces:** `last_fired_at`,
+`fire_count` and the run log are all written at *enqueue* time and read `ok`
+through a total outage (see the sensing warning above). The committed
+transcript is the only surface that discriminates executed from dark.
+
+**Where it logs.** `/var/log/meridian-cron-sensing.log` (appended; the
+Meridian units on this host all use `append:`, so `journalctl` is not the place
+to look). Unit state is still visible via `systemctl status
+meridian-cron-sensing` and `systemctl list-timers meridian-cron-sensing.timer`.
+Exit 0 = healthy, 1 = at least one FAIL line, 2 = the check could not run
+(missing `jq`, unreadable `crons.json`).
+
+**Install** (already done on Meridian; this is the recipe for a rebuild):
+
+```bash
+install -D -m 0755 scripts/deploy/cron-sensing-check.sh \
+  /opt/meridian/bin/cron-sensing-check.sh
+install -m 0644 scripts/deploy/meridian-cron-sensing.service \
+  /etc/systemd/system/meridian-cron-sensing.service
+install -m 0644 scripts/deploy/meridian-cron-sensing.timer \
+  /etc/systemd/system/meridian-cron-sensing.timer
+systemctl daemon-reload
+systemctl enable --now meridian-cron-sensing.timer
+systemctl start meridian-cron-sensing.service   # one immediate run
+cat /var/log/meridian-cron-sensing.log
+```
+
+Run it by hand at any time — it takes no arguments beyond `--quiet` and writes
+nothing:
+
+```
+$ /opt/meridian/bin/cron-sensing-check.sh
+OK    lease holder pid 2796361 is alive
+OK    lease holder start-ticks match (4286799) — not a recycled pid
+OK    lease holder is an app-server process
+OK    lease boot_id matches the running boot
+OK    task 4ce8300d (letta-mobile-pm-30m): fired 2026-08-01T05:01:04.999Z
+      (796s ago, budget 3900s, cron '*/30 * * * *')
+```
+
+**On a FAIL, in order:** confirm the App Server is up and has a client attached
+(a lease with no attached WS client ticks *dark* — fact 2); check whether the
+lease holder is the App Server or a leftover lettashim; then look at the
+conversation transcript directly. Do **not** consult the run log — it will say
+`ok`. The check is deliberately not self-healing: it senses, a human decides.
+
+### Channels-host cutover (lgns8.23) — EXECUTED 2026-08-01 ~01:5x
+
+> **STATUS: DONE.** Performed in a user-approved window on release `5311f99cd`
+> (which carries #1085's fast path), in the mandatory order below.
+> `SHIM_CHANNELS_ENABLED=0` was written to the shim's `channels.conf` and
+> lettashim restarted **first**; only then was `LETTA_CHANNELS_HOST=1` added to
+> `/etc/meridian/iroh-wrapper.env` and the wrapper restarted.
+>
+> **Verified in the window:** the shim log shows **zero** adapter starts, so the
+> channels-host role is retired shim-side; the controller's `ChannelRestore`
+> started `matrix/lettabot` and `mobile/default` and reported
+> `restore_complete channels=2 started=2 failed=0` with `attempt=0` on the first
+> try; the patched identity `plugin.mjs` now runs under the **upstream** host as
+> a fresh import, so the per-agent sender identity fix is live with no ESM cache
+> ambiguity. Bead `letta-mobile-d7uls` (CLOSED).
+>
+> **Still to observe (passive, no action):** step 8's `fast-path re-wire:
+> attempted=<n> rewired=<n>` line on the next wrapper↔App-Server reconnect, and
+> step 9's `fast_path_started_stale_account` WARN if it ever appears.
+>
+> **Watch item:** the legacy python Matrix client still syncs the same
+> `@lettabot` account, so a dual-sync / doubled-reply is possible until it is
+> retired. Monitor; the fix is the separate, unforced Matrix consolidation onto
+> the plugin path, which is **not** a prerequisite for retiring lettashim.
+>
+> **Rollback (one flag):** `LETTA_CHANNELS_HOST=0` + wrapper restart, then
+> `SHIM_CHANNELS_ENABLED=1` + shim restart. A retry after a rollback must
+> re-honour stop-before-start.
+>
+> The procedure below is retained verbatim as the executed record and as the
+> form any re-run must take.
+
+`LETTA_CHANNELS_HOST` (equivalently `--channels-host`) was **absent/false in
+every environment above** and had to stay that way until the cutover step below.
+lettashim was the channels host (`SHIM_CHANNELS_ENABLED=1`): it imports
 `~/.letta/channels/{matrix,mobile}/plugin.mjs` and drives the Matrix adapters.
 Running both hosts double-starts the same accounts against the same homeserver
 — two sync loops, duplicated inbound, ping-pong risk.
@@ -684,7 +816,8 @@ lives inside upstream's ingress closure. In practice: after any App Server
 restart, an inbound message sent within the first moment may show typing and no
 reply; re-send it. Do not read that as a routing or identity failure.
 
-Cutover, in a maintenance window, in this order:
+Cutover, in a maintenance window, in this order (**steps 1–7 EXECUTED
+2026-08-01; steps 8–9 are the passive observations still outstanding**):
 
 1. Verify the wrapper build contains the flag: `app-server-serve-iroh --help`
    lists `--channels-host`.

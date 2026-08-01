@@ -85,7 +85,25 @@ over a config value substitutes for one real connect with the real engine.
 | `AdminRestServiceInjectionTest` fails if the REST adapter or its env var is reintroduced; `ShimOffParityGateTest` derives its expectations from `iroh-admin-ownership-matrix.json` across four buckets (shim-free native, capability-gated, bounded-service, local-backend-store); `IrohAdminOwnershipMatrixTest` requires a disposition + caller evidence for every shim-only surface. | PROVEN-HARNESS |
 | **Shim-only surface disposition on live traffic** (`lgns8.25`, PR #1060): 70,569 logged requests over 2026-07-23T14:40Z → 2026-07-31T05:48Z, credible-complete (the 60s healthcheck's 10,925 `GET /` rows match the expected ~11.5k). One surface found **ALIVE** and nearly missed — `/v1/work-activity`, called by `vibesync.service` on the same host, configured and enabled but idle. "No traffic in the window" and "no caller" are different findings. | **PROVEN-LIVE** |
 | PR #1063 — no-HTTP gate attributed to the wrapper with parity assertions derived from the matrix; PR #1081 — legacy mobile WS shim connectors removed from the Iroh path (`lgns8.10.4.1`). | PROVEN-HARNESS |
-| Running the full gate with lettashim actually **stopped** in production. | **PENDING-OPS** |
+| **The client no longer dials the shim — measured on the device, 2026-08-01.** The acceptance criterion `lgns8.10.4.1` deferred to the device lane ("an iroh-configured client opens ZERO connections to `:8291`") is now measured rather than only structurally enforced. With the matched shipping APK on the Pixel and the stale sibling package no longer contributing, established connections to `:8291` count **0**; host-side the port is still `LISTEN` but carries no device-originating traffic (only the loopback lease ping). This is the row that could not be taken while a six-week-old sibling build was installed — the earlier readings attributed to the shipping client were mis-scoped to `com.letta.mobile` (uid 10530), never to the live client. #1081's `BackendKind` routing is doing what it was written to do, on hardware. | **PROVEN-LIVE** |
+| **lettashim actually stopped in production, 2026-08-01 01:05.** During the cron handover window lettashim *and* its watchdog were stopped and the system ran on the App Server alone: the App Server claimed the scheduler lease, a probe schedule fired and executed against a production agent, and native admin routes kept serving. That is the shim-off condition observed live, not simulated (§8). | **PROVEN-LIVE** |
+| **Residual, stated precisely:** lettashim is still RUNNING, but no longer in any of its former roles. Its one surviving live surface is `POST /v1/work-activity` (the `vibesync.service` ingest found ALIVE by the 70,569-request disposition above). The successor is `letta-mobile-lgns8.25.1`; the service-stop is that bead's final step, not `lgns8.11`'s. Pool/session sensing (`GET /shim/pool`) follows in `lgns8.25.2`. | PROVEN-HARNESS (scoped) |
+
+### 5.1 Post-cutover regressions (found by the user, same night)
+
+The cutover moved real surfaces onto the native tier, and two of them arrived
+broken. Recording them here keeps this ledger honest: "all 36 methods have a
+native owner" was true, and two of those owners still did not work in production.
+Both were user-reported on 2026-08-01, root-caused the same night, and fixed by
+**PR #1092**, deployed from branch.
+
+| Evidence | Status |
+|---|---|
+| **Memory blanked: `block.list` had no store and could not have fitted in a frame anyway.** Two stacked causes, both measured. (a) `local_backend_store` owns six read-only methods, but the wrapper env template forbids inheriting `LETTA_LOCAL_BACKEND_DIR` from `appserver.env` and the CLI had no flag of its own — so the wrapper ran with the root UNSET and those methods denied in production (`handler.error method=agent.context error=capability_unavailable: no injected 'local_backend_store' service`, in `/var/log/meridian-iroh-wrapper.log`). (b) Once wired, the unwindowed union measured **1439 blocks / 2,394,364 bytes** against the **1,048,576**-byte `IrohFrameCodec` cap — undeliverable. Fixed by an explicit `--local-backend-dir` plus real `limit`/`offset` paging in `LocalBackendBlockReader` (count ceiling *and* a ~512 KB byte budget, because one 50-block page already measured 394 KB) and a cursor loop in `IrohAdminRpcBlockSource`. #991 had flagged the oversize risk and deferred it; the cutover is what made it fatal. | **PROVEN-LIVE** |
+| **Skills blanked: no enumerator, plus a deny the app actually called.** (a) `NativeSkillsCatalog` had the `hydrateFromHost` seam from #1062 but no production enumerator (`letta-mobile-7dm1q`), so `skill.list` answered `hydrated=false` forever. (b) `skill.list_agent` was deny-closed by matrix decision, but `loadSkillsSnapshot` issues it alongside `skill.list`, so the typed denial threw out of the snapshot loader and broke the entire Skills screen — `handler.error method=skill.list_agent` observed live from the desktop. Fixed by `HostSkillsEnumerator` (reads the skills root at startup, hydrating before the router is built) and by serving the process-global catalog with an explicit `process_global: true`. The matrix row was reversed with its evidence recorded. | **PROVEN-LIVE** |
+| **Fix verified in production, 2026-08-01.** Deployed from branch to `/opt/meridian/iroh-wrapper/releases/04525474d`: `Telemetry/SkillsCatalog: host.hydrated skillsDir=/opt/skills skills=65` — exactly the 65 of 69 skill directories that carry a `SKILL.md` — and `[iroh-app-server] local_backend_store: /root/.letta/lc-local-backend`. Against the live store with the deployed binary: `limit=50 offset=0` → 394,378 bytes, `limit=50 offset=50` → 77,183 bytes, pages differ, two pages in 124 ms; the unwindowed call is now bounded to 535,072 bytes. | **PROVEN-LIVE** |
+| Fail-on-revert coverage pins both regressions: the full union exceeds the frame cap while every page stays under it; **different offsets return different pages** (the observed failure was page 1 for every offset); a sweep covers the set exactly once; an oversized page is trimmed yet its remainder stays pageable; and the enumerator is pinned on both `SKILL.md` shapes, cold-start discovery, and restart preservation. | PROVEN-HARNESS |
+| **The lesson, stated plainly:** a green matrix row is not a working surface. Neither of these would have been caught by the parity gate, because both handlers were registered and both denials were *correctly typed* — the failures were a missing deploy-time wiring and a response too large to send. Startup now logs the resolved store root and the hydrated skill count, so the next such gap is visible from the log instead of from a blank screen. | PROVEN-HARNESS |
 
 ## 6. Deployment, ownership fencing, and rollback
 
@@ -109,7 +127,9 @@ rollback option, and a verified redeploy inside one day.
 | **Inbound round trip — PROVEN, executed 2026-08-01** (probe #4, second throwaway env, live untouched). A REAL Matrix event posted by the account's dedicated sync identity was picked up by the adapter, reached `wireChannelIngress`, resolved its route, enqueued on the routed runtime, **executed the turn**, and replied back through the channel via the `MessageChannel` tool — the reply event was then fetched back from the homeserver to confirm. So inbound → ingress → turn → outbound works under bare `--listen` with no shim. **Routes are provisionable over the WS**: `channel_route_update` writes `~/.letta/channels/<id>/routing.yaml` (JSON despite the name) and the on-disk file matched the accepted frame exactly — no file surgery needed by the controller. Reply identity landed as the shared account, consistent with the (c) plugin-side identity regression already recorded (corroborating, not an independent proof — the throwaway agent had no seeded identity). | PROVEN-HARNESS |
 | **The reconnect question is answered, and the answer was a new defect: `letta-mobile-o5bqk`.** On a fresh socket that had issued only `runtime_start`, inbound *did* still fire from the OLD socket-bound ingress closure — event received, typing indicator posted to the real room, route resolved, item **enqueued** (visible verbatim in `update_queue`) — but **the turn never ran** for the ~100s the client stayed attached, with no error and no channel-side failure notice; it drained ~2 min later on the NEXT connect. `scheduleQueuePump` bails on the dead captured socket: the same enqueue-but-never-drain shape as the cron defect in §8 (3c/3d). PR #1083's re-issue on generation-ready is confirmed load-bearing (with it, inbound replied in 5s), but it does not cover the window between socket-open and that re-issue. | PROVEN-HARNESS (defect) |
 | **This PR** — client-side mitigation for the window. The restore now issues `channel_start` for every account the previous enumeration found enabled **before** `channels_list`, from a process-lifetime `ChannelAccountCache` that outlives the socket, shrinking the window from `1 + 1 + <channel count>` round trips to one. Five new tests, four of which fail when the fast path is removed and a fifth when the "don't start twice in one pass" dedup is removed. **Residual, stated honestly:** the window is shortened, not closed — the enqueue-against-a-dead-socket silent drop lives inside upstream's ingress closure and cannot be fixed from the client. An inbound event landing inside the surviving window still shows typing-then-silence and drains on a later connect. Upstream ask filed with the probe transcript. Second residual: an account disabled between generations is started once from the cache before the enumeration contradicts it; there is no `channel_stop` on this client, so that case emits a WARN (`fast_path_started_stale_account`) rather than being silently resurrected. | PROVEN-HARNESS |
-| Live cutover: quiesce → stop wrapper → `SHIM_CHANNELS_ENABLED=0` + restart lettashim → `LETTA_CHANNELS_HOST=true` + start wrapper → verify `[matrix:*] started` appears **exactly once** per account → inbound/outbound identity checks → force a reconnect and repeat. `letta-mobile-d7uls` (P1). **The double-host guard is an announcement, not a detection** — nothing checks whether lettashim is concurrently hosting, so the stop-before-start ordering is mandatory and must never be reversed or combined into one window. | **PENDING-OPS** |
+| **LIVE CUTOVER EXECUTED 2026-08-01 ~01:5x** (user-approved window, `letta-mobile-d7uls`, CLOSED). Release `5311f99cd` deployed (carrying #1085's fast path); the mandatory stop-before-start order was honoured — lettashim's `channels.conf` set to `SHIM_CHANNELS_ENABLED=0` and restarted **first**, then `LETTA_CHANNELS_HOST=1` in `iroh-wrapper.env` and the wrapper restarted. **Verified:** the shim log shows **zero** adapter starts, so the host role is retired on the shim side; the controller's `ChannelRestore` started `matrix/lettabot` and `mobile/default` with `restore_complete channels=2 started=2 failed=0`, `attempt=0` on the first try. The patched identity `plugin.mjs` now runs under the **upstream** host as a fresh import, so the per-agent sender identity fix is live with no ESM cache ambiguity. Rollback is one flag: `LETTA_CHANNELS_HOST=0` + wrapper restart. | **PROVEN-LIVE** |
+| **Watch item carried out of the window (not a blocker, not silent):** the legacy python Matrix client still syncs the same `@lettabot` account, so a dual-sync / doubled-reply is possible until that client is retired. Monitor; the fix is the separate, unforced Matrix consolidation onto the plugin path (§7 above, and the ceiling doc §3). **The double-host guard remains an announcement, not a detection** — nothing checks whether lettashim is concurrently hosting, so the stop-before-start ordering stays mandatory for any future re-run or rollback-and-retry. | PROVEN-LIVE (residual) |
+| **Step-8 fast-path re-wire observation** — on the next wrapper↔App-Server reconnect, `fast-path re-wire: attempted=<n> rewired=<n>` should precede the enumeration line and `restore_complete` should report `rewired>0`. This is a **passive log observation**, not an action, and it is the only channels item still unobserved. Step 9's stale-account WARN monitoring rides along with it. | **PENDING-OPS** (passive) |
 
 ## 8. Cron / scheduler execution ownership
 
@@ -118,15 +138,23 @@ rollback option, and a verified redeploy inside one day.
 | **Scope shrank on inspection.** letta-code 0.29.12 ships cron natively and first-class: the full `Cron{List,Add,Get,Runs,Trigger,Update,Delete,DeleteAll}Command` protocol plus `CronsUpdatedMessage`, and *real execution* — `startConnectedListenerRuntime()` calls `startScheduler()` when `shouldStartCronScheduler`, and the app-server listen path passes `startCronScheduler: true` (kill switch `LETTA_DISABLE_CRON_SCHEDULER=1`, set nowhere in this repo or the shim). `cron` is a first-class `QueueItemSource`, so a fired cron enters the same turn queue as user or channel input. The shim does **not** own a separate cron model — `admin-shim/lib/cron-scheduler.ts` says so explicitly: it shares `crons.json` with the bundled letta cron CLI, byte-for-byte. | PROVEN-HARNESS (source-verified on the pin) |
 | **Execution PROVEN on the harness, 2026-08-01** (`lgns8.24` probe, third throwaway env: no shim anywhere, own HOME/backend/port, live `crons.json` and the `*/30` PM schedule untouched). **(1) The lease is claimed by the app-server process itself — at FIRST WS CONNECT, not at boot.** `crons.json` did not exist after 12s of idle listening; `scheduler_owner` appeared only once a client attached (`attachOpenListenerSocket({startCronScheduler:true})`), carrying the `--listen` PID. Confirmed again across a restart with the new PID. **(2)** `cron_add` takes a real cron expression; `* * * * *` is the floor (`TICK_INTERVAL_MS` = 60000) and was accepted over a bare WS. **(3) Three consecutive 1-minute fires really executed** — proven by the committed transcript (`messages.jsonl`), not the run log: three `user` fire-prompts at exactly 60s spacing, each answered by the agent against a real provider. `cron_delete` takes effect immediately with no leaked timer. | PROVEN-HARNESS |
 | **Four defects the same probe measured, all of which shape the cutover.** **(3b) The run log cannot discriminate.** Every entry — executed and dark alike — reads `status:"ok", outcome:"queued", reason:"scheduled_time_matched"`; there is no terminal executed/succeeded outcome written at all. **Any gate or alert built on cron run-log outcomes is inert; only the conversation transcript or an external heartbeat can tell a live scheduler from a dead one.** **(3c) Zero-client ticks are dark** (settles `lgns8.24.1` empirically): with the client disconnected the scheduler keeps ticking and enqueueing, but `scheduleQueuePump` bails on the closed transport and no turn runs. **(3d) The drain on reconnect is LOSSY — this corrects the bead's own "everything drains at once" note.** Three buffered dark fires produced exactly ONE turn on reconnect, carrying the OLDEST occurrence's (3-minute-stale) timestamp; the other two were silently discarded with no error, no `failed_count`, and run-log entries still reading `ok`. For a `*/30` heartbeat: hours dark → one late, mislabelled run → no signal that the rest were lost. **(4) Missed-tick policy on restart is silent skip, with no accounting.** A clean SIGTERM releases the lease; the minutes the server was down produced no run-log entry, no turn, and `missed_count` stayed 0 (`shouldFireTask()` is a pure `cronMatchesTime` check; missed accounting exists only for one-shot tasks). **(4b) The startup tick never fires** (2/2 reproducible): the first fire is always exactly +60s after the lease, so a restart costs at least one tick — the real skip window is downtime *plus* the remainder of the restart minute. | PROVEN-HARNESS (defects) |
-| The production handover itself: lettashim currently holds the live lease and nothing yet releases it. Acceptance is unchanged — a 1-minute schedule surviving a controller restart, in production — but (3c)+(3d) add a hard requirement the bead did not have: **the controller must keep a WS connection attached at all times, or every tick is dark and "it catches up later" is false.** `letta-mobile-lgns8.24` (P0), catch-up regression tracked as `lgns8.24.2`. | **PENDING-OPS** |
+| **THE PRODUCTION HANDOVER, EXECUTED 2026-08-01 01:05** (user-authorized maintenance window). lettashim and its watchdog stopped; `meridian-appserver` restarted and **claimed the scheduler lease on its first WS connect** — `/root/.letta/crons.json` `scheduler_owner.pid = 2796361`, identical to the unit's `MainPID`. A `* * * * *` probe schedule added over the App Server WS **fired and executed against the production agent**: `CRONFIRE-PROD-PROOF` is in the production conversation transcript at `01:05:46` (the transcript is the sensor; the run log is inert per 3b). `cron_delete` clean. lettashim was then restored and **the lease stayed App-Server-owned** (still pid `2796361` with lettashim running) — the ownership transfer is durable across a shim restart, and cron execution is permanently retired from the shim. `letta-mobile-lgns8.24`. | **PROVEN-LIVE** |
+| **The sensing the defects force is INSTALLED, not merely specified** (2026-08-01). `scripts/deploy/cron-sensing-check.sh` plus `meridian-cron-sensing.{service,timer}` run every 15 minutes on the Meridian host, logging to `/var/log/meridian-cron-sensing.log`. Two halves, both required: (i) the lease is held by a live process that really is the process it claims to be — non-null `scheduler_owner`, pid alive, `/proc` start-ticks equal to the recorded `process_start_ticks` (a recycled pid fails), `boot_id` equal to the running one (a previous-boot lease fails); (ii) every enabled recurring task has a `Scheduled task "<name>" is firing` prompt in its **conversation transcript** newer than `2 x cadence + 5min`, else FAIL. An un-parseable cadence is reported UNSENSED, never a silent pass. First live run under systemd exited 0 against production: lease `pid 2796361` verified on all four identity checks, `letta-mobile-pm-30m` last fired `2026-08-01T05:01:04.999Z`, 796s old against a 3900s budget. This is detection, not recovery — the two defects it senses are upstream. | **PROVEN-LIVE** |
+| **The two client-unfixable defects are filed upstream with the measured evidence.** (4)/(4b) — silent missed ticks, no catch-up, no `missed_count`, and a startup-tick gap that costs one tick on every restart — is `letta-mobile-mocf1`, asking for either replay from a persisted `last_tick_at` or an explicit missed-count. The lease loser giving up permanently after 3x30s with only a `console.error`, its budget spent from first-WS-connect rather than boot, is `letta-mobile-xsxwd`, asking for backoff retry and/or a structured, queryable give-up signal. Both are scheduler internals inside letta.js; neither is reachable from the client. `lgns8.24.2` and `lgns8.24.3` close as **measured + mitigated + upstream-referenced**. | PROVEN-HARNESS (defects, upstream-blocked) |
 
 Execution is no longer the unknown — a bare `letta app-server --listen` with no
 shim claims the scheduler lease itself and really runs the fired turn end to
-end. What replaced that unknown is worse-shaped and now measured: cron failure
-is **invisible from the cron surfaces themselves**. A silent scheduler was
-always the risk; (3b) proves the run log will report `ok` throughout one.
-Post-cutover sensing must therefore be built on the conversation transcript or
-an external heartbeat, and the cutover checklist says so explicitly.
+end, and since 2026-08-01 the production App Server does exactly that. What
+replaced that unknown is worse-shaped and now measured: cron failure is
+**invisible from the cron surfaces themselves**. A silent scheduler was always
+the risk; (3b) proves the run log will report `ok` throughout one. That is why
+this row is only PROVEN-LIVE *with* the external sensor: the handover alone
+would have moved the scheduler onto a surface where its own death is
+unobservable. The sensor reads the conversation transcript because nothing
+inside cron discriminates, and it fails closed — nonzero exit, no self-healing,
+a human decides. Recovery from the two sensed defects requires upstream
+(`letta-mobile-mocf1`, `letta-mobile-xsxwd`); detection does not, and is
+installed.
 
 ---
 
@@ -155,28 +183,42 @@ the PR shipped a test that was demonstrated to fail without the fix.
 | #1082 | `lgns8.9` | Admin REST adapter retired with real per-method owners; reintroduction fails a test. |
 | #1083 | `lgns8.23` | Controller-native channel restore behind `--channels-host`; three guards each verified fail-on-revert. |
 | #1084 | `vnp3q` | Real-engine WS connect regression test + OkHttp negative control — closes the gap that let #1064→#1077 ship. |
-| *(this PR)* | `o5bqk` | Channel ingress re-wired in the first round trip after a reconnect: `channel_start` for cached accounts precedes `channels_list`. Removing the fast path fails four tests; removing the start-once-per-pass dedup fails a fifth. |
+| #1085 | `o5bqk` | Channel ingress re-wired in the first round trip after a reconnect: `channel_start` for cached accounts precedes `channels_list`. Removing the fast path fails four tests; removing the start-once-per-pass dedup fails a fifth. |
+| #1089 | `lgns8.24.2`, `lgns8.24.3` | Cron sensing installed on the production host: transcript-based check plus a 15-minute systemd timer. Docs-and-scripts only — the defects it senses are upstream (`mocf1`, `xsxwd`). Also broadened `android.yml`'s PR path filter to cover `scripts/deploy/**`, so scripts-and-docs PRs report the required contexts instead of hanging BLOCKED. |
+| *(this PR)* | `lgns8.11` | Close-out record: channels cutover and the zero-`:8291` device measurement written into this ledger, and the role-by-role retirement record + rollback inventory into the ceiling doc. Docs-and-scripts only. |
 
 ---
 
 ## What is still open
 
-Three rows, and only three, stand between this ledger and a closed `lgns8.10` —
-the fourth (`lgns8.23.1`'s inbound probe) was executed on 2026-08-01 and is now
-a PROVEN-HARNESS row in §7, having produced `o5bqk` on the way:
+Two rows, and only two — and **neither is an operation anyone still has to
+perform in production.** Of the four that stood here earlier on 2026-08-01,
+three were executed the same night: `lgns8.23.1`'s inbound probe (now a
+PROVEN-HARNESS row in §7, having produced `o5bqk` on the way), the `lgns8.24`
+cron handover (now PROVEN-LIVE in §8, with its sensing installed and green), and
+the `d7uls` channels cutover (now PROVEN-LIVE in §7, `channels=2 started=2
+failed=0`). The device half of the shim-retirement claim was measured the same
+night as well: zero `:8291` connections from the shipping client (§5).
 
-1. **PENDING-INTERACTIVE — device protocol steps 1–3.** Concurrent conversations
-   (UI half), Stop button (`lgns8.19` device evidence, including the first-ever
-   real Desktop abort), and the image pipeline (`iej8j` device half). Protocol:
-   `docs/testing/lgns8-e2e-device-protocol.md`.
-2. **PENDING-OPS — `lgns8.24` cron handover.** Execution itself is now proven on
-   the harness (§8); what remains is the production lease handover, the
-   always-attached-client requirement that (3c)/(3d) imposes, and **an external
-   sensing check, because the cron run log reports `ok` through a total
-   outage.**
-3. **PENDING-OPS — `d7uls` channels cutover.** The maintenance-window flag flip,
-   in the mandatory stop-before-start order, now also carrying the cron sensing
-   step and a post-restart inbound re-check.
+1. **PENDING-INTERACTIVE — device protocol steps 1–3, on the Pixel.** Concurrent
+   conversations (UI half), Stop button (`lgns8.19` device evidence, including
+   the first-ever real Desktop abort), and the image pipeline (`iej8j` device
+   half). These need a human holding the device; nothing else does. Protocol:
+   `docs/testing/lgns8-e2e-device-protocol.md`. Beads: `lgns8.19`, `iej8j`,
+   `eaczz.10`.
+2. **PENDING-OPS (passive) — the channels step-8 fast-path re-wire observation.**
+   On the next wrapper↔App-Server reconnect, confirm `fast-path re-wire:
+   attempted=<n> rewired=<n>` precedes the enumeration line and `restore_complete`
+   reports `rewired>0`, and watch for step 9's `fast_path_started_stale_account`
+   WARN. This is **reading a log line that the next reconnect will emit on its
+   own** — no window, no flag, no restart required.
 
-Everything else in this document is proven, and §1, §2, §4, §5, §6 and §7 each
-carry at least one PROVEN-LIVE row.
+Everything else in this document is proven, and §1, §2, §4, §5, §6, §7 and §8
+each carry at least one PROVEN-LIVE row.
+
+`lgns8.11` (production cutover and lettashim retirement) is closed against this
+state — see the "lgns8.11 close-out — 2026-08-01" section of
+`docs/architecture/lgns8-epic-status-and-shim-retirement-ceiling.md` for the
+role-by-role retirement record, the rollback inventory, and why the lettashim
+**service-stop** belongs to `lgns8.25.1` rather than to `.11`. `lgns8.10` stays
+open on row 1 above; the epic stays open on `lgns8.10`.
