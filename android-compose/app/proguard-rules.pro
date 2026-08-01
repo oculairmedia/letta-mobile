@@ -153,3 +153,45 @@
 -keepclasseswithmembernames class com.letta.mobile.runtime.local.** {
     native <methods>;
 }
+
+# ---------------------------------------------------------------------------
+# JNA + Iroh UniFFI bindings — JNI resolves fields/methods BY NAME (letta-mobile-t7fkg).
+#
+# Same failure class as the NativeLettaCodeNodeBridge keeps above, and just as
+# fatal. JNA's native initIDs() looks up `com.sun.jna.Pointer.peer` by name over
+# JNI. R8 renames that field, the lookup fails, and class-init of the whole Iroh
+# binding dies:
+#
+#   UnsatisfiedLinkError: Can't obtain peer field ID for class com.sun.jna.Pointer
+#     at com.sun.jna.Native.initIDs()
+#     at computer.iroh.UniffiRustCallStatus.<init>()
+#
+# The failure is release/minified ONLY — debug builds are unaffected, which is
+# why this survived undetected until a signed release was actually run over Iroh
+# on a device (prod v0.16.0: "Iroh connection not ready after 30000ms").
+# The .so files (libiroh_ffi.so, libjnidispatch.so) are packaged fine; it is
+# purely the Java-side names being mangled. DO NOT REMOVE — removing these
+# silently kills the Iroh transport in every production build.
+-dontwarn com.sun.jna.**
+-dontwarn computer.iroh.**
+
+# JNA core: Pointer.peer and Structure fields are read directly by native code.
+-keep class com.sun.jna.** { *; }
+-keepclassmembers class com.sun.jna.** {
+    <fields>;
+    native <methods>;
+}
+# Any project/library Structure or Callback subclass has its fields mapped by
+# name into the native layout, so field order and names must both survive.
+-keepclassmembers class * extends com.sun.jna.Structure {
+    <fields>;
+}
+-keep class * implements com.sun.jna.Callback { *; }
+
+# UniFFI-generated Iroh binding: RustBuffer/RustCallStatus and friends are
+# JNA Structures whose fields native Rust writes into by name.
+-keep class computer.iroh.** { *; }
+-keepclassmembers class computer.iroh.** {
+    <fields>;
+    native <methods>;
+}
