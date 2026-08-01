@@ -133,6 +133,11 @@ kotlin {
                 implementation("io.ktor:ktor-server-core:3.5.0")
                 implementation("io.ktor:ktor-server-cio:3.5.0")
                 implementation("io.ktor:ktor-server-websockets:3.5.0")
+                // TEST-ONLY. letta-mobile-vnp3q negative control: proves the
+                // OkHttp engine still rejects applyAppServerFrameLimits() (the
+                // #1064->#1077 production incident, fixed by #1078). No
+                // production source set may depend on this engine.
+                implementation("io.ktor:ktor-client-okhttp:3.5.0")
             }
         }
 

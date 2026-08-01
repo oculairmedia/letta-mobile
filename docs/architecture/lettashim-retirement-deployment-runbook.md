@@ -45,13 +45,65 @@ files.
 10. Every intentionally removed capability must return a typed
     `capability_unavailable` response.
 
+## Remaining Steps — 2026-08-01
+
+Everything in this runbook that is *code* has landed, and the packaged-dist
+cutover has been performed. **Production runs `dist 93908d8ec`** from
+`/opt/meridian/iroh-wrapper/releases/` behind the `current` symlink, with a
+wrapper-only environment file and the NodeId and pairing store verified
+unchanged. Deploy, incident, rollback option and verified redeploy are all on
+record — see `docs/testing/lgns8-acceptance-evidence-ledger.md` §6.
+
+Four items remain before `letta-mobile-lgns8.11` (production cutover and
+lettashim retirement) can close. None of them is implementation.
+
+| # | Item | Bead | Where |
+|---|---|---|---|
+| 1 | Device protocol steps 1–3 — concurrent conversations (UI half), Stop button (incl. the first real Desktop abort), image pipeline | `lgns8.19`, `iej8j`, `eaczz.10` | `docs/testing/lgns8-e2e-device-protocol.md` |
+| 2 | Cron/scheduler execution handover — schedules must still fire with lettashim stopped | `lgns8.24` (P0) | below, "Cron handover" |
+| 3 | Channels-host live cutover — flag on, `SHIM_CHANNELS_ENABLED=0`, **in that order** | `d7uls` (P1) | "Channels-host cutover (lgns8.23)" |
+| 4 | Inbound channel delivery after a reconnect with no re-issued `channel_start` | `lgns8.23.1` | folded into item 3's window |
+
+Two things about this list are easy to get wrong:
+
+- **Item 2 is not solved by "letta-code has cron".** 0.29.12 does ship cron
+  natively and does execute it (`startScheduler()` under the listen path), and
+  the shim shares `crons.json` with the bundled CLI byte-for-byte. But CRUD
+  coverage is not execution coverage. `PM-letta-mobile` runs on a `*/30`
+  schedule; a silently stopped scheduler is a silent failure. **Acceptance: a
+  1-minute test schedule fires across a controller restart, with an explicit and
+  logged missed-tick policy, and schedule state survives the restart.** Do this
+  before the shim goes down, not after.
+- **Item 3's double-host guard is an announcement, not a detection.** Nothing
+  checks whether lettashim is concurrently hosting the same account, and both
+  hosts live means every account double-starts against the same homeserver. The
+  stop-before-start ordering is mandatory: `SHIM_CHANNELS_ENABLED=0` and restart
+  lettashim first, verify no plugin import, *then* start the wrapper with
+  `--channels-host`. Never the reverse, never both in one window.
+
+Scope note that shrinks item 3 considerably: **the shim never hosted Matrix in
+production.** `/tmp/admin-shim.log` has zero `[matrix` lines — live Matrix runs
+through the separate legacy python client (`python -m src.matrix.client`,
+`matrix-tuwunel-deploy`). Only the `mobile` channel is shim-hosted. Matrix
+consolidation onto the plugin path is a separate, unforced migration and is
+**not** a prerequisite for retiring lettashim.
+
 ## Current Deployment Caveat
 
-The current production wrapper is not packaged as a release artifact. It runs
+> **Historical as of 2026-07-31.** The captured-classpath launcher described
+> below has been retired: `letta-mobile-r6221` cut the live service over to the
+> packaged dist, and `/etc/meridian/iroh-wrapper.env` now carries a wrapper-only
+> environment with no provider keys. Kept for the reasoning, and because the
+> rollback snapshot at `/root/meridian-rollback-pretrain` still contains the old
+> unit, launcher and classpath file. One template bug was found by that deploy
+> and fixed in flight: the unit template omitted the `JAVA_HOME` pin while the
+> dist targets class-file 65 and the system java is 17.
+
+The pre-2026-07-31 production wrapper was not packaged as a release artifact. It ran
 `com.letta.mobile.cli.Main` from the Android `:cli` unit-test runtime classpath
 captured in `/etc/meridian/iroh-wrapper-classpath.txt`.
 
-This is transitional and must not become the shim-free deployment mechanism:
+That was transitional and must not become the shim-free deployment mechanism:
 
 - dependency changes require classpath recapture;
 - build outputs are loaded directly from a worktree;
@@ -240,9 +292,12 @@ Still open inside Phase 4:
 
 - legacy mobile WS shim connector deletion (item 6) — tracked as follow-up.
 
-### Phase 5: Package the wrapper — DONE (code), deploy pending
+### Phase 5: Package the wrapper — DONE (code and deploy)
 
-Delivered by `letta-mobile-zsgad`. The module exists at the preferred path:
+Code delivered by `letta-mobile-zsgad` (PR #1073); deployed to production by
+`letta-mobile-r6221` on 2026-07-31 and re-deployed the same evening onto
+`releases/hotfix-1078` after the OkHttp frame-limit incident. The module exists
+at the preferred path:
 
 ```text
 android-compose/iroh-wrapper-cli/

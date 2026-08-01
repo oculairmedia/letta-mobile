@@ -279,3 +279,150 @@ long-run convergence, with (c) available only as a bridge if the retirement date
 is forced. Either way, `lgns8.11` (full shim retirement) cannot close until one
 of these lands — it should be marked blocked on `lgns8.23`/`q2b9z` rather than
 carried as merely outstanding.
+
+> **Superseded on 2026-08-01.** Options (a)/(b)/(c) above were resolved by
+> measurement, not by choosing: see "3. Channels, resolved" in the final section
+> below. Read the addendum for the reasoning, the final section for the outcome.
+
+---
+
+# Final status — 2026-08-01
+
+Every **code** bead in the lgns8 epic has landed. What remains is not
+implementation: it is three device runs and three operational steps. This
+section is the epic's closing record.
+
+The evidence behind every claim here is catalogued in
+**`docs/testing/lgns8-acceptance-evidence-ledger.md`**, which grades each
+acceptance dimension PROVEN-LIVE / PROVEN-HARNESS / PENDING-INTERACTIVE /
+PENDING-OPS. This section states the conclusions; the ledger holds the proof.
+
+## 1. The code is done
+
+The final day merged nine PRs on top of the train:
+
+| PR | Bead | What landed |
+|---|---|---|
+| #1077 | — | Train: batch merge of the lgns8 queue (#1062, #1066–#1073, #1075, #1076) |
+| #1078 | — | CIO engine for the wrapper — OkHttp rejects the WS frame-size limit |
+| #1079 | `wxy4s` | Application-level liveness probe for dead QUIC connections |
+| #1080 | `lgns8.22.5` | `ApprovalRegistry` + `ExternalToolDispatcher` extracted |
+| #1081 | `lgns8.10.4.1` | Legacy mobile WS shim connectors retired from the Iroh path |
+| #1082 | `lgns8.9` | Admin REST adapter retired with real per-method owners |
+| #1083 | `lgns8.23` | Controller-native channel restore behind `--channels-host` |
+
+Preceded on the same day by #1055/#1056 (`or40x`), #1059 (`lgns8.21.1.1`), #1060
+(`lgns8.25`), #1061 (`lgns8.22.4.1`), #1063 (`lgns8.21`), #1064 (`lgns8.21.7`),
+#1065 (`8xxzv`), #1073 (`zsgad`) and #1074 (`jr5tx`).
+
+**Production runs `dist 93908d8ec`** — the packaged wrapper distribution
+carrying the full epic — from `/opt/meridian/iroh-wrapper/releases/` behind the
+`current` symlink, with a wrapper-only environment file, `StateDirectory=meridian`,
+and the NodeId and pairing store verified unchanged across the cutover.
+
+That deployment was not a quiet one, and it is better evidence for it: the
+packaged dist was deployed, took a production outage from the OkHttp frame-limit
+regression (#1064 → #1077), had a rollback snapshot available, and was recovered
+by rolling **forward** to `releases/hotfix-1078` with live verification
+(`generation.ready attempt=0`, native admin routes succeeding, both devices
+reconnected). Deploy, incident, rollback option, and verified redeploy inside one
+day — see ledger §6.
+
+## 2. The ceiling is exactly where .9 left it
+
+`lgns8.9` closed the admin-REST question and nothing since has moved it. The
+remaining upstream ceiling is unchanged from the table above:
+
+- **15 methods, all writes or reads with no store behind them** — 12 write
+  methods (`tool.*` CRUD/attach, `block.*` CRUD/attach, `passage.create`,
+  `passage.delete`) and 3 reads (`passage.list`, `identity.get`, `job.get`),
+  plus `message.search` which has no admin_rpc method at all. Every one is
+  already non-functional today: lettashim 404s them. **Denying them is parity,
+  not regression.** Each waits on an upstream App Server command (tool library,
+  global block, archival memory, identity, job, search).
+- **`letta-mobile-q2b9z` is now a nicety, not a blocker.** It was re-scoped on
+  2026-07-31 from "upstream must make `initializeChannels()` reachable under
+  `--listen`" (a hard blocker) to "boot-time restore would be nice upstream"
+  (P3). The `channel_start` / `channel_account_start` / `channel_set_config`
+  frames are reachable over the app-server WS under bare `--listen`, each
+  routing `ensureChannelRegistry().startChannelAccount()` then
+  `wireChannelIngress`. The only genuine gap was boot-time restore, and #1083
+  closed it **controller-side** — the Kotlin controller re-issues
+  `channel_start` for enabled accounts after each connect and reattach.
+
+Nothing on the ceiling list is served by lettashim either. The wrapper does not
+need the shim's REST admin surface at all.
+
+## 3. Channels, resolved — and lettashim retirement de-risked
+
+The single most consequential finding of the closing window is a negative one.
+
+**The shim never hosted Matrix in production.** `/tmp/admin-shim.log` contains
+**zero** `[matrix` lines across the analysed window — only `[mobile:default]`.
+Live Matrix traffic runs through a separate legacy python client
+(`python -m src.matrix.client`, the `matrix-tuwunel-deploy` stack). The
+addendum's blunt claim above — "retiring lettashim right now takes Matrix and
+the mobile channel host down with it (~130 per-agent Matrix identities, 180
+`routing.yaml` routes)" — was **wrong on the Matrix half**. It was inferred from
+`SHIM_CHANNELS_ENABLED=1` and the presence of the plugin loader, without
+checking whether the shim's log ever showed it loading.
+
+Three consequences:
+
+1. **Only the `mobile` channel is shim-hosted**, and #1083 gives it a
+   controller-native host behind `--channels-host`. That is the whole cutover.
+2. **Matrix consolidation becomes a separate, unforced migration** — moving the
+   python client onto the plugin path, on its own schedule, not on the shim's.
+3. The patched `plugin.mjs` could be staged into `/root/.letta/channels/matrix/`
+   with zero production risk, because nothing live imports it.
+
+The (a)/(b)/(c) re-scope options are therefore moot: the answer is neither
+"wait upstream" nor "run a second supervised process" nor "keep the shim as a
+bounded channel host". It is **controller-native restore over the existing WS**,
+which #1083 implemented and 14 tests guard.
+
+One caution carries forward into the cutover: the double-host guard in #1083 is
+an **announcement, not a detection**. Nothing checks whether lettashim is
+concurrently hosting the same account. The stop-before-start ordering in the
+runbook is mandatory — `SHIM_CHANNELS_ENABLED=0` and restart lettashim *first*,
+verify, *then* start the wrapper with `--channels-host`. Never the reverse,
+never both in one window.
+
+## 4. A regression class closed, and why it was open
+
+The `#1064 → #1077` frame-limit incident deserves recording as an epic-level
+lesson rather than a footnote. #1064 applied a non-default `maxFrameSize` to
+every App Server `/ws` client. Ktor's OkHttp engine rejects any non-default
+`maxFrameSize` at connect time. The wrapper went dark in production; only #1078
+fixed it, live.
+
+Three tests existed over that exact code and none could have caught it: one
+asserted the *constant*, one asserted the plugin *carried* the value on an
+already-CIO client, and the lifecycle test connected with a hand-rolled client
+that was not any production config. **No test performed a real connect with a
+real production engine.** `letta-mobile-vnp3q` closes that structurally:
+`AppServerProductionEngineConnectTest` drives a genuine connect and frame
+exchange against an embedded Ktor WS server using each production client's exact
+engine and `WebSockets` configuration, with an OkHttp negative control that
+reproduces the incident on demand — so the positive cases are proven capable of
+failing, not merely green.
+
+## 5. What `lgns8.11` still needs
+
+Cutover is gated on four items, all of them runs rather than code. They are the
+PENDING rows of the evidence ledger:
+
+| # | Item | Bead | Kind |
+|---|---|---|---|
+| 1 | Device protocol steps 1–3: concurrent conversations (UI half), Stop button (incl. first real Desktop abort), image pipeline | `lgns8.19`, `iej8j`, `eaczz.10` | PENDING-INTERACTIVE |
+| 2 | Cron/scheduler execution handover — schedules must still fire with lettashim stopped, across a controller restart, with a logged missed-tick policy | `lgns8.24` (P0) | PENDING-OPS |
+| 3 | Channels-host live cutover — flag on, `SHIM_CHANNELS_ENABLED=0`, in that order | `d7uls` (P1) | PENDING-OPS |
+| 4 | Inbound channel delivery after a reconnect with no re-issued `channel_start` | `lgns8.23.1` | PENDING-OPS (folded into `d7uls`) |
+
+Item 2 is the one most likely to be under-weighted. letta-code 0.29.12 ships
+cron natively *and executes it* (`startScheduler()` under the listen path), and
+the shim shares `crons.json` with the bundled CLI byte-for-byte — so this reads
+like a solved problem. It is not: **CRUD coverage is not execution coverage.**
+`PM-letta-mobile` runs on a `*/30` schedule and a silently stopped scheduler is a
+silent failure. Prove a 1-minute test schedule firing across a controller
+restart before the shim goes down.
