@@ -2,6 +2,10 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.util.TelemetryDelegate
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -250,6 +254,46 @@ class RosterNameTelemetryTest {
         val ev = lastEvent("name.fallback")
         assertEquals("chatCoordinator", ev.attrs["site"])
         assertEquals("previousUiName", ev.attrs["fallbackKind"])
+    }
+
+    @Test
+    fun `concurrent cache miss resolvers join one request and reuse success`() = runTest {
+        val release = CompletableDeferred<String?>()
+        var fetches = 0
+        val resolver = RosterNameResolver(
+            fetch = { _: String ->
+                fetches += 1
+                release.await()
+            },
+            source = "test",
+        )
+
+        val first = async { resolver.resolve("agent-1") }
+        runCurrent()
+        val second = async { resolver.resolve("agent-1") }
+        runCurrent()
+        assertEquals(1, fetches)
+
+        release.complete("Ada")
+        runCurrent()
+        assertEquals("Ada", first.await())
+        assertEquals("Ada", second.await())
+        assertEquals("Ada", resolver.resolve("agent-1"))
+        assertEquals(1, fetches)
+        val event = lastEvent("name.resolveOutcome")
+        assertEquals("success", event.attrs["outcome"])
+    }
+
+    @Test
+    fun `not found and failure resolve outcomes are loud`() = runTest {
+        RosterNameResolver<String>({ null }, "test").resolve("missing")
+        RosterNameResolver<String>({ error("down") }, "test").resolve("failed")
+
+        val outcomes = eventsNamed("name.resolveOutcome").associateBy { it.attrs["agentId"] }
+        assertEquals("notFound", outcomes["missing"]?.attrs?.get("outcome"))
+        assertEquals(Telemetry.Level.WARN, outcomes["missing"]?.level)
+        assertEquals("failure", outcomes["failed"]?.attrs?.get("outcome"))
+        assertEquals(Telemetry.Level.WARN, outcomes["failed"]?.level)
     }
 
     @Test

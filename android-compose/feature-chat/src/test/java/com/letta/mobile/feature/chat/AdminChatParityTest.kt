@@ -15,12 +15,14 @@ import com.letta.mobile.testutil.TestData
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -126,6 +128,35 @@ class AdminChatParityTest {
         assertEquals(current, next)
     }
 
+    @Test
+    fun `cache miss resolves agent name into chat header state`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        assertEquals("Ada", harness.uiState.value.agentName)
+    }
+
+    @Test
+    fun `cache miss resolver is a no-op when the cache already has the agent`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+        every { harness.agentRepository.getCachedAgent(AgentId("agent-1")) } returns
+            TestData.agent(id = "agent-1", name = "Cached Ada")
+
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+
+        // letta-mobile-xl1o2 AC: when the cache already has the agent, the
+        // resolver MUST NOT trigger a per-id fetch. The only getAgent call
+        // the harness ever sees is the one from loadMessagesInternal, not
+        // the resolver's getAgent.
+        val resolverCalls = harness.coordinator.rosterNameResolverForTest.resolveCallsForTest()
+        assertEquals(0, resolverCalls)
+    }
+
     private class Harness(scope: CoroutineScope) {
         val chatSessionResolver: ChatSessionResolver = mockk(relaxed = true)
         val agentRepository: IAgentRepository = mockk(relaxed = true)
@@ -175,7 +206,8 @@ class AdminChatParityTest {
 
         init {
             every { agentRepository.getCachedAgent(AgentId("agent-1")) } returns null
-            every { agentRepository.getAgent(AgentId("agent-1")) } returns flowOf(TestData.agent(id = "agent-1", name = "Ada"))
+            coEvery { agentRepository.getAgent(AgentId("agent-1")) } returns flowOf(TestData.agent(id = "agent-1", name = "Ada"))
+            every { agentRepository.agents } returns MutableStateFlow(emptyList())
         }
     }
 }

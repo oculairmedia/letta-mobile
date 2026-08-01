@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.coordination
 import com.letta.mobile.data.channel.CurrentConversationTracker
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.UiMessage
+import com.letta.mobile.data.repository.RosterNameResolver
 import com.letta.mobile.data.repository.RosterNameTelemetry
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.util.Telemetry
@@ -85,6 +86,10 @@ internal class ChatConversationCoordinator(
     private var hasResolvedConversationOnce: Boolean = false
     private var clientModeBootstrapState: ClientModeBootstrapState =
         if (isFreshRoute) ClientModeBootstrapState.NewConversationPending else ClientModeBootstrapState.Idle
+    private val rosterNameResolver = RosterNameResolver(
+        fetch = { id -> agentRepository.getAgent(AgentId(id)).first() },
+        source = "ChatConversationCoordinator",
+    )
 
     fun conversationId(useClientMode: Boolean): String? =
         activeConversationId ?: if (useClientMode) currentClientModeConversationId() else null
@@ -268,10 +273,11 @@ internal class ChatConversationCoordinator(
         } else {
             val cachedAgent = agentRepository.getCachedAgent(AgentId(agentId))
             reportNameFallbackIfUnresolved(cachedAgent?.name)
+            val agent = cachedAgent ?: resolveMissingAgentName()
             val summary = ChatConversationSummary(
                 id = conversationId,
-                title = cachedAgent?.name ?: uiState.value.agentName,
-                agentName = cachedAgent?.name ?: uiState.value.agentName,
+                title = agent?.name ?: uiState.value.agentName,
+                agentName = agent?.name ?: uiState.value.agentName,
                 updatedAtLabel = "",
                 lastMessagePreview = "",
             )
@@ -279,6 +285,7 @@ internal class ChatConversationCoordinator(
                 val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
                 ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
             }
+            agent?.name?.let { uiState.value = uiState.value.copy(agentName = it) }
             loadMessagesInternal()
         }
 
@@ -301,6 +308,10 @@ internal class ChatConversationCoordinator(
             rosterSize = agentRepository.agents.value.size,
         )
     }
+
+    private suspend fun resolveMissingAgentName() = rosterNameResolver.resolve(agentId)
+
+    internal val rosterNameResolverForTest get() = rosterNameResolver
 
     private suspend fun resolveMostRecentConversation(maxAgeMs: Long): String? {
         return chatSessionResolver.resolveMostRecentConversation(agentId, maxAgeMs)
