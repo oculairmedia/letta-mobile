@@ -183,6 +183,24 @@ class AppServerServeIrohCommand : CliktCommand(
             "there). Overrides --app-server-url when set.",
     ).flag(default = false)
 
+    /**
+     * lgns8.23: take channels-host ownership in the controller.
+     *
+     * OFF by default because production still runs lettashim as the channels
+     * host (SHIM_CHANNELS_ENABLED=1). Enabling both hosts would double-start the
+     * same accounts against the same homeserver. Cutover is a single maintenance
+     * step: set SHIM_CHANNELS_ENABLED=0 on lettashim, then start the wrapper with
+     * --channels-host. See docs/architecture/lettashim-retirement-deployment-runbook.md.
+     */
+    private val channelsHost by option(
+        "--channels-host",
+        envvar = "LETTA_CHANNELS_HOST",
+        help = "lgns8.23: restore enabled channel accounts (channels_list -> " +
+            "channel_accounts_list -> channel_start) on every App Server connect and " +
+            "reconnect, making this controller the channels host. Requires lettashim's " +
+            "SHIM_CHANNELS_ENABLED=0 — running both hosts double-starts accounts.",
+    ).flag(default = false)
+
     private val lettaCommand by option(
         "--letta-command",
         envvar = "LETTA_COMMAND",
@@ -266,6 +284,14 @@ class AppServerServeIrohCommand : CliktCommand(
                     "(methods: ${adminRpcRouter.methodCount}, " +
                     "subagent_registry_v1: ${AdminRpcRegistry.subagentMethods.all { it in adminRpcRouter.registeredMethods }})",
             )
+
+            if (channelsHost) {
+                println(
+                    "[iroh-app-server] channels-host ENABLED (lgns8.23): enabled channel accounts are " +
+                        "restored on every App Server connect/reconnect. lettashim MUST run with " +
+                        "SHIM_CHANNELS_ENABLED=0 — two hosts double-start the same accounts.",
+                )
+            }
 
             // Start accepting connections
             irohEndpoint.start(controller)
@@ -402,6 +428,11 @@ class AppServerServeIrohCommand : CliktCommand(
                             System.err.println("[iroh-app-server] reattach failed: ${it.message}")
                         }
                     }
+                    // lgns8.23: restore channel accounts on THIS generation's client.
+                    // Must run on every generation-ready (not just the first): a
+                    // repeat channel_start re-wires ingress to the live socket, which
+                    // a reconnect otherwise leaves pointed at the dead one.
+                    restoreChannels(client)
                     controllerRef?.markConnected()
                     println(
                         "[iroh-app-server] App Server connection recovered " +
@@ -424,6 +455,31 @@ class AppServerServeIrohCommand : CliktCommand(
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
         reconnectingClient.start(scope)
         return controller to reconnectingClient
+    }
+
+    /**
+     * lgns8.23: flag-gated channels-host restore. No-op unless --channels-host is
+     * set, so the default deployment keeps lettashim as the sole channels host.
+     * Never fails recovery — a channel outage must not block runtime reattach.
+     */
+    private suspend fun restoreChannels(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+        if (!channelsHost) return
+        val result = com.letta.mobile.data.controller.channels.ChannelRestoreCoordinator(
+            client = client,
+            log = { System.err.println("[iroh-app-server] $it") },
+        ).restore()
+        // Identifiers + counts only: channel account config carries cleartext
+        // plugin credentials and must never reach a log sink (lgns8.23 landmine 2).
+        println(
+            "[iroh-app-server] channels-host restore: channels=${result.channelIds.size} " +
+                "started=${result.startedAccounts} failed=${result.failures.size}",
+        )
+        result.failures.forEach {
+            System.err.println(
+                "[iroh-app-server] channel restore failed: " +
+                    "${it.channelId ?: "-"}/${it.accountId ?: "-"} phase=${it.phase} reason=${it.reason}",
+            )
+        }
     }
 
     private fun createStubController(

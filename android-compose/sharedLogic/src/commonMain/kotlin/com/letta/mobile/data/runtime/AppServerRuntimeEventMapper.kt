@@ -51,6 +51,13 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.CronDeleteAllResponse,
             is AppServerInboundFrame.GetReflectionSettingsResponse,
             is AppServerInboundFrame.SetReflectionSettingsResponse,
+            // Channels host (lgns8.23): controller-initiated, correlated by the
+            // request registry, and credential-bearing — never a turn event and
+            // never mapped into a runtime draft that could reach a viewer.
+            is AppServerInboundFrame.ChannelsListResponse,
+            is AppServerInboundFrame.ChannelAccountsListResponse,
+            is AppServerInboundFrame.ChannelStartResponse,
+            is AppServerInboundFrame.ChannelAccountUpdateResponse,
             -> emptyList()
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)

@@ -1604,8 +1604,23 @@
     },
     {
       "domain": "channels",
-      "current_state": "no Iroh admin surface; native channel_* commands exist in the pinned inventory",
-      "decision": "capability-gated future work; not in lgns8.7-.9 scope; any exposure requires explicit per-command policy (lgns8.12)"
+      "shim_routes": [
+        "GET /v1/channels",
+        "GET /v1/channels/{id}/accounts",
+        "POST /v1/channels/{id}/start",
+        "POST /v1/channels/{id}/stop"
+      ],
+      "current_state": "lettashim (SHIM_CHANNELS_ENABLED=1) is the live channels host: it imports ~/.letta/channels/*/plugin.mjs (matrix, mobile) and serves /v1/channels/*. No Iroh admin_rpc surface. Upstream letta-code 0.29.12 DOES accept channel_* over the app-server WS under --listen with no handshake, but initializeChannels() is unreachable at boot there, so enabled accounts are never auto-restored.",
+      "disposition": "alive_keep_on_shim_until_successor",
+      "decision": "CONTROLLER-NATIVE BEHIND A FLAG (lgns8.23). ChannelRestoreCoordinator (sharedLogic) closes the boot-restore gap client-side: channels_list -> channel_accounts_list -> channel_start for every enabled account, re-issued on EVERY generation-ready because channel_start also re-wires ingress to the issuing socket. Shipped OFF behind --channels-host / LETTA_CHANNELS_HOST; production keeps lettashim as host until the maintenance-window cutover (flag on + SHIM_CHANNELS_ENABLED=0) \u2014 two hosts would double-start the same accounts. This is NOT an admin_rpc exposure: channel_* frames are controller-initiated and controller-internal, never fanned out to viewers, because channel_accounts_list returns plugin config (Matrix accessToken/syncAccessToken) in CLEARTEXT. Any future VIEWER-facing channel surface still requires the explicit per-command sensitive-capability policy of lgns8.12.",
+      "evidence": "EMPIRICAL, letta-mobile-lgns8.23.1 probe 2026-07-31 against letta-code 0.29.12 on a throwaway HOME: (1) channel_* accepted on a bare socket with no handshake; (2) our matrix plugin discovered via channel.json and started to running=true with a live sync; (3) boot-restore absent after appserver restart (enabled=true, running=false) until a client-issued channel_start restored it; (4) a repeated channel_start is a clean stop+start, exactly one sync loop, no leak; (5) a FAILED channel_start persists enabled:false into accounts.json \u2014 hence the enabled re-assertion in the coordinator; (6) channel_accounts_list returns accessToken/syncAccessToken in cleartext.",
+      "successor": "controller_native (ChannelRestoreCoordinator, flag-gated --channels-host; cutover deferred to the lgns8.11 maintenance window)",
+      "native_contract": [
+        "channels_list",
+        "channel_accounts_list",
+        "channel_start",
+        "channel_account_update"
+      ]
     },
     {
       "domain": "secrets",
