@@ -181,85 +181,14 @@ open class SubagentRepository(
         // Clear absence tracking for entries that ARE present in this snapshot.
         incomingByKey.keys.forEach { key -> absence.remove(key) }
 
-        // Delta signal: AUTHORITATIVE snapshot count disagrees with local.
-        if (kind == SnapshotKind.AUTHORITATIVE) {
-            val localRunning = state.value.count { it.status == SubagentStatus.RUNNING }
-            val incomingRunning = incoming.count { it.status == SubagentStatus.RUNNING }
-            if (localRunning != incomingRunning) {
-                Telemetry.event(
-                    "SubagentRepo",
-                    "merge.deltaRunningCount",
-                    "localRunning" to localRunning,
-                    "incomingRunning" to incomingRunning,
-                    "delta" to (localRunning - incomingRunning),
-                )
-            }
-        }
-
+        val absentRunning = absentRunningEntries(incomingByKey, terminalKey)
         val retained = when (kind) {
             SnapshotKind.AUTHORITATIVE -> {
-                // Ground truth: running entries omitted from a full
-                // subagent_list response are EVICTED immediately.
-                val evicted = state.value.filter { previous ->
-                    val key = previous.cacheKey()
-                    previous.status == SubagentStatus.RUNNING &&
-                        key !in incomingByKey &&
-                        key != terminalKey
-                }
-                evicted.forEach { entry ->
-                    val key = entry.cacheKey()
-                    absence.remove(key)
-                    Telemetry.event(
-                        "SubagentRepo",
-                        "merge.evictRunning",
-                        "cacheKey" to key,
-                        "status" to entry.status,
-                        "kind" to kind.name,
-                        "reason" to "absent-from-authoritative-snapshot",
-                    )
-                }
+                emitDeltaRunningCount(incoming)
+                evictAbsentRunning(absentRunning, absence, kind)
                 emptyList()
             }
-            SnapshotKind.INCREMENTAL -> {
-                // Conservative: retain running entries omitted from a push,
-                // bounded by absence linger to prevent unbounded retention.
-                state.value.filter { previous ->
-                    val key = previous.cacheKey()
-                    previous.status == SubagentStatus.RUNNING &&
-                        key !in incomingByKey &&
-                        key != terminalKey
-                }.filter { previous ->
-                    val key = previous.cacheKey()
-                    val absentSince = absence[key]
-                    if (absentSince == null) {
-                        absence[key] = now
-                        Telemetry.event(
-                            "SubagentRepo",
-                            "merge.retainRunning",
-                            "cacheKey" to key,
-                            "status" to previous.status,
-                            "ageMs" to 0L,
-                            "kind" to kind.name,
-                            "reason" to "absent-from-push-retained",
-                        )
-                        true
-                    } else if (now - absentSince < RUNNING_ABSENCE_LINGER_MS) {
-                        true
-                    } else {
-                        absence.remove(key)
-                        Telemetry.event(
-                            "SubagentRepo",
-                            "merge.evictRunning",
-                            "cacheKey" to key,
-                            "status" to previous.status,
-                            "ageMs" to (now - absentSince),
-                            "kind" to kind.name,
-                            "reason" to "absent-from-push-exceeded-linger",
-                        )
-                        false
-                    }
-                }
-            }
+            SnapshotKind.INCREMENTAL -> retainWithinLinger(absentRunning, absence, now, kind)
         }
 
         // Publish the absence clock once, after every branch above has settled.
@@ -271,6 +200,96 @@ open class SubagentRepository(
                 previous.terminalAtEpochMs?.let { now - it < TERMINAL_LINGER_MS } == true
         }
         return (completeIncoming + retained + previousTerminals).distinctBy { it.cacheKey() }
+    }
+
+    /** Locally-RUNNING entries that this snapshot did not mention. */
+    private fun absentRunningEntries(
+        incomingByKey: Map<String, SubagentEntry>,
+        terminalKey: String?,
+    ): List<SubagentEntry> = state.value.filter { previous ->
+        val key = previous.cacheKey()
+        previous.status == SubagentStatus.RUNNING &&
+            key !in incomingByKey &&
+            key != terminalKey
+    }
+
+    /** Delta signal: AUTHORITATIVE snapshot count disagrees with local. */
+    private fun emitDeltaRunningCount(incoming: List<SubagentEntry>) {
+        val localRunning = state.value.count { it.status == SubagentStatus.RUNNING }
+        val incomingRunning = incoming.count { it.status == SubagentStatus.RUNNING }
+        if (localRunning == incomingRunning) return
+        Telemetry.event(
+            "SubagentRepo",
+            "merge.deltaRunningCount",
+            "localRunning" to localRunning,
+            "incomingRunning" to incomingRunning,
+            "delta" to (localRunning - incomingRunning),
+        )
+    }
+
+    /**
+     * Ground truth: running entries omitted from a full subagent_list
+     * response are EVICTED immediately.
+     */
+    private fun evictAbsentRunning(
+        absentRunning: List<SubagentEntry>,
+        absence: MutableMap<String, Long>,
+        kind: SnapshotKind,
+    ) {
+        absentRunning.forEach { entry ->
+            val key = entry.cacheKey()
+            absence.remove(key)
+            Telemetry.event(
+                "SubagentRepo",
+                "merge.evictRunning",
+                "cacheKey" to key,
+                "status" to entry.status,
+                "kind" to kind.name,
+                "reason" to "absent-from-authoritative-snapshot",
+            )
+        }
+    }
+
+    /**
+     * Conservative: retain running entries omitted from a push, bounded by
+     * absence linger to prevent unbounded retention.
+     */
+    private fun retainWithinLinger(
+        absentRunning: List<SubagentEntry>,
+        absence: MutableMap<String, Long>,
+        now: Long,
+        kind: SnapshotKind,
+    ): List<SubagentEntry> = absentRunning.filter { previous ->
+        val key = previous.cacheKey()
+        val absentSince = absence[key]
+        if (absentSince == null) {
+            absence[key] = now
+            Telemetry.event(
+                "SubagentRepo",
+                "merge.retainRunning",
+                "cacheKey" to key,
+                "status" to previous.status,
+                "ageMs" to 0L,
+                "kind" to kind.name,
+                "reason" to "absent-from-push-retained",
+            )
+            return@filter true
+        }
+        val ageMs = now - absentSince
+        if (ageMs < RUNNING_ABSENCE_LINGER_MS) {
+            return@filter true
+        }
+        absence.remove(key)
+        Telemetry.event(
+            "SubagentRepo",
+            "merge.evictRunning",
+            "cacheKey" to key,
+            "status" to previous.status,
+            "ageMs" to ageMs,
+            "kind" to kind.name,
+            "reason" to "absent-from-push-exceeded-linger",
+        )
+        false
     }
 
     private fun SubagentEntry.cacheKey(): String = listOf(
