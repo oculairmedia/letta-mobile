@@ -41,7 +41,10 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.singleWindowApplication
+import com.letta.mobile.desktop.initializeDesktopLifecycleMainThread
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_MAIN_PREMULTIPLIED
 import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
@@ -53,9 +56,10 @@ import org.jetbrains.skia.RuntimeShaderBuilder
 import kotlin.math.PI
 
 /**
- * Realtime lookdev for the ambient agent-status shader.
+ * Realtime lookdev for the ambient agent-status shader, hosted as a SECOND
+ * window inside the running app:
  *
- *   ./gradlew :desktop:runShaderLookdev
+ *   LETTA_SHADER_LOOKDEV=1 ./gradlew :desktop:run
  *
  * Live-edit the SkSL on the left (recompiles per keystroke — Skia compiles in
  * milliseconds; the last GOOD effect keeps rendering through syntax errors),
@@ -64,10 +68,36 @@ import kotlin.math.PI
  * readability is judged against real content, using the exact production
  * pipeline (RuntimeEffect + nativeCanvas). When the look lands, port the SkSL
  * back to AmbientShaderSource.kt and the numbers to AmbientMotion.kt.
+ *
+ * Also embeddable in the running app as a second window
+ * (LETTA_SHADER_LOOKDEV=1 with :desktop:run) for tuning against the real
+ * theme.
  */
-fun main() = singleWindowApplication(title = "Ambient Shader Lookdev") {
-    MaterialTheme(colorScheme = darkColorScheme()) {
-        Surface(modifier = Modifier.fillMaxSize()) { LookdevRoot() }
+fun main() {
+    // Without this, Compose 1.11 + lifecycle deadlocks the EDT in
+    // MainDispatcherChecker (runBlocking onto Dispatchers.Main from the main
+    // thread) before the window ever shows — the app's Main.kt documents the
+    // same workaround.
+    initializeDesktopLifecycleMainThread()
+    singleWindowApplication(title = "Ambient Shader Lookdev") {
+        MaterialTheme(colorScheme = darkColorScheme()) {
+            Surface(modifier = Modifier.fillMaxSize()) { LookdevRoot() }
+        }
+    }
+}
+
+@Composable
+internal fun ShaderLookdevWindow() {
+    var open by remember { mutableStateOf(true) }
+    if (!open) return
+    Window(
+        onCloseRequest = { open = false },
+        title = "Ambient Shader Lookdev",
+        state = rememberWindowState(width = 1280.dp, height = 860.dp),
+    ) {
+        MaterialTheme(colorScheme = darkColorScheme()) {
+            Surface(modifier = Modifier.fillMaxSize()) { LookdevRoot() }
+        }
     }
 }
 
