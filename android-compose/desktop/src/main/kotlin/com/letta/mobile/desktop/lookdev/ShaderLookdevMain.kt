@@ -14,9 +14,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.io.File
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -159,6 +165,36 @@ half4 main(float2 fragCoord) {
 }
 """
 
+private data class ShaderVariant(val name: String, val source: String, val mtime: Long)
+
+/**
+ * Variant library: every `*.sksl` file in `desktop/lookdev-shaders/`, polled
+ * live — drop a new file (or overwrite one) while the window is open and the
+ * carousel updates within ~a second. This is the design-injection loop: the
+ * agent authors variants as files, the human scrolls the carousel.
+ */
+private fun resolveVariantDir(): File? =
+    sequenceOf(
+        System.getProperty("lookdev.shaderDir")?.let(::File),
+        File("lookdev-shaders"),
+        File("desktop/lookdev-shaders"),
+        File("android-compose/desktop/lookdev-shaders"),
+    ).filterNotNull().firstOrNull { it.isDirectory }
+
+private fun loadVariants(dir: File?): List<ShaderVariant> =
+    dir?.listFiles { f -> f.isFile && f.name.endsWith(".sksl") }
+        ?.sortedBy { it.name }
+        ?.mapNotNull { file ->
+            runCatching {
+                ShaderVariant(
+                    name = file.name.removeSuffix(".sksl").substringAfter('-'),
+                    source = file.readText(),
+                    mtime = file.lastModified(),
+                )
+            }.getOrNull()
+        }
+        .orEmpty()
+
 private class LookdevState {
     var speed by mutableFloatStateOf(1.7f)
     var agitation by mutableFloatStateOf(1.6f)
@@ -167,6 +203,8 @@ private class LookdevState {
     var tint by mutableStateOf(Color(0xFF3FE0C0))
     var source by mutableStateOf(PROPOSED_DESKTOP_SKSL)
     var compileError by mutableStateOf<String?>(null)
+    var variants by mutableStateOf(listOf<ShaderVariant>())
+    var selectedVariant by mutableStateOf<String?>(null)
 }
 
 @Composable
@@ -192,6 +230,26 @@ private fun LookdevRoot() {
         }
     }
 
+    // Poll the variant folder: new/changed .sksl files appear in the carousel
+    // live; if the file behind the SELECTED variant changes on disk, hot-swap
+    // it into the editor — overwrite-and-see, no restart.
+    LaunchedEffect(Unit) {
+        val dir = resolveVariantDir()
+        while (true) {
+            val fresh = withContext(Dispatchers.IO) { loadVariants(dir) }
+            if (fresh != state.variants) {
+                val selected = state.selectedVariant
+                val previous = state.variants.firstOrNull { it.name == selected }
+                val updated = fresh.firstOrNull { it.name == selected }
+                state.variants = fresh
+                if (previous != null && updated != null && updated.mtime != previous.mtime) {
+                    state.source = updated.source
+                }
+            }
+            delay(1_000)
+        }
+    }
+
     Row(Modifier.fillMaxSize()) {
         ControlsColumn(state)
         PreviewPane(state, { builder }, { phase })
@@ -208,10 +266,29 @@ private fun ControlsColumn(state: LookdevState) {
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("Source", style = MaterialTheme.typography.labelLarge)
+        Text(
+            "Variants — drop .sksl files into desktop/lookdev-shaders/ (live)",
+            style = MaterialTheme.typography.labelLarge,
+        )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            items(state.variants, key = { it.name }) { variant ->
+                val selected = state.selectedVariant == variant.name
+                Button(onClick = {
+                    state.selectedVariant = variant.name
+                    state.source = variant.source
+                }) {
+                    Text(if (selected) "▶ ${variant.name}" else variant.name, fontSize = 10.sp)
+                }
+            }
+        }
+        Text("Built-in sources", style = MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Button(onClick = { state.source = PROPOSED_DESKTOP_SKSL }) { Text("Proposed", fontSize = 10.sp) }
             Button(onClick = {
+                state.selectedVariant = null
+                state.source = PROPOSED_DESKTOP_SKSL
+            }) { Text("Proposed", fontSize = 10.sp) }
+            Button(onClick = {
+                state.selectedVariant = null
                 state.source = AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_PREMULTIPLIED
             }) { Text("Production (near-invisible)", fontSize = 10.sp) }
         }

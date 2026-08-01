@@ -1,0 +1,41 @@
+uniform float2 uSize;
+uniform float uTime;
+uniform float uAgitation;
+uniform float uEnvelope;
+uniform vec4 uColor;
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i + float2(0.0, 0.0)), hash(i + float2(1.0, 0.0)), u.x),
+        mix(hash(i + float2(0.0, 1.0)), hash(i + float2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+float fbm(float2 p) {
+    float v = 0.0;
+    v += 0.50 * noise(p);
+    v += 0.28 * noise(p * 2.1 + 13.7);
+    v += 0.16 * noise(p * 4.3 + 47.1);
+    return v;
+}
+
+// Fog: slow rolling ground-fog layers; calm, almost still at low agitation.
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
+    float t = uTime * 0.06;
+    float layer1 = fbm(float2(uv.x * 2.0 + t, uv.y * 5.0 - t * 0.4));
+    float layer2 = fbm(float2(uv.x * 3.4 - t * 1.6, uv.y * 7.0 + 3.0));
+    float density = 0.6 * layer1 + 0.4 * layer2;
+    density = smoothstep(0.35, 0.85, density + 0.12 * uAgitation * sin(uTime * 0.8 + uv.x * 5.0));
+    float ground = smoothstep(0.55, 1.00, uv.y);
+    float alpha = density * ground * 0.30 * uEnvelope * uColor.a;
+    return half4(uColor.rgb * alpha, alpha);
+}

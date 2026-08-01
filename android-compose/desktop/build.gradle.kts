@@ -219,6 +219,8 @@ tasks.register<JavaExec>("runShaderLookdev") {
     description = "Runs the ambient-shader lookdev window (live SkSL editing + uniform sliders)."
     mainClass.set("com.letta.mobile.desktop.lookdev.ShaderLookdevMainKt")
     classpath = sourceSets.main.get().runtimeClasspath
+    // Variant carousel folder: *.sksl files here are polled live by the window.
+    systemProperty("lookdev.shaderDir", layout.projectDirectory.dir("lookdev-shaders").asFile.absolutePath)
 }
 
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
