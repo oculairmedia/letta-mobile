@@ -116,9 +116,19 @@ class SettingsRepository internal constructor(
         val CHAT_BACKGROUND = stringPreferencesKey("chat_background")
         val FAVORITE_AGENT_ID = stringPreferencesKey("favorite_agent_id")
         val ADMIN_AGENT_ID = stringPreferencesKey("admin_agent_id")
-        val LAST_CHAT_AGENT_ID = stringPreferencesKey("last_chat_agent_id")
-        val LAST_CHAT_AGENT_NAME = stringPreferencesKey("last_chat_agent_name")
-        val LAST_CHAT_CONVERSATION_ID = stringPreferencesKey("last_chat_conversation_id")
+        // letta-mobile-byqjj.1: the selection is ONE serialized string under
+        // ONE key so a write lands whole or not at all. The three keys below
+        // are the legacy layout, read once on startup for migration and never
+        // written again. Shape/policy lives in
+        // sharedLogic LastChatSelectionStorage.
+        val LAST_CHAT_SELECTION =
+            stringPreferencesKey(LastChatSelectionStorage.KEY)
+        val LAST_CHAT_AGENT_ID =
+            stringPreferencesKey(LastChatSelectionStorage.LEGACY_AGENT_ID_KEY)
+        val LAST_CHAT_AGENT_NAME =
+            stringPreferencesKey(LastChatSelectionStorage.LEGACY_AGENT_NAME_KEY)
+        val LAST_CHAT_CONVERSATION_ID =
+            stringPreferencesKey(LastChatSelectionStorage.LEGACY_CONVERSATION_ID_KEY)
         val PINNED_CONVERSATION_IDS = stringSetPreferencesKey("pinned_conversation_ids")
         val PINNED_AGENT_IDS = stringSetPreferencesKey("pinned_agent_ids")
         // JSON-encoded List<String> — source of truth for pinned agent
@@ -283,33 +293,36 @@ class SettingsRepository internal constructor(
             agentName = agentName,
             conversationId = conversationId,
         ) ?: return
+        // letta-mobile-byqjj.1: ONE put of the whole serialized triple. Three
+        // independent puts made a torn (agentId, agentName, conversationId)
+        // representable; a single write cannot tear.
+        val serialized = LastChatSelectionStorage.serialize(selection) ?: return
         _lastChatSelection.update { selection }
-        secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_ID.name, selection.agentId)
-        val selectedAgentName = selection.agentName
-        if (selectedAgentName != null) {
-            secureSettingsStore.putString(Keys.LAST_CHAT_AGENT_NAME.name, selectedAgentName)
-        } else {
-            secureSettingsStore.remove(Keys.LAST_CHAT_AGENT_NAME.name)
-        }
-        val selectedConversationId = selection.conversationId
-        if (selectedConversationId != null) {
-            secureSettingsStore.putString(Keys.LAST_CHAT_CONVERSATION_ID.name, selectedConversationId)
-        } else {
-            secureSettingsStore.remove(Keys.LAST_CHAT_CONVERSATION_ID.name)
-        }
+        secureSettingsStore.putString(Keys.LAST_CHAT_SELECTION.name, serialized)
     }
 
     private fun loadLastChatSelection(): LastChatSelection? {
-        val agentId = secureSettingsStore.getString(Keys.LAST_CHAT_AGENT_ID.name)
-            ?.takeIf { it.isNotBlank() }
-            ?: return null
-        return LastChatSelection(
-            agentId = agentId,
-            agentName = secureSettingsStore.getString(Keys.LAST_CHAT_AGENT_NAME.name)
-                ?.takeIf { it.isNotBlank() },
-            conversationId = secureSettingsStore.getString(Keys.LAST_CHAT_CONVERSATION_ID.name)
-                ?.takeIf { it.isNotBlank() },
+        val stored = secureSettingsStore.getString(Keys.LAST_CHAT_SELECTION.name)
+        if (stored != null) {
+            return LastChatSelectionStorage.deserialize(stored)
+        }
+        // letta-mobile-byqjj.1: legacy triple. Migration is deliberately
+        // conservative — a triple whose mutual consistency we cannot prove is
+        // discarded (and telemetered), not reconstructed.
+        val migrated = LastChatSelectionStorage.migrateLegacy(
+            legacyAgentId = secureSettingsStore.getString(Keys.LAST_CHAT_AGENT_ID.name),
+            legacyAgentName = secureSettingsStore.getString(Keys.LAST_CHAT_AGENT_NAME.name),
+            legacyConversationId = secureSettingsStore.getString(Keys.LAST_CHAT_CONVERSATION_ID.name),
         )
+        secureSettingsStore.remove(Keys.LAST_CHAT_AGENT_ID.name)
+        secureSettingsStore.remove(Keys.LAST_CHAT_AGENT_NAME.name)
+        secureSettingsStore.remove(Keys.LAST_CHAT_CONVERSATION_ID.name)
+        if (migrated != null) {
+            LastChatSelectionStorage.serialize(migrated)?.let {
+                secureSettingsStore.putString(Keys.LAST_CHAT_SELECTION.name, it)
+            }
+        }
+        return migrated
     }
 
     override suspend fun clearAllData() = withContext(Dispatchers.IO) {
