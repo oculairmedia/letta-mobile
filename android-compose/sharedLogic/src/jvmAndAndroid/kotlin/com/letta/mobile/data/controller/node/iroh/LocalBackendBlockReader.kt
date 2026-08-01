@@ -38,8 +38,8 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
      * **windowed** by [offset]/[limit].
      *
      * letta-mobile post-cutover regression (2026-08-01): the unpaged union on the
-     * live host is 153 agents x 1447 memory files = ~1.83 MB of JSON, which is
-     * larger than `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1 MiB). A peer without
+     * live host measured 1439 blocks / 2,394,364 bytes of JSON, well past
+     * `IrohFrameCodec.DEFAULT_MAX_FRAME_BYTES` (1,048,576). A peer without
      * the `frame_part` capability got the typed "response too large" envelope and
      * the Block Library rendered nothing; a peer with it paid multi-MB of relayed
      * QUIC per refresh. The window is therefore mandatory, and the caller pages
@@ -52,30 +52,39 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
      * over successive offsets is stable.
      */
     fun listAllBlocks(limit: Int?, offset: Int?): JsonArray? = runCatching {
-        val index = blockIndex()
-        val from = (offset ?: 0).coerceAtLeast(0)
-        val window = if (from >= index.size) {
-            emptyList()
-        } else {
-            val end = if (limit != null) (from + limit.coerceAtLeast(0)).coerceAtMost(index.size) else index.size
-            index.subList(from, end)
-        }
-        buildJsonArray {
-            var budget = PAGE_BYTE_BUDGET
-            for ((agentId, label) in window) {
-                val value = readBlockValue(agentId, label)
-                // Block VALUES are whole files and are not truncated on read: one
-                // page of 50 measured 394 KB on the live store, so a pathological
-                // page could still cross the 1 MiB frame cap on count alone. Stop
-                // short rather than emit an undeliverable frame — the handler's
-                // has_more is computed from the page LENGTH, so a short page pages
-                // correctly instead of silently dropping the remainder.
-                if (budget <= 0) break
-                add(projectBlock(agentId, label, value))
-                budget -= value.length + PROJECTION_OVERHEAD_BYTES
-            }
-        }
+        projectWithinByteBudget(window(blockIndex(), limit, offset))
     }.getOrNull()
+
+    /** The requested slice of the flat index, clamped to its bounds. */
+    private fun window(
+        index: List<Pair<String, String>>,
+        limit: Int?,
+        offset: Int?,
+    ): List<Pair<String, String>> {
+        val from = (offset ?: 0).coerceAtLeast(0)
+        if (from >= index.size) return emptyList()
+        val end = if (limit == null) index.size else (from + limit.coerceAtLeast(0)).coerceAtMost(index.size)
+        return index.subList(from, end)
+    }
+
+    /**
+     * Reads and projects [window], stopping early if the page would get too big.
+     *
+     * Block VALUES are whole files and are not truncated on read: one page of 50
+     * measured 394 KB on the live store, so a page bounded only by COUNT could
+     * still cross the 1 MiB frame cap. Stopping short is safe — the handler
+     * derives `has_more` from the page LENGTH, so a trimmed page simply pages
+     * rather than silently dropping the remainder.
+     */
+    private fun projectWithinByteBudget(window: List<Pair<String, String>>): JsonArray = buildJsonArray {
+        var budget = PAGE_BYTE_BUDGET
+        for ((agentId, label) in window) {
+            if (budget <= 0) break
+            val value = readBlockValue(agentId, label)
+            add(projectBlock(agentId, label, value))
+            budget -= value.length + PROJECTION_OVERHEAD_BYTES
+        }
+    }
 
     /**
      * Port of `GET /v1/blocks/{id}`: first agent whose synthesised block id matches.
