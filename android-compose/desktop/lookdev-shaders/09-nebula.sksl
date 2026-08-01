@@ -19,12 +19,25 @@ float noise(float2 p) {
     );
 }
 
+float2 rot(float2 p, float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return float2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
 float fbm(float2 p) {
     float v = 0.0;
-    v += 0.50 * noise(p);
-    v += 0.28 * noise(p * 2.1 + 13.7);
-    v += 0.16 * noise(p * 4.3 + 47.1);
+    float amp = 0.52;
+    for (int i = 0; i < 4; i++) {
+        v += amp * noise(p);
+        p = rot(p, 0.62) * 2.03 + 17.3;
+        amp *= 0.55;
+    }
     return v;
+}
+
+float dither(float2 fragCoord) {
+    return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
 }
 
 // Nebula: two-tone cloud (tint + channel-rotated partner) drifting bottom-up.
@@ -35,8 +48,10 @@ half4 main(float2 fragCoord) {
     float cloudB = fbm(uv * 3.6 + float2(-t * 1.2, t * 0.4) + 11.0);
     float mixv = smoothstep(0.25, 0.85, cloudA + 0.15 * uAgitation * sin(uTime + uv.x * 6.0));
     float ground = smoothstep(0.35, 1.00, uv.y);
-    float3 partner = uColor.rgb.gbr;
-    float3 rgb = mix(partner, uColor.rgb, mixv);
-    float alpha = max(cloudA, cloudB * 0.7) * mixv * ground * 0.32 * uEnvelope * uColor.a;
+    float3 rgb = mix(uColor.rgb.gbr, uColor.rgb, mixv);
+    float aRaw = max(cloudA, cloudB * 0.7) * mixv * ground * 0.32;
+
+    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.92);
+    alpha = max(alpha + dither(fragCoord), 0.0);
     return half4(rgb * alpha, alpha);
 }

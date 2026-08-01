@@ -40,22 +40,21 @@ float dither(float2 fragCoord) {
     return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
 }
 
-// Ember: bottom-anchored breathing glow, noise-textured.
+// Prism: three colored lobes (tint + two channel rotations) breathing along the bottom.
 half4 main(float2 fragCoord) {
     float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
     float aspect = uSize.x / max(uSize.y, 1.0);
-    float2 p = float2((uv.x - 0.50) * aspect, uv.y - 0.95);
-    float breath = 0.5 + 0.5 * sin(uTime);
-    float2 warp = float2(noise(uv * 3.1 + float2(uTime * 0.11, 0.0)),
-                         noise(uv * 3.7 + float2(0.0, -uTime * 0.07)));
-    float2 driftUv = float2(uv.x * 2.2 + uTime * 0.08, uv.y * 1.6 - uTime * 0.05)
-        + (warp - 0.5) * (0.9 * uAgitation);
-    float drift = fbm(driftUv);
-    float radius = mix(0.55, 0.75, breath) + (drift - 0.5) * (0.10 + 0.08 * uAgitation);
-    float glow = 1.0 - smoothstep(0.0, radius, length(p));
-    float shape = smoothstep(0.45, 0.95, uv.y);
-    float aRaw = glow * shape * 0.38;
-    float3 rgb = uColor.rgb;
+    float3 cA = uColor.rgb;
+    float3 cB = uColor.rgb.gbr;
+    float3 cC = uColor.rgb.brg;
+    float wob = 0.04 * (fbm(uv * 3.0 + uTime * 0.1) - 0.5) * (1.0 + uAgitation);
+    float2 p = float2((uv.x - 0.5) * aspect, uv.y - 1.0);
+    float g1 = exp(-pow(length(p - float2((0.18 - 0.5) * aspect + wob, 0.0)) / (0.42 + 0.06 * sin(uTime)), 2.0));
+    float g2 = exp(-pow(length(p - float2(0.0 + wob * 1.7, 0.05)) / (0.50 + 0.06 * sin(uTime + 2.1)), 2.0));
+    float g3 = exp(-pow(length(p - float2((0.82 - 0.5) * aspect - wob, 0.0)) / (0.42 + 0.06 * sin(uTime + 4.2)), 2.0));
+    float sum = g1 + g2 + g3;
+    float3 rgb = (cA * g1 + cB * g2 + cC * g3) / max(sum, 0.001);
+    float aRaw = sum * 0.26 * smoothstep(0.35, 0.90, uv.y);
 
     float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.92);
     alpha = max(alpha + dither(fragCoord), 0.0);
