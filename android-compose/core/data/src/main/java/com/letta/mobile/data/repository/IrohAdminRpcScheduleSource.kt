@@ -33,6 +33,21 @@ class IrohAdminRpcScheduleSource(
         return json.decodeFromJsonElement(ListSerializer(ScheduledMessage.serializer()), result)
     }
 
+    suspend fun getSchedule(agentId: String, scheduleId: String): ScheduledMessage {
+        val params = buildJsonObject {
+            put("schedule_id", scheduleId)
+            put("agent_id", agentId)
+        }
+        val response = channelTransport.adminRpc(
+            method = "schedule.get",
+            path = "/v1/schedules/$scheduleId",
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc schedule.get failed")
+        val result = response.result ?: error("Iroh admin_rpc schedule.get returned no result")
+        return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
+    }
+
     suspend fun createSchedule(params: ScheduleCreateParams): ScheduledMessage {
         val response = channelTransport.adminRpc(
             method = "schedule.create",
