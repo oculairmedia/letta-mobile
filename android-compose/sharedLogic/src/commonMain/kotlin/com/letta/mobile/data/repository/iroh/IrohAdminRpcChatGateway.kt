@@ -616,6 +616,15 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(ListSerializer(serializer<T>()), result)
     }
 
+    /**
+     * True when the last [listAgents] stopped because the backend returned a
+     * REPEATED page (it ignores limit/offset), i.e. the roster is known to be
+     * truncated. Surfaces let the user see "N+" instead of a confident count.
+     */
+    @kotlin.concurrent.Volatile
+    var lastAgentListTruncated: Boolean = false
+        private set
+
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
         // agent.list returns FULL agent objects (each carries its whole system
         // prompt + core-memory), so the complete set is multiple MB. A single
@@ -653,6 +662,7 @@ class IrohAdminRpcAgentDirectory(
             if (page.size < pageLimit) break
             offset += page.size
         }
+        lastAgentListTruncated = false
         return out
     }
 

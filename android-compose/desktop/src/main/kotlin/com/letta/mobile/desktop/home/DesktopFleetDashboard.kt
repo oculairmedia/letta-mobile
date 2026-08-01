@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -65,28 +68,35 @@ internal fun LazyListScope.fleetDashboardSection(
  */
 @Composable
 private fun FleetStatTiles(summary: FleetSummary) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+    // height(IntrinsicSize.Max) + fillMaxHeight: every tile matches the
+    // tallest one and footers pin to a common bottom edge — mixed tile
+    // heights made the strip look broken.
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+    ) {
         FleetStatTile(
             label = "Agents",
-            value = summary.totalAgents.toString(),
-            modifier = Modifier.weight(1f),
+            value = summary.agentsLabel,
+            caption = "roster truncated by backend".takeIf { summary.rosterTruncated },
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         FleetStatTile(
             label = "Conversations",
             value = summary.totalConversations.toString(),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         FleetStatTile(
             label = "Active today",
             value = summary.activeToday.toString(),
             series = summary.agentsActiveByDay,
-            seriesCaption = "agents active · ${summary.agentsActiveByDay.size}d",
-            modifier = Modifier.weight(1f),
+            caption = "agents active · ${summary.agentsActiveByDay.size}d",
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         FleetStatTile(
             label = "Running now",
             value = summary.runningNow.toString(),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
     }
 }
@@ -97,15 +107,17 @@ private fun FleetStatTile(
     value: String,
     modifier: Modifier = Modifier,
     series: List<Int>? = null,
-    seriesCaption: String? = null,
+    caption: String? = null,
 ) {
     Column(
+        // background(shape) + border(shape), NO clip: clipping then bordering
+        // the same rounded shape at fractional Windows DPI cuts the stroke to
+        // sub-pixel on straight edges — the outline appeared only at the
+        // corners. Nothing here needs clipping (no ripple, no overflow).
         modifier = modifier
-            .clip(MaterialTheme.shapes.large)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .background(MaterialTheme.colorScheme.surfaceContainer, MaterialTheme.shapes.large)
             .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.large)
             .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Text(
             text = label.uppercase(),
@@ -113,21 +125,25 @@ private fun FleetStatTile(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             fontWeight = FontWeight.SemiBold,
         )
+        Spacer(Modifier.height(6.dp))
         Text(
             text = value,
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
         )
+        // Footer pins to the shared bottom edge across all tiles.
+        Spacer(Modifier.weight(1f))
         if (series != null) {
             FleetBarSpark(series, Modifier.fillMaxWidth().height(26.dp))
-            if (seriesCaption != null) {
-                Text(
-                    text = seriesCaption,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                )
-            }
+        }
+        if (caption != null) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = caption,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            )
         }
     }
 }

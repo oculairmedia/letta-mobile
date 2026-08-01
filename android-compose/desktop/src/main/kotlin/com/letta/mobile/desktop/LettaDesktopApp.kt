@@ -364,6 +364,9 @@ internal fun LettaDesktopApp(
                 rosterAgents = rosterAgents,
                 runningAgentIds = runningAgentIds,
                 now = fleetClock,
+                // Broken backend pagination truncates the roster; the summary
+                // then renders counts as "N+" lower bounds, not exact figures.
+                rosterTruncated = irohAgentDirectory?.lastAgentListTruncated == true,
             ),
         )
     }

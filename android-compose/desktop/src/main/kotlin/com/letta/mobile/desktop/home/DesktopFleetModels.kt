@@ -86,7 +86,17 @@ data class FleetSummary(
     val conversationsByDay: List<Int>,
     /** Distinct agents that were active per day, oldest -> newest. */
     val agentsActiveByDay: List<Int>,
+    /**
+     * True when the roster fetch was cut short by broken backend pagination —
+     * counts derived from it are LOWER BOUNDS and render as "N+", never as an
+     * exact figure the user will disbelieve (correctly).
+     */
+    val rosterTruncated: Boolean = false,
 )
+
+/** "22" when the roster is complete, "22+" when it is a known lower bound. */
+val FleetSummary.agentsLabel: String
+    get() = if (rosterTruncated) "$totalAgents+" else totalAgents.toString()
 
 /** Everything the Home page renders. */
 @Immutable
@@ -167,6 +177,8 @@ data class FleetOverviewParams(
     val hours: Int = FLEET_ACTIVITY_HOURS,
     /** How many rows the recent-conversations list keeps. */
     val recentLimit: Int = FLEET_RECENT_LIMIT,
+    /** Roster fetch was cut short (backend ignores pagination). */
+    val rosterTruncated: Boolean = false,
 )
 
 /** Rows shown in the recent-conversations list before it stops. */
@@ -230,6 +242,7 @@ fun buildFleetOverview(params: FleetOverviewParams): FleetOverview {
 
     return FleetOverview(
         summary = FleetSummary(
+            rosterTruncated = params.rosterTruncated,
             totalAgents = agents.size,
             totalConversations = conversations.size,
             activeToday = agents.count { stat ->
