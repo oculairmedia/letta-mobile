@@ -33,6 +33,7 @@ import com.letta.mobile.ui.ambient.AMBIENT_GLOW_SHADER_SOURCE
 import com.letta.mobile.ui.ambient.AmbientMotion
 import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.theme.HctColorHarmonizer
+import com.letta.mobile.util.Telemetry
 import kotlin.math.PI
 import kotlin.math.sin
 
@@ -125,7 +126,9 @@ fun AmbientShaderAgentBackground(
     )
     val agitation by animateFloatAsState(
         targetValue = if (reducedMotion) 0f else spec.agitation,
-        animationSpec = tween(durationMillis = 600),
+        // Zeroed under reduced motion for the same reason as the speed above:
+        // "animate to no animation" is still animation.
+        animationSpec = tween(durationMillis = if (reducedMotion) 0 else 600),
         label = "ambientAgitation",
     )
 
@@ -193,9 +196,31 @@ private fun AmbientCanvas(
         }
     }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val shader = remember { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
-        val shaderBrush = remember { ShaderBrush(shader) }
+    // API 33+ is necessary but not sufficient: RuntimeShader THROWS on an SkSL
+    // compile error, and drivers disagree about what compiles. An unhandled
+    // throw here would take the whole chat screen down over decoration, so the
+    // construction is guarded and a failure falls through to the same gradient
+    // path pre-33 devices use — loudly, because a silent compile failure and
+    // "this device has no shader support" are otherwise indistinguishable.
+    val shader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        remember {
+            runCatching { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
+                .onFailure { failure ->
+                    Telemetry.event(
+                        AMBIENT_TELEMETRY_TAG,
+                        "shader.compileFailed",
+                        "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                        level = Telemetry.Level.WARN,
+                    )
+                }
+                .getOrNull()
+        }
+    } else {
+        null
+    }
+
+    if (shader != null) {
+        val shaderBrush = remember(shader) { ShaderBrush(shader) }
         Canvas(modifier = modifier.fillMaxSize()) {
             shader.setFloatUniform("uTime", phase)
             shader.setFloatUniform("uSize", size.width, size.height)
@@ -239,6 +264,7 @@ private fun DrawScope.drawAmbientFallback(
     )
 }
 
+private const val AMBIENT_TELEMETRY_TAG = "AmbientShader"
 private const val HiddenAlpha = 0.001f
 private const val BaseRadiansPerSecond =
     (2 * PI).toFloat() * 1000f / AmbientMotion.BASE_PERIOD_MILLIS
