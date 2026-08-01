@@ -78,7 +78,13 @@ open class SubagentRepository(
     private val initialized = atomic(false)
     // Track when a running entry was first noticed absent from an INCREMENTAL
     // push so absence-bound eviction can fire later.
-    private val runningAbsentSince = mutableMapOf<String, Long>()
+    //
+    // Held as an immutable map behind an atomic reference: `mergeSnapshot` is
+    // reached concurrently from `pushJob` (observePushEvents) and `refresh()`,
+    // both on Dispatchers.Default, so a bare mutable map could be structurally
+    // mutated from two threads at once. Each merge reads one consistent
+    // snapshot, mutates a private local copy, and publishes it once.
+    private val runningAbsentSince = atomic<Map<String, Long>>(emptyMap())
 
     private val pushJob = scope.launch { observePushEvents() }
     private val reconnectJob = scope.launch { observeReconnects() }
@@ -167,8 +173,13 @@ open class SubagentRepository(
         val incomingByKey = completeIncoming.associateBy { it.cacheKey() }
         val terminalKey = stampedTerminal?.cacheKey()
 
+        // One consistent read of the absence clock for the whole merge; all
+        // mutations below go to this private local copy and are published once
+        // at the end, so no other thread can observe a half-updated map.
+        val absence = runningAbsentSince.value.toMutableMap()
+
         // Clear absence tracking for entries that ARE present in this snapshot.
-        incomingByKey.keys.forEach { key -> runningAbsentSince.remove(key) }
+        incomingByKey.keys.forEach { key -> absence.remove(key) }
 
         // Delta signal: AUTHORITATIVE snapshot count disagrees with local.
         if (kind == SnapshotKind.AUTHORITATIVE) {
@@ -197,7 +208,7 @@ open class SubagentRepository(
                 }
                 evicted.forEach { entry ->
                     val key = entry.cacheKey()
-                    runningAbsentSince.remove(key)
+                    absence.remove(key)
                     Telemetry.event(
                         "SubagentRepo",
                         "merge.evictRunning",
@@ -219,9 +230,9 @@ open class SubagentRepository(
                         key != terminalKey
                 }.filter { previous ->
                     val key = previous.cacheKey()
-                    val absentSince = runningAbsentSince[key]
+                    val absentSince = absence[key]
                     if (absentSince == null) {
-                        runningAbsentSince[key] = now
+                        absence[key] = now
                         Telemetry.event(
                             "SubagentRepo",
                             "merge.retainRunning",
@@ -235,7 +246,7 @@ open class SubagentRepository(
                     } else if (now - absentSince < RUNNING_ABSENCE_LINGER_MS) {
                         true
                     } else {
-                        runningAbsentSince.remove(key)
+                        absence.remove(key)
                         Telemetry.event(
                             "SubagentRepo",
                             "merge.evictRunning",
@@ -250,6 +261,9 @@ open class SubagentRepository(
                 }
             }
         }
+
+        // Publish the absence clock once, after every branch above has settled.
+        runningAbsentSince.value = absence.toMap()
 
         val previousTerminals = state.value.filter { previous ->
             previous.status in TERMINAL_STATUSES &&
