@@ -231,31 +231,8 @@ class AppServerServeIrohCommand : CliktCommand(
             )
             irohEndpoint.create()
             
-            // Get the dialable information
-            val nodeId = irohEndpoint.nodeIdHex()
-            val ticket = irohEndpoint.ticketString()
-            
-            // Print the dialable information
-            println("[iroh-app-server] Node ID: $nodeId")
-            println("[iroh-app-server] Ticket: $ticket")
-            // Short human-friendly dial form: iroh://<node-id>@<host:port>[,...]
-            // Only meaningful when the port is pinned; with a random port it
-            // rotates like the ticket does.
-            val port = irohPort.toIntOrNull() ?: 0
-            if (port > 0) {
-                val lanAddrs = try {
-                    java.net.NetworkInterface.getNetworkInterfaces().asSequence()
-                        .filter { it.isUp && !it.isLoopback }
-                        .flatMap { it.inetAddresses.asSequence() }
-                        .filterIsInstance<java.net.Inet4Address>()
-                        .map { "${it.hostAddress}:$port" }
-                        .toList()
-                } catch (_: Exception) { emptyList() }
-                if (lanAddrs.isNotEmpty()) {
-                    println("[iroh-app-server] Short URL: iroh://$nodeId@${lanAddrs.joinToString(",")}")
-                }
-            }
-            
+            printDialInfo(irohEndpoint)
+
             // lgns8.18 (Path A, desktop): optionally spawn + OWN the App Server child
             // on an ephemeral loopback port, instead of connecting to an external URL.
             val ownedServer = maybeSpawnOwnedAppServer(scope)
@@ -449,6 +426,34 @@ class AppServerServeIrohCommand : CliktCommand(
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
         reconnectingClient.start(scope)
         return controller to reconnectingClient
+    }
+
+    /**
+     * Print the dialable NodeID/ticket, plus the short `iroh://<node-id>@<host:port>`
+     * form. The short form is only meaningful when the port is pinned; with a
+     * random port it rotates like the ticket does.
+     */
+    private fun printDialInfo(irohEndpoint: IrohNodeEndpoint) {
+        val nodeId = irohEndpoint.nodeIdHex()
+        println("[iroh-app-server] Node ID: $nodeId")
+        println("[iroh-app-server] Ticket: ${irohEndpoint.ticketString()}")
+        val port = irohPort.toIntOrNull() ?: 0
+        if (port <= 0) return
+        val lanAddrs = lanAddresses(port)
+        if (lanAddrs.isNotEmpty()) {
+            println("[iroh-app-server] Short URL: iroh://$nodeId@${lanAddrs.joinToString(",")}")
+        }
+    }
+
+    private fun lanAddresses(port: Int): List<String> = try {
+        java.net.NetworkInterface.getNetworkInterfaces().asSequence()
+            .filter { it.isUp && !it.isLoopback }
+            .flatMap { it.inetAddresses.asSequence() }
+            .filterIsInstance<java.net.Inet4Address>()
+            .map { "${it.hostAddress}:$port" }
+            .toList()
+    } catch (_: Exception) {
+        emptyList()
     }
 
     /** lgns8.23: announce channels-host ownership so a double-host misconfig is visible at start. */
