@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.desktop.chat.AgentOrb
 
@@ -174,9 +175,16 @@ internal fun DesktopAgentRail(
     // "Letta Code" agents spawned per task — into a single stacked orb with a
     // count chip, so the rail doesn't grow unbounded with near-duplicate spawns.
     // Order follows first appearance in [agents].
+    // Keyed on IDENTITY for synthetic labels: agents that merely share an
+    // "Agent <short-id>" placeholder share nothing, and stacking them hides
+    // every member but one behind an orb that cannot select them. Only a real,
+    // shared name means "same fleet".
     val groups = remember(state.agents) {
-        state.agents.groupBy { it.second }
-            .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
+        state.agents
+            .groupBy { (id, name) -> if (DisplayNames.isAgentFallback(name)) id else name }
+            .map { (_, members) ->
+                AgentRailGroup(name = members.first().second, agentIds = members.map { it.first })
+            }
     }
     val width by animateDpAsState(if (state.expanded) 248.dp else 56.dp, label = "railWidth")
     // Start-aligned in BOTH modes, with each header control wrapped in a

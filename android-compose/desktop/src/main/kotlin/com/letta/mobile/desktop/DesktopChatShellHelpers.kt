@@ -187,7 +187,14 @@ internal fun buildRailAgents(
     // endpoints during active runs (same defect as the conversation-list
     // fan-out), and a duplicated roster agent crashes every LazyColumn that
     // keys rows by agent id (e.g. the New Conversation directory).
-    return (fromConversations + fromRoster).distinctBy { it.first }
+    //
+    // Then widen any synthetic label that repeats. The first eight characters
+    // of a prefixed UUID are not unique, and the rail STACKS agents by display
+    // name — two unresolved agents colliding on "Agent 12345678" merged into
+    // one orb, leaving the second with no way to be opened.
+    return DisplayNames.disambiguateAgentFallbacks(
+        (fromConversations + fromRoster).distinctBy { it.first },
+    )
 }
 
 /**
@@ -218,6 +225,14 @@ internal data class FilterStackConversationsParams(
     val conversations: List<DesktopConversationSummary>,
     val activeSubagents: List<SubagentEntry>,
     val selectedAgentName: String,
+    /**
+     * The selected agent's IDENTITY, which is what normal-agent membership is
+     * really keyed on. [selectedAgentName] is a rendered label — once it can be
+     * a resolved or synthesised display name, comparing it against a
+     * conversation's stored `agentName` (which may still be a raw id) selects
+     * nothing and the sidebar goes empty. Null only when nothing is selected.
+     */
+    val selectedAgentId: String? = null,
     val selectedConversationId: String?,
     val archiveFilter: ConversationArchiveFilter,
 )
@@ -239,8 +254,19 @@ internal fun filterStackConversations(
         val memberIds = selectedStack.memberConversationIds.toSet()
         conversations.filter { it.id in memberIds }
     } else {
-        // Normal agent: unchanged display-name membership over ungrouped convs.
-        grouping.ungrouped.filter { it.agentName == selectedAgentName }
+        // Normal agent: membership by identity when we have it. The historical
+        // display-name test only survives as a fallback for conversations the
+        // server sent without an agentId — it cannot be the primary key now
+        // that the selected name is a RENDERED label rather than the raw
+        // string stored on the conversation.
+        val selectedAgentId = params.selectedAgentId
+        grouping.ungrouped.filter { conversation ->
+            if (selectedAgentId != null && !conversation.agentId.isNullOrBlank()) {
+                conversation.agentId == selectedAgentId
+            } else {
+                conversation.agentName == selectedAgentName
+            }
+        }
     }
     // Dedupe by id: the server can hand back the same conversation twice while
     // a run is active on it, and the sidebar LazyColumn keys rows by id — a
@@ -297,14 +323,22 @@ internal fun buildPaletteItems(
     workPlayMode: WorkPlayMode,
 ): List<PaletteItem> = buildList {
     conversations.forEach { conversation ->
-        val orbIndex = railAgents.indexOfFirst { it.first == conversation.agentId }.coerceAtLeast(0)
+        val railIndex = railAgents.indexOfFirst { it.first == conversation.agentId }
+        // Resolve the subtitle through the rail rather than parroting
+        // `agentName`: that field still holds the raw id whenever name
+        // resolution missed at conversation-load time, and "no raw ids in
+        // user-visible text" has to hold on every surface or it holds on none.
+        // The rail entry is already the disambiguated label; fall back to the
+        // same helper for a conversation the rail does not know about.
+        val agentLabel = railAgents.getOrNull(railIndex)?.second
+            ?: DisplayNames.agent(conversation.agentName, conversation.agentId ?: conversation.agentName)
         add(
             PaletteItem(
                 id = conversation.id,
                 label = conversation.title,
-                sublabel = conversation.agentName,
+                sublabel = agentLabel,
                 kind = PaletteItemKind.Conversation,
-                orbIndex = orbIndex,
+                orbIndex = railIndex.coerceAtLeast(0),
             ),
         )
     }

@@ -284,6 +284,7 @@ internal fun LettaDesktopApp(
         chatState.conversations,
         activeSubagents,
         selectedAgentName,
+        selectedAgentId,
         selectedConversationId,
         archiveFilter,
     ) {
@@ -292,6 +293,7 @@ internal fun LettaDesktopApp(
                 conversations = chatState.conversations,
                 activeSubagents = activeSubagents,
                 selectedAgentName = selectedAgentName,
+                selectedAgentId = selectedAgentId,
                 selectedConversationId = selectedConversationId,
                 archiveFilter = archiveFilter,
             ),
