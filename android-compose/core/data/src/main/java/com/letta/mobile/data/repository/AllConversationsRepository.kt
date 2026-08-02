@@ -86,6 +86,32 @@ open class AllConversationsRepository(
         }
     }
 
+    internal fun createConversationsPagingSource(
+        agentId: AgentId?,
+        archiveStatus: String?,
+        summarySearch: String?,
+    ): ConversationPagingSource = ConversationPagingSource(
+        conversationApi = conversationApi,
+        agentId = agentId,
+        archiveStatus = archiveStatus,
+        summarySearch = summarySearch,
+        order = "desc",
+        orderBy = "last_message_at",
+        pageLoader = irohConversationListSource?.takeIf { it.shouldUseIroh() }?.let { source ->
+            { pageAgentId, limit, after, pageArchiveStatus, pageSummarySearch, order, orderBy ->
+                source.listConversations(
+                    agentId = pageAgentId,
+                    limit = limit,
+                    after = after,
+                    archiveStatus = pageArchiveStatus,
+                    summarySearch = pageSummarySearch,
+                    order = order,
+                    orderBy = orderBy,
+                )
+            }
+        },
+    )
+
     override fun getConversationsPaged(
         agentId: AgentId?,
         archiveStatus: String?,
@@ -98,14 +124,7 @@ open class AllConversationsRepository(
                 initialLoadSize = ConversationPagingSource.PAGE_SIZE,
             ),
             pagingSourceFactory = {
-                ConversationPagingSource(
-                    conversationApi = conversationApi,
-                    agentId = agentId,
-                    archiveStatus = archiveStatus,
-                    summarySearch = summarySearch,
-                    order = "desc",
-                    orderBy = "last_message_at",
-                )
+                createConversationsPagingSource(agentId, archiveStatus, summarySearch)
             },
         ).flow
     }
