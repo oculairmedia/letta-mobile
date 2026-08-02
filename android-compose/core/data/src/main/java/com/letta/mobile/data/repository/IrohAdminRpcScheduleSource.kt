@@ -2,9 +2,9 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.model.ScheduleCreateParams
+import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
-import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -29,8 +29,8 @@ class IrohAdminRpcScheduleSource(
             body = "{}",
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc schedule.list failed")
-        val result = response.result ?: return emptyList()
-        return json.decodeFromJsonElement(ListSerializer(ScheduledMessage.serializer()), result)
+        val result = response.result ?: error("Iroh admin_rpc schedule.list returned no result")
+        return json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
     }
 
     suspend fun getSchedule(agentId: String, scheduleId: String): ScheduledMessage {
