@@ -22,6 +22,7 @@ import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -425,7 +426,7 @@ class ChatSendCoordinator(
             "IrohTrace", "coordinator.config",
             "hasConfig" to (config != null),
             "mode" to config?.mode?.name,
-            "serverUrl" to config?.serverUrl,
+            "serverUrl" to backendUrlTelemetryDescriptor(config?.serverUrl),
             "hasToken" to !config?.accessToken.isNullOrBlank(),
         )
         if (config == null) {

@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import io.ktor.client.call.body
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
@@ -171,7 +172,7 @@ class SlashCommandRepository @Inject constructor(
         }
         Telemetry.event(
             "IrohTransport", "adminRpc.ensureConnected",
-            "serverUrl" to serverUrl,
+            "serverUrl" to backendUrlTelemetryDescriptor(serverUrl),
             "state" to channelTransport.state.value::class.simpleName,
         )
         channelTransport.connect(

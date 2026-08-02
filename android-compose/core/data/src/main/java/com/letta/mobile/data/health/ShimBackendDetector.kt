@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.isIrohBackend
 import com.letta.mobile.data.repository.SettingsRepository
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.backendUrlTelemetryDescriptor
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import kotlinx.coroutines.CoroutineScope
@@ -131,7 +132,7 @@ class ShimBackendDetector internal constructor(
         Telemetry.event(
             "Backend", "shim_probe.result",
             "configId" to config.id,
-            "serverUrl" to config.serverUrl,
+            "serverUrl" to backendUrlTelemetryDescriptor(config.serverUrl),
             "isShim" to detected,
         )
         detected
