@@ -64,6 +64,34 @@ class IrohAdminRpcConversationSourceTest {
     }
 
     @Test
+    fun `updateConversation routes to conversation_update with summary body and decodes`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"agent-1","summary":"renamed"}""") }
+        }
+
+        val conv = source(transport).updateConversation(ConversationId("conv-1"), "renamed")
+
+        val call = transport.adminRpcCalls.single()
+        assertEquals("conversation.update", call.method)
+        assertEquals("/v1/conversations/conv-1", call.path)
+        assertEquals("""{"summary":"renamed"}""", call.body)
+        assertEquals("renamed", conv.summary)
+    }
+
+    @Test
+    fun `updateConversation fails when result is missing`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> AppServerInboundFrame.AdminRpcResponse("req", success = true) }
+        }
+
+        val thrown = runCatching {
+            source(transport).updateConversation(ConversationId("conv-1"), "renamed")
+        }.exceptionOrNull()
+
+        assertTrue(thrown!!.message.orEmpty().contains("returned no result"))
+    }
+
+    @Test
     fun `deleteConversation archives because conversation_delete is unavailable`() = runTest {
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ -> ok("""{"id":"conv-1","agent_id":"a","archived":true}""") }

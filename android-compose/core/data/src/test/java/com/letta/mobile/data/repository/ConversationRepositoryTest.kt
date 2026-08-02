@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.local.ConversationEntity
 import com.letta.mobile.data.local.ConversationRefreshEntity
 import com.letta.mobile.data.local.LettaDatabase
@@ -10,6 +11,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeAgentRepository
 import com.letta.mobile.testutil.TestData
@@ -19,6 +21,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.After
 import org.junit.Assert.assertTrue
@@ -27,6 +30,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -244,6 +248,82 @@ class ConversationRepositoryTest {
         val result = repository.getConversations("a1").first()
         assertEquals("Original", result.first().summary)
     }
+
+    @Test
+    fun `updateConversation in iroh mode bypasses HTTP and stores RPC result`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { method, path, body ->
+                assertEquals("conversation.update", method)
+                assertEquals("/v1/conversations/1", path)
+                assertEquals("""{"summary":"Updated"}""", body)
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = Json.parseToJsonElement(
+                        """{"id":"1","agent_id":"a1","summary":"Server summary"}""",
+                    ),
+                )
+            }
+        }
+        val httpThatThrows = object : FakeConversationApi() {
+            override suspend fun updateConversation(
+                conversationId: com.letta.mobile.data.model.ConversationId,
+                params: com.letta.mobile.data.model.ConversationUpdateParams,
+            ): Conversation = throw IrohAdminApiUnavailableException("iroh://test-node")
+        }
+        httpThatThrows.conversations.add(TestData.conversation(id = "1", agentId = "a1", summary = "Original"))
+        repository = ConversationRepository(
+            httpThatThrows,
+            FakeAgentRepository(),
+            database.conversationDao(),
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+        )
+        database.conversationDao().upsert(
+            ConversationEntity.fromConversation(httpThatThrows.conversations.single(), cachedAtEpochMs = 10L),
+        )
+
+        repository.updateConversation("1", "a1", "Updated")
+
+        assertEquals("Server summary", repository.getConversations("a1").first().single().summary)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `updateConversation rolls back when iroh RPC fails`() = runTest {
+        val settings = irohSettings()
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse("req", success = false, error = "RPC failed")
+            }
+        }
+        fakeApi.conversations.add(TestData.conversation(id = "1", agentId = "a1", summary = "Original"))
+        repository = ConversationRepository(
+            fakeApi,
+            FakeAgentRepository(),
+            database.conversationDao(),
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+        )
+        database.conversationDao().upsert(
+            ConversationEntity.fromConversation(fakeApi.conversations.single(), cachedAtEpochMs = 10L),
+        )
+
+        val thrown = runCatching { repository.updateConversation("1", "a1", "Updated") }.exceptionOrNull()
+
+        assertTrue(thrown!!.message.orEmpty().contains("RPC failed"))
+        assertEquals("Original", repository.getConversations("a1").first().single().summary)
+        assertTrue(fakeApi.calls.none { it.startsWith("updateConversation") })
+    }
+
+    private fun irohSettings() = FakeSettingsRepository(
+        initialActiveConfig = LettaConfig(
+            id = "iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://test-node",
+        ),
+    )
 
     @Test
     fun `forkConversation creates new conversation`() = runTest {
