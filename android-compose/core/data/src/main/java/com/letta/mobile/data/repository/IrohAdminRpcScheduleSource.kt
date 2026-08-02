@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -22,15 +23,28 @@ class IrohAdminRpcScheduleSource(
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listSchedules(): List<ScheduledMessage> {
+    suspend fun listSchedules(agentId: String): List<ScheduledMessage> {
+        val params = buildJsonObject { put("agent_id", agentId) }
         val response = channelTransport.adminRpc(
             method = "schedule.list",
-            path = "/v1/schedules",
-            body = "{}",
+            path = "/v1/agents/$agentId/schedule",
+            body = params.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc schedule.list failed")
         val result = response.result ?: error("Iroh admin_rpc schedule.list returned no result")
-        return json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
+        val schedules = json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
+        val scopedSchedules = schedules.filter { it.agentId == agentId }
+        val excludedCount = schedules.size - scopedSchedules.size
+        if (excludedCount > 0) {
+            Telemetry.event(
+                "IrohAdminRpcScheduleSource",
+                "scheduleList.scopeMismatch",
+                "requestedAgentId" to agentId,
+                "excludedCount" to excludedCount,
+                level = Telemetry.Level.WARN,
+            )
+        }
+        return scopedSchedules
     }
 
     suspend fun getSchedule(agentId: String, scheduleId: String): ScheduledMessage {
