@@ -408,7 +408,9 @@ object MemoryParityMapper {
                 channelCount = 1,
                 totalMemoryTokens = contextWindowOverview?.totalMemoryTokens(),
                 contextWindowUsed = contextWindowOverview?.contextWindowSizeCurrent,
-                contextWindowLimit = selectedAgent?.contextWindowLimit,
+                contextWindowLimit = contextWindowOverview?.contextWindowSizeMax
+                    ?.takeIf { it > 0 }
+                    ?: selectedAgent?.contextWindowLimit,
                 contextLoaded = availability.contextLoaded,
             ),
             graph = memoryGraph(

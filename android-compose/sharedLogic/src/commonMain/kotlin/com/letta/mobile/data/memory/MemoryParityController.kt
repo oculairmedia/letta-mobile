@@ -42,6 +42,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
     val state: StateFlow<MemoryParityControllerState> = stateFlow
     private var loadJob: Job? = null
     private var selectedAgentId: String? = null
+    private var selectedAgentDetail: Agent? = null
 
     fun start() {
         if (stateFlow.value.memory.sections.isEmpty()) {
@@ -72,36 +73,44 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             graph.agentRepository.refreshAgentsIfStale(maxAgeMs = maxAgeMs)
             graph.agentRepository.agents.value
         }
-        val agents = roster.value ?: stateFlow.value.agents.map { option ->
-            Agent(id = com.letta.mobile.data.model.AgentId(option.id), name = option.name)
+        val selectionId = requestedAgentId ?: selectedAgentId
+        val agents = roster.value ?: selectedAgentDetail?.let(::listOf).orEmpty()
+        val selectedAgent = agents.resolveSelection(selectionId)
+        if (roster.loaded) {
+            selectedAgentId = selectedAgent?.id?.value
+            selectedAgentDetail = selectedAgent
         }
-        val selectedAgent = agents.resolveSelection(requestedAgentId ?: selectedAgentId)
-        selectedAgentId = selectedAgent?.id?.value
 
-        val tools = sectionReader.read("skills") {
-            graph.toolRepository.refreshToolsIfStale(maxAgeMs = maxAgeMs)
-            graph.toolRepository.getTools().value
-        }
+        // Agent tools are the only per-agent skill source available until skill.list_agent is wired.
+        val skillsLoaded = roster.loaded || selectedAgentDetail != null
         val schedules = selectedAgent?.id?.value?.let { agentId ->
             sectionReader.read("schedules") {
                 graph.scheduleRepository.refreshSchedules(agentId)
                 graph.scheduleRepository.getSchedules(agentId).first()
             }
-        } ?: MemoryParitySectionRead.Loaded(emptyList())
+        } ?: if (roster.loaded) {
+            MemoryParitySectionRead.Loaded(emptyList())
+        } else {
+            MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
+        }
         val context = selectedAgent?.id?.let { agentId ->
             sectionReader.read("context") { graph.agentRepository.getContextWindow(agentId) }
-        } ?: MemoryParitySectionRead.Loaded(null)
+        } ?: if (roster.loaded) {
+            MemoryParitySectionRead.Loaded(null)
+        } else {
+            MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
+        }
 
         val memory = MemoryParityMapper.build(
             agents = agents,
             selectedAgentId = selectedAgent?.id?.value,
-            allTools = tools.value.orEmpty(),
+            allTools = emptyList(),
             schedules = schedules.value.orEmpty(),
             backendDescriptor = graph.backendDescriptor,
             channelTransportState = channelState,
             contextWindowOverview = context.value,
             availability = MemoryParityAvailability(
-                skillsLoaded = tools.loaded,
+                skillsLoaded = skillsLoaded,
                 memoryBlocksLoaded = roster.loaded,
                 schedulesLoaded = schedules.loaded,
                 contextLoaded = context.loaded,
@@ -125,6 +134,9 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         } else {
             firstOrNull()
         }
+
+    private class DependencyUnavailable(section: String) :
+        IllegalStateException("$section dependency unavailable")
 
     private companion object {
         const val DEFAULT_MEMORY_REFRESH_MAX_AGE_MS = 30_000L
