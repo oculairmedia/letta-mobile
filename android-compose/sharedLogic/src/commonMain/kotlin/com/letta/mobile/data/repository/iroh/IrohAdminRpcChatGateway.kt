@@ -586,6 +586,17 @@ class IrohAdminRpcAgentDirectory(
         return response.result
     }
 
+    private suspend fun scheduleGetResultOrNull(path: String, body: String): JsonElement? {
+        val response = transport.adminRpc("schedule.get", path, body)
+        if (!response.success) {
+            val error = response.error
+            if (error != null && SCHEDULE_GET_NOT_FOUND.matches(error)) return null
+            throw TimelineTransportHttpException(502, error ?: "schedule.get failed over iroh admin_rpc")
+        }
+        return response.result
+            ?: throw TimelineTransportHttpException(502, "schedule.get returned no result over iroh admin_rpc")
+    }
+
     private suspend inline fun <reified T> adminRpcDecoded(
         method: String,
         path: String,
@@ -818,7 +829,7 @@ class IrohAdminRpcAgentDirectory(
             agentId?.let { put("agent_id", it) }
         }.toString()
         val path = agentId?.let { "/v1/agents/$it/schedule/$scheduleId" } ?: "/v1/schedules/$scheduleId"
-        val result = adminRpcResultOrNull("schedule.get", path, body) ?: return null
+        val result = scheduleGetResultOrNull(path, body) ?: return null
         return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
     }
 
@@ -853,5 +864,12 @@ class IrohAdminRpcAgentDirectory(
         // is a few hundred KB, well under the admin_rpc timeout on a slow link,
         // whereas the full set is multiple MB and times out in one shot.
         const val AGENT_LIST_PAGE_SIZE = 10
+
+        // Native schedule.get emits the first form; HTTP-backed protocol bridges
+        // may preserve a 404 status or canonical not_found code in the error.
+        private val SCHEDULE_GET_NOT_FOUND = Regex(
+            "^(?:scheduled message \\S+ not found|HTTP 404(?::.*)?|not_found(?::.*)?)$",
+            RegexOption.IGNORE_CASE,
+        )
     }
 }

@@ -5,8 +5,9 @@ import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
 import com.letta.mobile.data.model.ScheduleMessage
-import com.letta.mobile.util.Telemetry
+import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -116,6 +117,71 @@ class IrohAgentAndScheduleRepositoryTest {
             repository.refreshSchedules("agent-1")
             assertEquals(emptyList(), repository.getSchedules("agent-1").first())
         }
+    }
+
+    @Test
+    fun getScheduleReturnsDecodedSuccess() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohAdminTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("schedule.get", call.method)
+            assertEquals("/v1/agents/agent-1/schedule/sched-1", call.path)
+            ok(scheduleJson("sched-1", "agent-1"))
+        }
+        val repository = IrohScheduleRepository { IrohAdminRpcAgentDirectory(transport) }
+
+        assertEquals("sched-1", repository.getSchedule("agent-1", "sched-1").id)
+    }
+
+    @Test
+    fun getScheduleMapsOnlyConfirmedNotFoundToRepositoryException() = runTest(UnconfinedTestDispatcher()) {
+        for (error in listOf(
+            "scheduled message sched-1 not found",
+            "not_found: scheduled message sched-1",
+            "HTTP 404: scheduled message sched-1 not found",
+        )) {
+            val transport = FakeIrohAdminTransport().apply { rpcResponder = { fail(error) } }
+            val repository = IrohScheduleRepository { IrohAdminRpcAgentDirectory(transport) }
+
+            assertFailsWith<NoSuchElementException> {
+                repository.getSchedule("agent-1", "sched-1")
+            }
+        }
+    }
+
+    @Test
+    fun getScheduleKeepsAuthorizationAndBackendFailuresLoud() = runTest(UnconfinedTestDispatcher()) {
+        for (error in listOf(
+            "authorization denied for schedule.get",
+            "capability_unavailable: schedule operations require the native App Server client",
+            "native backend unavailable",
+            "cron_get failed: database offline",
+        )) {
+            val transport = FakeIrohAdminTransport().apply { rpcResponder = { fail(error) } }
+            val repository = IrohScheduleRepository { IrohAdminRpcAgentDirectory(transport) }
+
+            val thrown = assertFailsWith<TimelineTransportHttpException> {
+                repository.getSchedule("agent-1", "sched-1")
+            }
+            assertEquals(502, thrown.code)
+            assertEquals(error, thrown.message)
+        }
+    }
+
+    @Test
+    fun getScheduleKeepsMissingAndMalformedSuccessResultsLoud() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohAdminTransport()
+        val repository = IrohScheduleRepository { IrohAdminRpcAgentDirectory(transport) }
+
+        transport.rpcResponder = {
+            AppServerInboundFrame.AdminRpcResponse(requestId = "req-1", success = true, result = null)
+        }
+        val missing = assertFailsWith<TimelineTransportHttpException> {
+            repository.getSchedule("agent-1", "sched-1")
+        }
+        assertEquals("schedule.get returned no result over iroh admin_rpc", missing.message)
+
+        transport.rpcResponder = { ok("{\"unexpected\":true}") }
+        assertFailsWith<Throwable> { repository.getSchedule("agent-1", "sched-1") }
     }
 
     @Test
