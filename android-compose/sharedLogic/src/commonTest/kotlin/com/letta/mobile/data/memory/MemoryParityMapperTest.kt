@@ -38,6 +38,7 @@ class MemoryParityMapperTest {
                 canonicalLiveTransport = "websocket",
             ),
             contextWindowOverview = ContextWindowOverview(
+                contextWindowSizeMax = 16_000,
                 contextWindowSizeCurrent = 512,
                 numTokensCoreMemory = 100,
                 numTokensExternalMemorySummary = 25,
@@ -66,7 +67,7 @@ class MemoryParityMapperTest {
         assertEquals(185, state.summary.totalMemoryTokens)
         assertEquals(512, state.summary.contextWindowUsed)
         assertEquals(
-            listOf("Skills" to "1", "Blocks" to "1", "Schedules" to "1", "Channels" to "1", "Context" to "512 / 8000"),
+            listOf("Skills" to "1", "Blocks" to "1", "Schedules" to "1", "Channels" to "1", "Context" to "512 / 16000"),
             state.summary.metrics.map { it.label to it.value },
         )
         assertEquals("5 nodes / 4 links", state.graph.summaryLabel)
@@ -137,7 +138,25 @@ class MemoryParityMapperTest {
 
         assertEquals(0, state.summary.skillCount)
         assertEquals(emptyList(), state.section(MemoryParitySectionKind.Skills).items)
+        assertEquals(MemoryParitySectionStatus.Loaded, state.section(MemoryParitySectionKind.Skills).status)
         assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
+    }
+
+    @Test
+    fun buildKeepsSelectedAgentSkillsUnavailableWhenItsSourceWasNotMeasured() {
+        val state = MemoryParityMapper.build(
+            agents = listOf(sampleAgent()),
+            selectedAgentId = "agent-1",
+            allTools = listOf(sampleTool("fallback")),
+            schedules = emptyList(),
+            backendDescriptor = sampleBackend(),
+            channelTransportState = ChannelTransportState.Idle,
+            availability = MemoryParityAvailability(skillsLoaded = false),
+        )
+
+        assertEquals(null, state.summary.skillCount)
+        assertEquals(1, state.section(MemoryParitySectionKind.Skills).items.size)
+        assertEquals(MemoryParitySectionStatus.Unavailable, state.section(MemoryParitySectionKind.Skills).status)
     }
 
     @Test
@@ -246,8 +265,9 @@ class MemoryParityMapperTest {
         assertEquals(0, state.summary.skillCount)
         assertEquals(0, state.summary.memoryBlockCount)
         assertEquals(0, state.summary.scheduleCount)
-        assertEquals(0, state.summary.totalMemoryTokens)
+        assertEquals(null, state.summary.totalMemoryTokens)
         assertEquals(null, state.summary.contextWindowUsed)
+        assertEquals("Unavailable", state.summary.contextUsageLabel)
         // The memory-data sections are empty when there is nothing to show.
         assertEquals(true, state.section(MemoryParitySectionKind.Skills).items.isEmpty())
         assertEquals(true, state.section(MemoryParitySectionKind.Memory).items.isEmpty())

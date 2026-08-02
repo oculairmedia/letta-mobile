@@ -355,7 +355,7 @@ private fun MemorySectionCard(section: MemoryParitySection) {
             }
             if (section.items.isEmpty()) {
                 Text(
-                    text = section.emptyMessage,
+                    text = section.messageWhenEmpty,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -594,6 +594,7 @@ private fun previewMemoryState(): MemoryParityControllerState =
                 totalMemoryTokens = 1204,
                 contextWindowUsed = 1204,
                 contextWindowLimit = 8192,
+                contextLoaded = true,
             ),
         ),
         agents = listOf(

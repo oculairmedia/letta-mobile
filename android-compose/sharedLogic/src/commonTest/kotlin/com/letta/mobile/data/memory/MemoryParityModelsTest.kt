@@ -132,17 +132,50 @@ class MemoryParityModelsTest {
 
     @Test
     fun testMemoryParitySummary_contextUsageLabel() {
-        val summary1 = MemoryParitySummary(contextWindowUsed = 100, contextWindowLimit = 500)
+        val summary1 = MemoryParitySummary(contextWindowUsed = 100, contextWindowLimit = 500, contextLoaded = true)
         assertEquals("100 / 500", summary1.contextUsageLabel)
 
-        val summary2 = MemoryParitySummary(contextWindowUsed = 100)
+        val summary2 = MemoryParitySummary(contextWindowUsed = 100, contextLoaded = true)
         assertEquals("100", summary2.contextUsageLabel)
 
-        val summary3 = MemoryParitySummary(totalMemoryTokens = 200)
+        val summary3 = MemoryParitySummary(totalMemoryTokens = 200, contextLoaded = true)
         assertEquals("200 tokens", summary3.contextUsageLabel)
 
         val summary4 = MemoryParitySummary()
-        assertEquals("Not loaded", summary4.contextUsageLabel)
+        assertEquals("—", summary4.contextUsageLabel)
+    }
+
+    @Test
+    fun `unknown and measured empty remain distinct`() {
+        val unknown = MemoryParityMapper.build(
+            agents = emptyList(),
+            selectedAgentId = null,
+            allTools = emptyList(),
+            schedules = emptyList(),
+            backendDescriptor = testBackend(),
+            channelTransportState = com.letta.mobile.data.transport.ChannelTransportState.Idle,
+            availability = MemoryParityAvailability(
+                skillsLoaded = false,
+                memoryBlocksLoaded = false,
+                schedulesLoaded = false,
+                contextLoaded = false,
+            ),
+        )
+        val measuredEmpty = MemoryParityMapper.build(
+            agents = emptyList(),
+            selectedAgentId = null,
+            allTools = emptyList(),
+            schedules = emptyList(),
+            backendDescriptor = testBackend(),
+            channelTransportState = com.letta.mobile.data.transport.ChannelTransportState.Idle,
+        )
+
+        assertEquals("—", unknown.summary.metrics.first { it.kind == MemorySummaryMetricKind.Skills }.value)
+        assertEquals("0", measuredEmpty.summary.metrics.first { it.kind == MemorySummaryMetricKind.Skills }.value)
+        assertEquals(MemoryParitySectionStatus.Unavailable, unknown.sections.first().status)
+        assertEquals("Could not load skills.", unknown.sections.first().messageWhenEmpty)
+        assertEquals(MemoryParitySectionStatus.Loaded, measuredEmpty.sections.first().status)
+        assertEquals("No skills attached.", measuredEmpty.sections.first().messageWhenEmpty)
     }
 
     @Test
@@ -154,7 +187,8 @@ class MemoryParityModelsTest {
             channelCount = 3,
             totalMemoryTokens = 1500,
             contextWindowUsed = 500,
-            contextWindowLimit = 8000
+            contextWindowLimit = 8000,
+            contextLoaded = true,
         )
         
         val json = kotlinx.serialization.json.Json.encodeToString(summary)
@@ -162,4 +196,20 @@ class MemoryParityModelsTest {
         
         assertEquals(summary, decoded)
     }
+
+    private fun testBackend() = com.letta.mobile.runtime.BackendDescriptor(
+        backendId = com.letta.mobile.runtime.BackendId("backend"),
+        runtimeId = com.letta.mobile.runtime.RuntimeId("runtime"),
+        kind = com.letta.mobile.runtime.BackendKind.RemoteLetta,
+        label = "Remote",
+        capabilities = com.letta.mobile.runtime.BackendCapabilities(
+            supportsStreaming = true,
+            supportsMemFs = true,
+            supportsToolEvents = true,
+            supportsToolExecution = true,
+            supportsApprovals = true,
+            supportsAgentFileImport = true,
+            supportsAgentFileExport = true,
+        ),
+    )
 }
