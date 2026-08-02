@@ -2,10 +2,12 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduleDefinition
+import com.letta.mobile.data.model.ScheduleListResponse
 import com.letta.mobile.data.model.ScheduleMessage
 import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.testutil.FakeScheduleApi
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -139,12 +141,18 @@ class ScheduleRepositoryTest {
         )
         val transport = com.letta.mobile.testutil.FakeChannelTransport()
         val testSchedules = listOf(sampleScheduledMessage())
-        transport.adminRpcHandler = { method, _, _ ->
+        transport.adminRpcHandler = { method, path, body ->
             assertEquals("schedule.list", method)
+            assertEquals("/v1/agents/a1/schedule", path)
+            assertEquals("{\"agent_id\":\"a1\"}", body)
             val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
             com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
                 requestId = "req", success = true,
-                result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(ScheduledMessage.serializer()), testSchedules),
+                // Matches ScheduleAdminHandlers.page's production envelope.
+                result = json.encodeToJsonElement(
+                    ScheduleListResponse.serializer(),
+                    ScheduleListResponse(hasNextPage = false, scheduledMessages = testSchedules),
+                ),
                 error = null
             )
         }
@@ -158,6 +166,92 @@ class ScheduleRepositoryTest {
         repo.refreshSchedules("a1")
         assertEquals(1, repo.getSchedules("a1").first().size)
         assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `refreshSchedules accepts legacy bare array result in iroh mode`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t"
+            )
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val testSchedules = listOf(sampleScheduledMessage())
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("schedule.list", method)
+            assertEquals("/v1/agents/a1/schedule", path)
+            assertEquals("{\"agent_id\":\"a1\"}", body)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(ScheduledMessage.serializer()),
+                    testSchedules,
+                ),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcScheduleSource(transport, settings)
+        val apiThatThrows = object : FakeScheduleApi() {
+            override suspend fun listSchedules(agentId: String, limit: Int?, after: String?): ScheduleListResponse {
+                throw AssertionError("Raw HTTP must not be called in iroh mode")
+            }
+        }
+        val repo = ScheduleRepository(apiThatThrows, irohSource)
+
+        repo.refreshSchedules("a1")
+
+        assertEquals(testSchedules, repo.getSchedules("a1").first())
+    }
+
+    @Test
+    fun `refreshSchedules excludes foreign agent schedules and emits warning`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t"
+            )
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        val schedules = listOf(sampleScheduledMessage(), sampleScheduledMessage(id = "s2", agentId = "a2"))
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("schedule.list", method)
+            assertEquals("/v1/agents/a1/schedule", path)
+            assertEquals("{\"agent_id\":\"a1\"}", body)
+            val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(
+                    ScheduleListResponse.serializer(),
+                    ScheduleListResponse(hasNextPage = false, scheduledMessages = schedules),
+                ),
+                error = null,
+            )
+        }
+        val apiThatThrows = object : FakeScheduleApi() {
+            override suspend fun listSchedules(agentId: String, limit: Int?, after: String?): ScheduleListResponse {
+                throw AssertionError("Raw HTTP must not be called in iroh mode")
+            }
+        }
+        val previousLogcatEnabled = Telemetry.logcatEnabled.get()
+        try {
+            Telemetry.clear()
+            Telemetry.logcatEnabled.set(false)
+            val repo = ScheduleRepository(apiThatThrows, IrohAdminRpcScheduleSource(transport, settings))
+
+            repo.refreshSchedules("a1")
+
+            assertEquals(listOf("s1"), repo.getSchedules("a1").first().map { it.id })
+            assertTrue(repo.getSchedules("a2").first().isEmpty())
+            val warning = Telemetry.snapshot().single { it.name == "scheduleList.scopeMismatch" }
+            assertEquals(Telemetry.Level.WARN, warning.level)
+            assertEquals("a1", warning.attrs["requestedAgentId"])
+            assertEquals(1, warning.attrs["excludedCount"])
+        } finally {
+            Telemetry.clear()
+            Telemetry.logcatEnabled.set(previousLogcatEnabled)
+        }
     }
 
     @Test
@@ -175,7 +269,13 @@ class ScheduleRepositoryTest {
                 )
             } else {
                 com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
-                    requestId = "req", success = true, result = json.encodeToJsonElement(kotlinx.serialization.builtins.ListSerializer(ScheduledMessage.serializer()), listOf(created)), error = null
+                    requestId = "req",
+                    success = true,
+                    result = json.encodeToJsonElement(
+                        ScheduleListResponse.serializer(),
+                        ScheduleListResponse(hasNextPage = false, scheduledMessages = listOf(created)),
+                    ),
+                    error = null
                 )
             }
         }
@@ -215,9 +315,12 @@ class ScheduleRepositoryTest {
         assertEquals(1, transport.adminRpcCalls.size)
     }
 
-    private fun sampleScheduledMessage() = ScheduledMessage(
-        id = "s1",
-        agentId = "a1",
+    private fun sampleScheduledMessage(
+        id: String = "s1",
+        agentId: String = "a1",
+    ) = ScheduledMessage(
+        id = id,
+        agentId = agentId,
         message = SchedulePayload(
             messages = listOf(ScheduleMessage(content = "hello", role = "user"))
         ),

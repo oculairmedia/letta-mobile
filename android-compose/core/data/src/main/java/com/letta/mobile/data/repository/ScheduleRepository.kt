@@ -23,7 +23,7 @@ open class ScheduleRepository(
     override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
         val irohSource = irohScheduleSource
         val schedules = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.listSchedules()
+            irohSource.listSchedules(agentId)
         } else {
             val response = scheduleApi.listSchedules(agentId = agentId, limit = limit, after = after)
             response.scheduledMessages
