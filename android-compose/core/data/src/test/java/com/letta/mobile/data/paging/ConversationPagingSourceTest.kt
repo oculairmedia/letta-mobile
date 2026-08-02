@@ -2,8 +2,6 @@ package com.letta.mobile.data.paging
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
-import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
@@ -13,6 +11,7 @@ import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.testutil.armedConversationApi
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -113,8 +112,8 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> irohSuccess(listOf(TestData.conversation(id = "iroh-1", agentId = "agent-1"))) }
         }
         val source = ConversationPagingSource(
-            conversationApi = armedHttpApi(),
-            irohConversationListSource = irohSource(transport),
+            conversationApi = armedConversationApi(),
+            pageLoader = irohPageLoader(transport),
             agentId = AgentId("agent-1"),
             archiveStatus = "unarchived",
             summarySearch = "important",
@@ -151,8 +150,8 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> irohSuccess(pages.removeFirst()) }
         }
         val source = ConversationPagingSource(
-            conversationApi = armedHttpApi(),
-            irohConversationListSource = irohSource(transport),
+            conversationApi = armedConversationApi(),
+            pageLoader = irohPageLoader(transport),
         )
 
         val first = source.load(refresh(loadSize = 2)) as PagingSource.LoadResult.Page
@@ -176,8 +175,8 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> irohSuccess(emptyList()) }
         }
         val emptyResult = ConversationPagingSource(
-            conversationApi = armedHttpApi(),
-            irohConversationListSource = irohSource(emptyTransport),
+            conversationApi = armedConversationApi(),
+            pageLoader = irohPageLoader(emptyTransport),
         ).load(refresh(loadSize = 50))
         emptyResult as PagingSource.LoadResult.Page
         assertTrue(emptyResult.data.isEmpty())
@@ -189,8 +188,8 @@ class ConversationPagingSourceTest {
             }
         }
         val failureResult = ConversationPagingSource(
-            conversationApi = armedHttpApi(),
-            irohConversationListSource = irohSource(failureTransport),
+            conversationApi = armedConversationApi(),
+            pageLoader = irohPageLoader(failureTransport),
         ).load(refresh(loadSize = 50))
         assertTrue(failureResult is PagingSource.LoadResult.Error)
 
@@ -198,8 +197,8 @@ class ConversationPagingSourceTest {
             adminRpcHandler = { _, _, _ -> throw IllegalStateException("transport failed") }
         }
         val throwResult = ConversationPagingSource(
-            conversationApi = armedHttpApi(),
-            irohConversationListSource = irohSource(throwingTransport),
+            conversationApi = armedConversationApi(),
+            pageLoader = irohPageLoader(throwingTransport),
         ).load(refresh(loadSize = 50))
         assertTrue(throwResult is PagingSource.LoadResult.Error)
     }
@@ -219,8 +218,8 @@ class ConversationPagingSourceTest {
         assert(result is PagingSource.LoadResult.Error)
     }
 
-    private fun irohSource(transport: FakeChannelTransport): IrohAdminRpcConversationListSource =
-        IrohAdminRpcConversationListSource(
+    private fun irohPageLoader(transport: FakeChannelTransport): ConversationPageLoader {
+        val source = IrohAdminRpcConversationListSource(
             transport,
             FakeSettingsRepository(
                 initialActiveConfig = LettaConfig(
@@ -230,17 +229,9 @@ class ConversationPagingSourceTest {
                 ),
             ),
         )
-
-    private fun armedHttpApi(): ConversationApi = object : ConversationApi(io.mockk.mockk(relaxed = true)) {
-        override suspend fun listConversations(
-            agentId: AgentId?,
-            limit: Int?,
-            after: String?,
-            archiveStatus: String?,
-            summarySearch: String?,
-            order: String?,
-            orderBy: String?,
-        ): List<Conversation> = throw IrohAdminApiUnavailableException("iroh://armed-http")
+        return { agentId, limit, after, archiveStatus, summarySearch, order, orderBy ->
+            source.listConversations(agentId, limit, after, archiveStatus, summarySearch, order, orderBy)
+        }
     }
 
     private fun irohSuccess(conversations: List<Conversation>) = AppServerInboundFrame.AdminRpcResponse(

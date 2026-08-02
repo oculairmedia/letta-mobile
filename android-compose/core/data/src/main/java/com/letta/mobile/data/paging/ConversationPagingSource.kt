@@ -5,7 +5,6 @@ import androidx.paging.PagingState
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.repository.IrohAdminRpcConversationListSource
 
 internal typealias ConversationPageLoader = suspend (
     agentId: AgentId?,
@@ -19,7 +18,6 @@ internal typealias ConversationPageLoader = suspend (
 
 class ConversationPagingSource(
     private val conversationApi: ConversationApi,
-    private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
     private val agentId: AgentId? = null,
     private val archiveStatus: String? = null,
     private val summarySearch: String? = null,
@@ -30,7 +28,6 @@ class ConversationPagingSource(
 
     override suspend fun load(params: LoadParams<String>): LoadResult<String, Conversation> {
         return try {
-            val irohSource = irohConversationListSource
             val conversations = if (pageLoader != null) {
                 pageLoader.invoke(
                     agentId,
@@ -40,16 +37,6 @@ class ConversationPagingSource(
                     summarySearch,
                     order,
                     orderBy,
-                )
-            } else if (irohSource?.shouldUseIroh() == true) {
-                irohSource.listConversations(
-                    agentId = agentId,
-                    limit = params.loadSize,
-                    after = params.key,
-                    archiveStatus = archiveStatus,
-                    summarySearch = summarySearch,
-                    order = order,
-                    orderBy = orderBy,
                 )
             } else {
                 conversationApi.listConversations(

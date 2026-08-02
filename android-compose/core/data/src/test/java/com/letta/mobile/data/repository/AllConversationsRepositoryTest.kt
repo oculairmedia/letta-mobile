@@ -1,8 +1,6 @@
 package com.letta.mobile.data.repository
 
 import androidx.paging.PagingSource
-import com.letta.mobile.data.api.ConversationApi
-import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
@@ -13,6 +11,7 @@ import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
+import com.letta.mobile.testutil.armedConversationApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -125,19 +124,8 @@ class AllConversationsRepositoryTest {
                 serverUrl = "iroh://EndpointTicket",
             ),
         )
-        val armedHttp = object : ConversationApi(io.mockk.mockk(relaxed = true)) {
-            override suspend fun listConversations(
-                agentId: AgentId?,
-                limit: Int?,
-                after: String?,
-                archiveStatus: String?,
-                summarySearch: String?,
-                order: String?,
-                orderBy: String?,
-            ): List<Conversation> = throw IrohAdminApiUnavailableException("iroh://armed-http")
-        }
         val pagedRepository = AllConversationsRepository(
-            conversationApi = armedHttp,
+            conversationApi = armedConversationApi(),
             conversationDao = null,
             repositoryScope = this,
             settingsRepository = settings,

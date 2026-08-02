@@ -92,7 +92,6 @@ open class AllConversationsRepository(
         summarySearch: String?,
     ): ConversationPagingSource = ConversationPagingSource(
         conversationApi = conversationApi,
-        irohConversationListSource = irohConversationListSource,
         agentId = agentId,
         archiveStatus = archiveStatus,
         summarySearch = summarySearch,
