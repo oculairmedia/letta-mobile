@@ -34,7 +34,12 @@ open class ScheduleRepository(
     }
 
     override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
-        return scheduleApi.retrieveSchedule(agentId, scheduledMessageId)
+        val irohSource = irohScheduleSource
+        return if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.getSchedule(agentId, scheduledMessageId)
+        } else {
+            scheduleApi.retrieveSchedule(agentId, scheduledMessageId)
+        }
     }
 
     override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
