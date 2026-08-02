@@ -1,10 +1,15 @@
 package com.letta.mobile.data.repository
 
+import androidx.paging.PagingSource
+import com.letta.mobile.data.api.ConversationApi
+import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.FakeConversationApi
 import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.TestData
@@ -12,6 +17,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -96,6 +103,59 @@ class AllConversationsRepositoryTest {
         repositoryWithLocal.refresh()
 
         assertEquals(listOf("remote-1"), repositoryWithLocal.conversations.value.map { it.id.value })
+    }
+
+    @Test
+    fun `paged conversations factory injects existing iroh source`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ ->
+                AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = Json.parseToJsonElement(
+                        Json.encodeToString(listOf(TestData.conversation(id = "iroh-page"))),
+                    ),
+                )
+            }
+        }
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "iroh",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://EndpointTicket",
+            ),
+        )
+        val armedHttp = object : ConversationApi(io.mockk.mockk(relaxed = true)) {
+            override suspend fun listConversations(
+                agentId: AgentId?,
+                limit: Int?,
+                after: String?,
+                archiveStatus: String?,
+                summarySearch: String?,
+                order: String?,
+                orderBy: String?,
+            ): List<Conversation> = throw IrohAdminApiUnavailableException("iroh://armed-http")
+        }
+        val pagedRepository = AllConversationsRepository(
+            conversationApi = armedHttp,
+            conversationDao = null,
+            repositoryScope = this,
+            settingsRepository = settings,
+            irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
+        )
+
+        val pagingSource = pagedRepository.createConversationsPagingSource(null, null, null)
+        assertTrue(pagingSource.pageLoader != null)
+        val result = pagingSource.load(
+            PagingSource.LoadParams.Refresh(
+                key = null,
+                loadSize = 50,
+                placeholdersEnabled = false,
+            ),
+        ) as PagingSource.LoadResult.Page
+
+        assertEquals(listOf("iroh-page"), result.data.map { it.id.value })
+        assertEquals("conversation.list", transport.adminRpcCalls.single().method)
     }
 
     @Test
