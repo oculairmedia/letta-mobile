@@ -4,44 +4,62 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
-import kotlin.test.assertTrue
 
 class BackendUrlTelemetryTest {
     @Test
-    fun preservesSchemeAndRedactsEndpointDetails() {
-        val cases = listOf(
-            "iroh://node-secret.example/path?token=iroh-token" to "iroh://",
-            "https://user:password@api-secret.example/v1/chat?token=https-token" to "https://",
-            "http://plain-secret.example:8080/private?token=http-token" to "http://",
+    fun endpointDetailsDoNotAffectDescriptor() {
+        val urls = listOf(
+            "https://first-user:first-password@first-secret.example:443/private?token=first-token",
+            "https://second-user:second-password@second-secret.example:8443/other?token=second-token",
         )
 
-        for ((url, expectedPrefix) in cases) {
-            val descriptor = backendUrlTelemetryDescriptor(url)
-            assertTrue(descriptor.startsWith(expectedPrefix))
-            assertEquals(expectedPrefix.length + 6, descriptor.length)
-            listOf("node-secret", "api-secret", "plain-secret", "user", "password", "private", "token").forEach {
-                assertFalse(descriptor.contains(it, ignoreCase = true))
+        val descriptors = urls.map(::backendUrlTelemetryDescriptor)
+
+        assertEquals(listOf("https", "https"), descriptors)
+        listOf(
+            "first-user",
+            "first-password",
+            "first-secret.example",
+            "443",
+            "private",
+            "first-token",
+            "second-user",
+            "second-password",
+            "second-secret.example",
+            "8443",
+            "other",
+            "second-token",
+        ).forEach { inputSubstring ->
+            descriptors.forEach { descriptor ->
+                assertFalse(descriptor.contains(inputSubstring, ignoreCase = true))
             }
         }
     }
 
     @Test
-    fun handlesAbsentAndMalformedValuesWithoutEchoingThem() {
-        assertEquals("unknown", backendUrlTelemetryDescriptor(null))
-        assertEquals("unknown", backendUrlTelemetryDescriptor(""))
-        assertEquals("unknown", backendUrlTelemetryDescriptor("   "))
-        assertEquals("unknown", backendUrlTelemetryDescriptor("host-secret/path?token=secret"))
+    fun supportedSchemesRemainDistinguishable() {
+        val descriptors = listOf(
+            backendUrlTelemetryDescriptor("iroh://node-secret.example/private?token=iroh-token"),
+            backendUrlTelemetryDescriptor("https://api-secret.example/private?token=https-token"),
+            backendUrlTelemetryDescriptor("http://plain-secret.example/private?token=http-token"),
+        )
+
+        assertEquals(listOf("iroh", "https", "http"), descriptors)
+        assertEquals(descriptors.size, descriptors.toSet().size)
+        assertNotEquals(descriptors[0], descriptors[1])
     }
 
     @Test
-    fun descriptorsAreStableAndDistinguishAuthorities() {
-        val first = "https://first-private.example/path?token=one"
-        val second = "https://second-private.example/path?token=two"
-        assertEquals(backendUrlTelemetryDescriptor(first), backendUrlTelemetryDescriptor(first))
-        assertNotEquals(backendUrlTelemetryDescriptor(first), backendUrlTelemetryDescriptor(second))
-        assertEquals(
-            backendUrlTelemetryDescriptor("https://first-private.example/other?token=changed"),
-            backendUrlTelemetryDescriptor(first),
-        )
+    fun absentMalformedAndUnsupportedValuesAreUnknown() {
+        listOf(
+            null,
+            "",
+            "   ",
+            "host-secret/path?token=secret",
+            "://host-secret",
+            "ftp://host-secret/private",
+        ).forEach { value ->
+            assertEquals("unknown", backendUrlTelemetryDescriptor(value))
+        }
     }
 }
