@@ -15,6 +15,15 @@ import com.letta.mobile.runtime.BackendDescriptor
 
 @Serializable
 @Immutable
+data class MemoryParityAvailability(
+    val skillsLoaded: Boolean = true,
+    val memoryBlocksLoaded: Boolean = true,
+    val schedulesLoaded: Boolean = true,
+    val contextLoaded: Boolean = true,
+)
+
+@Serializable
+@Immutable
 data class MemoryParityState(
     val selectedAgentId: String? = null,
     val selectedAgentName: String? = null,
@@ -34,28 +43,36 @@ data class MemoryParityState(
 @Serializable
 @Immutable
 data class MemoryParitySummary(
-    val skillCount: Int = 0,
-    val memoryBlockCount: Int = 0,
-    val scheduleCount: Int = 0,
+    val skillCount: Int? = null,
+    val memoryBlockCount: Int? = null,
+    val scheduleCount: Int? = null,
     val channelCount: Int = 0,
-    val totalMemoryTokens: Int = 0,
+    val totalMemoryTokens: Int? = null,
     val contextWindowUsed: Int? = null,
     val contextWindowLimit: Int? = null,
+    val contextLoaded: Boolean = false,
 ) {
     val contextUsageLabel: String = when {
+        !contextLoaded -> UNKNOWN_METRIC_LABEL
         contextWindowUsed != null && contextWindowLimit != null -> "$contextWindowUsed / $contextWindowLimit"
         contextWindowUsed != null -> contextWindowUsed.toString()
-        totalMemoryTokens > 0 -> "$totalMemoryTokens tokens"
-        else -> "Not loaded"
+        totalMemoryTokens != null -> "$totalMemoryTokens tokens"
+        else -> "Unavailable"
     }
 
     val metrics: List<MemorySummaryMetric> = listOf(
-        MemorySummaryMetric(MemorySummaryMetricKind.Skills, "Skills", skillCount.toString()),
-        MemorySummaryMetric(MemorySummaryMetricKind.Blocks, "Blocks", memoryBlockCount.toString()),
-        MemorySummaryMetric(MemorySummaryMetricKind.Schedules, "Schedules", scheduleCount.toString()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Skills, "Skills", skillCount.metricLabel()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Blocks, "Blocks", memoryBlockCount.metricLabel()),
+        MemorySummaryMetric(MemorySummaryMetricKind.Schedules, "Schedules", scheduleCount.metricLabel()),
         MemorySummaryMetric(MemorySummaryMetricKind.Channels, "Channels", channelCount.toString()),
         MemorySummaryMetric(MemorySummaryMetricKind.Context, "Context", contextUsageLabel),
     )
+
+    private fun Int?.metricLabel(): String = this?.toString() ?: UNKNOWN_METRIC_LABEL
+
+    private companion object {
+        const val UNKNOWN_METRIC_LABEL = "—"
+    }
 }
 
 @Serializable
@@ -83,7 +100,27 @@ data class MemoryParitySection(
     val subtitle: String,
     val emptyMessage: String,
     val items: List<MemoryParityItem>,
-)
+    val status: MemoryParitySectionStatus = MemoryParitySectionStatus.Loaded,
+) {
+    val messageWhenEmpty: String
+        get() = when (status) {
+            MemoryParitySectionStatus.Loaded -> emptyMessage
+            MemoryParitySectionStatus.Unavailable -> "Could not load ${kind.unavailableLabel()}."
+        }
+}
+
+@Serializable
+enum class MemoryParitySectionStatus {
+    Loaded,
+    Unavailable,
+}
+
+private fun MemoryParitySectionKind.unavailableLabel(): String = when (this) {
+    MemoryParitySectionKind.Skills -> "skills"
+    MemoryParitySectionKind.Memory -> "memory blocks"
+    MemoryParitySectionKind.Schedules -> "schedules"
+    MemoryParitySectionKind.Channels -> "channels"
+}
 
 @Serializable
 enum class MemoryParitySectionKind {
@@ -339,6 +376,7 @@ object MemoryParityMapper {
         backendDescriptor: BackendDescriptor,
         channelTransportState: ChannelTransportState,
         contextWindowOverview: ContextWindowOverview? = null,
+        availability: MemoryParityAvailability = MemoryParityAvailability(),
     ): MemoryParityState {
         val selectedAgent = if (selectedAgentId != null) {
             agents.firstOrNull { it.id.value == selectedAgentId }
@@ -353,9 +391,9 @@ object MemoryParityMapper {
         val selectedBlocks = selectedAgent?.coreBlocks.orEmpty()
         val channelSection = channelsSection(backendDescriptor, channelTransportState)
         val sections = listOf(
-            skillsSection(selectedTools),
-            memorySection(selectedBlocks),
-            schedulesSection(schedules),
+            skillsSection(selectedTools, availability.skillsLoaded),
+            memorySection(selectedBlocks, availability.memoryBlocksLoaded),
+            schedulesSection(schedules, availability.schedulesLoaded),
             channelSection,
         )
 
@@ -364,13 +402,14 @@ object MemoryParityMapper {
             selectedAgentName = selectedAgent?.name,
             sections = sections,
             summary = MemoryParitySummary(
-                skillCount = selectedTools.size,
-                memoryBlockCount = selectedBlocks.size,
-                scheduleCount = schedules.size,
+                skillCount = selectedTools.size.takeIf { availability.skillsLoaded },
+                memoryBlockCount = selectedBlocks.size.takeIf { availability.memoryBlocksLoaded },
+                scheduleCount = schedules.size.takeIf { availability.schedulesLoaded },
                 channelCount = 1,
-                totalMemoryTokens = contextWindowOverview.totalMemoryTokens(),
+                totalMemoryTokens = contextWindowOverview?.totalMemoryTokens(),
                 contextWindowUsed = contextWindowOverview?.contextWindowSizeCurrent,
                 contextWindowLimit = selectedAgent?.contextWindowLimit,
+                contextLoaded = availability.contextLoaded,
             ),
             graph = memoryGraph(
                 selectedAgent = selectedAgent,
@@ -380,12 +419,13 @@ object MemoryParityMapper {
         )
     }
 
-    private fun skillsSection(tools: List<Tool>): MemoryParitySection =
+    private fun skillsSection(tools: List<Tool>, loaded: Boolean): MemoryParitySection =
         MemoryParitySection(
             kind = MemoryParitySectionKind.Skills,
             title = "Skills",
             subtitle = "Tools and callable skills attached to the active agent.",
             emptyMessage = "No skills attached.",
+            status = loaded.toSectionStatus(),
             items = tools.map { tool ->
                 val detailText = tool.description?.takeIf { it.isNotBlank() }
                     ?: tool.sourceType?.takeIf { it.isNotBlank() }
@@ -411,12 +451,13 @@ object MemoryParityMapper {
             },
         )
 
-    private fun memorySection(blocks: List<Block>): MemoryParitySection =
+    private fun memorySection(blocks: List<Block>, loaded: Boolean): MemoryParitySection =
         MemoryParitySection(
             kind = MemoryParitySectionKind.Memory,
             title = "Memory",
             subtitle = "Core memory blocks available to the selected agent.",
             emptyMessage = "No memory blocks attached.",
+            status = loaded.toSectionStatus(),
             items = blocks.map { block ->
                 val preview = block.value.lineSequence().firstOrNull { it.isNotBlank() }
                     ?.take(MAX_MEMORY_PREVIEW_CHARS)
@@ -441,12 +482,13 @@ object MemoryParityMapper {
             },
         )
 
-    private fun schedulesSection(schedules: List<ScheduledMessage>): MemoryParitySection =
+    private fun schedulesSection(schedules: List<ScheduledMessage>, loaded: Boolean): MemoryParitySection =
         MemoryParitySection(
             kind = MemoryParitySectionKind.Schedules,
             title = "Memory schedules",
             subtitle = "Scheduled messages and recurring memory maintenance.",
             emptyMessage = "No memory schedules configured.",
+            status = loaded.toSectionStatus(),
             items = schedules.map { schedule ->
                 val message = schedule.message.messages.firstOrNull()?.content.orEmpty()
                 val subtitle = when (schedule.schedule.type) {
@@ -578,13 +620,14 @@ object MemoryParityMapper {
         MemoryParitySectionKind.Channels -> "delivers"
     }
 
-    private fun ContextWindowOverview?.totalMemoryTokens(): Int =
-        this?.let { overview ->
-            overview.numTokensCoreMemory +
-                overview.numTokensExternalMemorySummary +
-                overview.numTokensMemoryFilesystem +
-                overview.numTokensSummaryMemory
-        } ?: 0
+    private fun Boolean.toSectionStatus(): MemoryParitySectionStatus =
+        if (this) MemoryParitySectionStatus.Loaded else MemoryParitySectionStatus.Unavailable
+
+    private fun ContextWindowOverview.totalMemoryTokens(): Int =
+        numTokensCoreMemory +
+            numTokensExternalMemorySummary +
+            numTokensMemoryFilesystem +
+            numTokensSummaryMemory
 
     private const val MAX_MEMORY_PREVIEW_CHARS = 160
     private const val MAX_METADATA_TAGS = 2
