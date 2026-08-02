@@ -31,18 +31,16 @@ data class MemoryParityAgentOption(
 class MemoryParityController<Graph : SessionRepositoryGraph>(
     private val sessionGraphProvider: SessionRepositoryGraphProvider<Graph>,
     private val scope: CoroutineScope,
-    sectionReader: MemoryParitySectionReader = MemoryParitySectionReader(),
-    private val errorMessageMapper: (Throwable) -> String = { throwable ->
-        throwable.message ?: "Memory data could not be loaded."
-    },
+    private val sectionReader: MemoryParitySectionReader = MemoryParitySectionReader(),
+    private val errorMessageMapper: (Throwable) -> String = ::safeMemoryErrorMessage,
     private val maxAgeMs: Long = DEFAULT_MEMORY_REFRESH_MAX_AGE_MS,
 ) : AutoCloseable {
-    private val sectionReader = sectionReader
     private val stateFlow = MutableStateFlow(MemoryParityControllerState())
     val state: StateFlow<MemoryParityControllerState> = stateFlow
     private var loadJob: Job? = null
     private var selectedAgentId: String? = null
     private var selectedAgentDetail: Agent? = null
+    private var selectedAgentGraphId: Long? = null
 
     fun start() {
         if (stateFlow.value.memory.sections.isEmpty()) {
@@ -69,6 +67,10 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         stateFlow.update { it.copy(isLoading = true, errorMessage = null) }
         val graph = sessionGraphProvider.current
         val channelState = graph.channelTransport.state.value
+        if (selectedAgentGraphId != graph.id) {
+            selectedAgentDetail = null
+            selectedAgentGraphId = graph.id
+        }
         val roster = sectionReader.read("roster") {
             graph.agentRepository.refreshAgentsIfStale(maxAgeMs = maxAgeMs)
             graph.agentRepository.agents.value
@@ -81,8 +83,20 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             selectedAgentDetail = selectedAgent
         }
 
-        // Agent tools are the only per-agent skill source available until skill.list_agent is wired.
-        val skillsLoaded = roster.loaded || selectedAgentDetail != null
+        val globalTools = if (roster.loaded && selectedAgent == null) {
+            sectionReader.read("tools") {
+                graph.toolRepository.refreshToolsIfStale(maxAgeMs = maxAgeMs)
+                graph.toolRepository.getTools().value
+            }
+        } else if (roster.loaded) {
+            MemoryParitySectionRead.Loaded(emptyList())
+        } else {
+            MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
+        }
+
+        // Agent tools and blocks come from the same cached Agent snapshot.
+        val agentSnapshotLoaded = roster.loaded || selectedAgentDetail != null
+        val skillsLoaded = if (selectedAgent == null) globalTools.loaded else agentSnapshotLoaded
         val schedules = selectedAgent?.id?.value?.let { agentId ->
             sectionReader.read("schedules") {
                 graph.scheduleRepository.refreshSchedules(agentId)
@@ -104,14 +118,14 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
         val memory = MemoryParityMapper.build(
             agents = agents,
             selectedAgentId = selectedAgent?.id?.value,
-            allTools = emptyList(),
+            allTools = globalTools.value.orEmpty(),
             schedules = schedules.value.orEmpty(),
             backendDescriptor = graph.backendDescriptor,
             channelTransportState = channelState,
             contextWindowOverview = context.value,
             availability = MemoryParityAvailability(
                 skillsLoaded = skillsLoaded,
-                memoryBlocksLoaded = roster.loaded,
+                memoryBlocksLoaded = agentSnapshotLoaded,
                 schedulesLoaded = schedules.loaded,
                 contextLoaded = context.loaded,
             ),
@@ -129,11 +143,7 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
     }
 
     private fun List<Agent>.resolveSelection(requestedAgentId: String?): Agent? =
-        if (requestedAgentId != null) {
-            firstOrNull { it.id.value == requestedAgentId }
-        } else {
-            firstOrNull()
-        }
+        requestedAgentId?.let { requested -> firstOrNull { it.id.value == requested } } ?: firstOrNull()
 
     private class DependencyUnavailable(section: String) :
         IllegalStateException("$section dependency unavailable")
@@ -141,6 +151,11 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
     private companion object {
         const val DEFAULT_MEMORY_REFRESH_MAX_AGE_MS = 30_000L
     }
+}
+
+internal fun safeMemoryErrorMessage(throwable: Throwable): String = when (throwable) {
+    is UnsupportedOperationException -> "Memory data is not available on this backend."
+    else -> "Memory data could not be loaded."
 }
 
 class MemoryParitySectionReader(

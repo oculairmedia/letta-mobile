@@ -40,6 +40,17 @@ class MemoryParitySectionReaderTest {
     }
 
     @Test
+    fun `safe error mapping never exposes raw exception messages`() {
+        val secret = "https://internal.example/token=super-secret"
+
+        assertEquals("Memory data could not be loaded.", safeMemoryErrorMessage(RuntimeException(secret)))
+        assertEquals(
+            "Memory data is not available on this backend.",
+            safeMemoryErrorMessage(UnsupportedOperationException(secret)),
+        )
+    }
+
+    @Test
     fun `cancellation propagates without warning`() = runTest {
         val warnings = mutableListOf<Pair<String, String>>()
         val reader = MemoryParitySectionReader { section, exceptionClass ->
