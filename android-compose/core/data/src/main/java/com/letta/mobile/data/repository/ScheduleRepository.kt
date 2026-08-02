@@ -12,7 +12,6 @@ import kotlinx.coroutines.flow.update
 
 open class ScheduleRepository(
     private val scheduleApi: ScheduleApi,
-    private val irohScheduleSource: IrohAdminRpcScheduleSource? = null,
 ) : IScheduleRepository {
     private val _schedules = MutableStateFlow<Map<String, List<ScheduledMessage>>>(emptyMap())
 
@@ -21,45 +20,25 @@ open class ScheduleRepository(
     }
 
     override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
-        val irohSource = irohScheduleSource
-        val schedules = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.listSchedules(agentId)
-        } else {
-            val response = scheduleApi.listSchedules(agentId = agentId, limit = limit, after = after)
-            response.scheduledMessages
-        }
+        val response = scheduleApi.listSchedules(agentId = agentId, limit = limit, after = after)
+        val schedules = response.scheduledMessages
         _schedules.update { current ->
             current.toMutableMap().apply { put(agentId, schedules) }
         }
     }
 
     override suspend fun getSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
-        val irohSource = irohScheduleSource
-        return if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.getSchedule(agentId, scheduledMessageId)
-        } else {
-            scheduleApi.retrieveSchedule(agentId, scheduledMessageId)
-        }
+        return scheduleApi.retrieveSchedule(agentId, scheduledMessageId)
     }
 
     override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
-        val irohSource = irohScheduleSource
-        val schedule = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.createSchedule(params)
-        } else {
-            scheduleApi.createSchedule(agentId, params)
-        }
+        val schedule = scheduleApi.createSchedule(agentId, params)
         refreshSchedules(agentId)
         return schedule
     }
 
     override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
-        val irohSource = irohScheduleSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deleteSchedule(scheduledMessageId)
-        } else {
-            scheduleApi.deleteSchedule(agentId, scheduledMessageId)
-        }
+        scheduleApi.deleteSchedule(agentId, scheduledMessageId)
         _schedules.update { current ->
             current.toMutableMap().apply {
                 val existing = get(agentId) ?: emptyList()

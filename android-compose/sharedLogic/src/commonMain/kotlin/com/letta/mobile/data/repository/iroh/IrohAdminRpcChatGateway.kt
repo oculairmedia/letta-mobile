@@ -54,6 +54,7 @@ import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -789,9 +790,26 @@ class IrohAdminRpcAgentDirectory(
             agentId?.let { put("agent_id", it) }
         }.toString()
         val path = agentId?.let { "/v1/agents/$it/schedule" } ?: "/v1/schedules"
-        val result = adminRpcResult("schedule.list", path, body) ?: return emptyList()
+        val result = adminRpcResult("schedule.list", path, body)
+            ?: throw TimelineTransportHttpException(502, "schedule.list returned no result over iroh admin_rpc")
+        if (result is JsonObject && "scheduled_messages" !in result) {
+            throw TimelineTransportHttpException(502, "schedule.list returned a malformed result over iroh admin_rpc")
+        }
         val schedules = json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
-        return agentId?.let { id -> schedules.filter { it.agentId == id } } ?: schedules
+        if (agentId == null) return schedules
+
+        val scopedSchedules = schedules.filter { it.agentId == agentId }
+        val excludedCount = schedules.size - scopedSchedules.size
+        if (excludedCount > 0) {
+            Telemetry.event(
+                "IrohAdminRpcAgentDirectory",
+                "scheduleList.scopeMismatch",
+                "requestedAgentId" to agentId,
+                "excludedCount" to excludedCount,
+                level = Telemetry.Level.WARN,
+            )
+        }
+        return scopedSchedules
     }
 
     suspend fun getSchedule(scheduleId: String, agentId: String? = null): ScheduledMessage? {
