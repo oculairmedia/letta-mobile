@@ -109,7 +109,17 @@ fun ActiveSubagentBar(
         // ALWAYS pinned at the head and never folded into the condensed
         // summary; only the dispatched-subagent count condenses behind it.
         val selfEntry = rendered.firstOrNull { it.isSelf }
-        val subagentEntries = rendered.filterNot { it.isSelf }
+        // letta-mobile-lgns8.26: reflection subagent chips (letta.js
+        // Agent(subagent_type:"reflection") dispatch path) are background
+        // sleeptime work the user did not ask to see. Drop them from EVERY
+        // partition (running, background-task, terminal) so a reflection run
+        // never surfaces a chip in any lifecycle state. Source-level filtering
+        // was rejected: keeping reflection entries in the model preserves
+        // future surfaces (todo sheet, debug panel) and makes this bar filter
+        // trivially reversible by removing the predicate.
+        val subagentEntries = rendered.filterNot {
+            it.isSelf || it.subagentType == "reflection"
+        }
         // letta-mobile-29h9u / pvrrm: terminal (lingering) chips, AND running
         // background-task chips, always render individually — only the running
         // *subagent* set condenses behind the count summary. Background tasks
