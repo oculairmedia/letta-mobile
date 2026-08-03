@@ -354,8 +354,12 @@ class BlockRepositoryTest {
         )
         transport.adminRpcHandler = { method, path, body ->
             assertEquals("must use agent-scoped block.list_agent, not global block.list", "block.list_agent", method)
-            assertEquals("/v1/agents/agent-1/core-memory/blocks", path)
+            assertTrue(
+                "path must target agent-scoped core-memory blocks: $path",
+                path.startsWith("/v1/agents/agent-1/core-memory/blocks"),
+            )
             assertTrue("body must carry agent_id", body.orEmpty().contains("\"agent_id\":\"agent-1\""))
+            assertTrue("body must request a page limit", body.orEmpty().contains("\"limit\""))
             val json = Json { ignoreUnknownKeys = true }
             AppServerInboundFrame.AdminRpcResponse(
                 requestId = "req",
