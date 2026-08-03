@@ -36,7 +36,7 @@ class IrohAdminRpcRunSource(
      * handler (`RunAdminHandlers` / admin-shim `handleRunsList`) understands,
      * omitting nulls. The server only supports a single `agent_id` (not a
      * list) and orders results by a fixed `created_at` column, so params that
-     * imply anything else — multiple `agentIds`, a conflicting `agentId` /
+     * imply anything else — non-singleton `agentIds`, a conflicting `agentId` /
      * `ascending` override, or an `orderBy` other than `created_at` — are
      * rejected loudly rather than silently dropped or ignored.
      */
@@ -74,8 +74,7 @@ class IrohAdminRpcRunSource(
 
     /** Singleton `agent_ids` maps onto the server's scalar `agent_id`; anything else is unsupported. */
     private fun resolveAgentId(params: RunListParams): String? {
-        val agentIds = params.agentIds
-        if (agentIds == null || agentIds.isEmpty()) return params.agentId
+        val agentIds = params.agentIds ?: return params.agentId
         require(agentIds.size == 1) {
             "Iroh run.list supports only a single agent_id; got ${agentIds.size} in agentIds"
         }
@@ -86,11 +85,15 @@ class IrohAdminRpcRunSource(
         return fromList
     }
 
-    /** `ascending` maps onto `order`; a conflicting explicit `order` is rejected rather than silently overridden. */
+    /** Explicit `order` is case-insensitive and normalized; conflicts with `ascending` are rejected. */
     private fun resolveOrder(params: RunListParams): String? {
+        val explicitOrder = params.order?.lowercase()
+        require(explicitOrder == null || explicitOrder == "asc" || explicitOrder == "desc") {
+            "Iroh run.list order must be 'asc' or 'desc' (case-insensitive); got '${params.order}'"
+        }
         val fromAscending = params.ascending?.let { if (it) "asc" else "desc" }
-        if (fromAscending == null) return params.order
-        require(params.order == null || params.order == fromAscending) {
+        if (fromAscending == null) return explicitOrder
+        require(explicitOrder == null || explicitOrder == fromAscending) {
             "Iroh run.list got conflicting order='${params.order}' and ascending=${params.ascending}"
         }
         return fromAscending

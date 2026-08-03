@@ -16,8 +16,8 @@ import org.junit.Test
  * letta-mobile-kzqkr.8: [IrohAdminRpcRunSource.listRuns] must encode every
  * [RunListParams] field the server's `run.list` admin_rpc handler
  * (`RunAdminHandlers`) understands rather than dropping them, and must reject
- * combinations the server cannot express (multiple agent ids, conflicting
- * agent/order overrides, any `orderBy` other than the server's fixed
+ * combinations the server cannot express (non-singleton agent ids, conflicting
+ * agent/order overrides, invalid order values, any `orderBy` other than the server's fixed
  * `created_at`) loudly instead of silently ignoring them.
  */
 class IrohAdminRpcRunSourceTest {
@@ -96,6 +96,20 @@ class IrohAdminRpcRunSourceTest {
     }
 
     @Test
+    fun `listRuns rejects empty agentIds`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("[]") }
+        }
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                source(transport).listRuns(RunListParams(agentIds = emptyList()))
+            }
+        }
+        assertTrue(ex.message.orEmpty().contains("single agent_id"))
+        assertTrue("must not broaden an empty agent selection", transport.adminRpcCalls.isEmpty())
+    }
+
+    @Test
     fun `listRuns rejects multiple agentIds`() = runTest {
         val transport = FakeChannelTransport().apply {
             adminRpcHandler = { _, _, _ -> ok("[]") }
@@ -121,6 +135,30 @@ class IrohAdminRpcRunSourceTest {
         }
         assertTrue(ex.message.orEmpty().contains("conflicting"))
         assertTrue(transport.adminRpcCalls.isEmpty())
+    }
+
+    @Test
+    fun `listRuns rejects invalid explicit order`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("[]") }
+        }
+        val ex = assertThrows(IllegalArgumentException::class.java) {
+            kotlinx.coroutines.runBlocking {
+                source(transport).listRuns(RunListParams(order = "sideways"))
+            }
+        }
+        assertTrue(ex.message.orEmpty().contains("'asc' or 'desc'"))
+        assertTrue("must not let the server reinterpret invalid order", transport.adminRpcCalls.isEmpty())
+    }
+
+    @Test
+    fun `listRuns normalizes explicit order case`() = runTest {
+        val transport = FakeChannelTransport().apply {
+            adminRpcHandler = { _, _, _ -> ok("[]") }
+        }
+        source(transport).listRuns(RunListParams(order = "ASC"))
+
+        assertEquals("{\"order\":\"asc\"}", transport.adminRpcCalls.single().body)
     }
 
     @Test
