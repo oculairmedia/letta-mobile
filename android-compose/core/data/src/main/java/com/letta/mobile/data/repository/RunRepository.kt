@@ -23,20 +23,23 @@ class RunRepository(
     override suspend fun refreshRuns(params: RunListParams) {
         val irohSource = irohRunSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            _runs.value = irohSource.listRuns()
+            _runs.value = irohSource.listRuns(params)
             return
         }
         _runs.value = runApi.listRuns(params)
     }
 
     override suspend fun getRecentRuns(limit: Int): List<Run> {
-        return runApi.listRuns(
-            RunListParams(
-                limit = limit,
-                order = "desc",
-                orderBy = "created_at",
-            )
+        val recentParams = RunListParams(
+            limit = limit,
+            order = "desc",
+            orderBy = "created_at",
         )
+        val irohSource = irohRunSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.listRuns(recentParams)
+        }
+        return runApi.listRuns(recentParams)
     }
 
     override suspend fun getRun(runId: String): Run {

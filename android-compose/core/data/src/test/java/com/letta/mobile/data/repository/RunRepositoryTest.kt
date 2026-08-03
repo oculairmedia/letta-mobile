@@ -95,7 +95,7 @@ class RunRepositoryTest {
     }
 
     @Test
-    fun `refreshRuns in iroh mode routes via admin_rpc`() = runTest {
+    fun `refreshRuns in iroh mode routes via admin_rpc with exact method, path and body`() = runTest {
         val settings = FakeSettingsRepository(
             initialActiveConfig = LettaConfig(
                 id = "test",
@@ -112,6 +112,10 @@ class RunRepositoryTest {
         transport.adminRpcHandler = { method, path, body ->
             assertEquals("run.list", method)
             assertEquals("/v1/runs", path)
+            assertEquals(
+                "{\"agent_id\":\"a1\",\"active\":true,\"limit\":10,\"order\":\"desc\"}",
+                body,
+            )
             val json = Json { ignoreUnknownKeys = true }
             AppServerInboundFrame.AdminRpcResponse(
                 requestId = "req",
@@ -127,9 +131,59 @@ class RunRepositoryTest {
             }
         }
         val repo = RunRepository(apiThatThrows, irohSource)
-        repo.refreshRuns(RunListParams())
+        repo.refreshRuns(RunListParams(agentId = "a1", active = true, limit = 10, order = "desc"))
         assertEquals(2, repo.runs.value.size)
         assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `getRecentRuns in iroh mode routes via admin_rpc with order=desc, order_by=created_at`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(
+                id = "test",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test-node",
+                accessToken = "token",
+            )
+        )
+        val transport = FakeChannelTransport()
+        val testRuns = listOf(Run(id = "r1", agentId = "a1", status = "completed"))
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("run.list", method)
+            assertEquals("/v1/runs", path)
+            assertEquals(
+                "{\"limit\":5,\"order\":\"desc\",\"order_by\":\"created_at\"}",
+                body,
+            )
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(ListSerializer(Run.serializer()), testRuns),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcRunSource(transport, settings)
+        val apiThatThrows = object : FakeRunApi() {
+            override suspend fun listRuns(params: RunListParams): List<Run> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = RunRepository(apiThatThrows, irohSource)
+        val result = repo.getRecentRuns(limit = 5)
+        assertEquals(1, result.size)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test(expected = IrohAdminApiUnavailableException::class)
+    fun `getRecentRuns in iroh mode without source throws IrohAdminApiUnavailableException`() = runTest {
+        val apiThatThrows = object : FakeRunApi() {
+            override suspend fun listRuns(params: RunListParams): List<Run> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
+            }
+        }
+        val repo = RunRepository(apiThatThrows)
+        repo.getRecentRuns(limit = 5)
     }
 
     @Test
