@@ -48,7 +48,7 @@ cd letta-mobile
 
 cd android-compose
 cp -f local.properties.example local.properties
-export JAVA_HOME="/usr/lib/jvm/jdk-26"
+export JAVA_HOME="/usr/lib/jvm/jdk-26"   # Linux path — see CONTRIBUTING.md for macOS/Windows
 ./gradlew :app:assembleDebug        # Android APK
 ./gradlew :desktop:run              # Compose Desktop (needs JDK 26, Rust toolchain, and a display)
 ```
@@ -77,9 +77,10 @@ opening a PR.**
 ## Releases
 
 Versioning is **tag-driven**. `vX.Y.Z` is the single source of truth for `versionName` and
-`versionCode`. CI builds the signed `play-release` APK on tag push and creates a GitHub
-Release. Pre-release suffix: `v0.2.0-rc.1`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for
-the full release flow.
+`versionCode`. CI builds on tag push and creates a GitHub Release. Each release ships a
+signed Android APK (embedded runtime included) and Windows desktop installers (`.exe` + `.msi`).
+Pre-release suffix: `v0.2.0-rc.1`. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full
+release flow.
 
 ## Development notes
 
