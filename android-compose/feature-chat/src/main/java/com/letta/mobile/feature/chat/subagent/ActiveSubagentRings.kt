@@ -92,9 +92,13 @@ fun ActiveSubagentRings(
     // FAILED rings are always visible.
     val completedRingHolds = remember { mutableStateMapOf<String, Long>() }
 
+    // letta-mobile-lgns8.26: production chrome is ActiveSubagentRings (the
+    // chip bar is preview/test-only). Apply the same reflection hide here.
+    val ringCandidates = subagents.filterNot { it.isHiddenReflection() }
+
     SideEffect {
         // Register new completions
-        for (s in subagents) {
+        for (s in ringCandidates) {
             if (s.status == ActiveSubagent.Status.COMPLETED && s.id !in completedRingHolds) {
                 completedRingHolds[s.id] = now
             }
@@ -105,7 +109,7 @@ fun ActiveSubagentRings(
         }
     }
 
-    val visibleSubagents = subagents.filter { subagent ->
+    val visibleSubagents = ringCandidates.filter { subagent ->
         when (subagent.status) {
             ActiveSubagent.Status.RUNNING -> true
             ActiveSubagent.Status.FAILED -> true

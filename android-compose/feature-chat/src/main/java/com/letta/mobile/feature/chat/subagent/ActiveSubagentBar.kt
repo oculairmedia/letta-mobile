@@ -60,8 +60,9 @@ import kotlinx.collections.immutable.ImmutableList
  *    (draw phase), matching the tool-card spinner fix — no composition-phase
  *    modifier churn that would invalidate layout each frame.
  *  - Reduced-motion: when set, the spinner does not animate (static icon).
- *  - The whole bar is wrapped in [AnimatedVisibility] gated on `isNotEmpty`
- *    so empty -> fully hidden (no residual height).
+ *  - The whole bar is wrapped in [AnimatedVisibility] gated on the rendered
+ *    chip set (self and/or non-reflection), so an all-reflection sleeptime
+ *    snapshot leaves no empty LazyRow padding.
  *
  * Condensed form: when more than [CONDENSE_THRESHOLD] subagents are active,
  * a single summary chip ("N subagents running") is shown instead of N chips,
@@ -92,9 +93,12 @@ fun ActiveSubagentBar(
     now: Long = System.currentTimeMillis(),
 ) {
     // Defensive active-only filter happens in the host; here we trust the
-    // snapshot. Visibility is driven purely by emptiness.
+    // snapshot. Visibility follows the *rendered* chip set (self + non-
+    // reflection), not the raw snapshot — an all-reflection sleeptime
+    // snapshot must leave zero layout reserved for an empty LazyRow.
+    val hasVisibleEntries = subagents.hasVisibleActiveSubagentBarEntries()
     AnimatedVisibility(
-        visible = subagents.isNotEmpty(),
+        visible = hasVisibleEntries,
         // Grow up from / shrink down toward the bottom edge (the bar hugs
         // the composer), reusing the shared design-system motion ramp.
         enter = LettaMotion.verticalEnter(expandFrom = Alignment.Bottom),
@@ -109,16 +113,11 @@ fun ActiveSubagentBar(
         // ALWAYS pinned at the head and never folded into the condensed
         // summary; only the dispatched-subagent count condenses behind it.
         val selfEntry = rendered.firstOrNull { it.isSelf }
-        // letta-mobile-lgns8.26: reflection subagent chips (letta.js
-        // Agent(subagent_type:"reflection") dispatch path) are background
-        // sleeptime work the user did not ask to see. Drop them from EVERY
-        // partition (running, background-task, terminal) so a reflection run
-        // never surfaces a chip in any lifecycle state. Source-level filtering
-        // was rejected: keeping reflection entries in the model preserves
-        // future surfaces (todo sheet, debug panel) and makes this bar filter
-        // trivially reversible by removing the predicate.
+        // letta-mobile-lgns8.26: drop reflection chips from EVERY partition
+        // (running, background-task, terminal). Source-level filtering was
+        // rejected so future surfaces can still observe the model.
         val subagentEntries = rendered.filterNot {
-            it.isSelf || it.subagentType == "reflection"
+            it.isSelf || it.isHiddenReflection()
         }
         // letta-mobile-29h9u / pvrrm: terminal (lingering) chips, AND running
         // background-task chips, always render individually — only the running

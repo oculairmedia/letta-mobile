@@ -307,4 +307,30 @@ class ActiveSubagentBarTest {
         // Non-reflection sibling still renders.
         composeRule.onNodeWithText("keep-running").assertIsDisplayed()
     }
+
+    // Review feedback on #1106: filtering chips but gating visibility on the
+    // unfiltered snapshot left an empty LazyRow when only reflection entries
+    // were active. The bar must fully hide in that case.
+    @Test
+    fun allReflectionSnapshotHidesTheBarEntirely() {
+        composeRule.setLettaTestContent {
+            ActiveSubagentBar(
+                subagents = persistentListOf(
+                    ActiveSubagent(
+                        id = "ref-only",
+                        description = "reflection-only",
+                        subagentType = ActiveSubagent.REFLECTION_SUBAGENT_TYPE,
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.SUBAGENT,
+                    ),
+                ).toImmutableList(),
+            )
+        }
+
+        composeRule.onNodeWithText("reflection-only").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("Subagent running:", substring = true)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("subagents running", substring = true)
+            .assertCountEquals(0)
+    }
 }
