@@ -22,6 +22,9 @@ import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
+import com.letta.mobile.data.repository.ScheduleRepository
+import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.BackendDescriptor
@@ -37,6 +40,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class SessionGraphFactoryTest {
@@ -109,6 +114,7 @@ class SessionGraphFactoryTest {
         )
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
+        every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
 
         val factory = SessionGraphFactory(
             agentApi = agentApi,
@@ -141,6 +147,50 @@ class SessionGraphFactoryTest {
         assertEquals("remote-letta:test-remote", graph.backendDescriptor.backendId.value)
         assertEquals("https://test.letta.com", graph.backendDescriptor.label)
         assertNull(graph.localRuntimeBackend)
+    }
+
+    @Test
+    fun `iroh graph binds canonical shared schedule repository and iroh transport`() {
+        val config = LettaConfig(
+            id = "test-iroh",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://test",
+            accessToken = "token",
+        )
+        val settingsRepository: ISettingsRepository = mockk()
+        every { settingsRepository.activeConfig } returns MutableStateFlow(config)
+        every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
+        val factory = SessionGraphFactory(
+            agentApi = agentApi,
+            agentDao = agentDao,
+            conversationApi = conversationApi,
+            conversationDao = conversationDao,
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
+            settingsRepository = settingsRepository,
+        )
+
+        val graph = factory.create()
+
+        assertTrue(graph.scheduleRepository is IrohScheduleRepository)
+        assertTrue(graph.channelTransport is IrohChannelTransport)
+        assertFalse(graph.scheduleRepository is ScheduleRepository)
+        graph.close()
     }
 
     @Test

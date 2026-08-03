@@ -38,7 +38,6 @@ import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
 import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
 import com.letta.mobile.data.repository.IrohAdminRpcRunSource
-import com.letta.mobile.data.repository.IrohAdminRpcScheduleSource
 import com.letta.mobile.data.repository.IrohAdminRpcToolSource
 import com.letta.mobile.data.repository.JobRepository
 import com.letta.mobile.data.repository.McpServerRepository
@@ -49,6 +48,8 @@ import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
 import com.letta.mobile.data.repository.ScheduleRepository
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
@@ -259,6 +260,7 @@ class SessionGraphFactory internal constructor(
             settingsRepository = settingsRepository,
             transport = channelTransport,
         )
+        val useIroh = IrohChannelTransport.shouldUseIroh(activeConfig?.serverUrl)
         val irohConversationListSource = settingsRepository?.let {
             com.letta.mobile.data.repository.IrohAdminRpcConversationListSource(
                 channelTransport = channelTransport,
@@ -395,15 +397,12 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            scheduleRepository = ScheduleRepository(
-                scheduleApi = scheduleApi,
-                irohScheduleSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcScheduleSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
+            scheduleRepository = if (useIroh) {
+                val directory = IrohAdminRpcAgentDirectory(channelTransport)
+                IrohScheduleRepository { directory }
+            } else {
+                ScheduleRepository(scheduleApi)
+            },
             selfTodoRepository = SelfTodoRepository(
                 transport = channelTransport,
                 scope = scope,

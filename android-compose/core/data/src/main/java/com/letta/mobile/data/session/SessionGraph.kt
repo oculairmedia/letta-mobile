@@ -16,7 +16,7 @@ import com.letta.mobile.data.repository.ProjectRepository
 import com.letta.mobile.data.repository.ProjectWorkRepository
 import com.letta.mobile.data.repository.ProviderRepository
 import com.letta.mobile.data.repository.RunRepository
-import com.letta.mobile.data.repository.ScheduleRepository
+import com.letta.mobile.data.repository.api.IScheduleRepository
 import com.letta.mobile.data.repository.SelfTodoRepository
 import com.letta.mobile.data.repository.StepRepository
 import com.letta.mobile.data.repository.SubagentRepository
@@ -50,7 +50,7 @@ class SessionGraph internal constructor(
     override val runRepository: RunRepository,
     override val jobRepository: JobRepository,
     override val providerRepository: ProviderRepository,
-    override val scheduleRepository: ScheduleRepository,
+    override val scheduleRepository: IScheduleRepository,
     override val selfTodoRepository: SelfTodoRepository,
     override val stepRepository: StepRepository,
     override val subagentRepository: SubagentRepository,
