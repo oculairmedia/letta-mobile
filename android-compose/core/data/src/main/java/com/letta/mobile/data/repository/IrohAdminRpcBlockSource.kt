@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
@@ -31,6 +32,7 @@ class IrohAdminRpcBlockSource(
         explicitNulls = false
         coerceInputValues = true
     },
+    private val agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
 ) {
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
@@ -223,6 +225,16 @@ class IrohAdminRpcBlockSource(
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc block.detach failed")
     }
+
+    /**
+     * Agent-scoped block list via `block.list_agent`.
+     *
+     * Returns only the projected blocks for [agentId], each carrying its stable
+     * synthesised id. This is NOT a client-side filter over the global
+     * [listAllBlocks] union — the server returns only the requested agent's rows.
+     */
+    suspend fun listAgentBlocks(agentId: String): List<Block> =
+        agentDirectory.listAgentBlocks(agentId)
 
     suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         val body = buildJsonObject {

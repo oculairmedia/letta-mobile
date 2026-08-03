@@ -1891,6 +1891,7 @@ class IrohChannelTransport(
             "tool.list",
             "block.get",
             "block.list",
+            "block.list_agent",
             "project.beadsRemoteStatus",
             "project.get",
             "project.list",

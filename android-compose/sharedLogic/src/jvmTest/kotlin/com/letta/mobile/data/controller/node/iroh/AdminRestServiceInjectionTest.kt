@@ -57,7 +57,7 @@ class AdminRestServiceInjectionTest {
 
     @Test
     fun theRetiredAdminRestSurfaceIsStillFullyEnumerated() {
-        assertEquals(36, formerAdminRestMethods.size, "expected the 36 former admin_rest methods")
+        assertEquals(37, formerAdminRestMethods.size, "expected the 37 former admin_rest methods")
     }
 
     @Test

@@ -322,6 +322,104 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun directoryListAgentBlocksUsesCanonicalRpcContractAndDecodesResult() = runTest(UnconfinedTestDispatcher()) {
+        val pageSize = IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_PAGE_SIZE
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("block.list_agent", call.method)
+            assertEquals(
+                "/v1/agents/agent-1/core-memory/blocks?limit=$pageSize&offset=0",
+                call.path,
+            )
+            assertEquals(
+                "{\"agent_id\":\"agent-1\",\"limit\":\"$pageSize\",\"offset\":\"0\"}",
+                call.body,
+            )
+            ok("""[{"id":"block-1","label":"persona","value":"Helpful"}]""")
+        }
+
+        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+
+        assertEquals(1, blocks.size)
+        assertEquals("block-1", blocks.single().id.value)
+        assertEquals("persona", blocks.single().label)
+        assertEquals("Helpful", blocks.single().value)
+    }
+
+    @Test
+    fun directoryListAgentBlocksPropagatesTransportFailure() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = {
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req-blocks",
+                success = false,
+                error = "agent block read denied",
+            )
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("agent block read denied"))
+        assertEquals(1, transport.rpcCalls.size)
+    }
+
+    @Test
+    fun directoryListAgentBlocksRejectsBlankAgentBeforeTransport() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("   ")
+        }
+
+        assertEquals("agent_id must not be blank", failure.message)
+        assertTrue(transport.rpcCalls.isEmpty(), "blank ids must not reach admin_rpc")
+    }
+
+    // letta-mobile-1105 (PR #1105 review): success=true with result=null must not be
+    // silently coerced into "this agent has zero blocks". A route decoded through
+    // adminRpcDecodedList() would return emptyList() here — a false-empty measurement.
+    // listAgentBlocks must throw loudly instead, so only an explicit JSON `[]` means
+    // measured empty.
+    @Test
+    fun directoryListAgentBlocksThrowsLoudlyOnNullResult() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("block.list_agent", call.method)
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req-blocks-null",
+                success = true,
+                result = null,
+            )
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(
+            failure.message.orEmpty().contains("block.list_agent"),
+            "expected failure to name the RPC method, got ${failure.message}",
+        )
+        assertEquals(1, transport.rpcCalls.size)
+    }
+
+    @Test
+    fun directoryListAgentBlocksReturnsEmptyListOnExplicitEmptyArray() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("block.list_agent", call.method)
+            ok("[]")
+        }
+
+        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+
+        assertTrue(blocks.isEmpty(), "explicit [] must decode as a measured empty list")
+        assertEquals(1, transport.rpcCalls.size)
+    }
+
+    @Test
     fun listAgentsStopsWhenBackendIgnoresPagination() = runTest(UnconfinedTestDispatcher()) {
         // Regression (observed in production): the backend ignores BOTH limit and
         // offset, returning its first page on every call. The short-page test

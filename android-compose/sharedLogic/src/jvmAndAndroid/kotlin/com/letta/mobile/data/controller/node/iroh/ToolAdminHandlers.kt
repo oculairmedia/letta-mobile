@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -103,6 +104,35 @@ object ToolAdminHandlers {
             val blockId = params.requireParam(AdminParamKey("block_id"))
             store.getBlockProjected(blockId) ?: adminError("block $blockId not found")
         }
+        router.register("block.list_agent") { params ->
+            val agentId = requireSafeMemfsSegment(
+                params.requireParam(AdminParamKey("agent_id")),
+                "agent_id",
+            )
+            // Same frame-cap window as block.list: absent limit means the
+            // default page, not "everything". Dual shape keeps the legacy bare
+            // array when the full agent set fits in one page.
+            val limit = param(params, AdminParamKey("limit"))?.toIntOrNull()
+                ?.coerceIn(1, MAX_BLOCK_LIST_LIMIT)
+                ?: DEFAULT_BLOCK_LIST_LIMIT
+            val offset = param(params, AdminParamKey("offset"))?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+            val all = store.blocksForAgentProjected(agentId)
+            val total = all.size
+            val page = buildJsonArray {
+                all.drop(offset).take(limit).forEach { add(it) }
+            }
+            if (offset == 0 && page.size >= total) {
+                page
+            } else {
+                buildJsonObject {
+                    put("blocks", page)
+                    put("total", total)
+                    put("offset", offset)
+                    put("limit", limit)
+                    put("has_more", offset + page.size < total)
+                }
+            }
+        }
     }
 
     private fun registerBlockWrites(router: AdminRpcRouter, nativeClient: AppServerClient?) {
@@ -115,8 +145,14 @@ object ToolAdminHandlers {
                 "Server owns natively",
         )
         router.register("block.update_agent") { params ->
-            val agentId = params.requireParam(AdminParamKey("agent_id"))
-            val label = params.requireParam(AdminParamKey("label"))
+            val agentId = requireSafeMemfsSegment(
+                params.requireParam(AdminParamKey("agent_id")),
+                "agent_id",
+            )
+            val label = requireSafeMemfsSegment(
+                params.requireParam(AdminParamKey("label")),
+                "label",
+            )
             val value = param(params, AdminParamKey("value"))
                 ?: adminError("value required: block.update_agent writes the memory file contents")
             val client = nativeClient
@@ -153,7 +189,7 @@ object ToolAdminHandlers {
     )
 
     /** Served from the on-disk memfs memory files. */
-    val BLOCK_READ_METHODS: Set<String> = setOf("block.list", "block.get")
+    val BLOCK_READ_METHODS: Set<String> = setOf("block.list", "block.get", "block.list_agent")
 
     /**
      * Page size when the caller sends no `limit`. Blocks are capped at

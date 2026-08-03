@@ -18,6 +18,10 @@ class BlockRepository @Inject constructor(
     override suspend fun clearForBackendSwitch() = Unit
 
     override suspend fun getBlocks(agentId: String): List<Block> {
+        val irohSource = irohBlockSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.listAgentBlocks(agentId)
+        }
         return blockApi.listBlocks(agentId)
     }
 

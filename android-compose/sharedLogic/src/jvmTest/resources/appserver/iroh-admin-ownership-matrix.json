@@ -994,6 +994,22 @@
       "phase3_decision": "bounded_service"
     },
     {
+      "method": "block.list_agent",
+      "handler": "ToolAdminHandlers.kt",
+      "current_backend": "local_backend_store: memfs/<agentId>/memory/system/*.md for a single agent (LocalBackendBlockReader.blocksForAgent)",
+      "owner": "local_backend_store",
+      "public_contract": "controller-owned agent-scoped memory-block projection over the letta-code on-disk backend",
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "lgns8.9",
+      "production_first_route": "local_backend_store",
+      "post_shim_owner": "local_backend_store",
+      "post_shim_fallback": "deny_fail_closed",
+      "notes": "kzqkr.7: agent-scoped block read over the same memfs store as block.get/block.list. Required agent_id; missing/blank agent_id fails before any store read. Returns only the requested agent's projected blocks with stable synthesised ids — no client-side filtering of the global union. admin-shim's handleBlocksList(path=v1/agents/{agentId}/core-memory/blocks) serves readBlocksForAgent for the same path.",
+      "phase3_decision": "bounded_service"
+    },
+    {
       "method": "block.get",
       "handler": "ToolAdminHandlers.kt",
       "current_backend": "local_backend_store: memfs memory-file lookup by synthesised id (LocalBackendBlockReader)",

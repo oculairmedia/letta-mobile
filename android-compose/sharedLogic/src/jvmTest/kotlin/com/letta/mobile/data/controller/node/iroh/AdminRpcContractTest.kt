@@ -45,7 +45,7 @@ class AdminRpcContractTest {
 
         fun blockMethods() = setOf(
             "block.attach", "block.create", "block.delete", "block.detach",
-            "block.get", "block.list", "block.update", "block.update_agent",
+            "block.get", "block.list", "block.list_agent", "block.update", "block.update_agent",
         )
 
         fun conversationMethods() = setOf(
