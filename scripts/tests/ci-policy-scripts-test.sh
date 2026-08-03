@@ -219,4 +219,15 @@ git -C "$repo" add . && git -C "$repo" commit -qm "commonTest violation"
 output3="$(bash "$repo/scripts/ci/agents-policy-check.sh" --diff-base "$base3")"
 assert_contains "$output3" 'sharedlogic-jvm-api|android-compose/sharedLogic/src/commonTest/kotlin/TestUtil.kt:1'
 
+# Release documentation contract: README claims APK + Windows EXE/MSI assets,
+# and release.yml must attach matching patterns so the docs stay true.
+readme="$(<"$SOURCE_ROOT/README.md")"
+assert_contains "$readme" 'signed Android APK'
+assert_contains "$readme" '.exe'
+assert_contains "$readme" '.msi'
+release_workflow="$(<"$SOURCE_ROOT/.github/workflows/release.yml")"
+assert_contains "$release_workflow" 'release-assets/*.apk'
+assert_contains "$release_workflow" 'release-assets/exe/*.exe'
+assert_contains "$release_workflow" 'release-assets/msi/*.msi'
+
 echo "ci policy script tests: PASS"

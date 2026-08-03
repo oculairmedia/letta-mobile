@@ -48,7 +48,7 @@ cd letta-mobile
 
 cd android-compose
 cp -f local.properties.example local.properties
-export JAVA_HOME="/usr/lib/jvm/jdk-26"   # Linux path — see CONTRIBUTING.md for macOS/Windows
+# Set JAVA_HOME using the platform-specific instructions in CONTRIBUTING.md.
 ./gradlew :app:assembleDebug        # Android APK
 ./gradlew :desktop:run              # Compose Desktop (needs JDK 26, Rust toolchain, and a display)
 ```
