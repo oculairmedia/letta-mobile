@@ -353,9 +353,9 @@ class BlockRepositoryTest {
             Block(id = BlockId("block-def456"), label = "human", value = "Agent human"),
         )
         transport.adminRpcHandler = { method, path, body ->
-            assertEquals("block.list_agent", method, "must use agent-scoped block.list_agent, not global block.list")
+            assertEquals("must use agent-scoped block.list_agent, not global block.list", "block.list_agent", method)
             assertEquals("/v1/agents/agent-1/core-memory/blocks", path)
-            assertTrue(body.orEmpty().contains("\"agent_id\":\"agent-1\""), "body must carry agent_id")
+            assertTrue("body must carry agent_id", body.orEmpty().contains("\"agent_id\":\"agent-1\""))
             val json = Json { ignoreUnknownKeys = true }
             AppServerInboundFrame.AdminRpcResponse(
                 requestId = "req",
@@ -403,10 +403,10 @@ class BlockRepositoryTest {
         try {
             repo.getBlocks(" ")
             org.junit.Assert.fail("Expected an exception for blank agent_id")
-        } catch (e: IllegalStateException) {
-            assertTrue(e.message!!.contains("blank"), "must reject blank agent_id: ${e.message}")
+        } catch (e: IllegalArgumentException) {
+            assertTrue("must reject blank agent_id: ${e.message}", e.message!!.contains("blank"))
         }
-        assertEquals(0, transport.adminRpcCalls.size, "blank agent_id must fail before admin_rpc is called")
+        assertEquals("blank agent_id must fail before admin_rpc is called", 0, transport.adminRpcCalls.size)
     }
 
     @Test

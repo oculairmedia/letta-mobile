@@ -13,9 +13,14 @@ import kotlin.test.assertTrue
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -340,7 +345,7 @@ class NativeAdminHandlersTest {
         LocalBackendFixtureStore.create(root)
         val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
         val r = AdminRpcRouter()
-        ToolAdminHandlers.registerBlockReads(r, store)
+        ToolAdminHandlers.register(r, store, nativeClient = null)
         // agent-2 exists but has no blocks.
         LocalBackendFixtureStore.writeAgent(root, "agent-2", name = "No Blocks")
         val response = r.dispatch(
@@ -351,10 +356,49 @@ class NativeAdminHandlersTest {
                 context = AdminRpcRequestContext.Authenticated,
             ),
         )
-        assertTrue(response.contains("\"success\":true"), "must serve empty list: $response")
-        // The result is an empty JSON array.
-        assertTrue(response.contains("[]") || response.contains("\"error\":") == false,
-            "expected empty array, got: $response")
+        val payload = Json.parseToJsonElement(response).jsonObject
+        assertEquals(true, payload.getValue("success").jsonPrimitive.boolean)
+        assertTrue(payload.getValue("result").jsonArray.isEmpty(), "expected empty array, got: $response")
+    }
+
+    @Test
+    fun blockListAgentPassesRequestedAgentIdAndReturnsOnlyThatAgentsBlocks() = runTest {
+        val root = kotlin.io.path.createTempDirectory("kzqkr7-two-agent-handler").toFile()
+        LocalBackendFixtureStore.create(root)
+        LocalBackendFixtureStore.writeAgent(root, "agent-2", name = "Second")
+        LocalBackendFixtureStore.writeBlock(root, "agent-2", "human-two", "Second human")
+        val router = AdminRpcRouter()
+        ToolAdminHandlers.register(
+            router,
+            LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1"),
+            nativeClient = null,
+        )
+
+        suspend fun request(agentId: String) = Json.parseToJsonElement(
+            router.dispatch(
+                AdminRpcInvocation(
+                    requestId = "blocks-$agentId",
+                    method = "block.list_agent",
+                    params = buildJsonObject { put("agent_id", agentId) },
+                    context = AdminRpcRequestContext.Authenticated,
+                ),
+            ),
+        ).jsonObject
+
+        val first = request(LocalBackendFixtureStore.AGENT_ID)
+        val second = request("agent-2")
+        assertEquals(true, first.getValue("success").jsonPrimitive.boolean)
+        assertEquals(true, second.getValue("success").jsonPrimitive.boolean)
+
+        val firstBlocks = first.getValue("result").jsonArray.map { it.jsonObject }
+        val secondBlocks = second.getValue("result").jsonArray.map { it.jsonObject }
+        assertEquals(listOf(LocalBackendFixtureStore.BLOCK_LABEL), firstBlocks.map { it.getValue("label").jsonPrimitive.content })
+        assertEquals(listOf("human-two"), secondBlocks.map { it.getValue("label").jsonPrimitive.content })
+        assertTrue(
+            firstBlocks.map { it.getValue("id").jsonPrimitive.content }.toSet()
+                .intersect(secondBlocks.map { it.getValue("id").jsonPrimitive.content }.toSet()).isEmpty(),
+            "agent-scoped responses must not share projected block ids",
+        )
     }
 
     @Test
@@ -363,7 +407,7 @@ class NativeAdminHandlersTest {
         LocalBackendFixtureStore.create(root)
         val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
         val r = AdminRpcRouter()
-        ToolAdminHandlers.registerBlockReads(r, store)
+        ToolAdminHandlers.register(r, store, nativeClient = null)
         val response = r.dispatch(
             AdminRpcInvocation(
                 requestId = "b-2",

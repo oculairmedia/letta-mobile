@@ -322,6 +322,55 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun directoryListAgentBlocksUsesCanonicalRpcContractAndDecodesResult() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("block.list_agent", call.method)
+            assertEquals("/v1/agents/agent-1/core-memory/blocks", call.path)
+            assertEquals("{\"agent_id\":\"agent-1\"}", call.body)
+            ok("""[{"id":"block-1","label":"persona","value":"Helpful"}]""")
+        }
+
+        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+
+        assertEquals(1, blocks.size)
+        assertEquals("block-1", blocks.single().id.value)
+        assertEquals("persona", blocks.single().label)
+        assertEquals("Helpful", blocks.single().value)
+    }
+
+    @Test
+    fun directoryListAgentBlocksPropagatesTransportFailure() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = {
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req-blocks",
+                success = false,
+                error = "agent block read denied",
+            )
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("agent block read denied"))
+        assertEquals(1, transport.rpcCalls.size)
+    }
+
+    @Test
+    fun directoryListAgentBlocksRejectsBlankAgentBeforeTransport() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+
+        val failure = assertFailsWith<IllegalArgumentException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("   ")
+        }
+
+        assertEquals("agent_id must not be blank", failure.message)
+        assertTrue(transport.rpcCalls.isEmpty(), "blank ids must not reach admin_rpc")
+    }
+
+    @Test
     fun listAgentsStopsWhenBackendIgnoresPagination() = runTest(UnconfinedTestDispatcher()) {
         // Regression (observed in production): the backend ignores BOTH limit and
         // offset, returning its first page on every call. The short-page test

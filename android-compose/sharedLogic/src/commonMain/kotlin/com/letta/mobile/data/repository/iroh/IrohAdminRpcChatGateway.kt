@@ -791,6 +791,7 @@ class IrohAdminRpcAgentDirectory(
     }
 
     suspend fun listAgentBlocks(agentId: String): List<Block> {
+        require(agentId.isNotBlank()) { "agent_id must not be blank" }
         val body = buildJsonObject { put("agent_id", agentId) }.toString()
         return adminRpcDecodedList(
             "block.list_agent",
