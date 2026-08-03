@@ -793,7 +793,12 @@ class IrohAdminRpcAgentDirectory(
     suspend fun listAgentBlocks(agentId: String): List<Block> {
         require(agentId.isNotBlank()) { "agent_id must not be blank" }
         val body = buildJsonObject { put("agent_id", agentId) }.toString()
-        return adminRpcDecodedList(
+        // letta-mobile-1105: adminRpcDecodedList() maps success=true/result=null to
+        // emptyList(), which converts a malformed/unmeasurable response into an
+        // authoritative "this agent has zero blocks" — a false-empty state this
+        // agent-scoped route must never emit. Require a non-null result so only an
+        // explicit JSON `[]` decodes as measured empty; a null result throws loudly.
+        return adminRpcDecoded(
             "block.list_agent",
             "/v1/agents/$agentId/core-memory/blocks",
             body,

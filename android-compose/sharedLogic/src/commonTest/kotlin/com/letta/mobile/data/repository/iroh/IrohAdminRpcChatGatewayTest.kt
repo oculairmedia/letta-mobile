@@ -370,6 +370,48 @@ class IrohAdminRpcChatGatewayTest {
         assertTrue(transport.rpcCalls.isEmpty(), "blank ids must not reach admin_rpc")
     }
 
+    // letta-mobile-1105 (PR #1105 review): success=true with result=null must not be
+    // silently coerced into "this agent has zero blocks". A route decoded through
+    // adminRpcDecodedList() would return emptyList() here — a false-empty measurement.
+    // listAgentBlocks must throw loudly instead, so only an explicit JSON `[]` means
+    // measured empty.
+    @Test
+    fun directoryListAgentBlocksThrowsLoudlyOnNullResult() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("block.list_agent", call.method)
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req-blocks-null",
+                success = true,
+                result = null,
+            )
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(
+            failure.message.orEmpty().contains("block.list_agent"),
+            "expected failure to name the RPC method, got ${failure.message}",
+        )
+        assertEquals(1, transport.rpcCalls.size)
+    }
+
+    @Test
+    fun directoryListAgentBlocksReturnsEmptyListOnExplicitEmptyArray() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("block.list_agent", call.method)
+            ok("[]")
+        }
+
+        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+
+        assertTrue(blocks.isEmpty(), "explicit [] must decode as a measured empty list")
+        assertEquals(1, transport.rpcCalls.size)
+    }
+
     @Test
     fun listAgentsStopsWhenBackendIgnoresPagination() = runTest(UnconfinedTestDispatcher()) {
         // Regression (observed in production): the backend ignores BOTH limit and
