@@ -263,8 +263,31 @@ data class ActiveSubagent(
          * window. The signal is derived from elapsed-since-[lastUpdateAt].
          */
         const val STUCK_THRESHOLD_MS: Long = 35_000L
+
+        /**
+         * letta-mobile-lgns8.26: letta.js sleeptime `Agent(subagent_type:"reflection")`
+         * dispatches are background work the user did not ask to see. Shared by
+         * [ActiveSubagentBar] and [ActiveSubagentRings] so production rings and
+         * the chip bar stay in lockstep.
+         */
+        const val REFLECTION_SUBAGENT_TYPE: String = "reflection"
     }
 }
+
+/**
+ * True when this entry is a sleeptime reflection dispatch that must stay out
+ * of the active-subagent chrome (bar chips and production rings).
+ */
+internal fun ActiveSubagent.isHiddenReflection(): Boolean =
+    subagentType == ActiveSubagent.REFLECTION_SUBAGENT_TYPE
+
+/**
+ * Whether the active-subagent bar should reserve layout: self plan and/or any
+ * non-reflection dispatched entry. An all-reflection snapshot must hide the
+ * bar entirely (no empty LazyRow padding).
+ */
+internal fun Iterable<ActiveSubagent>.hasVisibleActiveSubagentBarEntries(): Boolean =
+    any { it.isSelf || !it.isHiddenReflection() }
 
 /**
  * letta-mobile-dvobc: the COLOR/semantic state of a chip's progress ring,

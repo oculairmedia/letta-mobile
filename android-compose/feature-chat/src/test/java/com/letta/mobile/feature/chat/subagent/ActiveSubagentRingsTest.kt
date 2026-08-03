@@ -101,6 +101,19 @@ class ActiveSubagentRingsTest {
     }
 
     @Test
+    fun `reflection subagents are excluded from production rings`() {
+        val reflection = running(id = "ref_1").copy(
+            subagentType = ActiveSubagent.REFLECTION_SUBAGENT_TYPE,
+            description = "sleeptime reflection",
+        )
+        val keep = running(id = "run_1")
+        val candidates = persistentListOf(reflection, keep).filterNot { it.isHiddenReflection() }
+        assertEquals(listOf("run_1"), candidates.map { it.id })
+        assertTrue(reflection.isHiddenReflection())
+        assertFalse(keep.isHiddenReflection())
+    }
+
+    @Test
     fun `only RUNNING and FAILED subagents pass the visibility filter`() {
         val all = persistentListOf(
             running(id = "run_1"),

@@ -256,4 +256,81 @@ class ActiveSubagentBarTest {
         composeRule.onAllNodesWithText("subagents running", substring = true)
             .assertCountEquals(0)
     }
+
+    // letta-mobile-lgns8.26: reflection subagent chips must never render in
+    // ANY partition — running subagent, background task, or terminal.
+    // The bar filter drops anything with subagentType == "reflection"
+    // regardless of lifecycle state. This test creates entries in all
+    // three partitions alongside a non-reflection sibling to prove the
+    // filter is partition-agnostic and the sibling still renders.
+    @Test
+    fun reflectionSubagentNeverRendersInAnyPartition() {
+        composeRule.setLettaTestContent {
+            ActiveSubagentBar(
+                subagents = persistentListOf(
+                    ActiveSubagent(
+                        id = "ref-run",
+                        description = "reflection-runner",
+                        subagentType = "reflection",
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.SUBAGENT,
+                    ),
+                    ActiveSubagent(
+                        id = "keep-run",
+                        description = "keep-running",
+                        subagentType = "tool",
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.SUBAGENT,
+                    ),
+                    ActiveSubagent(
+                        id = "ref-bg",
+                        description = "reflection-bg",
+                        subagentType = "reflection",
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.BACKGROUND_TASK,
+                    ),
+                    ActiveSubagent(
+                        id = "ref-term",
+                        description = "reflection-done",
+                        subagentType = "reflection",
+                        status = ActiveSubagent.Status.COMPLETED,
+                        kind = ActiveSubagent.Kind.SUBAGENT,
+                    ),
+                ).toImmutableList(),
+            )
+        }
+
+        // Reflection chip text must never appear.
+        composeRule.onNodeWithText("reflection-runner").assertDoesNotExist()
+        composeRule.onNodeWithText("reflection-bg").assertDoesNotExist()
+        composeRule.onNodeWithText("reflection-done").assertDoesNotExist()
+        // Non-reflection sibling still renders.
+        composeRule.onNodeWithText("keep-running").assertIsDisplayed()
+    }
+
+    // Review feedback on #1106: filtering chips but gating visibility on the
+    // unfiltered snapshot left an empty LazyRow when only reflection entries
+    // were active. The bar must fully hide in that case.
+    @Test
+    fun allReflectionSnapshotHidesTheBarEntirely() {
+        composeRule.setLettaTestContent {
+            ActiveSubagentBar(
+                subagents = persistentListOf(
+                    ActiveSubagent(
+                        id = "ref-only",
+                        description = "reflection-only",
+                        subagentType = ActiveSubagent.REFLECTION_SUBAGENT_TYPE,
+                        status = ActiveSubagent.Status.RUNNING,
+                        kind = ActiveSubagent.Kind.SUBAGENT,
+                    ),
+                ).toImmutableList(),
+            )
+        }
+
+        composeRule.onNodeWithText("reflection-only").assertDoesNotExist()
+        composeRule.onAllNodesWithContentDescription("Subagent running:", substring = true)
+            .assertCountEquals(0)
+        composeRule.onAllNodesWithContentDescription("subagents running", substring = true)
+            .assertCountEquals(0)
+    }
 }
