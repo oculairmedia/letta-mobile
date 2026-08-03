@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import java.io.File
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -418,5 +419,34 @@ class NativeAdminHandlersTest {
         )
         assertTrue(response.contains("\"success\":false"), "blank agent_id must fail: $response")
         assertTrue(response.contains("must not be blank"), "must carry a descriptive error: $response")
+    }
+
+    @Test
+    fun blockListAgentRejectsPathTraversalAgentId() = runTest {
+        val root = kotlin.io.path.createTempDirectory("kzqkr7-traversal-store").toFile()
+        LocalBackendFixtureStore.create(root)
+        // Plant a markdown file outside memfs that a naive join would read.
+        val outside = File(root, "outside-secret/memory/system").apply { mkdirs() }
+        File(outside, "leaked.md").writeText("should-not-leak")
+        val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
+        val r = AdminRpcRouter()
+        ToolAdminHandlers.register(r, store, nativeClient = null)
+        val response = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "b-trav",
+                method = "block.list_agent",
+                params = buildJsonObject { put("agent_id", "../outside-secret") },
+                context = AdminRpcRequestContext.Authenticated,
+            ),
+        )
+        assertTrue(response.contains("\"success\":false"), "traversal agent_id must fail: $response")
+        assertTrue(
+            response.contains("single path segment"),
+            "must reject multi-segment agent_id: $response",
+        )
+        assertTrue(
+            !response.contains("should-not-leak"),
+            "must not return contents from outside memfs: $response",
+        )
     }
 }

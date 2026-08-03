@@ -142,8 +142,20 @@ internal class LocalBackendBlockReader(private val support: LocalBackendStoreSup
     private fun readBlockValue(agentId: String, label: String): String =
         runCatching { File(systemMemoryDir(agentId), "$label.md").readText() }.getOrDefault("")
 
-    private fun systemMemoryDir(agentId: String): File =
-        File(File(File(File(support.baseDir, "memfs"), agentId), "memory"), "system")
+    private fun systemMemoryDir(agentId: String): File {
+        // Defense in depth for RPC handlers that already validate the segment:
+        // never resolve a multi-segment / traversal agentId beneath memfs.
+        require(isSafeMemfsSegment(agentId)) {
+            "agentId must be a single path segment, got '$agentId'"
+        }
+        val memfsRoot = File(support.baseDir, "memfs").canonicalFile
+        val resolved = File(File(File(memfsRoot, agentId), "memory"), "system").canonicalFile
+        val prefix = memfsRoot.path.trimEnd(File.separatorChar) + File.separator
+        require(resolved.path.startsWith(prefix)) {
+            "resolved system memory dir escaped memfs root: $resolved"
+        }
+        return resolved
+    }
 
     /** Agent ids in the same order the agent list serves them (mtime desc). */
     private fun agentIds(): List<String> {

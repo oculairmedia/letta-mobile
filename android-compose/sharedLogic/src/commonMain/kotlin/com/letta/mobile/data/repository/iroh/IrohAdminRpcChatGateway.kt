@@ -53,6 +53,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -792,18 +793,55 @@ class IrohAdminRpcAgentDirectory(
 
     suspend fun listAgentBlocks(agentId: String): List<Block> {
         require(agentId.isNotBlank()) { "agent_id must not be blank" }
-        val body = buildJsonObject { put("agent_id", agentId) }.toString()
-        // letta-mobile-1105: adminRpcDecodedList() maps success=true/result=null to
-        // emptyList(), which converts a malformed/unmeasurable response into an
-        // authoritative "this agent has zero blocks" — a false-empty state this
-        // agent-scoped route must never emit. Require a non-null result so only an
-        // explicit JSON `[]` decodes as measured empty; a null result throws loudly.
-        return adminRpcDecoded(
-            "block.list_agent",
-            "/v1/agents/$agentId/core-memory/blocks",
-            body,
-        )
+        // Mirror block.list paging: default page on the server, accumulate here.
+        // A bare array means the full agent set fit in one page; an envelope means
+        // more pages remain. Null result throws (never a false-empty).
+        val merged = mutableListOf<Block>()
+        val seenIds = HashSet<String>()
+        var offset = 0
+        repeat(AGENT_BLOCK_LIST_MAX_PAGES) {
+            val body = buildJsonObject {
+                put("agent_id", agentId)
+                put("limit", AGENT_BLOCK_LIST_PAGE_SIZE.toString())
+                put("offset", offset.toString())
+            }.toString()
+            val result = adminRpcResult(
+                "block.list_agent",
+                "/v1/agents/$agentId/core-memory/blocks?limit=$AGENT_BLOCK_LIST_PAGE_SIZE&offset=$offset",
+                body,
+            ) ?: throw TimelineTransportHttpException(
+                502,
+                "block.list_agent returned no result over iroh admin_rpc",
+            )
+            val page = decodeAgentBlockPage(result)
+            val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
+            merged += fresh
+            if (page.blocks.isEmpty() || fresh.isEmpty()) return merged
+            val hasMore = page.hasMore ?: (page.blocks.size >= AGENT_BLOCK_LIST_PAGE_SIZE)
+            if (!hasMore) return merged
+            offset += page.blocks.size
+        }
+        return merged
     }
+
+    private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage = when (result) {
+        is JsonArray -> AgentBlockPage(
+            blocks = json.decodeFromJsonElement(ListSerializer(Block.serializer()), result),
+            hasMore = false,
+        )
+        is JsonObject -> AgentBlockPage(
+            blocks = result["blocks"]
+                ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
+                .orEmpty(),
+            hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull(),
+        )
+        else -> AgentBlockPage(emptyList(), hasMore = false)
+    }
+
+    private data class AgentBlockPage(
+        val blocks: List<Block>,
+        val hasMore: Boolean?,
+    )
 
     suspend fun createBlock(params: BlockCreateParams): Block {
         val body = json.encodeToString(BlockCreateParams.serializer(), params)
@@ -901,6 +939,12 @@ class IrohAdminRpcAgentDirectory(
         // is a few hundred KB, well under the admin_rpc timeout on a slow link,
         // whereas the full set is multiple MB and times out in one shot.
         const val AGENT_LIST_PAGE_SIZE = 10
+
+        /** Matches ToolAdminHandlers.DEFAULT_BLOCK_LIST_LIMIT. */
+        const val AGENT_BLOCK_LIST_PAGE_SIZE = 50
+
+        /** Belt-and-braces bound for the agent-scoped block.list_agent sweep. */
+        const val AGENT_BLOCK_LIST_MAX_PAGES = 100
 
         // Native schedule.get emits the first form; HTTP-backed protocol bridges
         // may preserve a 404 status or canonical not_found code in the error.

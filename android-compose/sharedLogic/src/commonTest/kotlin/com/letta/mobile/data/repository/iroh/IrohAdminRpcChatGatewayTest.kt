@@ -323,11 +323,18 @@ class IrohAdminRpcChatGatewayTest {
 
     @Test
     fun directoryListAgentBlocksUsesCanonicalRpcContractAndDecodesResult() = runTest(UnconfinedTestDispatcher()) {
+        val pageSize = IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_PAGE_SIZE
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->
             assertEquals("block.list_agent", call.method)
-            assertEquals("/v1/agents/agent-1/core-memory/blocks", call.path)
-            assertEquals("{\"agent_id\":\"agent-1\"}", call.body)
+            assertEquals(
+                "/v1/agents/agent-1/core-memory/blocks?limit=$pageSize&offset=0",
+                call.path,
+            )
+            assertEquals(
+                "{\"agent_id\":\"agent-1\",\"limit\":\"$pageSize\",\"offset\":\"0\"}",
+                call.body,
+            )
             ok("""[{"id":"block-1","label":"persona","value":"Helpful"}]""")
         }
 

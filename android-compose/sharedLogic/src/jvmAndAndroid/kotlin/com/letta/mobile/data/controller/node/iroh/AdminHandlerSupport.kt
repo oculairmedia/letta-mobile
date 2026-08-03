@@ -128,6 +128,31 @@ internal fun JsonObject?.requireProjectIdentifierParam(): String =
 
 internal const val PROJECT_IDENTIFIER_REQUIRED = "identifier or project_id required"
 
+/**
+ * Reject path-traversal and multi-segment ids before they reach memfs joins.
+ * Agent/block labels are always a single directory/file segment under the
+ * local-backend root; `../`, absolute paths, and control chars must fail closed.
+ */
+internal fun isSafeMemfsSegment(value: String): Boolean {
+    val trimmed = value.trim()
+    if (trimmed.isEmpty()) return false
+    return trimmed != "." &&
+        trimmed != ".." &&
+        '/' !in trimmed &&
+        '\\' !in trimmed &&
+        '\u0000' !in trimmed &&
+        trimmed.none { it.isISOControl() }
+}
+
+internal fun requireSafeMemfsSegment(value: String, paramName: String): String {
+    val trimmed = value.trim()
+    if (!isSafeMemfsSegment(trimmed)) {
+        if (trimmed.isEmpty()) adminError("$paramName must not be blank")
+        adminError("$paramName must be a single path segment")
+    }
+    return trimmed
+}
+
 internal fun passthroughBody(params: JsonObject?, excludedKeys: List<AdminParamKey>): String {
     if (params == null) return "{}"
     val excluded = excludedKeys.map { it.value }.toSet()
