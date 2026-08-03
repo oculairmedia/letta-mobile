@@ -616,6 +616,15 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(ListSerializer(serializer<T>()), result)
     }
 
+    /**
+     * True when the last [listAgents] stopped because the backend returned a
+     * REPEATED page (it ignores limit/offset), i.e. the roster is known to be
+     * truncated. Surfaces let the user see "N+" instead of a confident count.
+     */
+    @kotlin.concurrent.Volatile
+    var lastAgentListTruncated: Boolean = false
+        private set
+
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
         // agent.list returns FULL agent objects (each carries its whole system
         // prompt + core-memory), so the complete set is multiple MB. A single
@@ -627,6 +636,11 @@ class IrohAdminRpcAgentDirectory(
         val out = ArrayList<Agent>(minOf(limit, 64))
         val seenIds = HashSet<String>()
         var offset = 0
+        // Every exit that leaves agents unread must set this: a roster we
+        // stopped short of is exactly the "we don't know the real total" case
+        // the `N+` label exists for. Clearing it unconditionally reported a
+        // partial count as exact.
+        var truncated = false
         while (out.size < limit) {
             val pageLimit = minOf(AGENT_LIST_PAGE_SIZE, limit - out.size)
             val body = buildJsonObject {
@@ -643,16 +657,24 @@ class IrohAdminRpcAgentDirectory(
             // 125 round trips per refresh, each carrying full agent objects,
             // accumulating the same page over and over. Observed in production.
             val fresh = page.filter { seenIds.add(it.id.value) }
-            out += fresh.take(limit - out.size)
+            val room = limit - out.size
+            if (fresh.size > room) truncated = true
+            out += fresh.take(room)
             // A page that contributes nothing new means the backend is not
             // paginating; stop rather than hammer it. (Cost of a false positive
             // is a truncated roster — the same outcome as the old heuristic, but
             // reached in 2 requests instead of 125.)
-            if (fresh.isEmpty()) break
+            if (fresh.isEmpty()) {
+                truncated = true
+                break
+            }
             // A short page means we've reached the end.
             if (page.size < pageLimit) break
             offset += page.size
         }
+        // Filling the accumulator to the cap means there may well be more.
+        if (out.size >= limit) truncated = true
+        lastAgentListTruncated = truncated
         return out
     }
 

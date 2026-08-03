@@ -52,7 +52,7 @@ fun main(args: Array<String>) {
  * narrowly scoped and lets a future Lifecycle upgrade remove the workaround
  * without exposing that implementation detail to the rest of the app.
  */
-private fun initializeDesktopLifecycleMainThread() {
+internal fun initializeDesktopLifecycleMainThread() {
     runCatching {
         val checkerClass = Class.forName("androidx.lifecycle.MainDispatcherChecker")
         checkerClass.getDeclaredField("isMainDispatcherAvailable").apply {
@@ -118,6 +118,11 @@ private fun runDesktopApplication(
                 // Spotlight-style floating query bar, summoned by the global
                 // hotkey without raising the main window.
                 DesktopQuickQueryWindow(quickQuery)
+                // Realtime shader lookdev as a second window, for tuning the
+                // ambient glow against the real app theme and backend state.
+                if (System.getenv("LETTA_SHADER_LOOKDEV") == "1") {
+                    com.letta.mobile.desktop.lookdev.ShaderLookdevWindow()
+                }
             }
         }
 }

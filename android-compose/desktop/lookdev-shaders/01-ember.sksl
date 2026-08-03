@@ -1,0 +1,63 @@
+uniform float2 uSize;
+uniform float uTime;
+uniform float uAgitation;
+uniform float uEnvelope;
+uniform vec4 uColor;
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i + float2(0.0, 0.0)), hash(i + float2(1.0, 0.0)), u.x),
+        mix(hash(i + float2(0.0, 1.0)), hash(i + float2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+float2 rot(float2 p, float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return float2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+float fbm(float2 p) {
+    float v = 0.0;
+    float amp = 0.52;
+    for (int i = 0; i < 4; i++) {
+        v += amp * noise(p);
+        p = rot(p, 0.62) * 2.03 + 17.3;
+        amp *= 0.55;
+    }
+    return v;
+}
+
+float dither(float2 fragCoord) {
+    return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
+}
+
+// Ember: bottom-anchored breathing glow, noise-textured.
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
+    float aspect = uSize.x / max(uSize.y, 1.0);
+    float2 p = float2((uv.x - 0.50) * aspect, uv.y - 0.95);
+    float breath = 0.5 + 0.5 * sin(uTime);
+    float2 warp = float2(noise(uv * 3.1 + float2(uTime * 0.11, 0.0)),
+                         noise(uv * 3.7 + float2(0.0, -uTime * 0.07)));
+    float2 driftUv = float2(uv.x * 2.2 + uTime * 0.08, uv.y * 1.6 - uTime * 0.05)
+        + (warp - 0.5) * (0.9 * uAgitation);
+    float drift = fbm(driftUv);
+    float radius = mix(0.55, 0.75, breath) + (drift - 0.5) * (0.10 + 0.08 * uAgitation);
+    float glow = 1.0 - smoothstep(0.0, radius, length(p));
+    float shape = smoothstep(0.45, 0.95, uv.y);
+    float aRaw = glow * shape * 0.38;
+    float3 rgb = uColor.rgb;
+
+    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.92);
+    alpha = max(alpha + dither(fragCoord), 0.0);
+    return half4(rgb * alpha, alpha);
+}

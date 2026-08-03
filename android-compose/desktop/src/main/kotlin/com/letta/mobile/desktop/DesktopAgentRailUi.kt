@@ -1,11 +1,13 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,7 +46,12 @@ import org.jetbrains.jewel.ui.component.TextField as JewelTextField
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -52,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.agents.AgentRailGroup
 import com.letta.mobile.data.agents.AgentRailSpace
 import com.letta.mobile.data.agents.deriveAgentSpaces
+import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.desktop.chat.AgentOrb
 
@@ -82,25 +90,53 @@ internal fun RailDivider() {
     )
 }
 
-/** Pulsing teal ring used as the agent "thinking" indicator. */
+/** Orbiting comet ring used as the agent "thinking" indicator. */
 @Composable
 private fun ThinkingRing(
     diameter: Dp,
-    cornerRadius: Dp,
     modifier: Modifier = Modifier,
 ) {
+    // Orbiting comet, not a blinking border: a sweep-gradient tail circling
+    // the orb with a bright head over a faint static track. Continuous motion
+    // with direction reads as "working"; the old alpha-pulsed rounded-square
+    // border just read as a blinking box.
     val transition = rememberInfiniteTransition(label = "thinking")
-    val alpha by transition.animateFloat(
-        initialValue = 0.25f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
-        label = "thinkingAlpha",
+    val angle by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(tween(1200, easing = LinearEasing)),
+        label = "thinkingOrbit",
     )
-    Box(
-        modifier = modifier
-            .size(diameter)
-            .border(2.dp, MaterialTheme.colorScheme.primary.copy(alpha = alpha), RoundedCornerShape(cornerRadius)),
-    )
+    val primary = MaterialTheme.colorScheme.primary
+    Canvas(modifier = modifier.size(diameter)) {
+        val strokeWidth = 2.dp.toPx()
+        val radius = (size.minDimension - strokeWidth) / 2f
+        // Faint full track so the indicator reads as a ring, not a flying dash.
+        drawCircle(
+            color = primary.copy(alpha = 0.18f),
+            radius = radius,
+            style = Stroke(width = strokeWidth),
+        )
+        rotate(angle) {
+            // Tail: transparent at the seam's far side building to full primary
+            // at the head. The hard sweep seam IS the comet head edge.
+            drawCircle(
+                brush = Brush.sweepGradient(
+                    0.0f to Color.Transparent,
+                    0.35f to Color.Transparent,
+                    1.0f to primary,
+                ),
+                radius = radius,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round),
+            )
+            // Rounded head cap at the seam (0° = +x axis in canvas space).
+            drawCircle(
+                color = primary,
+                radius = strokeWidth * 0.9f,
+                center = Offset(center.x + radius, center.y),
+            )
+        }
+    }
 }
 
 @Immutable
@@ -139,9 +175,16 @@ internal fun DesktopAgentRail(
     // "Letta Code" agents spawned per task — into a single stacked orb with a
     // count chip, so the rail doesn't grow unbounded with near-duplicate spawns.
     // Order follows first appearance in [agents].
+    // Keyed on IDENTITY for synthetic labels: agents that merely share an
+    // "Agent <short-id>" placeholder share nothing, and stacking them hides
+    // every member but one behind an orb that cannot select them. Only a real,
+    // shared name means "same fleet".
     val groups = remember(state.agents) {
-        state.agents.groupBy { it.second }
-            .map { (name, members) -> AgentRailGroup(name = name, agentIds = members.map { it.first }) }
+        state.agents
+            .groupBy { (id, name) -> if (DisplayNames.isAgentFallback(name)) id else name }
+            .map { (_, members) ->
+                AgentRailGroup(name = members.first().second, agentIds = members.map { it.first })
+            }
     }
     val width by animateDpAsState(if (state.expanded) 248.dp else 56.dp, label = "railWidth")
     // Start-aligned in BOTH modes, with each header control wrapped in a
@@ -369,7 +412,7 @@ private fun ExpandedAgentRow(params: AgentRailOrbParams) {
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (flags.thinking) {
-                ThinkingRing(diameter = 32.dp, cornerRadius = 9.dp)
+                ThinkingRing(diameter = 32.dp)
             }
             AgentOrb(index = target.orbStyle, size = 28.dp, cornerRadius = 8.dp) {
                 Text(
@@ -408,7 +451,11 @@ private fun ColumnScope.AgentRailOrbList(
     LazyColumn(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        // Each 30dp orb already sits in a 34dp slot (2dp slack top and bottom),
+        // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
+        // adjacent orbs. The slot itself stays 34dp — the thinking ring is
+        // exactly that size, so shrinking the slot would crowd it.
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         itemsIndexed(groups, key = { _, group -> "orb-${group.name}" }) { index, group ->
             AgentRailOrb(
@@ -518,7 +565,7 @@ private fun AgentRailOrbContent(
         if (flags.thinking) {
             // Concentric with the 30dp orb (2dp gap) and sized to fit the
             // slot so it doesn't crowd neighbouring orbs.
-            ThinkingRing(diameter = 34.dp, cornerRadius = 9.dp)
+            ThinkingRing(diameter = 34.dp)
         }
         AgentOrb(
             index = target.orbStyle,

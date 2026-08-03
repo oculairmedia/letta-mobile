@@ -178,6 +178,55 @@ class DesktopSubagentStackFilteringTest {
     }
 
     @Test
+    fun normalAgentMembershipFollowsIdentityNotTheRenderedLabel() {
+        // The selected label is now a RESOLVED or SYNTHESISED display name,
+        // while a conversation's stored `agentName` can still be the raw id
+        // that name resolution missed. Comparing the two matched nothing, so
+        // the sidebar went empty for exactly the agents the fallback exists
+        // to help.
+        val conversations = listOf(
+            conversation(id = "c1", agentId = "agent-c356b8f2-1a2b", agentName = "agent-c356b8f2-1a2b"),
+            conversation(id = "c2", agentId = "agent-other-9999", agentName = "Ada"),
+        )
+
+        val stack = filterStackConversations(
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = emptyList(),
+                selectedAgentName = "Agent c356b8f2",
+                selectedAgentId = "agent-c356b8f2-1a2b",
+                selectedConversationId = null,
+                archiveFilter = ConversationArchiveFilter.All,
+            ),
+        )
+
+        assertEquals(listOf("c1"), stack.map { it.id })
+    }
+
+    @Test
+    fun membershipFallsBackToTheNameWhenTheConversationHasNoIdentity() {
+        // Conversations the server sent without an agentId still have to be
+        // selectable, so the historical name test survives as the fallback.
+        val conversations = listOf(
+            conversation(id = "c1", agentId = "", agentName = "Ada"),
+            conversation(id = "c2", agentId = "", agentName = "Bob"),
+        )
+
+        val stack = filterStackConversations(
+            FilterStackConversationsParams(
+                conversations = conversations,
+                activeSubagents = emptyList(),
+                selectedAgentName = "Ada",
+                selectedAgentId = "agent-ada",
+                selectedConversationId = null,
+                archiveFilter = ConversationArchiveFilter.All,
+            ),
+        )
+
+        assertEquals(listOf("c1"), stack.map { it.id })
+    }
+
+    @Test
     fun archiveFilterAppliedAfterProvenanceGrouping() {
         val conversations = listOf(
             conversation(id = "live", agentId = "sub-1", agentName = "Letta Code", archived = false),

@@ -350,6 +350,10 @@ class IrohAdminRpcChatGatewayTest {
             "ids de-duplicated, order preserved",
         )
         assertEquals(2, transport.rpcCalls.size, "stops after the first repeat — not 125 round trips")
+        assertTrue(
+            directory.lastAgentListTruncated,
+            "we stopped short of the real roster, so callers must render N+ rather than a confident count",
+        )
     }
 
     @Test
@@ -364,6 +368,7 @@ class IrohAdminRpcChatGatewayTest {
 
         assertEquals(5, agents.size)
         assertEquals((0 until 5).map { "agent-$it" }, agents.map { it.id.value })
+        assertTrue(directory.lastAgentListTruncated, "we dropped agents to honour the cap — the count is not exact")
     }
 
     @Test
@@ -394,6 +399,10 @@ class IrohAdminRpcChatGatewayTest {
         assertEquals(pageSize + 3, agents.size, "all pages accumulated")
         assertEquals(2, transport.rpcCalls.size, "stops on the short page — no wasted 3rd call")
         assertEquals(listOf(0, pageSize), transport.rpcCalls.map { offsetOf(it.body) }, "offsets advance by page")
+        assertTrue(
+            !directory.lastAgentListTruncated,
+            "a short page IS the end of the roster — this count is exact and must not be dressed up as N+",
+        )
     }
 
     // ------------------------------------------------------------------

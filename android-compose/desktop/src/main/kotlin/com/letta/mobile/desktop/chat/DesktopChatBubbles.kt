@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.chat
 
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -48,9 +49,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
@@ -346,44 +350,81 @@ private fun PromptExpandButton(expanded: Boolean, onToggle: () -> Unit) {
  */
 @Composable
 internal fun ThinkingMessageRow() {
+    // Quiet, current treatment: a small breathing glow-dot plus a shimmering
+    // "Thinking…" label. The previous 40dp glossy sphere + three grey dots
+    // read as a toy marble in an otherwise flat, dark surface.
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        AgentActivityOrb(size = 40.dp, activity = AgentActivity.Working)
-        ThinkingDots()
+        ThinkingGlowDot(diameter = 18.dp)
+        ThinkingShimmerLabel("Thinking…")
     }
 }
 
+/** Soft radial glow that breathes — presence without spectacle. */
 @Composable
-private fun ThinkingDots() {
-    val transition = rememberInfiniteTransition(label = "thinkingDots")
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        repeat(3) { index ->
-            val alpha by transition.animateFloat(
-                initialValue = 0.2f,
-                targetValue = 1f,
-                animationSpec = infiniteRepeatable(
-                    animation = tween(durationMillis = 600, delayMillis = index * 160, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-                label = "thinkingDot$index",
-            )
-            Box(
-                modifier = Modifier
-                    .size(7.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
-                        shape = CircleShape,
-                    ),
-            )
-        }
+private fun ThinkingGlowDot(diameter: androidx.compose.ui.unit.Dp) {
+    val transition = rememberInfiniteTransition(label = "thinkingGlow")
+    val breath by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "thinkingBreath",
+    )
+    val primary = MaterialTheme.colorScheme.primary
+    Canvas(modifier = Modifier.size(diameter)) {
+        val maxRadius = size.minDimension / 2f
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(primary.copy(alpha = 0.28f + 0.22f * breath), Color.Transparent),
+                center = center,
+                radius = maxRadius,
+            ),
+            radius = maxRadius,
+            center = center,
+        )
+        drawCircle(
+            color = primary.copy(alpha = 0.75f + 0.25f * breath),
+            radius = maxRadius * (0.30f + 0.05f * breath),
+            center = center,
+        )
     }
 }
+
+/** Label with a slow left-to-right highlight sweep. */
+@Composable
+private fun ThinkingShimmerLabel(text: String) {
+    val transition = rememberInfiniteTransition(label = "thinkingShimmer")
+    val sweep by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(durationMillis = 1600, easing = LinearEasing)),
+        label = "thinkingSweep",
+    )
+    val base = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+    val highlight = MaterialTheme.colorScheme.onSurface
+    // Sweep a bright band across the label width; band travels past both ends
+    // so the loop restart has no visible pop.
+    val bandWidth = 90f
+    val x = sweep * (LABEL_SWEEP_SPAN + 2 * bandWidth) - bandWidth
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            brush = Brush.linearGradient(
+                colors = listOf(base, highlight, base),
+                start = Offset(x - bandWidth, 0f),
+                end = Offset(x + bandWidth, 0f),
+            ),
+        ),
+    )
+}
+
+private const val LABEL_SWEEP_SPAN = 80f
 
 @JvmInline
 internal value class IsoTimestamp(val value: String)

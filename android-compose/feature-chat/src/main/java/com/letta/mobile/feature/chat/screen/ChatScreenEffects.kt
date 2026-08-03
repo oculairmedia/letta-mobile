@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.LocalView
 import com.letta.mobile.data.model.ToolReturnStatus
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
+import com.letta.mobile.ui.ambient.AmbientMotion
+import com.letta.mobile.ui.ambient.AmbientMotionStatus
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.SnackbarMessage
@@ -205,7 +207,12 @@ private fun ChatScreenAmbientStatusEffect(
             }
             ambient.hadActiveRun -> {
                 ambient.onStatusChange("Completed")
-                kotlinx.coroutines.delay(1400.milliseconds)
+                // Same shared hold as desktop: cutting this short cancels the
+                // Completed decay mid-flight and Idle animates the envelope
+                // back up, so the afterglow reads as a rebound.
+                kotlinx.coroutines.delay(
+                    AmbientMotion.holdMillis(AmbientMotionStatus.Completed).milliseconds,
+                )
                 ambient.onHadActiveRunChange(false)
                 ambient.onStatusChange("Idle")
             }

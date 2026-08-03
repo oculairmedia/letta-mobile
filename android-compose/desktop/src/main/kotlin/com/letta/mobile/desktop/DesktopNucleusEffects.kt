@@ -58,6 +58,17 @@ internal fun activateDesktopWindow(window: Window) {
         if (window is Frame) {
             window.extendedState = window.extendedState and Frame.ICONIFIED.inv()
         }
+        // Windows focus-stealing prevention: toFront()/requestFocus() from a
+        // background process (e.g. a toast-activation callback, where the
+        // shell is foreground) is denied and degrades to a taskbar flash. A
+        // momentary always-on-top toggle forces the window to the top of the
+        // z-order regardless, so the focus request lands on a window that is
+        // actually frontmost. Skipped when the window is deliberately
+        // always-on-top, so we never switch that off.
+        if (!window.isAlwaysOnTop && window.isAlwaysOnTopSupported) {
+            window.isAlwaysOnTop = true
+            window.isAlwaysOnTop = false
+        }
         window.toFront()
         window.requestFocus()
     }
@@ -176,6 +187,14 @@ internal fun DesktopNucleusEffects(
     val applicationScope = bindings.applicationScope
     val window = bindings.window
     val activate = remember(window) { { activateDesktopWindow(window) } }
+
+    // Route toast clicks that no longer match an in-memory reply handler
+    // (toasts posted by a previous process instance, still in the Action
+    // Center) to plain window activation instead of a silent no-op.
+    DisposableEffect(bindings.controller, window) {
+        bindings.controller.onToastActivationFallback = activate
+        onDispose { bindings.controller.onToastActivationFallback = null }
+    }
 
     DesktopTray(
         applicationScope = applicationScope,

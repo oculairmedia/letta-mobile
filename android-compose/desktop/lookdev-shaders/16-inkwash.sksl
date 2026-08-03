@@ -1,0 +1,65 @@
+uniform float2 uSize;
+uniform float uTime;
+uniform float uAgitation;
+uniform float uEnvelope;
+uniform vec4 uColor;
+
+float hash(float2 p) {
+    return fract(sin(dot(p, float2(127.1, 311.7))) * 43758.5453123);
+}
+
+float noise(float2 p) {
+    float2 i = floor(p);
+    float2 f = fract(p);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    return mix(
+        mix(hash(i + float2(0.0, 0.0)), hash(i + float2(1.0, 0.0)), u.x),
+        mix(hash(i + float2(0.0, 1.0)), hash(i + float2(1.0, 1.0)), u.x),
+        u.y
+    );
+}
+
+float2 rot(float2 p, float a) {
+    float c = cos(a);
+    float s = sin(a);
+    return float2(c * p.x - s * p.y, s * p.x + c * p.y);
+}
+
+float fbm(float2 p) {
+    float v = 0.0;
+    float amp = 0.52;
+    for (int i = 0; i < 4; i++) {
+        v += amp * noise(p);
+        p = rot(p, 0.62) * 2.03 + 17.3;
+        amp *= 0.55;
+    }
+    return v;
+}
+
+float dither(float2 fragCoord) {
+    return (hash(fragCoord * 0.7131) - 0.5) * (1.6 / 255.0);
+}
+
+// Inkwash: three slow watercolor blooms, each its own color, soft-merged.
+half4 main(float2 fragCoord) {
+    float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
+    float aspect = uSize.x / max(uSize.y, 1.0);
+    float t = uTime * 0.09;
+    float2 p = float2((uv.x - 0.5) * aspect, uv.y);
+    float2 m1 = float2(-0.25 * aspect + 0.06 * sin(t * 1.1), 0.88 + 0.03 * cos(t * 0.9));
+    float2 m2 = float2(0.05 * aspect + 0.08 * sin(t * 0.7 + 2.0), 0.96 + 0.03 * sin(t * 1.3));
+    float2 m3 = float2(0.28 * aspect + 0.06 * cos(t * 0.8 + 4.0), 0.90 + 0.04 * sin(t * 1.0 + 1.0));
+    float e1 = fbm(p * 2.6 + m1 * 3.0 + t);
+    float g1 = exp(-pow(length(p - m1) / (0.34 + 0.10 * e1 * (1.0 + 0.5 * uAgitation)), 2.0));
+    float e2 = fbm(p * 2.6 + m2 * 3.0 - t);
+    float g2 = exp(-pow(length(p - m2) / (0.40 + 0.12 * e2 * (1.0 + 0.5 * uAgitation)), 2.0));
+    float e3 = fbm(p * 2.6 + m3 * 3.0 + t * 0.5);
+    float g3 = exp(-pow(length(p - m3) / (0.34 + 0.10 * e3 * (1.0 + 0.5 * uAgitation)), 2.0));
+    float sum = g1 + g2 + g3;
+    float3 rgb = (uColor.rgb * g1 + uColor.rgb.gbr * g2 + uColor.rgb.brg * g3) / max(sum, 0.001);
+    float aRaw = sum * 0.28 * smoothstep(0.30, 0.85, uv.y);
+
+    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.92);
+    alpha = max(alpha + dither(fragCoord), 0.0);
+    return half4(rgb * alpha, alpha);
+}
