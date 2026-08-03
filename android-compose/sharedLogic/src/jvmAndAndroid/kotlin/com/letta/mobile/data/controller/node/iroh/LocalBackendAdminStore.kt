@@ -73,6 +73,9 @@ class LocalBackendAdminStore(
     /** See [LocalBackendBlockReader.getBlock]. */
     fun getBlockProjected(blockId: String): JsonObject? = blockReader.getBlock(blockId)
 
+    /** See [LocalBackendBlockReader.blocksForAgent]. */
+    fun blocksForAgentProjected(agentId: String): JsonArray = blockReader.blocksForAgent(agentId)
+
     /** See [LocalBackendRunReader.listRuns]. */
     internal fun listRunsProjected(query: RunQuery): JsonArray? = runReader.listRuns(query)
 

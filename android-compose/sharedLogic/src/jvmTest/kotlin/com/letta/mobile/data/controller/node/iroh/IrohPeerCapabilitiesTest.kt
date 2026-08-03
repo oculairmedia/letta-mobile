@@ -158,6 +158,7 @@ class IrohPeerCapabilitiesTest {
         val readOnly = setOf(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.MEMORY_READ)
         assertTrue(IrohPeerCapabilities.isAllowed(readOnly, IrohPeerCapabilities.forAdminMethod("message.list")))
         assertTrue(IrohPeerCapabilities.isAllowed(readOnly, IrohPeerCapabilities.forAdminMethod("block.list")))
+        assertTrue(IrohPeerCapabilities.isAllowed(readOnly, IrohPeerCapabilities.forAdminMethod("block.list_agent")))
         assertFalse(IrohPeerCapabilities.isAllowed(readOnly, IrohPeerCapabilities.forAdminMethod("block.update")))
         assertFalse(IrohPeerCapabilities.isAllowed(readOnly, IrohPeerCapabilities.forAdminMethod("conversation.create")))
         assertFalse(IrohPeerCapabilities.isAllowed(readOnly, IrohPeerCapabilities.forProtocolCommand("input")!!))

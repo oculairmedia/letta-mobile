@@ -790,6 +790,15 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
 
+    suspend fun listAgentBlocks(agentId: String): List<Block> {
+        val body = buildJsonObject { put("agent_id", agentId) }.toString()
+        return adminRpcDecodedList(
+            "block.list_agent",
+            "/v1/agents/$agentId/core-memory/blocks",
+            body,
+        )
+    }
+
     suspend fun createBlock(params: BlockCreateParams): Block {
         val body = json.encodeToString(BlockCreateParams.serializer(), params)
         return adminRpcDecoded("block.create", "/v1/blocks", body)

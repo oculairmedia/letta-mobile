@@ -339,4 +339,84 @@ class BlockRepositoryTest {
         assertEquals(2, result.size)
         assertEquals(1, transport.adminRpcCalls.size)
     }
+
+    // ─── Agent-scoped block.list_agent (kzqkr.7) ────────────────────────────
+
+    @Test
+    fun `getBlocks in iroh mode routes via blockDOTlist_agent not blockDOTlist`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(id = "test", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = FakeChannelTransport()
+        val blocks = listOf(
+            Block(id = BlockId("block-abc123"), label = "persona", value = "Agent persona"),
+            Block(id = BlockId("block-def456"), label = "human", value = "Agent human"),
+        )
+        transport.adminRpcHandler = { method, path, body ->
+            assertEquals("block.list_agent", method, "must use agent-scoped block.list_agent, not global block.list")
+            assertEquals("/v1/agents/agent-1/core-memory/blocks", path)
+            assertTrue(body.orEmpty().contains("\"agent_id\":\"agent-1\""), "body must carry agent_id")
+            val json = Json { ignoreUnknownKeys = true }
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req",
+                success = true,
+                result = json.encodeToJsonElement(
+                    kotlinx.serialization.builtins.ListSerializer(Block.serializer()),
+                    blocks,
+                ),
+                error = null,
+            )
+        }
+        val irohSource = IrohAdminRpcBlockSource(transport, settings)
+        val apiThatThrows = object : FakeBlockApi() {
+            override suspend fun listBlocks(agentId: String): List<Block> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = BlockRepository(apiThatThrows, irohSource)
+        val result = repo.getBlocks("agent-1")
+        assertEquals(2, result.size)
+        assertEquals("persona", result[0].label)
+        assertEquals("human", result[1].label)
+        assertEquals(1, transport.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `getBlocks with blank agentId fails before any call`() = runTest {
+        val settings = FakeSettingsRepository(
+            initialActiveConfig = LettaConfig(id = "test", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")
+        )
+        val transport = FakeChannelTransport()
+        transport.adminRpcHandler = { _, _, _ ->
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req", success = true,
+                result = Json.parseToJsonElement("[]"),
+            )
+        }
+        val irohSource = IrohAdminRpcBlockSource(transport, settings)
+        val apiThatThrows = object : FakeBlockApi() {
+            override suspend fun listBlocks(agentId: String): List<Block> {
+                throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = BlockRepository(apiThatThrows, irohSource)
+        try {
+            repo.getBlocks(" ")
+            org.junit.Assert.fail("Expected an exception for blank agent_id")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message!!.contains("blank"), "must reject blank agent_id: ${e.message}")
+        }
+        assertEquals(0, transport.adminRpcCalls.size, "blank agent_id must fail before admin_rpc is called")
+    }
+
+    @Test
+    fun `getBlocks in HTTP mode uses blockApi`() = runTest {
+        fakeApi.blocks["agent-1"] = mutableListOf(
+            Block(id = BlockId("block-1"), label = "persona", value = "Test value"),
+        )
+        val result = repository.getBlocks("agent-1")
+        assertEquals(1, result.size)
+        assertEquals("persona", result[0].label)
+        assertTrue(fakeApi.calls.contains("listBlocks:agent-1"))
+    }
 }

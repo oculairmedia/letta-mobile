@@ -331,4 +331,48 @@ class NativeAdminHandlersTest {
         dispatch(r, "conversation.restore", mapOf("conversation_id" to "conv-1"))
         assertEquals(2, client.calls.count { it == "conversation_update" })
     }
+
+    // ─── block.list_agent (kzqkr.7) ─────────────────────────────────────────
+
+    @Test
+    fun blockListAgentReturnsEmptyForAnAgentWithNoBlocksFromStore() = runTest {
+        val root = kotlin.io.path.createTempDirectory("kzqkr7-handler-store").toFile()
+        LocalBackendFixtureStore.create(root)
+        val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
+        val r = AdminRpcRouter()
+        ToolAdminHandlers.registerBlockReads(r, store)
+        // agent-2 exists but has no blocks.
+        LocalBackendFixtureStore.writeAgent(root, "agent-2", name = "No Blocks")
+        val response = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "b-1",
+                method = "block.list_agent",
+                params = buildJsonObject { put("agent_id", "agent-2") },
+                context = AdminRpcRequestContext.Authenticated,
+            ),
+        )
+        assertTrue(response.contains("\"success\":true"), "must serve empty list: $response")
+        // The result is an empty JSON array.
+        assertTrue(response.contains("[]") || response.contains("\"error\":") == false,
+            "expected empty array, got: $response")
+    }
+
+    @Test
+    fun blockListAgentRejectsBlankAgentId() = runTest {
+        val root = kotlin.io.path.createTempDirectory("kzqkr7-blank-store").toFile()
+        LocalBackendFixtureStore.create(root)
+        val store = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1")
+        val r = AdminRpcRouter()
+        ToolAdminHandlers.registerBlockReads(r, store)
+        val response = r.dispatch(
+            AdminRpcInvocation(
+                requestId = "b-2",
+                method = "block.list_agent",
+                params = buildJsonObject { put("agent_id", " ") },
+                context = AdminRpcRequestContext.Authenticated,
+            ),
+        )
+        assertTrue(response.contains("\"success\":false"), "blank agent_id must fail: $response")
+        assertTrue(response.contains("must not be blank"), "must carry a descriptive error: $response")
+    }
 }

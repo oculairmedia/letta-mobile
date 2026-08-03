@@ -224,6 +224,26 @@ class IrohAdminRpcBlockSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc block.detach failed")
     }
 
+    /**
+     * Agent-scoped block list via `block.list_agent`.
+     *
+     * Returns only the projected blocks for [agentId], each carrying its stable
+     * synthesised id. This is NOT a client-side filter over the global
+     * [listAllBlocks] union — the server returns only the requested agent's rows.
+     */
+    suspend fun listAgentBlocks(agentId: String): List<Block> {
+        if (agentId.isBlank()) error("agent_id must not be blank")
+        val params = buildJsonObject { put("agent_id", agentId) }
+        val response = channelTransport.adminRpc(
+            method = "block.list_agent",
+            path = "/v1/agents/$agentId/core-memory/blocks",
+            body = params.toString(),
+        )
+        if (!response.success) error(response.error ?: "Iroh admin_rpc block.list_agent failed")
+        val result = response.result ?: error("Iroh admin_rpc block.list_agent returned no result")
+        return json.decodeFromJsonElement(ListSerializer(Block.serializer()), result)
+    }
+
     suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         val body = buildJsonObject {
             put("agent_id", agentId)

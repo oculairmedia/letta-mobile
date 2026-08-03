@@ -103,6 +103,11 @@ object ToolAdminHandlers {
             val blockId = params.requireParam(AdminParamKey("block_id"))
             store.getBlockProjected(blockId) ?: adminError("block $blockId not found")
         }
+        router.register("block.list_agent") { params ->
+            val agentId = params.requireParam(AdminParamKey("agent_id"))
+            if (agentId.isBlank()) adminError("block.list_agent: agent_id must not be blank")
+            store.blocksForAgentProjected(agentId)
+        }
     }
 
     private fun registerBlockWrites(router: AdminRpcRouter, nativeClient: AppServerClient?) {
@@ -153,7 +158,7 @@ object ToolAdminHandlers {
     )
 
     /** Served from the on-disk memfs memory files. */
-    val BLOCK_READ_METHODS: Set<String> = setOf("block.list", "block.get")
+    val BLOCK_READ_METHODS: Set<String> = setOf("block.list", "block.get", "block.list_agent")
 
     /**
      * Page size when the caller sends no `limit`. Blocks are capped at

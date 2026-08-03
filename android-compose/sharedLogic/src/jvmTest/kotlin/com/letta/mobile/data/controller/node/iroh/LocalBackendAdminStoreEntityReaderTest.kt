@@ -232,6 +232,53 @@ class LocalBackendAdminStoreEntityReaderTest {
         assertNull(store.agentContextProjected("agent-unknown", null))
     }
 
+    // ── agent-scoped block.list_agent (kzqkr.7) ──────────────────────────────
+
+    @Test
+    fun blocksForAgentReturnsOnlyTheRequestedAgentsRows() {
+        val (store, root) = store()
+        LocalBackendFixtureStore.writeAgent(root, "agent-2", name = "Second")
+        LocalBackendFixtureStore.writeBlock(root, "agent-2", "human", "someone")
+
+        val agent1Blocks = store.blocksForAgentProjected(LocalBackendFixtureStore.AGENT_ID)
+        val agent2Blocks = store.blocksForAgentProjected("agent-2")
+
+        assertEquals(
+            listOf(LocalBackendFixtureStore.BLOCK_LABEL),
+            agent1Blocks.map { it.jsonObject.getValue("label").jsonPrimitive.content },
+            "agent-1 should only return its own blocks",
+        )
+        assertEquals(
+            listOf("human"),
+            agent2Blocks.map { it.jsonObject.getValue("label").jsonPrimitive.content },
+            "agent-2 should only return its own blocks",
+        )
+        // Both blocks carry stable synthesised ids.
+        agent1Blocks.forEach {
+            val id = it.jsonObject.getValue("id").jsonPrimitive.content
+            assertTrue(id.startsWith("block-"), "every block must carry a synthesised id: $id")
+        }
+        agent2Blocks.forEach {
+            val id = it.jsonObject.getValue("id").jsonPrimitive.content
+            assertTrue(id.startsWith("block-"), "every block must carry a synthesised id: $id")
+        }
+    }
+
+    @Test
+    fun blocksForAgentReturnsEmptyForAnAgentWithNoBlocks() {
+        val (store, root) = store()
+        LocalBackendFixtureStore.writeAgent(root, "agent-noblocks", name = "No Blocks")
+        val blocks = store.blocksForAgentProjected("agent-noblocks")
+        assertEquals(0, blocks.size)
+    }
+
+    @Test
+    fun blocksForAgentReturnsEmptyForUnknownAgent() {
+        val (store, _) = store()
+        val blocks = store.blocksForAgentProjected("agent-unknown")
+        assertEquals(0, blocks.size)
+    }
+
     // ── fail-closed on a missing / unreadable store ─────────────────────────
 
     @Test
