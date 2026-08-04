@@ -36,6 +36,15 @@ internal class TimelineSendCoordinator(
     ): Job {
         return scope.launch {
             val enqueueTimer = Telemetry.startTimer("AdminChatVM", "send.enqueue")
+            // letta-mobile-mxwtn: optimistic insert. The user bubble reaches
+            // the timeline state in the same frame as the composer clear so
+            // the visible latency is the projection + frame-pacing delay
+            // (and not the transport round-trip). The otid is minted up front
+            // and threaded into both the optimistic insert and the actual
+            // transport call so the two paths see the same identity and the
+            // existing replaceByOtid reconcile on the server echo collapses
+            // the Local into the Confirmed.
+            val otid = newOptimisticOtid()
             clearComposerAfterSend()
             uiState.value = uiState.value.copy(
                 isStreaming = true,
@@ -44,25 +53,90 @@ internal class TimelineSendCoordinator(
             val summary = text.conversationSummary()
             try {
                 val convId = resolveConversationId(summary)
+                // Optimistic insert BEFORE the observer is rebound so the
+                // initial projection the observer renders already includes
+                // the Local user bubble. If the conversation resolves to a
+                // replacement after a 404, the insert is repeated for the
+                // replacement id (the original otid never reached the
+                // transport so no state diverges).
+                appendOptimisticLocalSafely(convId, otid, text, attachments)
                 startTimelineObserver(convId)
                 var sentConversationId = convId
-                val otid = try {
-                    sendToConversation(convId, text, attachments)
+                try {
+                    sendToConversation(convId, otid, text, attachments)
                 } catch (e: ApiException) {
                     if (!e.isMissingConversation()) throw e
                     val replacementId = createReplacementConversation(summary, convId)
+                    appendOptimisticLocalSafely(replacementId, otid, text, attachments)
                     startTimelineObserver(replacementId)
                     sentConversationId = replacementId
-                    sendToConversation(replacementId, text, attachments)
+                    sendToConversation(replacementId, otid, text, attachments)
                 }
                 enqueueTimer.stop("otid" to otid, "conversationId" to sentConversationId)
             } catch (e: Exception) {
+                // letta-mobile-mxwtn: send rejected. Flip the optimistic
+                // Local bubble to FAILED so the user sees a retry affordance
+                // instead of a permanent spinner. The otid we minted is the
+                // one that was inserted optimistically — mark that one
+                // failed, regardless of which conversation id the transport
+                // call ended up targeting. If the optimistic insert itself
+                // errored (shouldn't, but defensive) the catch above is
+                // where the failure is surfaced.
+                markOptimisticLocalFailedSafely(otid)
                 enqueueTimer.stopError(e)
                 uiState.value = uiState.value.copy(
                     error = e.message,
                     isStreaming = false,
                     isAgentTyping = false,
                 )
+            }
+        }
+    }
+
+    /**
+     * letta-mobile-mxwtn: mint a fresh client otid for the upcoming send.
+     * Kept as a virtual seam so a future test can substitute a deterministic
+     * generator without rewriting the call site.
+     */
+    internal fun newOptimisticOtid(): String = java.util.UUID.randomUUID().toString()
+
+    /**
+     * letta-mobile-mxwtn: optimistically insert the Local user bubble into
+     * the timeline state. Wrapped in runCatching because the underlying
+     * repository can be in a torn-down state during rapid route changes;
+     * the caller's outer catch still surfaces the user-visible error.
+     */
+    private suspend fun appendOptimisticLocalSafely(
+        conversationId: String,
+        otid: String,
+        text: String,
+        attachments: List<MessageContentPart.Image>,
+    ) {
+        runCatching {
+            timelineRepository.appendOptimisticLocal(
+                agentId = agentId,
+                conversationId = conversationId,
+                otid = otid,
+                content = text,
+                attachments = attachments,
+            )
+        }
+    }
+
+    /**
+     * letta-mobile-mxwtn: best-effort failure flip. Walks both the current
+     * active conversation and the explicit one because the failing path may
+     * have raced a route change; the optimistic insert only ever happened
+     * in ONE of them, so at most one call mutates state.
+     */
+    private suspend fun markOptimisticLocalFailedSafely(otid: String) {
+        val candidates = sequenceOf(
+            explicitConversationId,
+            activeConversationId(),
+        ).filterNotNull().distinct()
+        for (conversationId in candidates) {
+            runCatching {
+                timelineRepository.markOptimisticLocalFailed(agentId, conversationId, otid)
             }
         }
     }
@@ -108,12 +182,22 @@ internal class TimelineSendCoordinator(
 
     private suspend fun sendToConversation(
         conversationId: String,
+        otid: String,
         text: String,
         attachments: List<MessageContentPart.Image>,
-    ): String = if (attachments.isEmpty()) {
-        timelineRepository.sendMessage(agentId, conversationId, text)
-    } else {
-        timelineRepository.sendMessage(agentId, conversationId, text, attachments)
+    ) {
+        // letta-mobile-mxwtn: pre-minted-otid send. The Local bubble is
+        // already in the timeline state from the optimistic insert, so we
+        // use the no-Local-append variant. MarkSent / MarkFailed / reconcile
+        // continue to run on top of the existing Local event — the user's
+        // retry / confirmation path is unchanged.
+        timelineRepository.sendWithOtid(
+            agentId = agentId,
+            conversationId = conversationId,
+            content = text,
+            otid = otid,
+            attachments = attachments,
+        )
     }
 
     private fun String.conversationSummary(): String = take(SUMMARY_MAX_LENGTH).let { summary ->

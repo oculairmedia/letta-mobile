@@ -253,6 +253,60 @@ open class TimelineRepository(
         attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
     ): String = getOrCreate(agentId, conversationId).send(content, attachments)
 
+    /**
+     * letta-mobile-mxwtn: send with a pre-minted otid and NO Local append.
+     * Pair with [appendOptimisticLocal] which the platform send coordinator
+     * MUST call BEFORE this so the user bubble reaches the timeline state
+     * synchronously. The transport call still runs and the MarkSent /
+     * MarkFailed / reconcile flow runs on top of the existing Local event.
+     */
+    suspend fun sendWithOtid(
+        agentId: String?,
+        conversationId: String,
+        content: String,
+        otid: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image>,
+    ) {
+        getOrCreate(agentId, conversationId).sendWithOtid(otid, content, attachments)
+    }
+
+    /**
+     * letta-mobile-mxwtn: synchronously insert an optimistic Local user
+     * bubble into the timeline state. Returns `true` if the bubble was
+     * appended, `false` if an event with that otid was already present
+     * (idempotent — the existing one is kept so duplicate callers don't fork
+     * the timeline). Use [sendWithOtid] to perform the transport call.
+     */
+    suspend fun appendOptimisticLocal(
+        agentId: String?,
+        conversationId: String,
+        otid: String,
+        content: String,
+        attachments: List<com.letta.mobile.data.model.MessageContentPart.Image> = emptyList(),
+    ): Boolean = getOrCreate(agentId, conversationId).appendOptimisticLocalSync(
+        otid = otid,
+        content = content,
+        attachments = attachments,
+    )
+
+    /** letta-mobile-mxwtn: synchronous SENT transition on a Local bubble. */
+    suspend fun markOptimisticLocalSent(
+        agentId: String?,
+        conversationId: String,
+        otid: String,
+    ) {
+        getOrCreate(agentId, conversationId).markOptimisticLocalSentSync(otid)
+    }
+
+    /** letta-mobile-mxwtn: synchronous FAILED transition on a Local bubble. */
+    suspend fun markOptimisticLocalFailed(
+        agentId: String?,
+        conversationId: String,
+        otid: String,
+    ) {
+        getOrCreate(agentId, conversationId).markOptimisticLocalFailedSync(otid)
+    }
+
     /** Retry a failed send. */
     suspend fun retry(conversationId: String, otid: String) {
         getOrCreate(conversationId).retry(otid)
