@@ -197,4 +197,72 @@ class RenderDiagnosticsTest {
             }
         }
     }
+
+    @Test
+    fun testRenderItemsBuilt_contentDupesScanIsSampled_letmamxwtn() {
+        // letta-mobile-mxwtn: the contentDupes scan is the heavy probe in
+        // onRenderItemsBuilt. It walks every item and builds a ~30KB Telemetry
+        // string. Even when renderDiag is on, it must NOT run every generation
+        // — verify that on a stream of render builds the scan is sampled at
+        // most once per N generations (CONTENT_DUPES_SAMPLE_INTERVAL=32).
+        Telemetry.renderDiagEnabled.set(true)
+        RenderDiagnostics.resetContentDupesSampleCounter()
+        Telemetry.clear()
+
+        // Drive 64 successive render builds. The cheap duplicateKeys + keys
+        // probe runs every generation (one Telemetry event per call); the
+        // heavy contentDupes scan runs at most twice (32 + 32 = 64, so the
+        // 64th generation hits the second scan).
+        val totalGenerations = 64
+        repeat(totalGenerations) {
+            RenderDiagnostics.onRenderItemsBuilt(
+                conversationId = "conv-sample",
+                path = "ReplaceTail",
+                items = emptyList(),
+            )
+        }
+
+        val renderBuilt = Telemetry.snapshot().filter {
+            it.tag == "RenderDiag" && it.name == "renderItems.built"
+        }
+        assertEquals(totalGenerations, renderBuilt.size)
+
+        // Sample flag is recorded on every event so a watcher can verify the
+        // sampling is happening (and not, e.g., every generation by accident).
+        // Exactly the first generation of each sample window is marked true.
+        val sampledTrueCount = renderBuilt.count { it.attrs["contentDupesScanSampled"] == true }
+        assertEquals(
+            2,
+            sampledTrueCount,
+            "expected contentDupes scan to run exactly twice in 64 generations",
+        )
+        // And every event must still report a contentDupes attribute (either
+        // "<skipped>" or a real value), so callers can grep for it.
+        assertTrue(renderBuilt.all { it.attrs.containsKey("contentDupes") })
+
+        RenderDiagnostics.resetContentDupesSampleCounter()
+    }
+
+    @Test
+    fun testRenderItemsBuilt_contentDupesScanOffWhenRenderDiagOff_letmamxwtn() {
+        // The broader renderDiag flag short-circuits the whole event — when
+        // disabled, NO telemetry is emitted and the sample counter does not
+        // advance. Confirms the sample gate is INSIDE the on/off branch.
+        assertFalse(RenderDiagnostics.enabled())
+        RenderDiagnostics.resetContentDupesSampleCounter()
+        Telemetry.clear()
+
+        repeat(100) {
+            RenderDiagnostics.onRenderItemsBuilt(
+                conversationId = "conv-disabled",
+                path = "Full",
+                items = emptyList(),
+            )
+        }
+
+        assertTrue(Telemetry.snapshot().none { it.name == "renderItems.built" })
+        // Counter was never advanced because the early return ran first.
+        assertFalse(RenderDiagnostics.contentDupesSampleDue())
+        RenderDiagnostics.resetContentDupesSampleCounter()
+    }
 }
