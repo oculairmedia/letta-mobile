@@ -48,7 +48,26 @@ object ToolAdminHandlers {
     }
 
     private fun registerToolMethods(router: AdminRpcRouter) {
-        router.register("tool.list") { NativeAdminCatalogs.toolCatalog() }
+        router.register("tool.list") { params ->
+            // kzqkr.6 (2026-08-04): the previous handler ignored limit/offset
+            // and returned the full BUILTIN_TOOLS catalog on every call, which
+            // made the client's paging loop terminate only by accident (catalog
+            // size < PAGE_SIZE). When the catalog grows, fetchAllTools loops
+            // unbounded; even today, fetchToolsPage(limit, offset) with offset > 0
+            // returns the same items as offset == 0, so the contract is a lie.
+            // Honor limit/offset verbatim; absent params still return the full
+            // list to preserve the legacy bare-array shape for older clients.
+            val limit = param(params, AdminParamKey("limit"))?.toIntOrNull()
+            val offset = param(params, AdminParamKey("offset"))?.toIntOrNull()
+            if (limit != null || offset != null) {
+                val effectiveLimit = (limit ?: DEFAULT_TOOL_LIST_LIMIT)
+                    .coerceIn(1, MAX_TOOL_LIST_LIMIT)
+                val effectiveOffset = (offset ?: 0).coerceAtLeast(0)
+                NativeAdminCatalogs.toolCatalogPaged(effectiveLimit, effectiveOffset)
+            } else {
+                NativeAdminCatalogs.toolCatalog()
+            }
+        }
         router.register("tool.get") { params ->
             val toolId = params.requireParam(AdminParamKey("tool_id"))
             NativeAdminCatalogs.tool(toolId) ?: adminError("tool $toolId not found")
@@ -200,6 +219,16 @@ object ToolAdminHandlers {
 
     /** Hard ceiling so a client cannot request its way back over the frame cap. */
     const val MAX_BLOCK_LIST_LIMIT: Int = 200
+
+    /**
+     * Default page size for tool.list when the caller sends only an `offset`.
+     * The current catalog has 14 entries, well under this limit, so absent
+     * limit returns the whole list; absent offset returns from the start.
+     */
+    const val DEFAULT_TOOL_LIST_LIMIT: Int = 100
+
+    /** Hard ceiling for tool.list paging, matching the block list contract. */
+    const val MAX_TOOL_LIST_LIMIT: Int = 200
 
     /** Served by the native `write_memory_file` command. */
     val BLOCK_NATIVE_WRITE_METHODS: Set<String> = setOf("block.update_agent")

@@ -59,6 +59,27 @@ internal object NativeAdminCatalogs {
         BUILTIN_TOOLS.forEach { (name, description) -> add(vanillaTool(name, description)) }
     }
 
+    /**
+     * Paged tool catalog mirroring admin-shim's `GET /v1/tools?limit=&offset=`
+     * semantics. The catalog is a 14-entry constant today; without an explicit
+     * slice, every page returns the full list and the client's `fetchToolsPage`
+     * loop terminates only because PAGE_SIZE (100) > total. The contract must be
+     * honored regardless of catalog size, so callers that pass limit/offset get a
+     * real slice; callers that pass nothing still get the whole list (legacy
+     * bare-array shape preserved for older clients).
+     *
+     * limit is coerced to >= 1; offset is coerced to >= 0. out-of-range offset
+     * returns an empty array (matching admin-shim's slice behaviour).
+     */
+    fun toolCatalogPaged(limit: Int, offset: Int): JsonArray {
+        val safeOffset = offset.coerceAtLeast(0)
+        val safeLimit = limit.coerceAtLeast(1)
+        val page = BUILTIN_TOOLS.drop(safeOffset).take(safeLimit)
+        return buildJsonArray {
+            page.forEach { (name, description) -> add(vanillaTool(name, description)) }
+        }
+    }
+
     /** Port of `handleToolDetail` — id match over the same catalog, null when absent. */
     fun tool(toolId: String): JsonObject? =
         BUILTIN_TOOLS.firstOrNull { (name, _) -> vanillaToolId(name) == toolId }
