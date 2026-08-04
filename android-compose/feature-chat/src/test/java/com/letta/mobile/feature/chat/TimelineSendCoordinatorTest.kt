@@ -146,6 +146,30 @@ class TimelineSendCoordinatorTest {
         assertEquals(insertOtidSlot.captured, sendOtidSlot.captured)
     }
 
+    @Test
+    fun `failed optimistic append does not proceed to transport send_letmamxwtn`() = runTest {
+        // Regression: appendOptimisticLocalSafely used to wrap the Local
+        // insert in runCatching and continue with sendWithOtid
+        // (appendLocal=false). A failed insert must abort the send — same
+        // user-visible outcome as awaiting LocalSendAppend ack on the old
+        // path — rather than shipping with no Local bubble.
+        val harness = Harness(scope = this, activeConversationId = "conv-1")
+        coEvery {
+            harness.timelineRepository.appendOptimisticLocal("agent-1", "conv-1", any(), "hello", any())
+        } throws IllegalStateException("timeline torn down")
+
+        harness.coordinator.send("hello")
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) {
+            harness.timelineRepository.sendWithOtid(any(), any(), any(), any(), any())
+        }
+        assertTrue(harness.startedObservers.isEmpty())
+        assertFalse(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.isAgentTyping)
+        assertTrue(harness.uiState.value.error.orEmpty().contains("timeline torn down"))
+    }
+
     private class Harness(
         scope: kotlinx.coroutines.CoroutineScope,
         isFreshRoute: Boolean = false,

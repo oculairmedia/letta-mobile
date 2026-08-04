@@ -59,7 +59,10 @@ internal class TimelineSendCoordinator(
                 // replacement after a 404, the insert is repeated for the
                 // replacement id (the original otid never reached the
                 // transport so no state diverges).
-                appendOptimisticLocalSafely(convId, otid, text, attachments)
+                // Failures must propagate: sendWithOtid uses appendLocal=false,
+                // so a swallowed Local insert would send with no user bubble
+                // (same as awaiting LocalSendAppend ack on the old path).
+                appendOptimisticLocal(convId, otid, text, attachments)
                 startTimelineObserver(convId)
                 var sentConversationId = convId
                 try {
@@ -67,7 +70,7 @@ internal class TimelineSendCoordinator(
                 } catch (e: ApiException) {
                     if (!e.isMissingConversation()) throw e
                     val replacementId = createReplacementConversation(summary, convId)
-                    appendOptimisticLocalSafely(replacementId, otid, text, attachments)
+                    appendOptimisticLocal(replacementId, otid, text, attachments)
                     startTimelineObserver(replacementId)
                     sentConversationId = replacementId
                     sendToConversation(replacementId, otid, text, attachments)
@@ -80,8 +83,7 @@ internal class TimelineSendCoordinator(
                 // one that was inserted optimistically — mark that one
                 // failed, regardless of which conversation id the transport
                 // call ended up targeting. If the optimistic insert itself
-                // errored (shouldn't, but defensive) the catch above is
-                // where the failure is surfaced.
+                // failed, mark is a no-op and this catch still surfaces error.
                 markOptimisticLocalFailedSafely(otid)
                 enqueueTimer.stopError(e)
                 uiState.value = uiState.value.copy(
@@ -102,25 +104,23 @@ internal class TimelineSendCoordinator(
 
     /**
      * letta-mobile-mxwtn: optimistically insert the Local user bubble into
-     * the timeline state. Wrapped in runCatching because the underlying
-     * repository can be in a torn-down state during rapid route changes;
-     * the caller's outer catch still surfaces the user-visible error.
+     * the timeline state. Must not swallow failures — [sendToConversation]
+     * skips Local append (`appendLocal=false`), so a failed insert must abort
+     * the send the same way awaiting LocalSendAppend ack did on the old path.
      */
-    private suspend fun appendOptimisticLocalSafely(
+    private suspend fun appendOptimisticLocal(
         conversationId: String,
         otid: String,
         text: String,
         attachments: List<MessageContentPart.Image>,
     ) {
-        runCatching {
-            timelineRepository.appendOptimisticLocal(
-                agentId = agentId,
-                conversationId = conversationId,
-                otid = otid,
-                content = text,
-                attachments = attachments,
-            )
-        }
+        timelineRepository.appendOptimisticLocal(
+            agentId = agentId,
+            conversationId = conversationId,
+            otid = otid,
+            content = text,
+            attachments = attachments,
+        )
     }
 
     /**
