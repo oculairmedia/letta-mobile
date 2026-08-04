@@ -245,6 +245,49 @@ class TimelineSyncLoop(
         return outboundSendProcessor.send(content, attachments)
     }
 
+    /**
+     * letta-mobile-mxwtn: pre-minted-otid send entry point that the platform
+     * send coordinator uses AFTER it has already inserted the Local event
+     * synchronously via [appendOptimisticLocalSync]. The Local append is
+     * skipped on this path — see [TimelineOutboundSendProcessor.sendWithOtid]
+     * for the lifecycle invariants.
+     */
+    suspend fun sendWithOtid(
+        otid: String,
+        content: String,
+        attachments: List<MessageContentPart.Image> = emptyList(),
+    ) {
+        outboundSendProcessor.sendWithOtid(otid, content, attachments, appendLocal = false)
+    }
+
+    /**
+     * letta-mobile-mxwtn: synchronous optimistic Local append. Writes a
+     * `TimelineEvent.Local` with the given otid directly into the timeline
+     * state (under the write mutex) and returns `true`. Idempotent: returns
+     * `false` if an event with the same otid is already present, so a
+     * duplicate caller cannot fork the timeline.
+     */
+    suspend fun appendOptimisticLocalSync(
+        otid: String,
+        content: String,
+        attachments: List<MessageContentPart.Image> = emptyList(),
+    ): Boolean = stateTransitionHandler.appendOptimisticLocalSync(
+        otid = otid,
+        content = content,
+        attachments = attachments.toTimelinePersistentList(),
+        sentAt = timelineNow(),
+    )
+
+    /** letta-mobile-mxwtn: synchronous SENT transition on a Local event. */
+    suspend fun markOptimisticLocalSentSync(otid: String) {
+        stateTransitionHandler.markOptimisticLocalSentSync(otid)
+    }
+
+    /** letta-mobile-mxwtn: synchronous FAILED transition on a Local event. */
+    suspend fun markOptimisticLocalFailedSync(otid: String) {
+        stateTransitionHandler.markOptimisticLocalFailedSync(otid)
+    }
+
     suspend fun appendExternalTransportLocal(content: String, otid: String, attachments: List<MessageContentPart.Image> = emptyList()): String {
         return externalTransportAppender.appendExternalTransportLocal(content, otid, attachments)
     }

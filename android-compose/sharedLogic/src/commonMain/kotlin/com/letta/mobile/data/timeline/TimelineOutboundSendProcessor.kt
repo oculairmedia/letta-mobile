@@ -73,11 +73,48 @@ internal class TimelineOutboundSendProcessor(
         attachments: List<MessageContentPart.Image> = emptyList(),
     ): String {
         val otid = newOtid()
+        sendWithOtid(otid, content, attachments, appendLocal = true)
+        return otid
+    }
+
+    /**
+     * letta-mobile-mxwtn: send with a pre-minted otid. When [appendLocal] is
+     * false, the Local append event is SKIPPED — the caller is expected to
+     * have already inserted the Local event into the timeline state
+     * synchronously via [com.letta.mobile.data.timeline.TimelineStateTransitionHandler.appendOptimisticLocalSync]
+     * so the user bubble reaches the UI in the same frame as the composer
+     * clear. The pending PendingSend is still queued to [sendQueue] for the
+     * actual HTTP transport; MarkSent / MarkFailed / reconcile run as before
+     * to mark the existing Local event's delivery state and swap it for the
+     * server's Confirmed echo.
+     */
+    suspend fun sendWithOtid(
+        otid: String,
+        content: String,
+        attachments: List<MessageContentPart.Image>,
+        appendLocal: Boolean,
+    ) {
         val sentAt = timelineNow()
         val pending = PendingSend(otid, content, attachments.toTimelinePersistentList())
-        val appendAck = CompletableDeferred<Unit>()
-        eventQueue.send(TimelineGatewayEvent.LocalSendAppend(pending, sentAt, appendAck))
-        appendAck.await()
+        if (appendLocal) {
+            val appendAck = CompletableDeferred<Unit>()
+            eventQueue.send(TimelineGatewayEvent.LocalSendAppend(pending, sentAt, appendAck))
+            appendAck.await()
+        } else {
+            // letta-mobile-mxwtn: caller already did the optimistic Local
+            // insert synchronously. Still hand the PendingSend to the
+            // sendQueue so the HTTP transport runs (streamAndReconcile
+            // pulls it off processSendQueue). We bypass eventQueue here so
+            // the existing Local stays SENDING while the transport runs;
+            // applyMarkSent on stream completion transitions it to SENT and
+            // reconcileAfterSend swaps it for the Confirmed echo.
+            sendQueue.send(pending)
+            Telemetry.event(
+                logTag, "send.optimisticLocalSkippedEventQueue",
+                "otid" to otid,
+                "conversationId" to conversationId,
+            )
+        }
         if (attachments.isNotEmpty()) {
             runCatching {
                 pendingLocalStore.save(
@@ -93,7 +130,6 @@ internal class TimelineOutboundSendProcessor(
                 Telemetry.error(logTag, "send.persistFailed", t, "otid" to otid)
             }
         }
-        return otid
     }
 
     private suspend fun processSendQueue() {

@@ -37,7 +37,36 @@ object RenderDiagnostics {
     private val composedKeysThisGeneration = HashSet<String>()
     private val lock = Any()
 
+    /**
+     * letta-mobile-mxwtn: deterministic sample gate for the heavy
+     * `contentDupes` scan in [onRenderItemsBuilt]. The scan walks every item
+     * and builds a ~30KB Telemetry string; on a 1,280-item streaming list it
+     * ran every render-delta on the main thread and was the dominant cost of
+     * a streaming frame. Now the scan runs at most once every
+     * [CONTENT_DUPES_SAMPLE_INTERVAL] render generations — even when the
+     * broader renderDiag flag is on — so it remains useful for diagnosing
+     * stranded dupe rows without making the path hot.
+     */
+    private var contentDupesSampleCounter: Int = 0
+
     fun enabled(): Boolean = Telemetry.isRenderDiagEnabled()
+
+    /**
+     * Cheap "should I run the heavy contentDupes scan this generation?" gate.
+     * Independent of [enabled] so the caller can still log the cheap shape
+     * probes unconditionally when renderDiag is on, but only pays the scan
+     * cost every Nth generation.
+     */
+    fun contentDupesSampleDue(): Boolean {
+        val due = ++contentDupesSampleCounter >= CONTENT_DUPES_SAMPLE_INTERVAL
+        if (due) contentDupesSampleCounter = 0
+        return due
+    }
+
+    /** Test/dev hook to reset the sample counter between harness invocations. */
+    fun resetContentDupesSampleCounter() {
+        contentDupesSampleCounter = 0
+    }
 
     /**
      * Call once whenever the render-item list is (re)built for the chat list.
@@ -53,23 +82,38 @@ object RenderDiagnostics {
         synchronized(lock) { composedKeysThisGeneration.clear() }
         val keys = items.joinToString(",") { it.key }
         val dupKeys = items.groupingBy { it.key }.eachCount().filter { it.value > 1 }.keys
-        // letta-mobile-x1xnl: detect items that render the SAME assistant content
-        // under DIFFERENT keys (the real dupe class — a streaming row vs its
-        // reconciled final with a fresh id). Map each item to (runId, contentSig)
-        // and flag any group that appears more than once. This distinguishes a
-        // genuine content dupe from benign LazyColumn re-composition.
-        val contentGroups = HashMap<String, MutableList<String>>()
-        for (item in items) {
-            val (runId, text) = when (item) {
-                is ChatRenderItem.Single -> (item.message.runId ?: "") to item.message.content
-                is ChatRenderItem.RunBlock -> item.runId to item.messages.joinToString("") { it.first.content }
-                is ChatRenderItem.SkillEnvelopeChip -> item.slug to item.rawContent
+        // letta-mobile-mxwtn: the contentDupes scan (below) walks every item
+        // and builds a ~30KB Telemetry string. On a 1,280-item streaming list
+        // running on the main thread, it was the dominant cost of a streaming
+        // frame. Run the scan at most every Nth render generation so it
+        // remains useful for diagnosis without making the path hot. The cheap
+        // duplicateKeys + keys probes (single pass, no allocation beyond the
+        // keys string) still run every generation so phantom-double draws are
+        // caught at full fidelity.
+        val scanNow = contentDupesSampleDue()
+        var contentDupesDescription = "<skipped>"
+        if (scanNow) {
+            // letta-mobile-x1xnl: detect items that render the SAME assistant content
+            // under DIFFERENT keys (the real dupe class — a streaming row vs its
+            // reconciled final with a fresh id). Map each item to (runId, contentSig)
+            // and flag any group that appears more than once. This distinguishes a
+            // genuine content dupe from benign LazyColumn re-composition.
+            val contentGroups = HashMap<String, MutableList<String>>()
+            for (item in items) {
+                val (runId, text) = when (item) {
+                    is ChatRenderItem.Single -> (item.message.runId ?: "") to item.message.content
+                    is ChatRenderItem.RunBlock -> item.runId to item.messages.joinToString("") { it.first.content }
+                    is ChatRenderItem.SkillEnvelopeChip -> item.slug to item.rawContent
+                }
+                if (item is ChatRenderItem.Single && item.message.role != "assistant") continue
+                val sig = "run=$runId|len=${text.length}|head=${text.take(24)}"
+                contentGroups.getOrPut(sig) { mutableListOf() }.add(item.key)
             }
-            if (item is ChatRenderItem.Single && item.message.role != "assistant") continue
-            val sig = "run=$runId|len=${text.length}|head=${text.take(24)}"
-            contentGroups.getOrPut(sig) { mutableListOf() }.add(item.key)
+            val contentDupes = contentGroups.filter { it.value.size > 1 }
+            contentDupesDescription = contentDupes.entries
+                .joinToString(" ; ") { "${it.key} -> [${it.value.joinToString(",")}]" }
+                .ifEmpty { "<none>" }
         }
-        val contentDupes = contentGroups.filter { it.value.size > 1 }
         Telemetry.event(
             "RenderDiag", "renderItems.built",
             "conversationId" to conversationId,
@@ -78,9 +122,10 @@ object RenderDiagnostics {
             "listIdentity" to System.identityHashCode(items),
             "count" to items.size,
             "duplicateKeys" to dupKeys.joinToString("|").ifEmpty { "<none>" },
-            "contentDupes" to contentDupes.entries.joinToString(" ; ") { "${it.key} -> [${it.value.joinToString(",")}]" }.ifEmpty { "<none>" },
+            "contentDupes" to contentDupesDescription,
+            "contentDupesScanSampled" to scanNow,
             "keys" to keys.take(300),
-            level = if (dupKeys.isNotEmpty() || contentDupes.isNotEmpty()) Telemetry.Level.WARN else Telemetry.Level.DEBUG,
+            level = if (dupKeys.isNotEmpty() || (scanNow && contentDupesDescription != "<none>")) Telemetry.Level.WARN else Telemetry.Level.DEBUG,
         )
     }
 
@@ -360,4 +405,11 @@ object RenderDiagnostics {
         )
         return result
     }
+
+    // letta-mobile-mxwtn: see [contentDupesSampleDue]. The contentDupes scan
+    // is gated to one execution per N render generations so it does not run
+    // unconditionally on the main thread per streaming delta. N=32 was chosen
+    // to keep the scan informative (~twice per second on a 60Hz stream) while
+    // cutting its amortized cost by ~32x on long conversations.
+    private const val CONTENT_DUPES_SAMPLE_INTERVAL = 32
 }
