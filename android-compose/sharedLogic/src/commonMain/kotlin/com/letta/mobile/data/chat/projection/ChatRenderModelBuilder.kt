@@ -349,17 +349,18 @@ fun filterMessagesForMode(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
 ): List<UiMessage> = when (mode) {
-    // letta-mobile-5s1n: keep error frames visible in Simple mode so users
-    // see when a run aborts instead of watching a silent spinner.
-    // Timeline-backed tool calls intentionally use role="assistant" so they
-    // can stay grouped inside assistant run blocks in Interactive/Debug mode;
-    // Simple mode must still hide those operational cards just like hydrated
-    // history tool messages (role="tool").
-    ChatDisplayMode.Simple -> messages.filter {
-        it.role == "user" ||
-            (it.role == "assistant" && !it.isReasoning && it.toolCalls.isNullOrEmpty()) ||
-            it.isError
-    }
+    // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches
+    // Aether's standard streaming view. Mid-turn tool/reasoning frames must
+    // reach RunBlock + projectRunActivity so the Working header and compact
+    // tool activity can render live; post-turn auto-collapse folds that work
+    // into the Worked/Thought disclosure while prose stays primary.
+    //
+    // Prior filter (letta-mobile-5s1n era) dropped tools/reasoning and left
+    // Simple as a dead prose-only timeline until final text arrived — that
+    // is the defect this supersedes. Errors remain visible because every
+    // mode now passes the full set; density differences live in the UI layer
+    // (RunBlock collapse, SkillEnvelopeChip, TimelineV1), not here.
+    ChatDisplayMode.Simple,
     ChatDisplayMode.Interactive,
     ChatDisplayMode.Debug -> messages
 }
