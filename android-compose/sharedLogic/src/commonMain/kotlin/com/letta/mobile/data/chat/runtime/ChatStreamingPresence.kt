@@ -24,6 +24,14 @@ data class ChatStreamingPresence(
  *  - failing those, a still-sending local message means working — and typing is
  *    suppressed once the tail is a confirmed assistant message (the reply has
  *    started landing, so it's "streaming" rather than "typing").
+ *  - letta-mobile-dir4k: `turnInFlight` is masked by `projectionRunActive`.
+ *    The transport-side `turnInFlight` can stay stale for one observer cycle
+ *    after the projection has folded the run (the projection settles before
+ *    the transport's `ActiveTurn` entry is removed, e.g. when an emitTurnFrame
+ *    for the engine path's terminal hasn't run yet). When the projection
+ *    says "done" we must NOT honor a stale `turnInFlight=true` — that is the
+ *    exact combination that left the composer stuck on "Thinking…" + red
+ *    cancel while the run disclosure correctly showed "Worked for 5.0s".
  */
 object ChatStreamingPresencePolicy {
     fun derive(
@@ -44,13 +52,26 @@ object ChatStreamingPresencePolicy {
         // the turn is genuinely in flight keeps "the agent is working" steady
         // across rounds. Defaulted so existing call sites/tests are unaffected.
         turnInFlight: Boolean = false,
+        // letta-mobile-dir4k: true iff the projection still says a server run is
+        // pending for this conversation (`anyLettaServerLocalPending > 0`).
+        // The projection is the source of truth for "the run is done" — once
+        // it has folded, `turnInFlight` is by definition stale and must be
+        // ignored. Defaulted to `turnInFlight` so existing call sites/tests
+        // that don't pass it explicitly behave as before (i.e. the projection
+        // mask is a no-op until the caller threads the new flag through).
+        projectionRunActive: Boolean = turnInFlight,
     ): ChatStreamingPresence {
+        // letta-mobile-dir4k: mask stale `turnInFlight` with the projection.
+        // If the projection says the run is settled, the turn cannot be in
+        // flight for presence purposes, even if the transport's ActiveTurn
+        // entry hasn't been retired yet.
+        val effectiveTurnInFlight = turnInFlight && projectionRunActive
         val isStreaming = when {
             clientModeStreamInFlight -> previousIsStreaming
             replyStreaming -> true
             a2uiThinkingActive -> true
             duplicateInitialMessageInFlight -> true
-            turnInFlight -> true
+            effectiveTurnInFlight -> true
             else -> anyServerLocalPending
         }
         val isAgentTyping = when {
@@ -61,8 +82,10 @@ object ChatStreamingPresencePolicy {
             // While a turn is in flight, hold typing/thinking presence EXCEPT
             // when the tail is a settled assistant message (mid-round reply text
             // already landed → show the streaming glow, not the typing dots),
-            // matching the anyServerLocalPending branch's tail rule.
-            turnInFlight -> !tailIsAssistant
+            // matching the anyServerLocalPending branch's tail rule. The
+            // projection mask applies the same way it does for [isStreaming]:
+            // a settled projection must NOT keep the typing dots animating.
+            effectiveTurnInFlight -> !tailIsAssistant
             else -> anyServerLocalPending && !tailIsAssistant
         }
         return ChatStreamingPresence(isStreaming = isStreaming, isAgentTyping = isAgentTyping)

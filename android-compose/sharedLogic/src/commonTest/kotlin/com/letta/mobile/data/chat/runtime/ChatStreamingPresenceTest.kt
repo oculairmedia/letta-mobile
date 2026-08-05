@@ -17,6 +17,7 @@ class ChatStreamingPresenceTest {
         a2uiThinkingActive: Boolean = false,
         duplicateInitialMessageInFlight: Boolean = false,
         turnInFlight: Boolean = false,
+        projectionRunActive: Boolean = turnInFlight,
     ) = ChatStreamingPresencePolicy.derive(
         previousIsStreaming = previousIsStreaming,
         previousIsAgentTyping = previousIsAgentTyping,
@@ -27,6 +28,7 @@ class ChatStreamingPresenceTest {
         a2uiThinkingActive = a2uiThinkingActive,
         duplicateInitialMessageInFlight = duplicateInitialMessageInFlight,
         turnInFlight = turnInFlight,
+        projectionRunActive = projectionRunActive,
     )
 
     @Test
@@ -80,6 +82,49 @@ class ChatStreamingPresenceTest {
         val pending = derive(turnInFlight = false, anyServerLocalPending = true, tailIsAssistant = false)
         assertTrue(pending.isStreaming)
         assertTrue(pending.isAgentTyping)
+    }
+
+    @Test
+    fun staleTurnInFlightIsMaskedByProjectionRunActiveFalse() {
+        // letta-mobile-dir4k: the projection says the run is settled, but the
+        // transport's `turnInFlight` signal is still true for one observer
+        // cycle (e.g. the engine's terminal `emitTurnFrame` has not run yet
+        // to retire the `ActiveTurn` entry). Without the projection mask the
+        // derive returns `isStreaming=true` and the composer keeps showing
+        // "Thinking…" + the red cancel button while the run disclosure
+        // correctly shows "Worked for 5.0s" — the exact stuck-state bug.
+        val stuck = derive(
+            turnInFlight = true,
+            // The projection's "any server run pending" gate. False means the
+            // projection has folded the run — its run-activity fact is gone.
+            projectionRunActive = false,
+            // The tail is a settled assistant message (the run finished and
+            // the assistant text landed). This is the state the user sees at
+            // the end of a successful reply.
+            tailIsAssistant = true,
+            anyServerLocalPending = false,
+            replyStreaming = false,
+        )
+        assertFalse(stuck.isStreaming, "stale turnInFlight must not keep streaming presence alive")
+        assertFalse(stuck.isAgentTyping, "stale turnInFlight must not keep typing presence alive")
+    }
+
+    @Test
+    fun freshTurnInFlightWithProjectionRunActiveKeepsPresence() {
+        // letta-mobile-dir4k: the positive control — when both signals agree
+        // (projection says run is pending AND transport says turn is in
+        // flight), presence is held just like the c4igq.7 inter-round gap
+        // case. This guards against the mask from being too aggressive and
+        // regressing the multi-tool-round flicker fix.
+        val fresh = derive(
+            turnInFlight = true,
+            projectionRunActive = true,
+            replyStreaming = false,
+            anyServerLocalPending = false,
+            tailIsAssistant = true,
+        )
+        assertTrue(fresh.isStreaming)
+        assertFalse(fresh.isAgentTyping)
     }
 
     @Test

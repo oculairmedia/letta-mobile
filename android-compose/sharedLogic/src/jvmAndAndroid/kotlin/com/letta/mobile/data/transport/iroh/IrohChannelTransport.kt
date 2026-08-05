@@ -514,6 +514,27 @@ class IrohChannelTransport(
                 "conversationId" to conversationId,
                 "turnId" to localTurn.turnId,
             )
+            // letta-mobile-dir4k: also project this delta so we can detect a
+            // terminal that the engine path missed (race / engine collect
+            // already returned). If the projection carries a TurnDone for the
+            // LOCAL turn id, retire the ActiveTurn now (without re-emitting the
+            // frame — the engine owns the terminal emit slot, see
+            // [emitTurnFrame]'s exactly-once guard). Anything else is
+            // engine-owned and we drop it as before.
+            val command = observerTurnCommand(agentId, conversationId)
+            val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
+                payloadToServerFrames(
+                    payload = draft.payload,
+                    agentId = draft.agentId?.value ?: agentId,
+                    conversationId = draft.conversationId?.value ?: conversationId,
+                    turnId = localTurn.turnId,
+                    runId = draft.runId?.value ?: localTurn.runId,
+                )
+            }
+            val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
+            if (terminal is ServerFrame.TurnDone) {
+                retireActiveTurn(localTurn, terminal.status, source = "observer_terminal")
+            }
             return
         }
 
@@ -1129,9 +1150,65 @@ class IrohChannelTransport(
             frameOwnershipPath.remove(turn.conversationId)
             emitBoth(frame)
             turn.terminalReached.complete(frame.status)
+            // letta-mobile-dir4k: also remove the ActiveTurn entry NOW. The
+            // sendJob's [invokeOnCompletion] cleanup may not fire for a while
+            // (the engine's collect can linger, and a cancel path that has
+            // already removed the entry prevents the keyed remove from
+            // matching). Without this proactive removal, [hasActiveChatTurn]
+            // keeps returning true until that cleanup eventually runs and the
+            // composer's "Thinking…" indicator never settles.
+            if (activeTurns.remove(turn.conversationId, turn)) {
+                Telemetry.event(
+                    "IrohTransport", "turn.terminal_retired_by_emit",
+                    "conversationId" to turn.conversationId,
+                    "turnId" to turn.turnId,
+                    "status" to frame.status,
+                )
+            }
             return
         }
         emitBoth(frame)
+    }
+
+    /**
+     * letta-mobile-dir4k: retire an [ActiveTurn] without re-emitting a
+     * [ServerFrame.TurnDone]. Used by the observer path when it sees a
+     * terminal for a turn whose engine path may or may not fire (race / engine
+     * already returned / engine never saw the frame). Crucially this does NOT
+     * call [ActiveTurn.claimTerminal] — that atomic guard still belongs to the
+     * engine path's [emitTurnFrame] so an engine path that DOES fire later
+     * can still emit the terminal exactly once (and complete the deferred if
+     * it wasn't already). Here we just:
+     *  - complete [ActiveTurn.terminalReached] so any [cancel] awaiters wake;
+     *  - drop the entry from [activeTurns] so [hasActiveChatTurn] clears;
+     *  - clear matching interrupted / ownership state.
+     * If the engine path fires afterward, [emitTurnFrame] will emit the
+     * frame and the keyed remove will no-op (entry already gone). `source` is
+     * the telemetry discriminator (e.g. `"observer_terminal"`).
+     */
+    private fun retireActiveTurn(turn: ActiveTurn, status: String, source: String) {
+        if (interruptedTurns[turn.conversationId]?.turnId == turn.turnId) {
+            interruptedTurns.remove(turn.conversationId)
+        }
+        // The engine -> observer handover at end of turn is legitimate; drop
+        // the recorded ownership path so it is not reported as a mid-stream
+        // flip by [recordFrameOwnership].
+        frameOwnershipPath.remove(turn.conversationId)
+        val removed = activeTurns.remove(turn.conversationId, turn)
+        // Complete the deferred LAST: any awaiter (e.g. the public cancel
+        // path's `terminalReached.await`) must see a fully-cleared state when
+        // it wakes. CompletableDeferred.complete returns false on a second
+        // call, so the engine path's later `terminalReached.complete` is a
+        // harmless no-op.
+        turn.terminalReached.complete(status)
+        Telemetry.event(
+            "IrohTransport", "turn.terminal_retired",
+            "conversationId" to turn.conversationId,
+            "turnId" to turn.turnId,
+            "status" to status,
+            "source" to source,
+            "entryRemoved" to removed.toString(),
+        )
     }
 
     private fun emitDraft(

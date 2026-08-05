@@ -85,6 +85,14 @@ class ChatTimelinePresenter {
         previousIsStreaming: Boolean,
         previousIsAgentTyping: Boolean,
     ): ChatPresentation {
+        // letta-mobile-dir4k: feed the projection's "run is still active" flag
+        // into the presence policy so a stale `signals.turnInFlight` cannot
+        // keep presence stuck after the projection has folded. The transport's
+        // ActiveTurn entry can linger one cycle after the projection settles
+        // (e.g. the engine's `emitTurnFrame` for the terminal has not run
+        // yet) — without this mask the composer kept showing "Thinking…" +
+        // the red cancel button while the run disclosure correctly showed
+        // "Worked for 5.0s".
         val presence = ChatStreamingPresencePolicy.derive(
             previousIsStreaming = previousIsStreaming,
             previousIsAgentTyping = previousIsAgentTyping,
@@ -95,6 +103,7 @@ class ChatTimelinePresenter {
             a2uiThinkingActive = signals.a2uiThinkingActive,
             duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
             turnInFlight = signals.turnInFlight,
+            projectionRunActive = projection.anyLettaServerLocalPending,
         )
         return ChatPresentation(
             messages = projection.ui,
