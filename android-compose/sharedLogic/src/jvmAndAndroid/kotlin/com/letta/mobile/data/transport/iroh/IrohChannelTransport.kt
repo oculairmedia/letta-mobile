@@ -1141,13 +1141,10 @@ class IrohChannelTransport(
                 )
                 return
             }
-            if (interruptedTurns[turn.conversationId]?.turnId == turn.turnId) {
-                interruptedTurns.remove(turn.conversationId)
-            }
-            // The engine -> observer handover at end of turn is legitimate; drop
-            // the recorded ownership path so it is not reported as a mid-stream
-            // flip by [recordFrameOwnership].
-            frameOwnershipPath.remove(turn.conversationId)
+            // The engine -> observer handover at end of turn is legitimate; drop the
+            // recorded ownership path so it is not reported as a mid-stream
+            // flip by [recordFrameOwnership]. [retireActiveTurn] handles the
+            // active-turns removal + telemetry with `source` to discriminate.
             emitBoth(frame)
             turn.terminalReached.complete(frame.status)
             // letta-mobile-dir4k: also remove the ActiveTurn entry NOW. The
@@ -1157,14 +1154,7 @@ class IrohChannelTransport(
             // matching). Without this proactive removal, [hasActiveChatTurn]
             // keeps returning true until that cleanup eventually runs and the
             // composer's "Thinking…" indicator never settles.
-            if (activeTurns.remove(turn.conversationId, turn)) {
-                Telemetry.event(
-                    "IrohTransport", "turn.terminal_retired_by_emit",
-                    "conversationId" to turn.conversationId,
-                    "turnId" to turn.turnId,
-                    "status" to frame.status,
-                )
-            }
+            retireActiveTurn(turn, frame.status, source = "engine_terminal_emit")
             return
         }
         emitBoth(frame)
