@@ -47,15 +47,26 @@ internal fun RunActivityDisclosure(
     collapsed: Boolean,
     onToggleCollapsed: () -> Unit,
     collapsible: Boolean = true,
+    chatMode: String = "interactive",
 ) {
     val text = activity.disclosureText(collapsed, collapsible)
     val canToggle = collapsible && !activity.isActive
+    val isSimpleMode = chatMode == "simple"
+
+    // Simple mode uses more compact rendering: smaller padding, smaller fonts,
+    // and no minimum height constraint to reduce visual prominence.
+    val horizontalPadding = if (isSimpleMode) 2.dp else 4.dp
+    val verticalPadding = if (isSimpleMode) 4.dp else 6.dp
+    val minHeight = if (isSimpleMode) 36.dp else 48.dp
+    val iconSize = if (isSimpleMode) 14.dp else 16.dp
+    val textStyle = if (isSimpleMode) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
+    val spacing = if (isSimpleMode) 4.dp else 6.dp
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag(RunActivityDisclosureTestTags.Header)
-            .heightIn(min = 48.dp)
+            .heightIn(min = minHeight)
             .semantics(mergeDescendants = true) {
                 text.stateDescription?.let { stateDescription = it }
             }
@@ -69,9 +80,9 @@ internal fun RunActivityDisclosure(
                     Modifier
                 },
             )
-            .padding(horizontal = 4.dp, vertical = 6.dp),
+            .padding(horizontal = horizontalPadding, vertical = verticalPadding),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
         if (activity.isActive) {
             WorkingIndicator()
@@ -81,20 +92,20 @@ internal fun RunActivityDisclosure(
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 modifier = Modifier
-                    .size(16.dp)
+                    .size(iconSize)
                     .rotate(if (collapsed) 0f else 180f),
             )
         }
         Text(
             text = text.title,
-            style = MaterialTheme.typography.labelMedium,
+            style = textStyle,
             color = if (activity.isActive) {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.88f)
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant
             },
         )
-        ActivityCounts(activity)
+        ActivityCounts(activity, isSimpleMode = isSimpleMode)
     }
 }
 
@@ -141,7 +152,8 @@ private fun RunActivityProjection.stateDescriptionResource(
 }
 
 @Composable
-private fun ActivityCounts(activity: RunActivityProjection) {
+private fun ActivityCounts(activity: RunActivityProjection, isSimpleMode: Boolean = false) {
+    val countStyle = if (isSimpleMode) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelSmall
     if (activity.toolCount > 0) {
         Text(
             text = pluralStringResource(
@@ -149,7 +161,7 @@ private fun ActivityCounts(activity: RunActivityProjection) {
                 activity.toolCount,
                 activity.toolCount,
             ),
-            style = MaterialTheme.typography.labelSmall,
+            style = countStyle,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
         )
     }
@@ -160,7 +172,7 @@ private fun ActivityCounts(activity: RunActivityProjection) {
                 activity.failureCount,
                 activity.failureCount,
             ),
-            style = MaterialTheme.typography.labelSmall,
+            style = countStyle,
             color = MaterialTheme.colorScheme.error,
         )
     }
