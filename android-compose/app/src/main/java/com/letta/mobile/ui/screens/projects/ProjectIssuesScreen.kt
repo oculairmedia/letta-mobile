@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -213,17 +214,7 @@ fun ProjectIssuesScreen(
                         // ⚡ Bolt Optimization: Use a zero-allocation for loop instead of `asSequence().mapNotNull().map().firstOrNull()`.
                         // This derivedStateOf block re-evaluates on every scroll frame (60-120Hz).
                         // Avoiding iterator and lambda allocations here prevents severe GC pressure and scroll jank.
-                        var foundId: String? = null
-                        val visibleItemsInfo = listState.layoutInfo.visibleItemsInfo
-                        for (i in visibleItemsInfo.indices) {
-                            val key = visibleItemsInfo[i].key as? String ?: continue
-                            val normalizedKey = if (key.startsWith("ready-")) key.removePrefix("ready-") else key
-                            if (issueIds.contains(normalizedKey)) {
-                                foundId = normalizedKey
-                                break
-                            }
-                        }
-                        foundId
+                        findHighlightedIssueId(listState.layoutInfo.visibleItemsInfo, issueIds)
                     }
                 }
                 PullToRefreshBox(
@@ -719,6 +710,17 @@ private fun projectTimelineExpandExit() =
             animationSpec = tween(durationMillis = 130, easing = FastOutLinearInEasing),
             shrinkTowards = Alignment.Top,
         )
+
+private fun findHighlightedIssueId(visibleItemsInfo: List<LazyListItemInfo>, issueIds: Set<String>): String? {
+    for (i in visibleItemsInfo.indices) {
+        val key = visibleItemsInfo[i].key as? String ?: continue
+        val normalizedKey = if (key.startsWith("ready-")) key.removePrefix("ready-") else key
+        if (issueIds.contains(normalizedKey)) {
+            return normalizedKey
+        }
+    }
+    return null
+}
 
 @Composable
 private fun ProjectIssueTimelineEvent(
