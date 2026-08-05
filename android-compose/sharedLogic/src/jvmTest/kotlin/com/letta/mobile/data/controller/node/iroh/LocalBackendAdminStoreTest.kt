@@ -115,6 +115,7 @@ class LocalBackendAdminStoreTest {
 
         // Offset past the end -> empty, not error.
         assertEquals(0, store.listAgentsProjected(limit = 5, offset = 99)!!.size)
+        assertEquals(3, store.countAgents())
     }
 
     @Test

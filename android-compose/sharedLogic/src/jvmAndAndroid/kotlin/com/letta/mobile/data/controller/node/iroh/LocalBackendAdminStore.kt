@@ -49,6 +49,9 @@ class LocalBackendAdminStore(
     fun listAgentsProjected(limit: Int?, offset: Int?): JsonArray? =
         agentReader.listAgentsProjected(limit, offset)
 
+    /** See [LocalBackendAgentReader.countAgents]. */
+    fun countAgents(): Int? = agentReader.countAgents()
+
     /** See [LocalBackendConversationReader.listConversationsProjected]. */
     fun listConversationsProjected(
         agentId: String?,

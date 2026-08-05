@@ -122,6 +122,22 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "agent.count",
+      "handler": "AgentAdminHandlers.kt",
+      "current_backend": "local_backend_store: count of agents/*.json (LocalBackendAgentReader.countAgents)",
+      "owner": "local_backend_store",
+      "public_contract": "controller-owned authoritative agent roster size (scalar)",
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "deny_fail_closed",
+      "migration_slice": "lgns8.9",
+      "production_first_route": "local_backend_store",
+      "post_shim_owner": "local_backend_store",
+      "post_shim_fallback": "deny_fail_closed",
+      "notes": "ulz2b.1: never derive count from a client agent.list sweep (page caps / repeated pages can silently truncate). Counts agent JSON files on disk; absent LETTA_LOCAL_BACKEND_DIR denies with capability_unavailable.",
+      "phase3_decision": "bounded_service"
+    },
+    {
       "method": "agent.get",
       "handler": "AgentAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",

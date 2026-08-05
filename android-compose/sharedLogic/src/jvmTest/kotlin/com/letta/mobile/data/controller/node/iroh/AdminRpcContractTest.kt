@@ -40,7 +40,7 @@ class AdminRpcContractTest {
                 miscMethods()
 
         fun agentMethods() = setOf(
-            "agent.context", "agent.create", "agent.delete", "agent.get", "agent.list", "agent.update",
+            "agent.context", "agent.count", "agent.create", "agent.delete", "agent.get", "agent.list", "agent.update",
         )
 
         fun blockMethods() = setOf(

@@ -322,6 +322,41 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun directoryCountAgentsRoutesCanonicalRpcAndDecodesBareInt() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { call ->
+            assertEquals("agent.count", call.method)
+            assertEquals("/v1/agents/count", call.path)
+            assertEquals("{}", call.body)
+            ok("131")
+        }
+        assertEquals(131, IrohAdminRpcAgentDirectory(transport).countAgents())
+    }
+
+    @Test
+    fun directoryCountAgentsDecodesCountEnvelope() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = { ok("""{"count":42}""") }
+        assertEquals(42, IrohAdminRpcAgentDirectory(transport).countAgents())
+    }
+
+    @Test
+    fun directoryCountAgentsThrowsWhenResultMissing() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport()
+        transport.rpcResponder = {
+            AppServerInboundFrame.AdminRpcResponse(
+                requestId = "req-count-null",
+                success = true,
+                result = null,
+            )
+        }
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).countAgents()
+        }
+        assertTrue(failure.message.orEmpty().contains("agent.count"))
+    }
+
+    @Test
     fun directoryListAgentBlocksUsesCanonicalRpcContractAndDecodesResult() = runTest(UnconfinedTestDispatcher()) {
         val pageSize = IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_PAGE_SIZE
         val transport = FakeIrohTransport()

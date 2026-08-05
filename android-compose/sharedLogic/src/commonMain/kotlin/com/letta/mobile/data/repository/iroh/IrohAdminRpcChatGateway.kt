@@ -57,7 +57,9 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.serializer
@@ -615,6 +617,24 @@ class IrohAdminRpcAgentDirectory(
     ): List<T> {
         val result = adminRpcResult(method, path, body) ?: return emptyList()
         return json.decodeFromJsonElement(ListSerializer(serializer<T>()), result)
+    }
+
+    /**
+     * letta-mobile-ulz2b.1: authoritative roster size over `agent.count`.
+     * Never derive this from [listAgents] — page caps / repeated pages can
+     * silently truncate, and a count computed from a partial sweep is the
+     * silent-truncation defect class. Null/unparseable results throw; never
+     * return 0 on failure.
+     */
+    suspend fun countAgents(): Int {
+        val result = adminRpcResult("agent.count", "/v1/agents/count", "{}")
+            ?: throw TimelineTransportHttpException(
+                502,
+                "agent.count returned no result over iroh admin_rpc",
+            )
+        return (result as? JsonPrimitive)?.intOrNull
+            ?: (result as? JsonObject)?.get("count")?.jsonPrimitive?.intOrNull
+            ?: error("agent.count returned unparseable result: $result")
     }
 
     /**
