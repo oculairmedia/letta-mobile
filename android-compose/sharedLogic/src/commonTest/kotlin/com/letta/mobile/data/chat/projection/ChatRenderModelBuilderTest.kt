@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
 import kotlin.test.Test
@@ -73,21 +74,24 @@ class ChatRenderModelBuilderTest {
     }
 
     @Test
-    fun `simple mode keeps user assistant and errors but filters reasoning`() {
+    fun `simple mode keeps reasoning tools and errors for run activity`() {
+        // letta-mobile-tz1sp: Simple must feed RunBlock the same frames Aether
+        // shows mid-turn — reasoning + tool calls + final prose + errors.
         val messages = listOf(
             user("u1"),
             reasoning("r1"),
+            assistantToolCall("tc1"),
             assistant("a1"),
             toolError("e1"),
         )
 
         val visible = filterMessagesForMode(messages, ChatDisplayMode.Simple)
 
-        assertEquals(listOf("u1", "a1", "e1"), visible.map { it.id })
+        assertEquals(listOf("u1", "r1", "tc1", "a1", "e1"), visible.map { it.id })
     }
 
     @Test
-    fun `simple mode filters assistant-scoped tool calls`() {
+    fun `simple mode keeps assistant-scoped tool calls`() {
         val messages = listOf(
             user("u1"),
             assistantToolCall("tc1"),
@@ -96,20 +100,120 @@ class ChatRenderModelBuilderTest {
 
         val visible = filterMessagesForMode(messages, ChatDisplayMode.Simple)
 
-        assertEquals(listOf("u1", "a1"), visible.map { it.id })
+        assertEquals(listOf("u1", "tc1", "a1"), visible.map { it.id })
     }
 
     @Test
-    fun `interactive and debug keep the same message set`() {
+    fun `all display modes keep the same message set`() {
         val messages = listOf(
             user("u1"),
             reasoning("r1"),
+            assistantToolCall("tc1"),
             assistant("a1"),
             toolError("e1"),
         )
 
+        assertEquals(messages, filterMessagesForMode(messages, ChatDisplayMode.Simple))
         assertEquals(messages, filterMessagesForMode(messages, ChatDisplayMode.Interactive))
         assertEquals(messages, filterMessagesForMode(messages, ChatDisplayMode.Debug))
+    }
+
+    @Test
+    fun `simple mode render model projects tool run into RunBlock`() {
+        // End-to-end proof for tz1sp: frames that used to be stripped still
+        // form a RunBlock so projectRunActivity can show Working/Worked.
+        val model = buildChatRenderModel(
+            messages = listOf(
+                user("u1"),
+                assistantToolCall(
+                    id = "tc1",
+                    toolCalls = listOf(
+                        UiToolCall(
+                            name = "Bash",
+                            arguments = "{\"command\":\"pwd\"}",
+                            result = "/tmp\n",
+                        ),
+                    ),
+                ).copy(runId = "r1"),
+                assistant("a1", content = "done", runId = "r1"),
+            ),
+            mode = ChatDisplayMode.Simple,
+        )
+
+        val block = model.renderItems.filterIsInstance<ChatRenderItem.RunBlock>().single()
+        assertEquals("run-r1", block.key)
+        assertEquals(listOf("tc1", "a1"), block.messages.map { it.first.id })
+
+        val activity = projectRunActivity(
+            messages = block.messages.map { it.first },
+            isActiveRunStreaming = false,
+        )
+        assertNotNull(activity)
+        assertEquals(RunActivityState.Worked, activity!!.state)
+        assertEquals(1, activity.toolCount)
+    }
+
+    @Test
+    fun `simple mode mid-turn tool run projects Working activity`() {
+        // Mid-turn: tool in flight + partial prose share a runId so the grouper
+        // emits a RunBlock (a lone tool message may stay a Single with a stable
+        // run key — both must feed projectRunActivity).
+        val model = buildChatRenderModel(
+            messages = listOf(
+                user("u1"),
+                assistantToolCall(
+                    id = "tc1",
+                    toolCalls = listOf(
+                        UiToolCall(
+                            name = "Bash",
+                            arguments = "{\"command\":\"pwd\"}",
+                            result = null,
+                        ),
+                    ),
+                ).copy(runId = "r1", isPending = true),
+                assistant("a1", content = "", runId = "r1").copy(isPending = true),
+            ),
+            mode = ChatDisplayMode.Simple,
+        )
+
+        val runMessages = model.renderItems
+            .filterIsInstance<ChatRenderItem.RunBlock>()
+            .single()
+            .messages
+            .map { it.first }
+        assertTrue(runMessages.any { !it.toolCalls.isNullOrEmpty() })
+
+        val activity = projectRunActivity(
+            messages = runMessages,
+            isActiveRunStreaming = true,
+        )
+        assertNotNull(activity)
+        assertEquals(RunActivityState.Working, activity!!.state)
+        assertTrue(activity.isActive)
+        assertEquals(1, activity.toolCount)
+    }
+
+    @Test
+    fun `simple mode thought-only run projects Thought activity`() {
+        val model = buildChatRenderModel(
+            messages = listOf(
+                user("u1"),
+                reasoning("r1").copy(runId = "run-thought"),
+            ),
+            mode = ChatDisplayMode.Simple,
+        )
+
+        // Reasoning without a shared runId may render as a single item; either
+        // way the message must survive the Simple filter so Thought can form.
+        val reasoningMessages = model.visibleMessages.filter { it.isReasoning }
+        assertEquals(listOf("r1"), reasoningMessages.map { it.id })
+
+        val activity = projectRunActivity(
+            messages = reasoningMessages,
+            isActiveRunStreaming = false,
+        )
+        assertNotNull(activity)
+        assertEquals(RunActivityState.Thought, activity!!.state)
     }
 
     @Test
