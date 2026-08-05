@@ -514,27 +514,13 @@ class IrohChannelTransport(
                 "conversationId" to conversationId,
                 "turnId" to localTurn.turnId,
             )
-            // letta-mobile-dir4k: also project this delta so we can detect a
-            // terminal that the engine path missed (race / engine collect
-            // already returned). If the projection carries a TurnDone for the
-            // LOCAL turn id, retire the ActiveTurn now (without re-emitting the
-            // frame — the engine owns the terminal emit slot, see
-            // [emitTurnFrame]'s exactly-once guard). Anything else is
-            // engine-owned and we drop it as before.
-            val command = observerTurnCommand(agentId, conversationId)
-            val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
-                payloadToServerFrames(
-                    payload = draft.payload,
-                    agentId = draft.agentId?.value ?: agentId,
-                    conversationId = draft.conversationId?.value ?: conversationId,
-                    turnId = localTurn.turnId,
-                    runId = draft.runId?.value ?: localTurn.runId,
-                )
-            }
-            val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
-            if (terminal is ServerFrame.TurnDone) {
-                retireActiveTurn(localTurn, terminal.status, source = "observer_terminal")
-            }
+            projectEngineOwnedObserverDelta(
+                streamDelta = streamDelta,
+                agentId = agentId,
+                conversationId = conversationId,
+                localTurn = localTurn,
+                received = received,
+            )
             return
         }
 
@@ -563,6 +549,42 @@ class IrohChannelTransport(
                 runId = draft.runId?.value ?: "iroh-observer-run-$conversationId",
             )
             frames.forEach { emitBoth(it) }
+        }
+    }
+
+    /**
+     * letta-mobile-dir4k: When the observer sees a frame for a conversation
+     * whose local turn is still active, the engine path already owns it. The
+     * observer must not re-emit it. But the projection is still worth running
+     * in one specific case: if the projection carries a `TurnDone` for the
+     * LOCAL turn id, the engine path's terminal `emitTurnFrame` will not run
+     * (race / engine collect already returned / frame was dropped) and we must
+     * retire the `ActiveTurn` ourselves — otherwise the composer keeps
+     * showing "Thinking…" indefinitely. The engine owns the emit slot (see
+     * [emitTurnFrame]'s exactly-once guard), so we retire using
+     * [retireActiveTurn] without re-emitting the frame. Anything else is
+     * engine-owned and we drop it as before.
+     */
+    private suspend fun projectEngineOwnedObserverDelta(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        agentId: String,
+        conversationId: String,
+        localTurn: ActiveTurn,
+        received: AppServerReceivedFrame,
+    ) {
+        val command = observerTurnCommand(agentId, conversationId)
+        val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
+            payloadToServerFrames(
+                payload = draft.payload,
+                agentId = draft.agentId?.value ?: agentId,
+                conversationId = draft.conversationId?.value ?: conversationId,
+                turnId = localTurn.turnId,
+                runId = draft.runId?.value ?: localTurn.runId,
+            )
+        }
+        val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
+        if (terminal is ServerFrame.TurnDone) {
+            retireActiveTurn(localTurn, terminal.status, source = "observer_terminal")
         }
     }
 

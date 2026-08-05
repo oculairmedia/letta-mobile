@@ -19,16 +19,18 @@ class ChatStreamingPresenceTest {
         turnInFlight: Boolean = false,
         projectionRunActive: Boolean = turnInFlight,
     ) = ChatStreamingPresencePolicy.derive(
-        previousIsStreaming = previousIsStreaming,
-        previousIsAgentTyping = previousIsAgentTyping,
-        anyServerLocalPending = anyServerLocalPending,
-        tailIsAssistant = tailIsAssistant,
-        replyStreaming = replyStreaming,
-        clientModeStreamInFlight = clientModeStreamInFlight,
-        a2uiThinkingActive = a2uiThinkingActive,
-        duplicateInitialMessageInFlight = duplicateInitialMessageInFlight,
-        turnInFlight = turnInFlight,
-        projectionRunActive = projectionRunActive,
+        inputs = ChatStreamInputs(
+            previousIsStreaming = previousIsStreaming,
+            previousIsAgentTyping = previousIsAgentTyping,
+            anyServerLocalPending = anyServerLocalPending,
+            tailIsAssistant = tailIsAssistant,
+            replyStreaming = replyStreaming,
+            clientModeStreamInFlight = clientModeStreamInFlight,
+            a2uiThinkingActive = a2uiThinkingActive,
+            duplicateInitialMessageInFlight = duplicateInitialMessageInFlight,
+            turnInFlight = turnInFlight,
+            projectionRunActive = projectionRunActive,
+        )
     )
 
     @Test

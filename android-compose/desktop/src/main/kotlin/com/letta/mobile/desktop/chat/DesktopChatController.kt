@@ -7,6 +7,7 @@ import com.letta.mobile.data.chat.runtime.ChatComposerPolicy
 import com.letta.mobile.data.chat.runtime.ChatComposerSendDraft
 import com.letta.mobile.data.chat.runtime.ChatSessionReducer
 import com.letta.mobile.data.chat.runtime.ConnectionStatusGateway
+import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresence
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.chat.runtime.ConversationSummary
@@ -225,15 +226,17 @@ class DesktopChatController(
         ) { facts, streamingConversationId, selectedConversationId ->
             val factsForSelected = facts.conversationId != null && facts.conversationId == selectedConversationId
             ChatStreamingPresencePolicy.derive(
-                // Held only on the inert client-mode branch, so the value is unused.
-                previousIsStreaming = false,
-                previousIsAgentTyping = false,
-                anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
-                tailIsAssistant = factsForSelected && facts.tailIsAssistant,
-                replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
-                clientModeStreamInFlight = false,
-                a2uiThinkingActive = false,
-                duplicateInitialMessageInFlight = false,
+                inputs = ChatStreamInputs(
+                    // Held only on the inert client-mode branch, so the value is unused.
+                    previousIsStreaming = false,
+                    previousIsAgentTyping = false,
+                    anyServerLocalPending = factsForSelected && facts.anyServerLocalPending,
+                    tailIsAssistant = factsForSelected && facts.tailIsAssistant,
+                    replyStreaming = streamingConversationId != null && streamingConversationId == selectedConversationId,
+                    clientModeStreamInFlight = false,
+                    a2uiThinkingActive = false,
+                    duplicateInitialMessageInFlight = false,
+                )
             )
         }.collect { _replyPresence.value = it }
     }

@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
+import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.Timeline
@@ -94,16 +95,18 @@ class ChatTimelinePresenter {
         // the red cancel button while the run disclosure correctly showed
         // "Worked for 5.0s".
         val presence = ChatStreamingPresencePolicy.derive(
-            previousIsStreaming = previousIsStreaming,
-            previousIsAgentTyping = previousIsAgentTyping,
-            anyServerLocalPending = projection.anyLettaServerLocalPending,
-            tailIsAssistant = projection.tailIsAssistant,
-            replyStreaming = signals.replyStreaming,
-            clientModeStreamInFlight = signals.clientModeStreamInFlight,
-            a2uiThinkingActive = signals.a2uiThinkingActive,
-            duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
-            turnInFlight = signals.turnInFlight,
-            projectionRunActive = projection.anyLettaServerLocalPending,
+            inputs = ChatStreamInputs(
+                previousIsStreaming = previousIsStreaming,
+                previousIsAgentTyping = previousIsAgentTyping,
+                anyServerLocalPending = projection.anyLettaServerLocalPending,
+                tailIsAssistant = projection.tailIsAssistant,
+                replyStreaming = signals.replyStreaming,
+                clientModeStreamInFlight = signals.clientModeStreamInFlight,
+                a2uiThinkingActive = signals.a2uiThinkingActive,
+                duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
+                turnInFlight = signals.turnInFlight,
+                projectionRunActive = projection.anyLettaServerLocalPending,
+            )
         )
         return ChatPresentation(
             messages = projection.ui,
