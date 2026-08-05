@@ -86,5 +86,5 @@ release flow.
 
 - Issue tracking is **bd** (beads) — `bd ready`, `bd show <id>`, `bd update <id> --claim`.
   Never commit `.beads` artifacts.
-- The pre-push hook compiles `:app:compileRootDebugKotlin` from `android-compose/`.
+- The pre-push hook blocks pushes to `main`/`master` and checks `JAVA_HOME`. Kotlin compile is **opt-in** (`PRE_PUSH_COMPILE=1`) — off by default so cold Gradle configure cannot OOM the shared host; CI owns the compile gate.
 - Anything touching `sharedLogic` **App Server transport** requires a matched wrapper + APK deploy.

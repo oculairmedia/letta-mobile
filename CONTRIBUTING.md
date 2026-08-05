@@ -28,7 +28,7 @@ git push --force-with-lease                 # safe force-push of your branch
 | Layer | What it does | Bypass |
 |-------|--------------|--------|
 | `.githooks/pre-commit` | Refuses commits on `main`/`master` | `git commit --no-verify` |
-| `.githooks/pre-push`   | Refuses pushes targeting `refs/heads/main` or `refs/heads/master` on any remote, runs `compileRootDebugKotlin` | `git push --no-verify` |
+| `.githooks/pre-push`   | Refuses pushes targeting `refs/heads/main` or `refs/heads/master` on any remote; checks `JAVA_HOME`; optional CodeScene delta. Compile is **opt-in** via `PRE_PUSH_COMPILE=1` (off by default — cold Gradle configure OOMs the shared Proxmox host) | `git push --no-verify` |
 | GitHub branch protection | Blocks direct pushes, requires `test` + `build-apk-pass` + `shared-multiplatform` + `perf-gate` to pass, linear history only | Admin override in the UI |
 
 The local hooks are nudges — they save a round-trip to CI. The branch-protection rule is the wall.
@@ -95,10 +95,10 @@ contain Gradle marker files.
 
 ## Recommended build checks
 
-Run these from `android-compose/` before pushing (the pre-push hook covers the first one automatically):
+Run these from `android-compose/` before pushing when you have the resources (CI owns the real gate; the pre-push hook does **not** compile by default):
 
 ```bash
-./gradlew :app:compileRootDebugKotlin
+./gradlew :app:compileRootDebugKotlin   # or: PRE_PUSH_COMPILE=1 git push
 ./gradlew :app:testRootDebugUnitTest
 ```
 

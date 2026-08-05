@@ -66,7 +66,7 @@ For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/lett
 
 ## Recommended Build Checks
 
-Run before pushing. The pre-push hook covers the first command; the rest is on you.
+Run before pushing when you have the resources. The pre-push hook does **not** compile by default (set `PRE_PUSH_COMPILE=1` to opt in); CI owns the compile gate.
 
 ```bash
 export JAVA_HOME=/usr/lib/jvm/jdk-26

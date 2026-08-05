@@ -3,14 +3,24 @@
 #   1. Refuse pushes that target main / master (including deletes) directly.
 #      Branch protection on the remote will reject them anyway -- this skips
 #      the round-trip.
-#   2. Run a quick Kotlin compile so syntactic breakage is caught locally
-#      before CI burns time on it. Skipped when every ref being pushed is a
-#      delete (no source to compile) so that branch cleanup doesn't require
-#      JAVA_HOME or a 30s gradle run.
+#   2. Cheap local sanity: JAVA_HOME must be set (so a later intentional
+#      compile/build does not fail mysteriously).
+#   3. Optional CodeScene delta (advisory) — skips when `cs` / token absent.
+#   4. OPTIONAL Kotlin compile. Off by default.
+#
+# Why the compile is opt-in (2026-08-05):
+#   `:app:compileRootDebugKotlin` cold-starts Gradle + Kotlin daemons and
+#   configures the full multi-module graph. On the shared Proxmox `home`
+#   host (CT 109, co-tenant with Jellyfin) that is enough load to OOM the
+#   host — every push became a crash loop. CI already owns the real compile
+#   gate (`build-apk-pass`, `test`, `shared-multiplatform`). Local compile
+#   remains available when you deliberately want it:
+#       PRE_PUSH_COMPILE=1 git push
+#   or export PRE_PUSH_COMPILE=1 in a well-resourced environment (VPS).
 set -euo pipefail
 
 # A `local_sha` of all zeros means git is deleting `remote_ref` -- there's no
-# source code being pushed, so the compile is meaningless.
+# source code being pushed, so any compile would be meaningless.
 ZERO_SHA="0000000000000000000000000000000000000000"
 has_content_push=0
 
@@ -41,23 +51,29 @@ EOF
 done
 
 # All refs were deletes (e.g. `git push --delete origin stale-branch`).
-# Nothing to compile.
+# Nothing further to do.
 if [ "$has_content_push" -eq 0 ]; then
   exit 0
 fi
 
 repo_root="$(git rev-parse --show-toplevel)"
-cd "$repo_root/android-compose"
 
+# Cheap check: JAVA_HOME present. Does not start a JVM.
 if [ -z "${JAVA_HOME:-}" ]; then
-  printf '%s\n' "JAVA_HOME is not set. Point it at Android Studio's bundled JBR before pushing." >&2
+  printf '%s\n' "JAVA_HOME is not set. Point it at a JDK before pushing (needed for local Android builds)." >&2
   exit 1
 fi
 
-./gradlew :app:compileRootDebugKotlin
+# Optional heavy compile — off by default (see header).
+if [ "${PRE_PUSH_COMPILE:-0}" = "1" ]; then
+  cd "$repo_root/android-compose"
+  ./gradlew :app:compileRootDebugKotlin
+else
+  printf '%s\n' "[pre-push] skipping :app:compileRootDebugKotlin (set PRE_PUSH_COMPILE=1 to enable; CI owns the compile gate)." >&2
+fi
 
-# 3. CodeScene delta (advisory) — surfaces the code-health findings the
-#    "CodeScene Code Health Review" PR check would flag, before the push.
-#    Skips silently when the `cs` CLI or CS_ACCESS_TOKEN is absent; set
-#    CS_DELTA_GATE=1 to make findings block the push.
+# CodeScene delta (advisory) — surfaces the code-health findings the
+# "CodeScene Code Health Review" PR check would flag, before the push.
+# Skips silently when the `cs` CLI or CS_ACCESS_TOKEN is absent; set
+# CS_DELTA_GATE=1 to make findings block the push.
 "$repo_root/scripts/codescene/cs-delta.sh" || exit 1
