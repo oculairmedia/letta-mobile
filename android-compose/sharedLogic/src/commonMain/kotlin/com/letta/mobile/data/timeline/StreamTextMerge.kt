@@ -74,6 +74,35 @@ data class StreamTextMergeResult(
  * append, not re-delivered snapshots. Cumulative growth (incoming.startsWith
  * existing → CUMULATIVE) and non-forward re-deliveries are unaffected, so the
  * stable-id cumulative snapshot path (WS) must leave this false.
+ *
+ * letta-mobile-bn008 / letta-mobile-wucn: [isCumulativeStream] is the
+ * CUMULATIVE-STREAM SHAPE signal that the upstream caller must derive from a
+ * stream-shape property (NOT from per-frame seq-id availability). The Iroh
+ * client boundary stamps a stable `cm-stream-<otid>` id and a stable
+ * synthesized otid on every cumulative frame (the App Server's
+ * `CumulativeStreamText` accumulator emits the cumulative text on every
+ * wire-frame, and `tagStreamDeltaForOptimisticDedup` rewrites the id to
+ * `cm-stream-<otid>`); an incremental HTTP-API SSE stream only stamps the
+ * otid on the first frame and leaves subsequent frames otid=null. So
+ *     confirmed.otid != null && confirmed.otid == existing.otid
+ * is a reliable shape signal: true on a cumulative stream, false on an
+ * incremental stream. The reducer derives this once per frame and passes it
+ * here. EQUAL / CUMULATIVE are gated on (isCumulativeStream || canUseSnapshotMerge)
+ * — true on EITHER an explicit ordering signal (seq ids on both sides) OR a
+ * stream-shape signal (stable otid confirms the upstream is cumulative). The
+ * seq-gated branches below (STALE, SUFFIX_DUPLICATE, SNAPSHOT_CONFLICT) remain
+ * gated on canUseSnapshotMerge only, because those can DROP text and need the
+ * full ordering signal.
+ *
+ * Why not gate on `incoming.startsWith(existing)` alone? Because the
+ * letta-mobile-wucn counterexample demonstrates that an INCREMENTAL stream can
+ * deliver a delta byte-identical to the accumulation so far (the 5th fragment
+ * "The quick brown fox jumps over the lazy dog " equals the accumulator at
+ * that point). On an incremental stream that delta is a genuine forward token
+ * and MUST append; ungating EQUAL/CUMULATIVE on the byte shape alone (the
+ * original bn008 fix) drops the 5th fragment. The shape signal must come from
+ * the stream SHAPE — not the per-frame content. Defaults to false so existing
+ * callers keep the historical append behaviour.
  */
 fun mergeStreamText(
     existing: String,
@@ -81,6 +110,7 @@ fun mergeStreamText(
     canUseSnapshotMerge: Boolean,
     incomingIsForwardDelta: Boolean = true,
     incrementalForwardAppend: Boolean = false,
+    isCumulativeStream: Boolean = false,
 ): StreamTextMergeResult {
     // A forward delta in an incremental stream is always new text to append: a
     // prefix/suffix coincidence must NOT drop it (STALE/SUFFIX_DUPLICATE).
@@ -103,27 +133,30 @@ fun mergeStreamText(
     } else 0
     val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
         (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
-    // letta-mobile-bn008: EQUAL and CUMULATIVE need NO ordering signal to be
-    // safe — they are structurally unambiguous. Appending a frame identical to
-    // the accumulated text, or one that already CONTAINS it as a prefix, is
-    // never correct for a cumulative stream; it stacks snapshots and produces
-    // staircase garble ("Hey" + "HeyHey." -> "HeyHeyHey."). The Iroh client
-    // boundary delivers cumulative snapshots under a stable stream id, and a
-    // single frame missing `event_seq` previously disabled every dedup branch
-    // for the whole stream (canUseSnapshotMerge=false -> straight APPEND).
+    // letta-mobile-bn008 + letta-mobile-wucn: EQUAL and CUMULATIVE are
+    // structurally unambiguous (a frame identical to the accumulated text, or
+    // one that already CONTAINS it as a prefix, is never a legitimate forward
+    // token on a cumulative stream — appending it stacks snapshots and produces
+    // staircase garble ("Hey" + "HeyHey." -> "HeyHeyHey.")).
     //
-    // These two branches are safe ungated for INCREMENTAL streams too: a
-    // genuine forward token can never equal the entire accumulated text or
-    // contain it as a prefix (it is shorter than the accumulation by
-    // construction), so the ungated branches only ever fire on re-delivered
-    // or cumulative-shaped frames — where replacing instead of appending is
-    // exactly right. The seq-gated branches below (STALE, SUFFIX_DUPLICATE,
-    // SNAPSHOT_CONFLICT) remain gated because THEY can drop text and need the
-    // ordering signal to be safe.
+    // gate must be derived from a *stream-shape* signal, not from per-frame
+    // seq-id availability. Original bn008 fix ungated EQUAL/CUMULATIVE entirely
+    // and broke the wucn counterexample (an incremental SSE stream whose 5th
+    // fragment is byte-identical to the accumulator — that fragment IS a
+    // forward token and must APPEND). The two gates are now OR'd:
+    //   canUseSnapshotMerge  -> the existing seq-id ordering signal (drop-text
+    //                           branches stay gated on this alone below)
+    //   isCumulativeStream   -> the upstream-derived stable-otid stream-shape
+    //                           signal (replaces the dropped-by-A-single-frame
+    //                           seq-id check from the bn008 cascade)
+    // STALE / SUFFIX_DUPLICATE / SNAPSHOT_CONFLICT remain gated on
+    // canUseSnapshotMerge because they DROP text and need the full ordering
+    // signal; isCumulativeStream alone is not sufficient for them.
+    val cumulativeShapeAccepted = isCumulativeStream || canUseSnapshotMerge
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
-        incoming == existing -> StreamTextMergeBranch.EQUAL
-        existing.isNotEmpty() && incoming.startsWith(existing) ->
+        incoming == existing && cumulativeShapeAccepted -> StreamTextMergeBranch.EQUAL
+        existing.isNotEmpty() && incoming.startsWith(existing) && cumulativeShapeAccepted ->
             StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && !forwardIncrement && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && !forwardIncrement && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE

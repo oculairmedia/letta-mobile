@@ -484,23 +484,84 @@ class TimelineStreamReducerTest {
     }
 
     @Test
-    fun `stream text merge only uses snapshot branches when seq ids are available`() {
+    fun `stream text merge EQUAL CUMULATIVE fire when EITHER ordering or cumulative-shape signal is present`() {
+        // letta-mobile-bn008 + letta-mobile-wucn: the new contract is that
+        // EQUAL/CUMULATIVE branches fire when EITHER the per-frame seq-id
+        // ordering signal (canUseSnapshotMerge) OR the upstream-derived
+        // stream-shape signal (isCumulativeStream) is present. The
+        // seq-gated branches below (STALE, SUFFIX_DUPLICATE, SNAPSHOT_CONFLICT)
+        // remain gated on canUseSnapshotMerge alone because they DROP text and
+        // need the full ordering signal.
+
+        // 1. Both gates true (typical seq-id-carrying cumulative snapshot).
         mergeStreamText(
             existing = "Hello",
             incoming = "Hello world",
             canUseSnapshotMerge = true,
+            isCumulativeStream = true,
         ) shouldBe StreamTextMergeResult(
             text = "Hello world",
             branch = StreamTextMergeBranch.CUMULATIVE,
             garbleRisk = false,
         )
 
+        // 2. canUseSnapshotMerge only (legacy seq-id gate, no shape signal).
+        mergeStreamText(
+            existing = "Hello",
+            incoming = "Hello world",
+            canUseSnapshotMerge = true,
+            isCumulativeStream = false,
+        ) shouldBe StreamTextMergeResult(
+            text = "Hello world",
+            branch = StreamTextMergeBranch.CUMULATIVE,
+            garbleRisk = false,
+        )
+
+        // 3. isCumulativeStream only (bn008 cascade: stable otid confirms the
+        //    upstream is cumulative, but seq ids may be missing on every frame).
         mergeStreamText(
             existing = "Hello",
             incoming = "Hello world",
             canUseSnapshotMerge = false,
+            isCumulativeStream = true,
+        ) shouldBe StreamTextMergeResult(
+            text = "Hello world",
+            branch = StreamTextMergeBranch.CUMULATIVE,
+            garbleRisk = false,
+        )
+
+        // 4. Neither gate (wucn counterexample: incremental stream, otid
+        //    absent on subsequent frames, no seq ids — must APPEND even when
+        //    `incoming.startsWith(existing)` is true).
+        mergeStreamText(
+            existing = "Hello",
+            incoming = "Hello world",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = false,
         ) shouldBe StreamTextMergeResult(
             text = "HelloHello world",
+            branch = StreamTextMergeBranch.APPEND,
+            garbleRisk = false,
+        )
+
+        // EQUAL analog: same gate logic.
+        mergeStreamText(
+            existing = "Hi",
+            incoming = "Hi",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = true,
+        ) shouldBe StreamTextMergeResult(
+            text = "Hi",
+            branch = StreamTextMergeBranch.EQUAL,
+            garbleRisk = false,
+        )
+        mergeStreamText(
+            existing = "Hi",
+            incoming = "Hi",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = false,
+        ) shouldBe StreamTextMergeResult(
+            text = "HiHi",
             branch = StreamTextMergeBranch.APPEND,
             garbleRisk = false,
         )
