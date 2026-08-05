@@ -116,6 +116,7 @@ internal fun RunBlock(
     isStreaming: Boolean = false,
     activeApprovalRequestId: String? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
+    chatMode: String = "interactive",
     renderRow: @Composable (
         message: UiMessage,
         position: GroupPosition,
@@ -156,6 +157,7 @@ internal fun RunBlock(
             collapsed = effectiveCollapsed,
             collapsible = collapsible,
             onToggleCollapsed = onToggleCollapsed,
+            chatMode = chatMode,
         )
 
         // Keep the historical one-step geometry: the disclosure is additive,

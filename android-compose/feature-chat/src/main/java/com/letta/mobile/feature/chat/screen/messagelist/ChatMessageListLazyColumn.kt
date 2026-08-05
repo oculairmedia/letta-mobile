@@ -219,6 +219,7 @@ private fun ChatMessageListRenderSingleItem(
             isStreaming = isStreamingRenderItem,
             activeApprovalRequestId = context.itemState.activeApprovalRequestId,
             onApprovalDecision = context.callbacks.onSubmitApproval,
+            chatMode = context.chatMode,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
                 params = RenderChatMessageRowParams(
@@ -266,6 +267,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         isStreaming = params.isStreamingRenderItem,
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,
+        chatMode = context.chatMode,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
             params = RenderChatMessageRowParams(
