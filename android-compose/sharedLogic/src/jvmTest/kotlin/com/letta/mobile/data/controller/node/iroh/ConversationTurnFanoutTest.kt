@@ -96,7 +96,10 @@ class ConversationTurnFanoutTest {
     private data class AssistantTestFrame(
         val content: String,
         val idempotencyKey: String,
-        val otid: String,
+        val otid: String? = null,
+        val id: String? = null,
+        val runId: String? = null,
+        val messageId: String? = null,
     )
 
     private fun assistantFrame(frame: AssistantTestFrame): String = rawStreamDeltaBody(
@@ -104,7 +107,10 @@ class ConversationTurnFanoutTest {
         idempotencyKey = frame.idempotencyKey,
         delta = buildJsonObject {
             put("message_type", "assistant_message")
-            put("otid", frame.otid)
+            frame.otid?.let { put("otid", it) }
+            frame.id?.let { put("id", it) }
+            frame.runId?.let { put("run_id", it) }
+            frame.messageId?.let { put("message_id", it) }
             put("content", frame.content)
         },
     )
@@ -317,6 +323,101 @@ class ConversationTurnFanoutTest {
                 AssistantTestFrame("Hello", "cumulative-2", "otid-cumulative"),
             ),
             expected = listOf("Hel", "Hello"),
+        )
+    }
+
+    /**
+     * letta-mobile-64ies: rotating per-fragment `id` values without otid used
+     * to create one byKey entry per fragment (staircase). With run_id present,
+     * all assistant_message fragments of one run must collapse to one cumulative
+     * body.
+     */
+    @Test
+    fun rotatingFragmentIdsWithoutOtidAccumulateUnderRunId() = runTest {
+        assertAccumulatedText(
+            source = StreamTextFrameSource.AppServerDelta,
+            frames = listOf(
+                AssistantTestFrame(
+                    content = "Hey",
+                    idempotencyKey = "frag-a",
+                    id = "cm-stream-a",
+                    runId = "run-64ies",
+                ),
+                AssistantTestFrame(
+                    content = "Hey.",
+                    idempotencyKey = "frag-b",
+                    id = "cm-stream-b",
+                    runId = "run-64ies",
+                ),
+                AssistantTestFrame(
+                    content = "H",
+                    idempotencyKey = "frag-c",
+                    id = "cm-stream-c",
+                    runId = "run-64ies",
+                ),
+            ),
+            expected = listOf("Hey", "HeyHey.", "HeyHey.H"),
+        )
+    }
+
+    /**
+     * letta-mobile-64ies positive control: stable otid still groups even when
+     * fragment ids rotate (no silent regression of the otid path).
+     */
+    @Test
+    fun stableOtidStillGroupsWhenFragmentIdsRotate() = runTest {
+        assertAccumulatedText(
+            source = StreamTextFrameSource.AppServerDelta,
+            frames = listOf(
+                AssistantTestFrame(
+                    content = "Hel",
+                    idempotencyKey = "otid-a",
+                    otid = "otid-stable",
+                    id = "cm-stream-a",
+                    runId = "run-other",
+                ),
+                AssistantTestFrame(
+                    content = "lo",
+                    idempotencyKey = "otid-b",
+                    otid = "otid-stable",
+                    id = "cm-stream-b",
+                    runId = "run-other",
+                ),
+                AssistantTestFrame(
+                    content = "!",
+                    idempotencyKey = "otid-c",
+                    otid = "otid-stable",
+                    id = "cm-stream-c",
+                    runId = "run-other",
+                ),
+            ),
+            expected = listOf("Hel", "Hello", "Hello!"),
+        )
+    }
+
+    /**
+     * When neither otid nor run_id is present, message_id must beat a rotating
+     * frame id so we still accumulate rather than staircase.
+     */
+    @Test
+    fun messageIdPreferredOverRotatingFrameIdWhenNoOtidOrRunId() = runTest {
+        assertAccumulatedText(
+            source = StreamTextFrameSource.AppServerDelta,
+            frames = listOf(
+                AssistantTestFrame(
+                    content = "A",
+                    idempotencyKey = "mid-a",
+                    id = "cm-stream-a",
+                    messageId = "msg-stable",
+                ),
+                AssistantTestFrame(
+                    content = "B",
+                    idempotencyKey = "mid-b",
+                    id = "cm-stream-b",
+                    messageId = "msg-stable",
+                ),
+            ),
+            expected = listOf("A", "AB"),
         )
     }
 
