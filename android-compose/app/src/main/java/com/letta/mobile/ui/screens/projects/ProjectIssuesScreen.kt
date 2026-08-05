@@ -210,11 +210,20 @@ fun ProjectIssuesScreen(
                 }
                 val highlightedIssueId by remember(issueIds, listState) {
                     derivedStateOf {
-                        val visibleKeys = listState.layoutInfo.visibleItemsInfo.asSequence()
-                        visibleKeys
-                            .mapNotNull { it.key as? String }
-                            .map { key -> if (key.startsWith("ready-")) key.removePrefix("ready-") else key }
-                            .firstOrNull { it in issueIds }
+                        // ⚡ Bolt Optimization: Use a zero-allocation for loop instead of `asSequence().mapNotNull().map().firstOrNull()`.
+                        // This derivedStateOf block re-evaluates on every scroll frame (60-120Hz).
+                        // Avoiding iterator and lambda allocations here prevents severe GC pressure and scroll jank.
+                        var foundId: String? = null
+                        val visibleItemsInfo = listState.layoutInfo.visibleItemsInfo
+                        for (i in visibleItemsInfo.indices) {
+                            val key = visibleItemsInfo[i].key as? String ?: continue
+                            val normalizedKey = if (key.startsWith("ready-")) key.removePrefix("ready-") else key
+                            if (issueIds.contains(normalizedKey)) {
+                                foundId = normalizedKey
+                                break
+                            }
+                        }
+                        foundId
                     }
                 }
                 PullToRefreshBox(
