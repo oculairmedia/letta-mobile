@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -211,10 +210,17 @@ fun ProjectIssuesScreen(
                 }
                 val highlightedIssueId by remember(issueIds, listState) {
                     derivedStateOf {
-                        // ⚡ Bolt Optimization: Use a zero-allocation for loop instead of `asSequence().mapNotNull().map().firstOrNull()`.
-                        // This derivedStateOf block re-evaluates on every scroll frame (60-120Hz).
-                        // Avoiding iterator and lambda allocations here prevents severe GC pressure and scroll jank.
-                        findHighlightedIssueId(listState.layoutInfo.visibleItemsInfo, issueIds)
+                        // ⚡ Bolt Optimization: Replace `asSequence().mapNotNull().map().firstOrNull()`
+                        // with a fast, inline `firstNotNullOfOrNull` single pass.
+                        // This block re-evaluates on every scroll frame (60-120Hz). By avoiding multiple
+                        // intermediate sequence object allocations and new methods, we reduce GC pressure
+                        // and keep cyclomatic complexity low.
+                        listState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { item ->
+                            (item.key as? String)?.let { key ->
+                                val normalizedKey = if (key.startsWith("ready-")) key.removePrefix("ready-") else key
+                                normalizedKey.takeIf { issueIds.contains(it) }
+                            }
+                        }
                     }
                 }
                 PullToRefreshBox(
@@ -710,17 +716,6 @@ private fun projectTimelineExpandExit() =
             animationSpec = tween(durationMillis = 130, easing = FastOutLinearInEasing),
             shrinkTowards = Alignment.Top,
         )
-
-private fun findHighlightedIssueId(visibleItemsInfo: List<LazyListItemInfo>, issueIds: Set<String>): String? {
-    for (i in visibleItemsInfo.indices) {
-        val key = visibleItemsInfo[i].key as? String ?: continue
-        val normalizedKey = if (key.startsWith("ready-")) key.removePrefix("ready-") else key
-        if (issueIds.contains(normalizedKey)) {
-            return normalizedKey
-        }
-    }
-    return null
-}
 
 @Composable
 private fun ProjectIssueTimelineEvent(
