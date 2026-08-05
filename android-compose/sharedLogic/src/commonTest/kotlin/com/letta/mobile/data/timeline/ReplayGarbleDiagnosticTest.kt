@@ -122,6 +122,55 @@ class ReplayGarbleDiagnosticTest {
         assertEquals("The APK is 174MB", cur(t), "cumulative snapshot must grow to the longer text")
     }
 
+    // letta-mobile-bn008: the Iroh client boundary delivers CUMULATIVE
+    // snapshots under one stable stream id. When the first frame carries no
+    // `event_seq` (seqId == null on both sides), `canUseSnapshotMerge` was
+    // false and EVERY dedup branch was skipped, so the reducer APPENDED each
+    // full snapshot onto the previous one: "Hey" + "HeyHey." -> "HeyHeyHey.".
+    // EQUAL/CUMULATIVE are structurally safe without an ordering signal and
+    // must run ungated.
+    @Test
+    fun `cumulative snapshots without seq ids replace instead of stacking`() {
+        var t = Timeline("conv")
+        t = reduce(t, f("Hey", null))
+        t = reduce(t, f("HeyHey. Dev", null))
+        assertEquals("HeyHey. Dev", cur(t), "second cumulative snapshot must REPLACE, not append")
+        t = reduce(t, f("HeyHey. Dev, on it", null))
+        assertEquals("HeyHey. Dev, on it", cur(t), "third snapshot must grow, not stack")
+    }
+
+    @Test
+    fun `merge without seq ids still dedups equal and cumulative frames`() {
+        // Re-delivered identical frame -> keep, never double.
+        val equal = mergeStreamText(
+            existing = "Hey",
+            incoming = "Hey",
+            canUseSnapshotMerge = false,
+        )
+        assertEquals(StreamTextMergeBranch.EQUAL, equal.branch)
+        assertEquals("Hey", equal.text)
+
+        // Cumulative snapshot containing the accumulated text -> replace.
+        val cumulative = mergeStreamText(
+            existing = "Hey",
+            incoming = "HeyHey. Dev",
+            canUseSnapshotMerge = false,
+        )
+        assertEquals(StreamTextMergeBranch.CUMULATIVE, cumulative.branch)
+        assertEquals("HeyHey. Dev", cumulative.text)
+    }
+
+    @Test
+    fun `incremental deltas without seq ids still append`() {
+        // h30cy guard: genuine forward tokens must keep appending even with
+        // no ordering signal; the ungated EQUAL/CUMULATIVE branches must not
+        // swallow them.
+        var t = Timeline("conv")
+        t = reduce(t, f("Y", null))
+        t = reduce(t, f("es — confirmed", null))
+        assertEquals("Yes — confirmed", cur(t), "forward deltas must append even without seq ids")
+    }
+
     // (3c) Direct branch coverage of mergeStreamText: without a reliable
     // ordering signal (no seq ids) a shorter incoming that coincidentally
     // shares a prefix/suffix must NOT replace or truncate the existing text.

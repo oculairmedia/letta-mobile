@@ -103,10 +103,28 @@ fun mergeStreamText(
     } else 0
     val nearOverlaps = canUseSnapshotMerge && overlapLen >= 4 &&
         (overlapLen.toDouble() / maxMatch.toDouble() >= 0.75)
+    // letta-mobile-bn008: EQUAL and CUMULATIVE need NO ordering signal to be
+    // safe — they are structurally unambiguous. Appending a frame identical to
+    // the accumulated text, or one that already CONTAINS it as a prefix, is
+    // never correct for a cumulative stream; it stacks snapshots and produces
+    // staircase garble ("Hey" + "HeyHey." -> "HeyHeyHey."). The Iroh client
+    // boundary delivers cumulative snapshots under a stable stream id, and a
+    // single frame missing `event_seq` previously disabled every dedup branch
+    // for the whole stream (canUseSnapshotMerge=false -> straight APPEND).
+    //
+    // These two branches are safe ungated for INCREMENTAL streams too: a
+    // genuine forward token can never equal the entire accumulated text or
+    // contain it as a prefix (it is shorter than the accumulation by
+    // construction), so the ungated branches only ever fire on re-delivered
+    // or cumulative-shaped frames — where replacing instead of appending is
+    // exactly right. The seq-gated branches below (STALE, SUFFIX_DUPLICATE,
+    // SNAPSHOT_CONFLICT) remain gated because THEY can drop text and need the
+    // ordering signal to be safe.
     val branch = when {
         incoming.isEmpty() -> StreamTextMergeBranch.EMPTY_INCOMING
-        canUseSnapshotMerge && incoming == existing -> StreamTextMergeBranch.EQUAL
-        canUseSnapshotMerge && incoming.startsWith(existing) -> StreamTextMergeBranch.CUMULATIVE
+        incoming == existing -> StreamTextMergeBranch.EQUAL
+        existing.isNotEmpty() && incoming.startsWith(existing) ->
+            StreamTextMergeBranch.CUMULATIVE
         canUseSnapshotMerge && !forwardIncrement && existing.startsWith(incoming) -> StreamTextMergeBranch.STALE
         canUseSnapshotMerge && !forwardIncrement && existing.endsWith(incoming) -> StreamTextMergeBranch.SUFFIX_DUPLICATE
         // letta-mobile-mvcr4: near-overlap forward snapshot -> coalesce
