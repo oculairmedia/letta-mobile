@@ -21,13 +21,11 @@ fun Modifier.statefulFadingEdges(
     backgroundColor: Color,
     fadeLength: Dp = 32.dp,
 ): Modifier = composed {
-    val canScrollBackward by remember(scrollState) {
-        derivedStateOf { scrollState.canScrollBackward }
-    }
-
-    val canScrollForward by remember(scrollState) {
-        derivedStateOf { scrollState.canScrollForward }
-    }
+    // ⚡ Bolt Optimization: `scrollState.canScrollBackward` and `canScrollForward`
+    // are already backed by Compose State. Wrapping them in `derivedStateOf` is redundant
+    // and causes unnecessary memory allocations and observation overhead.
+    val canScrollBackward = scrollState.canScrollBackward
+    val canScrollForward = scrollState.canScrollForward
 
     val leftAlpha = animateFloatAsState(
         targetValue = if (canScrollBackward) EdgeVisibleAlpha else EdgeHiddenAlpha,

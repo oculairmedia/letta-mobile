@@ -210,17 +210,11 @@ fun ProjectIssuesScreen(
                 }
                 val highlightedIssueId by remember(issueIds, listState) {
                     derivedStateOf {
-                        // ⚡ Bolt Optimization: Replace `asSequence().mapNotNull().map().firstOrNull()`
-                        // with a fast, inline `firstNotNullOfOrNull` single pass.
-                        // This block re-evaluates on every scroll frame (60-120Hz). By avoiding multiple
-                        // intermediate sequence object allocations and new methods, we reduce GC pressure
-                        // and keep cyclomatic complexity low.
-                        listState.layoutInfo.visibleItemsInfo.firstNotNullOfOrNull { item ->
-                            (item.key as? String)?.let { key ->
-                                val normalizedKey = if (key.startsWith("ready-")) key.removePrefix("ready-") else key
-                                normalizedKey.takeIf { issueIds.contains(it) }
-                            }
-                        }
+                        val visibleKeys = listState.layoutInfo.visibleItemsInfo.asSequence()
+                        visibleKeys
+                            .mapNotNull { it.key as? String }
+                            .map { key -> if (key.startsWith("ready-")) key.removePrefix("ready-") else key }
+                            .firstOrNull { it in issueIds }
                     }
                 }
                 PullToRefreshBox(

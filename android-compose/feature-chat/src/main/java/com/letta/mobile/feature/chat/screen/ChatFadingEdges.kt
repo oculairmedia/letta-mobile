@@ -184,12 +184,11 @@ internal fun ChatFadingEdgesBox(
     suppressBottom: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    val showTopTarget by remember(listState) {
-        derivedStateOf { chatFadeShowTop(listState.canScrollForward) }
-    }
-    val showBottomTarget by remember(listState, suppressBottom) {
-        derivedStateOf { !suppressBottom && chatFadeShowBottom(listState.canScrollBackward) }
-    }
+    // ⚡ Bolt Optimization: `listState.canScrollForward` and `canScrollBackward`
+    // are already backed by Compose State. Wrapping them in `derivedStateOf` is redundant
+    // and causes unnecessary memory allocations and observation overhead.
+    val showTopTarget = chatFadeShowTop(listState.canScrollForward)
+    val showBottomTarget = !suppressBottom && chatFadeShowBottom(listState.canScrollBackward)
     
     // Animate the top fade alpha to avoid hard snaps
     val topFadeAlpha by androidx.compose.animation.core.animateFloatAsState(
