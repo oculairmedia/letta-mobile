@@ -122,6 +122,92 @@ class ReplayGarbleDiagnosticTest {
         assertEquals("The APK is 174MB", cur(t), "cumulative snapshot must grow to the longer text")
     }
 
+    // letta-mobile-bn008: the Iroh client boundary delivers CUMULATIVE
+    // snapshots under one stable stream id. When the first frame carries no
+    // `event_seq` (seqId == null on both sides), `canUseSnapshotMerge` was
+    // false and EVERY dedup branch was skipped, so the reducer APPENDED each
+    // full snapshot onto the previous one: "Hey" + "HeyHey." -> "HeyHeyHey.".
+    // EQUAL/CUMULATIVE are gated on (isCumulativeStream || canUseSnapshotMerge);
+    // the reducer derives isCumulativeStream from the stable otid match on
+    // every cumulative frame, so EQUAL/CUMULATIVE still fire even with no
+    // seq ids. See the wucn counterexample in TimelineSyncLoopStreamingTest
+    // for the incremental-stream case where neither gate holds and the
+    // byte-coincident delta must APPEND.
+    @Test
+    fun `cumulative snapshots without seq ids replace instead of stacking`() {
+        var t = Timeline("conv")
+        t = reduce(t, f("Hey", null))
+        t = reduce(t, f("HeyHey. Dev", null))
+        assertEquals("HeyHey. Dev", cur(t), "second cumulative snapshot must REPLACE, not append")
+        t = reduce(t, f("HeyHey. Dev, on it", null))
+        assertEquals("HeyHey. Dev, on it", cur(t), "third snapshot must grow, not stack")
+    }
+
+    @Test
+    fun `merge without seq ids still dedups equal and cumulative frames`() {
+        // Direct call: pass isCumulativeStream=true to assert the new
+        // contract (the reducer does this automatically when it sees a
+        // stable-otid cumulative stream at the wire boundary).
+        // Re-delivered identical frame -> keep, never double.
+        val equal = mergeStreamText(
+            existing = "Hey",
+            incoming = "Hey",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = true,
+        )
+        assertEquals(StreamTextMergeBranch.EQUAL, equal.branch)
+        assertEquals("Hey", equal.text)
+
+        // Cumulative snapshot containing the accumulated text -> replace.
+        val cumulative = mergeStreamText(
+            existing = "Hey",
+            incoming = "HeyHey. Dev",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = true,
+        )
+        assertEquals(StreamTextMergeBranch.CUMULATIVE, cumulative.branch)
+        assertEquals("HeyHey. Dev", cumulative.text)
+
+        // Same EQUAL/CUMULATIVE inputs on an INCREMENTAL stream (no shape
+        // signal) must APPEND — the wucn guard. Asserts the new contract
+        // from the OTHER side.
+        val incrementalEqual = mergeStreamText(
+            existing = "Hey",
+            incoming = "Hey",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = false,
+        )
+        assertEquals(StreamTextMergeBranch.APPEND, incrementalEqual.branch)
+        assertEquals("HeyHey", incrementalEqual.text)
+
+        val incrementalCumulative = mergeStreamText(
+            existing = "Hey",
+            incoming = "HeyHey. Dev",
+            canUseSnapshotMerge = false,
+            isCumulativeStream = false,
+        )
+        assertEquals(StreamTextMergeBranch.APPEND, incrementalCumulative.branch)
+        assertEquals("HeyHeyHey. Dev", incrementalCumulative.text)
+    }
+
+    @Test
+    fun `incremental deltas without seq ids still append`() {
+        // h30cy guard + letta-mobile-wucn: genuine forward tokens must keep
+        // appending even with no ordering signal AND no cumulative-shape
+        // signal; the EQUAL/CUMULATIVE branches must not swallow them. The
+        // reducer derives isCumulativeStream from the stable-otid match, so
+        // it is false here (the test data constructs otid="otidA" on EVERY
+        // frame, but the test exercises an incremental forward-token pair
+        // that doesn't trigger EQUAL/CUMULATIVE because the bytes don't
+        // coincide with the accumulated prefix — a separate guard for that
+        // byte-coincidence case lives in the wucn test in
+        // TimelineSyncLoopStreamingTest).
+        var t = Timeline("conv")
+        t = reduce(t, f("Y", null))
+        t = reduce(t, f("es — confirmed", null))
+        assertEquals("Yes — confirmed", cur(t), "forward deltas must append even without seq ids")
+    }
+
     // (3c) Direct branch coverage of mergeStreamText: without a reliable
     // ordering signal (no seq ids) a shorter incoming that coincidentally
     // shares a prefix/suffix must NOT replace or truncate the existing text.
