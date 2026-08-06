@@ -50,7 +50,10 @@
 # EXIT CODES
 #   0  all checks passed
 #   1  at least one check FAILED
-#   2  the check could not run (missing dependency / unreadable input)
+#   2  the check could not run (missing dependency / unreadable input) OR
+#      the structural gate fired (expected >= 1 recurring task(s), sensed 0).
+#      The two are distinct on purpose: make verify-pm-cron-deploy checks them
+#      separately (letta-mobile-g87by).
 
 set -uo pipefail
 
@@ -103,6 +106,25 @@ NOW_EPOCH="$(date -u +%s)"
 log "cron sensing check — $(date -u +%Y-%m-%dT%H:%M:%SZ)"
 log "  lease file : $CRONS_JSON"
 log "  store      : $BACKEND_DIR"
+
+# ----------------------------------------------- structural gate (letta-mobile-g87by)
+#
+# Doctrine 24 — a validator with zero production writers must NEVER silently
+# pass. Pre-g87by this script iterated over `.tasks[]` and emitted 0 warnings
+# / 0 failures against an empty registry, exiting 0 every 15 minutes while
+# the pm-30m heartbeat sat unregistered for ~3 days. We peek at the task
+# count up-front and short-circuit with a distinct exit code (2) so make
+# verify-pm-cron-deploy can assert the structural gate separately from the
+# per-task DARK/dead path (which keeps its own exit 1). The pre-existing
+# per-task FAIL path is preserved unchanged (additive-only constraint).
+
+TASK_COUNT_PEEK="$(jq '.tasks | length' "$CRONS_JSON" 2>/dev/null || echo 0)"
+log "  tasks      : $TASK_COUNT_PEEK"
+if [ "$TASK_COUNT_PEEK" -lt 1 ]; then
+  printf 'FAIL  expected >= 1 recurring task(s); sensed 0\n' >&2
+  printf 'FAIL  cron sensing check FAILED (structural gate) — see docs/architecture/lettashim-retirement-deployment-runbook.md "Cron sensing check"\n' >&2
+  exit 2
+fi
 
 # ---------------------------------------------------------------- lease owner
 
@@ -169,6 +191,13 @@ fi
 # Deliberately minimal. Returns the cadence in seconds, or empty when the
 # expression is anything more interesting than N-minutes / hourly / daily.
 # An unparsed cadence is a WARN (unsensed), never a silent pass.
+#
+# */N range lint (letta-mobile-g87by): cron_cadence_seconds rejects a `*/N`
+# step with N outside [1, 59] (the valid minutes range). Pre-g87by the parser
+# would happily compute `0 * 60 = 0` for `*/0` and a fresh fire would exit 0 —
+# exactly the silent-pass shape doctrine 24 forbids. The check is integrated
+# into the same parser so a single source of truth owns the N range; the
+# per-task WARN path above remains the surfacing channel.
 
 cron_cadence_seconds() {
   local expr="$1"
@@ -188,7 +217,17 @@ cron_cadence_seconds() {
   case "$min" in
     '*/'[0-9]*)
       if [ "$hour" = "*" ]; then
-        echo $((${min#*/} * 60))
+        local n="${min#*/}"
+        # */N range lint (g87by): N must be a positive integer in [1, 59].
+        # Reject */0 (infinite-fire) and */60 (out of range). Empty / non-numeric
+        # tail also rejected — anything not a clean integer is suspicious.
+        case "$n" in
+          '' | *[!0-9]*) return 1 ;;
+        esac
+        if [ "$n" -lt 1 ] || [ "$n" -gt 59 ]; then
+          return 1
+        fi
+        echo $((n * 60))
         return 0
       fi
       return 1
@@ -200,7 +239,14 @@ cron_cadence_seconds() {
           return 0
           ;; # hourly at minute N
         '*/'[0-9]*)
-          echo $((${hour#*/} * 3600))
+          local nh="${hour#*/}"
+          case "$nh" in
+            '' | *[!0-9]*) return 1 ;;
+          esac
+          if [ "$nh" -lt 1 ] || [ "$nh" -gt 23 ]; then
+            return 1
+          fi
+          echo $((nh * 3600))
           return 0
           ;; # every N hours
         [0-9]*)
@@ -253,8 +299,7 @@ latest_fire_iso() {
     sed 's/.*"timestamp":"//; s/"$//'
 }
 
-TASK_COUNT="$(jq '.tasks | length' "$CRONS_JSON")"
-log "  tasks      : $TASK_COUNT"
+TASK_COUNT="$TASK_COUNT_PEEK"
 
 SENSED=0
 while IFS=$'\t' read -r TID TNAME TSTATUS TRECUR TCRON TCONV; do
