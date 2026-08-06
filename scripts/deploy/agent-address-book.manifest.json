@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "notes": [
+    "letta-mobile-bn008.7 — host-level manifest for seed-agent-address-book.py.",
+    "Each entry is merged INTO the SQL pull from matrix_letta.identities, with manifest",
+    "entries winning on id collisions. Add a new agent here when you want its address",
+    "seeded BEFORE the SQL pull learns about it (e.g. before bn008.8 emits a Matrix",
+    "identity row for it). For PM-letta-mobile specifically, the 'agent-<uuid>' source",
+    "form is converted to canonical 'letta_agent-<uuid>' on load (dispatch brief,",
+    "PM one-off branch).",
+    "",
+    "ID FORM: 'agent_id' here may be either canonical 'letta_agent-<uuid>' OR",
+    "the PM source form 'agent-<uuid>'. Anything else is rejected with a loud",
+    "ValueError before any write happens.",
+    "",
+    "MXID: nullable. PM-letta-mobile currently has no Matrix identity row in",
+    "matrix_letta.identities; bn008.8 will emit one, after which it can be removed",
+    "from this manifest (the SQL pull will start providing it).",
+    "",
+    "DEFERRED-BECAUSE: bn008.6 — the receiver wire for IrohAgentMessageReceiver",
+    "is not yet landed; AC #5 (roundtrip proof via meridian agent-message send",
+    "--probe) re-verifies post-bn008.6-merge. See the bead description for the",
+    "rewritten AC #5."
+  ],
+  "entries": [
+    {
+      "agent_id": "letta_agent-597b5756-2915-4560-ba6b-91005f085166",
+      "mxid": "@agent_597b5756_2915_4560_ba6b_91005f085166:matrix.oculair.ca",
+      "note": "Meridian. Already present in matrix_letta.identities (id=letta_agent-597b5756-2915-4560-ba6b-91005f085166, identity_type='letta', is_active=true). Listed here as the host-level source of truth so re-seeds are stable across SQL churn."
+    },
+    {
+      "agent_id": "agent-c356b54a-8b37-4d53-b9d0-b43164749b6f",
+      "mxid": null,
+      "note": "PM-letta-mobile. Has NO Matrix identity row in matrix_letta.identities — listed here as a manual placeholder until bn008.8 emits a real identity. The source form 'agent-<uuid>' is converted to canonical 'letta_agent-<uuid>' on load. deferred-because: bn008.8 (Matrix identity row)."
+    }
+  ]
+}
