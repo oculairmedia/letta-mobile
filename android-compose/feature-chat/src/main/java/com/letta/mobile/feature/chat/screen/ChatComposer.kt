@@ -25,6 +25,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -71,7 +73,13 @@ internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_
 private val ChatComposerActionTargetSize = 48.dp
 private val ChatComposerAttachIconSize = LettaSpacing.COMPOSER_ATTACH_ICON_SIZE
 private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
-private val ChatComposerInputVerticalPadding = LettaSpacing.XS
+// letta-mobile-6237v.2: padded up to 24.dp from LettaSpacing.XS (6.dp) so
+// the composer bar feels substantial enough to anchor chat input at rest.
+// When the keyboard slides up (IME open), the bar animates back down to
+// ChatComposerInputCompactVerticalPadding so the typing surface reclaims
+// the space — the bar's previous compact state, restored live.
+private val ChatComposerInputVerticalPadding = 24.dp
+private val ChatComposerInputCompactVerticalPadding = 12.dp
 private val ChatComposerInputItemSpacing = LettaSpacing.XS
 
 internal object ChatComposerTestTags {
@@ -328,6 +336,21 @@ private fun ChatComposerInput(
     val model = state.model
     val hasSendableContent = model.inputText.isNotBlank() || model.pendingAttachments.isNotEmpty()
     val canSend = !model.isStreaming && model.canSendMessages && hasSendableContent
+    // letta-mobile-6237v.2: bar grows 50% taller at rest, then animates back
+    // to its compact previous state when the IME slides up — typing surface
+    // reclaims the padding. Driven off ime visibility rather than focus so it
+    // tracks the keyboard even when the field loses focus while the IME is
+    // still up (e.g. user taps the attach menu).
+    val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
+    val animatedVerticalPadding by animateDpAsState(
+        targetValue = if (keyboardOpen) {
+            ChatComposerInputCompactVerticalPadding
+        } else {
+            ChatComposerInputVerticalPadding
+        },
+        animationSpec = tween(durationMillis = 220),
+        label = "chatComposerVerticalPadding",
+    )
     LettaInputBar(
         text = model.inputText,
         onTextChange = callbacks.onTextChange,
@@ -352,7 +375,7 @@ private fun ChatComposerInput(
         customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
         contentPadding = PaddingValues(
             horizontal = ChatComposerInputHorizontalPadding,
-            vertical = ChatComposerInputVerticalPadding,
+            vertical = animatedVerticalPadding,
         ),
         itemSpacing = ChatComposerInputItemSpacing,
         leadingContent = {

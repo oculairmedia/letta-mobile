@@ -413,6 +413,11 @@ private fun ChatScreenFloatingOverlays(params: ChatScreenFloatingOverlaysParams)
 private fun ChatScreenComposerColumn(params: ChatScreenComposerColumnParams) {
     val density = LocalDensity.current
     Column(
+        // letta-mobile-6237v.2: outer .imePadding() (in ChatScreen.kt)
+        // already shrinks the layout to the top of the keyboard, so the
+        // composer Column needs its own bottom padding to push above any
+        // remaining safe-area inset (navbar / gesture bar). Without this
+        // padding the composer would extend into the bottom inset region.
         modifier = params.modifier
             .fillMaxWidth()
             .padding(bottom = params.bottomInsetDp)
