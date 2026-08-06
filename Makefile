@@ -34,7 +34,7 @@ SEED_ADDRESS_BOOK_SCRIPT := scripts/deploy/seed-agent-address-book.py
 SEED_ADDRESS_BOOK_MANIFEST := scripts/deploy/agent-address-book.manifest.json
 SEED_ADDRESS_BOOK_DRY_RUN ?= 1
 
-.PHONY: help lint-telemetry verify-build verify-unit-tests verify-device-ready verify-sync verify-stream verify-all verify-release check-cli check-device seed-iroh-address-book
+.PHONY: help lint-telemetry verify-build verify-unit-tests verify-device-ready verify-sync verify-stream verify-all verify-release verify-pm-cron-deploy check-cli check-device seed-iroh-address-book
 
 help:
 	@echo "letta-mobile make targets"
@@ -60,6 +60,12 @@ help:
 	@echo "                          manifest. Default is --dry-run for release checklists."
 	@echo "                          Set SEED_ADDRESS_BOOK_DRY_RUN=0 to perform a real seed."
 	@echo "                          Set FORCE=1 to bypass the .seedDone idempotency guard."
+	@echo "  verify-pm-cron-deploy Three-assertion gate for the pm-30m heartbeat cron (letta-mobile-g87by):"
+	@echo "                      (a) install-pm-cron.sh --check exits 0, (b) cron-sensing-check.sh"
+	@echo "                      exits 0, (c) jq -e '.tasks | length >= 1' returns true. Exits non-zero"
+	@echo "                      on any failure. Read-only against the live ledger -- never mutates."
+	@echo "                      Optional: LETTA_HOME, LETTA_CRONS_JSON, LETTA_LOCAL_BACKEND_DIR,"
+	@echo "                      LETTA_AGENT_ID overrides for sandboxed runs."
 
 lint-telemetry:
 	@python3 scripts/lint_telemetry.py
@@ -226,3 +232,12 @@ seed-iroh-address-book:
 		ARGS="$$ARGS --force"; \
 	fi; \
 	python3 $(SEED_ADDRESS_BOOK_SCRIPT) $$ARGS
+
+# letta-mobile-g87by — three-assertion gate for the pm-30m heartbeat cron.
+# (a) install-pm-cron.sh --check exits 0 (schedule registered, never mutates).
+# (b) cron-sensing-check.sh exits 0 (structural + per-task both green).
+# (c) jq -e '.tasks | length >= 1' on the live ledger returns true.
+# Read-only. CI gate target.
+verify-pm-cron-deploy:
+	@echo "=== verify-pm-cron-deploy (letta-mobile-g87by) ==="
+	@bash scripts/deploy/verify-pm-cron-deploy

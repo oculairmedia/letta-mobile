@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# verify-pm-cron-deploy — letta-mobile-g87by.
+#
+# Three-assertion gate wired into `make verify-pm-cron-deploy`:
+#   (a) `install-pm-cron.sh --check` exits 0  (the pm-30m schedule is
+#       registered; --check is read-only and never mutates).
+#   (b) `cron-sensing-check.sh` exits 0        (the structural + per-task
+#       validator passes against the live ledger).
+#   (c) `jq -e '.tasks | length >= 1' $CRONS_JSON` returns true
+#       (the live ledger has at least one recurring task).
+#
+# Exits non-zero on any failure; each step prints what it did and why.
+#
+# This script is INTENDED to run after the operator has authorized the live
+# install-pm-cron.sh invocation. It is a verify-only contract — running it
+# against an un-restored ledger will FAIL step (a), which is the correct
+# behaviour: a missing schedule is exactly the defect this PR exists to
+# surface.
+#
+# Environment
+# -----------
+#   LETTA_HOME                 default /root/.letta
+#   LETTA_CRONS_JSON           default $LETTA_HOME/crons.json
+#   LETTA_LOCAL_BACKEND_DIR    default $LETTA_HOME/lc-local-backend
+#   LETTA_AGENT_ID             default agent-c356b54a-8b37-4d53-b9d0-b43164749b6f
+#
+# Exit codes
+# ----------
+#   0  all three assertions passed
+#   1  at least one assertion FAILED
+#   2  a precondition (jq / missing file) could not be satisfied
+
+set -uo pipefail
+
+LETTA_HOME="${LETTA_HOME:-/root/.letta}"
+CRONS_JSON="${LETTA_CRONS_JSON:-$LETTA_HOME/crons.json}"
+BACKEND_DIR="${LETTA_LOCAL_BACKEND_DIR:-$LETTA_HOME/lc-local-backend}"
+AGENT_ID="${LETTA_AGENT_ID:-agent-c356b54a-8b37-4d53-b9d0-b43164749b6f}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL="$SCRIPT_DIR/install-pm-cron.sh"
+SENSING="$SCRIPT_DIR/cron-sensing-check.sh"
+
+PASS=0
+FAIL=0
+STEP=0
+
+step() {
+  STEP=$((STEP + 1))
+  printf '\n=== step %d: %s ===\n' "$STEP" "$*"
+}
+record_pass() { PASS=$((PASS + 1)); printf '  PASS  %s\n' "$*"; }
+record_fail() { FAIL=$((FAIL + 1)); printf '  FAIL  %s\n' "$*" >&2; }
+die() { printf 'ERROR %s\n' "$*" >&2; exit 2; }
+
+command -v jq >/dev/null 2>&1 || die "jq is required"
+[ -x "$INSTALL" ]  || die "install-pm-cron.sh missing or not executable: $INSTALL"
+[ -x "$SENSING" ]  || die "cron-sensing-check.sh missing or not executable: $SENSING"
+[ -r "$CRONS_JSON" ] || die "crons.json not readable: $CRONS_JSON"
+jq -e . "$CRONS_JSON" >/dev/null 2>&1 || die "crons.json is not valid JSON: $CRONS_JSON"
+
+printf 'verify-pm-cron-deploy — %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+printf '  agent_id  : %s\n' "$AGENT_ID"
+printf '  crons.json: %s\n' "$CRONS_JSON"
+printf '  backend   : %s\n' "$BACKEND_DIR"
+
+# --------------------------------------------------------------- step (a)
+step "(a) install-pm-cron.sh --check (must exit 0; read-only)"
+CHECK_OUT="$(LETTA_AGENT_ID="$AGENT_ID" bash "$INSTALL" --check 2>&1)"
+CHECK_EXIT=$?
+printf '%s\n' "$CHECK_OUT"
+if [ "$CHECK_EXIT" -eq 0 ]; then
+  record_pass "install-pm-cron.sh --check exits 0 (schedule present)"
+else
+  record_fail "install-pm-cron.sh --check exited $CHECK_EXIT (schedule missing)"
+fi
+
+# --------------------------------------------------------------- step (b)
+step "(b) cron-sensing-check.sh (must exit 0; both structural + per-task OK)"
+SENSE_OUT="$(LETTA_CRONS_JSON="$CRONS_JSON" LETTA_LOCAL_BACKEND_DIR="$BACKEND_DIR" bash "$SENSING" 2>&1)"
+SENSE_EXIT=$?
+printf '%s\n' "$SENSE_OUT"
+if [ "$SENSE_EXIT" -eq 0 ]; then
+  record_pass "cron-sensing-check.sh exits 0"
+else
+  # Surface WHICH gate fired so the operator knows whether it's structural
+  # (count>=1, exit 2) or per-task (exit 1).
+  if [ "$SENSE_EXIT" -eq 2 ]; then
+    record_fail "cron-sensing-check.sh exited 2 — structural gate (count>=1) fired"
+  elif [ "$SENSE_EXIT" -eq 1 ]; then
+    record_fail "cron-sensing-check.sh exited 1 — per-task DARK/dead gate fired"
+  else
+    record_fail "cron-sensing-check.sh exited $SENSE_EXIT (unexpected)"
+  fi
+fi
+
+# --------------------------------------------------------------- step (c)
+step "(c) jq -e '.tasks | length >= 1' (must be true)"
+if jq -e '.tasks | length >= 1' "$CRONS_JSON" >/dev/null 2>&1; then
+  TASK_COUNT="$(jq '.tasks | length' "$CRONS_JSON")"
+  record_pass "live ledger has $TASK_COUNT task(s) (>= 1)"
+else
+  record_fail "live ledger has 0 tasks (expected >= 1)"
+fi
+
+# ---------------------------------------------------------------- summary
+printf '\n=== summary ===\n'
+printf 'pass: %d   fail: %d   steps: %d\n' "$PASS" "$FAIL" "$STEP"
+if [ "$FAIL" -gt 0 ]; then
+  printf 'FAIL  verify-pm-cron-deploy FAILED\n' >&2
+  exit 1
+fi
+printf 'PASS  verify-pm-cron-deploy\n'
+exit 0
