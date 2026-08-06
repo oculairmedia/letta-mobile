@@ -184,6 +184,21 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             existing.seqId != null && confirmed.seqId != null && confirmed.seqId > existing.seqId
         val snapshotReplacement = syntheticLiveToRealFinal && !promotedForwardDelta
         val canUseSnapshotMerge = snapshotReplacement || (existing.seqId != null && confirmed.seqId != null)
+        // letta-mobile-bn008 + letta-mobile-wucn: derive isCumulativeStream
+        // from a STREAM-SHAPE signal (not per-frame seq-id availability). The
+        // Iroh client boundary stamps a stable `cm-stream-<otid>` id AND a
+        // stable otid on every cumulative frame (the App Server's
+        // CumulativeStreamText emits cumulative text, and
+        // tagStreamDeltaForOptimisticDedup rewrites the id to cm-stream-<otid>;
+        // if the upstream has no otid, IrohStreamDeltaServerFrameMapper falls
+        // back to a per-turn synthesized otid). An incremental HTTP-API SSE
+        // stream only stamps otid on the FIRST frame and leaves subsequent
+        // frames otid=null. So `confirmed.otid != null && confirmed.otid ==
+        // existing.otid` is true on a cumulative stream and false on an
+        // incremental stream — the same signal that distinguishes the bn008
+        // production cascade from the wucn counterexample at this exact merge
+        // point.
+        val isCumulativeStream = confirmed.otid != null && confirmed.otid == existing.otid
         // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
         // seq id is strictly greater than the text we already hold. A frame with
         // a lower-or-equal seq id is a replayed / out-of-order re-delivery and
@@ -205,6 +220,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 incoming = newText,
                 canUseSnapshotMerge = canUseSnapshotMerge,
                 incomingIsForwardDelta = incomingIsForwardDelta,
+                isCumulativeStream = isCumulativeStream,
             )
         }
         val mergedText = textMerge.text
@@ -278,11 +294,19 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val bothAssistant = otidMatch.messageType == TimelineMessageType.ASSISTANT &&
             confirmed.messageType == TimelineMessageType.ASSISTANT
         val merge = if (bothAssistant) {
-            // Same-otid assistant frames with seq ids support both cumulative
-            // snapshots and incremental tokens. Snapshot-merge remains enabled so
-            // cumulative growth replaces the prior body before any append logic,
-            // while incomingIsForwardDelta + incrementalForwardAppend ensures only
-            // monotonic forward tokens bypass the STALE/SUFFIX drop branches.
+            // letta-mobile-bn008 + letta-mobile-wucn: this path is reached for
+            // App Server assistant streams whose backend id ROTATES per chunk
+            // (findByServerId above would not match) but whose otid is STABLE
+            // (the Iroh server projects a synthesized per-stream otid onto
+            // every frame). The otid match itself is the stream-shape signal
+            // at this layer — confirmed.otid == otidMatch.otid by construction
+            // (findByOtid matched on confirmed.otid). The canUseSnapshotMerge
+            // here means the original seq-id ordering signal is also set
+            // (or the upstream EQUAL/CUMULATIVE gates would not fire), so the
+            // two gates are still OR'd inside mergeStreamText:
+            // canUseSnapshotMerge picks up the seq-id case; isCumulativeStream
+            // picks up the seq-id-missing case that this same-otid stream still
+            // belongs to as a cumulative stream from the Iroh App Server side.
             mergeStreamText(
                 existing = otidMatch.content,
                 incoming = confirmed.content,
@@ -293,6 +317,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 // prefix/suffix byte coincidence is new text, not a stale resend;
                 // true cumulative snapshots still route to CUMULATIVE above.
                 incrementalForwardAppend = true,
+                isCumulativeStream = true,
             )
         } else {
             null
@@ -381,6 +406,13 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             } as? TimelineEvent.Confirmed
         }
     if (otidRow != null) {
+        // letta-mobile-bn008 + letta-mobile-wucn: the otidRow match is the
+        // stream-shape signal at this layer — confirmed.otid == otidRow.otid by
+        // construction (we filtered on it above). Same logic as the findByOtid
+        // merge: pass isCumulativeStream=true so EQUAL/CUMULATIVE still fire
+        // when both seq ids are absent. incrementalForwardAppend stays true
+        // so that monotonic incremental token deltas still APPEND instead of
+        // being dropped by the seq-gated branches below.
         val merge = mergeStreamText(
             existing = otidRow.content,
             incoming = confirmed.content,
@@ -390,6 +422,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             // h30cy: same-otid monotonic forward tokens must append even when
             // their bytes coincide with existing prefix/suffix text.
             incrementalForwardAppend = true,
+            isCumulativeStream = true,
         )
         val merged = otidRow.copy(
             content = merge.text,
