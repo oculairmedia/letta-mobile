@@ -194,6 +194,15 @@ internal class ChatTimelineObserver(
                             timeline = timeline,
                             prefix = prefix,
                             previousState = previousState,
+                            // letta-mobile-dir4k.1: thread the transport's
+                            // "turn in flight" latch into the projector so
+                            // [TimelineProjection.anyRunActive] stays true
+                            // across inter-tool-call gaps where no
+                            // `isPending=true` message is currently in `live`.
+                            // Without this the Thinking chip drops mid-turn
+                            // between tools (regression introduced by PR
+                            // #1119 — see bead letta-mobile-dir4k.1).
+                            isActiveRunStreaming = hasActiveChatTurn(),
                         )
                     }
 

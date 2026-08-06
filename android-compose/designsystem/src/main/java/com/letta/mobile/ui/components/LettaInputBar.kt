@@ -295,7 +295,12 @@ fun LettaInputBar(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(composerCorner),
+        shape = RoundedCornerShape(
+            topStart = composerCorner,
+            topEnd = composerCorner,
+            bottomStart = 0.dp,
+            bottomEnd = 0.dp,
+        ),
         color = composerColor,
         tonalElevation = composerElevation,
     ) {
@@ -329,7 +334,12 @@ fun LettaInputBar(
                 ),
                 maxLines = maxLines,
                 singleLine = maxLines == 1,
-                shape = RoundedCornerShape(composerCorner),
+                shape = RoundedCornerShape(
+                    topStart = composerCorner,
+                    topEnd = composerCorner,
+                    bottomStart = 0.dp,
+                    bottomEnd = 0.dp,
+                ),
                 colors = TextFieldDefaults.colors(
                     unfocusedContainerColor = Color.Transparent,
                     focusedContainerColor = Color.Transparent,

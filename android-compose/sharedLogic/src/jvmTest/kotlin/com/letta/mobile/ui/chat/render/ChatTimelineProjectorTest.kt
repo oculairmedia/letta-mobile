@@ -56,7 +56,7 @@ class ChatTimelineProjectorTest {
         Timeline(conversationId = conv, events = events.toPersistentList(), stablePrefixVersion = version)
 
     private fun ChatTimelineProjector.projectLive(events: List<TimelineEvent>, version: Long): TimelineProjection =
-        project(timeline(events, version), olderPrefixFor(conv), ChatUiState())
+        project(timeline(events, version), olderPrefixFor(conv), ChatUiState(), isActiveRunStreaming = false)
 
     @Test
     fun fullProjectionOrdersMessagesAndFlagsAssistantTail() {
@@ -255,6 +255,68 @@ class ChatTimelineProjectorTest {
         }
         // The newest (live) message must never be evicted by pagination growth.
         assertEquals("live-1", existing.last().id)
+    }
+
+    // letta-mobile-dir4k.1 — Regression for the PR #1119 follow-up. Between
+    // tool calls within a single turn the timeline holds no `isPending=true`
+    // UiMessage, but the transport's `turnInFlight` latch is still true. The
+    // projector must keep [TimelineProjection.anyRunActive] true in that gap
+    // when the caller passes `isActiveRunStreaming = true`, otherwise the
+    // presence policy's `Working` chip drops mid-turn between tool calls.
+    //
+    // Discriminating fixture: two Confirmed messages in the SAME run
+    // (runId="r1"). No `isPending` flag exists anywhere in `live`. The only
+    // signal that distinguishes "mid-turn" from "settled" is the new
+    // `isActiveRunStreaming` parameter — without it the test is structurally
+    // incapable of telling the regression apart from the fix (both produce
+    // `anyRunActive = false`).
+    @Test
+    fun `anyRunActive stays true mid-turn when isActiveRunStreaming is true even with no isPending`() {
+        val projector = ChatTimelineProjector()
+        val midTurnEvents = listOf(
+            confirmed(TimelineMessageType.USER, "hi", "u1", 1.0),
+            TimelineEvent.Confirmed(
+                position = 2.0,
+                otid = "server-tc1",
+                content = "tool call",
+                serverId = "tc1",
+                messageType = TimelineMessageType.TOOL_CALL,
+                runId = "r1",
+                stepId = null,
+                date = parseTimelineInstant("2026-04-19T06:00:00Z"),
+                toolCalls = persistentListOf(),
+                approvalRequestId = null,
+                approvalDecided = false,
+                toolReturnContent = null,
+                toolReturnIsError = false,
+                toolReturnContentByCallId = persistentMapOf(),
+                toolReturnIsErrorByCallId = persistentMapOf(),
+                attachments = persistentListOf(),
+                source = MessageSource.LETTA_SERVER,
+            ),
+        )
+
+        val midTurn = projector.project(
+            timeline(midTurnEvents, version = 1),
+            projector.olderPrefixFor(conv),
+            ChatUiState(),
+            isActiveRunStreaming = true,
+        )
+        assertTrue(
+            midTurn.anyRunActive,
+            "anyRunActive must be true when transport reports the turn is in flight, even with no isPending row.",
+        )
+
+        val settled = projector.project(
+            timeline(midTurnEvents, version = 1),
+            projector.olderPrefixFor(conv),
+            ChatUiState(),
+            isActiveRunStreaming = false,
+        )
+        assertFalse(
+            settled.anyRunActive,
+            "anyRunActive must drop to false once the turn settles, even with the same timeline.",
+        )
     }
 
     @Test

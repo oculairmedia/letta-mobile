@@ -53,7 +53,7 @@ class ChatTimelinePresenterTest {
             ).toPersistentList(),
             stablePrefixVersion = 1,
         )
-        return presenter.project(timeline, presenter.olderPrefixFor(conv), ChatUiState())
+        return presenter.project(timeline, presenter.olderPrefixFor(conv), ChatUiState(), isActiveRunStreaming = false)
     }
 
     @Test

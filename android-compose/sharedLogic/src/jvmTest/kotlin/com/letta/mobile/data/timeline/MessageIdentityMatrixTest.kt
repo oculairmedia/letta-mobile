@@ -35,7 +35,7 @@ class MessageIdentityMatrixTest {
 
         val projector = ChatTimelineProjector()
         fun project(): List<com.letta.mobile.data.model.UiMessage> {
-            return projector.project(timeline, emptyList(), ChatUiState()).ui
+            return projector.project(timeline, emptyList(), ChatUiState(), isActiveRunStreaming = false).ui
         }
 
         // 1. Initial user message

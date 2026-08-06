@@ -37,9 +37,15 @@ float hash(float2 p) {
 }
 
 // Indigo -> teal -> gold cosine palette (IQ-style).
+// Amplitudes widened (letta-mobile-shader-saturation-2026-08-06) so the
+// palette covers more of the color gamut; mid-amplitude terms give the
+// glow a vivid palette instead of the previous mid-gray hover. Second
+// pass (letta-mobile-shader-tint-2026-08-06) bumped 0.68/0.58/0.50 ->
+// 0.85/0.72/0.62 because the narrow bottom band drops the palette at
+// low-energy pixels, leaving the tint mix reading as gray instead of teal.
 float3 palB(float t) {
-    return float3(0.45, 0.40, 0.42)
-         + float3(0.50, 0.42, 0.40) * cos(6.28318 * (float3(0.9, 1.0, 1.0) * t + float3(0.55, 0.30, 0.05)));
+    return float3(0.42, 0.36, 0.38)
+         + float3(0.85, 0.72, 0.62) * cos(6.28318 * (float3(0.9, 1.0, 1.0) * t + float3(0.55, 0.30, 0.05)));
 }
 
 // +-0.5/255-scale dither: faint gradients over the near-black background
@@ -69,11 +75,18 @@ half4 ambientColor(float2 fragCoord) {
         acc += palB(fi * 0.19 + uv.x * 0.25 + t * 0.05) * w;
         wsum += w;
     }
-    float3 rgb = mix(acc / max(wsum, 0.001), uColor.rgb, 0.22);
+    // Mix ratio lifted 0.22 -> 0.40 (letta-mobile-shader-saturation), then
+    // 0.40 -> 0.58 (letta-mobile-shader-tint-2026-08-06) so the green/teal
+    // tint dominates the palette at low-energy pixels in the narrow band.
+    float3 rgb = mix(acc / max(wsum, 0.001), uColor.rgb, 0.58);
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
-    float aRaw = energy * smoothstep(0.35, 0.90, uv.y) * 0.36;
-    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.92);
+    // Alpha curve narrowed to bottom band (0.72..0.98) so the visible glow
+    // occupies less vertical real estate — a thin glow under the composer
+    // instead of a broad mid-screen band. Amplitude reduced 0.55 -> 0.34
+    // for a more subtle, less dominant presence. Alpha cap 0.98 -> 0.78.
+    float aRaw = energy * smoothstep(0.72, 0.98, uv.y) * 0.34;
+    float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.78);
     alpha = max(alpha + dither(fragCoord), 0.0);
     return half4(rgb, alpha);
 }

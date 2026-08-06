@@ -1349,6 +1349,9 @@ class DesktopChatController(
             timeline = timeline,
             prefix = timelineProjector.olderPrefixFor(conversationId),
             previousState = ChatUiState(),
+            // letta-mobile-dir4k.1: keep anyRunActive true across inter-tool gaps
+            // while this conversation's reply stream is still in flight.
+            isActiveRunStreaming = _streamingConversationId.value == conversationId,
         )
         // A no-op tick (the tail re-emitted unchanged) projects to a UI
         // byte-identical to the current one — skip the state write so a streamed
