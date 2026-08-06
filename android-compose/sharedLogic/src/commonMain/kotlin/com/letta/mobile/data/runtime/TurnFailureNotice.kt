@@ -55,7 +55,8 @@ object TurnFailureNotices {
     fun isCompletedMainReplyStopReason(stopReason: String?): Boolean {
         if (stopReason.isNullOrBlank()) return false
         return when (stopReason.lowercase()) {
-            "end_turn", "stop_sequence", "max_tokens" -> true
+            // `length` == OpenAI-compat max output/context stop (lmstudio/MiniMax).
+            "end_turn", "stop_sequence", "max_tokens", "length" -> true
             else -> false
         }
     }

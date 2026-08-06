@@ -251,7 +251,12 @@ class AppServerRuntimeEventMapper {
 
     private fun JsonObject.isTerminalStopReason(): Boolean {
         val reason = string("stop_reason") ?: string("reason") ?: return true
-        return reason == "end_turn" || reason == "stop_sequence" || reason == "max_tokens" || reason == "cancelled" || reason == "error"
+        // `length` is the OpenAI-compat finish_reason for output/context caps;
+        // providers on the lmstudio path (e.g. MiniMax-M3) emit it instead of
+        // `max_tokens`. Treat it as terminal Completed the same way — otherwise
+        // the turn stays open until a later error_message paints a false Failed.
+        return reason == "end_turn" || reason == "stop_sequence" || reason == "max_tokens" ||
+            reason == "length" || reason == "cancelled" || reason == "error"
     }
 
     private fun JsonObject.errorMessage(fallback: String = "App Server turn failed"): String =
