@@ -39,10 +39,13 @@ float hash(float2 p) {
 // Indigo -> teal -> gold cosine palette (IQ-style).
 // Amplitudes widened (letta-mobile-shader-saturation-2026-08-06) so the
 // palette covers more of the color gamut; mid-amplitude terms give the
-// glow a vivid palette instead of the previous mid-gray hover.
+// glow a vivid palette instead of the previous mid-gray hover. Second
+// pass (letta-mobile-shader-tint-2026-08-06) bumped 0.68/0.58/0.50 ->
+// 0.85/0.72/0.62 because the narrow bottom band drops the palette at
+// low-energy pixels, leaving the tint mix reading as gray instead of teal.
 float3 palB(float t) {
     return float3(0.42, 0.36, 0.38)
-         + float3(0.68, 0.58, 0.50) * cos(6.28318 * (float3(0.9, 1.0, 1.0) * t + float3(0.55, 0.30, 0.05)));
+         + float3(0.85, 0.72, 0.62) * cos(6.28318 * (float3(0.9, 1.0, 1.0) * t + float3(0.55, 0.30, 0.05)));
 }
 
 // +-0.5/255-scale dither: faint gradients over the near-black background
@@ -72,9 +75,10 @@ half4 ambientColor(float2 fragCoord) {
         acc += palB(fi * 0.19 + uv.x * 0.25 + t * 0.05) * w;
         wsum += w;
     }
-    // Mix ratio lifted 0.22 -> 0.40 so the theme tint reads through the
-    // palette; previously the cosine palette's gray hover swallowed it.
-    float3 rgb = mix(acc / max(wsum, 0.001), uColor.rgb, 0.40);
+    // Mix ratio lifted 0.22 -> 0.40 (letta-mobile-shader-saturation), then
+    // 0.40 -> 0.58 (letta-mobile-shader-tint-2026-08-06) so the green/teal
+    // tint dominates the palette at low-energy pixels in the narrow band.
+    float3 rgb = mix(acc / max(wsum, 0.001), uColor.rgb, 0.58);
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
     // Alpha curve narrowed to bottom band (0.72..0.98) so the visible glow
