@@ -140,4 +140,124 @@ class ChatTimelinePresenterTest {
         assertEquals(2, closePresentation.messages.size)
         assertEquals(ChatMessageListChange.Full, closePresentation.messageListChange)
     }
+
+    @Test
+    fun presentWiresProjectionRunActiveFromProjectionNotFromServerLocalPending() {
+        // letta-mobile-dir4k wiring regression: the mask in
+        // ChatStreamingPresencePolicy derives `effectiveTurnInFlight =
+        // turnInFlight && projectionRunActive`. PR #1117 collapsed this mask
+        // to a no-op by reading `projection.anyLettaServerLocalPending` for
+        // BOTH `anyServerLocalPending` AND `projectionRunActive` in
+        // ChatTimelinePresenter.kt — same source for both inputs means the
+        // mask was always equivalent to its left operand.
+        //
+        // The fix-forward reads `projectionRunActive` from a new
+        // `TimelineProjection.anyRunActive` field, which the projection
+        // computes from `projectRunActivity` over the just-projected live
+        // messages. Today the projector computes these two booleans to
+        // the same value (a run is active iff it has a Local+SENDING
+        // message, which is the only thing that makes
+        // `anyLettaServerLocalPending` true), so a behavioural test against
+        // a real projection cannot distinguish the two wirings — and PR
+        // #1117's existing unit tests passed against the broken code,
+        // which is exactly how the bug shipped.
+        //
+        // To prove the wire is correct, this test constructs a
+        // TimelineProjection where the two fields are FORCED to disagree
+        // (`anyLettaServerLocalPending = false`, `anyRunActive = true`).
+        // Today's projector cannot produce this shape from real inputs
+        // (a run is active iff it has a Local+SENDING message, which is
+        // the only thing that makes `anyLettaServerLocalPending` true —
+        // so the two booleans are conflated by construction), but the
+        // wire at the call site MUST split them so the mask can defend
+        // the user-visible "stuck Thinking" symptom once the two facts
+        // are allowed to mean different things (the entire reason for
+        // splitting them in the first place).
+        //
+        // With turnInFlight=true and the divergent fixture, the
+        // discriminator is on `isStreaming`:
+        //   * Bug-state (`projectionRunActive = projection.anyLettaServerLocalPending`):
+        //     mask = true && false = false → effectiveTurnInFlight=false
+        //     → isStreaming falls through to anyServerLocalPending(false)
+        //     = false. PRESENCE CLEARS, even though projection says a run
+        //     is active. The transport's stale `turnInFlight=true` is
+        //     suppressed, AND the projection's "run active" is also
+        //     discarded — net effect: presence clears when it should
+        //     stay.
+        //   * Fix-state (`projectionRunActive = projection.anyRunActive`):
+        //     mask = true && true = true → effectiveTurnInFlight=true
+        //     → isStreaming = true. PRESENCE HELD, the projection's
+        //     "run active" decision wins.
+        //
+        // This is the regression test that catches a re-introduction of
+        // the structural no-op: if anyone reverts the presenter's wire
+        // back to `projectionRunActive = projection.anyLettaServerLocalPending`,
+        // the divergent fixture's `isStreaming` flips to false and the
+        // assert below fails. Today the test exercises a shape the real
+        // projector cannot produce, which is the honest limitation;
+        // the durable defence is the wire itself, and the test is the
+        // tripwire when it gets rewired wrong.
+        val presenter = ChatTimelinePresenter()
+        val projection = projectionOf(presenter)
+        // Sanity: a server-confirmed-only projection has both fields false.
+        // If either field ever changes meaning, this test fails LOUDLY
+        // rather than passing against the wrong shape.
+        assertFalse(
+            projection.anyLettaServerLocalPending,
+            "fixture invariant: server-confirmed-only timeline must have no Local-pending",
+        )
+        assertFalse(
+            projection.anyRunActive,
+            "fixture invariant: server-confirmed-only timeline must have no active run",
+        )
+        // Construct a divergent fixture: anyLettaServerLocalPending=false
+        // simulates the transport-side count having been settled (no
+        // Local pending entry), while anyRunActive=true simulates the
+        // projection-layer fact that a run is still unresolved (e.g. its
+        // final Confirmed never landed but the run's `isActive` has not
+        // flipped to false). This is the shape the wire MUST split —
+        // and today the projection's `projectRunActivity` cannot produce
+        // it, but the wire at the call site must be correct for when
+        // the run-state side of the projection learns to track
+        // turn-state independently.
+        val divergentProjection = projection.copy(
+            anyLettaServerLocalPending = false,
+            anyRunActive = true,
+            tailIsAssistant = true,
+        )
+
+        val presentation = presenter.present(
+            projection = divergentProjection,
+            signals = ChatPresenceSignals(
+                replyStreaming = false,
+                clientModeStreamInFlight = false,
+                a2uiThinkingActive = false,
+                duplicateInitialMessageInFlight = false,
+                turnInFlight = true,
+            ),
+            previousIsStreaming = false,
+            previousIsAgentTyping = false,
+        )
+        // isStreaming: with the divergent fixture
+        // (anyServerLocalPending=false, anyRunActive=true,
+        // tailIsAssistant=true) and turnInFlight=true, the two wirings
+        // produce OPPOSITE results:
+        //   bug-state:  effectiveTurnInFlight = true && false = false
+        //               → isStreaming = anyServerLocalPending(false)
+        //               = false. PRESENCE CLEARS, projection's "run
+        //               active" lost.
+        //   fix-state:  effectiveTurnInFlight = true && true = true
+        //               → isStreaming = true. PRESENCE HELD, projection
+        //               wins.
+        // The discriminating assertion below fails against any reversion
+        // of the presenter's wire to
+        // `projectionRunActive = projection.anyLettaServerLocalPending`.
+        assertTrue(
+            presentation.isStreaming,
+            "project.anyRunActive=true must hold streaming presence " +
+                "even when projection.anyLettaServerLocalPending=false — " +
+                "proves the mask reads anyRunActive, not " +
+                "anyLettaServerLocalPending.",
+        )
+    }
 }

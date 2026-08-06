@@ -3,6 +3,7 @@ package com.letta.mobile.ui.chat.render
 import com.letta.mobile.data.a2ui.A2uiHistoryExtractor
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
+import com.letta.mobile.data.chat.projection.projectRunActivity
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.DeliveryState
@@ -183,6 +184,20 @@ class ChatTimelineProjector {
         }
         val anyLettaServerLocalPending = pendingCount > 0
         val anyConfirmed = confirmedCount > 0
+        // letta-mobile-dir4k: the projection layer's view of "any run is still
+        // active." Today this collapses to the same boolean as
+        // [anyLettaServerLocalPending] because `projectRunActivity.isActive`
+        // is true iff a run contains a `isPending=true` message, and only
+        // Local+SENDING events carry `isPending=true` (server-confirmed
+        // messages have it false). Naming the signal at the projection layer
+        // keeps the presence mask's intent explicit and avoids re-deriving
+        // "is the run done?" from the implementation-side Local-pending count
+        // in callers that should be reading projection facts. Group over
+        // `live` (the just-projected UiMessages), not `combined` — the older
+        // prefix is fixed and never carries active runs.
+        val anyRunActive = live
+            .groupBy { it.runId }
+            .any { (_, msgs) -> projectRunActivity(msgs, false)?.isActive == true }
         val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
         val prefixToolCardCount = prefix.sumOf { it.toolCardCount() }
         val previousSnapshot = lastProjectionSnapshot
@@ -201,6 +216,7 @@ class ChatTimelineProjector {
             ui = reusedSnapshotUi ?: ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyRunActive = anyRunActive,
             anyConfirmed = anyConfirmed,
             a2uiMessages = if (renderedNoChange && previousSnapshot != null) previousSnapshot.a2uiMessages else a2uiMessages,
             toolCardCount = prefixToolCardCount + liveToolCardCount,
@@ -219,6 +235,7 @@ class ChatTimelineProjector {
             prefix = prefix,
             a2uiMessages = a2uiMessages.toList(),
             anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyRunActive = anyRunActive,
             anyConfirmed = anyConfirmed,
             toolCardCount = liveToolCardCount,
             prefixToolCardCount = prefixToolCardCount,
@@ -314,6 +331,7 @@ class ChatTimelineProjector {
                     ui = previous.uiSnapshot ?: combineOlderPrefix(prefix, previous.liveMessages).toImmutableList(),
                     tailIsAssistant = previous.tailIsAssistant,
                     anyLettaServerLocalPending = previous.anyLettaServerLocalPending,
+                    anyRunActive = previous.anyRunActive,
                     anyConfirmed = previous.anyConfirmed,
                     a2uiMessages = previous.a2uiMessages,
                     toolCardCount = previous.prefixToolCardCount + previous.toolCardCount,
@@ -397,6 +415,15 @@ class ChatTimelineProjector {
         }
         val anyLettaServerLocalPending = pendingCount > 0
         val anyConfirmed = confirmedCount > 0
+        // letta-mobile-dir4k: see full-path note above. Same shape on the
+        // fast/incremental path — group the just-built `live` list by runId
+        // and ask the projection layer whether any run is still active. The
+        // older prefix doesn't contribute (it is fixed state, never carrying
+        // an active run), so looking at `live` is both correct and the
+        // minimum scan.
+        val anyRunActive = live
+            .groupBy { it.runId }
+            .any { (_, msgs) -> projectRunActivity(msgs, false)?.isActive == true }
         val toolCardCount = if (appendTail) {
             previous.toolCardCount + tailRecord.toolCardCount
         } else {
@@ -415,6 +442,7 @@ class ChatTimelineProjector {
             prefix = prefix,
             a2uiMessages = a2uiMessages,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyRunActive = anyRunActive,
             anyConfirmed = anyConfirmed,
             toolCardCount = toolCardCount,
             prefixToolCardCount = previous.prefixToolCardCount,
@@ -432,6 +460,7 @@ class ChatTimelineProjector {
             ui = ui,
             tailIsAssistant = tailIsAssistant,
             anyLettaServerLocalPending = anyLettaServerLocalPending,
+            anyRunActive = anyRunActive,
             anyConfirmed = anyConfirmed,
             a2uiMessages = a2uiMessages,
             toolCardCount = previous.prefixToolCardCount + toolCardCount,
@@ -588,6 +617,18 @@ data class TimelineProjection(
     val ui: ImmutableList<UiMessage>,
     val tailIsAssistant: Boolean,
     val anyLettaServerLocalPending: Boolean,
+    /**
+     * letta-mobile-dir4k: true iff any run in the projection still has an
+     * active `projectRunActivity` (i.e. an unresolved run). Computed by
+     * grouping the just-projected `live` messages by `runId` and asking the
+     * projection layer (`RunActivityProjection.projectRunActivity`) whether
+     * any run is still active. Today this collapses to the same boolean as
+     * [anyLettaServerLocalPending] because the only way a run is active is
+     * via a `isPending=true` Local+SENDING message — but the projection
+     * owns the semantic so the presence mask reads the projection fact, not
+     * an implementation detail of how pending is counted.
+     */
+    val anyRunActive: Boolean,
     val anyConfirmed: Boolean,
     val a2uiMessages: List<A2uiMessage>,
     val toolCardCount: Int,
@@ -613,6 +654,7 @@ private data class CachedTimelineProjectionSnapshot(
     val prefix: List<UiMessage>,
     val a2uiMessages: List<A2uiMessage>,
     val anyLettaServerLocalPending: Boolean,
+    val anyRunActive: Boolean,
     val anyConfirmed: Boolean,
     val toolCardCount: Int,
     val prefixToolCardCount: Int,
