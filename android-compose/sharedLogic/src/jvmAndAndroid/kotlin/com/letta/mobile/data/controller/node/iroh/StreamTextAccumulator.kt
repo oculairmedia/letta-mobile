@@ -72,11 +72,25 @@ internal class CumulativeStreamText {
         )
     }
 
-    private fun textKey(delta: JsonObject, messageType: String): String =
-        delta["otid"]?.jsonPrimitive?.contentOrNull
+    /**
+     * Group streamed text by stable message identity.
+     *
+     * Upstream Node stream_delta frames often rotate `delta.id` per fragment
+     * (cm-stream-a/b/c) and omit `otid` on the streaming path. Falling through
+     * to that rotating id made each fragment its own byKey entry → staircase
+     * rows (letta-mobile-64ies). Prefer otid, then run_id, then message_id,
+     * and only then the frame id.
+     */
+    private fun textKey(delta: JsonObject, messageType: String): String {
+        val otid = delta["otid"]?.jsonPrimitive?.contentOrNull
+        if (otid != null && otid.isNotBlank()) return "$otid:$messageType"
+        val runId = delta["run_id"]?.jsonPrimitive?.contentOrNull
+        if (runId != null && runId.isNotBlank()) return "$runId:$messageType"
+        // Last resort only — prefer message_id over rotating frame id.
+        return delta["message_id"]?.jsonPrimitive?.contentOrNull
             ?: delta["id"]?.jsonPrimitive?.contentOrNull
-            ?: delta["message_id"]?.jsonPrimitive?.contentOrNull
             ?: messageType
+    }
 
     private fun textFrom(element: JsonElement?): String? {
         if (element == null) return null

@@ -7,31 +7,17 @@ import kotlin.test.assertTrue
 
 class ChatStreamingPresenceTest {
 
-    private fun derive(
-        previousIsStreaming: Boolean = false,
-        previousIsAgentTyping: Boolean = false,
-        anyServerLocalPending: Boolean = false,
-        tailIsAssistant: Boolean = false,
-        replyStreaming: Boolean = false,
-        clientModeStreamInFlight: Boolean = false,
-        a2uiThinkingActive: Boolean = false,
-        duplicateInitialMessageInFlight: Boolean = false,
-        turnInFlight: Boolean = false,
-    ) = ChatStreamingPresencePolicy.derive(
-        previousIsStreaming = previousIsStreaming,
-        previousIsAgentTyping = previousIsAgentTyping,
-        anyServerLocalPending = anyServerLocalPending,
-        tailIsAssistant = tailIsAssistant,
-        replyStreaming = replyStreaming,
-        clientModeStreamInFlight = clientModeStreamInFlight,
-        a2uiThinkingActive = a2uiThinkingActive,
-        duplicateInitialMessageInFlight = duplicateInitialMessageInFlight,
-        turnInFlight = turnInFlight,
-    )
+    // Default ChatStreamInputs (all signals idle). Tests call `.derive(...)`
+    // to copy with only the fields they exercise, keeping the test surface
+    // ergonomic AND inside the CodeScene "max 4 args per function" budget
+    // by avoiding a ten-parameter wrapper.
+    private val idleInputs = ChatStreamInputs()
+    private fun derive(overrides: ChatStreamInputs.() -> ChatStreamInputs) =
+        ChatStreamingPresencePolicy.derive(inputs = idleInputs.overrides())
 
     @Test
     fun idleWhenNothingInFlight() {
-        val p = derive()
+        val p = derive { this }
         assertFalse(p.isStreaming)
         assertFalse(p.isAgentTyping)
     }
@@ -45,12 +31,9 @@ class ChatStreamingPresenceTest {
         // true, presence holds: streaming stays true; typing is suppressed only
         // because the tail is a settled assistant message (show the glow, not
         // the dots).
-        val p = derive(
-            turnInFlight = true,
-            replyStreaming = false,
-            anyServerLocalPending = false,
-            tailIsAssistant = true,
-        )
+        val p = derive {
+            copy(turnInFlight = true, projectionRunActive = true, tailIsAssistant = true)
+        }
         assertTrue(p.isStreaming)
         assertFalse(p.isAgentTyping)
     }
@@ -60,12 +43,9 @@ class ChatStreamingPresenceTest {
         // Inter-round gap where the tail is not yet a settled assistant message
         // (e.g. right after a tool return, before the next assistant text):
         // presence holds as full working state including the typing indicator.
-        val p = derive(
-            turnInFlight = true,
-            replyStreaming = false,
-            anyServerLocalPending = false,
-            tailIsAssistant = false,
-        )
+        val p = derive {
+            copy(turnInFlight = true, projectionRunActive = true, tailIsAssistant = false)
+        }
         assertTrue(p.isStreaming)
         assertTrue(p.isAgentTyping)
     }
@@ -74,46 +54,82 @@ class ChatStreamingPresenceTest {
     fun turnInFlightFalseIsUnchangedFromLegacyBehavior() {
         // Regression guard: with turnInFlight=false the derivation is identical
         // to before this signal existed (falls through to anyServerLocalPending).
-        val idle = derive(turnInFlight = false)
+        val idle = derive { this }
         assertFalse(idle.isStreaming)
         assertFalse(idle.isAgentTyping)
-        val pending = derive(turnInFlight = false, anyServerLocalPending = true, tailIsAssistant = false)
+        val pending = derive {
+            copy(anyServerLocalPending = true, tailIsAssistant = false)
+        }
         assertTrue(pending.isStreaming)
         assertTrue(pending.isAgentTyping)
+    }
+
+    @Test
+    fun staleTurnInFlightIsMaskedByProjectionRunActiveFalse() {
+        // letta-mobile-dir4k: the projection says the run is settled, but the
+        // transport's `turnInFlight` signal is still true for one observer
+        // cycle (e.g. the engine's terminal `emitTurnFrame` has not run yet
+        // to retire the `ActiveTurn` entry). Without the projection mask the
+        // derive returns `isStreaming=true` and the composer keeps showing
+        // "Thinking…" + the red cancel button while the run disclosure
+        // correctly shows "Worked for 5.0s" — the exact stuck-state bug.
+        val stuck = derive {
+            // The projection's "any server run pending" gate. False means the
+            // projection has folded the run — its run-activity fact is gone.
+            // The tail is a settled assistant message (the run finished and
+            // the assistant text landed). This is the state the user sees at
+            // the end of a successful reply.
+            copy(turnInFlight = true, projectionRunActive = false, tailIsAssistant = true)
+        }
+        assertFalse(stuck.isStreaming, "stale turnInFlight must not keep streaming presence alive")
+        assertFalse(stuck.isAgentTyping, "stale turnInFlight must not keep typing presence alive")
+    }
+
+    @Test
+    fun freshTurnInFlightWithProjectionRunActiveKeepsPresence() {
+        // letta-mobile-dir4k: the positive control — when both signals agree
+        // (projection says run is pending AND transport says turn is in
+        // flight), presence is held just like the c4igq.7 inter-round gap
+        // case. This guards against the mask from being too aggressive and
+        // regressing the multi-tool-round flicker fix.
+        val fresh = derive {
+            copy(turnInFlight = true, projectionRunActive = true, tailIsAssistant = true)
+        }
+        assertTrue(fresh.isStreaming)
+        assertFalse(fresh.isAgentTyping)
     }
 
     @Test
     fun clientModeStreamHoldsPreviousFlags() {
         // The runtime owns the flags during a client-mode turn — other signals
         // are ignored and the prior values are preserved.
-        val p = derive(
-            previousIsStreaming = true,
-            previousIsAgentTyping = false,
-            clientModeStreamInFlight = true,
-            replyStreaming = true,
-            anyServerLocalPending = true,
-        )
+        val p = derive {
+            copy(
+                previousIsStreaming = true,
+                clientModeStreamInFlight = true,
+            )
+        }
         assertTrue(p.isStreaming)
         assertFalse(p.isAgentTyping)
     }
 
     @Test
     fun replyStreamingShowsStreamingAndTyping() {
-        val p = derive(replyStreaming = true)
+        val p = derive { copy(replyStreaming = true) }
         assertTrue(p.isStreaming)
         assertTrue(p.isAgentTyping)
     }
 
     @Test
     fun a2uiThinkingShowsWorking() {
-        val p = derive(a2uiThinkingActive = true)
+        val p = derive { copy(a2uiThinkingActive = true) }
         assertTrue(p.isStreaming)
         assertTrue(p.isAgentTyping)
     }
 
     @Test
     fun duplicateInitialFollowShowsWorking() {
-        val p = derive(duplicateInitialMessageInFlight = true)
+        val p = derive { copy(duplicateInitialMessageInFlight = true) }
         assertTrue(p.isStreaming)
         assertTrue(p.isAgentTyping)
     }
@@ -123,11 +139,15 @@ class ChatStreamingPresenceTest {
         // A still-sending local message: working. Typing while the tail is the
         // user's own prompt; once an assistant tail lands it's streaming, not
         // typing.
-        val beforeReply = derive(anyServerLocalPending = true, tailIsAssistant = false)
+        val beforeReply = derive {
+            copy(anyServerLocalPending = true, tailIsAssistant = false)
+        }
         assertTrue(beforeReply.isStreaming)
         assertTrue(beforeReply.isAgentTyping)
 
-        val afterReplyStarts = derive(anyServerLocalPending = true, tailIsAssistant = true)
+        val afterReplyStarts = derive {
+            copy(anyServerLocalPending = true, tailIsAssistant = true)
+        }
         assertTrue(afterReplyStarts.isStreaming)
         assertFalse(afterReplyStarts.isAgentTyping)
     }
