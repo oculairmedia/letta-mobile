@@ -62,6 +62,7 @@ class ChatPresentationGoldenTest {
             Timeline(conversationId = conv, events = events.toPersistentList(), stablePrefixVersion = version),
             olderPrefixFor(conv),
             ChatUiState(),
+            isActiveRunStreaming = false,
         )
 
     /** Signals for a settled, non-streaming, server-mode turn (the common idle case). */

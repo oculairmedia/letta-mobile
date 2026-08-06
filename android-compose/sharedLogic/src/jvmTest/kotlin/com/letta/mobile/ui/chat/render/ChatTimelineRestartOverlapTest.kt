@@ -60,7 +60,7 @@ class ChatTimelineRestartOverlapTest {
         val initialTimeline = Timeline(conversationId = conv, events = persistedEvents.toPersistentList(), stablePrefixVersion = 1)
 
         // First projection
-        val initialProjection = projector.project(initialTimeline, projector.olderPrefixFor(conv), ChatUiState())
+        val initialProjection = projector.project(initialTimeline, projector.olderPrefixFor(conv), ChatUiState(), isActiveRunStreaming = false)
         assertEquals(3, initialProjection.ui.size)
         
         // Find the index of assistant messages, order may change because older messages could prepend or projector re-orders
@@ -102,7 +102,7 @@ class ChatTimelineRestartOverlapTest {
         assertEquals(3, overlappedTimeline.events.size, "No duplicates after stream reducer")
 
         // 4. Project the fully overlapped/replayed timeline
-        val overlappedProjection = projector.project(overlappedTimeline, projector.olderPrefixFor(conv), ChatUiState())
+        val overlappedProjection = projector.project(overlappedTimeline, projector.olderPrefixFor(conv), ChatUiState(), isActiveRunStreaming = false)
         
         // Assert idempotency: stable IDs, no duplicates, no reordered text
         assertEquals(3, overlappedProjection.ui.size)

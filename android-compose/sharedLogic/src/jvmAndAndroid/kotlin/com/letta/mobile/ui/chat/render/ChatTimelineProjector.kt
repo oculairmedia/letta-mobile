@@ -128,15 +128,23 @@ class ChatTimelineProjector {
     /**
      * Project [timeline] into a [TimelineProjection]. [prefix] is the
      * pagination prefix (see [olderPrefixFor]); [previousState] is read only for
-     * telemetry context (streaming/loading flags).
+     * telemetry context (streaming/loading flags); [isActiveRunStreaming] is
+     * the transport's "turn is in flight" latch — threaded through to
+     * [projectRunActivity] so [TimelineProjection.anyRunActive] (and therefore
+     * the chat-presence mask) stays true across inter-tool-call gaps where no
+     * `isPending=true` message is currently in `live`. Without this flag the
+     * projection collapses to the same boolean as
+     * [TimelineProjection.anyLettaServerLocalPending] and the Thinking chip
+     * drops mid-turn between tools. See bead letta-mobile-dir4k.1.
      */
     fun project(
         timeline: Timeline,
         prefix: List<UiMessage>,
         previousState: ChatUiState,
+        isActiveRunStreaming: Boolean,
     ): TimelineProjection {
         val startedAtMs = System.currentTimeMillis()
-        tailProjectionFastPath(timeline = timeline, prefix = prefix)?.let { fastProjection ->
+        tailProjectionFastPath(timeline = timeline, prefix = prefix, isActiveRunStreaming = isActiveRunStreaming)?.let { fastProjection ->
             emitProjectionTelemetry(
                 timeline = timeline,
                 projection = fastProjection,
@@ -197,7 +205,7 @@ class ChatTimelineProjector {
         // prefix is fixed and never carries active runs.
         val anyRunActive = live
             .groupBy { it.runId }
-            .any { (_, msgs) -> projectRunActivity(msgs, false)?.isActive == true }
+            .any { (_, msgs) -> projectRunActivity(msgs, isActiveRunStreaming)?.isActive == true }
         val liveToolCardCount = nextRecords.sumOf { it.toolCardCount }
         val prefixToolCardCount = prefix.sumOf { it.toolCardCount() }
         val previousSnapshot = lastProjectionSnapshot
@@ -285,6 +293,7 @@ class ChatTimelineProjector {
     private fun tailProjectionFastPath(
         timeline: Timeline,
         prefix: List<UiMessage>,
+        isActiveRunStreaming: Boolean,
     ): TimelineProjection? {
         val previous = lastProjectionSnapshot ?: return null
         if (previous.conversationId != timeline.conversationId || timeline.events.isEmpty()) return null
@@ -327,11 +336,24 @@ class ChatTimelineProjector {
         if (replaceTail) {
             val previousTailRecord = previous.records.lastOrNull()
             if (previousTailRecord != null && tailRecord.rendersSameAs(previousTailRecord)) {
+                // letta-mobile-dir4k.1: even when the projected tail is
+                // byte-identical (no rendering change), the caller may have
+                // flipped `isActiveRunStreaming` between calls — the
+                // transport's turn latch fires `Working` between tool calls
+                // and clears it on settle, and this is the seam where the
+                // "no visible diff" optimization would otherwise mask that
+                // flip. Recompute `anyRunActive` against the live+snapshot
+                // input set using the NEW `isActiveRunStreaming` value so
+                // the chip state can move down on settle while leaving
+                // everything else on the no-op fast path.
+                val recomputedAnyRunActive = previous.liveMessages
+                    .groupBy { it.runId }
+                    .any { (_, msgs) -> projectRunActivity(msgs, isActiveRunStreaming)?.isActive == true }
                 return TimelineProjection(
                     ui = previous.uiSnapshot ?: combineOlderPrefix(prefix, previous.liveMessages).toImmutableList(),
                     tailIsAssistant = previous.tailIsAssistant,
                     anyLettaServerLocalPending = previous.anyLettaServerLocalPending,
-                    anyRunActive = previous.anyRunActive,
+                    anyRunActive = recomputedAnyRunActive,
                     anyConfirmed = previous.anyConfirmed,
                     a2uiMessages = previous.a2uiMessages,
                     toolCardCount = previous.prefixToolCardCount + previous.toolCardCount,
@@ -423,7 +445,7 @@ class ChatTimelineProjector {
         // minimum scan.
         val anyRunActive = live
             .groupBy { it.runId }
-            .any { (_, msgs) -> projectRunActivity(msgs, false)?.isActive == true }
+            .any { (_, msgs) -> projectRunActivity(msgs, isActiveRunStreaming)?.isActive == true }
         val toolCardCount = if (appendTail) {
             previous.toolCardCount + tailRecord.toolCardCount
         } else {
