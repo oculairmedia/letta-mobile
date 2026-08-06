@@ -249,8 +249,13 @@ private fun DrawScope.drawAmbientFallback(
     // agitation approximates the shader's drift so the fallback still gets
     // livelier when the shader would.
     val wobble = sin(phase * 2.7f) * 0.03f * agitation
-    val radius = size.maxDimension * (0.52f + 0.12f * breath + wobble)
-    val center = Offset(size.width * 0.5f, size.height * 0.92f)
+    // letta-mobile-shader-position-2026-08-06: anchor pushed from 0.92 to
+    // 0.985 so the bright zone sits at the very bottom edge; radius
+    // tightened (0.56 -> 0.46) so the band is short and subtle rather
+    // than broad — pairs with shader-side alpha narrowing for a thin
+    // under-composer glow.
+    val radius = size.maxDimension * (0.46f + 0.12f * breath + wobble)
+    val center = Offset(size.width * 0.5f, size.height * 0.985f)
     drawRect(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
