@@ -18,7 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -140,7 +143,26 @@ internal fun RunBlock(
     // auto-collapse flag until completion without mutating the caller-owned
     // expansion state.
     val collapsible = messages.size > 1
-    val effectiveCollapsed = collapsible && collapsed && !activity.isActive
+    // letta-mobile-tz1sp (refined Simple projection): Aether's post-turn shape
+    // collapses the disclosure once the run has settled so the assistant prose
+    // is the primary surface. We track the user's "I want this expanded"
+    // override locally so the Simple auto-fold defaults new runs while still
+    // honouring an explicit tap-to-expand. Interactive/Debug keep the prior
+    // caller-owned `collapsed` semantics across the same boundary.
+    var userExpandedOverride by remember(messages) { mutableStateOf(false) }
+    val effectiveCollapsed = when {
+        !collapsible -> false
+        activity.isActive -> false
+        chatMode == "simple" -> !userExpandedOverride
+        else -> collapsed
+    }
+    val toggleCollapsed: () -> Unit = {
+        if (chatMode == "simple") {
+            userExpandedOverride = !userExpandedOverride
+        } else {
+            onToggleCollapsed()
+        }
+    }
 
     val runIdentityColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.24f)
 
@@ -156,7 +178,7 @@ internal fun RunBlock(
             activity = activity,
             collapsed = effectiveCollapsed,
             collapsible = collapsible,
-            onToggleCollapsed = onToggleCollapsed,
+            onToggleCollapsed = toggleCollapsed,
             chatMode = chatMode,
         )
 
