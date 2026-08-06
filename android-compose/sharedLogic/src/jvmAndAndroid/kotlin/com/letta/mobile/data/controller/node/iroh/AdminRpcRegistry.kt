@@ -45,6 +45,7 @@ object AdminRpcRegistry {
         "tool.attach",
         "tool.detach",
         "agent.list",
+        "agent.count",
         "subagent.list",
         "subagent.todos",
         "health.check",

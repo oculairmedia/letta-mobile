@@ -252,6 +252,27 @@ class IrohAgentAndScheduleRepositoryTest {
     }
 
     @Test
+    fun countAgentsUsesAuthoritativeAgentCountNotCachedListSize() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohAdminTransport()
+        transport.rpcResponder = { call ->
+            when (call.method) {
+                "agent.list" -> ok("""[{"id":"agent-1","name":"Only"}]""")
+                "agent.count" -> {
+                    assertEquals("/v1/agents/count", call.path)
+                    ok("131")
+                }
+                else -> error("unexpected rpc ${call.method}")
+            }
+        }
+        val repository = IrohAgentRepository { IrohAdminRpcAgentDirectory(transport) }
+        repository.refreshAgents()
+        assertEquals(1, repository.agents.value.size)
+        // Cache has 1 agent; authoritative count is 131 — must not return .size.
+        assertEquals(131, repository.countAgents())
+        assertTrue(transport.rpcCalls.any { it.method == "agent.count" })
+    }
+
+    @Test
     fun getAgentPropagatesCancellationInsteadOfReturningCachedAgent() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohAdminTransport()
         transport.rpcResponder = { call ->

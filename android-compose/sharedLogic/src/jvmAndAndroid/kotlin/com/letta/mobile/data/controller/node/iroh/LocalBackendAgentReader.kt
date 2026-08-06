@@ -26,8 +26,14 @@ internal class LocalBackendAgentReader(
      * Port of admin-shim `GET /v1/agents` (non-slim): read `agents/{id}.json`, sort
      * by file mtime desc, page by offset/limit, project each via [agentToLettaState].
      * The LIST endpoint never hydrates transcripts (message_ids -> []). Returns null
-     * on any error so the caller falls back to the shim proxy.
+     * on any error so the caller fails closed.
+     *
+     * letta-mobile-ulz2b.1: [countAgents] returns the authoritative roster size
+     * from the same on-disk records without projecting full objects. Completeness
+     * is proven by the directory listing itself (no page / offset).
      */
+    fun countAgents(): Int? = runCatching { readAgentRecords().size }.getOrNull()
+
     fun listAgentsProjected(limit: Int?, offset: Int?): JsonArray? = runCatching {
         val records = readAgentRecords().sortedByDescending { it.mtimeMs }
         val from = (offset ?: 0).coerceAtLeast(0)

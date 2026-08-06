@@ -30,10 +30,7 @@ class IrohAgentRepository(
     override val isRefreshing: StateFlow<Boolean> = refreshingFlow
     override val refreshError: StateFlow<Throwable?> = refreshErrorFlow
 
-    override suspend fun countAgents(): Int {
-        if (agentsFlow.value.isEmpty()) refreshAgents()
-        return agentsFlow.value.size
-    }
+    override suspend fun countAgents(): Int = directory().countAgents()
 
     override suspend fun refreshAgents() {
         refreshingFlow.value = true

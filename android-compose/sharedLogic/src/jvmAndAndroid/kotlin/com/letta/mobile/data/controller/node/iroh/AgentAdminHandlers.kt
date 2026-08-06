@@ -107,7 +107,24 @@ object AgentAdminHandlers {
                 if (response.success) buildJsonObject { put("deleted", true) } as JsonObject else null
             }
         }
+        // letta-mobile-ulz2b.1: authoritative scalar roster size from the on-disk
+        // agent catalog. Completeness is the directory listing itself — never a
+        // client agent.list .size. Absent store fails closed (same contract as
+        // agent.context / block.list); no admin-HTTP / silent-0 fallback.
+        registerAgentCount(router, tiers.localBackendStore)
         registerAgentContext(router, tiers.localBackendStore)
+    }
+
+    private fun registerAgentCount(router: AdminRpcRouter, store: LocalBackendAdminStore?) {
+        if (store == null) {
+            CapabilityUnavailable.register(router, setOf("agent.count"), service = "local_backend_store")
+            return
+        }
+        router.register("agent.count") { _ ->
+            val count = store.countAgents()
+                ?: adminError("agent.count could not read the local backend agent store")
+            JsonPrimitive(count)
+        }
     }
 
     /**

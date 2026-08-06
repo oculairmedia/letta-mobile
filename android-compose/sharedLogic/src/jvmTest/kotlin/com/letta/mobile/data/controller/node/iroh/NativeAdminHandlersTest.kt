@@ -19,6 +19,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -215,6 +216,47 @@ class NativeAdminHandlersTest {
         val r = router(client)
         val response = dispatch(r, "agent.list", mapOf("limit" to "2", "offset" to "10"))
         assertFalse("agent-" in response, "expected empty page, got: $response")
+    }
+
+    // letta-mobile-ulz2b.1: agent.count is an authoritative scalar, never a
+    // client-side .size of a (possibly truncated) agent.list sweep.
+    @Test
+    fun agentCountFromLocalBackendStoreReturnsAuthoritativeSize() = runTest {
+        val root = kotlin.io.path.createTempDirectory("ulz2b1-count-store").toFile()
+        LocalBackendFixtureStore.create(root) // seeds agent-1
+        LocalBackendFixtureStore.writeAgent(root, "agent-a", name = "A")
+        LocalBackendFixtureStore.writeAgent(root, "agent-b", name = "B")
+        // create() + two writes = 3 agents on disk
+        val native = FakeNativeClient(agentRosterSize = 1)
+        val r = AdminRpcRouter()
+        AgentAdminHandlers.register(
+            r,
+            controller = null,
+            tiers = NativeReadTiers(
+                nativeClient = native,
+                localBackendStore = LocalBackendAdminStore(root, lmstudioBaseUrl = "http://e/v1"),
+            ),
+        )
+        val response = dispatch(r, "agent.count", emptyMap())
+        val payload = Json.parseToJsonElement(response).jsonObject
+        assertEquals(true, payload.getValue("success").jsonPrimitive.boolean)
+        assertEquals(3, payload.getValue("result").jsonPrimitive.int)
+        // Store path must not dial native agent_list.
+        assertFalse("agent_list" in native.calls, "store-backed count must not dial native: ${native.calls}")
+    }
+
+    @Test
+    fun agentCountWithoutStoreFailsClosedWithCapabilityUnavailable() = runTest {
+        val client = FakeNativeClient(agentRosterSize = 7)
+        val r = router(client)
+        val response = dispatch(r, "agent.count", emptyMap())
+        val payload = Json.parseToJsonElement(response).jsonObject
+        assertEquals(false, payload.getValue("success").jsonPrimitive.boolean)
+        assertTrue(
+            payload.getValue("error").jsonPrimitive.content.contains("capability_unavailable"),
+            "absent store must deny, got: $response",
+        )
+        assertFalse("agent_list" in client.calls, "must not dial native when store is absent")
     }
 
     private suspend fun dispatch(r: AdminRpcRouter, method: String, params: Map<String, String>): String =

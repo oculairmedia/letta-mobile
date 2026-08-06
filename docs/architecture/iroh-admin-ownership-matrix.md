@@ -8,7 +8,7 @@ Beads: `letta-mobile-lgns8.13`
 > state ownership, cache invalidation, and audit procedure, start with
 > [App Server v2 and Meridian State Audit Specification](app-server-v2-audit-spec.md).
 > The machine-readable ownership matrix remains authoritative for the currently
-> registered method set (**89 methods**; owner/fallback counts in that doc and
+> registered method set (**90 methods**; owner/fallback counts in that doc and
 > `iroh-admin-ownership-matrix.json`). Counts below are historical (2026-07-22)
 > and must not be treated as current.
 

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -10,10 +11,6 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /**
@@ -44,6 +41,7 @@ class IrohAdminRpcAgentSource(
         explicitNulls = false
         coerceInputValues = true
     },
+    private val agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
 ) {
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
@@ -226,6 +224,12 @@ class IrohAdminRpcAgentSource(
     }
 
     /**
+     * letta-mobile-ulz2b.1: authoritative roster size via the shared
+     * [IrohAdminRpcAgentDirectory.countAgents] seam. Never silent-0 on failure.
+     */
+    suspend fun countAgents(): Int = agentDirectory.countAgents()
+
+    /**
      * letta-mobile-z5lqt: compare the swept roster against the authoritative
      * `agent.count`. Observation only — the swept list is returned unchanged
      * whatever this reports, and a failure to measure is recorded as UNKNOWN
@@ -233,26 +237,11 @@ class IrohAdminRpcAgentSource(
      */
     private suspend fun reportRosterCompleteness(sweptSize: Int) {
         if (!Telemetry.rosterCompletenessProbeEnabled.get()) return
-        val authoritative = runCatching { fetchAuthoritativeAgentCount() }
+        val authoritative = runCatching { agentDirectory.countAgents() }
         RosterNameTelemetry.rosterCompleteness(
             outcome = RosterNameTelemetry.classifyCompleteness(sweptSize, authoritative),
             source = TELEMETRY_SOURCE,
         )
-    }
-
-    /** @return the server-reported total, or null when it is unavailable. */
-    private suspend fun fetchAuthoritativeAgentCount(): Int? {
-        val response = channelTransport.adminRpc(
-            method = "agent.count",
-            path = "/v1/agents/count",
-            body = "{}",
-        )
-        if (!response.success) return null
-        val result = response.result ?: return null
-        // `/v1/agents/count` returns a bare number; tolerate a `{"count": n}`
-        // envelope too rather than misreporting a shape change as a mismatch.
-        return (result as? JsonPrimitive)?.intOrNull
-            ?: (result as? JsonObject)?.get("count")?.jsonPrimitive?.intOrNull
     }
 
     private companion object {

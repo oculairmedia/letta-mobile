@@ -1977,6 +1977,7 @@ class IrohChannelTransport(
             // which they must stay OFF (see isLegacyFallbackSafeAdminRpcMethod).
             "agent.get",
             "agent.list",
+            "agent.count",
             "agent.context",
             "subagent.list",
             "subagent.todos",

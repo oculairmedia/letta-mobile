@@ -507,6 +507,51 @@ class AgentRepositoryTest {
     }
 
     @Test
+    fun `countAgents in iroh mode routes via agent_count admin_rpc`() = runTest {
+        val settings = com.letta.mobile.testutil.FakeSettingsRepository(
+            initialActiveConfig = com.letta.mobile.data.model.LettaConfig(
+                id = "test",
+                mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://test",
+                accessToken = "t",
+            ),
+        )
+        val transport = com.letta.mobile.testutil.FakeChannelTransport()
+        transport.adminRpcHandler = { method, _, _ ->
+            when (method) {
+                "agent.count" -> com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = kotlinx.serialization.json.JsonPrimitive(131),
+                    error = null,
+                )
+                "agent.list" -> com.letta.mobile.data.transport.appserver.AppServerInboundFrame.AdminRpcResponse(
+                    requestId = "req",
+                    success = true,
+                    result = kotlinx.serialization.json.JsonArray(emptyList()),
+                    error = null,
+                )
+                else -> error("unexpected admin_rpc method: $method")
+            }
+        }
+        val irohSource = IrohAdminRpcAgentSource(transport, settings)
+        val apiThatThrows = object : FakeAgentApi() {
+            override suspend fun countAgents(): Int {
+                throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
+            }
+        }
+        val repo = AgentRepository(
+            apiThatThrows,
+            FakeAgentDao(),
+            settingsRepository = settings,
+            transport = transport,
+            irohAgentSource = irohSource,
+        )
+        assertEquals(131, repo.countAgents())
+        assertTrue(transport.adminRpcCalls.any { it.method == "agent.count" })
+    }
+
+    @Test
     fun `createAgent in iroh mode routes via admin_rpc`() = runTest {
         val settings = com.letta.mobile.testutil.FakeSettingsRepository(
             initialActiveConfig = com.letta.mobile.data.model.LettaConfig(id = "test", mode = com.letta.mobile.data.model.LettaConfig.Mode.SELF_HOSTED, serverUrl = "iroh://test", accessToken = "t")

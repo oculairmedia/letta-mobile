@@ -115,7 +115,7 @@ object IrohPeerCapabilities {
     private val CHAT_READ_METHODS = setOf(
         "conversation.list", "conversation.get",
         "message.list", "message.get", "tool_return.get",
-        "agent.list", "agent.get", "agent.context",
+        "agent.list", "agent.count", "agent.get", "agent.context",
         "model.list", "model.list.embedding",
         "subagent.list", "subagent.todos",
         "slash_command.list", "slash_command.list_agent",

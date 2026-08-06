@@ -83,7 +83,13 @@ open class AgentRepository(
         }
     }
 
-    override suspend fun countAgents(): Int = agentApi.countAgents()
+    override suspend fun countAgents(): Int {
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.countAgents()
+        }
+        return agentApi.countAgents()
+    }
 
     /**
      * Slim agent list for picker UIs (Schedules dropdown). Hits the
