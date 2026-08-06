@@ -2,6 +2,7 @@ package com.letta.mobile.ui.chat.render
 
 import com.letta.mobile.data.a2ui.A2uiMessage
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
+import com.letta.mobile.data.chat.runtime.ChatStreamInputs
 import com.letta.mobile.data.chat.runtime.ChatStreamingPresencePolicy
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.Timeline
@@ -85,16 +86,27 @@ class ChatTimelinePresenter {
         previousIsStreaming: Boolean,
         previousIsAgentTyping: Boolean,
     ): ChatPresentation {
+        // letta-mobile-dir4k: feed the projection's "run is still active" flag
+        // into the presence policy so a stale `signals.turnInFlight` cannot
+        // keep presence stuck after the projection has folded. The transport's
+        // ActiveTurn entry can linger one cycle after the projection settles
+        // (e.g. the engine's `emitTurnFrame` for the terminal has not run
+        // yet) — without this mask the composer kept showing "Thinking…" +
+        // the red cancel button while the run disclosure correctly showed
+        // "Worked for 5.0s".
         val presence = ChatStreamingPresencePolicy.derive(
-            previousIsStreaming = previousIsStreaming,
-            previousIsAgentTyping = previousIsAgentTyping,
-            anyServerLocalPending = projection.anyLettaServerLocalPending,
-            tailIsAssistant = projection.tailIsAssistant,
-            replyStreaming = signals.replyStreaming,
-            clientModeStreamInFlight = signals.clientModeStreamInFlight,
-            a2uiThinkingActive = signals.a2uiThinkingActive,
-            duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
-            turnInFlight = signals.turnInFlight,
+            inputs = ChatStreamInputs(
+                previousIsStreaming = previousIsStreaming,
+                previousIsAgentTyping = previousIsAgentTyping,
+                anyServerLocalPending = projection.anyLettaServerLocalPending,
+                tailIsAssistant = projection.tailIsAssistant,
+                replyStreaming = signals.replyStreaming,
+                clientModeStreamInFlight = signals.clientModeStreamInFlight,
+                a2uiThinkingActive = signals.a2uiThinkingActive,
+                duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
+                turnInFlight = signals.turnInFlight,
+                projectionRunActive = projection.anyLettaServerLocalPending,
+            )
         )
         return ChatPresentation(
             messages = projection.ui,
