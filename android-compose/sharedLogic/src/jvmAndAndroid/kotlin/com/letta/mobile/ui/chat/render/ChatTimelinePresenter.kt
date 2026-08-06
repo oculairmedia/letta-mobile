@@ -105,7 +105,16 @@ class ChatTimelinePresenter {
                 a2uiThinkingActive = signals.a2uiThinkingActive,
                 duplicateInitialMessageInFlight = signals.duplicateInitialMessageInFlight,
                 turnInFlight = signals.turnInFlight,
-                projectionRunActive = projection.anyLettaServerLocalPending,
+                // letta-mobile-dir4k fix-forward: read the projection-layer
+                // "is any run still active" fact (added to TimelineProjection
+                // as `anyRunActive`) rather than the implementation-side
+                // Local-pending count. Same boolean value today, but the name
+                // is correct and the brief's regression test (which wires
+                // both mask inputs from their REAL production sources and
+                // flips each independently) can prove the mask is actually a
+                // defence rather than a structural no-op hiding behind
+                // aliasing.
+                projectionRunActive = projection.anyRunActive,
             )
         )
         return ChatPresentation(
