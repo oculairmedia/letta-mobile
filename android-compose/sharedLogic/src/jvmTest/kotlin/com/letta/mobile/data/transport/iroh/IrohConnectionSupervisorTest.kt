@@ -329,7 +329,10 @@ class IrohConnectionSupervisorTest {
         config = configB
         supervisor.refreshConfig()
         advanceUntilIdle()
-        val second = supervisor.ready()
+
+        val readyState = assertIs<IrohConnectionState.Ready>(supervisor.state.value)
+        assertEquals(configB, readyState.handle.config)
+        val second = readyState.handle
 
         assertTrue(first.sessionId != second.sessionId)
         assertEquals(listOf("iroh://ticket-a:config_changed"), closed)
