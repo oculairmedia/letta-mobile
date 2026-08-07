@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
 /**
@@ -81,6 +82,37 @@ class LocalBackendAdminStore(
 
     /** See [LocalBackendRunReader.listRuns]. */
     internal fun listRunsProjected(query: RunQuery): JsonArray? = runReader.listRuns(query)
+
+    /**
+     * bn008.6: set of conversationIds with at least one `active=true` run for
+     * [agentId]. Used by the a2a receiver's `conversationsFor` closure to mark
+     * a conversation `busy` so the router queues instead of re-triggering.
+     *
+     * Empty on any read failure — the router will treat every candidate as
+     * idle, which is the safe default for a freshness-critical routing decision.
+     *
+     * **Truncation caveat (N1):** the underlying `limit = 200` is a SAFETY
+     * CAP, not a page size. If an agent has more than 200 active runs we
+     * return only the first 200's conversation_ids — busy conversations on
+     * longer-tailed agents can be reported as idle, causing the a2a router
+     * to return [Deliver][IrohAgentMessageRouter.RoutingDecision.Deliver]
+     * instead of [Queue][IrohAgentMessageRouter.RoutingDecision.Queue].
+     * Layer-2 fix: bump the limit (it caps the JSON page, not the disk walk)
+     * or replace the boolean with a separate authoritative count store.
+     * Filed as a follow-up bead; not blocking layer-1 because a `busy=false`
+     * miss at most costs a same-runtime second turn, not a deliver/queue
+     * correctness violation.
+     */
+    fun activeConversationIds(agentId: String): Set<String> = runCatching {
+        val runs = runReader.listRuns(
+            RunQuery(agentId = agentId, active = true, limit = 200),
+        ) ?: return@runCatching emptySet()
+        runs.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val prim = obj["conversation_id"] as? JsonPrimitive
+            if (prim != null && prim.isString) prim.content else null
+        }.toSet()
+    }.getOrDefault(emptySet())
 
     /** See [LocalBackendRunReader.getRun]. */
     fun getRunProjected(runId: String): JsonObject? = runReader.getRun(runId)

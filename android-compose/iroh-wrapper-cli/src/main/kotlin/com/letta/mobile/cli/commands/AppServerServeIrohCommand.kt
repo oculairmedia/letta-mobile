@@ -4,6 +4,7 @@ import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
@@ -272,6 +273,49 @@ class AppServerServeIrohCommand : CliktCommand(
     )
 
     /**
+     * letta-mobile-bn008.6: a2a (direct agent-to-agent) receiver wiring.
+     *
+     * The wrapper binds a SECOND Iroh endpoint on this UDP port, exposed only
+     * over the `/letta/a2a/0` ALPN. Inbound QUIC connections land through
+     * [IrohAgentMessageReceiver], which routes by the target agent's most-recent
+     * interactive conversation and lands the body as a user message on it via
+     * the same App Server client the rest of the wrapper uses. The wrapper's
+     * stable secret-key file is reused so the a2a node id matches the
+     * app-server node id (demux is by `toAgentId`, not by node id).
+     *
+     * `--a2a-port 0` => OS-assigned random (testing only). Production should pin.
+     */
+    private val a2aPort by option(
+        "--a2a-port",
+        envvar = "LETTA_A2A_PORT",
+        help = "letta-mobile-bn008.6: UDP port for the a2a receiver (0 = OS-assigned). " +
+            "Set to -1 to disable the a2a receiver entirely (default: 0).",
+    ).int().default(0)
+
+    private val a2aAddressBook by option(
+        "--a2a-address-book",
+        envvar = "LETTA_A2A_ADDRESS_BOOK",
+        help = "letta-mobile-bn008.6: kv file holding agentId->Iroh EndpointAddr mappings " +
+            "(agent-addresses.kv format). Default: ~/.letta/iroh/agent-addresses.kv.",
+    )
+
+    private val a2aIdentityDir by option(
+        "--a2a-identity-dir",
+        envvar = "LETTA_A2A_IDENTITY_DIR",
+        help = "letta-mobile-bn008.6: directory of per-agent Ed25519 identity files. " +
+            "Default: ~/.letta/iroh/identities. Loaded lazily via IrohAgentIdentity.loadOrCreate.",
+    )
+
+    private val a2aPublishAgents by option(
+        "--a2a-publish-agents",
+        envvar = "LETTA_A2A_PUBLISH_AGENTS",
+        help = "letta-mobile-bn008.6: comma-separated agentIds whose addresses THIS wrapper " +
+            "publishes into the address book on bind (so peers can dial Meridian and PM-letta-mobile). " +
+            "Default: empty (no publish). The seed script can also pre-populate — these writes " +
+            "coexist and overwrite on collision.",
+    ).default("")
+
+    /**
      * o5bqk: process-lifetime cache of the last-known enabled channel accounts, so
      * every reconnect can re-wire channel ingress in its first round trip instead
      * of after a full enumeration. Held here (not in the coordinator) because a
@@ -355,6 +399,83 @@ class AppServerServeIrohCommand : CliktCommand(
             // Start accepting connections
             irohEndpoint.start(controller)
             println("[iroh-app-server] Listening on Iroh... (Ctrl+C to stop)")
+
+            // letta-mobile-bn008.6: bind the a2a (direct agent-to-agent) receiver.
+            // The receiver's accept loop runs on the wrapper's main scope so the
+            // shutdown hook below cancels it. Disable with --a2a-port=-1; the default
+            // is to enable with an OS-assigned port (the address-book entry carries
+            // the dialable addr, so pinning the port is not required for peers).
+            //
+            // N9 (PR #1125): `a2aPort` is now an Int (option declared via
+            // `.int().default(0)`), so the old `a2aPort.toIntOrNull()`-and-fallback
+            // dance is gone — the parser owns the type conversion.
+            if (a2aPort < 0) {
+                println("[iroh-app-server] a2a receiver: DISABLED (--a2a-port=$a2aPort)")
+            } else {
+                // N8 (PR #1125): hoist the LETTA_IROH_HOME fallback so the
+                // address-book and identity-dir defaults can't drift apart
+                // (the previous duplicated expression was a footgun the day a
+                // future operator sets the envvar on only one path).
+                val irohHome = java.io.File(
+                    System.getenv("LETTA_IROH_HOME") ?: "${System.getProperty("user.home")}/.letta/iroh",
+                )
+                val effectiveAddressBook: java.io.File = a2aAddressBook
+                    ?.let { java.io.File(it) }
+                    ?: java.io.File(irohHome, "agent-addresses.kv")
+                val effectiveIdentityDir: java.io.File = a2aIdentityDir
+                    ?.let { java.io.File(it) }
+                    ?: java.io.File(irohHome, "identities")
+                val publishList = a2aPublishAgents
+                    .split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                val localBackendFile = (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { java.io.File(it) }
+                val a2aCfg = A2aWiringConfig(
+                    // N8 (PR #1125): the `else` branch above already guarantees
+                    // `a2aPort >= 0`, so the previous `coerceAtLeast(0)` was
+                    // dead code.
+                    port = a2aPort,
+                    secretKeyPath = irohSecretKeyPath,
+                    identityDir = effectiveIdentityDir,
+                    addressBook = effectiveAddressBook,
+                    publishAgents = publishList,
+                )
+                // B1 (PR #1125): degrade gracefully when the a2a receiver can't
+                // be built (e.g. the address-book seed is missing on a first run
+                // that doesn't pass --a2a-publish-agents). The wrapper stays up so
+                // the rest of the surface — app-server ALPN, admin_rpc — keeps
+                // serving; the a2a receiver is just unavailable until the operator
+                // seeds the address book or sets the publish flag.
+                val wiring = runCatching {
+                    buildA2aWiring(
+                        config = a2aCfg,
+                        client = nativeAdminClient,
+                        localBackendDir = localBackendFile,
+                    )
+                }.getOrElse { t ->
+                    println(
+                        "[iroh-app-server] a2a receiver: DISABLED (${t.message}). " +
+                            "Seed $effectiveAddressBook or pass --a2a-publish-agents to enable.",
+                    )
+                    null
+                }
+                if (wiring != null) {
+                    val acceptJob = wiring.start(scope)
+                    scope.coroutineContext[Job]?.invokeOnCompletion { _ ->
+                        runCatching { acceptJob.cancel() }
+                        runCatching { wiring.close() }
+                    }
+                    println(
+                        "[iroh-app-server] a2a receiver: BOUND " +
+                            "(node=${wiring.nodeIdHex}, port=$a2aPort, " +
+                            "address_book=${effectiveAddressBook.absolutePath}, " +
+                            "publish_agents=${publishList.size}, " +
+                            "local_backend=${localBackendFile?.absolutePath ?: "UNSET (CreateAndDeliver->Dropped)"})",
+                    )
+                }
+            }
             
             // Keep the server running
             // In production, this would handle graceful shutdown signals
