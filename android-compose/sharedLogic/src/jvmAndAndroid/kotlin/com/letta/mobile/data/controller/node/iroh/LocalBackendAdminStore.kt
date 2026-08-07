@@ -53,6 +53,13 @@ class LocalBackendAdminStore(
     /** See [LocalBackendAgentReader.countAgents]. */
     fun countAgents(): Int? = agentReader.countAgents()
 
+    /** Checks whether an agent JSON record or directory exists under baseDir/agents. */
+    fun agentExists(agentId: String): Boolean {
+        val agentsDir = File(baseDir, "agents")
+        if (!agentsDir.exists()) return true
+        return File(agentsDir, agentId).exists() || File(agentsDir, "$agentId.json").exists()
+    }
+
     /** See [LocalBackendConversationReader.listConversationsProjected]. */
     fun listConversationsProjected(
         agentId: String?,
