@@ -9,7 +9,6 @@ package com.letta.mobile.data.controller.node.iroh
  */
 enum class NativeAdminOperationPolicy {
     Read,
-    ReadScan,
     MutationAmbiguous,
 }
 
@@ -22,20 +21,20 @@ enum class NativeAdminOp(
     val method: String,
     val policy: NativeAdminOperationPolicy,
 ) {
-    AgentList("agent.list", NativeAdminOperationPolicy.ReadScan),
+    AgentList("agent.list", NativeAdminOperationPolicy.Read),
     AgentGet("agent.get", NativeAdminOperationPolicy.Read),
     AgentCreate("agent.create", NativeAdminOperationPolicy.MutationAmbiguous),
     AgentUpdate("agent.update", NativeAdminOperationPolicy.MutationAmbiguous),
     AgentDelete("agent.delete", NativeAdminOperationPolicy.MutationAmbiguous),
 
-    ConversationList("conversation.list", NativeAdminOperationPolicy.ReadScan),
+    ConversationList("conversation.list", NativeAdminOperationPolicy.Read),
     ConversationGet("conversation.get", NativeAdminOperationPolicy.Read),
     ConversationCreate("conversation.create", NativeAdminOperationPolicy.MutationAmbiguous),
     ConversationUpdate("conversation.update", NativeAdminOperationPolicy.MutationAmbiguous),
     ConversationArchive("conversation.archive", NativeAdminOperationPolicy.MutationAmbiguous),
     ConversationRestore("conversation.restore", NativeAdminOperationPolicy.MutationAmbiguous),
 
-    MessageList("message.list", NativeAdminOperationPolicy.ReadScan),
+    MessageList("message.list", NativeAdminOperationPolicy.Read),
     MessageGet("message.get", NativeAdminOperationPolicy.Read),
     ToolReturnGet("tool_return.get", NativeAdminOperationPolicy.Read),
 

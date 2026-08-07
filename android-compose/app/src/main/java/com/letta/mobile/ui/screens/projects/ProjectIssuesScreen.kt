@@ -210,11 +210,7 @@ fun ProjectIssuesScreen(
                 }
                 val highlightedIssueId by remember(issueIds, listState) {
                     derivedStateOf {
-                        val visibleKeys = listState.layoutInfo.visibleItemsInfo.asSequence()
-                        visibleKeys
-                            .mapNotNull { it.key as? String }
-                            .map { key -> if (key.startsWith("ready-")) key.removePrefix("ready-") else key }
-                            .firstOrNull { it in issueIds }
+                        findFirstVisibleIssue(listState.layoutInfo.visibleItemsInfo, issueIds)
                     }
                 }
                 PullToRefreshBox(
