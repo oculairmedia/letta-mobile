@@ -159,47 +159,67 @@ suspend fun buildA2aWiring(
             )
         }
     }
-    // M2: compute hex node id once at bind time (suspend id() call) and store it
-    // on A2aWiring as a plain `val`.
-    val nodeIdHex = endpointIdHex(endpoint)
+    // letta-mobile-bn008.6 sweep round 2 (PR #1125): the endpoint is now BOUND
+    // but every subsequent step (endpointIdHex, publishLocalAgents,
+    // LocalBackendAdminStore construction, A2aWiring wiring) can still throw.
+    // Without this guard a post-bind failure would leak the bound Endpoint —
+    // the receiver would never start, so A2aWiring.close() would never run,
+    // and the address book entry that publishLocalAgents just wrote would point
+    // at a dead node. Wrap the post-bind init in try/catch; on failure
+    // shutdown() the endpoint (best-effort, runBlocking on the suspending call)
+    // and rethrow so the AppServerServeIrohCommand.run wrapper can degrade
+    // gracefully. The native-gated test `endpoint is released when post-bind
+    // setup fails` (in A2aWiringTest) pins this contract.
+    try {
+        // M2: compute hex node id once at bind time (suspend id() call) and store it
+        // on A2aWiring as a plain `val`.
+        val nodeIdHex = endpointIdHex(endpoint)
 
-    publishLocalAgents(config, endpoint, store)
+        publishLocalAgents(config, endpoint, store)
 
-    // M4 (PR #1125): construct the [LocalBackendAdminStore] exactly once at
-    // bind time (sync file I/O had been running on the receiver's
-    // connection-coroutine dispatcher — a layering bug). The receiver's
-    // `conversationsFor` closure now captures it; if either client is null or
-    // the backend dir is null we short-circuit to an empty list (router
-    // falls through to CreateAndDeliver -> Dropped).
-    val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
-    val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
-        if (client == null || backendStore == null) emptyList()
-        else listConversationsForAgent(backendStore, agentId)
+        // M4 (PR #1125): construct the [LocalBackendAdminStore] exactly once at
+        // bind time (sync file I/O had been running on the receiver's
+        // connection-coroutine dispatcher — a layering bug). The receiver's
+        // `conversationsFor` closure now captures it; if either client is null or
+        // the backend dir is null we short-circuit to an empty list (router
+        // falls through to CreateAndDeliver -> Dropped).
+        val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
+        val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
+            if (client == null || backendStore == null) emptyList()
+            else listConversationsForAgent(backendStore, agentId)
+        }
+
+        val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> Unit = { message, decision ->
+            handleDecision(client, message, decision)
+        }
+
+        val router = IrohAgentMessageRouter(
+            ownAgentId = ownAgentId,
+        )
+
+        val receiver = IrohAgentMessageReceiver(
+            endpoint = endpoint,
+            router = router,
+            conversationsFor = conversationsFor,
+            onDeliver = onDeliver,
+        )
+
+        return A2aWiring(
+            endpoint = endpoint,
+            receiver = receiver,
+            router = router,
+            addressStore = store,
+            identityDir = config.identityDir,
+            nodeIdHex = nodeIdHex,
+        )
+    } catch (t: Throwable) {
+        // Best-effort release of the bound endpoint before propagating.
+        // The endpoint is bound to a UDP socket on the OS, so leaking it
+        // here would keep the port occupied until process exit — bad for
+        // a wrapper that may restart on configuration changes.
+        runCatching { runBlocking { endpoint.shutdown() } }
+        throw t
     }
-
-    val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> Unit = { message, decision ->
-        handleDecision(client, message, decision)
-    }
-
-    val router = IrohAgentMessageRouter(
-        ownAgentId = ownAgentId,
-    )
-
-    val receiver = IrohAgentMessageReceiver(
-        endpoint = endpoint,
-        router = router,
-        conversationsFor = conversationsFor,
-        onDeliver = onDeliver,
-    )
-
-    return A2aWiring(
-        endpoint = endpoint,
-        receiver = receiver,
-        router = router,
-        addressStore = store,
-        identityDir = config.identityDir,
-        nodeIdHex = nodeIdHex,
-    )
 }
 
 /**

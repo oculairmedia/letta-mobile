@@ -182,7 +182,7 @@ class A2aWiringTest {
             // A completed run on the default conversation -> NOT busy.
             writeRun(base, "run-done", agentId, conversationId = "conv-default", status = "completed")
 
-            val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+            val store = LocalBackendAdminStore(base)
             val states = runBlocking { listConversationsForAgent(store, agentId) }
 
             // Both conversations present, sorted newest-first.
