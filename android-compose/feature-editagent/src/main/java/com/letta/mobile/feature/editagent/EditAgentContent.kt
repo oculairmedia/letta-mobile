@@ -28,7 +28,15 @@ internal fun EditAgentContent(
     lazyListState: LazyListState = rememberLazyListState(),
 ) {
     val dialogState = rememberEditAgentContentDialogState()
-    val selection = remember(state, llmModels, embeddingModels) {
+    val selection = remember(
+        state.model,
+        state.embedding,
+        state.compactionModel,
+        state.agent?.llmConfig?.contextWindow,
+        state.agent?.contextWindowLimit,
+        llmModels,
+        embeddingModels,
+    ) {
         resolveEditAgentContentModels(state, llmModels, embeddingModels)
     }
     ClampEditAgentContextWindow(
