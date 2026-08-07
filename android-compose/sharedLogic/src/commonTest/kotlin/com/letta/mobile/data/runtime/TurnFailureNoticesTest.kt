@@ -87,6 +87,7 @@ class TurnFailureNoticesTest {
         assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("end_turn"))
         assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("stop_sequence"))
         assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("max_tokens"))
+        assertTrue(TurnFailureNotices.isCompletedMainReplyStopReason("length"))
         assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason("requires_approval"))
         assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason("error"))
         assertFalse(TurnFailureNotices.isCompletedMainReplyStopReason("cancelled"))

@@ -130,6 +130,31 @@ class AppServerRuntimeEventMapperTest {
     }
 
     @Test
+    fun mapsLengthStopReasonToCompletedLifecycleLikeMaxTokens() {
+        // letta-mobile-xm1dk: OpenAI-compat providers emit `length`, not `max_tokens`.
+        val drafts = mapper.map(
+            command = command,
+            received = received(
+                streamDelta(
+                    messageType = "stop_reason",
+                    runId = "run-1",
+                    body = buildJsonObject {
+                        put("message_type", "stop_reason")
+                        put("run_id", "run-1")
+                        put("stop_reason", "length")
+                    },
+                ),
+            ),
+        )
+
+        val stop = assertIs<RuntimeEventPayload.RemoteStreamFrame>(drafts[0].payload)
+        assertEquals("stop_reason", stop.messageType)
+        val payload = assertIs<RuntimeEventPayload.RunLifecycleChanged>(drafts[1].payload)
+        assertEquals(RuntimeRunStatus.Completed, payload.status)
+        assertEquals("run-1", drafts[1].runId?.value)
+    }
+
+    @Test
     fun mapsLoopErrorToFailedLifecycle() {
         val draft = mapper.map(
             command = command,
