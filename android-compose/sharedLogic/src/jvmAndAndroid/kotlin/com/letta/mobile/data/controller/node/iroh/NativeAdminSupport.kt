@@ -19,8 +19,6 @@ internal object NativeAdmin {
     private val counter = java.util.concurrent.atomic.AtomicLong(0)
     /** Fail-fast budget for native reads / idempotent probes. */
     private const val NATIVE_ATTEMPT_TIMEOUT_MS = 2_000L
-    /** Budget for bulk/scan reads on disk-backed local backend stores. */
-    private const val NATIVE_READ_SCAN_TIMEOUT_MS = 15_000L
     /**
      * Longer budget for mutations that may already have been accepted server-side.
      * Timing out the wait after send and inviting a retry risks duplicate creates
@@ -103,7 +101,6 @@ internal object NativeAdmin {
         when (policy) {
             NativeAdminOperationPolicy.MutationAmbiguous -> NATIVE_MUTATION_TIMEOUT_MS
             NativeAdminOperationPolicy.Read -> NATIVE_ATTEMPT_TIMEOUT_MS
-            NativeAdminOperationPolicy.ReadScan -> NATIVE_READ_SCAN_TIMEOUT_MS
         }
 
     /** Test hook: policy for a known method, or null if unregistered. */
@@ -145,7 +142,7 @@ internal object NativeAdmin {
     private fun onRequireTimeout(op: String, policy: NativeAdminOperationPolicy): Nothing {
         // Mutations: report timeout but do not trip the breaker — a late success
         // on the server must not black-hole subsequent reads/writes for 60s.
-        if (policy == NativeAdminOperationPolicy.Read || policy == NativeAdminOperationPolicy.ReadScan) tripBreaker(op)
+        if (policy == NativeAdminOperationPolicy.Read) tripBreaker(op)
         markSelected(op, "unavailable", "native_timeout")
         adminError("capability_unavailable: $op App Server v2 timed out")
     }
