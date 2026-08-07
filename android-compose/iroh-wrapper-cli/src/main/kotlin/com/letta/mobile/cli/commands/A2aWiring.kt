@@ -360,7 +360,20 @@ internal suspend fun listConversationsForAgent(
     }.getOrElse { emptyList() }
 }
 
-private fun JsonElement?.stringOrNullSafe(): String? = (this as? JsonPrimitive)?.let { if (it.isString) it.content else null }
+internal fun JsonElement?.stringOrNullSafe(): String? = (this as? JsonPrimitive)?.let { if (it.isString) it.content else null }
+
+/**
+ * Wrap an inbound [IrohAgentMessage] in an a2a envelope JSON string helper.
+ * Shape: {"envelope":"a2a","from_agent_id":...,"to_agent_id":...,"ts":...,"msg_id":...,"content":...}
+ */
+internal fun wrapA2aEnvelope(message: IrohAgentMessage): String = buildJsonObject {
+    put("envelope", "a2a")
+    put("from_agent_id", message.fromAgentId)
+    put("to_agent_id", message.toAgentId)
+    put("ts", message.ts)
+    put("msg_id", message.msgId)
+    put("content", message.body)
+}.toString()
 
 /**
  * N5 (PR #1125): `internal` so the JVM tests in `iroh-wrapper-cli` can
@@ -525,7 +538,7 @@ private suspend fun inputOnConversation(
                     messages = listOf(
                         AppServerInputMessage(
                             role = "user",
-                            content = JsonPrimitive(message.body),
+                            content = JsonPrimitive(wrapA2aEnvelope(message)),
                             clientMessageId = message.msgId,
                         ),
                     ),
