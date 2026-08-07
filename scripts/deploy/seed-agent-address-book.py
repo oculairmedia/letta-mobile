@@ -55,7 +55,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -99,12 +98,25 @@ PM_SOURCE_ID = re.compile(
 # ID validation + PM normalization
 # ---------------------------------------------------------------------------
 
+def _require_nonblank_str(value: object, blank_message: str) -> str:
+    """Raise ValueError unless `value` is a non-blank string."""
+    if not isinstance(value, str):
+        raise ValueError(blank_message)
+    candidate = value.strip()
+    if not candidate:
+        raise ValueError(blank_message)
+    return candidate
+
+
+def _is_bare_agent_prefix(candidate: str) -> bool:
+    """True for `agent-<…>` that is not already `letta_agent-<…>`."""
+    return candidate.startswith("agent-") and not candidate.startswith("letta_agent-")
+
+
 def validate_id(agent_id: str) -> str:
     """Strict canonical id check. Raises ValueError on anything else."""
-    if not isinstance(agent_id, str) or not agent_id.strip():
-        raise ValueError("agent id is blank")
-    candidate = agent_id.strip()
-    if candidate.startswith("agent-") and not candidate.startswith("letta_agent-"):
+    candidate = _require_nonblank_str(agent_id, "agent id is blank")
+    if _is_bare_agent_prefix(candidate):
         raise ValueError(
             f"agent id {candidate!r} uses 'agent-' prefix; canonical form is "
             f"'letta_agent-<uuid>'. Use --from-manifest to load PM-letta-mobile "
@@ -122,12 +134,9 @@ def validate_id(agent_id: str) -> str:
 def normalize_manifest_id(agent_id: str) -> str:
     """One-off conversion for PM-letta-mobile: `agent-<uuid>` -> `letta_agent-<uuid>`.
     Anything else is rejected loudly before it reaches the kv write."""
-    if not isinstance(agent_id, str) or not agent_id.strip():
-        raise ValueError("manifest agent_id is blank")
-    candidate = agent_id.strip()
+    candidate = _require_nonblank_str(agent_id, "manifest agent_id is blank")
     if PM_SOURCE_ID.match(candidate):
         converted = "letta_agent-" + candidate[len("agent-"):]
-        # The converted form MUST match the canonical regex.
         if not CANONICAL_ID.match(converted):
             raise ValueError(f"PM conversion produced non-canonical id: {converted!r}")
         return converted
@@ -143,30 +152,55 @@ def normalize_manifest_id(agent_id: str) -> str:
 # Manifest + SQL pull + merge
 # ---------------------------------------------------------------------------
 
-def load_manifest(path: Path) -> list[dict]:
-    """Load a manifest file with shape {"version": 1, "entries": [{agent_id, mxid, ...}]}.
-    Returns a list of normalized entries with `agent_id` in canonical form."""
+def _normalize_manifest_entry(index: int, entry: object) -> dict:
+    """Validate one manifest entry object and return its canonical form."""
+    if not isinstance(entry, dict):
+        raise ValueError(f"manifest entry #{index} is not an object: {entry!r}")
+    if "agent_id" not in entry:
+        raise ValueError(f"manifest entry #{index} missing agent_id: {entry!r}")
+    return {
+        "agent_id": normalize_manifest_id(entry["agent_id"]),
+        "mxid": entry.get("mxid"),
+        "note": entry.get("note"),
+    }
+
+
+def _read_manifest_document(path: Path) -> dict:
+    """Load + validate the top-level manifest document (version=1)."""
     if not path.exists():
         raise FileNotFoundError(f"manifest not found: {path}")
     raw = json.loads(path.read_text())
-    if not isinstance(raw, dict) or raw.get("version") != 1:
+    if not isinstance(raw, dict):
         raise ValueError(f"manifest {path} must have version=1, got {raw!r}")
+    if raw.get("version") != 1:
+        raise ValueError(f"manifest {path} must have version=1, got {raw!r}")
+    return raw
+
+
+def _manifest_entries_list(path: Path, raw: dict) -> list:
+    """Extract the entries list from a validated manifest document."""
     entries = raw.get("entries", [])
     if not isinstance(entries, list):
-        raise ValueError(f"manifest {path} entries must be a list, got {type(entries).__name__}")
-    out = []
-    for i, e in enumerate(entries):
-        if not isinstance(e, dict):
-            raise ValueError(f"manifest entry #{i} is not an object: {e!r}")
-        if "agent_id" not in e:
-            raise ValueError(f"manifest entry #{i} missing agent_id: {e!r}")
-        canonical = normalize_manifest_id(e["agent_id"])
-        out.append({
-            "agent_id": canonical,
-            "mxid": e.get("mxid"),
-            "note": e.get("note"),
-        })
-    return out
+        raise ValueError(
+            f"manifest {path} entries must be a list, got {type(entries).__name__}"
+        )
+    return entries
+
+
+def load_manifest(path: Path) -> list[dict]:
+    """Load a manifest file with shape {"version": 1, "entries": [{agent_id, mxid, ...}]}.
+    Returns a list of normalized entries with `agent_id` in canonical form."""
+    raw = _read_manifest_document(path)
+    entries = _manifest_entries_list(path, raw)
+    return [_normalize_manifest_entry(i, e) for i, e in enumerate(entries)]
+
+
+def _parse_psql_row(line: str) -> dict:
+    """Parse one `id|mxid` psql `-tAc` line into a row dict."""
+    parts = line.split("|", 1)
+    if len(parts) != 2:
+        raise RuntimeError(f"psql returned unexpected row shape: {line!r}")
+    return {"id": parts[0].strip(), "mxid": parts[1].strip()}
 
 
 def pull_sql_rows() -> list[dict]:
@@ -184,14 +218,25 @@ def pull_sql_rows() -> list[dict]:
         )
     rows: list[dict] = []
     for line in proc.stdout.splitlines():
-        line = line.strip()
-        if not line:
+        stripped = line.strip()
+        if not stripped:
             continue
-        parts = line.split("|", 1)
-        if len(parts) != 2:
-            raise RuntimeError(f"psql returned unexpected row shape: {line!r}")
-        rows.append({"id": parts[0].strip(), "mxid": parts[1].strip()})
+        rows.append(_parse_psql_row(stripped))
     return rows
+
+
+def _sql_row_to_entry(row: dict) -> dict:
+    canonical = validate_id(row["id"])
+    return {"agent_id": canonical, "mxid": row["mxid"], "note": None}
+
+
+def _manifest_override_note(entry: dict, existing: dict | None) -> str | None:
+    note = entry.get("note")
+    if existing is None:
+        return note
+    if entry.get("mxid") == existing.get("mxid"):
+        return note
+    return note or "manifest override"
 
 
 def merge_sql_and_manifest(
@@ -201,31 +246,18 @@ def merge_sql_and_manifest(
     the SQL pull missed. Manifest entries with mxid=None are kept (PM placeholder).
     All ids are validated before write."""
     by_id: dict[str, dict] = {}
-    # SQL first (all sql rows have non-null mxid by schema).
     for row in sql_rows:
-        canonical = validate_id(row["id"])
-        by_id[canonical] = {
-            "agent_id": canonical,
-            "mxid": row["mxid"],
-            "note": None,
-        }
-    # Manifest second — overrides on collision, adds new on miss. Manifest
-    # entries may use the PM source form (`agent-<uuid>`); normalize first
-    # so they land in canonical form. validate_id is the final belt-and-braces
-    # check, but normalize_manifest_id already enforces the strict shape.
+        entry = _sql_row_to_entry(row)
+        by_id[entry["agent_id"]] = entry
     for entry in manifest_entries:
         canonical = normalize_manifest_id(entry["agent_id"])
-        # Double-check (defense in depth) — normalize already enforced this.
         validate_id(canonical)
         existing = by_id.get(canonical)
         by_id[canonical] = {
             "agent_id": canonical,
             "mxid": entry.get("mxid"),
-            "note": entry.get("note"),
+            "note": _manifest_override_note(entry, existing),
         }
-        # If we replaced a SQL row, preserve a hint that this was a manifest override.
-        if existing is not None and entry.get("mxid") != existing.get("mxid"):
-            by_id[canonical]["note"] = entry.get("note") or "manifest override"
     return list(by_id.values())
 
 
@@ -244,7 +276,6 @@ def atomic_write_text(target: Path, content: str, mode: int) -> None:
         content = content + "\n"
     target.parent.mkdir(parents=True, exist_ok=True)
     tmp = target.with_suffix(target.suffix + ".tmp")
-    # If a leftover tmp from a prior crash exists, remove it before writing.
     if tmp.exists():
         tmp.unlink()
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
@@ -253,6 +284,24 @@ def atomic_write_text(target: Path, content: str, mode: int) -> None:
         os.fsync(f.fileno())
     os.replace(tmp, target)
     os.chmod(target, mode)
+
+
+def _is_skippable_kv_line(stripped: str) -> bool:
+    """True for blank, comment, or non key=value kv lines."""
+    if not stripped:
+        return True
+    if stripped.startswith("#"):
+        return True
+    return "=" not in stripped
+
+
+def _parse_kv_line(stripped: str) -> tuple[str, str] | None:
+    """Parse one `agentId=wire` line. Returns None when the agent id is blank."""
+    agent_id, _, wire = stripped.partition("=")
+    agent_id = agent_id.strip()
+    if not agent_id:
+        return None
+    return agent_id, wire
 
 
 def read_existing_wires(target: Path) -> dict[str, str]:
@@ -267,13 +316,21 @@ def read_existing_wires(target: Path) -> dict[str, str]:
     wires: dict[str, str] = {}
     for line in target.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
+        if _is_skippable_kv_line(stripped):
             continue
-        agent_id, _, wire = stripped.partition("=")
-        agent_id = agent_id.strip()
-        if agent_id:
-            wires[agent_id] = wire
+        parsed = _parse_kv_line(stripped)
+        if parsed is None:
+            continue
+        agent_id, wire = parsed
+        wires[agent_id] = wire
     return wires
+
+
+def _resolve_wire(entry: dict, existing: dict[str, str], agent_id: str) -> str:
+    """Pick the wire for one kv line: explicit endpoint wins, else preserve."""
+    if "iroh_endpoint" in entry:
+        return entry["iroh_endpoint"] or ""
+    return existing.get(agent_id) or ""
 
 
 def atomic_write_kv(target: Path, entries: list[dict]) -> None:
@@ -291,10 +348,7 @@ def atomic_write_kv(target: Path, entries: list[dict]) -> None:
         # Wire form per FileIrohAgentAddressStore: `agentId=<hexNodeId>` when
         # no direct addrs; `<hexNodeId>@a,b` when present. Stage-1 SQL/manifest
         # merges omit iroh_endpoint — preserve any registered wire in that case.
-        if "iroh_endpoint" in entry:
-            wire = entry["iroh_endpoint"] or ""
-        else:
-            wire = existing.get(agent_id) or ""
+        wire = _resolve_wire(entry, existing, agent_id)
         lines.append(f"{agent_id}={wire}")
     content = "\n".join(lines) + "\n"
     # Mode 0644 since all entries have null endpoints in stage 1 (dispatch
@@ -388,69 +442,115 @@ def build_argparser() -> argparse.ArgumentParser:
     return p
 
 
-def main(argv: list[str] | None = None) -> int:
-    args = build_argparser().parse_args(argv)
+def _should_skip_seed(seed_done: Path, force: bool, dry_run: bool) -> bool:
+    """True when a prior seed marker should short-circuit this run."""
+    if dry_run:
+        return False
+    if force:
+        return False
+    return seed_done.exists()
 
-    iroh_home = Path(args.iroh_home)
-    identities_dir = iroh_home / "identities"
-    kv = iroh_home / "agent-addresses.kv"
-    seed_done = iroh_home / ".seedDone"
 
-    # Idempotency guard: skip if marker present and --force not set.
-    if seed_done.exists() and not args.force and not args.dry_run:
-        print(f"seed-done marker present at {seed_done} — skipping (pass --force to re-seed)", file=sys.stderr)
-        return 0
+def _load_sql_rows(stub_sql: bool) -> tuple[list[dict] | None, int]:
+    """Return (rows, 0) on success, or (None, exit_code) on fatal SQL failure."""
+    if stub_sql:
+        return [], 0
+    try:
+        return pull_sql_rows(), 0
+    except Exception as e:
+        print(f"FATAL: SQL pull failed: {e}", file=sys.stderr)
+        print("DO NOT add an HTTP fallback — the seed is offline by design.", file=sys.stderr)
+        return None, 2
 
-    # Data sources.
-    sql_rows: list[dict] = []
-    if not args.stub_sql:
-        try:
-            sql_rows = pull_sql_rows()
-        except Exception as e:
-            print(f"FATAL: SQL pull failed: {e}", file=sys.stderr)
-            print("DO NOT add an HTTP fallback — the seed is offline by design.", file=sys.stderr)
-            return 2
 
-    manifest_entries: list[dict] = []
-    if args.from_manifest:
-        try:
-            manifest_entries = load_manifest(Path(args.from_manifest))
-        except (FileNotFoundError, ValueError) as e:
-            # On --dry-run, a missing/empty/invalid manifest is treated as
-            # "no manifest" so operators can verify SQL counts alone.
-            # On a real (non-dry) run, this IS fatal — silent fallback
-            # would let an operator think they seeded PM when they didn't.
-            if args.dry_run:
-                print(
-                    f"dry-run: --from-manifest {args.from_manifest} unavailable "
-                    f"({e}); ignoring",
-                    file=sys.stderr,
-                )
-            else:
-                print(f"FATAL: manifest load failed: {e}", file=sys.stderr)
-                return 2
+def _load_manifest_entries(
+    manifest_path: str | None, dry_run: bool,
+) -> tuple[list[dict] | None, int]:
+    """Return (entries, 0) on success, or (None, exit_code) on fatal load failure.
 
-    # Validate every id before any write — loud error if any are wrong.
-    merged = merge_sql_and_manifest(sql_rows, manifest_entries)
-    for entry in merged:
-        # validate_id raises on any non-canonical form; we already normalized
-        # manifest entries, so this is a final belt-and-braces pass.
-        validate_id(entry["agent_id"])
+    On --dry-run, a missing/invalid manifest is treated as "no manifest" so
+    operators can verify SQL counts alone. On a real run it is fatal.
+    """
+    if not manifest_path:
+        return [], 0
+    try:
+        return load_manifest(Path(manifest_path)), 0
+    except (FileNotFoundError, ValueError) as e:
+        if dry_run:
+            print(
+                f"dry-run: --from-manifest {manifest_path} unavailable "
+                f"({e}); ignoring",
+                file=sys.stderr,
+            )
+            return [], 0
+        print(f"FATAL: manifest load failed: {e}", file=sys.stderr)
+        return None, 2
 
-    print(f"plan: sql_rows={len(sql_rows)} manifest_entries={len(manifest_entries)} merged={len(merged)}")
-    if args.dry_run:
-        # Print the count and DO NOT write anything.
-        print("dry-run: would write identity dir + kv + seed-done marker; skipping writes")
-        return 0
 
-    # Writes (atomic, LF-only).
+def _seed_paths(iroh_home: Path) -> dict[str, Path]:
+    """Resolve the three artifact paths under an Iroh home directory."""
+    return {
+        "iroh_home": iroh_home,
+        "identities_dir": iroh_home / "identities",
+        "kv": iroh_home / "agent-addresses.kv",
+        "seed_done": iroh_home / ".seedDone",
+    }
+
+
+def _write_seed_artifacts(paths: dict[str, Path], merged: list[dict], source: str) -> None:
+    """Create dirs + write kv + seed-done marker (atomic, LF-only)."""
+    iroh_home = paths["iroh_home"]
+    identities_dir = paths["identities_dir"]
+    kv = paths["kv"]
+    seed_done = paths["seed_done"]
     iroh_home.mkdir(parents=True, exist_ok=True)
     os.chmod(iroh_home, 0o700)
     ensure_identity_dir(identities_dir)
     atomic_write_kv(kv, merged)
-    write_seed_done_marker(seed_done, len(merged), source=str(args.from_manifest or "sql+manifest"))
+    write_seed_done_marker(seed_done, len(merged), source=source)
     print(f"wrote: {identities_dir} (0700), {kv} (0644), {seed_done} (0600)")
     print(f"iroh.addressbook.seedDone{{entries={len(merged)}}}")
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_argparser().parse_args(argv)
+    paths = _seed_paths(Path(args.iroh_home))
+    seed_done = paths["seed_done"]
+
+    if _should_skip_seed(seed_done, args.force, args.dry_run):
+        print(
+            f"seed-done marker present at {seed_done} — skipping (pass --force to re-seed)",
+            file=sys.stderr,
+        )
+        return 0
+
+    sql_rows, sql_rc = _load_sql_rows(args.stub_sql)
+    if sql_rows is None:
+        return sql_rc
+
+    manifest_entries, manifest_rc = _load_manifest_entries(
+        args.from_manifest, args.dry_run,
+    )
+    if manifest_entries is None:
+        return manifest_rc
+
+    merged = merge_sql_and_manifest(sql_rows, manifest_entries)
+    for entry in merged:
+        validate_id(entry["agent_id"])
+
+    print(
+        f"plan: sql_rows={len(sql_rows)} "
+        f"manifest_entries={len(manifest_entries)} merged={len(merged)}"
+    )
+    if args.dry_run:
+        print("dry-run: would write identity dir + kv + seed-done marker; skipping writes")
+        return 0
+
+    _write_seed_artifacts(
+        paths,
+        merged,
+        source=str(args.from_manifest or "sql+manifest"),
+    )
     return 0
 
 
