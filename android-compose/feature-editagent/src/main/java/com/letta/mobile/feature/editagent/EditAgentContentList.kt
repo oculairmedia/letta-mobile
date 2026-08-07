@@ -26,6 +26,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -359,14 +360,17 @@ private fun CardGroupScope.addLlmProviderAndSamplingItems(
     )
     item(
         headlineContent = {
+            var localTemperature by remember { mutableStateOf(state.temperature) }
+            LaunchedEffect(state.temperature) { localTemperature = state.temperature }
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    stringResource(R.string.screen_agent_edit_temperature_value, state.temperature),
+                    stringResource(R.string.screen_agent_edit_temperature_value, localTemperature),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Slider(
-                    value = state.temperature,
-                    onValueChange = callbacks.onTemperatureChange,
+                    value = localTemperature,
+                    onValueChange = { localTemperature = it },
+                    onValueChangeFinished = { callbacks.onTemperatureChange(localTemperature) },
                     valueRange = 0f..2f,
                     steps = 39,
                 )
