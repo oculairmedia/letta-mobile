@@ -64,6 +64,12 @@ class IrohAgentMessageReceiver(
                     onDeliver(message, decision)
                 }
             }
+        }.onFailure { e ->
+            Telemetry.event(
+                "A2aHost",
+                "a2a.recv_failed",
+                "error" to (e.message ?: e::class.simpleName ?: "unknown"),
+            )
         }
     }
 }

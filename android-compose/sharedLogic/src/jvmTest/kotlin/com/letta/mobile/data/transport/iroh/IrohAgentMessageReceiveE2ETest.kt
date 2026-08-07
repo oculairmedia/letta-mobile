@@ -92,6 +92,7 @@ class IrohAgentMessageReceiveE2ETest {
         store.register(IrohAgentAddress("agent-recv", nodeHex, direct))
         val sender = IrohAgentMessageSender(senderEp, IrohAgentAddressResolver(store))
 
+        val initialEventCount = com.letta.mobile.util.Telemetry.events.value.size
         val result = sender.send(IrohAgentMessage("agent-sender", "agent-recv", "hi", "m-1", 1L))
         assertIs<AgentSendResult.Delivered>(result)
 
@@ -101,7 +102,9 @@ class IrohAgentMessageReceiveE2ETest {
         // letta-mobile-5nspp: the receiver MUST emit a2a.recv BEFORE ack/decision,
         // so the sensor sees the inbound even if downstream drops/rewrites it.
         // The recv and route telemetry must pair 1:1 (a route without a recv is a bug).
-        val recvEvents = com.letta.mobile.util.Telemetry.events.value.filter { it.name == "a2a.recv" }
+        val recvEvents = com.letta.mobile.util.Telemetry.events.value
+            .drop(initialEventCount)
+            .filter { it.name == "a2a.recv" && it.attrs["msgId"] == "m-1" }
         assertEquals(
             1,
             recvEvents.size,
