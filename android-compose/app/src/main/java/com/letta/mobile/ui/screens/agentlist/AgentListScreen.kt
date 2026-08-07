@@ -4,16 +4,12 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Surface
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,7 +22,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import io.github.vinceglb.filekit.PlatformFile
@@ -41,9 +36,8 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.icons.LettaIcons
-import com.letta.mobile.ui.theme.LettaTheme
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
-import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
@@ -387,21 +381,10 @@ private fun previewAgentListContentActions() = AgentListContentActions(
     onCreateAgent = {},
 )
 
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
-@Composable
-private fun AgentListPreviewFrame(content: @Composable () -> Unit) {
-    val windowSizeClass = WindowSizeClass.calculateFromSize(DpSize(411.dp, 891.dp))
-    CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
-        LettaTheme(dynamicColor = false) {
-            Surface(content = content)
-        }
-    }
-}
-
 @PreviewLightDark
 @Composable
 private fun AgentListContentPreview() {
-    AgentListPreviewFrame {
+    LettaPreviewFrame {
         val haptic = LocalHapticFeedback.current
         AgentListContent(
             state = previewAgentListContentState(previewAgentListUiState()),
@@ -419,7 +402,7 @@ private fun AgentListContentPreview() {
 @PreviewLightDark
 @Composable
 private fun AgentListContentGridPreview() {
-    AgentListPreviewFrame {
+    LettaPreviewFrame {
         val haptic = LocalHapticFeedback.current
         AgentListContent(
             state = previewAgentListContentState(previewAgentListUiState(showGrid = true)),
@@ -437,7 +420,7 @@ private fun AgentListContentGridPreview() {
 @PreviewLightDark
 @Composable
 private fun AgentListContentEmptyPreview() {
-    AgentListPreviewFrame {
+    LettaPreviewFrame {
         val haptic = LocalHapticFeedback.current
         AgentListContent(
             state = previewAgentListContentState(previewAgentListUiState()).copy(filteredAgents = emptyList()),
@@ -455,7 +438,7 @@ private fun AgentListContentEmptyPreview() {
 @PreviewLightDark
 @Composable
 private fun AgentListContentErrorPreview() {
-    AgentListPreviewFrame {
+    LettaPreviewFrame {
         val haptic = LocalHapticFeedback.current
         AgentListContent(
             state = previewAgentListContentState(
