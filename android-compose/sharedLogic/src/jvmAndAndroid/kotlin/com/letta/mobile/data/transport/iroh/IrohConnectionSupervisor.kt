@@ -139,6 +139,9 @@ class IrohConnectionSupervisor(
             }
         }
         staleHandle?.close("config_changed")
+        if (staleHandle != null && !closed) {
+            ensureDialing()
+        }
     }
 
     // letta-mobile-r3i1z: handles reported lost while NOT the current handle.
