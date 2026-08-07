@@ -1,14 +1,19 @@
 package com.letta.mobile.ui.screens.agentlist
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Surface
+import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
+import androidx.compose.material3.windowsizeclass.WindowSizeClass
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -21,6 +26,9 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import io.github.vinceglb.filekit.PlatformFile
 import io.github.vinceglb.filekit.dialogs.FileKitMode
 import io.github.vinceglb.filekit.dialogs.FileKitType
@@ -33,7 +41,10 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.theme.LettaTheme
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import com.letta.mobile.ui.theme.LocalWindowSizeClass
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
 /**
@@ -335,3 +346,130 @@ private fun AgentListScaffold(params: AgentListScaffoldParams) {
         )
     }
 }
+
+// region Previews
+
+private val previewAgents = listOf(
+    Agent(id = com.letta.mobile.data.model.AgentId("1"), name = "General Assistant", model = "letta/letta-free", description = "A general-purpose agent", tags = listOf("default", "chat")),
+    Agent(id = com.letta.mobile.data.model.AgentId("2"), name = "Code Helper", model = "openai/gpt-4o", description = "Specialized in programming", tags = listOf("code")),
+    Agent(id = com.letta.mobile.data.model.AgentId("3"), name = "Research Bot", model = "anthropic/claude-3.5-sonnet", tags = listOf("research", "analysis")),
+)
+
+private fun previewAgentListUiState(
+    isLoading: Boolean = false,
+    error: String? = null,
+    showGrid: Boolean = false,
+    agents: List<Agent> = previewAgents,
+) = AgentListUiState(
+    agents = agents.toImmutableList(),
+    isLoading = isLoading,
+    error = error,
+    showGrid = showGrid,
+    favoriteAgentId = com.letta.mobile.data.model.AgentId("1"),
+)
+
+private fun previewAgentListContentState(uiState: AgentListUiState) = AgentListContentState(
+    uiState = uiState,
+    isShareMode = false,
+    filteredAgents = previewAgents,
+    visibleFavoriteAgent = previewAgents.firstOrNull { it.id.value == uiState.favoriteAgentId?.value },
+    gridAgents = previewAgents,
+)
+
+private fun previewAgentListContentActions() = AgentListContentActions(
+    onSelectAgent = { _, _ -> },
+    onNavigateToEditAgent = {},
+    onDeleteAgent = {},
+    onToggleFavorite = {},
+    onTogglePinned = {},
+    onRefresh = {},
+    onRetry = {},
+    onCreateAgent = {},
+)
+
+@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+@Composable
+private fun AgentListPreviewFrame(content: @Composable () -> Unit) {
+    val windowSizeClass = WindowSizeClass.calculateFromSize(DpSize(411.dp, 891.dp))
+    CompositionLocalProvider(LocalWindowSizeClass provides windowSizeClass) {
+        LettaTheme(dynamicColor = false) {
+            Surface(content = content)
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentListContentPreview() {
+    AgentListPreviewFrame {
+        val haptic = LocalHapticFeedback.current
+        AgentListContent(
+            state = previewAgentListContentState(previewAgentListUiState()),
+            actions = previewAgentListContentActions(),
+            layout = AgentListContentLayout(
+                paddingValues = PaddingValues(16.dp),
+                listState = rememberLazyListState(),
+                gridState = rememberLazyGridState(),
+                haptic = haptic,
+            ),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentListContentGridPreview() {
+    AgentListPreviewFrame {
+        val haptic = LocalHapticFeedback.current
+        AgentListContent(
+            state = previewAgentListContentState(previewAgentListUiState(showGrid = true)),
+            actions = previewAgentListContentActions(),
+            layout = AgentListContentLayout(
+                paddingValues = PaddingValues(16.dp),
+                listState = rememberLazyListState(),
+                gridState = rememberLazyGridState(),
+                haptic = haptic,
+            ),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentListContentEmptyPreview() {
+    AgentListPreviewFrame {
+        val haptic = LocalHapticFeedback.current
+        AgentListContent(
+            state = previewAgentListContentState(previewAgentListUiState()).copy(filteredAgents = emptyList()),
+            actions = previewAgentListContentActions(),
+            layout = AgentListContentLayout(
+                paddingValues = PaddingValues(16.dp),
+                listState = rememberLazyListState(),
+                gridState = rememberLazyGridState(),
+                haptic = haptic,
+            ),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentListContentErrorPreview() {
+    AgentListPreviewFrame {
+        val haptic = LocalHapticFeedback.current
+        AgentListContent(
+            state = previewAgentListContentState(
+                previewAgentListUiState(error = "Failed to load agents", agents = emptyList()),
+            ),
+            actions = previewAgentListContentActions(),
+            layout = AgentListContentLayout(
+                paddingValues = PaddingValues(16.dp),
+                listState = rememberLazyListState(),
+                gridState = rememberLazyGridState(),
+                haptic = haptic,
+            ),
+        )
+    }
+}
+
+// endregion
