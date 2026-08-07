@@ -30,8 +30,11 @@ CLI                 := cli/letta-cli
 GRADLEW             := ./gradlew
 ANDROID_DIR         := android-compose
 VERIFY_RELEASE_SCRIPT := scripts/release/verify-release.sh
+SEED_ADDRESS_BOOK_SCRIPT := scripts/deploy/seed-agent-address-book.py
+SEED_ADDRESS_BOOK_MANIFEST := scripts/deploy/agent-address-book.manifest.json
+SEED_ADDRESS_BOOK_DRY_RUN ?= 1
 
-.PHONY: help lint-telemetry verify-build verify-unit-tests verify-device-ready verify-sync verify-stream verify-all verify-release check-cli check-device
+.PHONY: help lint-telemetry verify-build verify-unit-tests verify-device-ready verify-sync verify-stream verify-all verify-release check-cli check-device seed-iroh-address-book
 
 help:
 	@echo "letta-mobile make targets"
@@ -52,6 +55,11 @@ help:
 	@echo "  verify-all          Run lint-telemetry + verify-sync + verify-stream in sequence."
 	@echo "  verify-release      Run release gates in prereq order and emit a report."
 	@echo "                      Optional: VERIFY_RELEASE_ARGS=--json"
+	@echo "  seed-iroh-address-book  Populate ~/.letta/iroh/ (identities dir + kv + seed-done"
+	@echo "                          marker) from matrix_letta.identities + the checked-in"
+	@echo "                          manifest. Default is --dry-run for release checklists."
+	@echo "                          Set SEED_ADDRESS_BOOK_DRY_RUN=0 to perform a real seed."
+	@echo "                          Set FORCE=1 to bypass the .seedDone idempotency guard."
 
 lint-telemetry:
 	@python3 scripts/lint_telemetry.py
@@ -184,3 +192,37 @@ verify-release:
 		GRADLEW="$(GRADLEW)" \
 		make="$(MAKE)" \
 		./$(VERIFY_RELEASE_SCRIPT) $(VERIFY_RELEASE_ARGS)
+
+# letta-mobile-bn008.7 — populate ~/.letta/iroh/ from matrix_letta + manifest.
+# Default mode is --dry-run so release checklists don't accidentally write to
+# the host's HOME. Pass SEED_ADDRESS_BOOK_DRY_RUN=0 for a real seed; pass
+# FORCE=1 to bypass the .seedDone idempotency guard.
+#
+# Artifacts:
+#   ~/.letta/iroh/identities/          (mode 0700; per-agent JSON populated by wrapper on first dial)
+#   ~/.letta/iroh/agent-addresses.kv   (mode 0644; FileIrohAgentAddressStore)
+#   ~/.letta/iroh/.seedDone            (mode 0600; iroh.addressbook.seedDone marker)
+#
+# AC #5 (roundtrip proof via meridian agent-message send --probe) is
+# deferred until bn008.6 lands the receiver wire — see the bead description
+# (deferred-because: bn008.6).
+seed-iroh-address-book:
+	@if [[ ! -x $(SEED_ADDRESS_BOOK_SCRIPT) ]]; then \
+		echo "ERROR: $(SEED_ADDRESS_BOOK_SCRIPT) not found or not executable"; \
+		exit 2; \
+	fi
+	@if [[ ! -f $(SEED_ADDRESS_BOOK_MANIFEST) ]]; then \
+		echo "ERROR: $(SEED_ADDRESS_BOOK_MANIFEST) not found"; \
+		exit 2; \
+	fi
+	@ARGS="--from-manifest $(SEED_ADDRESS_BOOK_MANIFEST)"; \
+	if [[ "$(SEED_ADDRESS_BOOK_DRY_RUN)" == "1" ]]; then \
+		ARGS="$$ARGS --dry-run"; \
+		echo "=== seed-iroh-address-book (dry-run) ==="; \
+	else \
+		echo "=== seed-iroh-address-book (LIVE) ==="; \
+	fi; \
+	if [[ "$(FORCE)" == "1" ]]; then \
+		ARGS="$$ARGS --force"; \
+	fi; \
+	python3 $(SEED_ADDRESS_BOOK_SCRIPT) $$ARGS
