@@ -54,8 +54,12 @@ record_fail() { FAIL=$((FAIL + 1)); printf '  FAIL  %s\n' "$*" >&2; }
 die() { printf 'ERROR %s\n' "$*" >&2; exit 2; }
 
 command -v jq >/dev/null 2>&1 || die "jq is required"
-[ -x "$INSTALL" ]  || die "install-pm-cron.sh missing or not executable: $INSTALL"
-[ -x "$SENSING" ]  || die "cron-sensing-check.sh missing or not executable: $SENSING"
+# Runnability check: bash-explicit scripts (every caller invokes via `bash <script>`,
+# per the standing repo convention). git may not preserve the executable bit across
+# clones; "has a shebang" is the durable invariant.
+runnable() { [ -r "$1" ] && head -1 "$1" | grep -q '^#!'; }
+runnable "$INSTALL" || die "install-pm-cron.sh missing or not shebang-explicit: $INSTALL"
+runnable "$SENSING" || die "cron-sensing-check.sh missing or not shebang-explicit: $SENSING"
 [ -r "$CRONS_JSON" ] || die "crons.json not readable: $CRONS_JSON"
 jq -e . "$CRONS_JSON" >/dev/null 2>&1 || die "crons.json is not valid JSON: $CRONS_JSON"
 
