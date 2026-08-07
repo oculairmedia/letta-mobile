@@ -3,10 +3,11 @@
 # companion meridian-cron-sensing.service template.
 #
 # 15 minutes is chosen against the live schedule set: the only enabled recurring
-# task is a */30 heartbeat, whose failure budget is 2 x 30min + slack, so a
-# 15-minute cadence detects a dark scheduler within one budget window. Tighten
-# it if a shorter schedule is ever added; do not loosen it past half the
-# shortest enabled cadence.
+# task is the hourly PM heartbeat (cron '0 * * * *' since 2026-08-07; previously
+# */30), whose failure budget is 2 x 60min + slack, so a 15-minute cadence
+# detects a dark scheduler well within one budget window. Tighten it if a
+# shorter schedule is ever added; do not loosen it past half the shortest
+# enabled cadence.
 
 [Unit]
 Description=Run the Meridian cron/scheduler sensing check every 15 minutes

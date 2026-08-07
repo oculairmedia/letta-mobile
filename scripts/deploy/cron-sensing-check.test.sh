@@ -11,7 +11,7 @@
 # Coverage
 # --------
 #   1. Empty registry  -> exit 2 + FAIL line present.
-#   2. Populated registry with a syntactically valid cron (`*/30 * * * *`) and a
+#   2. Populated registry with the production hourly cron (`0 * * * *`) and a
 #      present transcript fire marker -> exit 0, OK line present.
 #   3. Populated registry with an out-of-range cron (`*/0 * * * *`) -> exit 0
 #      (WARN, not silent pass), WARN line present.
@@ -125,11 +125,13 @@ assert_eq "empty registry exit code" "2" "$EMPTY_EXIT"
 assert_contains "empty registry FAIL line" "FAIL  expected >= 1 recurring task(s); sensed 0" "$EMPTY_OUT"
 
 # --------------------------------------------- case 2: populated, valid cron
-echo "=== case 2: populated registry with valid */30 cron + present fire ==="
+echo "=== case 2: populated registry with valid hourly cron + present fire ==="
 # A task row that the cron parser will accept AND a transcript with a fresh
-# "Scheduled task" fire line so the per-task OK path runs.
+# "Scheduled task" fire line so the per-task OK path runs. The fixture uses
+# the PRODUCTION shape (hourly at minute 0, name pm-hourly-triage) so the
+# parser path the live schedule actually exercises is under test.
 TASK_ID="t-populated"
-TASK_NAME="letta-mobile-pm-30m-test"
+TASK_NAME="pm-hourly-triage-test"
 CONV_ID="conv-test-populated"
 B64="$(printf 'conversation:%s' "$CONV_ID" | base64 -w0)"
 CONV_DIR="$WORK/lc-local-backend/conversations/$B64"
@@ -164,7 +166,7 @@ POPULATED=$(jq -n \
       name: $tname,
       status: "active",
       recurring: true,
-      cron: "*/30 * * * *",
+      cron: "0 * * * *",
       runner: "local",
       conversation_id: $conv
     }]
@@ -237,12 +239,13 @@ case "$1" in
   cron)
     case "$2" in
       add)
-        # Parse --cron / --agent / --conversation / --runner / --prompt flags.
+        # Parse --cron / --agent / --conversation / --runner / --prompt / --name flags.
         CRON_EXPR=""
         AGENT_ID=""
         CONV_ID=""
         RUNNER=""
         PROMPT=""
+        TNAME=""
         shift 2
         while [ $# -gt 0 ]; do
           case "$1" in
@@ -251,6 +254,7 @@ case "$1" in
             --conversation) CONV_ID="$2"; shift 2 ;;
             --runner) RUNNER="$2"; shift 2 ;;
             --prompt) PROMPT="$2"; shift 2 ;;
+            --name) TNAME="$2"; shift 2 ;;
             *) shift ;;
           esac
         done
@@ -262,7 +266,7 @@ case "$1" in
         fi
         # Append a task (the stub mirrors the live add path: no dedup).
         TASK_ID="stub-task-$(date +%s%N)"
-        TNAME="letta-mobile-pm-30m"
+        TNAME="${TNAME:-pm-hourly-triage}"
         jq --arg tid "$TASK_ID" \
            --arg tname "$TNAME" \
            --arg cron "$CRON_EXPR" \
