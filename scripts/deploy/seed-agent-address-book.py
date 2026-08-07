@@ -101,7 +101,7 @@ PM_SOURCE_ID = re.compile(
 
 def validate_id(agent_id: str) -> str:
     """Strict canonical id check. Raises ValueError on anything else."""
-    if not agent_id or not agent_id.strip():
+    if not isinstance(agent_id, str) or not agent_id.strip():
         raise ValueError("agent id is blank")
     candidate = agent_id.strip()
     if candidate.startswith("agent-") and not candidate.startswith("letta_agent-"):
@@ -122,7 +122,7 @@ def validate_id(agent_id: str) -> str:
 def normalize_manifest_id(agent_id: str) -> str:
     """One-off conversion for PM-letta-mobile: `agent-<uuid>` -> `letta_agent-<uuid>`.
     Anything else is rejected loudly before it reaches the kv write."""
-    if not agent_id or not agent_id.strip():
+    if not isinstance(agent_id, str) or not agent_id.strip():
         raise ValueError("manifest agent_id is blank")
     candidate = agent_id.strip()
     if PM_SOURCE_ID.match(candidate):
@@ -255,16 +255,46 @@ def atomic_write_text(target: Path, content: str, mode: int) -> None:
     os.chmod(target, mode)
 
 
+def read_existing_wires(target: Path) -> dict[str, str]:
+    """Parse an existing agent-addresses.kv into {agent_id: wire}.
+
+    Missing or empty files yield {}. Comment / blank lines are skipped.
+    Used so a --force re-seed does not wipe wires that
+    FileIrohAgentAddressStore.register already persisted.
+    """
+    if not target.exists():
+        return {}
+    wires: dict[str, str] = {}
+    for line in target.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        agent_id, _, wire = stripped.partition("=")
+        agent_id = agent_id.strip()
+        if agent_id:
+            wires[agent_id] = wire
+    return wires
+
+
 def atomic_write_kv(target: Path, entries: list[dict]) -> None:
-    """Render the kv file (one `agentId=<wire>` per line, LF-only, trailing LF)."""
+    """Render the kv file (one `agentId=<wire>` per line, LF-only, trailing LF).
+
+    When a merged entry omits `iroh_endpoint`, any previously stored non-empty
+    wire for that agent_id is preserved. An explicitly supplied endpoint
+    (including empty string) replaces the stored value. This keeps
+    FileIrohAgentAddressStore.register results intact across --force re-seeds.
+    """
+    existing = read_existing_wires(target)
     lines = []
     for entry in entries:
         agent_id = validate_id(entry["agent_id"])
         # Wire form per FileIrohAgentAddressStore: `agentId=<hexNodeId>` when
-        # no direct addrs; `<hexNodeId>@a,b` when present. iroh_endpoint null
-        # in stage 1 -> bare line. We DO NOT invent endpoint values here —
-        # bn008.6's wrapper merge populates them when an agent binds.
-        wire = entry.get("iroh_endpoint") or ""  # empty == registered, no addrs
+        # no direct addrs; `<hexNodeId>@a,b` when present. Stage-1 SQL/manifest
+        # merges omit iroh_endpoint — preserve any registered wire in that case.
+        if "iroh_endpoint" in entry:
+            wire = entry["iroh_endpoint"] or ""
+        else:
+            wire = existing.get(agent_id) or ""
         lines.append(f"{agent_id}={wire}")
     content = "\n".join(lines) + "\n"
     # Mode 0644 since all entries have null endpoints in stage 1 (dispatch

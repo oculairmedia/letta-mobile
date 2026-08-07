@@ -1,7 +1,8 @@
 # Iroh agent address book — operator runbook
 
-> Status: implemented in [letta-mobile-bn008.7](#) (PR title: `Seed host a2a
-> address book + stable per-agent Iroh identities (bn008.7)`).
+> Status: implemented in [`letta-mobile-bn008.7`](https://github.com/oculairmedia/letta-mobile/pull/1122)
+> (PR title: `Seed host a2a address book + stable per-agent Iroh identities
+> (bn008.7)`).
 > Scope: local fs only. No host service mutation. No `letta` CLI invocation.
 > No HTTP/RPC fallback. Failure is loud.
 
@@ -94,7 +95,8 @@ docker exec letta-postgres-1 psql -U letta -d matrix_letta -tAc \
 # Expect: ~114 (current at dispatch time 2026-08-06).
 
 # 2. Dry-run to print the plan without writing anything.
-python3 scripts/deploy/seed-agent-address-book.py --dry-run
+python3 scripts/deploy/seed-agent-address-book.py --dry-run \
+  --from-manifest scripts/deploy/agent-address-book.manifest.json
 # Expect: `plan: sql_rows=N manifest_entries=2 merged=N+1`
 
 # 3. Real seed.
@@ -155,7 +157,8 @@ docker exec letta-postgres-1 psql -U letta -d matrix_letta -tAc \
 # Expect: ~114
 
 # Dry-run (no writes).
-python3 scripts/deploy/seed-agent-address-book.py --dry-run
+python3 scripts/deploy/seed-agent-address-book.py --dry-run \
+  --from-manifest scripts/deploy/agent-address-book.manifest.json
 # Expect: `plan: sql_rows=N manifest_entries=2 merged=N+1` then exit 0.
 
 # Real seed.

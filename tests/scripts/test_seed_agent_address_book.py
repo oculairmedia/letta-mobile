@@ -113,6 +113,12 @@ class TestValidateId:
         with pytest.raises(ValueError):
             import_script.validate_id("   ")
 
+    def test_non_string_id_rejected(self, import_script) -> None:
+        with pytest.raises(ValueError, match="blank"):
+            import_script.validate_id(1)  # type: ignore[arg-type]
+        with pytest.raises(ValueError, match="blank"):
+            import_script.validate_id(None)  # type: ignore[arg-type]
+
 
 # ---------- PM one-off branch (agent- -> letta_agent-) -----------------------
 
@@ -133,6 +139,10 @@ class TestNormalizePmId:
     def test_unrelated_prefix_rejected(self, import_script) -> None:
         with pytest.raises(ValueError):
             import_script.normalize_manifest_id("foo-12345678-1234-1234-1234-123456789012")
+
+    def test_non_string_id_rejected(self, import_script) -> None:
+        with pytest.raises(ValueError, match="blank"):
+            import_script.normalize_manifest_id(1)  # type: ignore[arg-type]
 
     def test_normalized_id_passes_validator(self, import_script) -> None:
         pm_src = "agent-c356b54a-8b37-4d53-b9d0-b43164749b6f"
@@ -242,6 +252,37 @@ class TestAtomicWrite:
             assert "=" in line, f"expected 'agentId=wire' on every line, got: {line!r}"
             agent_id, _, wire = line.partition("=")
             assert CANONICAL_ID.match(agent_id), f"bad agent_id on line: {agent_id!r}"
+
+    def test_preserves_existing_wire_when_endpoint_omitted(
+        self, import_script, tmp_path: Path,
+    ) -> None:
+        """Re-seed must not wipe wires FileIrohAgentAddressStore.register wrote."""
+        target = tmp_path / "agent-addresses.kv"
+        agent_id = "letta_agent-11111111-1111-1111-1111-111111111111"
+        registered_wire = "deadbeefcafebabe@127.0.0.1:1122"
+        # First seed: empty wire (stage-1 SQL/manifest shape — no iroh_endpoint).
+        import_script.atomic_write_kv(
+            target, [{"agent_id": agent_id, "mxid": "@a:matrix.oculair.ca"}],
+        )
+        # Simulate register() writing a non-empty wire.
+        target.write_text(f"{agent_id}={registered_wire}\n")
+        # Re-seed with the same entry shape (iroh_endpoint omitted).
+        import_script.atomic_write_kv(
+            target, [{"agent_id": agent_id, "mxid": "@a:matrix.oculair.ca"}],
+        )
+        assert target.read_text() == f"{agent_id}={registered_wire}\n"
+
+    def test_explicit_endpoint_replaces_existing_wire(
+        self, import_script, tmp_path: Path,
+    ) -> None:
+        target = tmp_path / "agent-addresses.kv"
+        agent_id = "letta_agent-11111111-1111-1111-1111-111111111111"
+        target.write_text(f"{agent_id}=oldwire\n")
+        import_script.atomic_write_kv(
+            target,
+            [{"agent_id": agent_id, "iroh_endpoint": "newwire@1.2.3.4:9"}],
+        )
+        assert target.read_text() == f"{agent_id}=newwire@1.2.3.4:9\n"
 
 
 # ---------- --dry-run atomic discipline (CLI) ---------------------------------
@@ -367,6 +408,50 @@ class TestFromManifest:
             f"expected entries=2 in marker, got: {entries_line!r}"
         )
 
+    def test_force_reseed_preserves_registered_wire(
+        self, tmp_home: Path, tmp_path: Path,
+    ) -> None:
+        """--force re-seed must keep wires written by register(), not blank them."""
+        kv = Path(os.environ["LETTA_IROH_ADDRESSES_KV"])
+        agent_id = "letta_agent-597b5756-2915-4560-ba6b-91005f085166"
+        registered_wire = "aabbccddeeff0011@10.0.0.1:1122"
+
+        manifest = tmp_path / "manifest.json"
+        self._write_manifest(manifest, [
+            {"agent_id": agent_id, "mxid": "@meridian:matrix.oculair.ca"},
+        ])
+        # Initial seed (empty wires).
+        first = subprocess.run(
+            [
+                sys.executable, str(SCRIPT),
+                "--from-manifest", str(manifest),
+                "--stub-sql",
+            ],
+            env=os.environ.copy(),
+            capture_output=True, text=True, timeout=30,
+        )
+        assert first.returncode == 0, f"stdout={first.stdout}\nstderr={first.stderr}"
+        assert f"{agent_id}=" in kv.read_text()
+
+        # Simulate FileIrohAgentAddressStore.register writing a non-empty wire.
+        kv.write_text(f"{agent_id}={registered_wire}\n")
+
+        # --force re-seed with the same manifest (no iroh_endpoint supplied).
+        second = subprocess.run(
+            [
+                sys.executable, str(SCRIPT),
+                "--from-manifest", str(manifest),
+                "--stub-sql",
+                "--force",
+            ],
+            env=os.environ.copy(),
+            capture_output=True, text=True, timeout=30,
+        )
+        assert second.returncode == 0, f"stdout={second.stdout}\nstderr={second.stderr}"
+        assert kv.read_text() == f"{agent_id}={registered_wire}\n", (
+            f"--force re-seed wiped registered wire; got: {kv.read_text()!r}"
+        )
+
 
 # ---------- skip-if-script-missing -------------------------------------------
 
@@ -378,4 +463,4 @@ def test_script_is_executable(tmp_home: Path) -> None:
         pytest.skip("script not yet implemented")
     mode = stat.S_IMODE(SCRIPT.stat().st_mode)
     assert mode & 0o111, "seed-agent-address-book.py must be executable"
-    assert mode & 0o100, "seed-agent-address-book.py must be owner-writable"
+    assert mode & 0o200, "seed-agent-address-book.py must be owner-writable"
