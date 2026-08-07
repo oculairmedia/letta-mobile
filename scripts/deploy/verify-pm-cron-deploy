@@ -2,7 +2,7 @@
 # verify-pm-cron-deploy — letta-mobile-g87by.
 #
 # Three-assertion gate wired into `make verify-pm-cron-deploy`:
-#   (a) `install-pm-cron.sh --check` exits 0  (the pm-30m schedule is
+#   (a) `install-pm-cron.sh --check` exits 0  (the PM heartbeat schedule is
 #       registered; --check is read-only and never mutates).
 #   (b) `cron-sensing-check.sh` exits 0        (the structural + per-task
 #       validator passes against the live ledger).

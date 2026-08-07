@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # install-pm-cron.sh — letta-mobile-g87by.
 #
-# Registers the pm-30m heartbeat cron for the PM agent directly through the
+# Registers the PM heartbeat cron for the PM agent directly through the
 # canonical `letta cron add --runner local` path. Idempotent: a second run
-# with the same id+cron+agent+runner already present exits 0 without
+# with the same name+cron+agent+runner already present exits 0 without
 # mutating the local store.
+#
+# Cadence history: originally */30 (name letta-mobile-pm-30m); switched to
+# hourly (name pm-hourly-triage, cron '0 * * * *') on 2026-08-07 by operator
+# direction. The defaults below track the LIVE schedule; override via
+# LETTA_PM_CRON_EXPR / LETTA_PM_CRON_NAME if the cadence moves again.
 #
 # Why this exists
 # ----------------
@@ -21,7 +26,7 @@
 # -------------------
 #   * Does NOT touch `/opt/meridian/bin/cron-sensing-check.sh`.
 #   * Does NOT restart `meridian-cron-sensing.service`.
-#   * Does NOT call `letta cron add` against a non-pm-30m schedule.
+#   * Does NOT call `letta cron add` against a non-PM-heartbeat schedule.
 #   * Does NOT add any HTTP/WS/RPC layer.
 #
 # Usage
@@ -36,9 +41,9 @@
 # ---------------------
 #   LETTA_HOME                default /root/.letta
 #   LETTA_AGENT_ID            default agent-c356b54a-8b37-4d53-b9d0-b43164749b6f
-#   LETTA_CONVERSATION_ID     default conv-local-150
-#   LETTA_PM_CRON_EXPR        default '*/30 * * * *'
-#   LETTA_PM_CRON_NAME        default letta-mobile-pm-30m
+#   LETTA_CONVERSATION_ID     default local-conv-150
+#   LETTA_PM_CRON_EXPR        default '0 * * * *'
+#   LETTA_PM_CRON_NAME        default pm-hourly-triage
 #   LETTA_PM_PROMPT_FILE      default scripts/deploy/pm-heartbeat.prompt.txt
 #                             (falls back to a built-in stub if absent)
 #
@@ -54,9 +59,9 @@ set -uo pipefail
 
 LETTA_HOME="${LETTA_HOME:-/root/.letta}"
 AGENT_ID="${LETTA_AGENT_ID:-agent-c356b54a-8b37-4d53-b9d0-b43164749b6f}"
-CONV_ID="${LETTA_CONVERSATION_ID:-conv-local-150}"
-CRON_EXPR="${LETTA_PM_CRON_EXPR:-*/30 * * * *}"
-CRON_NAME="${LETTA_PM_CRON_NAME:-letta-mobile-pm-30m}"
+CONV_ID="${LETTA_CONVERSATION_ID:-local-conv-150}"
+CRON_EXPR="${LETTA_PM_CRON_EXPR:-0 * * * *}"
+CRON_NAME="${LETTA_PM_CRON_NAME:-pm-hourly-triage}"
 RUNNER="${LETTA_PM_RUNNER:-local}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -104,7 +109,7 @@ command -v letta >/dev/null 2>&1 || die "letta CLI is required on PATH"
 if [ -r "$PROMPT_FILE" ]; then
   HEARTBEAT_PROMPT="$(cat "$PROMPT_FILE")"
 else
-  HEARTBEAT_PROMPT="Scheduled task \"$CRON_NAME\" is firing. This is the pm-30m heartbeat for agent $AGENT_ID on conversation $CONV_ID. Run your standard PM sweep: triage queue, EPIC status, open PRs, blockers. If anything needs a human, surface it; otherwise report clean."
+  HEARTBEAT_PROMPT="Scheduled task \"$CRON_NAME\" is firing. This is the PM heartbeat for agent $AGENT_ID on conversation $CONV_ID. Run your standard PM sweep: triage queue, EPIC status, open PRs, blockers. If anything needs a human, surface it; otherwise report clean."
 fi
 
 # -------------------------------------------------------------- --check path
@@ -161,10 +166,15 @@ if [ "$(printf '%s' "$EXISTING" | jq 'length')" -ge 1 ]; then
 fi
 
 # No matching row — register.
+# --name is load-bearing: the idempotence probe above matches on
+# (agent_id, cron, name), so an unnamed registration would never be
+# detected by a second run and the script would duplicate the task
+# (doctrine 61 — idempotence must match by the full tuple it probes).
 log "install-pm-cron: registering $CRON_NAME via letta cron add..."
 ADD_OUT="$(letta cron add \
   --prompt "$HEARTBEAT_PROMPT" \
   --cron "$CRON_EXPR" \
+  --name "$CRON_NAME" \
   --runner "$RUNNER" \
   --agent "$AGENT_ID" \
   --conversation "$CONV_ID" 2>&1)" || die "letta cron add failed: $ADD_OUT"
