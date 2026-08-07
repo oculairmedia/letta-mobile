@@ -97,8 +97,16 @@ class NativeAdminFastFallbackTest {
             NativeAdmin.policyForMethod("conversation.archive"),
         )
         assertEquals(
-            NativeAdminOperationPolicy.Read,
+            NativeAdminOperationPolicy.ReadScan,
             NativeAdmin.policyForMethod("conversation.list"),
+        )
+        assertEquals(
+            NativeAdminOperationPolicy.ReadScan,
+            NativeAdmin.policyForMethod("agent.list"),
+        )
+        assertEquals(
+            NativeAdminOperationPolicy.ReadScan,
+            NativeAdmin.policyForMethod("message.list"),
         )
         assertEquals(
             NativeAdminOperationPolicy.Read,

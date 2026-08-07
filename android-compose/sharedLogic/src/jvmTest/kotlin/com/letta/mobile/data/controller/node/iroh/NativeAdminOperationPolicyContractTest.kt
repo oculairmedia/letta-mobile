@@ -106,7 +106,7 @@ class NativeAdminOperationPolicyContractTest {
     @Test
     fun readTimeoutTripsBreakerButMutationTimeoutDoesNotAutoRetry() = runTest {
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.AgentList) {
+            NativeAdmin.require(FakeClient, NativeAdminOp.AgentGet) {
                 delay(5_000)
                 "x"
             }
@@ -114,7 +114,7 @@ class NativeAdminOperationPolicyContractTest {
         // Read breaker open — next same-op require fails closed without probing.
         var readProbed = false
         assertFailsWith<IllegalArgumentException> {
-            NativeAdmin.require(FakeClient, NativeAdminOp.AgentList) {
+            NativeAdmin.require(FakeClient, NativeAdminOp.AgentGet) {
                 readProbed = true
                 "y"
             }
@@ -131,6 +131,43 @@ class NativeAdminOperationPolicyContractTest {
             }
         }
         assertEquals(1, mutationAttempts, "require must not automatically re-issue a timed-out mutation")
+    }
+
+    @Test
+    fun conversationListSucceedsOnThreeSecondReadsWithoutTimingOutOrTrippingCircuitOpen() = runTest {
+        val result = NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+            delay(3_000)
+            "bulk-list-success"
+        }
+        assertEquals("bulk-list-success", result)
+
+        // Circuit breaker should remain closed and subsequent reads succeed.
+        var subsequentProbed = false
+        val result2 = NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+            subsequentProbed = true
+            "subsequent-success"
+        }
+        assertTrue(subsequentProbed)
+        assertEquals("subsequent-success", result2)
+    }
+
+    @Test
+    fun readScanTimeoutTripsBreakerIfExceeding15SecondBudget() = runTest {
+        assertFailsWith<IllegalArgumentException> {
+            NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+                delay(16_000)
+                "too-slow"
+            }
+        }
+
+        var probed = false
+        assertFailsWith<IllegalArgumentException> {
+            NativeAdmin.require(FakeClient, NativeAdminOp.ConversationList) {
+                probed = true
+                "next"
+            }
+        }
+        assertFalse(probed, "read scan timeout must trip breaker")
     }
 
     private fun locateIrohHandlersDir(): java.nio.file.Path {
