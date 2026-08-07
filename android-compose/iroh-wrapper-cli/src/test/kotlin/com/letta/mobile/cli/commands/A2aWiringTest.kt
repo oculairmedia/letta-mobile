@@ -16,8 +16,11 @@ import java.util.Base64
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -310,13 +313,31 @@ class A2aWiringTest {
     }
 
     @Test
+    fun `wrapA2aEnvelope produces valid JSON string with expected fields`() {
+        val message = IrohAgentMessage(
+            fromAgentId = "agent-a",
+            toAgentId = "agent-b",
+            body = "hello world",
+            msgId = "msg-123",
+            ts = 1_700_000_000_123L,
+        )
+        val wrappedStr = wrapA2aEnvelope(message)
+        val json = Json.parseToJsonElement(wrappedStr) as JsonObject
+        assertEquals("a2a", json["envelope"]?.stringOrNullSafe())
+        assertEquals("agent-a", json["from_agent_id"]?.stringOrNullSafe())
+        assertEquals("agent-b", json["to_agent_id"]?.stringOrNullSafe())
+        assertEquals(1_700_000_000_123L, (json["ts"] as? JsonPrimitive)?.long)
+        assertEquals("msg-123", json["msg_id"]?.stringOrNullSafe())
+        assertEquals("hello world", json["content"]?.stringOrNullSafe())
+    }
+
+    @Test
     fun `handleDecision logs a2a deliver for RoutingDecision Deliver and calls client input`() {
         // Recording stub: captures the Input command the receiver hands to
         // the client when a Deliver decision lands. The handleDecision
-        // path emits a telemetry event AND inputs the message body as a
+        // path emits a telemetry event AND inputs the wrapped envelope as a
         // user message on the chosen conversation.
-        val captured = mutableListOf<AppServerCommand.Input>()
-        val client = RecordingClient(captured)
+        val client = RecordingClient()
         val message = IrohAgentMessage(
             fromAgentId = "Meridian",
             toAgentId = "PM-letta-mobile",
@@ -328,15 +349,15 @@ class A2aWiringTest {
 
         runBlocking { handleDecision(client, message, decision) }
 
-        assertEquals(1, captured.size, "expected exactly one client.input call")
-        val cmd = captured.single()
+        assertEquals(1, client.captured.size, "expected exactly one client.input call")
+        val cmd = client.captured.single()
         assertEquals("PM-letta-mobile", cmd.runtime.agentId, "input runtime targets toAgentId")
         assertEquals("conv-deliver", cmd.runtime.conversationId, "input runtime targets the chosen conversation")
         val payload = cmd.payload as AppServerInputPayload.CreateMessage
         assertEquals(1, payload.messages.size)
         val m = payload.messages.single()
         assertEquals("user", m.role, "decision lands the message as a USER message")
-        assertEquals(JsonPrimitive("ping"), m.content, "decision lands the original body verbatim")
+        assertEquals(JsonPrimitive(wrapA2aEnvelope(message)), m.content, "decision lands wrapped a2a envelope in content")
         assertEquals("msg-1", m.clientMessageId, "decision forwards the wire msgId for at-most-once on the receiver")
     }
 
@@ -442,28 +463,98 @@ class A2aWiringTest {
         }
     }
 
+    @Test
+    fun `handleDecision CreateAndDeliver creates conversation via client conversationCreate and inputs wrapped message`() {
+        val client = RecordingClient()
+        val message = IrohAgentMessage(
+            fromAgentId = "Meridian",
+            toAgentId = "PM-letta-mobile",
+            body = "ping create",
+            msgId = "msg-2",
+            ts = 1_700_000_000_000L,
+        )
+        val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
+
+        runBlocking { handleDecision(client, message, decision) }
+
+        assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
+        val createCmd = client.capturedCreate.single()
+        assertEquals("PM-letta-mobile", createCmd.body["agent_id"]?.stringOrNullSafe())
+
+        assertEquals(1, client.captured.size, "expected one input call after creation")
+        val inputCmd = client.captured.single()
+        assertEquals("PM-letta-mobile", inputCmd.runtime.agentId)
+        assertEquals("conv-created-1", inputCmd.runtime.conversationId)
+
+        val payload = inputCmd.payload as AppServerInputPayload.CreateMessage
+        val m = payload.messages.single()
+        assertEquals("user", m.role)
+        assertEquals(JsonPrimitive(wrapA2aEnvelope(message)), m.content)
+        assertEquals("msg-2", m.clientMessageId)
+    }
+
+    @Test
+    fun `handleDecision CreateAndDeliver drops message on conversationCreate failure`() {
+        val client = RecordingClient(
+            conversationCreateResult = { cmd ->
+                AppServerInboundFrame.ConversationCreateResponse(
+                    requestId = cmd.requestId,
+                    success = false,
+                    error = "Failed to create conversation",
+                )
+            },
+        )
+        val message = IrohAgentMessage(
+            fromAgentId = "Meridian",
+            toAgentId = "PM-letta-mobile",
+            body = "ping create fail",
+            msgId = "msg-3",
+            ts = 1_700_000_000_000L,
+        )
+        val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
+
+        runBlocking { handleDecision(client, message, decision) }
+
+        assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
+        assertTrue(client.captured.isEmpty(), "expected input not to be called when create fails")
+    }
+
     /**
-     * A minimal [AppServerClient] stub: only [input] does anything useful
-     * (records the command). Every other entry point throws — `handleDecision`
-     * never reaches them on the Deliver path. Keeping the surface tight makes
-     * the test fail loudly if `handleDecision` ever starts calling another
-     * method under the Deliver branch.
+     * A minimal [AppServerClient] stub: only [input] and [conversationCreate] do
+     * anything useful (record the commands). Every other entry point throws —
+     * `handleDecision` never reaches them on these paths. Keeping the surface tight
+     * makes the test fail loudly if `handleDecision` ever starts calling another
+     * method unexpected.
      */
-    private class RecordingClient(val captured: MutableList<AppServerCommand.Input>) : AppServerClient {
+    private class RecordingClient(
+        val captured: MutableList<AppServerCommand.Input> = mutableListOf(),
+        val capturedCreate: MutableList<AppServerCommand.ConversationCreate> = mutableListOf(),
+        var conversationCreateResult: (AppServerCommand.ConversationCreate) -> AppServerInboundFrame.ConversationCreateResponse = { cmd ->
+            AppServerInboundFrame.ConversationCreateResponse(
+                requestId = cmd.requestId,
+                success = true,
+                conversation = buildJsonObject { put("id", "conv-created-1") },
+            )
+        },
+    ) : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
-            error("unused on Deliver path")
+            error("unused path")
         override suspend fun input(command: AppServerCommand.Input) {
             captured += command
         }
+        override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): AppServerInboundFrame.ConversationCreateResponse {
+            capturedCreate += command
+            return conversationCreateResult(command)
+        }
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
-            error("unused on Deliver path")
+            error("unused path")
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
-            error("unused on Deliver path")
+            error("unused path")
         override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
-            error("unused on Deliver path")
+            error("unused path")
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
-            error("unused on Deliver path")
+            error("unused path")
     }
 
     private class FailingCreateClient(val errorMessage: String) : AppServerClient {
