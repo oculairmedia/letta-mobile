@@ -210,17 +210,7 @@ fun ProjectIssuesScreen(
                 }
                 val highlightedIssueId by remember(issueIds, listState) {
                     derivedStateOf {
-                        // ⚡ Bolt Optimization: Replace asSequence map chains with an indexed loop
-                        // to prevent iterator allocations on every scroll frame, stopping GC jank.
-                        val visibleItems = listState.layoutInfo.visibleItemsInfo
-                        for (i in visibleItems.indices) {
-                            val rawKey = visibleItems[i].key as? String ?: continue
-                            val key = if (rawKey.startsWith("ready-")) rawKey.removePrefix("ready-") else rawKey
-                            if (issueIds.contains(key)) {
-                                return@derivedStateOf key
-                            }
-                        }
-                        null
+                        findFirstVisibleIssue(listState.layoutInfo.visibleItemsInfo, issueIds)
                     }
                 }
                 PullToRefreshBox(
@@ -921,3 +911,21 @@ private fun IssueMetaChip(value: String, isWarning: Boolean = false) {
 
 private fun String.toIssueLabel(): String =
     replace('_', ' ').replaceFirstChar { it.uppercase() }
+
+// ⚡ Bolt Optimization: Replace asSequence map chains with an indexed loop
+// to prevent iterator allocations on every scroll frame, stopping GC jank.
+// Extracted to a top-level function to keep `ProjectIssuesScreen` complexity low.
+@androidx.annotation.VisibleForTesting
+internal fun findFirstVisibleIssue(
+    visibleItems: List<androidx.compose.foundation.lazy.LazyListItemInfo>,
+    issueIds: Set<String>
+): String? {
+    for (i in visibleItems.indices) {
+        val rawKey = visibleItems[i].key as? String ?: continue
+        val key = if (rawKey.startsWith("ready-")) rawKey.removePrefix("ready-") else rawKey
+        if (issueIds.contains(key)) {
+            return key
+        }
+    }
+    return null
+}
