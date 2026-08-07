@@ -83,4 +83,57 @@ class IrohWrapperCliWiringTest {
         val endpoint = Class.forName("computer.iroh.Endpoint", false, javaClass.classLoader)
         assertNotNull(endpoint)
     }
+
+    @Test
+    fun virtualBridgeNetworkInterfacesAreFilteredOut() {
+        val virtualNames = listOf(
+            "docker0",
+            "docker_gwbridge",
+            "br-123456789abc",
+            "br0",
+            "veth1234567",
+            "virbr0",
+            "cni0",
+            "flannel.1",
+            "tun0",
+            "tap0",
+            "dummy0",
+        )
+        virtualNames.forEach { name ->
+            assertTrue(
+                !com.letta.mobile.cli.commands.isRealNetworkInterfaceName(name),
+                "expected virtual interface $name to be filtered out",
+            )
+        }
+
+        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("lo", isLoopback = true), "loopback must be filtered out")
+        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("eth0", isUp = false), "down interface must be filtered out")
+        assertTrue(!com.letta.mobile.cli.commands.isRealNetworkInterfaceName("ppp0", isPointToPoint = true), "point-to-point must be filtered out")
+
+        val physicalNames = listOf("eth0", "wlan0", "enp3s0", "wlp2s0", "en0", "wl0")
+        physicalNames.forEach { name ->
+            assertTrue(
+                com.letta.mobile.cli.commands.isRealNetworkInterfaceName(name),
+                "expected physical interface $name to be accepted",
+            )
+        }
+    }
+
+    @Test
+    fun directAddressesSortPhysicalLanIpsBeforeDockerBridgeIps() {
+        val addresses = listOf(
+            "172.17.0.1:4501",
+            "172.18.0.1:4501",
+            "192.168.50.90:4501",
+            "10.0.0.5:4501",
+        )
+
+        val sorted = com.letta.mobile.cli.commands.sortDirectAddresses(addresses)
+
+        val dockerIps = setOf("172.17.0.1:4501", "172.18.0.1:4501")
+        val lanIps = setOf("192.168.50.90:4501", "10.0.0.5:4501")
+
+        assertTrue(sorted.take(2).toSet() == lanIps, "Physical LAN IPs must come first: got $sorted")
+        assertTrue(sorted.takeLast(2).toSet() == dockerIps, "Docker bridge IPs must come last: got $sorted")
+    }
 }

@@ -254,7 +254,7 @@ suspend fun publishLocalAgents(
     val resolver = IrohAgentAddressResolver(store)
     val addr = endpoint.addr()
     val nodeHex = endpointIdHex(endpoint)
-    val direct = addr.directAddresses()
+    val direct = sortDirectAddresses(addr.directAddresses())
     val published = mutableListOf<String>()
     val targetAgents = resolveTargetAgentsToPublish(config.publishAgents, config.addressBook)
     targetAgents.forEach { rawAgentId ->
