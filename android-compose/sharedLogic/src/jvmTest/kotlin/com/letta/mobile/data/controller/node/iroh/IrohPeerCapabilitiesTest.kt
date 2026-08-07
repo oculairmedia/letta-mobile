@@ -54,6 +54,7 @@ class IrohPeerCapabilitiesTest {
             // accessible to a standard paired desktop (not admin-gated).
             "provider.list", "goal.get", "group.list", "folder.list", "archive.list",
             "step.list", "identity.list", "identity.get", "run.list", "run.get",
+            "health.check",
             // Regression fix: agent.update (model selection) and agent.context
             // (context-window UI) fell to else->ADMIN_FULL once the admin_rpc
             // stream path started enforcing per-method capabilities, breaking
@@ -70,7 +71,7 @@ class IrohPeerCapabilitiesTest {
         // Denied: server administration + MUTATIONS still require explicit admin.full.
         listOf(
             "agent.create", "agent.delete",
-            "health.check", "goal.command",
+            "goal.command",
             "pair.invite.create", "pair.peer.list", "pair.peer.get",
             "pair.peer.rename", "pair.peer.set_capabilities", "pair.peer.revoke",
         ).forEach { method ->
