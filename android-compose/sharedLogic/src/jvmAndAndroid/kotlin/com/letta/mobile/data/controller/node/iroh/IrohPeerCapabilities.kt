@@ -127,6 +127,7 @@ object IrohPeerCapabilities {
      * folded in; any mutation in the same namespace stays admin.full.
      */
     private val ADMIN_READ_METHODS = setOf(
+        "health.check",
         "provider.list",
         "goal.get",
         "group.list",
