@@ -68,8 +68,10 @@ command -v jq >/dev/null 2>&1 || {
   printf 'ERROR jq is required\n' >&2
   exit 2
 }
-[ -x "$SENSING" ] || {
-  printf 'ERROR %s is missing or not executable\n' "$SENSING" >&2
+# Runnability check: shebang-explicit (git does not preserve xbit reliably).
+runnable() { [ -r "$1" ] && head -1 "$1" | grep -q '^#!'; }
+runnable "$SENSING" || {
+  printf 'ERROR %s is missing or not shebang-explicit\n' "$SENSING" >&2
   exit 2
 }
 
@@ -220,6 +222,9 @@ echo "=== case 4: install-pm-cron.sh idempotence under sandbox ==="
 # `letta` binary on PATH so the script thinks it just registered a task.
 # The contract under test is: same id+cron+agent+runner in the local store ->
 # exit 0 without further mutation.
+# Set the executable bit on the install script for this run.
+# (git may not preserve the bit across clones; the script is bash-explicit.)
+chmod +x "$INSTALL" 2>/dev/null || true
 if [ -x "$INSTALL" ]; then
   STUB_BIN="$WORK/stub-bin"
   mkdir -p "$STUB_BIN"
