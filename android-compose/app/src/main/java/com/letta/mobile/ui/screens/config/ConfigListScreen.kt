@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -23,8 +24,10 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
+import kotlinx.collections.immutable.toImmutableList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -279,3 +282,77 @@ private fun serverModeLabel(mode: ServerMode): String = when (mode) {
     ServerMode.SELF_HOSTED -> stringResource(R.string.common_self_hosted)
     ServerMode.LOCAL -> stringResource(R.string.common_local_runtime)
 }
+
+// region Previews
+
+private val previewServerConfigs = listOf(
+    ServerConfig(
+        id = "config-1",
+        mode = ServerMode.CLOUD,
+        url = "api.letta.com",
+        isActive = true,
+        health = ServerHealthState.ONLINE,
+    ),
+    ServerConfig(
+        id = "config-2",
+        mode = ServerMode.SELF_HOSTED,
+        url = "letta.example.com",
+        isActive = false,
+        health = ServerHealthState.OFFLINE,
+    ),
+)
+
+private val previewEmbeddedRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+    nativeEnabled = false,
+    assetsEnabled = false,
+    version = "disabled",
+    integrity = "",
+)
+
+private fun previewConfigListUiState(
+    configs: List<ServerConfig> = previewServerConfigs,
+) = ConfigListUiState(
+    configs = configs.toImmutableList(),
+    embeddedRuntimeStatus = previewEmbeddedRuntimeStatus,
+    hasEmbeddedLettaCodeConfig = false,
+)
+
+@PreviewLightDark
+@Composable
+private fun ConfigListContentPreview() {
+    LettaPreviewFrame {
+        ConfigListContent(
+            state = previewConfigListUiState(),
+            onSetActive = {},
+            onDelete = {},
+            onConnectEmbeddedRuntime = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun EmbeddedRuntimeConnectCardPreview() {
+    LettaPreviewFrame {
+        EmbeddedRuntimeConnectCard(
+            status = previewEmbeddedRuntimeStatus,
+            onConnect = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ConfigCardPreview() {
+    LettaPreviewFrame {
+        ConfigCard(
+            config = previewServerConfigs.first(),
+            onSetActive = {},
+            onDelete = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+// endregion

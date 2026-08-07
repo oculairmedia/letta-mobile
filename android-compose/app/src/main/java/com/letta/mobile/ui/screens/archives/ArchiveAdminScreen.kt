@@ -38,12 +38,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Archive
+import com.letta.mobile.data.model.EmbeddingConfig
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
@@ -56,6 +58,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemSupporting
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -543,3 +546,43 @@ private fun ArchiveEditorDialog(
         }
     }
 }
+
+// region Previews
+
+private val previewArchive = Archive(
+    id = "archive-1",
+    name = "Product Docs",
+    description = "Embedding store for product documentation passages",
+    organizationId = "org-123",
+    vectorDbProvider = "pgvector",
+    embeddingConfig = EmbeddingConfig(embeddingModel = "letta/letta-free"),
+    createdAt = "2026-07-20T10:15:00Z",
+)
+
+@PreviewLightDark
+@Composable
+private fun ArchiveCardPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ArchiveCard(
+                archive = previewArchive,
+                onInspect = {},
+                onEdit = {},
+                onDelete = {},
+            )
+            ArchiveCard(
+                archive = previewArchive.copy(id = "archive-2", name = "Meeting Notes", description = null, vectorDbProvider = null),
+                onInspect = {},
+                onEdit = {},
+                onDelete = {},
+            )
+        }
+    }
+}
+
+// endregion
