@@ -4,6 +4,7 @@ import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentIdNamespace
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationClass
 import com.letta.mobile.data.model.ConversationId
@@ -31,7 +32,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
+import java.util.UUID
 
 /**
  * letta-mobile-bn008.6: production wiring for the a2a (direct agent-to-agent)
@@ -186,7 +190,7 @@ suspend fun buildA2aWiring(
         val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
         val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
             if (client == null || backendStore == null) emptyList()
-            else listConversationsForAgent(backendStore, agentId)
+            else listConversationsForAgent(backendStore, AgentIdNamespace.normalizeToBareId(agentId))
         }
 
         val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> Unit = { message, decision ->
@@ -250,10 +254,11 @@ suspend fun publishLocalAgents(
     val resolver = IrohAgentAddressResolver(store)
     val addr = endpoint.addr()
     val nodeHex = endpointIdHex(endpoint)
-    val direct = addr.directAddresses()
+    val direct = sortDirectAddresses(addr.directAddresses())
     val published = mutableListOf<String>()
     val targetAgents = resolveTargetAgentsToPublish(config.publishAgents, config.addressBook)
-    targetAgents.forEach { agentId ->
+    targetAgents.forEach { rawAgentId ->
+        val agentId = AgentIdNamespace.normalizeToBareId(rawAgentId)
         // Touch the per-agent identity dir so a future dial can load-or-create
         // its IrohAgentIdentity file (the seed only writes the README + dir).
         runCatching {
@@ -282,7 +287,8 @@ internal fun resolveTargetAgentsToPublish(
     addressBook: File,
 ): List<String> {
     val seededEmptyAgents = findSeededEmptyAgents(addressBook)
-    return (publishAgents.map { it.trim() } + seededEmptyAgents)
+    return (publishAgents.map { AgentIdNamespace.normalizeToBareId(it.trim()) } +
+            seededEmptyAgents.map { AgentIdNamespace.normalizeToBareId(it) })
         .filterNot { it.isBlank() }
         .distinct()
 }
@@ -326,8 +332,17 @@ internal fun findSeededEmptyAgents(addressBook: File): List<String> {
  */
 internal suspend fun listConversationsForAgent(
     store: LocalBackendAdminStore,
-    agentId: String,
+    rawAgentId: String,
 ): List<IrohAgentMessageRouter.ConversationState> = withContext(Dispatchers.IO) {
+    val agentId = AgentIdNamespace.normalizeToBareId(rawAgentId)
+    if (!store.agentExists(agentId)) {
+        Telemetry.event(
+            "A2aHost", "a2a.agent_missing",
+            "agentId" to agentId,
+            level = Telemetry.Level.WARN,
+        )
+        return@withContext emptyList()
+    }
     runCatching {
         val convsArray = store.listConversationsProjected(
             agentId = agentId,
@@ -384,15 +399,19 @@ internal suspend fun handleDecision(
     message: IrohAgentMessage,
     decision: IrohAgentMessageRouter.RoutingDecision,
 ) {
+    val normMessage = message.copy(
+        fromAgentId = AgentIdNamespace.normalizeToBareId(message.fromAgentId),
+        toAgentId = AgentIdNamespace.normalizeToBareId(message.toAgentId),
+    )
     when (decision) {
         is IrohAgentMessageRouter.RoutingDecision.Deliver -> {
             Telemetry.event(
                 "A2aHost", "a2a.deliver",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
+                "fromAgentId" to normMessage.fromAgentId,
+                "toAgentId" to normMessage.toAgentId,
                 "conversationId" to decision.conversationId,
             )
-            inputOnConversation(client, message, decision.conversationId)
+            inputOnConversation(client, normMessage, decision.conversationId)
         }
         is IrohAgentMessageRouter.RoutingDecision.Queue -> {
             // Same as Deliver but no second turn: the app-server already serializes
@@ -402,35 +421,81 @@ internal suspend fun handleDecision(
             // there — but we mark a different telemetry signal.
             Telemetry.event(
                 "A2aHost", "a2a.route",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
+                "fromAgentId" to normMessage.fromAgentId,
+                "toAgentId" to normMessage.toAgentId,
                 "decision" to "queue",
                 "conversationId" to decision.conversationId,
             )
-            inputOnConversation(client, message, decision.conversationId)
+            inputOnConversation(client, normMessage, decision.conversationId)
         }
         is IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver -> {
-            // bn008.6 layer-1: no clean create-conversation path on this wrapper
-            // (would require orchestrating runtime_start + create_conversation,
-            // which the existing controller exposes only via runTurn()). Drop with
-            // a typed reason — the gap is surfaced on the bead as a non-blocking
-            // finding for layer-2.
-            Telemetry.event(
-                "A2aHost", "a2a.drop",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
-                "reason" to "no_conversation_create_path",
-                level = Telemetry.Level.WARN,
-            )
+            handleCreateAndDeliver(client, normMessage)
         }
         is IrohAgentMessageRouter.RoutingDecision.Dropped -> {
             Telemetry.event(
                 "A2aHost", "a2a.drop",
-                "fromAgentId" to message.fromAgentId,
-                "toAgentId" to message.toAgentId,
+                "fromAgentId" to normMessage.fromAgentId,
+                "toAgentId" to normMessage.toAgentId,
                 "reason" to decision.reason,
             )
         }
+    }
+}
+
+internal suspend fun handleCreateAndDeliver(
+    client: AppServerClient?,
+    message: IrohAgentMessage,
+) {
+    if (client == null) {
+        Telemetry.event(
+            "A2aHost", "a2a.drop",
+            "fromAgentId" to message.fromAgentId,
+            "toAgentId" to message.toAgentId,
+            "reason" to "no_app_server_client",
+            level = Telemetry.Level.WARN,
+        )
+        return
+    }
+    var appServerError: String? = null
+    val createdId = runCatching {
+        val response = client.conversationCreate(
+            AppServerCommand.ConversationCreate(
+                requestId = "conv-create-${UUID.randomUUID()}",
+                body = buildJsonObject { put("agent_id", message.toAgentId) },
+            ),
+        )
+        if (response.success) {
+            response.conversation?.get("id")?.stringOrNullSafe()
+        } else {
+            appServerError = response.error
+            null
+        }
+    }.onFailure { t ->
+        appServerError = t.message ?: t::class.simpleName
+    }.getOrNull()
+
+    if (!createdId.isNullOrEmpty()) {
+        Telemetry.event(
+            "A2aHost", "a2a.create_and_deliver",
+            "fromAgentId" to message.fromAgentId,
+            "toAgentId" to message.toAgentId,
+            "conversationId" to createdId,
+        )
+        inputOnConversation(client, message, createdId)
+    } else {
+        val dropAttrs = mutableListOf<Pair<String, Any?>>(
+            "fromAgentId" to message.fromAgentId,
+            "toAgentId" to message.toAgentId,
+            "reason" to "no_conversation_create_path",
+        )
+        if (!appServerError.isNullOrBlank()) {
+            dropAttrs.add("error" to appServerError)
+        }
+        Telemetry.event(
+            "A2aHost", "a2a.drop",
+            *dropAttrs.toTypedArray(),
+            level = Telemetry.Level.WARN,
+        )
     }
 }
 

@@ -340,6 +340,108 @@ class A2aWiringTest {
         assertEquals("msg-1", m.clientMessageId, "decision forwards the wire msgId for at-most-once on the receiver")
     }
 
+    @Test
+    fun `listConversationsForAgent normalizes letta_agent namespaced ID to bare ID for candidate lookup`() {
+        val base = Files.createTempDirectory("a2a-normalize-list").toFile()
+        try {
+            val bareAgentId = "agent-c356b54a-8b37-4d53-b9d0-b43164749b6f"
+            val namespacedAgentId = "letta_agent-c356b54a-8b37-4d53-b9d0-b43164749b6f"
+
+            File(base, "agents").apply { mkdirs() }
+            File(base, "agents/$bareAgentId.json").writeText("""{"id":"$bareAgentId","name":"TestAgent"}""")
+
+            writeConversation(base, "default:$bareAgentId", """{"id":"conv-123","agent_id":"$bareAgentId","last_message_at":"2026-07-22T20:05:00.000Z"}""")
+
+            val store = LocalBackendAdminStore(base)
+            val states = runBlocking { listConversationsForAgent(store, namespacedAgentId) }
+
+            assertEquals(1, states.size, "expected candidate conversation found via namespaced lookup")
+            assertEquals("conv-123", states.single().conversation.id.value)
+        } finally {
+            base.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `handleDecision normalizes namespaced from and to agent IDs`() {
+        val captured = mutableListOf<AppServerCommand.Input>()
+        val client = RecordingClient(captured)
+        val message = IrohAgentMessage(
+            fromAgentId = "letta_agent-from-123",
+            toAgentId = "letta_agent-to-456",
+            body = "hello",
+            msgId = "msg-norm-1",
+            ts = 1_700_000_000_000L,
+        )
+        val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-norm")
+
+        runBlocking { handleDecision(client, message, decision) }
+
+        assertEquals(1, captured.size)
+        val cmd = captured.single()
+        assertEquals("agent-to-456", cmd.runtime.agentId, "input target agentId should be bare ID")
+    }
+
+    @Test
+    fun `handleDecision emits no_app_server_client drop when client is null on CreateAndDeliver`() {
+        com.letta.mobile.util.Telemetry.clear()
+        val message = IrohAgentMessage(
+            fromAgentId = "letta_agent-from-1",
+            toAgentId = "letta_agent-to-2",
+            body = "test",
+            msgId = "msg-drop-1",
+            ts = 1_700_000_000_000L,
+        )
+        val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
+
+        runBlocking { handleDecision(client = null, message, decision) }
+
+        val events = com.letta.mobile.util.Telemetry.snapshot()
+        val dropEvent = events.single { it.name == "a2a.drop" }
+        assertEquals("no_app_server_client", dropEvent.attrs["reason"])
+        assertEquals("agent-from-1", dropEvent.attrs["fromAgentId"])
+        assertEquals("agent-to-2", dropEvent.attrs["toAgentId"])
+    }
+
+    @Test
+    fun `handleCreateAndDeliver logs appserver error when conversationCreate returns error`() {
+        com.letta.mobile.util.Telemetry.clear()
+        val client = FailingCreateClient(errorMessage = "Agent not found in registry")
+        val message = IrohAgentMessage(
+            fromAgentId = "letta_agent-from-1",
+            toAgentId = "letta_agent-to-2",
+            body = "test",
+            msgId = "msg-create-fail",
+            ts = 1_700_000_000_000L,
+        )
+
+        runBlocking { handleCreateAndDeliver(client, message) }
+
+        val events = com.letta.mobile.util.Telemetry.snapshot()
+        val dropEvent = events.single { it.name == "a2a.drop" }
+        assertEquals("no_conversation_create_path", dropEvent.attrs["reason"])
+        assertEquals("Agent not found in registry", dropEvent.attrs["error"])
+    }
+
+    @Test
+    fun `listConversationsForAgent emits warning telemetry when agent record is missing`() {
+        com.letta.mobile.util.Telemetry.clear()
+        val base = Files.createTempDirectory("a2a-missing-agent").toFile()
+        try {
+            File(base, "agents").apply { mkdirs() }
+            val store = LocalBackendAdminStore(base)
+            val states = runBlocking { listConversationsForAgent(store, "agent-nonexistent") }
+
+            assertTrue(states.isEmpty(), "expected empty list of conversation states for missing agent")
+            val events = com.letta.mobile.util.Telemetry.snapshot()
+            val warnEvent = events.single { it.name == "a2a.agent_missing" }
+            assertEquals("agent-nonexistent", warnEvent.attrs["agentId"])
+            assertEquals(com.letta.mobile.util.Telemetry.Level.WARN, warnEvent.level)
+        } finally {
+            base.deleteRecursively()
+        }
+    }
+
     /**
      * A minimal [AppServerClient] stub: only [input] does anything useful
      * (records the command). Every other entry point throws — `handleDecision`
@@ -362,5 +464,26 @@ class A2aWiringTest {
             error("unused on Deliver path")
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
             error("unused on Deliver path")
+    }
+
+    private class FailingCreateClient(val errorMessage: String) : AppServerClient {
+        override val events: Flow<AppServerReceivedFrame> = emptyFlow()
+        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
+            error("unused")
+        override suspend fun input(command: AppServerCommand.Input) {}
+        override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
+            error("unused")
+        override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse =
+            error("unused")
+        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse =
+            error("unused")
+        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
+            error("unused")
+        override suspend fun conversationCreate(command: AppServerCommand.ConversationCreate): com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationCreateResponse =
+            com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationCreateResponse(
+                requestId = command.requestId,
+                success = false,
+                error = errorMessage,
+            )
     }
 }

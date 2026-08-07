@@ -679,12 +679,15 @@ class AppServerServeIrohCommand : CliktCommand(
     }
 
     private fun lanAddresses(port: Int): List<String> = try {
-        java.net.NetworkInterface.getNetworkInterfaces().asSequence()
-            .filter { it.isUp && !it.isLoopback }
-            .flatMap { it.inetAddresses.asSequence() }
-            .filterIsInstance<java.net.Inet4Address>()
-            .map { "${it.hostAddress}:$port" }
+        val addrs = java.net.NetworkInterface.getNetworkInterfaces().asSequence()
+            .filter { isRealNetworkInterface(it) }
+            .flatMap { iface ->
+                iface.inetAddresses.asSequence()
+                    .filterIsInstance<java.net.Inet4Address>()
+                    .map { "${it.hostAddress}:$port" }
+            }
             .toList()
+        sortDirectAddresses(addrs)
     } catch (_: Exception) {
         emptyList()
     }
@@ -745,4 +748,97 @@ class AppServerServeIrohCommand : CliktCommand(
         val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
         return DefaultAppServerController(client) to null
     }
+}
+
+/**
+ * Helper to determine if a network interface is a real physical/routable interface
+ * (excludes loopback, down, point-to-point, and virtual Docker/bridge interfaces).
+ */
+internal fun isRealNetworkInterfaceName(
+    name: String,
+    displayName: String? = null,
+    isUp: Boolean = true,
+    isLoopback: Boolean = false,
+    isPointToPoint: Boolean = false,
+): Boolean {
+    if (!isUp || isLoopback || isPointToPoint) return false
+    val nameLower = name.lowercase()
+    val displayLower = (displayName ?: "").lowercase()
+    val virtualKeywords = listOf(
+        "docker", "br-", "veth", "virbr", "cni", "flannel", "tun", "tap", "dummy"
+    )
+    val isVirtual = virtualKeywords.any { keyword ->
+        nameLower.contains(keyword) || displayLower.contains(keyword)
+    } || nameLower.matches(Regex("^br[-_\\d].*"))
+    return !isVirtual
+}
+
+internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
+    return try {
+        isRealNetworkInterfaceName(
+            name = iface.name,
+            displayName = iface.displayName,
+            isUp = iface.isUp,
+            isLoopback = iface.isLoopback,
+            isPointToPoint = iface.isPointToPoint,
+        )
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/**
+ * Priority ranking for IP address strings. Lower number = higher priority.
+ * Priority 0/1: Physical LAN IPs (eth*, wlan*, en*, wl* or 192.168.*, 10.*).
+ * Priority 2: Other IPs.
+ * Priority 3: Virtual Docker bridge IPs (e.g. 172.17.x.x - 172.31.x.x or virtual interfaces).
+ */
+internal fun directAddressPriority(address: String): Int {
+    val ipStr = address.substringBefore(':').trim()
+    val iface = try {
+        java.net.InetAddress.getByName(ipStr)?.let { java.net.NetworkInterface.getByInetAddress(it) }
+    } catch (_: Exception) {
+        null
+    }
+
+    if (iface != null) {
+        if (!isRealNetworkInterface(iface)) {
+            return 3
+        }
+        val name = iface.name.lowercase()
+        if (name.startsWith("eth") || name.startsWith("wlan") || name.startsWith("en") || name.startsWith("wl")) {
+            return 0
+        }
+    }
+
+    if (ipStr.startsWith("192.168.") || ipStr.startsWith("10.")) {
+        return 1
+    }
+
+    if (isDockerBridgeIp(ipStr)) {
+        return 3
+    }
+
+    return 2
+}
+
+internal fun isDockerBridgeIp(ip: String): Boolean {
+    if (ip.startsWith("172.")) {
+        val secondOctet = ip.split('.').getOrNull(1)?.toIntOrNull()
+        if (secondOctet != null && secondOctet in 16..31) {
+            return true
+        }
+    }
+    return false
+}
+
+/**
+ * Sorts direct address strings ("IP:port") so physical LAN IP addresses appear before Docker bridge IPs.
+ */
+internal fun sortDirectAddresses(directAddresses: List<String>): List<String> {
+    return directAddresses.sortedWith(Comparator { addr1, addr2 ->
+        val p1 = directAddressPriority(addr1)
+        val p2 = directAddressPriority(addr2)
+        if (p1 != p2) p1.compareTo(p2) else addr1.compareTo(addr2)
+    })
 }
