@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
+import com.letta.mobile.util.Telemetry
 import computer.iroh.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -42,6 +43,17 @@ class IrohAgentMessageReceiver(
                 bi.use { stream ->
                     val wire = IrohFrameCodec.readOne(stream.recv()) ?: return
                     val message = IrohAgentMessage.decode(wire)
+                    // letta-mobile-5nspp: emit a2a.recv BEFORE ack so the recv-side
+                    // sensor sees the inbound even if the downstream routing/deliver
+                    // path drops or rewrites it. The recv and route telemetry must
+                    // pair 1:1 (one route per recv; a route without a recv is a bug).
+                    Telemetry.event(
+                        "A2aHost",
+                        "a2a.recv",
+                        "fromAgentId" to message.fromAgentId,
+                        "toAgentId" to message.toAgentId,
+                        "msgId" to message.msgId,
+                    )
                     // Ack first (QUIC is lossless; the receiver owns at-most-once).
                     val send = stream.send()
                     IrohFrameCodec.write(send, IrohAgentMessageAck(message.msgId, accepted = true).encode())
@@ -52,6 +64,12 @@ class IrohAgentMessageReceiver(
                     onDeliver(message, decision)
                 }
             }
+        }.onFailure { e ->
+            Telemetry.event(
+                "A2aHost",
+                "a2a.recv_failed",
+                "error" to (e.message ?: e::class.simpleName ?: "unknown"),
+            )
         }
     }
 }
