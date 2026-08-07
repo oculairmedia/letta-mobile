@@ -83,6 +83,12 @@ dependencies {
     // source set, so a JVM consumer must ask for the JNI artifact itself for it
     // to land in the distribution's lib/ directory.
     runtimeOnly("computer.iroh:iroh:1.0.0")
+    // letta-mobile-bn008.6: the a2a wiring binds a SECOND Endpoint directly
+    // (so we can add `/letta/a2a/0` alongside the app-server ALPN). Mirrors
+    // sharedLogic's `implementation` of the same artifact — `implementation`
+    // here keeps the surface tight while still letting the A2aWiring helper
+    // reach Endpoint/EndpointOptions/SecretKey.
+    implementation("computer.iroh:iroh:1.0.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
@@ -92,6 +98,11 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    // letta-mobile-bn008.6: forward the opt-in flag for the live-QUIC a2a
+    // build probe. Native bind through iroh-ffi is flaky in CI runners and
+    // never useful for the default gate; A2aWiringTest gates the loopback
+    // cases via JUnit Assume unless this is "true".
+    System.getProperty("runIrohNativeE2E")?.let { systemProperty("runIrohNativeE2E", it) }
 }
 
 // sharedLogic's KMP variants can contribute same-named resources; keep the

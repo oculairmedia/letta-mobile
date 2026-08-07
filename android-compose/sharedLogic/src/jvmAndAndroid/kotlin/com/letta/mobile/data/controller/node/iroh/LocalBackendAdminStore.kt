@@ -82,6 +82,25 @@ class LocalBackendAdminStore(
     /** See [LocalBackendRunReader.listRuns]. */
     internal fun listRunsProjected(query: RunQuery): JsonArray? = runReader.listRuns(query)
 
+    /**
+     * bn008.6: set of conversationIds with at least one `active=true` run for
+     * [agentId]. Used by the a2a receiver's `conversationsFor` closure to mark
+     * a conversation `busy` so the router queues instead of re-triggering.
+     *
+     * Empty on any read failure — the router will treat every candidate as
+     * idle, which is the safe default for a freshness-critical routing decision.
+     */
+    fun activeConversationIds(agentId: String): Set<String> = runCatching {
+        val runs = runReader.listRuns(
+            RunQuery(agentId = agentId, active = true, limit = 200),
+        ) ?: return@runCatching emptySet()
+        runs.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val prim = obj["conversation_id"] as? kotlinx.serialization.json.JsonPrimitive
+            if (prim != null && prim.isString) prim.content else null
+        }.toSet()
+    }.getOrDefault(emptySet())
+
     /** See [LocalBackendRunReader.getRun]. */
     fun getRunProjected(runId: String): JsonObject? = runReader.getRun(runId)
 

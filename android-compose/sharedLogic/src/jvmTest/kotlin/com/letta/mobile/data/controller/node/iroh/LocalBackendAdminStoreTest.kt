@@ -375,4 +375,56 @@ class LocalBackendAdminStoreTest {
         assertEquals(listOf("agent-good"), ids)
         assertNull(ids.firstOrNull { it != "agent-good" })
     }
+
+    /**
+     * letta-mobile-bn008.6: the a2a wiring calls
+     * [LocalBackendAdminStore.activeConversationIds] for every inbound
+     * agentId. Pin the contract: a conversation is `busy` iff at least one run
+     * has `status="running"` referencing it; completed / archived / unrelated
+     * runs do NOT make a conversation busy.
+     */
+    @Test
+    fun `activeConversationIds returns only conversation ids with running runs`() {
+        val base = tempStore()
+
+        // Three runs:
+        //   - run-active-conv-A: status=running -> conv-A busy
+        //   - run-done-conv-A:   status=completed -> conv-A stays busy (one running is enough)
+        //   - run-done-conv-B:   status=completed -> conv-B NOT busy
+        //   - run-archived-conv-C: status=running under _archive -> still running,
+        //                          but the reader's archived-filter drops it,
+        //                          so conv-C is NOT busy (no false positive)
+        // Use the existing fixture writer's archive flag to control that.
+        LocalBackendFixtureStore.writeRun(base, "run-active-conv-A", archived = false)
+        // We need to override status; do it by writing the file ourselves so
+        // we can mark this run running while leaving the others completed.
+        val activeRunDir = File(base, "runs/run-active-conv-A")
+        File(activeRunDir, "run.json").writeText(
+            """{"id":"run-active-conv-A","agent_id":"${LocalBackendFixtureStore.AGENT_ID}","conversation_id":"conv-A","status":"running","background":false,"stop_reason":"end_turn","created_at":"2026-07-22T20:01:42.045Z","message_ids":[],"num_steps":0}""",
+        )
+        // Conv-B run is also completed (default in writeRun).
+        LocalBackendFixtureStore.writeRun(base, "run-done-conv-B", archived = false)
+        File(File(base, "runs/run-done-conv-B"), "run.json").writeText(
+            """{"id":"run-done-conv-B","agent_id":"${LocalBackendFixtureStore.AGENT_ID}","conversation_id":"conv-B","status":"completed","background":false,"stop_reason":"end_turn","created_at":"2026-07-22T20:02:42.045Z","message_ids":[],"num_steps":0}""",
+        )
+        // An archived run with status=running: not active.
+        LocalBackendFixtureStore.writeRun(base, "run-arch-conv-C", archived = true)
+        File(File(base, "runs/_archive/run-arch-conv-C"), "run.json").writeText(
+            """{"id":"run-arch-conv-C","agent_id":"${LocalBackendFixtureStore.AGENT_ID}","conversation_id":"conv-C","status":"running","background":false,"stop_reason":"end_turn","created_at":"2026-07-22T20:03:42.045Z","message_ids":[],"num_steps":0}""",
+        )
+
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        val active = store.activeConversationIds(LocalBackendFixtureStore.AGENT_ID)
+        assertEquals(setOf("conv-A"), active)
+    }
+
+    @Test
+    fun `activeConversationIds returns empty when the runs directory is missing`() {
+        // No `runs/` written at all: must NOT throw; must return emptySet() so
+        // the a2a receiver falls through to CreateAndDeliver (downgraded to
+        // Dropped in the wrapper) instead of black-holing the call.
+        val base = tempStore()
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        assertEquals(emptySet<String>(), store.activeConversationIds(LocalBackendFixtureStore.AGENT_ID))
+    }
 }

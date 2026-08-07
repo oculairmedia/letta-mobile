@@ -51,6 +51,13 @@ class IrohWrapperCliWiringTest {
             "--iroh-port",
             "--iroh-secret-key-file",
             "--pairing-store-file",
+            // letta-mobile-bn008.6: the a2a receiver flags must register so the
+            // systemd unit can pass them. Regression guard: a refactor that
+            // renames or drops them would silently disable the receiver.
+            "--a2a-port",
+            "--a2a-address-book",
+            "--a2a-identity-dir",
+            "--a2a-publish-agent",
         ).forEach { option ->
             assertTrue(option in options, "expected $option in $options")
         }
