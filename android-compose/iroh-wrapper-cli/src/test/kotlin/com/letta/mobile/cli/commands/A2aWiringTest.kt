@@ -114,6 +114,70 @@ class A2aWiringTest {
     }
 
     @Test
+    fun `publishLocalAgents auto-publishes seeded empty-wire agents when publishAgents is empty`() {
+        assumeTrue(nativeEnabled(), "set -DrunIrohNativeE2E=true to run the loopback a2a build probe")
+        val tmp = Files.createTempDirectory("ymew7-wire").toFile()
+        try {
+            val addressBook = File(tmp, "agents.kv").also {
+                it.writeText("agent-seeded-1=\nagent-seeded-2=  \nagent-bound=node123@1.2.3.4:1234\n")
+            }
+            val identitiesDir = File(tmp, "identities")
+            val cfg = A2aWiringConfig(
+                port = 0,
+                secretKeyPath = null,
+                identityDir = identitiesDir,
+                addressBook = addressBook,
+                publishAgents = emptyList(),
+            )
+            val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
+            try {
+                val content = addressBook.readText()
+                assertTrue("agent-seeded-1" in content, "agent-seeded-1 missing from kv: $content")
+                assertTrue("agent-seeded-2" in content, "agent-seeded-2 missing from kv: $content")
+                assertTrue(wiring.nodeIdHex in content, "node id missing from kv: $content")
+                assertTrue(content.contains("agent-seeded-1=${wiring.nodeIdHex}"), "agent-seeded-1 wire not updated: $content")
+                assertTrue(content.contains("agent-seeded-2=${wiring.nodeIdHex}"), "agent-seeded-2 wire not updated: $content")
+                assertTrue(content.contains("agent-bound=node123@1.2.3.4:1234"), "pre-existing bound agent altered: $content")
+            } finally {
+                wiring.close()
+            }
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `resolveTargetAgentsToPublish combines seeded empty-wire entries with publishAgents`() {
+        // Pure-Kotlin hermetic test: does NOT touch iroh native endpoint.
+        val tmp = Files.createTempDirectory("ymew7-hermetic").toFile()
+        try {
+            val addressBook = File(tmp, "agents.kv").also {
+                it.writeText(
+                    """
+                    # comment line
+                    agent-seeded-1=
+                    agent-seeded-2=  
+                    agent-already-bound=nodehex123@1.2.3.4:5678
+                    =invalid_empty_key
+                    invalid_no_equals
+                    """.trimIndent(),
+                )
+            }
+            val seeded = findSeededEmptyAgents(addressBook)
+            assertEquals(listOf("agent-seeded-1", "agent-seeded-2"), seeded)
+
+            // Combine with publishAgents: preserves order, deduplicates, removes blanks
+            val resolved = resolveTargetAgentsToPublish(
+                publishAgents = listOf("agent-explicit-1", "agent-seeded-2", "  "),
+                addressBook = addressBook,
+            )
+            assertEquals(listOf("agent-explicit-1", "agent-seeded-2", "agent-seeded-1"), resolved)
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `build refuses empty publishAgents and missing addressBook`() {
         // Pure-Kotlin guard — does NOT touch iroh, so it runs without opt-in.
         val tmp = Files.createTempDirectory("bn008-6-wire").toFile()

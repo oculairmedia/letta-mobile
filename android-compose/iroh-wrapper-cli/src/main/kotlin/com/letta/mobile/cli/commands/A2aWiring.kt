@@ -252,8 +252,8 @@ suspend fun publishLocalAgents(
     val nodeHex = endpointIdHex(endpoint)
     val direct = addr.directAddresses()
     val published = mutableListOf<String>()
-    config.publishAgents.forEach { agentId ->
-        if (agentId.isBlank()) return@forEach
+    val targetAgents = resolveTargetAgentsToPublish(config.publishAgents, config.addressBook)
+    targetAgents.forEach { agentId ->
         // Touch the per-agent identity dir so a future dial can load-or-create
         // its IrohAgentIdentity file (the seed only writes the README + dir).
         runCatching {
@@ -271,6 +271,38 @@ suspend fun publishLocalAgents(
     }
     return published
 }
+
+/**
+ * Resolve the list of target agent IDs to publish on bind by combining
+ * [publishAgents] with seeded empty-wire entries from [addressBook] (if present).
+ * Preserves order, removes duplicates, and filters out blank agent IDs.
+ */
+internal fun resolveTargetAgentsToPublish(
+    publishAgents: List<String>,
+    addressBook: File,
+): List<String> {
+    val seededEmptyAgents = findSeededEmptyAgents(addressBook)
+    return (publishAgents.map { it.trim() } + seededEmptyAgents)
+        .filterNot { it.isBlank() }
+        .distinct()
+}
+
+/**
+ * Read [addressBook] if it exists and find all agent IDs whose wire value is empty or blank
+ * (e.g. `agentId=` or `agentId=  `).
+ */
+internal fun findSeededEmptyAgents(addressBook: File): List<String> {
+    if (!addressBook.exists()) return emptyList()
+    return addressBook.readLines().mapNotNull { line ->
+        val eq = line.indexOf('=')
+        if (eq <= 0) null else {
+            val key = line.substring(0, eq).trim()
+            val value = line.substring(eq + 1).trim()
+            if (key.isNotEmpty() && value.isBlank()) key else null
+        }
+    }
+}
+
 
 /**
  * Resolve a list of interactive conversations for the target agent. The
