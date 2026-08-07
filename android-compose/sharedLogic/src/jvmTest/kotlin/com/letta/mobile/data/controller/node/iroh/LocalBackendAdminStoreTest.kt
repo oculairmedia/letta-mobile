@@ -387,7 +387,7 @@ class LocalBackendAdminStoreTest {
     fun `activeConversationIds returns only conversation ids with running runs`() {
         val base = tempStore()
 
-        // Three runs:
+        // Four runs:
         //   - run-active-conv-A: status=running -> conv-A busy
         //   - run-done-conv-A:   status=completed -> conv-A stays busy (one running is enough)
         //   - run-done-conv-B:   status=completed -> conv-B NOT busy
@@ -401,6 +401,15 @@ class LocalBackendAdminStoreTest {
         val activeRunDir = File(base, "runs/run-active-conv-A")
         File(activeRunDir, "run.json").writeText(
             """{"id":"run-active-conv-A","agent_id":"${LocalBackendFixtureStore.AGENT_ID}","conversation_id":"conv-A","status":"running","background":false,"stop_reason":"end_turn","created_at":"2026-07-22T20:01:42.045Z","message_ids":[],"num_steps":0}""",
+        )
+        // N6 (PR #1125): the missing run-done-conv-A — conv-A already has a
+        // single `running` run above, but the fixture should also hold a
+        // `completed` predecessor on the same conversation so the busy-set
+        // is provably "at least one running wins, not "only running counts".
+        // Without it the test silently collapses to a single-run case.
+        LocalBackendFixtureStore.writeRun(base, "run-done-conv-A", archived = false)
+        File(File(base, "runs/run-done-conv-A"), "run.json").writeText(
+            """{"id":"run-done-conv-A","agent_id":"${LocalBackendFixtureStore.AGENT_ID}","conversation_id":"conv-A","status":"completed","background":false,"stop_reason":"end_turn","created_at":"2026-07-22T20:01:00.045Z","message_ids":[],"num_steps":0}""",
         )
         // Conv-B run is also completed (default in writeRun).
         LocalBackendFixtureStore.writeRun(base, "run-done-conv-B", archived = false)

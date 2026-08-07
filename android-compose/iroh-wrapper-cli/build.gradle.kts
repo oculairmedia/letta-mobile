@@ -79,20 +79,25 @@ dependencies {
     implementation("io.ktor:ktor-client-websockets:3.5.0")
     implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
-    // iroh is `implementation` (not `api`) inside sharedLogic's jvmAndAndroid
-    // source set, so a JVM consumer must ask for the JNI artifact itself for it
-    // to land in the distribution's lib/ directory.
-    runtimeOnly("computer.iroh:iroh:1.0.0")
     // letta-mobile-bn008.6: the a2a wiring binds a SECOND Endpoint directly
     // (so we can add `/letta/a2a/0` alongside the app-server ALPN). Mirrors
     // sharedLogic's `implementation` of the same artifact — `implementation`
     // here keeps the surface tight while still letting the A2aWiring helper
-    // reach Endpoint/EndpointOptions/SecretKey.
+    // reach Endpoint/EndpointOptions/SecretKey. It also covers the
+    // distribution's runtime classpath (the KDoc on `irohNativeBindingIs
+    // OnTheDistributionRuntimeClasspath` test pins this).
+    //
+    // N10 (PR #1125): the previous `runtimeOnly` and `testImplementation`
+    // declarations of the same `computer.iroh:iroh:1.0.0` artifact were
+    // redundant — `implementation` is on both the compile and runtime
+    // classpaths, and `testImplementation` extends `implementation`. The
+    // irohNativeBindingIsOnTheDistributionRuntimeClasspath test still passes
+    // after the removal (it resolves `computer.iroh.Endpoint` through the
+    // production `implementation` declaration).
     implementation("computer.iroh:iroh:1.0.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("computer.iroh:iroh:1.0.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 

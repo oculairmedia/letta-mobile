@@ -24,8 +24,10 @@ import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import computer.iroh.SecretKey
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,20 +53,27 @@ class A2aWiring internal constructor(
     val router: IrohAgentMessageRouter,
     val addressStore: FileIrohAgentAddressStore,
     val identityDir: File,
+    /**
+     * M2 (PR #1125): the a2a node id (hex, 64 chars). Equal to the app-server
+     * node id when both endpoints share the same secret-key file. Computed
+     * once at bind time (suspending; the underlying `Endpoint.addr().id()`
+     * is async) and stored as a plain `val`, so callers can read it
+     * synchronously without a `runBlocking` per access. */
+    val nodeIdHex: String,
 ) {
     /** Start the receiver's accept loop on [scope]; returns the accept-loop Job. */
     fun start(scope: CoroutineScope): Job = receiver.start(scope)
 
-    /** The a2a node id (hex, 64 chars). Equal to the app-server node id when the
-     *  same secret-key file is shared between both endpoints. */
-    val nodeIdHex: String get() {
-        val id = endpoint.addr().id()
-        return runBlocking { id.use { it.toBytes().joinToString("") { b -> "%02x".format(b) } } }
-    }
-
-    /** Best-effort shutdown: closes the underlying endpoint. */
+    /** Best-effort shutdown: shuts down the underlying endpoint.
+     *
+     *  M1 (PR #1125): per the UniFFI Kotlin binding, `Endpoint::close()` is the
+     *  `AutoCloseable.close()` shim and is BLOCKING, while the native iroh
+     *  `Endpoint::close()` is async. UniFFI resolves the signature collision by
+     *  exposing the async one as `shutdown()`. Calling `endpoint.close()` here
+     *  would deadlock under load; call the suspend `shutdown()` via a
+     *  `runBlocking` (best-effort, wrapped) so the helper stays synchronous. */
     fun close() {
-        runCatching { endpoint.close() }
+        runCatching { runBlocking { endpoint.shutdown() } }
     }
 }
 
@@ -122,6 +131,9 @@ suspend fun buildA2aWiring(
     require(config.publishAgents.isNotEmpty() || config.addressBook.exists()) {
         "publishAgents is empty AND addressBook ${config.addressBook} does not exist; nothing to bind"
     }
+    // M3 (PR #1125): ONE [FileIrohAgentAddressStore] instance per bind. Sharing
+    // it between publishLocalAgents and the closures below prevents divergent
+    // in-memory state in the kv file (each new instance re-reads the file).
     val store = FileIrohAgentAddressStore(config.addressBook)
     val secretKeyBytes = loadSecretKey(config.secretKeyPath)  // suspend (FileIrohSecretKeyStore.loadOrCreate)
     val bindAddr = "0.0.0.0:${config.port}"
@@ -132,13 +144,37 @@ suspend fun buildA2aWiring(
             alpns = listOf(IrohAgentMessage.ALPN),
             relayMode = RelayMode.defaultMode(),
         ),
-    ).also { runCatching { it.online() } }
+    ).also { ep ->
+        // N2 (PR #1125): a relay-set-up failure no longer black-holes silently
+        // — emit a typed warning. The receiver still proceeds (the endpoint
+        // can serve direct addrs even when the relay is unavailable), but an
+        // operator can grep the log for `a2a.online_failed` and see why
+        // rendezvous dials keep timing out.
+        runCatching { ep.online() }.onFailure { t ->
+            Telemetry.event(
+                "A2aHost", "a2a.online_failed",
+                "reason" to (t::class.simpleName ?: "error"),
+                "message" to (t.message ?: ""),
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
+    // M2: compute hex node id once at bind time (suspend id() call) and store it
+    // on A2aWiring as a plain `val`.
+    val nodeIdHex = endpointIdHex(endpoint)
 
-    publishLocalAgents(config, endpoint)
+    publishLocalAgents(config, endpoint, store)
 
+    // M4 (PR #1125): construct the [LocalBackendAdminStore] exactly once at
+    // bind time (sync file I/O had been running on the receiver's
+    // connection-coroutine dispatcher — a layering bug). The receiver's
+    // `conversationsFor` closure now captures it; if either client is null or
+    // the backend dir is null we short-circuit to an empty list (router
+    // falls through to CreateAndDeliver -> Dropped).
+    val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
     val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
-        if (client == null || localBackendDir == null) emptyList()
-        else listConversationsForAgent(localBackendDir, agentId)
+        if (client == null || backendStore == null) emptyList()
+        else listConversationsForAgent(backendStore, agentId)
     }
 
     val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> Unit = { message, decision ->
@@ -162,6 +198,7 @@ suspend fun buildA2aWiring(
         router = router,
         addressStore = store,
         identityDir = config.identityDir,
+        nodeIdHex = nodeIdHex,
     )
 }
 
@@ -172,15 +209,27 @@ suspend fun buildA2aWiring(
  * matches what the seed script and the sender expect.
  *
  * Returns the list of agents actually published (skips empty ids).
+ *
+ * M3 (PR #1125): accepts [store] as a parameter so callers can share one
+ * [FileIrohAgentAddressStore] across publish + receiver wiring (preventing
+ * divergent in-memory kv state). The default still constructs one for
+ * direct callers that don't have a store handy (e.g. tests).
+ *
+ * M2 follow-on (PR #1125): this is `suspend` because it reads the host's
+ * own node id via [endpointIdHex], which is `suspend` (the underlying
+ * `Endpoint.addr().id()` is async). Both production callers (`buildA2aWiring`,
+ * the test below) are already inside `runBlocking { ... }` so the suspend
+ * marker does not change the call ergonomics — only makes the async I/O
+ * visible in the type system.
  */
-fun publishLocalAgents(
+suspend fun publishLocalAgents(
     config: A2aWiringConfig,
     endpoint: Endpoint,
+    store: FileIrohAgentAddressStore = FileIrohAgentAddressStore(config.addressBook),
 ): List<String> {
-    val store = FileIrohAgentAddressStore(config.addressBook)
     val resolver = IrohAgentAddressResolver(store)
     val addr = endpoint.addr()
-    val nodeHex = runBlocking { addr.id().use { id -> id.toBytes().joinToString("") { b -> "%02x".format(b) } } }
+    val nodeHex = endpointIdHex(endpoint)
     val direct = addr.directAddresses()
     val published = mutableListOf<String>()
     config.publishAgents.forEach { agentId ->
@@ -208,38 +257,53 @@ fun publishLocalAgents(
  * `busy` flag is computed from the local `runs/` store: a conversation is
  * busy iff there's at least one run with status="running" referencing it.
  *
+ * M4 (PR #1125): reuses a [LocalBackendAdminStore] built once at bind time
+ * (no per-call re-construct or per-call file walk re-read), wraps the
+ * synchronous readers in [withContext] so the file I/O does NOT run on the
+ * receiver's connection-coroutine dispatcher, and is `suspend` (so callers
+ * must wait for it before moving on — important for the conversation
+ * ordering invariant the router depends on).
+ *
+ * N5 (PR #1125): visibility is `internal` so the JVM tests in the
+ * `iroh-wrapper-cli` module can exercise it without bringing up the iroh
+ * native binding (the default `:iroh-wrapper-cli:test` gate stays hermetic).
+ *
  * Best-effort: every read is wrapped in runCatching so a missing dir or
  * corrupt record yields an empty list (router falls through to
  * CreateAndDeliver, which the wrapper downgrades).
  */
-private fun listConversationsForAgent(
-    localBackendDir: File,
+internal suspend fun listConversationsForAgent(
+    store: LocalBackendAdminStore,
     agentId: String,
-): List<IrohAgentMessageRouter.ConversationState> = runCatching {
-    val store = LocalBackendAdminStore(localBackendDir)
-    val convsArray = store.listConversationsProjected(
-        agentId = agentId,
-        archiveStatus = "active",
-        limit = 200,
-        offset = 0,
-    ) ?: return@runCatching emptyList<IrohAgentMessageRouter.ConversationState>()
-    val activeConvs = store.activeConversationIds(agentId)
+): List<IrohAgentMessageRouter.ConversationState> = withContext(Dispatchers.IO) {
+    runCatching {
+        val convsArray = store.listConversationsProjected(
+            agentId = agentId,
+            archiveStatus = "active",
+            limit = 200,
+            offset = 0,
+        ) ?: return@runCatching emptyList<IrohAgentMessageRouter.ConversationState>()
+        val activeConvs = store.activeConversationIds(agentId)
 
-    convsArray.mapNotNull { el ->
-        val obj = el as? JsonObject ?: return@mapNotNull null
-        val conv = decodeConversation(obj, agentId) ?: return@mapNotNull null
-        IrohAgentMessageRouter.ConversationState(conv, conv.id.value in activeConvs)
-    }.sortedByDescending { it.conversation.lastMessageAt ?: it.conversation.updatedAt ?: it.conversation.createdAt ?: "" }
-}.getOrElse { emptyList() }
-
-private fun JsonPrimitive.contentIfString(): String? = if (isString) content else null
+        convsArray.mapNotNull { el ->
+            val obj = el as? JsonObject ?: return@mapNotNull null
+            val conv = decodeConversation(obj, agentId) ?: return@mapNotNull null
+            IrohAgentMessageRouter.ConversationState(conv, conv.id.value in activeConvs)
+        }.sortedByDescending { it.conversation.lastMessageAt ?: it.conversation.updatedAt ?: it.conversation.createdAt ?: "" }
+    }.getOrElse { emptyList() }
+}
 
 private fun JsonElement?.stringOrNullSafe(): String? = (this as? JsonPrimitive)?.let { if (it.isString) it.content else null }
 
-private fun decodeConversation(obj: JsonObject, fallbackAgentId: String): Conversation? = runCatching {
-    val id = obj["id"]?.let { (it as? JsonPrimitive)?.contentIfString() } ?: return@runCatching null
-    val agentIdStr = obj["agent_id"]?.let { (it as? JsonPrimitive)?.contentIfString() } ?: fallbackAgentId
-    val convClass = when (obj["conversation_class"]?.let { (it as? JsonPrimitive)?.contentIfString() }) {
+/**
+ * N5 (PR #1125): `internal` so the JVM tests in `iroh-wrapper-cli` can
+ * exercise the decoder shape directly (the default gate is hermetic — it
+ * does not bring up the iroh native binding).
+ */
+internal fun decodeConversation(obj: JsonObject, fallbackAgentId: String): Conversation? = runCatching {
+    val id = obj["id"].stringOrNullSafe() ?: return@runCatching null
+    val agentIdStr = obj["agent_id"].stringOrNullSafe() ?: fallbackAgentId
+    val convClass = when (obj["conversation_class"].stringOrNullSafe()) {
         "autonomous" -> ConversationClass.AUTONOMOUS
         else -> ConversationClass.INTERACTIVE
     }
@@ -259,8 +323,11 @@ private fun decodeConversation(obj: JsonObject, fallbackAgentId: String): Conver
  * Telemetry signals are emitted here (NOT in the receiver) so the wrapper
  * controls what gets logged — and what's NOT (body text, msgId payload,
  * agent secrets are NEVER logged).
+ *
+ * N5 (PR #1125): visibility is `internal` so the JVM tests in
+ * `iroh-wrapper-cli` can exercise the decision / telemetry path directly.
  */
-private suspend fun handleDecision(
+internal suspend fun handleDecision(
     client: AppServerClient?,
     message: IrohAgentMessage,
     decision: IrohAgentMessageRouter.RoutingDecision,
@@ -373,4 +440,18 @@ private suspend fun loadSecretKey(path: String?): ByteArray {
         return SecretKey.generate().use { it.toBytes() }
     }
     return FileIrohSecretKeyStore(path).loadOrCreate()
+}
+
+/**
+ * M2 (PR #1125): file-scope helper that returns the bound endpoint's node id
+ * as a hex string. `Endpoint.id()` itself is `suspend` (UniFFI bridges the
+ * async FFI call); the subsequent `EndpointId.toBytes()` is not. Wrapping
+ * here lets `buildA2aWiring` compute the hex once at bind time and store it
+ * on [A2aWiring] as a plain `val`, so the many property reads elsewhere do
+ * not pay for a `runBlocking` apiece. Also used by [publishLocalAgents] when
+ * it writes the address book — one helper, two callers, zero divergence.
+ */
+private suspend fun endpointIdHex(endpoint: Endpoint): String {
+    val id = endpoint.addr().id()
+    return id.use { it.toBytes().joinToString("") { b -> "%02x".format(b) } }
 }

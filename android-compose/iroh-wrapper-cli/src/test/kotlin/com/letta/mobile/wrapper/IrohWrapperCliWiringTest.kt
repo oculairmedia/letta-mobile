@@ -54,10 +54,14 @@ class IrohWrapperCliWiringTest {
             // letta-mobile-bn008.6: the a2a receiver flags must register so the
             // systemd unit can pass them. Regression guard: a refactor that
             // renames or drops them would silently disable the receiver.
+            //
+            // N7 (PR #1125): the publish flag is plural (`--a2a-publish-agents`)
+            // because the envvar and value are both lists — matching the
+            // singular here would silently break the systemd unit's argv.
             "--a2a-port",
             "--a2a-address-book",
             "--a2a-identity-dir",
-            "--a2a-publish-agent",
+            "--a2a-publish-agents",
         ).forEach { option ->
             assertTrue(option in options, "expected $option in $options")
         }
