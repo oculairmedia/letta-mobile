@@ -271,10 +271,12 @@ internal data class EditAgentLoadedContentParams(
 
 @Composable
 private fun EditAgentLoadedContent(params: EditAgentLoadedContentParams) {
-    val callbacks = params.viewModel.contentCallbacks(
-        onResetMessages = { params.dialogState.showResetDialog = true },
-        onDeleteAgent = { params.dialogState.showDeleteDialog = true },
-    )
+    val callbacks = remember(params.viewModel) {
+        params.viewModel.contentCallbacks(
+            onResetMessages = { params.dialogState.showResetDialog = true },
+            onDeleteAgent = { params.dialogState.showDeleteDialog = true },
+        )
+    }
     EditAgentContent(
         state = params.agentState,
         llmModels = params.models.llmModels,

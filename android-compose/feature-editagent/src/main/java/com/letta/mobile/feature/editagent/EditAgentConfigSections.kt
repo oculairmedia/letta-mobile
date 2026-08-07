@@ -22,6 +22,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -607,11 +608,14 @@ internal fun AdvancedCompactionSection(
         )
         item(
             headlineContent = {
+                val committedValue = state.slidingWindowPercentage.coerceIn(0f, 1f)
+                var localValue by remember { mutableStateOf(committedValue) }
+                LaunchedEffect(committedValue) { localValue = committedValue }
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
                         text = stringResource(
                             R.string.screen_agent_edit_sliding_window_percentage,
-                            formatCompactionPercentage(state.slidingWindowPercentage),
+                            formatCompactionPercentage(localValue),
                         ),
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -621,8 +625,9 @@ internal fun AdvancedCompactionSection(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Slider(
-                            value = state.slidingWindowPercentage.coerceIn(0f, 1f),
-                            onValueChange = onSlidingWindowPercentageChange,
+                            value = localValue,
+                            onValueChange = { localValue = it },
+                            onValueChangeFinished = { onSlidingWindowPercentageChange(localValue) },
                             valueRange = 0f..1f,
                             steps = 19,
                             modifier = Modifier.weight(1f),
@@ -714,11 +719,15 @@ internal fun ContextWindowLimitSlider(
 
         if (maxValue != null && maxValue > 0) {
             val coercedValue = value.coerceIn(0, maxValue)
-            val percentage = ((coercedValue.toFloat() / maxValue.toFloat()) * 100f).roundToInt()
+            val initialSliderValue = coercedValue.toFloat()
+            var localSliderValue by remember(maxValue, coercedValue) { mutableStateOf(initialSliderValue) }
+            LaunchedEffect(coercedValue) { localSliderValue = coercedValue.toFloat() }
+            val displayValue = localSliderValue.toInt().coerceIn(0, maxValue)
+            val percentage = ((localSliderValue / maxValue.toFloat()) * 100f).roundToInt()
             Text(
                 text = stringResource(
                     R.string.screen_chat_context_window_usage,
-                    formatEditAgentNumber(coercedValue),
+                    formatEditAgentNumber(displayValue),
                     formatEditAgentNumber(maxValue),
                     percentage,
                 ),
@@ -726,9 +735,10 @@ internal fun ContextWindowLimitSlider(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Slider(
-                value = coercedValue.toFloat(),
-                onValueChange = { sliderValue ->
-                    onValueChange(snapContextWindowValue(sliderValue, maxValue))
+                value = localSliderValue,
+                onValueChange = { localSliderValue = it },
+                onValueChangeFinished = {
+                    onValueChange(snapContextWindowValue(localSliderValue, maxValue))
                 },
                 valueRange = 0f..maxValue.toFloat(),
             )
