@@ -98,6 +98,18 @@ class IrohAgentMessageReceiveE2ETest {
         val landedConv = withTimeout(15.seconds) { landed.await() }
         assertEquals("chat", landedConv, "must land in the INTERACTIVE conversation, not the heartbeat")
         assertEquals(1, turns.get(), "exactly one turn triggered")
+        // letta-mobile-5nspp: the receiver MUST emit a2a.recv BEFORE ack/decision,
+        // so the sensor sees the inbound even if downstream drops/rewrites it.
+        // The recv and route telemetry must pair 1:1 (a route without a recv is a bug).
+        val recvEvents = com.letta.mobile.util.Telemetry.events.value.filter { it.name == "a2a.recv" }
+        assertEquals(
+            1,
+            recvEvents.size,
+            "exactly one a2a.recv event for the inbound message; got: $recvEvents",
+        )
+        assertEquals("agent-sender", recvEvents[0].attrs["fromAgentId"])
+        assertEquals("agent-recv", recvEvents[0].attrs["toAgentId"])
+        assertEquals("m-1", recvEvents[0].attrs["msgId"])
         job.cancel()
         scope.coroutineContext[Job]?.cancel()
         Unit
