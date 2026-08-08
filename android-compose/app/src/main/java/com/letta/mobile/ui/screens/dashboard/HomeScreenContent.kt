@@ -19,12 +19,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.ui.components.LettaInputBar
 import com.letta.mobile.ui.components.ShimmerBox
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 
 @Composable
 internal fun HomeContent(
@@ -182,3 +188,94 @@ private fun HomePinnedItemsLoadingShimmer() {
         }
     }
 }
+
+// region Previews
+
+private val previewHomeNoop: () -> Unit = {}
+private val previewHomeNoopChat: (String, String?, String?) -> Unit = { _, _, _ -> }
+private val previewHomeNoopChatMessage: (String, String, String) -> Unit = { _, _, _ -> }
+private val previewHomeNoopEditAgent: (String) -> Unit = {}
+private val previewHomeNoopShortcut: (DashboardShortcut) -> Unit = {}
+private val previewHomeNoopReorder: (List<String>) -> Unit = {}
+
+private fun previewHomeContentCallbacks() = HomeContentCallbacks(
+    onNavigateToTools = previewHomeNoop,
+    onNavigateToBlocks = previewHomeNoop,
+    onNavigateToChat = previewHomeNoopChat,
+    onNavigateToChatMessage = previewHomeNoopChatMessage,
+    onNavigateToEditAgent = previewHomeNoopEditAgent,
+    onUnpinAgent = previewHomeNoopEditAgent,
+    onShortcutClick = previewHomeNoopShortcut,
+    onUnpinShortcut = previewHomeNoopShortcut,
+    onReorderPinnedItems = previewHomeNoopReorder,
+)
+
+private val previewHomeAgents = listOf(
+    Agent(id = AgentId("agent-1"), name = "General Assistant", model = "letta/letta-free", description = "A general-purpose agent"),
+)
+
+private fun previewHomeUiState(
+    isSearchActive: Boolean = false,
+    error: String? = null,
+) = DashboardUiState(
+    isConnected = true,
+    agentCount = 3,
+    isAgentCountLoading = false,
+    conversationCount = 12,
+    isConversationCountLoading = false,
+    toolCount = 5,
+    isToolCountLoading = false,
+    blockCount = 2,
+    isBlockCountLoading = false,
+    isUsageLoading = false,
+    favoriteAgentId = "agent-1",
+    favoriteAgentName = "General Assistant",
+    pinnedItems = persistentListOf(
+        PinnedItem.Shortcut(DashboardShortcut.CONVERSATIONS),
+        PinnedItem.Shortcut(DashboardShortcut.AGENTS),
+        PinnedItem.Agent(PinnedAgent("agent-1", "General Assistant")),
+    ),
+    isPinnedItemsLoading = false,
+    isSearchActive = isSearchActive,
+    searchQuery = if (isSearchActive) "plan" else "",
+    agentResults = if (isSearchActive) previewHomeAgents.toImmutableList() else persistentListOf(),
+    messageResults = if (isSearchActive) {
+        persistentListOf(
+            ParsedSearchMessage(
+                messageId = "msg-1",
+                agentId = "agent-1",
+                role = "assistant",
+                content = "Here is the plan for this week.",
+                date = "2026-08-07T18:30:00Z",
+                conversationId = "conv-1",
+            ),
+        )
+    } else {
+        persistentListOf()
+    },
+    error = error,
+)
+
+@PreviewLightDark
+@Composable
+private fun HomeContentPreview() {
+    LettaPreviewFrame {
+        HomeContent(
+            state = previewHomeUiState(),
+            callbacks = previewHomeContentCallbacks(),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeContentSearchPreview() {
+    LettaPreviewFrame {
+        HomeContent(
+            state = previewHomeUiState(isSearchActive = true, error = "Backend unreachable"),
+            callbacks = previewHomeContentCallbacks(),
+        )
+    }
+}
+
+// endregion

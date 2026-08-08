@@ -67,6 +67,8 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.coroutines.flow.MutableStateFlow
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.chat.render.buildToolCallTemplate
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 // letta-mobile-awbf.1: composer sizing now references the design system tokens
 internal val ChatComposerAttachButtonSize = LettaSpacing.COMPOSER_ATTACH_BUTTON_SIZE
@@ -715,3 +717,57 @@ private fun rememberAttachmentImageBitmap(base64: String) = remember(base64) {
         decodeImageBitmap(bytes)
     }.getOrNull()
 }
+
+// region Previews
+
+private sealed interface ChatComposerPreviewMode {
+    data object Idle : ChatComposerPreviewMode
+    data object Draft : ChatComposerPreviewMode
+    data object Streaming : ChatComposerPreviewMode
+}
+
+private val previewChatComposerNoop: () -> Unit = {}
+private val previewChatComposerNoopInt: (Int) -> Unit = { _ -> }
+
+private fun previewChatComposerInputText(mode: ChatComposerPreviewMode): String = when (mode) {
+    ChatComposerPreviewMode.Idle -> ""
+    ChatComposerPreviewMode.Draft -> "Draft a release announcement for v0.4.2."
+    ChatComposerPreviewMode.Streaming -> "Drafting the announcement, give me a moment…"
+}
+
+@Composable
+private fun PreviewChatComposer(mode: ChatComposerPreviewMode) {
+    LettaPreviewFrame {
+        ChatComposer(
+            inputText = previewChatComposerInputText(mode),
+            pendingAttachments = kotlinx.collections.immutable.persistentListOf(),
+            isStreaming = mode is ChatComposerPreviewMode.Streaming,
+            canSendMessages = true,
+            onTextChange = { _ -> },
+            onSend = { _ -> },
+            onStop = previewChatComposerNoop,
+            onRemoveAttachment = previewChatComposerNoopInt,
+            onAttachImage = previewChatComposerNoop,
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChatComposerIdlePreview() {
+    PreviewChatComposer(ChatComposerPreviewMode.Idle)
+}
+
+@PreviewLightDark
+@Composable
+private fun ChatComposerDraftPreview() {
+    PreviewChatComposer(ChatComposerPreviewMode.Draft)
+}
+
+@PreviewLightDark
+@Composable
+private fun ChatComposerStreamingPreview() {
+    PreviewChatComposer(ChatComposerPreviewMode.Streaming)
+}
+
+// endregion

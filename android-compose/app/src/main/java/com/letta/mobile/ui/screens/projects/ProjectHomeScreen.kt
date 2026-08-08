@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -75,6 +76,7 @@ import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.route.ProjectChatStartAction
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.customColors
@@ -868,3 +870,164 @@ private fun ProjectTile(
         }
     }
 }
+
+// region Previews
+
+private data class PreviewProjectSummaryConfig(
+    val name: String = "letta-mobile",
+    val identifier: String = "letta-mobile",
+    val status: String = "active",
+    val issueCount: Int? = 3,
+    val lastSyncAt: String? = "2026-08-07T18:30:00Z",
+    val beadsIssueCount: Int? = 2,
+)
+
+private fun previewProjectSummary(
+    config: PreviewProjectSummaryConfig = PreviewProjectSummaryConfig(),
+) = ProjectSummary(
+    id = null,
+    identifier = config.identifier,
+    name = config.name,
+    filesystemPath = "/home/dev/projects/letta-mobile",
+    status = config.status,
+    issueCount = config.issueCount,
+    beadsIssueCount = config.beadsIssueCount,
+    lastSyncAt = config.lastSyncAt,
+)
+
+private data class PreviewBeadsStatusConfig(
+    val status: String = "provisioned",
+    val provisionedAt: String? = "2026-08-07T12:00:00Z",
+)
+
+private fun previewBeadsStatus(
+    config: PreviewBeadsStatusConfig = PreviewBeadsStatusConfig(),
+) = BeadsRemoteStatus(
+    status = config.status,
+    provisionedAt = config.provisionedAt,
+)
+
+private fun previewPmAgent() = PmAgentMetadata(
+    agentId = com.letta.mobile.data.model.AgentId("agent-pm-1"),
+    name = "PM agent",
+)
+
+private data class PreviewStatusBadgeSpec(
+    val text: String,
+    val containerColor: Color,
+    val contentColor: Color,
+)
+
+private data class PreviewMetaRowSpec(
+    val statusLabel: String,
+    val statusContainerColor: Color,
+    val statusContentColor: Color,
+    val issueCount: Int,
+    val isPinned: Boolean,
+)
+
+@PreviewLightDark
+@Composable
+private fun ProjectStatusBadgePreview() {
+    LettaPreviewFrame {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(
+                PreviewStatusBadgeSpec(
+                    text = "Active",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+                PreviewStatusBadgeSpec(
+                    text = "Archived",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                PreviewStatusBadgeSpec(
+                    text = "3 issues",
+                    containerColor = MaterialTheme.customColors.harmonizedErrorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ).forEach { spec ->
+                StatusBadge(
+                    text = spec.text,
+                    containerColor = spec.containerColor,
+                    contentColor = spec.contentColor,
+                )
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectTileMetaRowPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(
+                PreviewMetaRowSpec(
+                    statusLabel = "Active",
+                    statusContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    issueCount = 3,
+                    isPinned = false,
+                ),
+                PreviewMetaRowSpec(
+                    statusLabel = "Archived",
+                    statusContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    statusContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    issueCount = 0,
+                    isPinned = true,
+                ),
+            ).forEach { spec ->
+                ProjectTileMetaRow(
+                    statusLabel = spec.statusLabel,
+                    statusContainerColor = spec.statusContainerColor,
+                    statusContentColor = spec.statusContentColor,
+                    issueCount = spec.issueCount,
+                    isPinned = spec.isPinned,
+                )
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectActionSheetHeaderPreview() {
+    LettaPreviewFrame {
+        ProjectActionSheetHeader(
+            project = previewProjectSummary(),
+            beadsStatus = previewBeadsStatus(),
+            pmAgent = previewPmAgent(),
+            syncInFlight = false,
+            onPmAgentClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectActionSheetHeaderFailedPreview() {
+    LettaPreviewFrame {
+        ProjectActionSheetHeader(
+            project = previewProjectSummary(
+                PreviewProjectSummaryConfig(name = "edge-case", identifier = "edge-case"),
+            ),
+            beadsStatus = BeadsRemoteStatus(
+                status = "failed",
+                error = "Unable to reach the beads remote. Check connection and retry.",
+            ),
+            pmAgent = null,
+            syncInFlight = true,
+            onPmAgentClick = {},
+        )
+    }
+}
+
+// endregion

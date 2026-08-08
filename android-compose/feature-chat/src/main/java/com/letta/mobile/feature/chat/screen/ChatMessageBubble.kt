@@ -27,6 +27,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.onLongClick
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
@@ -36,6 +37,8 @@ import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
 import com.letta.mobile.ui.components.LatencyText
 import com.letta.mobile.ui.components.MessageBubbleShape
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatColors
@@ -394,3 +397,73 @@ internal fun MessageBubbleSurface(
         }
     }
 }
+
+// region Previews
+
+private fun previewUiMessage(
+    role: String,
+    content: String,
+    latencyMs: Long? = null,
+    isError: Boolean = false,
+): UiMessage = UiMessage(
+    id = "preview-$role",
+    role = role,
+    content = content,
+    timestamp = "2026-08-08T00:00:00Z",
+    latencyMs = latencyMs,
+    isError = isError,
+)
+
+@Composable
+private fun PreviewMessageBubble(
+    role: String,
+    content: String,
+    latencyMs: Long? = null,
+    isError: Boolean = false,
+) {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            MessageBubbleSurface(
+                message = previewUiMessage(
+                    role = role,
+                    content = content,
+                    latencyMs = latencyMs,
+                    isError = isError,
+                ),
+                groupPosition = GroupPosition.None,
+                isStreaming = false,
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageBubbleSurfaceUserPreview() {
+    PreviewMessageBubble(
+        role = "user",
+        content = "Can you summarize the latest sales numbers?",
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageBubbleSurfaceAssistantPreview() {
+    PreviewMessageBubble(
+        role = "assistant",
+        content = "Here is the summary you asked for.",
+        latencyMs = 1_240,
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageBubbleSurfaceErrorPreview() {
+    PreviewMessageBubble(
+        role = "assistant",
+        content = "The request failed: server returned 503.",
+        isError = true,
+    )
+}
+
+// endregion

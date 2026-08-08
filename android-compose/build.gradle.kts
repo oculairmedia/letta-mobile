@@ -5,9 +5,9 @@ plugins {
     id("com.letta.mobile.architecture-graph")
     id("com.autonomousapps.dependency-analysis") version "3.5.1" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.8"
-    id("com.android.application") version "9.2.0" apply false
-    id("com.android.library") version "9.2.0" apply false
-    id("com.android.kotlin.multiplatform.library") version "9.2.0" apply false
+    id("com.android.application") version "9.3.1" apply false
+    id("com.android.library") version "9.3.1" apply false
+    id("com.android.kotlin.multiplatform.library") version "9.3.1" apply false
     id("org.jetbrains.kotlin.jvm") version "2.4.0" apply false
     id("org.jetbrains.kotlin.multiplatform") version "2.4.0" apply false
     // Keep the project plugin on 1.10.0 for the shared macOS x64 target, which

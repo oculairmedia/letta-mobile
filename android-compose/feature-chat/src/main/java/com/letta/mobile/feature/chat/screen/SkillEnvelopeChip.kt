@@ -24,8 +24,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.toChatDisplayMode
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LocalChatFontScale
 
 /**
@@ -124,3 +126,44 @@ fun SkillEnvelopeChip(
         }
     }
 }
+
+// region Previews
+
+private const val PreviewSkillEnvelopeRawContent: String = """{
+  "name": "asus-router",
+  "version": "1.0.0",
+  "instructions": "Use the asus-router CLI to query the home gateway. Returns bandwidth, device list, and Wi-Fi diagnostics.",
+  "tools": ["router.status", "router.devices", "router.wifi"]
+}"""
+
+@PreviewLightDark
+@Composable
+private fun SkillEnvelopeChipInteractivePreview() {
+    LettaPreviewFrame {
+        SkillEnvelopeChip(
+            slug = "asus-router",
+            name = "Asus Router",
+            description = "Home gateway diagnostics",
+            args = "device=living-room",
+            rawContent = PreviewSkillEnvelopeRawContent,
+            chatMode = "interactive",
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun SkillEnvelopeChipSimplePreview() {
+    LettaPreviewFrame {
+        SkillEnvelopeChip(
+            slug = "asus-router",
+            name = "Asus Router",
+            description = "Home gateway diagnostics",
+            args = "",
+            rawContent = PreviewSkillEnvelopeRawContent,
+            chatMode = "simple",
+        )
+    }
+}
+
+// endregion

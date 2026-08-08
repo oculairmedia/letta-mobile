@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -61,6 +62,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -509,3 +511,65 @@ private fun JsonElement?.toDisplayString(): String {
 private fun Job.isTerminalStatus(): Boolean {
     return status in setOf("completed", "failed", "cancelled", "expired")
 }
+
+// region Previews
+
+private fun previewJob(
+    id: String = "batch-9c4f",
+    status: String? = "completed",
+    jobType: String? = "batch_completion",
+    agentId: String? = "agent-1",
+) = Job(
+    id = id,
+    status = status,
+    createdAt = "2026-08-07T18:30:00Z",
+    completedAt = "2026-08-07T18:35:12Z",
+    stopReason = "end_turn",
+    jobType = jobType,
+    background = false,
+    agentId = agentId,
+    metadata = mapOf(
+        "channel" to JsonPrimitive("cli"),
+        "items" to JsonPrimitive(12),
+    ),
+)
+
+private fun previewBatchMessage() = BatchMessage(
+    id = "msg-1",
+    agentId = "agent-1",
+    role = "assistant",
+    content = JsonPrimitive("Here is the rolled-up response from the worker agent."),
+    createdAt = "2026-08-07T18:31:00Z",
+)
+
+@PreviewLightDark
+@Composable
+private fun MessageBatchCardPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MessageBatchCard(batch = previewJob(), onInspect = {})
+            MessageBatchCard(
+                batch = previewJob(
+                    id = "batch-running",
+                    status = "running",
+                    jobType = "batch_send",
+                    agentId = "agent-42",
+                ),
+                onInspect = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun BatchMessageCardPreview() {
+    LettaPreviewFrame {
+        BatchMessageCard(message = previewBatchMessage())
+    }
+}
+
+// endregion

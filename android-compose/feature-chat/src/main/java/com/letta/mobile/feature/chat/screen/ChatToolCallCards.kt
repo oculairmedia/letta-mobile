@@ -88,6 +88,8 @@ import com.letta.mobile.feature.chat.subagent.LocalSubagentTodoSheetOpener
 import com.letta.mobile.feature.chat.subagent.SubagentTodoSheetTarget
 import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.components.shimmerColor
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
 
@@ -1889,3 +1891,39 @@ internal fun RequestFullToolResultOnExpand(toolCall: UiToolCall, expanded: Boole
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun ToolApprovalChipRequestingInputPreview() {
+    LettaPreviewFrame {
+        ToolApprovalChip(state = ToolApprovalState.RequestingInput)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolApprovalChipApprovedPreview() {
+    LettaPreviewFrame {
+        ToolApprovalChip(state = ToolApprovalState.Approved)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolApprovalChipRejectedPreview() {
+    LettaPreviewFrame {
+        ToolApprovalChip(state = ToolApprovalState.Rejected)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolMetaChipPreview() {
+    LettaPreviewFrame {
+        ToolMetaChip(text = "12.4s")
+    }
+}
+
+// endregion

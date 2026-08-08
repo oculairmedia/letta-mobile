@@ -44,6 +44,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,6 +66,7 @@ import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.components.TagDrillInDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInSource
 import com.letta.mobile.ui.tags.TagDrillInViewModel
@@ -685,6 +687,95 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
     Toast.makeText(context, context.getString(R.string.action_copied), Toast.LENGTH_SHORT).show()
+}
+
+// region Previews
+
+private fun previewDetailTool(
+    name: String = "send_email",
+    description: String? = "Send an email to a recipient with a subject and body.",
+    toolType: String? = "composio",
+    sourceType: String? = "python",
+    sourceCode: String? = "def send_email(to: str, subject: str, body: str) -> str:\n    return f\"queued {subject}\"",
+    tags: List<String> = listOf("email", "communication"),
+) = Tool(
+    id = com.letta.mobile.data.model.ToolId("tool-1"),
+    name = name,
+    description = description,
+    toolType = toolType,
+    sourceType = sourceType,
+    sourceCode = sourceCode,
+    jsonSchema = kotlinx.serialization.json.buildJsonObject {
+        put("type", kotlinx.serialization.json.JsonPrimitive("object"))
+    },
+    tags = tags,
+    createdAt = "2026-08-07T12:00:00Z",
+    updatedAt = "2026-08-07T18:30:00Z",
+)
+
+private fun previewAttachedAgent(name: String = "General Assistant") =
+    com.letta.mobile.data.model.Agent(
+        id = com.letta.mobile.data.model.AgentId("agent-$name"),
+        name = name,
+        description = "Friendly conversational agent",
+    )
+
+@PreviewLightDark
+@Composable
+private fun ToolDetailHeaderPreview() {
+    LettaPreviewFrame {
+        ToolDetailHeader(
+            tool = previewDetailTool(),
+            onTagClick = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolDetailHeaderEditablePreview() {
+    LettaPreviewFrame {
+        ToolDetailHeader(
+            tool = previewDetailTool(
+                name = "summarize_doc",
+                description = "Summarize a long document into bullet points.",
+                toolType = "custom",
+                sourceType = "python",
+            ),
+            onTagClick = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolDetailContentPreview() {
+    LettaPreviewFrame {
+        ToolDetailContent(
+            tool = previewDetailTool(),
+            attachedAgents = listOf(previewAttachedAgent()),
+            onDetachAgent = {},
+            onTagClick = {},
+            modifier = Modifier,
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolCodeSectionPreview() {
+    LettaPreviewFrame {
+        ToolCodeSection(
+            title = "Source code",
+            icon = LettaIcons.Code,
+            content = "def my_tool(arg: str) -> str:\n    \"\"\"Describe what this tool does.\"\"\"\n    return f\"Result: {arg}\"\n",
+            initiallyExpanded = true,
+            onCopy = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
 }
 
 private fun isEditableTool(tool: Tool): Boolean {

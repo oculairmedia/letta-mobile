@@ -23,9 +23,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.R
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.sectionTitle
 import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
@@ -136,3 +138,18 @@ private fun AboutHeader(
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun AboutHeaderPreview() {
+    LettaPreviewFrame {
+        AboutHeader(
+            appVersion = "1.0.0",
+            onClearDataClick = {},
+        )
+    }
+}
+
+// endregion

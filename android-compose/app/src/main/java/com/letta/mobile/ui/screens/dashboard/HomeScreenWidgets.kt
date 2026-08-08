@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.ui.components.ActionSheet
@@ -47,6 +48,7 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableList
 import sh.calvin.reorderable.ReorderableItem
@@ -394,38 +396,42 @@ internal fun ReorderablePinnedItemsGrid(
     }
 }
 
+internal data class CollapsibleSectionHeaderState(
+    val title: String,
+    val count: Int,
+    val expanded: Boolean,
+    val topPadding: Boolean = false,
+)
+
 @Composable
 internal fun CollapsibleSectionHeader(
-    title: String,
-    count: Int,
-    expanded: Boolean,
+    state: CollapsibleSectionHeaderState,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
-    topPadding: Boolean = false,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .combinedClickable(onClick = onToggle)
-            .padding(top = if (topPadding) 8.dp else 0.dp, bottom = 4.dp),
+            .padding(top = if (state.topPadding) 8.dp else 0.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = title,
+            text = state.title,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-            text = "($count)",
+            text = "(${state.count})",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.weight(1f))
         Icon(
-            imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
-            contentDescription = if (expanded) "Collapse" else "Expand",
+            imageVector = if (state.expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
+            contentDescription = if (state.expanded) "Collapse" else "Expand",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
@@ -433,3 +439,66 @@ internal fun CollapsibleSectionHeader(
 }
 
 internal fun formatNumber(value: Int): String = String.format(Locale.US, "%,d", value)
+
+// region Previews
+
+private data class PreviewTileModifier(
+    val widthFill: Boolean = true,
+    val height: androidx.compose.ui.unit.Dp = 108.dp,
+)
+
+private data class PreviewDashboardTileSpec(
+    val shortcut: DashboardShortcut = DashboardShortcut.CONVERSATIONS,
+    val contextualInfo: String? = "12",
+)
+
+private fun Modifier.previewTile(spec: PreviewTileModifier): Modifier =
+    then(if (spec.widthFill) Modifier.fillMaxWidth() else Modifier)
+        .height(spec.height)
+
+@PreviewLightDark
+@Composable
+private fun PinnedAgentCardPreview() {
+    LettaPreviewFrame {
+        PinnedAgentCard(
+            name = "General Assistant",
+            onClick = {},
+            onUnpin = {},
+            onConfigure = {},
+            modifier = Modifier.previewTile(PreviewTileModifier()),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun DashboardWidgetTilePreview() {
+    val tileSpec = PreviewDashboardTileSpec()
+    LettaPreviewFrame {
+        DashboardWidgetTile(
+            shortcut = tileSpec.shortcut,
+            contextualInfo = tileSpec.contextualInfo,
+            onClick = {},
+            onUnpin = {},
+            modifier = Modifier.previewTile(PreviewTileModifier()),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun CollapsibleSectionHeaderPreview() {
+    LettaPreviewFrame {
+        CollapsibleSectionHeader(
+            state = CollapsibleSectionHeaderState(
+                title = "Pinned",
+                count = 4,
+                expanded = true,
+            ),
+            onToggle = {},
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+// endregion

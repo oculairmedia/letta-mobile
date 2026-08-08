@@ -18,10 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.effectiveArgs
 import com.letta.mobile.data.model.effectiveAuthHeader
@@ -34,6 +36,7 @@ import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -304,30 +307,48 @@ internal fun initialFormState(server: McpServer?): McpServerFormState {
 }
 
 internal fun validateForm(state: McpServerFormState): String? {
-    if (state.serverName.isBlank()) {
-        return "Server name is required"
-    }
-    if (state.transportType == MCP_TYPE_STDIO && state.command.isBlank() && state.rawConfigText.isBlank()) {
-        return "Command is required for stdio servers"
-    }
-    if (state.transportType != MCP_TYPE_STDIO && state.serverUrl.isBlank() && state.rawConfigText.isBlank()) {
-        return "Server URL is required for HTTP-based servers"
-    }
-    if (state.transportType != MCP_TYPE_STDIO && state.serverUrl.isNotBlank()) {
-        val url = state.serverUrl.trim()
-        if (!url.startsWith("http://") && !url.startsWith("https://")) {
-            return "Server URL must start with http:// or https://"
-        }
-    }
-    if (state.rawConfigText.isNotBlank() && buildConfig(state).isFailure) {
-        return "Raw config must be valid JSON"
-    }
+    validateServerName(state)?.let { return it }
+    validateTransportFields(state)?.let { return it }
+    validateServerUrl(state)?.let { return it }
+    validateRawConfig(state)?.let { return it }
     if (parseKeyValueObject(state.customHeadersText).isFailure) {
         return "Custom headers must use one KEY=value pair per line"
     }
     if (parseKeyValueObject(state.envText).isFailure) {
         return "Environment variables must use one KEY=value pair per line"
     }
+    return null
+}
+
+private fun validateServerName(state: McpServerFormState): String? {
+    if (state.serverName.isBlank()) return "Server name is required"
+    return null
+}
+
+private fun validateTransportFields(state: McpServerFormState): String? {
+    val hasRawConfig = state.rawConfigText.isNotBlank()
+    return when {
+        state.transportType == MCP_TYPE_STDIO && state.command.isBlank() && !hasRawConfig ->
+            "Command is required for stdio servers"
+        state.transportType != MCP_TYPE_STDIO && state.serverUrl.isBlank() && !hasRawConfig ->
+            "Server URL is required for HTTP-based servers"
+        else -> null
+    }
+}
+
+private fun validateServerUrl(state: McpServerFormState): String? {
+    if (state.transportType == MCP_TYPE_STDIO) return null
+    if (state.serverUrl.isBlank()) return null
+    val url = state.serverUrl.trim()
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+        return "Server URL must start with http:// or https://"
+    }
+    return null
+}
+
+private fun validateRawConfig(state: McpServerFormState): String? {
+    if (state.rawConfigText.isBlank()) return null
+    if (buildConfig(state).isFailure) return "Raw config must be valid JSON"
     return null
 }
 
@@ -341,24 +362,52 @@ internal fun buildConfig(state: McpServerFormState): Result<JsonObject> {
     return runCatching {
         val customHeaders = parseKeyValueObject(state.customHeadersText).getOrThrow()
         val env = parseKeyValueObject(state.envText).getOrThrow()
-        val args = state.argsText.trim()
-            .split(Regex("[\\s,]+"))
-            .filter { it.isNotBlank() }
+        val args = parseCommandArgs(state.argsText)
 
         buildJsonObject {
             put("mcp_server_type", JsonPrimitive(state.transportType))
             if (state.transportType == MCP_TYPE_STDIO) {
-                put("command", JsonPrimitive(state.command.trim()))
-                put("args", buildJsonArray { args.forEach { add(JsonPrimitive(it)) } })
-                env?.let { put("env", it) }
+                putStdioConfig(this, state, args, env)
             } else {
-                put("server_url", JsonPrimitive(state.serverUrl.trim()))
-                state.authHeader.trim().takeIf { it.isNotBlank() }?.let { put("auth_header", JsonPrimitive(it)) }
-                state.authToken.trim().takeIf { it.isNotBlank() }?.let { put("auth_token", JsonPrimitive(it)) }
-                customHeaders?.let { put("custom_headers", it) }
+                putHttpConfig(this, state, customHeaders)
             }
         }
     }
+}
+
+private fun parseCommandArgs(argsText: String): List<String> = argsText.trim()
+    .split(Regex("[\\s,]+"))
+    .filter { it.isNotBlank() }
+
+private fun putStdioConfig(
+    builder: kotlinx.serialization.json.JsonObjectBuilder,
+    state: McpServerFormState,
+    args: List<String>,
+    env: JsonObject?,
+) {
+    builder.put("command", JsonPrimitive(state.command.trim()))
+    builder.put("args", buildJsonArray { args.forEach { add(JsonPrimitive(it)) } })
+    env?.let { builder.put("env", it) }
+}
+
+private fun putHttpConfig(
+    builder: kotlinx.serialization.json.JsonObjectBuilder,
+    state: McpServerFormState,
+    customHeaders: JsonObject?,
+) {
+    builder.put("server_url", JsonPrimitive(state.serverUrl.trim()))
+    putIfNotBlank(builder, "auth_header", state.authHeader)
+    putIfNotBlank(builder, "auth_token", state.authToken)
+    customHeaders?.let { builder.put("custom_headers", it) }
+}
+
+private fun putIfNotBlank(
+    builder: kotlinx.serialization.json.JsonObjectBuilder,
+    key: String,
+    value: String,
+) {
+    val trimmed = value.trim()
+    if (trimmed.isNotBlank()) builder.put(key, JsonPrimitive(trimmed))
 }
 
 internal fun parseKeyValueObject(text: String): Result<JsonObject?> {
@@ -380,3 +429,67 @@ internal fun parseKeyValueObject(text: String): Result<JsonObject?> {
         }
     }
 }
+
+// region Previews
+
+private val previewFormHttpState = McpServerFormState(
+    serverName = "Sample Server",
+    transportType = MCP_TYPE_STREAMABLE_HTTP,
+    serverUrl = "https://mcp.example.com/stream",
+    command = "",
+    argsText = "",
+    authHeader = "Authorization",
+    authToken = "sample-token",
+)
+
+private val previewFormStdioState = McpServerFormState(
+    serverName = "Local Stdio Server",
+    transportType = MCP_TYPE_STDIO,
+    command = "npx",
+    argsText = "-y @modelcontextprotocol/server-filesystem /tmp",
+    envText = "DEBUG=1\nLOG_LEVEL=info",
+)
+
+@Composable
+private fun PreviewServerFormDialog(
+    formState: McpServerFormState? = null,
+    initialServer: McpServer? = null,
+) {
+    LettaPreviewFrame {
+        ServerFormDialog(
+            initialServer = initialServer,
+            initialFormStateOverride = formState,
+            onDismiss = {},
+            onCreate = {},
+            onUpdate = { _, _ -> },
+        )
+    }
+}
+
+private val previewFormEditServer = McpServer(
+    id = McpServerId("server-1"),
+    serverName = "Existing Server",
+    serverUrl = "https://mcp.example.com/edit",
+    authHeader = "X-Api-Key",
+    type = "streamable_http",
+)
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogCreatePreview() {
+    PreviewServerFormDialog(formState = previewFormHttpState)
+}
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogStdioPreview() {
+    PreviewServerFormDialog(formState = previewFormStdioState)
+}
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogEditPreview() {
+    PreviewServerFormDialog(initialServer = previewFormEditServer)
+}
+
+// endregion

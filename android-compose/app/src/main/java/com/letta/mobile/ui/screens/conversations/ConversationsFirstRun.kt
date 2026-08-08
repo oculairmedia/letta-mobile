@@ -20,10 +20,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @Composable
 internal fun FirstRunWelcomeCard(
@@ -111,3 +113,31 @@ private fun FirstRunStep(text: String) {
         )
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun FirstRunWelcomeCardPreview() {
+    LettaPreviewFrame {
+        FirstRunWelcomeCard(
+            localReadiness = LocalLettaCodeCreateReadiness(),
+            onCreateFirstAgent = {},
+            onOpenLocalSettings = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun FirstRunWelcomeCardLocalSetupPreview() {
+    LettaPreviewFrame {
+        FirstRunWelcomeCard(
+            localReadiness = LocalLettaCodeCreateReadiness(activeConfigIsLocal = true),
+            onCreateFirstAgent = {},
+            onOpenLocalSettings = {},
+        )
+    }
+}
+
+// endregion

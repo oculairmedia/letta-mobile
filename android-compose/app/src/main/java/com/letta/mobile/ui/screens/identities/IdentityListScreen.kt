@@ -39,6 +39,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +51,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.letta.mobile.data.model.Identity
+import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.ui.common.UiState
@@ -65,6 +67,7 @@ import com.letta.mobile.ui.motion.StaggeredListItem
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemMetadataMonospace
@@ -650,3 +653,81 @@ private fun String.parseCommaSeparatedValues(): List<String> {
         .map { it.trim() }
         .filter { it.isNotBlank() }
 }
+
+// region Previews
+
+private val previewIdentity = Identity(
+    id = IdentityId("identity-1"),
+    identifierKey = "user-alice",
+    name = "Alice Carter",
+    identityType = "user",
+    blockIds = listOf(
+        BlockId("block-1"),
+        BlockId("block-2"),
+    ),
+    properties = listOf(
+        com.letta.mobile.data.model.IdentityProperty(
+            key = "role",
+            value = kotlinx.serialization.json.JsonPrimitive("admin"),
+            type = "string",
+        ),
+    ),
+)
+
+private val previewAgent = Agent(
+    id = AgentId("agent-1"),
+    name = "General Assistant",
+    model = "letta/letta-free",
+    description = "A general-purpose agent",
+)
+
+@Composable
+private fun PreviewIdentityCard() = LettaPreviewFrame {
+    IdentityCard(
+        identity = previewIdentity,
+        onInspect = {},
+        onEdit = {},
+        onDelete = {},
+    )
+}
+
+@Composable
+private fun PreviewIdentityDetailDialog() = LettaPreviewFrame {
+    IdentityDetailDialog(
+        identity = previewIdentity,
+        knownAgents = listOf(previewAgent),
+        onDismiss = {},
+        onEdit = {},
+        onAttachAgent = {},
+        onDetachAgent = {},
+    )
+}
+
+@Composable
+private fun PreviewAgentAttachDialog() = LettaPreviewFrame {
+    AgentAttachDialog(
+        agents = listOf(previewAgent),
+        onDismiss = {},
+        onAttach = {},
+    )
+}
+
+@PreviewLightDark
+@Composable
+private fun IdentityCardPreview() {
+    PreviewIdentityCard()
+}
+
+@PreviewLightDark
+@Composable
+private fun IdentityDetailDialogPreview() {
+    PreviewIdentityDetailDialog()
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentAttachDialogPreview() {
+    PreviewAgentAttachDialog()
+}
+
+// endregion

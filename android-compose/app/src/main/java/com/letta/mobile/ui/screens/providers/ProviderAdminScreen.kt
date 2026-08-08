@@ -37,11 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
@@ -56,6 +58,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
 
@@ -144,8 +147,10 @@ fun ProviderAdminScreen(
 
     if (showCreateDialog) {
         ProviderEditorDialog(
-            title = stringResource(R.string.screen_providers_add_title),
-            confirmLabel = stringResource(R.string.action_create),
+            labels = ProviderEditorLabels(
+                title = stringResource(R.string.screen_providers_add_title),
+                confirmLabel = stringResource(R.string.action_create),
+            ),
             onDismiss = { showCreateDialog = false },
             onConfirm = { name, providerType, apiKey, baseUrl, accessKey, region ->
                 viewModel.createProvider(name, providerType, apiKey, baseUrl, accessKey, region) {
@@ -157,14 +162,18 @@ fun ProviderAdminScreen(
 
     editTarget?.let { provider ->
         ProviderEditorDialog(
-            title = stringResource(R.string.screen_providers_edit_title),
-            confirmLabel = stringResource(R.string.action_save),
-            initialName = provider.name,
-            initialProviderType = provider.providerType,
-            initialApiKey = provider.apiKey.orEmpty(),
-            initialBaseUrl = provider.baseUrl.orEmpty(),
-            initialAccessKey = provider.accessKey.orEmpty(),
-            initialRegion = provider.region.orEmpty(),
+            labels = ProviderEditorLabels(
+                title = stringResource(R.string.screen_providers_edit_title),
+                confirmLabel = stringResource(R.string.action_save),
+            ),
+            initialState = ProviderEditorInitialState(
+                name = provider.name,
+                providerType = provider.providerType,
+                apiKey = provider.apiKey.orEmpty(),
+                baseUrl = provider.baseUrl.orEmpty(),
+                accessKey = provider.accessKey.orEmpty(),
+                region = provider.region.orEmpty(),
+            ),
             isCreate = false,
             onDismiss = { editTarget = null },
             onConfirm = { _, _, apiKey, baseUrl, accessKey, region ->
@@ -451,31 +460,39 @@ private fun ProviderDetailRefreshStatus(isRefreshing: Boolean) {
     }
 }
 
+private data class ProviderEditorLabels(
+    val title: String,
+    val confirmLabel: String,
+)
+
+private data class ProviderEditorInitialState(
+    val name: String = "",
+    val providerType: String = "",
+    val apiKey: String = "",
+    val baseUrl: String = "",
+    val accessKey: String = "",
+    val region: String = "",
+)
+
 @Composable
 private fun ProviderEditorDialog(
-    title: String,
-    confirmLabel: String,
-    initialName: String = "",
-    initialProviderType: String = "",
-    initialApiKey: String = "",
-    initialBaseUrl: String = "",
-    initialAccessKey: String = "",
-    initialRegion: String = "",
+    labels: ProviderEditorLabels,
+    initialState: ProviderEditorInitialState = ProviderEditorInitialState(),
     isCreate: Boolean = true,
     onDismiss: () -> Unit,
     onConfirm: (String, String, String, String, String, String) -> Unit,
 ) {
-    var name by remember(initialName) { mutableStateOf(initialName) }
-    var providerType by remember(initialProviderType) { mutableStateOf(initialProviderType) }
-    var apiKey by remember(initialApiKey) { mutableStateOf(initialApiKey) }
-    var baseUrl by remember(initialBaseUrl) { mutableStateOf(initialBaseUrl) }
-    var accessKey by remember(initialAccessKey) { mutableStateOf(initialAccessKey) }
-    var region by remember(initialRegion) { mutableStateOf(initialRegion) }
+    var name by remember(initialState.name) { mutableStateOf(initialState.name) }
+    var providerType by remember(initialState.providerType) { mutableStateOf(initialState.providerType) }
+    var apiKey by remember(initialState.apiKey) { mutableStateOf(initialState.apiKey) }
+    var baseUrl by remember(initialState.baseUrl) { mutableStateOf(initialState.baseUrl) }
+    var accessKey by remember(initialState.accessKey) { mutableStateOf(initialState.accessKey) }
+    var region by remember(initialState.region) { mutableStateOf(initialState.region) }
 
     MultiFieldInputDialog(
         show = true,
-        title = title,
-        confirmText = confirmLabel,
+        title = labels.title,
+        confirmText = labels.confirmLabel,
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         confirmEnabled = apiKey.isNotBlank() && (!isCreate || (name.isNotBlank() && providerType.isNotBlank())),
@@ -561,3 +578,44 @@ private fun ProviderEditorDialog(
         }
     }
 }
+
+// region Previews
+
+private val previewProvider = Provider(
+    id = ProviderId("prov-1"),
+    name = "Anthropic Prod",
+    providerType = "anthropic",
+    providerCategory = "Hosted",
+    baseUrl = "https://example.test/local",
+    region = "us-east-1",
+    apiKey = "sk-ant-sample",
+)
+
+@Composable
+private fun PreviewProviderCard() = LettaPreviewFrame {
+    ProviderCard(
+        provider = previewProvider,
+        onInspect = {},
+        onEdit = {},
+        onDelete = {},
+    )
+}
+
+@Composable
+private fun PreviewProviderDetailRefreshStatus() = LettaPreviewFrame {
+    ProviderDetailRefreshStatus(isRefreshing = true)
+}
+
+@PreviewLightDark
+@Composable
+private fun ProviderCardPreview() {
+    PreviewProviderCard()
+}
+
+@PreviewLightDark
+@Composable
+private fun ProviderDetailRefreshStatusPreview() {
+    PreviewProviderDetailRefreshStatus()
+}
+
+// endregion

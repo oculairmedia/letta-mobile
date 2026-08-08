@@ -26,6 +26,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.feature.chat.R
@@ -35,6 +36,8 @@ import com.letta.mobile.ui.components.MarkdownText
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalChatIsPinching
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
@@ -262,3 +265,71 @@ internal fun String.reasoningPreview(): String {
     }
 }
 
+// region Previews
+
+private fun previewReasoningMessage(
+    content: String,
+    latencyMs: Long? = null,
+): UiMessage = UiMessage(
+    id = "preview-reasoning",
+    role = "assistant",
+    content = content,
+    timestamp = "2026-08-08T00:00:00Z",
+    latencyMs = latencyMs,
+    isReasoning = true,
+)
+
+@PreviewLightDark
+@Composable
+private fun MessageReasoningCollapsedPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            MessageReasoning(
+                message = previewReasoningMessage(
+                    content = "Let me break this down step by step.\nFirst, the user is asking about the latest sales data.",
+                    latencyMs = 1_400,
+                ),
+                isStreaming = false,
+                collapsed = true,
+                onToggleCollapsed = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageReasoningExpandedPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            MessageReasoning(
+                message = previewReasoningMessage(
+                    content = "The user wants the latest sales numbers. I'll look at the Q3 totals first, then compare against last quarter.",
+                    latencyMs = 3_200,
+                ),
+                isStreaming = false,
+                collapsed = false,
+                onToggleCollapsed = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageReasoningStreamingPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            MessageReasoning(
+                message = previewReasoningMessage(
+                    content = "",
+                ),
+                isStreaming = true,
+                collapsed = false,
+                onToggleCollapsed = {},
+            )
+        }
+    }
+}
+
+// endregion

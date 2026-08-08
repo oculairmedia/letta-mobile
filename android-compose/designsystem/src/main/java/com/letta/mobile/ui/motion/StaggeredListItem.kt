@@ -17,6 +17,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalInspectionMode
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
@@ -54,7 +55,9 @@ fun LazyItemScope.StaggeredListItem(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val reducedMotion = rememberReducedMotionEnabled()
+    // Previews capture frame 0, so the entrance animation would hide every
+    // row; treat inspection mode like reduced motion so previews show content.
+    val reducedMotion = rememberReducedMotionEnabled() || LocalInspectionMode.current
     var entranceCompleted by rememberSaveable { mutableStateOf(false) }
     val withinViewport = index < StaggerViewportIndexLimit
     var isVisible by remember { mutableStateOf(entranceCompleted || reducedMotion) }

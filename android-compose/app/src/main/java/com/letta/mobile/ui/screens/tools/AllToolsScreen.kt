@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +64,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerGrid
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -331,3 +333,50 @@ private fun ToolTile(
         }
     }
 }
+
+// region Previews
+
+private fun previewTool(
+    name: String = "send_email",
+    description: String? = "Send an email to a recipient with a subject and body.",
+    toolType: String? = "composio",
+    sourceType: String? = "python",
+) = Tool(
+    id = com.letta.mobile.data.model.ToolId("tool-1"),
+    name = name,
+    description = description,
+    toolType = toolType,
+    sourceType = sourceType,
+    tags = listOf("email", "communication"),
+)
+
+@PreviewLightDark
+@Composable
+private fun ToolTilePreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ToolTile(tool = previewTool(), onClick = {})
+            ToolTile(
+                tool = previewTool(
+                    name = "long_tool_name_that_wraps",
+                    description = "A more detailed description that explains what this tool does.",
+                    toolType = "custom",
+                ),
+                onClick = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun McpLoadingBannerPreview() {
+    LettaPreviewFrame {
+        McpLoadingBanner(modifier = Modifier.padding(16.dp))
+    }
+}
+
+// endregion

@@ -13,6 +13,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -27,6 +28,8 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.tags.TagDrillInEntityType
 import com.letta.mobile.ui.tags.TagDrillInSource
 import com.letta.mobile.ui.tags.TagDrillInViewModel
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import kotlinx.collections.immutable.persistentListOf
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,3 +246,78 @@ private fun TemplateCard(
         }
     }
 }
+
+// region Previews
+
+private val previewTemplateGeneral = StarterAgentTemplate(
+    id = "default",
+    name = "Default Agent",
+    description = "A balanced assistant for everyday questions, planning, and coordination.",
+    icon = "\uD83E\uDD16",
+    systemPrompt = "You are a helpful general-purpose Letta assistant.",
+    tags = persistentListOf("starter", "general"),
+)
+
+private val previewTemplateCoder = StarterAgentTemplate(
+    id = "coder",
+    name = "Coding Assistant",
+    description = "A starter tuned for debugging, implementation planning, and developer workflows.",
+    icon = "\uD83D\uDCBB",
+    systemPrompt = "You are a coding-focused Letta assistant.",
+    tags = persistentListOf("starter", "coding", "developer"),
+)
+
+private val previewTemplateWriter = StarterAgentTemplate(
+    id = "writer",
+    name = "Writing Assistant",
+    description = "A starter for drafting, editing, summarizing, and shaping tone across written work.",
+    icon = "\u270D\uFE0F",
+    systemPrompt = "You are a writing-focused Letta assistant.",
+    tags = persistentListOf("starter", "writing"),
+)
+
+@PreviewLightDark
+@Composable
+private fun TemplateCardDefaultPreview() {
+    LettaPreviewFrame {
+        TemplateCard(
+            template = previewTemplateGeneral,
+            onClick = {},
+            onTagClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun TemplateCardCoderPreview() {
+    LettaPreviewFrame {
+        TemplateCard(
+            template = previewTemplateCoder,
+            onClick = {},
+            onTagClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun TemplateCardWriterPreview() {
+    LettaPreviewFrame {
+        TemplateCard(
+            template = previewTemplateWriter,
+            onClick = {},
+            onTagClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun StarterAgentsInfoCardPreview() {
+    LettaPreviewFrame {
+        StarterAgentsInfoCard(onNavigateToAgentList = {})
+    }
+}
+
+// endregion

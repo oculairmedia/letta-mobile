@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,6 +81,7 @@ import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.util.formatRelativeTime
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -911,3 +913,85 @@ private fun IssueMetaChip(value: String, isWarning: Boolean = false) {
 
 private fun String.toIssueLabel(): String =
     replace('_', ' ').replaceFirstChar { it.uppercase() }
+
+// region Previews
+
+private fun previewProjectIssueSummary(
+    id: String = "letta-123",
+    title: String = "Allow preview rendering of issue cards",
+    status: String = "in_progress",
+    priority: String? = "high",
+    type: String? = "task",
+) = ProjectIssueSummary(
+    id = id,
+    title = title,
+    type = type,
+    priority = priority,
+    status = status,
+    statusLabel = "In progress",
+    ready = false,
+    assignee = "agent-1",
+    updatedAt = "2026-08-07T18:30:00Z",
+    summary = "Add Compose previews for the issue cards so designers can iterate quickly.",
+)
+
+private fun previewReadyIssueSummary() = ProjectIssueSummary(
+    id = "letta-124",
+    title = "Investigate slow navigation transitions",
+    type = "task",
+    priority = "med",
+    status = "open",
+    statusLabel = "Ready",
+    ready = true,
+    assignee = "agent-2",
+    updatedAt = "2026-08-07T19:00:00Z",
+    summary = "Slow transitions on the home screen when scrolling between pinned agents.",
+)
+
+@PreviewLightDark
+@Composable
+private fun ProjectIssueCardPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ProjectIssueCard(issue = previewProjectIssueSummary(), onClick = {})
+            ProjectIssueCard(issue = previewReadyIssueSummary(), onClick = {})
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectIssueStatusChipPreview() {
+    LettaPreviewFrame {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            IssueStatusChip(status = "open", ready = false)
+            IssueStatusChip(status = "in_progress", ready = false)
+            IssueStatusChip(status = "closed", ready = false)
+            IssueStatusChip(status = "ready", ready = true)
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectIssueMetaChipPreview() {
+    LettaPreviewFrame {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            IssueMetaChip(value = "high")
+            IssueMetaChip(value = "task")
+            IssueMetaChip(value = "agent-1")
+            IssueMetaChip(value = "blocked", isWarning = true)
+        }
+    }
+}
+
+// endregion

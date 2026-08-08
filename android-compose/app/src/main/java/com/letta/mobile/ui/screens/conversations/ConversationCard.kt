@@ -21,8 +21,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.components.ConfirmDialog
@@ -32,6 +36,7 @@ import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.formatRelativeTime
 
 data class ConversationCardCallbacks(
@@ -301,3 +306,56 @@ private fun conversationActivityText(conversation: com.letta.mobile.data.model.C
         stringResource(R.string.screen_conversations_created_format, relative)
     }
 }
+
+// region Previews
+
+private fun previewConversation(
+    id: String = "conv-1",
+    summary: String? = "Weekly planning check-in",
+) = Conversation(
+    id = ConversationId(id),
+    agentId = AgentId("agent-1"),
+    summary = summary,
+    createdAt = "2026-08-01T09:00:00Z",
+    lastMessageAt = "2026-08-07T18:30:00Z",
+)
+
+private fun previewConversationCardCallbacks() = ConversationCardCallbacks(
+    onClick = {},
+    onOpenAdmin = {},
+    onDelete = {},
+    onRename = {},
+    onTogglePinned = {},
+    onFork = {},
+)
+
+@Composable
+private fun PreviewConversationCard(pinned: Boolean = false) {
+    val id = if (pinned) "conv-2" else "conv-1"
+    val summary = if (pinned) "Release triage" else "Weekly planning check-in"
+    val agentName = if (pinned) "Code Helper" else "General Assistant"
+    LettaPreviewFrame {
+        ConversationCard(
+            display = ConversationDisplay(
+                conversation = previewConversation(id = id, summary = summary),
+                agentName = agentName,
+                isPinned = pinned,
+            ),
+            callbacks = previewConversationCardCallbacks(),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ConversationCardPreview() {
+    PreviewConversationCard()
+}
+
+@PreviewLightDark
+@Composable
+private fun ConversationCardPinnedPreview() {
+    PreviewConversationCard(pinned = true)
+}
+
+// endregion

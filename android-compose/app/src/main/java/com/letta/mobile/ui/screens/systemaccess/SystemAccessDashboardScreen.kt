@@ -48,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -57,12 +58,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.platform.SystemAccessFlavor
 import com.letta.mobile.platform.systemaccess.SystemAccessApprovalPolicy
+import com.letta.mobile.platform.systemaccess.SystemAccessAuditPolicy
 import com.letta.mobile.platform.systemaccess.SystemAccessCapability
+import com.letta.mobile.platform.systemaccess.SystemAccessCapabilityDefinition
 import com.letta.mobile.platform.systemaccess.SystemAccessCapabilityStatus
+import com.letta.mobile.platform.systemaccess.SystemAccessDataSensitivity
 import com.letta.mobile.platform.systemaccess.SystemAccessFlavorAvailability
+import com.letta.mobile.platform.systemaccess.SystemAccessFlavorSupport
 import com.letta.mobile.platform.systemaccess.SystemAccessPermissionIntent
 import com.letta.mobile.platform.systemaccess.SystemAccessPermissionIntentKind
+import com.letta.mobile.platform.systemaccess.SystemAccessPolicyRisk
 import com.letta.mobile.platform.systemaccess.SystemAccessPolicyRiskLevel
+import com.letta.mobile.platform.systemaccess.SystemAccessProbe
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
@@ -70,6 +77,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.listItemMetadata
 import java.util.Locale
@@ -490,3 +498,131 @@ private val SystemAccessCapability.auditSummary: String
 private fun String.toDisplayLabel(): String = replace('_', ' ')
     .lowercase(Locale.ROOT)
     .replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase(Locale.ROOT) else char.toString() }
+
+// region Previews
+
+private data class PreviewCapabilityStrings(
+    val statusReason: String,
+    val policyRiskRationale: String,
+    val summary: String,
+)
+
+private data class PreviewCapabilityConfig(
+    val status: SystemAccessCapabilityStatus,
+    val toolIds: Set<String>,
+    val approvalPolicy: SystemAccessApprovalPolicy,
+    val audit: SystemAccessAuditPolicy,
+    val strings: PreviewCapabilityStrings,
+)
+
+private fun previewCapability(config: PreviewCapabilityConfig): SystemAccessCapability {
+    val flavorSupport = SystemAccessFlavorSupport(
+        play = SystemAccessFlavorAvailability.Supported,
+        sideload = SystemAccessFlavorAvailability.Supported,
+        root = SystemAccessFlavorAvailability.Supported,
+    )
+    val intents = listOf(
+        SystemAccessPermissionIntent(
+            id = "open_settings",
+            label = "Open settings",
+            kind = SystemAccessPermissionIntentKind.SettingsDeepLink,
+            settingsAction = "android.settings.APP_NOTIFICATION_SETTINGS",
+        ),
+    )
+    val policyRisk = SystemAccessPolicyRisk(
+        level = SystemAccessPolicyRiskLevel.Medium,
+        rationale = config.strings.policyRiskRationale,
+    )
+    val definition = SystemAccessCapabilityDefinition(
+        id = "notifications.post",
+        title = "Post notifications",
+        summary = config.strings.summary,
+        flavorAvailability = flavorSupport,
+        permissionIntents = intents,
+        dataSensitivity = SystemAccessDataSensitivity.AppPrivate,
+        toolIds = config.toolIds,
+        approvalPolicy = config.approvalPolicy,
+        auditPolicy = config.audit,
+        policyRisk = policyRisk,
+        probe = SystemAccessProbe.AlwaysGranted,
+    )
+    return SystemAccessCapability(
+        definition = definition,
+        status = config.status,
+        statusReason = config.strings.statusReason,
+        userEnabled = true,
+    )
+}
+
+private fun previewCapabilityGranted(): SystemAccessCapability = previewCapability(
+    PreviewCapabilityConfig(
+        status = SystemAccessCapabilityStatus.Granted,
+        toolIds = setOf("send_email"),
+        approvalPolicy = SystemAccessApprovalPolicy.RememberPerSession,
+        audit = SystemAccessAuditPolicy(
+            loggedFields = listOf("tool_id", "timestamp"),
+            redactedFields = listOf("body"),
+            localOnlyByDefault = true,
+        ),
+        strings = PreviewCapabilityStrings(
+            statusReason = "Notification permission granted.",
+            policyRiskRationale = "Requests a runtime permission to read recent inbox metadata.",
+            summary = "Lets the app post user-visible notifications while a tool is running.",
+        ),
+    ),
+)
+
+private fun previewCapabilityNeedsSetup(): SystemAccessCapability = previewCapability(
+    PreviewCapabilityConfig(
+        status = SystemAccessCapabilityStatus.AvailableNeedsSetup,
+        toolIds = emptySet(),
+        approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
+        audit = SystemAccessAuditPolicy(
+            loggedFields = listOf("tool_id"),
+            localOnlyByDefault = true,
+        ),
+        strings = PreviewCapabilityStrings(
+            statusReason = "Enable notifications in system settings to use this capability.",
+            policyRiskRationale = "Requires user opt-in via system settings.",
+            summary = "Lets the app post user-visible notifications.",
+        ),
+    ),
+)
+
+@PreviewLightDark
+@Composable
+private fun CapabilityHeadlinePreview() {
+    LettaPreviewFrame {
+        CapabilityHeadline(capability = previewCapabilityGranted())
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun CapabilityDetailsPreview() {
+    LettaPreviewFrame {
+        CapabilityDetails(
+            capability = previewCapabilityNeedsSetup(),
+            flavor = SystemAccessFlavor.Play,
+            onPermissionIntentClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MetadataChipPreview() {
+    LettaPreviewFrame {
+        MetadataChip(text = "Flavor: Supported")
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun DetailLinePreview() {
+    LettaPreviewFrame {
+        DetailLine(label = "Audit summary", value = "Logs tool_id; redacts body")
+    }
+}
+
+// endregion

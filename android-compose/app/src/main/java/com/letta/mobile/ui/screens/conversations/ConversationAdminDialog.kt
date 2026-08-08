@@ -22,8 +22,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
@@ -35,6 +39,7 @@ import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemMetadataMonospace
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.formatRelativeTime
 
 internal data class ConversationAdminDialogState(
@@ -329,3 +334,87 @@ private fun ConversationInspectorCard(message: ConversationInspectorMessage) {
         }
     }
 }
+
+// region Previews
+
+private fun previewAdminDialogState(
+    inspectorMessages: List<ConversationInspectorMessage> = emptyList(),
+    isInspectorLoading: Boolean = false,
+) = ConversationAdminDialogState(
+    display = ConversationDisplay(
+        conversation = Conversation(
+            id = ConversationId("conv-1"),
+            agentId = AgentId("agent-1"),
+            summary = "Weekly planning check-in",
+            createdAt = "2026-08-01T09:00:00Z",
+            lastMessageAt = "2026-08-07T18:30:00Z",
+        ),
+        agentName = "General Assistant",
+    ),
+    recompilePreview = null,
+    inspectorMessages = inspectorMessages,
+    isInspectorLoading = isInspectorLoading,
+    inspectorError = null,
+)
+
+private val previewAdminNoop: () -> Unit = {}
+
+private fun previewAdminDialogCallbacks() = ConversationAdminDialogCallbacks(
+    onDismiss = previewAdminNoop,
+    onRename = {},
+    onToggleArchived = {},
+    onFork = previewAdminNoop,
+    onCancelRuns = previewAdminNoop,
+    onRecompile = previewAdminNoop,
+    onDelete = previewAdminNoop,
+)
+
+@PreviewLightDark
+@Composable
+private fun ConversationAdminSectionsPreview() {
+    // Renders the dialog sections directly: the layoutlib preview renderer
+    // cannot host the ConfirmDialog window, so the full
+    // ConversationAdminDialog is not previewable here.
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ConversationAdminDetailsSection(display = previewAdminDialogState().display)
+            ConversationAdminActionsSection(
+                display = previewAdminDialogState().display,
+                callbacks = previewAdminDialogCallbacks(),
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ConversationAdminInspectorPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ConversationAdminInspectorSection(
+                isInspectorLoading = false,
+                inspectorError = null,
+                inspectorMessages = listOf(
+                    ConversationInspectorMessage(
+                        id = "msg-1",
+                        messageType = "assistant_message",
+                        date = "2026-08-07T18:30:00Z",
+                        runId = "run-1",
+                        stepId = null,
+                        otid = null,
+                        summary = "Here is the plan for this week.",
+                        detailLines = listOf("model" to "letta/letta-free"),
+                    ),
+                ),
+            )
+        }
+    }
+}
+
+// endregion

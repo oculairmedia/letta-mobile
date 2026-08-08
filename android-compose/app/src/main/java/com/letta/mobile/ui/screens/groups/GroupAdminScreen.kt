@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +64,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemSupporting
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -85,37 +87,14 @@ fun GroupAdminScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-            LargeFlexibleTopAppBar(
-                title = {
-                    ExpandableTitleSearch(
-                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onClear = { viewModel.updateSearchQuery("") },
-                        expanded = isSearchExpanded,
-                        onExpandedChange = { isSearchExpanded = it },
-                        placeholder = stringResource(R.string.screen_groups_search_hint),
-                        openSearchContentDescription = stringResource(R.string.action_search),
-                        closeSearchContentDescription = stringResource(R.string.action_close),
-                        titleContent = { Text(stringResource(R.string.screen_groups_title)) },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+            GroupAdminTopBar(
+                uiState = uiState,
+                viewModel = viewModel,
+                isSearchExpanded = isSearchExpanded,
+                onSearchExpandedChange = { isSearchExpanded = it },
+                onNavigateBack = onNavigateBack,
                 scrollBehavior = scrollBehavior,
             )
-            ExpandableSearchField(
-                query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                onQueryChange = viewModel::updateSearchQuery,
-                onClear = { viewModel.updateSearchQuery("") },
-                expanded = isSearchExpanded,
-                placeholder = stringResource(R.string.screen_groups_search_hint),
-            )
-            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
@@ -123,51 +102,141 @@ fun GroupAdminScreen(
             }
         },
     ) { paddingValues ->
-        when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
-            is UiState.Error -> ErrorContent(
-                message = state.message,
-                onRetry = viewModel::loadGroups,
-                modifier = Modifier.padding(paddingValues),
-            )
-            is UiState.Success -> {
-                val filtered = remember(state.data.groups, state.data.searchQuery) { viewModel.getFilteredGroups() }
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                ) {
-                    if (filtered.isEmpty()) {
-                        EmptyState(
-                            icon = LettaIcons.ForkRight,
-                            message = if (state.data.searchQuery.isBlank()) {
-                                stringResource(R.string.screen_groups_empty)
-                            } else {
-                                stringResource(R.string.screen_groups_empty_search, state.data.searchQuery)
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(filtered, key = { it.id }) { group ->
-                                GroupCard(
-                                    group = group,
-                                    onInspect = { viewModel.inspectGroup(group.id) },
-                                    onEdit = { editTarget = group },
-                                    onDelete = { deleteTarget = group },
-                                )
-                            }
+        GroupAdminContent(
+            uiState = uiState,
+            viewModel = viewModel,
+            paddingValues = paddingValues,
+            onEdit = { editTarget = it },
+            onDelete = { deleteTarget = it },
+        )
+    }
+
+    GroupAdminDialogs(
+        state = (uiState as? UiState.Success)?.data,
+        viewModel = viewModel,
+        showCreateDialog = showCreateDialog,
+        onShowCreateDialogChange = { showCreateDialog = it },
+        editTarget = editTarget,
+        onEditTargetChange = { editTarget = it },
+        deleteTarget = deleteTarget,
+        onDeleteTargetChange = { deleteTarget = it },
+        sendMessageTarget = sendMessageTarget,
+        onSendMessageTargetChange = { sendMessageTarget = it },
+        resetMessagesTarget = resetMessagesTarget,
+        onResetMessagesTargetChange = { resetMessagesTarget = it },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupAdminTopBar(
+    uiState: UiState<GroupAdminUiState>,
+    viewModel: GroupAdminViewModel,
+    isSearchExpanded: Boolean,
+    onSearchExpandedChange: (Boolean) -> Unit,
+    onNavigateBack: () -> Unit,
+    scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior?,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LargeFlexibleTopAppBar(
+            title = {
+                ExpandableTitleSearch(
+                    query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                    onQueryChange = viewModel::updateSearchQuery,
+                    onClear = { viewModel.updateSearchQuery("") },
+                    expanded = isSearchExpanded,
+                    onExpandedChange = onSearchExpandedChange,
+                    placeholder = stringResource(R.string.screen_groups_search_hint),
+                    openSearchContentDescription = stringResource(R.string.action_search),
+                    closeSearchContentDescription = stringResource(R.string.action_close),
+                    titleContent = { Text(stringResource(R.string.screen_groups_title)) },
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+                }
+            },
+            colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+            scrollBehavior = scrollBehavior,
+        )
+        ExpandableSearchField(
+            query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+            onQueryChange = viewModel::updateSearchQuery,
+            onClear = { viewModel.updateSearchQuery("") },
+            expanded = isSearchExpanded,
+            placeholder = stringResource(R.string.screen_groups_search_hint),
+        )
+    }
+}
+
+@Composable
+private fun GroupAdminContent(
+    uiState: UiState<GroupAdminUiState>,
+    viewModel: GroupAdminViewModel,
+    paddingValues: PaddingValues,
+    onEdit: (Group) -> Unit,
+    onDelete: (Group) -> Unit,
+) {
+    when (val state = uiState) {
+        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+        is UiState.Error -> ErrorContent(
+            message = state.message,
+            onRetry = viewModel::loadGroups,
+            modifier = Modifier.padding(paddingValues),
+        )
+        is UiState.Success -> {
+            val filtered = remember(state.data.groups, state.data.searchQuery) { viewModel.getFilteredGroups() }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+            ) {
+                if (filtered.isEmpty()) {
+                    EmptyState(
+                        icon = LettaIcons.ForkRight,
+                        message = if (state.data.searchQuery.isBlank()) {
+                            stringResource(R.string.screen_groups_empty)
+                        } else {
+                            stringResource(R.string.screen_groups_empty_search, state.data.searchQuery)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(filtered, key = { it.id }) { group ->
+                            GroupCard(
+                                group = group,
+                                onInspect = { viewModel.inspectGroup(group.id) },
+                                onEdit = { onEdit(group) },
+                                onDelete = { onDelete(group) },
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
 
-    val state = (uiState as? UiState.Success)?.data
+@Composable
+private fun GroupAdminDialogs(
+    state: GroupAdminUiState?,
+    viewModel: GroupAdminViewModel,
+    showCreateDialog: Boolean,
+    onShowCreateDialogChange: (Boolean) -> Unit,
+    editTarget: Group?,
+    onEditTargetChange: (Group?) -> Unit,
+    deleteTarget: Group?,
+    onDeleteTargetChange: (Group?) -> Unit,
+    sendMessageTarget: Group?,
+    onSendMessageTargetChange: (Group?) -> Unit,
+    resetMessagesTarget: Group?,
+    onResetMessagesTargetChange: (Group?) -> Unit,
+) {
     state?.selectedGroup?.let { group ->
         GroupDetailDialog(
             group = group,
@@ -175,21 +244,23 @@ fun GroupAdminScreen(
             onDismiss = viewModel::clearSelectedGroup,
             onEdit = {
                 viewModel.clearSelectedGroup()
-                editTarget = group
+                onEditTargetChange(group)
             },
-            onSendMessage = { sendMessageTarget = group },
-            onResetMessages = { resetMessagesTarget = group },
+            onSendMessage = { onSendMessageTargetChange(group) },
+            onResetMessages = { onResetMessagesTargetChange(group) },
         )
     }
 
     if (showCreateDialog) {
         GroupEditorDialog(
-            title = stringResource(R.string.screen_groups_add_title),
-            confirmLabel = stringResource(R.string.action_create),
-            onDismiss = { showCreateDialog = false },
+            labels = GroupEditorLabels(
+                title = stringResource(R.string.screen_groups_add_title),
+                confirmLabel = stringResource(R.string.action_create),
+            ),
+            onDismiss = { onShowCreateDialogChange(false) },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
                 viewModel.createGroup(description, agentIds, projectId, sharedBlockIds, hidden) {
-                    showCreateDialog = false
+                    onShowCreateDialogChange(false)
                 }
             },
         )
@@ -197,17 +268,21 @@ fun GroupAdminScreen(
 
     editTarget?.let { group ->
         GroupEditorDialog(
-            title = stringResource(R.string.screen_groups_edit_title),
-            confirmLabel = stringResource(R.string.action_save),
-            initialDescription = group.description,
-            initialAgentIds = group.agentIds.joinToString(", ") { it.value },
-            initialProjectId = group.projectId?.value.orEmpty(),
-            initialSharedBlockIds = group.sharedBlockIds.joinToString(", ") { it.value },
-            initialHidden = group.hidden == true,
-            onDismiss = { editTarget = null },
+            labels = GroupEditorLabels(
+                title = stringResource(R.string.screen_groups_edit_title),
+                confirmLabel = stringResource(R.string.action_save),
+            ),
+            initialState = GroupEditorInitialState(
+                description = group.description,
+                agentIds = group.agentIds.joinToString(", ") { it.value },
+                projectId = group.projectId?.value.orEmpty(),
+                sharedBlockIds = group.sharedBlockIds.joinToString(", ") { it.value },
+                hidden = group.hidden == true,
+            ),
+            onDismiss = { onEditTargetChange(null) },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
                 viewModel.updateGroup(group.id, description, agentIds, projectId, sharedBlockIds, hidden) {
-                    editTarget = null
+                    onEditTargetChange(null)
                 }
             },
         )
@@ -222,9 +297,9 @@ fun GroupAdminScreen(
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
                 viewModel.deleteGroup(group.id)
-                deleteTarget = null
+                onDeleteTargetChange(null)
             },
-            onDismiss = { deleteTarget = null },
+            onDismiss = { onDeleteTargetChange(null) },
             destructive = true,
         )
     }
@@ -237,9 +312,9 @@ fun GroupAdminScreen(
             confirmText = stringResource(R.string.action_send_message),
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = { input ->
-                viewModel.sendMessage(group.id, input) { sendMessageTarget = null }
+                viewModel.sendMessage(group.id, input) { onSendMessageTargetChange(null) }
             },
-            onDismiss = { sendMessageTarget = null },
+            onDismiss = { onSendMessageTargetChange(null) },
         )
     }
 
@@ -252,9 +327,9 @@ fun GroupAdminScreen(
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
                 viewModel.resetMessages(group.id)
-                resetMessagesTarget = null
+                onResetMessagesTargetChange(null)
             },
-            onDismiss = { resetMessagesTarget = null },
+            onDismiss = { onResetMessagesTargetChange(null) },
             destructive = true,
         )
     }
@@ -493,28 +568,36 @@ private fun GroupMessageCard(message: LettaMessage) {
     }
 }
 
+private data class GroupEditorInitialState(
+    val description: String = "",
+    val agentIds: String = "",
+    val projectId: String = "",
+    val sharedBlockIds: String = "",
+    val hidden: Boolean = false,
+)
+
+private data class GroupEditorLabels(
+    val title: String,
+    val confirmLabel: String,
+)
+
 @Composable
 private fun GroupEditorDialog(
-    title: String,
-    confirmLabel: String,
-    initialDescription: String = "",
-    initialAgentIds: String = "",
-    initialProjectId: String = "",
-    initialSharedBlockIds: String = "",
-    initialHidden: Boolean = false,
+    labels: GroupEditorLabels,
+    initialState: GroupEditorInitialState = GroupEditorInitialState(),
     onDismiss: () -> Unit,
     onConfirm: (String, String, String, String, Boolean) -> Unit,
 ) {
-    var description by remember(initialDescription) { mutableStateOf(initialDescription) }
-    var agentIds by remember(initialAgentIds) { mutableStateOf(initialAgentIds) }
-    var projectId by remember(initialProjectId) { mutableStateOf(initialProjectId) }
-    var sharedBlockIds by remember(initialSharedBlockIds) { mutableStateOf(initialSharedBlockIds) }
-    var hidden by remember(initialHidden) { mutableStateOf(initialHidden) }
+    var description by remember(initialState.description) { mutableStateOf(initialState.description) }
+    var agentIds by remember(initialState.agentIds) { mutableStateOf(initialState.agentIds) }
+    var projectId by remember(initialState.projectId) { mutableStateOf(initialState.projectId) }
+    var sharedBlockIds by remember(initialState.sharedBlockIds) { mutableStateOf(initialState.sharedBlockIds) }
+    var hidden by remember(initialState.hidden) { mutableStateOf(initialState.hidden) }
 
     MultiFieldInputDialog(
         show = true,
-        title = title,
-        confirmText = confirmLabel,
+        title = labels.title,
+        confirmText = labels.confirmLabel,
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         confirmEnabled = description.isNotBlank() && agentIds.split(',').any { it.trim().isNotEmpty() },
@@ -597,3 +680,80 @@ private fun LettaMessage.toSummary(): String = when (this) {
     is ToolReturnMessage -> toolReturn.funcResponse ?: toolReturn.status
     else -> id
 }
+
+// region Previews
+
+private val previewGroupSpec = PreviewGroupSpec()
+
+private data class PreviewGroupSpec(
+    val id: String = "group-1",
+    val managerType: String = "round-robin",
+    val agentIdStrings: List<String> = listOf("agent-1", "agent-2"),
+    val description: String = "Research team",
+    val hidden: Boolean = false,
+)
+
+private data class PreviewGroupEditorLabels(
+    val title: String = "Edit group",
+    val confirmLabel: String = "Save",
+)
+
+private data class PreviewGroupMessage(
+    val id: String = "msg-1",
+    val date: String = "2026-08-07T18:30:00Z",
+    val content: String = "Hello, group!",
+)
+
+private val previewGroup = Group(
+    id = com.letta.mobile.data.model.GroupId(previewGroupSpec.id),
+    managerType = previewGroupSpec.managerType,
+    agentIds = previewGroupSpec.agentIdStrings.map { com.letta.mobile.data.model.AgentId(it) },
+    description = previewGroupSpec.description,
+    hidden = previewGroupSpec.hidden,
+)
+
+@PreviewLightDark
+@Composable
+private fun GroupCardPreview() {
+    LettaPreviewFrame {
+        GroupCard(
+            group = previewGroup,
+            onInspect = {},
+            onEdit = {},
+            onDelete = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun GroupEditorDialogPreview() {
+    val labels = PreviewGroupEditorLabels()
+    LettaPreviewFrame {
+        GroupEditorDialog(
+            labels = GroupEditorLabels(
+                title = labels.title,
+                confirmLabel = labels.confirmLabel,
+            ),
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _ -> },
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun GroupMessageCardPreview() {
+    val msg = PreviewGroupMessage()
+    LettaPreviewFrame {
+        GroupMessageCard(
+            message = UserMessage(
+                id = msg.id,
+                date = msg.date,
+                contentRaw = kotlinx.serialization.json.JsonPrimitive(msg.content),
+            ),
+        )
+    }
+}
+
+// endregion

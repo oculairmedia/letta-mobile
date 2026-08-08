@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -38,6 +39,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -279,3 +281,52 @@ private fun ServersTab(
         }
     }
 }
+
+// region Previews
+
+private val previewMcpTools = listOf(
+    Tool(
+        id = ToolId("tool-1"),
+        name = "send_email",
+        description = "Send an email to a recipient.",
+        toolType = "composio",
+    ),
+    Tool(
+        id = ToolId("tool-2"),
+        name = "list_inbox",
+        description = "List the most recent inbox messages.",
+    ),
+)
+
+private val previewMcpToolParents = mapOf(
+    ToolId("tool-1") to McpToolParent(
+        serverId = McpServerId("server-1"),
+        serverName = "Gmail MCP",
+    ),
+)
+
+@PreviewLightDark
+@Composable
+private fun ToolsTabEmptyPreview() {
+    LettaPreviewFrame {
+        ToolsTab(
+            tools = emptyList(),
+            toolParents = emptyMap(),
+            onNavigateToServerTools = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolsTabPopulatedPreview() {
+    LettaPreviewFrame {
+        ToolsTab(
+            tools = previewMcpTools,
+            toolParents = previewMcpToolParents,
+            onNavigateToServerTools = {},
+        )
+    }
+}
+
+// endregion

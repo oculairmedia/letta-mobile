@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +36,9 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.ui.chat.render.runStepDotColor
 import com.letta.mobile.data.chat.projection.runStepDotIcon
@@ -580,3 +584,119 @@ private fun UiMessage.runStepDotCenterY() = when {
     !toolCalls.isNullOrEmpty() -> ToolCallStepDotCenterY
     else -> DefaultStepDotCenterY
 }
+
+// region Previews
+
+private data class PreviewRunMessageSpec(
+    val id: String,
+    val content: String,
+    val runId: String = "preview-run",
+    val stepId: String? = "step-$id",
+    val latencyMs: Long? = null,
+)
+
+private data class PreviewRunMessages(
+    val stepContents: List<String>,
+) {
+    fun toUiMessages(): List<UiMessage> = stepContents.mapIndexed { index, content ->
+        previewRunMessage(PreviewRunMessageSpec(id = "step-${index + 1}", content = content))
+    }
+}
+
+private fun previewRunMessage(spec: PreviewRunMessageSpec): UiMessage = UiMessage(
+    id = spec.id,
+    role = "assistant",
+    content = spec.content,
+    timestamp = "2026-08-08T00:00:00Z",
+    runId = spec.runId,
+    stepId = spec.stepId,
+    latencyMs = spec.latencyMs,
+)
+
+@Composable
+private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowModifier: Modifier) {
+    // Bubble geometry mirrors `MessageBubbleSurface` enough to keep the
+    // timeline dot anchored on the first text baseline
+    // (DefaultStepDotCenterY = 17.dp). Anything heavier than 7.dp vertical
+    // padding pushes the text below the dot.
+    androidx.compose.material3.Surface(
+        modifier = rowModifier.padding(vertical = 7.dp),
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+    ) {
+        androidx.compose.material3.Text(
+            text = message.content,
+            modifier = androidx.compose.ui.Modifier.padding(horizontal = 12.dp),
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@Composable
+private fun PreviewRunBlock(spec: PreviewRunBlockSpec) {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            // -10.dp pulls the disclosure header's trailing minHeight padding
+            // up against the first step's text so the preview is tighter than
+            // the runtime layout. The production gap stays untouched.
+            RunBlock(
+                messages = spec.messages.toUiMessages(),
+                collapsed = !spec.expanded,
+                onToggleCollapsed = {},
+                isStreaming = spec.isStreaming,
+                modifier = Modifier.offset(y = (-10).dp),
+                renderRow = ::previewRunBubble,
+            )
+        }
+    }
+}
+
+private data class PreviewRunBlockSpec(
+    val messages: PreviewRunMessages,
+    val expanded: Boolean = true,
+    val isStreaming: Boolean = false,
+)
+
+private val previewRunBlockThreeStepMessages = PreviewRunMessages(
+    stepContents = listOf(
+        "I will search the codebase for matching patterns.",
+        "Found three candidates, let me check each.",
+        "All three confirmed, here is the summary.",
+    ),
+)
+
+@Composable
+private fun PreviewRunBlockMultiStep(expanded: Boolean) = PreviewRunBlock(
+    PreviewRunBlockSpec(
+        messages = previewRunBlockThreeStepMessages,
+        expanded = expanded,
+    ),
+)
+
+@PreviewLightDark
+@Composable
+private fun RunBlockExpandedPreview() {
+    PreviewRunBlockMultiStep(expanded = true)
+}
+
+@PreviewLightDark
+@Composable
+private fun RunBlockCollapsedPreview() {
+    PreviewRunBlockMultiStep(expanded = false)
+}
+
+@PreviewLightDark
+@Composable
+private fun RunBlockWorkingPreview() {
+    PreviewRunBlock(
+        PreviewRunBlockSpec(
+            messages = PreviewRunMessages(
+                stepContents = listOf("Starting the diagnostic sweep…"),
+            ),
+            expanded = true,
+            isStreaming = true,
+        ),
+    )
+}
+
+// endregion

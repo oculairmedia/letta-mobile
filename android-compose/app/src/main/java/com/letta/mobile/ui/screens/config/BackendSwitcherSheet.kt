@@ -33,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,6 +44,7 @@ import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.coroutines.launch
 
 /**
@@ -322,3 +324,80 @@ private fun BackendSwitcherRow(
         }
     }
 }
+
+// region Previews
+
+private data class PreviewServerConfig(
+    val id: String,
+    val mode: ServerMode,
+    val url: String,
+    val isActive: Boolean,
+    val health: ServerHealthState,
+)
+
+private fun previewServerConfig(spec: PreviewServerConfig) = ServerConfig(
+    id = spec.id,
+    mode = spec.mode,
+    url = spec.url,
+    isActive = spec.isActive,
+    health = spec.health,
+)
+
+@PreviewLightDark
+@Composable
+private fun BackendSwitcherRowPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            BackendSwitcherRow(
+                config = previewServerConfig(
+                    PreviewServerConfig(
+                        id = "config-1",
+                        mode = ServerMode.SELF_HOSTED,
+                        url = "https://example.test/local",
+                        isActive = true,
+                        health = ServerHealthState.ONLINE,
+                    ),
+                ),
+                onSelect = {},
+                onEdit = {},
+                onLongPress = {},
+            )
+            BackendSwitcherRow(
+                config = previewServerConfig(
+                    PreviewServerConfig(
+                        id = "config-2",
+                        mode = ServerMode.CLOUD,
+                        url = "https://example.test/local",
+                        isActive = false,
+                        health = ServerHealthState.OFFLINE,
+                    ),
+                ),
+                onSelect = {},
+                onEdit = {},
+                onLongPress = {},
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun EmbeddedRuntimeConnectActionPreview() {
+    LettaPreviewFrame {
+        EmbeddedRuntimeConnectAction(
+            status = EmbeddedLettaCodeRuntimeStatus(
+                nativeEnabled = true,
+                assetsEnabled = true,
+                version = "0.1.0",
+                integrity = "ok",
+            ),
+            onConnect = {},
+        )
+    }
+}
+
+// endregion

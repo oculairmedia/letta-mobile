@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +48,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.StatusChip
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.customColors
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -503,3 +505,69 @@ private fun truncateModel(model: String): String {
     val lastSlash = model.lastIndexOf('/')
     return if (lastSlash >= 0 && lastSlash < model.length - 1) model.substring(lastSlash + 1) else model
 }
+
+// region Previews
+
+private val previewRunSummaryOk = RunSummary(
+    id = "run-1",
+    agentName = "General Assistant",
+    model = "openai/gpt-4o",
+    status = "completed",
+    totalTokens = 12_450,
+    durationMs = 4_200L,
+    createdAt = "2026-08-07T18:30:00Z",
+    hasError = false,
+)
+
+private val previewRunSummaryError = RunSummary(
+    id = "run-2",
+    agentName = "Code Helper",
+    model = "anthropic/claude-3.5-sonnet",
+    status = "error",
+    totalTokens = 1_890,
+    durationMs = 900L,
+    createdAt = "2026-08-07T17:05:00Z",
+    hasError = true,
+)
+
+@PreviewLightDark
+@Composable
+private fun RunSummaryCardPreview() {
+    LettaPreviewFrame {
+        RunSummaryCard(run = previewRunSummaryOk)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RunSummaryCardErrorPreview() {
+    LettaPreviewFrame {
+        RunSummaryCard(run = previewRunSummaryError)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChartCardPreview() {
+    LettaPreviewFrame {
+        ChartCard(
+            title = "Tokens by model",
+            values = listOf(82_000, 63_320, 12_400),
+            labels = listOf("gpt-4o", "claude-3.5", "letta-free"),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChartCardEmptyPreview() {
+    LettaPreviewFrame {
+        ChartCard(
+            title = "Tokens by model",
+            values = emptyList(),
+            labels = emptyList(),
+        )
+    }
+}
+
+// endregion
