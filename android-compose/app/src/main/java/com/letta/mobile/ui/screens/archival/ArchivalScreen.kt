@@ -341,16 +341,18 @@ private fun previewArchivalUiState(
     filterHasMetadata = filterHasMetadata,
 )
 
-@PreviewLightDark
 @Composable
-private fun ArchivalContentPreview() {
+private fun PreviewArchivalContent(
+    state: ArchivalUiState = previewArchivalUiState(),
+    filteredPassages: List<Passage> = previewPassages,
+) {
     LettaPreviewFrame {
         ArchivalContent(
-            state = previewArchivalUiState(),
+            state = state,
             onSearchChange = {},
             onToggleHasSource = {},
             onToggleHasMetadata = {},
-            filteredPassages = previewPassages,
+            filteredPassages = filteredPassages,
             onInspectPassage = {},
             onDeletePassage = {},
         )
@@ -359,18 +361,14 @@ private fun ArchivalContentPreview() {
 
 @PreviewLightDark
 @Composable
+private fun ArchivalContentPreview() {
+    PreviewArchivalContent()
+}
+
+@PreviewLightDark
+@Composable
 private fun ArchivalContentEmptyPreview() {
-    LettaPreviewFrame {
-        ArchivalContent(
-            state = previewArchivalUiState(),
-            onSearchChange = {},
-            onToggleHasSource = {},
-            onToggleHasMetadata = {},
-            filteredPassages = emptyList(),
-            onInspectPassage = {},
-            onDeletePassage = {},
-        )
-    }
+    PreviewArchivalContent(filteredPassages = emptyList())
 }
 
 @PreviewLightDark

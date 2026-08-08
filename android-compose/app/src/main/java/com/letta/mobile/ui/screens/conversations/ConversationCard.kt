@@ -329,14 +329,17 @@ private fun previewConversationCardCallbacks() = ConversationCardCallbacks(
     onFork = {},
 )
 
-@PreviewLightDark
 @Composable
-private fun ConversationCardPreview() {
+private fun PreviewConversationCard(pinned: Boolean = false) {
+    val id = if (pinned) "conv-2" else "conv-1"
+    val summary = if (pinned) "Release triage" else "Weekly planning check-in"
+    val agentName = if (pinned) "Code Helper" else "General Assistant"
     LettaPreviewFrame {
         ConversationCard(
             display = ConversationDisplay(
-                conversation = previewConversation(),
-                agentName = "General Assistant",
+                conversation = previewConversation(id = id, summary = summary),
+                agentName = agentName,
+                isPinned = pinned,
             ),
             callbacks = previewConversationCardCallbacks(),
         )
@@ -345,17 +348,14 @@ private fun ConversationCardPreview() {
 
 @PreviewLightDark
 @Composable
+private fun ConversationCardPreview() {
+    PreviewConversationCard()
+}
+
+@PreviewLightDark
+@Composable
 private fun ConversationCardPinnedPreview() {
-    LettaPreviewFrame {
-        ConversationCard(
-            display = ConversationDisplay(
-                conversation = previewConversation(id = "conv-2", summary = "Release triage"),
-                agentName = "Code Helper",
-                isPinned = true,
-            ),
-            callbacks = previewConversationCardCallbacks(),
-        )
-    }
+    PreviewConversationCard(pinned = true)
 }
 
 // endregion

@@ -381,13 +381,15 @@ private fun previewAgentListContentActions() = AgentListContentActions(
     onCreateAgent = {},
 )
 
-@PreviewLightDark
 @Composable
-private fun AgentListContentPreview() {
+private fun PreviewAgentListContent(
+    uiState: AgentListUiState,
+    filteredAgents: List<Agent> = previewAgents,
+) {
     LettaPreviewFrame {
         val haptic = LocalHapticFeedback.current
         AgentListContent(
-            state = previewAgentListContentState(previewAgentListUiState()),
+            state = previewAgentListContentState(uiState).copy(filteredAgents = filteredAgents),
             actions = previewAgentListContentActions(),
             layout = AgentListContentLayout(
                 paddingValues = PaddingValues(16.dp),
@@ -397,62 +399,35 @@ private fun AgentListContentPreview() {
             ),
         )
     }
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentListContentPreview() {
+    PreviewAgentListContent(previewAgentListUiState())
 }
 
 @PreviewLightDark
 @Composable
 private fun AgentListContentGridPreview() {
-    LettaPreviewFrame {
-        val haptic = LocalHapticFeedback.current
-        AgentListContent(
-            state = previewAgentListContentState(previewAgentListUiState(showGrid = true)),
-            actions = previewAgentListContentActions(),
-            layout = AgentListContentLayout(
-                paddingValues = PaddingValues(16.dp),
-                listState = rememberLazyListState(),
-                gridState = rememberLazyGridState(),
-                haptic = haptic,
-            ),
-        )
-    }
+    PreviewAgentListContent(previewAgentListUiState(showGrid = true))
 }
 
 @PreviewLightDark
 @Composable
 private fun AgentListContentEmptyPreview() {
-    LettaPreviewFrame {
-        val haptic = LocalHapticFeedback.current
-        AgentListContent(
-            state = previewAgentListContentState(previewAgentListUiState()).copy(filteredAgents = emptyList()),
-            actions = previewAgentListContentActions(),
-            layout = AgentListContentLayout(
-                paddingValues = PaddingValues(16.dp),
-                listState = rememberLazyListState(),
-                gridState = rememberLazyGridState(),
-                haptic = haptic,
-            ),
-        )
-    }
+    PreviewAgentListContent(
+        uiState = previewAgentListUiState(),
+        filteredAgents = emptyList(),
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun AgentListContentErrorPreview() {
-    LettaPreviewFrame {
-        val haptic = LocalHapticFeedback.current
-        AgentListContent(
-            state = previewAgentListContentState(
-                previewAgentListUiState(error = "Failed to load agents", agents = emptyList()),
-            ),
-            actions = previewAgentListContentActions(),
-            layout = AgentListContentLayout(
-                paddingValues = PaddingValues(16.dp),
-                listState = rememberLazyListState(),
-                gridState = rememberLazyGridState(),
-                haptic = haptic,
-            ),
-        )
-    }
+    PreviewAgentListContent(
+        previewAgentListUiState(error = "Failed to load agents", agents = emptyList()),
+    )
 }
 
 // endregion
