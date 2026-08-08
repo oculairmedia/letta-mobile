@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.model.AgentIdNamespace
 import computer.iroh.EndpointAddr
 import computer.iroh.EndpointId
 import java.io.File
@@ -67,19 +68,34 @@ interface IrohAgentAddressStore {
  * File-backed [IrohAgentAddressStore]: one line per agent, "agentId=<wire>".
  * Justification (smallest correct, layer-1): no live multi-writer contention,
  * human-inspectable, zero new deps; swap for Postgres/kv when multi-host lands.
+ *
+ * letta-mobile-u6hwa: the keyspace is CANONICAL — every key is normalized to its
+ * bare form ([AgentIdNamespace.normalizeToBareId]) on the way in AND on the way
+ * out, so `agent-X` and `letta_agent-X` always denote one entry. This is a secret
+ * of the address book, not knowledge each caller must carry: callers are many
+ * (CLI send, wrapper publish, seed script) and each one that forgot to normalize
+ * was a chance to write a duplicate row. The live incident this fixes: the wrapper
+ * published under the bare key while an older bind had written a `letta_`-prefixed
+ * key, so the prefixed row survived pointing at a DEAD port — a prefixed lookup
+ * resolved to a stale address and blackholed rather than cleanly reporting
+ * `not_registered`. Canonicalizing at the storage boundary makes that state
+ * unrepresentable: one agent, one row, updated in place.
  */
 class FileIrohAgentAddressStore(private val file: File) : IrohAgentAddressStore {
 
     @Synchronized
     override fun register(address: IrohAgentAddress) {
         val entries = readAll().toMutableMap()
-        entries[address.agentId] = address.toWire()
+        entries[AgentIdNamespace.normalizeToBareId(address.agentId)] = address.toWire()
         writeAll(entries)
     }
 
     @Synchronized
     override fun resolve(agentId: String): AddressResolution {
-        val wire = readAll()[agentId]
+        // Resolve under the canonical key, but report the id the CALLER used —
+        // an Unavailable that echoes a different id than was asked for would send
+        // an operator hunting for the wrong agent.
+        val wire = readAll()[AgentIdNamespace.normalizeToBareId(agentId)]
             ?: return AddressResolution.Unavailable(agentId, "not_registered")
         return runCatching { IrohAgentAddress.fromWire(agentId, wire) }
             .fold(
@@ -91,18 +107,33 @@ class FileIrohAgentAddressStore(private val file: File) : IrohAgentAddressStore 
     @Synchronized
     override fun unregister(agentId: String) {
         val entries = readAll().toMutableMap()
-        if (entries.remove(agentId) != null) writeAll(entries)
+        if (entries.remove(AgentIdNamespace.normalizeToBareId(agentId)) != null) writeAll(entries)
     }
 
+    /**
+     * Read the file into a canonically-keyed map.
+     *
+     * Legacy files may hold BOTH a bare and a `letta_`-prefixed row for one agent
+     * (see the class comment). Normalizing keys here collapses them, which means a
+     * subsequent [register]/[unregister] rewrites the file with the duplicate
+     * EVICTED rather than merely superseded — the stale row cannot linger and be
+     * dialed. Bare wins on collision: it is the form the live publish path writes,
+     * so it is the row backed by the current bind. Order matters (later entries
+     * overwrite earlier ones), so prefixed rows are applied first and a bare row,
+     * if present, lands on top.
+     */
     private fun readAll(): Map<String, String> {
         if (!file.exists()) return emptyMap()
-        return file.readLines()
+        val parsed = file.readLines()
             .mapNotNull { line ->
                 val eq = line.indexOf('=')
                 if (eq <= 0) null else line.substring(0, eq).trim() to line.substring(eq + 1).trim()
             }
             .filter { it.first.isNotEmpty() }
-            .toMap()
+        val canonical = LinkedHashMap<String, String>(parsed.size)
+        parsed.sortedBy { it.first == AgentIdNamespace.normalizeToBareId(it.first) }
+            .forEach { (key, value) -> canonical[AgentIdNamespace.normalizeToBareId(key)] = value }
+        return canonical
     }
 
     private fun writeAll(entries: Map<String, String>) {
