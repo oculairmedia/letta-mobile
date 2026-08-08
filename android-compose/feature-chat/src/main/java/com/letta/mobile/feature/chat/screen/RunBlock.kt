@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -635,11 +636,15 @@ private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowMod
 private fun PreviewRunBlock(spec: PreviewRunBlockSpec) {
     LettaPreviewFrame {
         LettaChatTheme {
+            // -10.dp pulls the disclosure header's trailing minHeight padding
+            // up against the first step's text so the preview is tighter than
+            // the runtime layout. The production gap stays untouched.
             RunBlock(
                 messages = spec.messages.toUiMessages(),
                 collapsed = !spec.expanded,
                 onToggleCollapsed = {},
                 isStreaming = spec.isStreaming,
+                modifier = Modifier.offset(y = (-10).dp),
                 renderRow = ::previewRunBubble,
             )
         }
