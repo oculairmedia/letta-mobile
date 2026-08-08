@@ -27,12 +27,14 @@ import kotlin.system.exitProcess
  * fallback. Emits a JSON result line the harness parses.
  *
  * Usage: meridian agent-message send --from <agentId> --to <agentId> --body <text>
+ * [--conversation-id <convId>]  (5m1qy: target an existing conversation on the recipient)
  */
 class AgentMessageSendCommand : CliktCommand(name = "send") {
     private val fromAgentId by option("--from", help = "Sender agentId.").required()
     private val toAgentId by option("--to", help = "Target agentId.").required()
     private val body by option("--body", help = "Message body.").required()
     private val msgId by option("--msg-id", help = "Idempotency id (defaults to a random uuid).").default("")
+    private val conversationId by option("--conversation-id", help = "Target conversation id on the recipient (omit to create/use the most recent interactive conversation).").default("")
     private val identityDir by option("--identity-dir", help = "Per-agent Iroh identity dir.")
         .default(File(System.getProperty("user.home"), ".letta/iroh/identities").path)
     private val addressStore by option("--address-store", help = "Agent address book kv file.")
@@ -59,6 +61,7 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
                     body = body,
                     msgId = id,
                     ts = System.currentTimeMillis(),
+                    conversationId = conversationId.ifBlank { null },
                 ),
             )
             println(resultJson(result, id))

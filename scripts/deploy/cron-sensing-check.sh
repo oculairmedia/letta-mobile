@@ -156,6 +156,7 @@ else
     CMD="$(tr '\0' ' ' <"/proc/$OWNER_PID/cmdline" 2>/dev/null)"
     case "$CMD" in
       *"app-server"*) ok "lease holder is an app-server process" ;;
+      *"letta server"*) ok "lease holder is the letta server (scheduler)" ;;
       "") warn "cannot read the lease holder's cmdline" ;;
       *) warn "lease holder does not look like an app-server: $CMD" ;;
     esac

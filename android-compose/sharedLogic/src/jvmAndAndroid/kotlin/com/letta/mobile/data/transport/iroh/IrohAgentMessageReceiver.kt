@@ -60,7 +60,12 @@ class IrohAgentMessageReceiver(
                     send.finish()
                     // Route + deliver.
                     val candidates = conversationsFor(message.toAgentId)
-                    val decision = router.route(message.fromAgentId, message.msgId, candidates)
+                    val decision = router.route(
+                        message.fromAgentId,
+                        message.msgId,
+                        candidates,
+                        targetConversationId = message.conversationId,
+                    )
                     onDeliver(message, decision)
                 }
             }
