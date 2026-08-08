@@ -18,6 +18,10 @@ import com.letta.mobile.data.model.ConversationClass
  *  - Queue-if-busy: the chosen interactive conversation is busy -> queue on it;
  *    NEVER reroute to a different conversation on busy.
  *  - Never hard-fail on a missing conversation.
+ *  - letta-mobile-5m1qy: an explicit targetConversationId overrides the
+ *    most-recent pick (Deliver/Queue per busy state); a target that does not
+ *    exist is dropped with the distinct reason "target_conversation_not_found"
+ *    (never created). All safety guards still run before explicit targeting.
  */
 class IrohAgentMessageRouter(
     /** This receiver's own agentId — messages from it are our own echo. */
@@ -48,12 +52,15 @@ class IrohAgentMessageRouter(
     /**
      * Decide where an inbound message goes. [candidates] are the target agent's
      * conversations with busy state (any order); most-recent is picked by
-     * lastMessageAt/updatedAt among the INTERACTIVE ones.
+     * lastMessageAt/updatedAt among the INTERACTIVE ones. When
+     * [targetConversationId] is non-null (5m1qy), the message routes to that
+     * exact conversation instead of the most-recent-interactive pick.
      */
     fun route(
         fromAgentId: String,
         msgId: String,
         candidates: List<ConversationState>,
+        targetConversationId: String? = null,
     ): RoutingDecision {
         // Ping-pong guard: never process our own / a sibling's message.
         if (fromAgentId == ownAgentId || fromAgentId in siblingAgentIds) {
@@ -68,6 +75,20 @@ class IrohAgentMessageRouter(
         perSenderCount[fromAgentId] = count
         if (count > maxPerSender) {
             return RoutingDecision.Dropped("per_sender_cap_exceeded")
+        }
+
+        // letta-mobile-5m1qy: an explicit target conversation from the sender
+        // overrides the most-recent-interactive pick — but only AFTER the safety
+        // guards above, and it must NEVER fall through to CreateAndDeliver
+        // (a missing target is dropped with a distinct reason, not created).
+        if (targetConversationId != null) {
+            val target = candidates.find { it.conversation.id.value == targetConversationId }
+                ?: return RoutingDecision.Dropped("target_conversation_not_found")
+            return if (target.busy) {
+                RoutingDecision.Queue(targetConversationId)
+            } else {
+                RoutingDecision.Deliver(targetConversationId)
+            }
         }
 
         // Most-recent INTERACTIVE conversation (never AUTONOMOUS/heartbeat).
