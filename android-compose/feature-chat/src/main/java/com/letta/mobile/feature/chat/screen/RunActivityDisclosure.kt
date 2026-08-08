@@ -233,16 +233,20 @@ private const val WorkingIndicatorPulseDurationMillis = 1_400
 
 // region Previews
 
+private data class PreviewRunActivityConfig(
+    val durationMs: Long? = null,
+    val toolCount: Int = 0,
+    val failureCount: Int = 0,
+)
+
 private fun previewRunActivity(
     state: RunActivityState,
-    durationMs: Long? = null,
-    toolCount: Int = 0,
-    failureCount: Int = 0,
+    config: PreviewRunActivityConfig = PreviewRunActivityConfig(),
 ): RunActivityProjection = RunActivityProjection(
     state = state,
-    durationMs = durationMs,
-    toolCount = toolCount,
-    failureCount = failureCount,
+    durationMs = config.durationMs,
+    toolCount = config.toolCount,
+    failureCount = config.failureCount,
 )
 
 private data class PreviewRunActivityDisclosureState(
@@ -260,9 +264,11 @@ private fun PreviewRunActivityDisclosure(state: PreviewRunActivityDisclosureStat
         RunActivityDisclosure(
             activity = previewRunActivity(
                 state = state.state,
-                durationMs = state.durationMs,
-                toolCount = state.toolCount,
-                failureCount = state.failureCount,
+                config = PreviewRunActivityConfig(
+                    durationMs = state.durationMs,
+                    toolCount = state.toolCount,
+                    failureCount = state.failureCount,
+                ),
             ),
             collapsed = state.collapsed,
             onToggleCollapsed = {},
@@ -274,7 +280,7 @@ private fun PreviewRunActivityDisclosure(state: PreviewRunActivityDisclosureStat
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureWorkingPreview() {
-    PreviewRunActivityDisclosure(
+    RunActivityDisclosurePreviewByState(
         PreviewRunActivityDisclosureState(
             state = RunActivityState.Working,
             durationMs = null,
@@ -289,7 +295,7 @@ private fun RunActivityDisclosureWorkingPreview() {
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureThoughtPreview() {
-    PreviewRunActivityDisclosure(
+    RunActivityDisclosurePreviewByState(
         PreviewRunActivityDisclosureState(
             state = RunActivityState.Thought,
             durationMs = 2_400,
@@ -304,7 +310,7 @@ private fun RunActivityDisclosureThoughtPreview() {
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureCollapsedPreview() {
-    PreviewRunActivityDisclosure(
+    RunActivityDisclosurePreviewByState(
         PreviewRunActivityDisclosureState(
             state = RunActivityState.Worked,
             durationMs = 8_200,
@@ -314,6 +320,11 @@ private fun RunActivityDisclosureCollapsedPreview() {
             chatMode = "simple",
         ),
     )
+}
+
+@Composable
+private fun RunActivityDisclosurePreviewByState(state: PreviewRunActivityDisclosureState) {
+    PreviewRunActivityDisclosure(state)
 }
 
 // endregion

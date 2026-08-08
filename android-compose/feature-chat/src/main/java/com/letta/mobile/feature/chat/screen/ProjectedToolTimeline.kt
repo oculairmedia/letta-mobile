@@ -670,14 +670,12 @@ private fun PreviewProjectedMessageToolCalls(call: UiToolCall, messageId: String
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsBashPreview() {
-    PreviewProjectedMessageToolCalls(
-        call = previewProjectedToolCall(
-            PreviewToolCallSpec(
-                name = "Bash",
-                arguments = """{"command":"ls -la /tmp"}""",
-                result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
-                executionTimeMs = 220,
-            ),
+    PreviewProjectedMessageToolCallsBashLike(
+        spec = PreviewToolCallSpec(
+            name = "Bash",
+            arguments = """{"command":"ls -la /tmp"}""",
+            result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
+            executionTimeMs = 220,
         ),
         messageId = "preview-message-1",
     )
@@ -702,17 +700,26 @@ private fun ProjectedMessageToolCallsSearchPreview() {
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsFailedPreview() {
-    PreviewProjectedMessageToolCalls(
-        call = previewProjectedToolCall(
-            PreviewToolCallSpec(
-                name = "Bash",
-                arguments = """{"command":"rm -rf /missing/path"}""",
-                result = "rm: cannot remove '/missing/path': No such file or directory",
-                status = "error",
-                executionTimeMs = 80,
-            ),
+    PreviewProjectedMessageToolCallsBashLike(
+        spec = PreviewToolCallSpec(
+            name = "Bash",
+            arguments = """{"command":"rm -rf /missing/path"}""",
+            result = "rm: cannot remove '/missing/path': No such file or directory",
+            status = "error",
+            executionTimeMs = 80,
         ),
         messageId = "preview-message-3",
+    )
+}
+
+@Composable
+private fun PreviewProjectedMessageToolCallsBashLike(
+    spec: PreviewToolCallSpec,
+    messageId: String,
+) {
+    PreviewProjectedMessageToolCalls(
+        call = previewProjectedToolCall(spec),
+        messageId = messageId,
     )
 }
 

@@ -396,38 +396,42 @@ internal fun ReorderablePinnedItemsGrid(
     }
 }
 
+internal data class CollapsibleSectionHeaderState(
+    val title: String,
+    val count: Int,
+    val expanded: Boolean,
+    val topPadding: Boolean = false,
+)
+
 @Composable
 internal fun CollapsibleSectionHeader(
-    title: String,
-    count: Int,
-    expanded: Boolean,
+    state: CollapsibleSectionHeaderState,
     onToggle: () -> Unit,
     modifier: Modifier = Modifier,
-    topPadding: Boolean = false,
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp))
             .combinedClickable(onClick = onToggle)
-            .padding(top = if (topPadding) 8.dp else 0.dp, bottom = 4.dp),
+            .padding(top = if (state.topPadding) 8.dp else 0.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = title,
+            text = state.title,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.primary,
         )
         Spacer(modifier = Modifier.width(6.dp))
         Text(
-            text = "($count)",
+            text = "(${state.count})",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.weight(1f))
         Icon(
-            imageVector = if (expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
-            contentDescription = if (expanded) "Collapse" else "Expand",
+            imageVector = if (state.expanded) LettaIcons.ExpandLess else LettaIcons.ExpandMore,
+            contentDescription = if (state.expanded) "Collapse" else "Expand",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(18.dp),
         )
@@ -480,9 +484,11 @@ private fun DashboardWidgetTilePreview() {
 private fun CollapsibleSectionHeaderPreview() {
     LettaPreviewFrame {
         CollapsibleSectionHeader(
-            title = "Pinned",
-            count = 4,
-            expanded = true,
+            state = CollapsibleSectionHeaderState(
+                title = "Pinned",
+                count = 4,
+                expanded = true,
+            ),
             onToggle = {},
             modifier = Modifier.padding(horizontal = 16.dp),
         )

@@ -75,9 +75,11 @@ internal fun SearchResultsContent(
         if (agentResults.isNotEmpty()) {
             item(key = "agents-header") {
                 CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_agents_section),
-                    count = agentResults.size,
-                    expanded = agentsExpanded,
+                    state = CollapsibleSectionHeaderState(
+                        title = stringResource(R.string.screen_home_search_agents_section),
+                        count = agentResults.size,
+                        expanded = agentsExpanded,
+                    ),
                     onToggle = { agentsExpanded = !agentsExpanded },
                 )
             }
@@ -124,11 +126,13 @@ internal fun SearchResultsContent(
         if (toolResults.isNotEmpty()) {
             item(key = "tools-header") {
                 CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_tools_section),
-                    count = toolResults.size,
-                    expanded = toolsExpanded,
+                    state = CollapsibleSectionHeaderState(
+                        title = stringResource(R.string.screen_home_search_tools_section),
+                        count = toolResults.size,
+                        expanded = toolsExpanded,
+                        topPadding = true,
+                    ),
                     onToggle = { toolsExpanded = !toolsExpanded },
-                    topPadding = true,
                 )
             }
             if (toolsExpanded) {
@@ -174,11 +178,13 @@ internal fun SearchResultsContent(
         if (blockResults.isNotEmpty()) {
             item(key = "blocks-header") {
                 CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_blocks_section),
-                    count = blockResults.size,
-                    expanded = blocksExpanded,
+                    state = CollapsibleSectionHeaderState(
+                        title = stringResource(R.string.screen_home_search_blocks_section),
+                        count = blockResults.size,
+                        expanded = blocksExpanded,
+                        topPadding = true,
+                    ),
                     onToggle = { blocksExpanded = !blocksExpanded },
-                    topPadding = true,
                 )
             }
             if (blocksExpanded) {
@@ -225,11 +231,13 @@ internal fun SearchResultsContent(
         if (messageResults.isNotEmpty()) {
             item(key = "messages-header") {
                 CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_messages_section),
-                    count = messageResults.size,
-                    expanded = messagesExpanded,
+                    state = CollapsibleSectionHeaderState(
+                        title = stringResource(R.string.screen_home_search_messages_section),
+                        count = messageResults.size,
+                        expanded = messagesExpanded,
+                        topPadding = true,
+                    ),
                     onToggle = { messagesExpanded = !messagesExpanded },
-                    topPadding = true,
                 )
             }
             if (messagesExpanded) {

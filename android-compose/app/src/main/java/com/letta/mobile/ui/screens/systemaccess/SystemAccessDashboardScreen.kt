@@ -501,15 +501,17 @@ private fun String.toDisplayLabel(): String = replace('_', ' ')
 
 // region Previews
 
-private fun previewCapability(
-    status: SystemAccessCapabilityStatus,
-    statusReason: String,
-    toolIds: Set<String>,
-    approvalPolicy: SystemAccessApprovalPolicy,
-    audit: SystemAccessAuditPolicy,
-    policyRiskRationale: String,
-    summary: String,
-): SystemAccessCapability {
+private data class PreviewCapabilityConfig(
+    val status: SystemAccessCapabilityStatus,
+    val statusReason: String,
+    val toolIds: Set<String>,
+    val approvalPolicy: SystemAccessApprovalPolicy,
+    val audit: SystemAccessAuditPolicy,
+    val policyRiskRationale: String,
+    val summary: String,
+)
+
+private fun previewCapability(config: PreviewCapabilityConfig): SystemAccessCapability {
     val flavorSupport = SystemAccessFlavorSupport(
         play = SystemAccessFlavorAvailability.Supported,
         sideload = SystemAccessFlavorAvailability.Supported,
@@ -525,54 +527,58 @@ private fun previewCapability(
     )
     val policyRisk = SystemAccessPolicyRisk(
         level = SystemAccessPolicyRiskLevel.Medium,
-        rationale = policyRiskRationale,
+        rationale = config.policyRiskRationale,
     )
     val definition = SystemAccessCapabilityDefinition(
         id = "notifications.post",
         title = "Post notifications",
-        summary = summary,
+        summary = config.summary,
         flavorAvailability = flavorSupport,
         permissionIntents = intents,
         dataSensitivity = SystemAccessDataSensitivity.AppPrivate,
-        toolIds = toolIds,
-        approvalPolicy = approvalPolicy,
-        auditPolicy = audit,
+        toolIds = config.toolIds,
+        approvalPolicy = config.approvalPolicy,
+        auditPolicy = config.audit,
         policyRisk = policyRisk,
         probe = SystemAccessProbe.AlwaysGranted,
     )
     return SystemAccessCapability(
         definition = definition,
-        status = status,
-        statusReason = statusReason,
+        status = config.status,
+        statusReason = config.statusReason,
         userEnabled = true,
     )
 }
 
 private fun previewCapabilityGranted(): SystemAccessCapability = previewCapability(
-    status = SystemAccessCapabilityStatus.Granted,
-    statusReason = "Notification permission granted.",
-    toolIds = setOf("send_email"),
-    approvalPolicy = SystemAccessApprovalPolicy.RememberPerSession,
-    audit = SystemAccessAuditPolicy(
-        loggedFields = listOf("tool_id", "timestamp"),
-        redactedFields = listOf("body"),
-        localOnlyByDefault = true,
+    PreviewCapabilityConfig(
+        status = SystemAccessCapabilityStatus.Granted,
+        statusReason = "Notification permission granted.",
+        toolIds = setOf("send_email"),
+        approvalPolicy = SystemAccessApprovalPolicy.RememberPerSession,
+        audit = SystemAccessAuditPolicy(
+            loggedFields = listOf("tool_id", "timestamp"),
+            redactedFields = listOf("body"),
+            localOnlyByDefault = true,
+        ),
+        policyRiskRationale = "Requests a runtime permission to read recent inbox metadata.",
+        summary = "Lets the app post user-visible notifications while a tool is running.",
     ),
-    policyRiskRationale = "Requests a runtime permission to read recent inbox metadata.",
-    summary = "Lets the app post user-visible notifications while a tool is running.",
 )
 
 private fun previewCapabilityNeedsSetup(): SystemAccessCapability = previewCapability(
-    status = SystemAccessCapabilityStatus.AvailableNeedsSetup,
-    statusReason = "Enable notifications in system settings to use this capability.",
-    toolIds = emptySet(),
-    approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
-    audit = SystemAccessAuditPolicy(
-        loggedFields = listOf("tool_id"),
-        localOnlyByDefault = true,
+    PreviewCapabilityConfig(
+        status = SystemAccessCapabilityStatus.AvailableNeedsSetup,
+        statusReason = "Enable notifications in system settings to use this capability.",
+        toolIds = emptySet(),
+        approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
+        audit = SystemAccessAuditPolicy(
+            loggedFields = listOf("tool_id"),
+            localOnlyByDefault = true,
+        ),
+        policyRiskRationale = "Requires user opt-in via system settings.",
+        summary = "Lets the app post user-visible notifications.",
     ),
-    policyRiskRationale = "Requires user opt-in via system settings.",
-    summary = "Lets the app post user-visible notifications.",
 )
 
 @PreviewLightDark

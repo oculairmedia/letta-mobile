@@ -186,8 +186,10 @@ fun GroupAdminScreen(
 
     if (showCreateDialog) {
         GroupEditorDialog(
-            title = stringResource(R.string.screen_groups_add_title),
-            confirmLabel = stringResource(R.string.action_create),
+            labels = GroupEditorLabels(
+                title = stringResource(R.string.screen_groups_add_title),
+                confirmLabel = stringResource(R.string.action_create),
+            ),
             onDismiss = { showCreateDialog = false },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
                 viewModel.createGroup(description, agentIds, projectId, sharedBlockIds, hidden) {
@@ -199,13 +201,17 @@ fun GroupAdminScreen(
 
     editTarget?.let { group ->
         GroupEditorDialog(
-            title = stringResource(R.string.screen_groups_edit_title),
-            confirmLabel = stringResource(R.string.action_save),
-            initialDescription = group.description,
-            initialAgentIds = group.agentIds.joinToString(", ") { it.value },
-            initialProjectId = group.projectId?.value.orEmpty(),
-            initialSharedBlockIds = group.sharedBlockIds.joinToString(", ") { it.value },
-            initialHidden = group.hidden == true,
+            labels = GroupEditorLabels(
+                title = stringResource(R.string.screen_groups_edit_title),
+                confirmLabel = stringResource(R.string.action_save),
+            ),
+            initialState = GroupEditorInitialState(
+                description = group.description,
+                agentIds = group.agentIds.joinToString(", ") { it.value },
+                projectId = group.projectId?.value.orEmpty(),
+                sharedBlockIds = group.sharedBlockIds.joinToString(", ") { it.value },
+                hidden = group.hidden == true,
+            ),
             onDismiss = { editTarget = null },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
                 viewModel.updateGroup(group.id, description, agentIds, projectId, sharedBlockIds, hidden) {
@@ -495,28 +501,36 @@ private fun GroupMessageCard(message: LettaMessage) {
     }
 }
 
+private data class GroupEditorInitialState(
+    val description: String = "",
+    val agentIds: String = "",
+    val projectId: String = "",
+    val sharedBlockIds: String = "",
+    val hidden: Boolean = false,
+)
+
+private data class GroupEditorLabels(
+    val title: String,
+    val confirmLabel: String,
+)
+
 @Composable
 private fun GroupEditorDialog(
-    title: String,
-    confirmLabel: String,
-    initialDescription: String = "",
-    initialAgentIds: String = "",
-    initialProjectId: String = "",
-    initialSharedBlockIds: String = "",
-    initialHidden: Boolean = false,
+    labels: GroupEditorLabels,
+    initialState: GroupEditorInitialState = GroupEditorInitialState(),
     onDismiss: () -> Unit,
     onConfirm: (String, String, String, String, Boolean) -> Unit,
 ) {
-    var description by remember(initialDescription) { mutableStateOf(initialDescription) }
-    var agentIds by remember(initialAgentIds) { mutableStateOf(initialAgentIds) }
-    var projectId by remember(initialProjectId) { mutableStateOf(initialProjectId) }
-    var sharedBlockIds by remember(initialSharedBlockIds) { mutableStateOf(initialSharedBlockIds) }
-    var hidden by remember(initialHidden) { mutableStateOf(initialHidden) }
+    var description by remember(initialState.description) { mutableStateOf(initialState.description) }
+    var agentIds by remember(initialState.agentIds) { mutableStateOf(initialState.agentIds) }
+    var projectId by remember(initialState.projectId) { mutableStateOf(initialState.projectId) }
+    var sharedBlockIds by remember(initialState.sharedBlockIds) { mutableStateOf(initialState.sharedBlockIds) }
+    var hidden by remember(initialState.hidden) { mutableStateOf(initialState.hidden) }
 
     MultiFieldInputDialog(
         show = true,
-        title = title,
-        confirmText = confirmLabel,
+        title = labels.title,
+        confirmText = labels.confirmLabel,
         dismissText = stringResource(R.string.action_cancel),
         onDismiss = onDismiss,
         confirmEnabled = description.isNotBlank() && agentIds.split(',').any { it.trim().isNotEmpty() },
@@ -638,8 +652,10 @@ private fun GroupCardPreview() {
 private fun GroupEditorDialogPreview() {
     LettaPreviewFrame {
         GroupEditorDialog(
-            title = "Edit group",
-            confirmLabel = "Save",
+            labels = GroupEditorLabels(
+                title = "Edit group",
+                confirmLabel = "Save",
+            ),
             onDismiss = {},
             onConfirm = { _, _, _, _, _ -> },
         )

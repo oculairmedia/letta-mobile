@@ -873,30 +873,38 @@ private fun ProjectTile(
 
 // region Previews
 
+private data class PreviewProjectSummaryConfig(
+    val name: String = "letta-mobile",
+    val identifier: String = "letta-mobile",
+    val status: String = "active",
+    val issueCount: Int? = 3,
+    val lastSyncAt: String? = "2026-08-07T18:30:00Z",
+    val beadsIssueCount: Int? = 2,
+)
+
 private fun previewProjectSummary(
-    name: String = "letta-mobile",
-    identifier: String = "letta-mobile",
-    status: String = "active",
-    issueCount: Int? = 3,
-    lastSyncAt: String? = "2026-08-07T18:30:00Z",
-    beadsIssueCount: Int? = 2,
+    config: PreviewProjectSummaryConfig = PreviewProjectSummaryConfig(),
 ) = ProjectSummary(
     id = null,
-    identifier = identifier,
-    name = name,
+    identifier = config.identifier,
+    name = config.name,
     filesystemPath = "/home/dev/projects/letta-mobile",
-    status = status,
-    issueCount = issueCount,
-    beadsIssueCount = beadsIssueCount,
-    lastSyncAt = lastSyncAt,
+    status = config.status,
+    issueCount = config.issueCount,
+    beadsIssueCount = config.beadsIssueCount,
+    lastSyncAt = config.lastSyncAt,
+)
+
+private data class PreviewBeadsStatusConfig(
+    val status: String = "provisioned",
+    val provisionedAt: String? = "2026-08-07T12:00:00Z",
 )
 
 private fun previewBeadsStatus(
-    status: String = "provisioned",
-    provisionedAt: String? = "2026-08-07T12:00:00Z",
+    config: PreviewBeadsStatusConfig = PreviewBeadsStatusConfig(),
 ) = BeadsRemoteStatus(
-    status = status,
-    provisionedAt = provisionedAt,
+    status = config.status,
+    provisionedAt = config.provisionedAt,
 )
 
 private fun previewPmAgent() = PmAgentMetadata(
@@ -1008,7 +1016,9 @@ private fun ProjectActionSheetHeaderPreview() {
 private fun ProjectActionSheetHeaderFailedPreview() {
     LettaPreviewFrame {
         ProjectActionSheetHeader(
-            project = previewProjectSummary(name = "edge-case", identifier = "edge-case"),
+            project = previewProjectSummary(
+                PreviewProjectSummaryConfig(name = "edge-case", identifier = "edge-case"),
+            ),
             beadsStatus = BeadsRemoteStatus(
                 status = "failed",
                 error = "Unable to reach the beads remote. Check connection and retry.",
