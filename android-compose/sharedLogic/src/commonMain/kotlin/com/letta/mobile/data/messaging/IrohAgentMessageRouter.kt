@@ -82,13 +82,7 @@ class IrohAgentMessageRouter(
         // guards above, and it must NEVER fall through to CreateAndDeliver
         // (a missing target is dropped with a distinct reason, not created).
         if (targetConversationId != null) {
-            val target = candidates.find { it.conversation.id.value == targetConversationId }
-                ?: return RoutingDecision.Dropped("target_conversation_not_found")
-            return if (target.busy) {
-                RoutingDecision.Queue(targetConversationId)
-            } else {
-                RoutingDecision.Deliver(targetConversationId)
-            }
+            return routeExplicitTarget(targetConversationId, candidates)
         }
 
         // Most-recent INTERACTIVE conversation (never AUTONOMOUS/heartbeat).
@@ -101,6 +95,24 @@ class IrohAgentMessageRouter(
             RoutingDecision.Queue(interactive.conversation.id.value)
         } else {
             RoutingDecision.Deliver(interactive.conversation.id.value)
+        }
+    }
+
+    /**
+     * letta-mobile-5m1qy: route to the sender-declared target conversation.
+     * A target missing from [candidates] is dropped with a distinct reason —
+     * never created — so an explicit send cannot silently open a fresh conv.
+     */
+    private fun routeExplicitTarget(
+        targetConversationId: String,
+        candidates: List<ConversationState>,
+    ): RoutingDecision {
+        val target = candidates.find { it.conversation.id.value == targetConversationId }
+            ?: return RoutingDecision.Dropped("target_conversation_not_found")
+        return if (target.busy) {
+            RoutingDecision.Queue(targetConversationId)
+        } else {
+            RoutingDecision.Deliver(targetConversationId)
         }
     }
 

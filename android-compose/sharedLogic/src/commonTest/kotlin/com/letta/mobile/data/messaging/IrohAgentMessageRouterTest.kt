@@ -19,6 +19,7 @@ class IrohAgentMessageRouterTest {
         id: String,
         cls: ConversationClass?,
         lastMessageAt: String,
+        busy: Boolean = false,
     ) = IrohAgentMessageRouter.ConversationState(
         conversation = Conversation(
             id = ConversationId(id),
@@ -26,7 +27,7 @@ class IrohAgentMessageRouterTest {
             conversationClass = cls,
             lastMessageAt = lastMessageAt,
         ),
-        busy = false,
+        busy = busy,
     )
 
     private fun router() = IrohAgentMessageRouter(ownAgentId = "agent-target")
@@ -146,21 +147,6 @@ class IrohAgentMessageRouterTest {
 
     // letta-mobile-5m1qy: explicit target conversation routing.
 
-    private fun convState(
-        id: String,
-        cls: ConversationClass?,
-        lastMessageAt: String,
-        busy: Boolean,
-    ) = IrohAgentMessageRouter.ConversationState(
-        conversation = Conversation(
-            id = ConversationId(id),
-            agentId = AgentId("agent-target"),
-            conversationClass = cls,
-            lastMessageAt = lastMessageAt,
-        ),
-        busy = busy,
-    )
-
     @Test
     fun explicitTargetPresentAndIdleDeliversToThatConversationNotMostRecent() {
         val decision = router().route(
@@ -168,7 +154,7 @@ class IrohAgentMessageRouterTest {
             msgId = "m-1",
             candidates = listOf(
                 conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
-                convState("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = false),
+                conv("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = false),
             ),
             targetConversationId = "target-conv",
         )
@@ -183,7 +169,7 @@ class IrohAgentMessageRouterTest {
             msgId = "m-1",
             candidates = listOf(
                 conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
-                convState("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = true),
+                conv("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = true),
             ),
             targetConversationId = "target-conv",
         )
