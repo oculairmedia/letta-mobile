@@ -614,14 +614,18 @@ private fun previewRunMessage(spec: PreviewRunMessageSpec): UiMessage = UiMessag
 
 @Composable
 private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowModifier: Modifier) {
+    // Bubble geometry mirrors `MessageBubbleSurface` enough to keep the
+    // timeline dot anchored on the first text baseline
+    // (DefaultStepDotCenterY = 17.dp). Anything heavier than 7.dp vertical
+    // padding pushes the text below the dot.
     androidx.compose.material3.Surface(
-        modifier = rowModifier.padding(vertical = 4.dp),
+        modifier = rowModifier.padding(vertical = 7.dp),
         color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
     ) {
         androidx.compose.material3.Text(
             text = message.content,
-            modifier = androidx.compose.ui.Modifier.padding(12.dp),
+            modifier = androidx.compose.ui.Modifier.padding(horizontal = 12.dp),
             style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
         )
     }
