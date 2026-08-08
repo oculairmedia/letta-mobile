@@ -14,6 +14,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.FileIrohAgentAddressStore
+import com.letta.mobile.data.transport.iroh.IdentityMigrationAction
 import com.letta.mobile.data.transport.iroh.IrohAgentAddress
 import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
@@ -256,6 +257,7 @@ suspend fun publishLocalAgents(
     val nodeHex = endpointIdHex(endpoint)
     val direct = sortDirectAddresses(addr.directAddresses())
     val published = mutableListOf<String>()
+    migrateLegacyIdentities(config.identityDir)
     val targetAgents = resolveTargetAgentsToPublish(config.publishAgents, config.addressBook)
     targetAgents.forEach { rawAgentId ->
         val agentId = AgentIdNamespace.normalizeToBareId(rawAgentId)
@@ -275,6 +277,48 @@ suspend fun publishLocalAgents(
         )
     }
     return published
+}
+
+/**
+ * letta-mobile-oi147: collapse identity files left under the retired `letta_`
+ * namespace onto their canonical (bare) names, once, at bind.
+ *
+ * Runs here because bind is the only moment the wrapper is guaranteed to own the
+ * identity dir and no dial is in flight. Each action is emitted as telemetry: this
+ * moves SECRET KEY MATERIAL, so it must be greppable after the fact rather than
+ * happening silently. Failures are reported at WARN and do not abort the bind — a
+ * stranded legacy file is a cleanup problem, not a reason to take messaging down.
+ */
+internal fun migrateLegacyIdentities(identityDir: File) {
+    val actions = runCatching { IrohAgentIdentity.migrateLegacyNamespacedFiles(identityDir) }
+        .getOrElse { t ->
+            Telemetry.event(
+                "A2aHost", "identity.migration_failed",
+                "reason" to (t.message ?: t::class.simpleName ?: "error"),
+                level = Telemetry.Level.WARN,
+            )
+            return
+        }
+    actions.forEach { action ->
+        when (action) {
+            is IdentityMigrationAction.DeletedOrphan -> Telemetry.event(
+                "A2aHost", "identity.orphan_deleted",
+                "legacyAgentId" to action.legacyAgentId,
+                "canonicalAgentId" to action.canonicalAgentId,
+            )
+            is IdentityMigrationAction.RenamedToCanonical -> Telemetry.event(
+                "A2aHost", "identity.renamed_to_canonical",
+                "legacyAgentId" to action.legacyAgentId,
+                "canonicalAgentId" to action.canonicalAgentId,
+            )
+            is IdentityMigrationAction.Failed -> Telemetry.event(
+                "A2aHost", "identity.migration_failed",
+                "legacyAgentId" to action.legacyAgentId,
+                "reason" to action.reason,
+                level = Telemetry.Level.WARN,
+            )
+        }
+    }
 }
 
 /**
