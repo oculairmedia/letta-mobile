@@ -17,9 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.R
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @Composable
 fun CreateToolDialog(
@@ -58,3 +60,18 @@ fun CreateToolDialog(
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun CreateToolDialogPreview() {
+    LettaPreviewFrame {
+        CreateToolDialog(
+            onDismiss = {},
+            onCreate = {},
+        )
+    }
+}
+
+// endregion

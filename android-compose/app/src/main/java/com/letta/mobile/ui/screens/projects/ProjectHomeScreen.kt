@@ -51,6 +51,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -75,6 +76,7 @@ import com.letta.mobile.ui.components.ShimmerBox
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.feature.chat.route.ProjectChatStartAction
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalWindowSizeClass
 import com.letta.mobile.ui.theme.customColors
@@ -868,3 +870,122 @@ private fun ProjectTile(
         }
     }
 }
+
+// region Previews
+
+private fun previewProjectSummary(
+    name: String = "letta-mobile",
+    identifier: String = "letta-mobile",
+    status: String = "active",
+    issueCount: Int? = 3,
+    lastSyncAt: String? = "2026-08-07T18:30:00Z",
+    beadsIssueCount: Int? = 2,
+) = ProjectSummary(
+    id = null,
+    identifier = identifier,
+    name = name,
+    filesystemPath = "/home/dev/projects/letta-mobile",
+    status = status,
+    issueCount = issueCount,
+    beadsIssueCount = beadsIssueCount,
+    lastSyncAt = lastSyncAt,
+)
+
+private fun previewBeadsStatus(
+    status: String = "provisioned",
+    provisionedAt: String? = "2026-08-07T12:00:00Z",
+) = BeadsRemoteStatus(
+    status = status,
+    provisionedAt = provisionedAt,
+)
+
+private fun previewPmAgent() = PmAgentMetadata(
+    agentId = com.letta.mobile.data.model.AgentId("agent-pm-1"),
+    name = "PM agent",
+)
+
+@PreviewLightDark
+@Composable
+private fun ProjectStatusBadgePreview() {
+    LettaPreviewFrame {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StatusBadge(
+                text = "Active",
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            StatusBadge(
+                text = "Archived",
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            StatusBadge(
+                text = "3 issues",
+                containerColor = MaterialTheme.customColors.harmonizedErrorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectTileMetaRowPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            ProjectTileMetaRow(
+                statusLabel = "Active",
+                statusContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                issueCount = 3,
+                isPinned = false,
+            )
+            ProjectTileMetaRow(
+                statusLabel = "Archived",
+                statusContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                statusContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                issueCount = 0,
+                isPinned = true,
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectActionSheetHeaderPreview() {
+    LettaPreviewFrame {
+        ProjectActionSheetHeader(
+            project = previewProjectSummary(),
+            beadsStatus = previewBeadsStatus(),
+            pmAgent = previewPmAgent(),
+            syncInFlight = false,
+            onPmAgentClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectActionSheetHeaderFailedPreview() {
+    LettaPreviewFrame {
+        ProjectActionSheetHeader(
+            project = previewProjectSummary(name = "edge-case", identifier = "edge-case"),
+            beadsStatus = BeadsRemoteStatus(
+                status = "failed",
+                error = "Unable to reach the beads remote. Check connection and retry.",
+            ),
+            pmAgent = null,
+            syncInFlight = true,
+            onPmAgentClick = {},
+        )
+    }
+}
+
+// endregion
