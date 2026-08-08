@@ -7,5 +7,6 @@ internal data class ConversationListActions(
     val onRenameConversation: (ConversationDisplay, String) -> Unit,
     val onTogglePinned: (ConversationDisplay) -> Unit,
     val onForkConversation: (ConversationDisplay) -> Unit,
+    val onArchiveToggle: (ConversationDisplay) -> Unit,
     val onRefresh: () -> Unit,
 )

@@ -46,6 +46,7 @@ data class ConversationCardCallbacks(
     val onRename: (String) -> Unit,
     val onTogglePinned: () -> Unit,
     val onFork: () -> Unit,
+    val onArchiveToggle: () -> Unit,
 )
 
 private data class ConversationCardMenuActions(
@@ -226,6 +227,11 @@ private fun ConversationCardContextMenu(
             onClick = { state.actions.onDismiss(); callbacks.onFork() },
         )
         ActionSheetItem(
+            text = stringResource(R.string.screen_conversations_archive_action),
+            icon = LettaIcons.Archive,
+            onClick = { state.actions.onDismiss(); callbacks.onArchiveToggle() },
+        )
+        ActionSheetItem(
             text = stringResource(R.string.action_delete),
             icon = LettaIcons.Delete,
             onClick = { state.actions.onDismiss(); state.actions.onRequestDelete() },
@@ -327,6 +333,7 @@ private fun previewConversationCardCallbacks() = ConversationCardCallbacks(
     onRename = {},
     onTogglePinned = {},
     onFork = {},
+    onArchiveToggle = {},
 )
 
 @Composable
