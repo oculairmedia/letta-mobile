@@ -693,6 +693,17 @@ private data class PreviewGroupSpec(
     val hidden: Boolean = false,
 )
 
+private data class PreviewGroupEditorLabels(
+    val title: String = "Edit group",
+    val confirmLabel: String = "Save",
+)
+
+private data class PreviewGroupMessage(
+    val id: String = "msg-1",
+    val date: String = "2026-08-07T18:30:00Z",
+    val content: String = "Hello, group!",
+)
+
 private val previewGroup = Group(
     id = com.letta.mobile.data.model.GroupId(previewGroupSpec.id),
     managerType = previewGroupSpec.managerType,
@@ -717,11 +728,12 @@ private fun GroupCardPreview() {
 @PreviewLightDark
 @Composable
 private fun GroupEditorDialogPreview() {
+    val labels = PreviewGroupEditorLabels()
     LettaPreviewFrame {
         GroupEditorDialog(
             labels = GroupEditorLabels(
-                title = "Edit group",
-                confirmLabel = "Save",
+                title = labels.title,
+                confirmLabel = labels.confirmLabel,
             ),
             onDismiss = {},
             onConfirm = { _, _, _, _, _ -> },
@@ -732,12 +744,13 @@ private fun GroupEditorDialogPreview() {
 @PreviewLightDark
 @Composable
 private fun GroupMessageCardPreview() {
+    val msg = PreviewGroupMessage()
     LettaPreviewFrame {
         GroupMessageCard(
             message = UserMessage(
-                id = "msg-1",
-                date = "2026-08-07T18:30:00Z",
-                contentRaw = kotlinx.serialization.json.JsonPrimitive("Hello, group!"),
+                id = msg.id,
+                date = msg.date,
+                contentRaw = kotlinx.serialization.json.JsonPrimitive(msg.content),
             ),
         )
     }

@@ -501,14 +501,18 @@ private fun String.toDisplayLabel(): String = replace('_', ' ')
 
 // region Previews
 
+private data class PreviewCapabilityStrings(
+    val statusReason: String,
+    val policyRiskRationale: String,
+    val summary: String,
+)
+
 private data class PreviewCapabilityConfig(
     val status: SystemAccessCapabilityStatus,
-    val statusReason: String,
     val toolIds: Set<String>,
     val approvalPolicy: SystemAccessApprovalPolicy,
     val audit: SystemAccessAuditPolicy,
-    val policyRiskRationale: String,
-    val summary: String,
+    val strings: PreviewCapabilityStrings,
 )
 
 private fun previewCapability(config: PreviewCapabilityConfig): SystemAccessCapability {
@@ -527,12 +531,12 @@ private fun previewCapability(config: PreviewCapabilityConfig): SystemAccessCapa
     )
     val policyRisk = SystemAccessPolicyRisk(
         level = SystemAccessPolicyRiskLevel.Medium,
-        rationale = config.policyRiskRationale,
+        rationale = config.strings.policyRiskRationale,
     )
     val definition = SystemAccessCapabilityDefinition(
         id = "notifications.post",
         title = "Post notifications",
-        summary = config.summary,
+        summary = config.strings.summary,
         flavorAvailability = flavorSupport,
         permissionIntents = intents,
         dataSensitivity = SystemAccessDataSensitivity.AppPrivate,
@@ -545,7 +549,7 @@ private fun previewCapability(config: PreviewCapabilityConfig): SystemAccessCapa
     return SystemAccessCapability(
         definition = definition,
         status = config.status,
-        statusReason = config.statusReason,
+        statusReason = config.strings.statusReason,
         userEnabled = true,
     )
 }
@@ -553,7 +557,6 @@ private fun previewCapability(config: PreviewCapabilityConfig): SystemAccessCapa
 private fun previewCapabilityGranted(): SystemAccessCapability = previewCapability(
     PreviewCapabilityConfig(
         status = SystemAccessCapabilityStatus.Granted,
-        statusReason = "Notification permission granted.",
         toolIds = setOf("send_email"),
         approvalPolicy = SystemAccessApprovalPolicy.RememberPerSession,
         audit = SystemAccessAuditPolicy(
@@ -561,23 +564,28 @@ private fun previewCapabilityGranted(): SystemAccessCapability = previewCapabili
             redactedFields = listOf("body"),
             localOnlyByDefault = true,
         ),
-        policyRiskRationale = "Requests a runtime permission to read recent inbox metadata.",
-        summary = "Lets the app post user-visible notifications while a tool is running.",
+        strings = PreviewCapabilityStrings(
+            statusReason = "Notification permission granted.",
+            policyRiskRationale = "Requests a runtime permission to read recent inbox metadata.",
+            summary = "Lets the app post user-visible notifications while a tool is running.",
+        ),
     ),
 )
 
 private fun previewCapabilityNeedsSetup(): SystemAccessCapability = previewCapability(
     PreviewCapabilityConfig(
         status = SystemAccessCapabilityStatus.AvailableNeedsSetup,
-        statusReason = "Enable notifications in system settings to use this capability.",
         toolIds = emptySet(),
         approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
         audit = SystemAccessAuditPolicy(
             loggedFields = listOf("tool_id"),
             localOnlyByDefault = true,
         ),
-        policyRiskRationale = "Requires user opt-in via system settings.",
-        summary = "Lets the app post user-visible notifications.",
+        strings = PreviewCapabilityStrings(
+            statusReason = "Enable notifications in system settings to use this capability.",
+            policyRiskRationale = "Requires user opt-in via system settings.",
+            summary = "Lets the app post user-visible notifications.",
+        ),
     ),
 )
 

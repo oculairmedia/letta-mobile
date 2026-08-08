@@ -447,6 +447,11 @@ private data class PreviewTileModifier(
     val height: androidx.compose.ui.unit.Dp = 108.dp,
 )
 
+private data class PreviewDashboardTileSpec(
+    val shortcut: DashboardShortcut = DashboardShortcut.CONVERSATIONS,
+    val contextualInfo: String? = "12",
+)
+
 private fun Modifier.previewTile(spec: PreviewTileModifier): Modifier =
     then(if (spec.widthFill) Modifier.fillMaxWidth() else Modifier)
         .height(spec.height)
@@ -468,10 +473,11 @@ private fun PinnedAgentCardPreview() {
 @PreviewLightDark
 @Composable
 private fun DashboardWidgetTilePreview() {
+    val tileSpec = PreviewDashboardTileSpec()
     LettaPreviewFrame {
         DashboardWidgetTile(
-            shortcut = DashboardShortcut.CONVERSATIONS,
-            contextualInfo = "12",
+            shortcut = tileSpec.shortcut,
+            contextualInfo = tileSpec.contextualInfo,
             onClick = {},
             onUnpin = {},
             modifier = Modifier.previewTile(PreviewTileModifier()),
