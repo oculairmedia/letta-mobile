@@ -648,38 +648,32 @@ private data class PreviewRunBlockSpec(
     val isStreaming: Boolean = false,
 )
 
+private val previewRunBlockThreeStepMessages = PreviewRunMessages(
+    stepContents = listOf(
+        "I will search the codebase for matching patterns.",
+        "Found three candidates, let me check each.",
+        "All three confirmed, here is the summary.",
+    ),
+)
+
+@Composable
+private fun PreviewRunBlockMultiStep(expanded: Boolean) = PreviewRunBlock(
+    PreviewRunBlockSpec(
+        messages = previewRunBlockThreeStepMessages,
+        expanded = expanded,
+    ),
+)
+
 @PreviewLightDark
 @Composable
 private fun RunBlockExpandedPreview() {
-    PreviewRunBlock(
-        PreviewRunBlockSpec(
-            messages = PreviewRunMessages(
-                stepContents = listOf(
-                    "I will search the codebase for matching patterns.",
-                    "Found three candidates, let me check each.",
-                    "All three confirmed, here is the summary.",
-                ),
-            ),
-            expanded = true,
-        ),
-    )
+    PreviewRunBlockMultiStep(expanded = true)
 }
 
 @PreviewLightDark
 @Composable
 private fun RunBlockCollapsedPreview() {
-    PreviewRunBlock(
-        PreviewRunBlockSpec(
-            messages = PreviewRunMessages(
-                stepContents = listOf(
-                    "I will search the codebase for matching patterns.",
-                    "Found three candidates, let me check each.",
-                    "All three confirmed, here is the summary.",
-                ),
-            ),
-            expanded = false,
-        ),
-    )
+    PreviewRunBlockMultiStep(expanded = false)
 }
 
 @PreviewLightDark
