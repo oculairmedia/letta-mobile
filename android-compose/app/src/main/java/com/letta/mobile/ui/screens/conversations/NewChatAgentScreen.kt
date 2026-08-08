@@ -33,14 +33,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadataMonospace
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -244,3 +247,35 @@ private fun AgentInitialAvatar(name: String) {
         }
     }
 }
+
+// region Previews
+
+private val previewNewChatAgents = listOf(
+    Agent(id = AgentId("agent-1"), name = "General Assistant", model = "letta/letta-free", description = "A general-purpose agent"),
+    Agent(id = AgentId("agent-2"), name = "Code Helper", model = "openai/gpt-4o", description = "Specialized in programming"),
+    Agent(id = AgentId("agent-3"), name = "Research Bot", model = "anthropic/claude-3.5-sonnet"),
+)
+
+@PreviewLightDark
+@Composable
+private fun NewChatAgentListPreview() {
+    // Renders the agent list directly: the layoutlib preview renderer cannot
+    // execute Material3 TopAppBar (NoSuchMethodError), so the full
+    // NewChatAgentScreen scaffold is not previewable here.
+    LettaPreviewFrame {
+        NewChatAgentList(
+            agents = previewNewChatAgents,
+            onAgentSelected = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun NewChatNoAgentsEmptyStatePreview() {
+    LettaPreviewFrame {
+        NewChatNoAgentsEmptyState()
+    }
+}
+
+// endregion

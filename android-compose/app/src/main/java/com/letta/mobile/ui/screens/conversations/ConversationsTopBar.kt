@@ -19,11 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.ui.components.ExpandableSearchField
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 internal data class ConversationsTopBarState(
     val searchQuery: String,
@@ -163,3 +165,34 @@ private fun conversationsOverflowMenuItems(navigation: ConversationsNavigation):
         ConversationsOverflowMenuItem(R.string.screen_about_title, LettaIcons.Info) { navigation.onNavigateToAbout() },
     )
 }
+
+// region Previews
+
+private val previewNoop: () -> Unit = {}
+
+@PreviewLightDark
+@Composable
+private fun ConversationsTopBarTitlePreview() {
+    // Renders the title row directly: the layoutlib preview renderer cannot
+    // execute Material3 TopAppBar (NoSuchMethodError), so the full
+    // ConversationsTopBar scaffold is not previewable here.
+    LettaPreviewFrame {
+        ConversationsTopBarTitle(
+            activeBackendLabel = "Cloud",
+            onNavigateToBackendSwitcher = previewNoop,
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ConversationsTopBarTitlePlainPreview() {
+    LettaPreviewFrame {
+        ConversationsTopBarTitle(
+            activeBackendLabel = null,
+            onNavigateToBackendSwitcher = null,
+        )
+    }
+}
+
+// endregion

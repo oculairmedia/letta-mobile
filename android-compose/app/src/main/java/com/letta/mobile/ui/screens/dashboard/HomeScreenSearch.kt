@@ -28,16 +28,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import androidx.compose.material3.Text
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
@@ -308,3 +313,70 @@ internal fun SearchResultsContent(
         }
     }
 }
+
+// region Previews
+
+private const val previewSearchQuery = "plan"
+
+private val previewSearchAgents = listOf(
+    Agent(id = AgentId("agent-1"), name = "Planner", model = "letta/letta-free", description = "Plans the week"),
+)
+
+private val previewSearchTools = listOf(
+    Tool(id = ToolId("tool-1"), name = "web_search", description = "Search the web for planning data"),
+)
+
+private val previewSearchBlocks = listOf(
+    Block(id = BlockId("block-1"), label = "plan_scratchpad", value = "week 32", description = "Scratchpad for plans"),
+)
+
+private val previewSearchMessages = listOf(
+    ParsedSearchMessage(
+        messageId = "msg-1",
+        agentId = "agent-1",
+        role = "assistant",
+        content = "Here is the plan for this week.",
+        date = "2026-08-07T18:30:00Z",
+        conversationId = "conv-1",
+    ),
+)
+
+@PreviewLightDark
+@Composable
+private fun SearchResultsContentPreview() {
+    LettaPreviewFrame {
+        SearchResultsContent(
+            agentResults = previewSearchAgents,
+            messageResults = previewSearchMessages,
+            toolResults = previewSearchTools,
+            blockResults = previewSearchBlocks,
+            isSearching = false,
+            searchQuery = previewSearchQuery,
+            onAgentClick = {},
+            onMessageClick = {},
+            onToolClick = {},
+            onBlockClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun SearchResultsContentEmptyPreview() {
+    LettaPreviewFrame {
+        SearchResultsContent(
+            agentResults = emptyList(),
+            messageResults = emptyList(),
+            toolResults = emptyList(),
+            blockResults = emptyList(),
+            isSearching = false,
+            searchQuery = previewSearchQuery,
+            onAgentClick = {},
+            onMessageClick = {},
+            onToolClick = {},
+            onBlockClick = {},
+        )
+    }
+}
+
+// endregion

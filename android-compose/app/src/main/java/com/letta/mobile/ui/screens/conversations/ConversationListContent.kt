@@ -24,8 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.ui.components.DateSeparator
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -34,6 +37,7 @@ import com.letta.mobile.ui.screens.agentlist.LocalLettaCodeCreateReadiness
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -237,3 +241,70 @@ private fun conversationLocalDate(conversation: com.letta.mobile.data.model.Conv
         Instant.parse(timestamp).atZone(ZoneId.systemDefault()).toLocalDate()
     }.getOrDefault(LocalDate.now())
 }
+
+// region Previews
+
+private fun previewListConversation(id: String, summary: String, pinned: Boolean = false): ConversationDisplay =
+    ConversationDisplay(
+        conversation = com.letta.mobile.data.model.Conversation(
+            id = ConversationId(id),
+            agentId = AgentId("agent-1"),
+            summary = summary,
+            createdAt = "2026-08-01T09:00:00Z",
+            lastMessageAt = "2026-08-07T18:30:00Z",
+        ),
+        agentName = "General Assistant",
+        isPinned = pinned,
+    )
+
+private fun previewConversationListContentState(conversations: List<ConversationDisplay>) =
+    ConversationListContentState(
+        conversations = conversations,
+        isRefreshing = false,
+        isSearchActive = false,
+        showFirstRunOnboarding = false,
+        localReadiness = LocalLettaCodeCreateReadiness(),
+        onCreateFirstAgent = {},
+        onOpenLocalSettings = {},
+    )
+
+private fun previewConversationListActions() = ConversationListActions(
+    onConversationClick = {},
+    onOpenAdmin = {},
+    onDeleteConversation = {},
+    onRenameConversation = { _, _ -> },
+    onTogglePinned = {},
+    onForkConversation = {},
+    onRefresh = {},
+)
+
+@PreviewLightDark
+@Composable
+private fun ConversationListContentPreview() {
+    // Renders the sectioned list directly: the layoutlib preview renderer
+    // cannot execute PullToRefreshBox (NoSuchMethodError), so we bypass
+    // ConversationListRefreshableContent here.
+    LettaPreviewFrame {
+        ConversationListSections(
+            conversations = listOf(
+                previewListConversation("conv-1", "Weekly planning check-in", pinned = true),
+                previewListConversation("conv-2", "Release triage"),
+                previewListConversation("conv-3", "Research digest"),
+            ),
+            actions = previewConversationListActions(),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ConversationListContentEmptyPreview() {
+    LettaPreviewFrame {
+        ConversationListContent(
+            state = previewConversationListContentState(emptyList()),
+            actions = previewConversationListActions(),
+        )
+    }
+}
+
+// endregion
