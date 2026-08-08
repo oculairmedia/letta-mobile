@@ -667,49 +667,44 @@ private fun PreviewProjectedMessageToolCalls(call: UiToolCall, messageId: String
     }
 }
 
+private val previewBashSpec = PreviewToolCallSpec(
+    name = "Bash",
+    arguments = """{"command":"ls -la /tmp"}""",
+    result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
+    executionTimeMs = 220,
+)
+
+private val previewSearchSpec = PreviewToolCallSpec(
+    name = "search",
+    arguments = """{"query":"letta-mobile compose previews"}""",
+    result = "3 results found.",
+    executionTimeMs = 1_280,
+)
+
+private val previewFailedSpec = PreviewToolCallSpec(
+    name = "Bash",
+    arguments = """{"command":"rm -rf /missing/path"}""",
+    result = "rm: cannot remove '/missing/path': No such file or directory",
+    status = "error",
+    executionTimeMs = 80,
+)
+
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsBashPreview() {
-    PreviewProjectedMessageToolCallsBashLike(
-        spec = PreviewToolCallSpec(
-            name = "Bash",
-            arguments = """{"command":"ls -la /tmp"}""",
-            result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
-            executionTimeMs = 220,
-        ),
-        messageId = "preview-message-1",
-    )
+    PreviewProjectedMessageToolCallsBashLike(spec = previewBashSpec, messageId = "preview-message-1")
 }
 
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsSearchPreview() {
-    PreviewProjectedMessageToolCalls(
-        call = previewProjectedToolCall(
-            PreviewToolCallSpec(
-                name = "search",
-                arguments = """{"query":"letta-mobile compose previews"}""",
-                result = "3 results found.",
-                executionTimeMs = 1_280,
-            ),
-        ),
-        messageId = "preview-message-2",
-    )
+    PreviewProjectedMessageToolCalls(call = previewProjectedToolCall(previewSearchSpec), messageId = "preview-message-2")
 }
 
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsFailedPreview() {
-    PreviewProjectedMessageToolCallsBashLike(
-        spec = PreviewToolCallSpec(
-            name = "Bash",
-            arguments = """{"command":"rm -rf /missing/path"}""",
-            result = "rm: cannot remove '/missing/path': No such file or directory",
-            status = "error",
-            executionTimeMs = 80,
-        ),
-        messageId = "preview-message-3",
-    )
+    PreviewProjectedMessageToolCallsBashLike(spec = previewFailedSpec, messageId = "preview-message-3")
 }
 
 @Composable

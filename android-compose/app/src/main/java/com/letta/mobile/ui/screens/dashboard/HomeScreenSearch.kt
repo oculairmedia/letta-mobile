@@ -45,6 +45,71 @@ import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import androidx.compose.material3.Text
 
+private fun <T> androidx.compose.foundation.lazy.LazyListScope.SearchSection(
+    keyPrefix: String,
+    headerTitle: String,
+    items: List<T>,
+    expanded: Boolean,
+    onExpandedChange: () -> Unit,
+    topPadding: Boolean,
+    cardIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    primaryText: (T) -> androidx.compose.ui.text.AnnotatedString,
+    secondaryText: (T) -> androidx.compose.ui.text.AnnotatedString?,
+    onClick: (T) -> Unit,
+    idOf: (T) -> Any,
+) {
+    if (items.isEmpty()) return
+    item(key = "$keyPrefix-header") {
+        CollapsibleSectionHeader(
+            state = CollapsibleSectionHeaderState(
+                title = headerTitle,
+                count = items.size,
+                expanded = expanded,
+                topPadding = topPadding,
+            ),
+            onToggle = onExpandedChange,
+        )
+    }
+    if (expanded) {
+        items(items, key = { "$keyPrefix-${idOf(it)}" }) { item ->
+            Card(
+                onClick = { onClick(item) },
+                modifier = Modifier.fillMaxWidth().animateItem(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        cardIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = primaryText(item),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        secondaryText(item)?.let { secondary ->
+                            Text(
+                                text = secondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
 internal fun SearchResultsContent(
@@ -61,6 +126,10 @@ internal fun SearchResultsContent(
     modifier: Modifier = Modifier,
 ) {
     val highlightColors = rememberSearchHighlightColors()
+    val agentsHeader = stringResource(R.string.screen_home_search_agents_section)
+    val toolsHeader = stringResource(R.string.screen_home_search_tools_section)
+    val blocksHeader = stringResource(R.string.screen_home_search_blocks_section)
+    val unnamedBlock = stringResource(R.string.screen_home_search_unnamed_block)
 
     var agentsExpanded by rememberSaveable { mutableStateOf(true) }
     var toolsExpanded by rememberSaveable { mutableStateOf(true) }
@@ -72,161 +141,50 @@ internal fun SearchResultsContent(
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (agentResults.isNotEmpty()) {
-            item(key = "agents-header") {
-                CollapsibleSectionHeader(
-                    state = CollapsibleSectionHeaderState(
-                        title = stringResource(R.string.screen_home_search_agents_section),
-                        count = agentResults.size,
-                        expanded = agentsExpanded,
-                    ),
-                    onToggle = { agentsExpanded = !agentsExpanded },
-                )
-            }
-            if (agentsExpanded) {
-                items(agentResults, key = { "agent-${it.id}" }) { agent ->
-                    Card(
-                        onClick = { onAgentClick(agent) },
-                        modifier = Modifier.fillMaxWidth().animateItem(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                LettaIcons.Agent,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = highlightSearchMatches(agent.name, searchQuery, highlightColors),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                agent.description?.let { desc ->
-                                    Text(
-                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SearchSection(
+            keyPrefix = "agents",
+            headerTitle = agentsHeader,
+            items = agentResults,
+            expanded = agentsExpanded,
+            onExpandedChange = { agentsExpanded = !agentsExpanded },
+            topPadding = false,
+            cardIcon = LettaIcons.Agent,
+            primaryText = { highlightSearchMatches(it.name, searchQuery, highlightColors) },
+            secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
+            onClick = { onAgentClick(it) },
+            idOf = { it.id },
+        )
 
-        if (toolResults.isNotEmpty()) {
-            item(key = "tools-header") {
-                CollapsibleSectionHeader(
-                    state = CollapsibleSectionHeaderState(
-                        title = stringResource(R.string.screen_home_search_tools_section),
-                        count = toolResults.size,
-                        expanded = toolsExpanded,
-                        topPadding = true,
-                    ),
-                    onToggle = { toolsExpanded = !toolsExpanded },
-                )
-            }
-            if (toolsExpanded) {
-                items(toolResults, key = { "tool-${it.id}" }) { tool ->
-                    Card(
-                        onClick = { onToolClick(tool.id.value) },
-                        modifier = Modifier.fillMaxWidth().animateItem(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                LettaIcons.Tool,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = highlightSearchMatches(tool.name, searchQuery, highlightColors),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                tool.description?.let { desc ->
-                                    Text(
-                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SearchSection(
+            keyPrefix = "tools",
+            headerTitle = toolsHeader,
+            items = toolResults,
+            expanded = toolsExpanded,
+            onExpandedChange = { toolsExpanded = !toolsExpanded },
+            topPadding = true,
+            cardIcon = LettaIcons.Tool,
+            primaryText = { highlightSearchMatches(it.name, searchQuery, highlightColors) },
+            secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
+            onClick = { onToolClick(it.id.value) },
+            idOf = { it.id },
+        )
 
-        if (blockResults.isNotEmpty()) {
-            item(key = "blocks-header") {
-                CollapsibleSectionHeader(
-                    state = CollapsibleSectionHeaderState(
-                        title = stringResource(R.string.screen_home_search_blocks_section),
-                        count = blockResults.size,
-                        expanded = blocksExpanded,
-                        topPadding = true,
-                    ),
-                    onToggle = { blocksExpanded = !blocksExpanded },
-                )
-            }
-            if (blocksExpanded) {
-                items(blockResults, key = { "block-${it.id}" }) { block ->
-                    Card(
-                        onClick = { onBlockClick(block.id.value) },
-                        modifier = Modifier.fillMaxWidth().animateItem(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                LettaIcons.ViewModule,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                val blockLabel = block.label ?: stringResource(R.string.screen_home_search_unnamed_block)
-                                Text(
-                                    text = highlightSearchMatches(blockLabel, searchQuery, highlightColors),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                block.description?.let { desc ->
-                                    Text(
-                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SearchSection(
+            keyPrefix = "blocks",
+            headerTitle = blocksHeader,
+            items = blockResults,
+            expanded = blocksExpanded,
+            onExpandedChange = { blocksExpanded = !blocksExpanded },
+            topPadding = true,
+            cardIcon = LettaIcons.ViewModule,
+            primaryText = { block ->
+                val label = block.label ?: unnamedBlock
+                highlightSearchMatches(label, searchQuery, highlightColors)
+            },
+            secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
+            onClick = { onBlockClick(it.id.value) },
+            idOf = { it.id },
+        )
 
         if (messageResults.isNotEmpty()) {
             item(key = "messages-header") {

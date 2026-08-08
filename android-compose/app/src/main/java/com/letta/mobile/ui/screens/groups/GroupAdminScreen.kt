@@ -87,37 +87,14 @@ fun GroupAdminScreen(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = com.letta.mobile.ui.theme.LettaTopBarDefaults.scaffoldContainerColor(),
         topBar = {
-            Column(modifier = Modifier.fillMaxWidth()) {
-            LargeFlexibleTopAppBar(
-                title = {
-                    ExpandableTitleSearch(
-                        query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                        onQueryChange = viewModel::updateSearchQuery,
-                        onClear = { viewModel.updateSearchQuery("") },
-                        expanded = isSearchExpanded,
-                        onExpandedChange = { isSearchExpanded = it },
-                        placeholder = stringResource(R.string.screen_groups_search_hint),
-                        openSearchContentDescription = stringResource(R.string.action_search),
-                        closeSearchContentDescription = stringResource(R.string.action_close),
-                        titleContent = { Text(stringResource(R.string.screen_groups_title)) },
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
-                    }
-                },
-                colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+            GroupAdminTopBar(
+                uiState = uiState,
+                viewModel = viewModel,
+                isSearchExpanded = isSearchExpanded,
+                onSearchExpandedChange = { isSearchExpanded = it },
+                onNavigateBack = onNavigateBack,
                 scrollBehavior = scrollBehavior,
             )
-            ExpandableSearchField(
-                query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
-                onQueryChange = viewModel::updateSearchQuery,
-                onClear = { viewModel.updateSearchQuery("") },
-                expanded = isSearchExpanded,
-                placeholder = stringResource(R.string.screen_groups_search_hint),
-            )
-            }
         },
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
@@ -125,51 +102,141 @@ fun GroupAdminScreen(
             }
         },
     ) { paddingValues ->
-        when (val state = uiState) {
-            is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
-            is UiState.Error -> ErrorContent(
-                message = state.message,
-                onRetry = viewModel::loadGroups,
-                modifier = Modifier.padding(paddingValues),
-            )
-            is UiState.Success -> {
-                val filtered = remember(state.data.groups, state.data.searchQuery) { viewModel.getFilteredGroups() }
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                ) {
-                    if (filtered.isEmpty()) {
-                        EmptyState(
-                            icon = LettaIcons.ForkRight,
-                            message = if (state.data.searchQuery.isBlank()) {
-                                stringResource(R.string.screen_groups_empty)
-                            } else {
-                                stringResource(R.string.screen_groups_empty_search, state.data.searchQuery)
-                            },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else {
-                        LazyColumn(
-                            contentPadding = PaddingValues(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            items(filtered, key = { it.id }) { group ->
-                                GroupCard(
-                                    group = group,
-                                    onInspect = { viewModel.inspectGroup(group.id) },
-                                    onEdit = { editTarget = group },
-                                    onDelete = { deleteTarget = group },
-                                )
-                            }
+        GroupAdminContent(
+            uiState = uiState,
+            viewModel = viewModel,
+            paddingValues = paddingValues,
+            onEdit = { editTarget = it },
+            onDelete = { deleteTarget = it },
+        )
+    }
+
+    GroupAdminDialogs(
+        state = (uiState as? UiState.Success)?.data,
+        viewModel = viewModel,
+        showCreateDialog = showCreateDialog,
+        onShowCreateDialogChange = { showCreateDialog = it },
+        editTarget = editTarget,
+        onEditTargetChange = { editTarget = it },
+        deleteTarget = deleteTarget,
+        onDeleteTargetChange = { deleteTarget = it },
+        sendMessageTarget = sendMessageTarget,
+        onSendMessageTargetChange = { sendMessageTarget = it },
+        resetMessagesTarget = resetMessagesTarget,
+        onResetMessagesTargetChange = { resetMessagesTarget = it },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GroupAdminTopBar(
+    uiState: UiState<GroupAdminUiState>,
+    viewModel: GroupAdminViewModel,
+    isSearchExpanded: Boolean,
+    onSearchExpandedChange: (Boolean) -> Unit,
+    onNavigateBack: () -> Unit,
+    scrollBehavior: androidx.compose.material3.TopAppBarScrollBehavior?,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        LargeFlexibleTopAppBar(
+            title = {
+                ExpandableTitleSearch(
+                    query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+                    onQueryChange = viewModel::updateSearchQuery,
+                    onClear = { viewModel.updateSearchQuery("") },
+                    expanded = isSearchExpanded,
+                    onExpandedChange = onSearchExpandedChange,
+                    placeholder = stringResource(R.string.screen_groups_search_hint),
+                    openSearchContentDescription = stringResource(R.string.action_search),
+                    closeSearchContentDescription = stringResource(R.string.action_close),
+                    titleContent = { Text(stringResource(R.string.screen_groups_title)) },
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = onNavigateBack) {
+                    Icon(LettaIcons.ArrowBack, stringResource(R.string.action_back))
+                }
+            },
+            colors = com.letta.mobile.ui.theme.LettaTopBarDefaults.largeTopAppBarColors(),
+            scrollBehavior = scrollBehavior,
+        )
+        ExpandableSearchField(
+            query = (uiState as? UiState.Success)?.data?.searchQuery.orEmpty(),
+            onQueryChange = viewModel::updateSearchQuery,
+            onClear = { viewModel.updateSearchQuery("") },
+            expanded = isSearchExpanded,
+            placeholder = stringResource(R.string.screen_groups_search_hint),
+        )
+    }
+}
+
+@Composable
+private fun GroupAdminContent(
+    uiState: UiState<GroupAdminUiState>,
+    viewModel: GroupAdminViewModel,
+    paddingValues: PaddingValues,
+    onEdit: (Group) -> Unit,
+    onDelete: (Group) -> Unit,
+) {
+    when (val state = uiState) {
+        is UiState.Loading -> ShimmerCard(modifier = Modifier.padding(16.dp))
+        is UiState.Error -> ErrorContent(
+            message = state.message,
+            onRetry = viewModel::loadGroups,
+            modifier = Modifier.padding(paddingValues),
+        )
+        is UiState.Success -> {
+            val filtered = remember(state.data.groups, state.data.searchQuery) { viewModel.getFilteredGroups() }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+            ) {
+                if (filtered.isEmpty()) {
+                    EmptyState(
+                        icon = LettaIcons.ForkRight,
+                        message = if (state.data.searchQuery.isBlank()) {
+                            stringResource(R.string.screen_groups_empty)
+                        } else {
+                            stringResource(R.string.screen_groups_empty_search, state.data.searchQuery)
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(filtered, key = { it.id }) { group ->
+                            GroupCard(
+                                group = group,
+                                onInspect = { viewModel.inspectGroup(group.id) },
+                                onEdit = { onEdit(group) },
+                                onDelete = { onDelete(group) },
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
 
-    val state = (uiState as? UiState.Success)?.data
+@Composable
+private fun GroupAdminDialogs(
+    state: GroupAdminUiState?,
+    viewModel: GroupAdminViewModel,
+    showCreateDialog: Boolean,
+    onShowCreateDialogChange: (Boolean) -> Unit,
+    editTarget: Group?,
+    onEditTargetChange: (Group?) -> Unit,
+    deleteTarget: Group?,
+    onDeleteTargetChange: (Group?) -> Unit,
+    sendMessageTarget: Group?,
+    onSendMessageTargetChange: (Group?) -> Unit,
+    resetMessagesTarget: Group?,
+    onResetMessagesTargetChange: (Group?) -> Unit,
+) {
     state?.selectedGroup?.let { group ->
         GroupDetailDialog(
             group = group,
@@ -177,10 +244,10 @@ fun GroupAdminScreen(
             onDismiss = viewModel::clearSelectedGroup,
             onEdit = {
                 viewModel.clearSelectedGroup()
-                editTarget = group
+                onEditTargetChange(group)
             },
-            onSendMessage = { sendMessageTarget = group },
-            onResetMessages = { resetMessagesTarget = group },
+            onSendMessage = { onSendMessageTargetChange(group) },
+            onResetMessages = { onResetMessagesTargetChange(group) },
         )
     }
 
@@ -190,10 +257,10 @@ fun GroupAdminScreen(
                 title = stringResource(R.string.screen_groups_add_title),
                 confirmLabel = stringResource(R.string.action_create),
             ),
-            onDismiss = { showCreateDialog = false },
+            onDismiss = { onShowCreateDialogChange(false) },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
                 viewModel.createGroup(description, agentIds, projectId, sharedBlockIds, hidden) {
-                    showCreateDialog = false
+                    onShowCreateDialogChange(false)
                 }
             },
         )
@@ -212,10 +279,10 @@ fun GroupAdminScreen(
                 sharedBlockIds = group.sharedBlockIds.joinToString(", ") { it.value },
                 hidden = group.hidden == true,
             ),
-            onDismiss = { editTarget = null },
+            onDismiss = { onEditTargetChange(null) },
             onConfirm = { description, agentIds, projectId, sharedBlockIds, hidden ->
                 viewModel.updateGroup(group.id, description, agentIds, projectId, sharedBlockIds, hidden) {
-                    editTarget = null
+                    onEditTargetChange(null)
                 }
             },
         )
@@ -230,9 +297,9 @@ fun GroupAdminScreen(
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
                 viewModel.deleteGroup(group.id)
-                deleteTarget = null
+                onDeleteTargetChange(null)
             },
-            onDismiss = { deleteTarget = null },
+            onDismiss = { onDeleteTargetChange(null) },
             destructive = true,
         )
     }
@@ -245,9 +312,9 @@ fun GroupAdminScreen(
             confirmText = stringResource(R.string.action_send_message),
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = { input ->
-                viewModel.sendMessage(group.id, input) { sendMessageTarget = null }
+                viewModel.sendMessage(group.id, input) { onSendMessageTargetChange(null) }
             },
-            onDismiss = { sendMessageTarget = null },
+            onDismiss = { onSendMessageTargetChange(null) },
         )
     }
 
@@ -260,9 +327,9 @@ fun GroupAdminScreen(
             dismissText = stringResource(R.string.action_cancel),
             onConfirm = {
                 viewModel.resetMessages(group.id)
-                resetMessagesTarget = null
+                onResetMessagesTargetChange(null)
             },
-            onDismiss = { resetMessagesTarget = null },
+            onDismiss = { onResetMessagesTargetChange(null) },
             destructive = true,
         )
     }

@@ -277,49 +277,49 @@ private fun PreviewRunActivityDisclosure(state: PreviewRunActivityDisclosureStat
     }
 }
 
+private val previewWorkingState = PreviewRunActivityDisclosureState(
+    state = RunActivityState.Working,
+    durationMs = null,
+    toolCount = 0,
+    failureCount = 0,
+    collapsed = false,
+    chatMode = "interactive",
+)
+
+private val previewThoughtState = PreviewRunActivityDisclosureState(
+    state = RunActivityState.Thought,
+    durationMs = 2_400,
+    toolCount = 3,
+    failureCount = 0,
+    collapsed = false,
+    chatMode = "interactive",
+)
+
+private val previewCollapsedState = PreviewRunActivityDisclosureState(
+    state = RunActivityState.Worked,
+    durationMs = 8_200,
+    toolCount = 5,
+    failureCount = 1,
+    collapsed = true,
+    chatMode = "simple",
+)
+
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureWorkingPreview() {
-    RunActivityDisclosurePreviewByState(
-        PreviewRunActivityDisclosureState(
-            state = RunActivityState.Working,
-            durationMs = null,
-            toolCount = 0,
-            failureCount = 0,
-            collapsed = false,
-            chatMode = "interactive",
-        ),
-    )
+    RunActivityDisclosurePreviewByState(previewWorkingState)
 }
 
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureThoughtPreview() {
-    RunActivityDisclosurePreviewByState(
-        PreviewRunActivityDisclosureState(
-            state = RunActivityState.Thought,
-            durationMs = 2_400,
-            toolCount = 3,
-            failureCount = 0,
-            collapsed = false,
-            chatMode = "interactive",
-        ),
-    )
+    RunActivityDisclosurePreviewByState(previewThoughtState)
 }
 
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureCollapsedPreview() {
-    RunActivityDisclosurePreviewByState(
-        PreviewRunActivityDisclosureState(
-            state = RunActivityState.Worked,
-            durationMs = 8_200,
-            toolCount = 5,
-            failureCount = 1,
-            collapsed = true,
-            chatMode = "simple",
-        ),
-    )
+    RunActivityDisclosurePreviewByState(previewCollapsedState)
 }
 
 @Composable
