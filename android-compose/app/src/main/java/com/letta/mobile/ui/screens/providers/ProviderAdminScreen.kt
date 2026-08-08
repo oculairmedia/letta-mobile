@@ -586,7 +586,7 @@ private val previewProvider = Provider(
     name = "Anthropic Prod",
     providerType = "anthropic",
     providerCategory = "Hosted",
-    baseUrl = "https://api.anthropic.com",
+    baseUrl = "https://example.test/local",
     region = "us-east-1",
     apiKey = "sk-ant-sample",
 )

@@ -244,7 +244,7 @@ private fun previewAskUserQuestionApproval(
     ),
 )
 
-private const val PreviewAskUserQuestionSingleArguments: String = """{
+private const val PREVIEW_ASK_USER_QUESTION_SINGLE_ARGUMENTS: String = """{
   "questions": [
     {
       "header": "Format",
@@ -259,7 +259,7 @@ private const val PreviewAskUserQuestionSingleArguments: String = """{
   ]
 }"""
 
-private const val PreviewAskUserQuestionMultiArguments: String = """{
+private const val PREVIEW_ASK_USER_QUESTION_MULTI_ARGUMENTS: String = """{
   "questions": [
     {
       "header": "Channels",
@@ -282,7 +282,7 @@ private fun AskUserQuestionCardSinglePreview() {
         LettaChatTheme {
             AskUserQuestionCard(
                 approval = previewAskUserQuestionApproval(
-                    argumentsJson = PreviewAskUserQuestionSingleArguments,
+                    argumentsJson = PREVIEW_ASK_USER_QUESTION_SINGLE_ARGUMENTS,
                 ),
                 isSubmitting = false,
                 onDecision = { _, _, _, _ -> },
@@ -298,7 +298,7 @@ private fun AskUserQuestionCardMultiPreview() {
         LettaChatTheme {
             AskUserQuestionCard(
                 approval = previewAskUserQuestionApproval(
-                    argumentsJson = PreviewAskUserQuestionMultiArguments,
+                    argumentsJson = PREVIEW_ASK_USER_QUESTION_MULTI_ARGUMENTS,
                 ),
                 isSubmitting = false,
                 onDecision = { _, _, _, _ -> },

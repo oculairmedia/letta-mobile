@@ -354,9 +354,9 @@ private fun previewTool(
 @Composable
 private fun ToolTilePreview() {
     LettaPreviewFrame {
-        Row(
+        Column(
             modifier = Modifier.padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ToolTile(tool = previewTool(), onClick = {})
             ToolTile(

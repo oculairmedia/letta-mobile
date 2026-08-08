@@ -289,14 +289,14 @@ private val previewServerConfigs = listOf(
     ServerConfig(
         id = "config-1",
         mode = ServerMode.CLOUD,
-        url = "api.letta.com",
+        url = "example.test/local",
         isActive = true,
         health = ServerHealthState.ONLINE,
     ),
     ServerConfig(
         id = "config-2",
         mode = ServerMode.SELF_HOSTED,
-        url = "letta.example.com",
+        url = "example.test/local",
         isActive = false,
         health = ServerHealthState.OFFLINE,
     ),

@@ -357,7 +357,7 @@ private fun BackendSwitcherRowPreview() {
                     PreviewServerConfig(
                         id = "config-1",
                         mode = ServerMode.SELF_HOSTED,
-                        url = "https://letta.example.com",
+                        url = "https://example.test/local",
                         isActive = true,
                         health = ServerHealthState.ONLINE,
                     ),
@@ -371,7 +371,7 @@ private fun BackendSwitcherRowPreview() {
                     PreviewServerConfig(
                         id = "config-2",
                         mode = ServerMode.CLOUD,
-                        url = "https://api.letta.com",
+                        url = "https://example.test/local",
                         isActive = false,
                         health = ServerHealthState.OFFLINE,
                     ),

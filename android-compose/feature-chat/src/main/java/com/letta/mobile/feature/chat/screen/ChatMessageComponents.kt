@@ -38,6 +38,7 @@ import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
@@ -270,7 +271,9 @@ internal fun buildMessageCopyText(message: UiMessage): String {
 @Composable
 private fun MessageAvatarUserPreview() {
     LettaPreviewFrame {
-        MessageAvatar(role = "user")
+        LettaChatTheme {
+            MessageAvatar(role = "user")
+        }
     }
 }
 
@@ -278,7 +281,9 @@ private fun MessageAvatarUserPreview() {
 @Composable
 private fun MessageAvatarAssistantPreview() {
     LettaPreviewFrame {
-        MessageAvatar(role = "assistant")
+        LettaChatTheme {
+            MessageAvatar(role = "assistant")
+        }
     }
 }
 
@@ -286,7 +291,9 @@ private fun MessageAvatarAssistantPreview() {
 @Composable
 private fun MessageAvatarToolPreview() {
     LettaPreviewFrame {
-        MessageAvatar(role = "tool")
+        LettaChatTheme {
+            MessageAvatar(role = "tool")
+        }
     }
 }
 
