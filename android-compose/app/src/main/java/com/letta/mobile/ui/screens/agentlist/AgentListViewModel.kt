@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSearchMatcher
 import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
@@ -304,13 +305,7 @@ class AgentListViewModel @Inject constructor(
         }
 
         if (state.searchQuery.isNotBlank()) {
-            val q = state.searchQuery.trim().lowercase()
-            result = result.filter { agent ->
-                agent.name.lowercase().contains(q) ||
-                    (agent.description?.lowercase()?.contains(q) == true) ||
-                    (agent.model?.lowercase()?.contains(q) == true) ||
-                    agent.tags.any { it.lowercase().contains(q) }
-            }
+            result = AgentSearchMatcher.filter(result, state.searchQuery)
         }
 
         return result

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSearchMatcher
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageSearchRequest
@@ -325,10 +326,7 @@ class DashboardViewModel @Inject constructor(
 
                     // Local filtering is instant — apply immediately.
                     val q = snapshot.query.trim().lowercase()
-                    val agents = snapshot.agents.filter { agent ->
-                        agent.name.lowercase().contains(q) ||
-                            (agent.description?.lowercase()?.contains(q) == true)
-                    }
+                    val agents = AgentSearchMatcher.filter(snapshot.agents, snapshot.query)
                     val tools = snapshot.tools.filter { tool ->
                         tool.name.lowercase().contains(q) ||
                             (tool.description?.lowercase()?.contains(q) == true)
