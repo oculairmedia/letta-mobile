@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.ui.components.ActionSheet
@@ -47,6 +48,7 @@ import com.letta.mobile.ui.components.ActionSheetItem
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import kotlinx.collections.immutable.ImmutableList
 import sh.calvin.reorderable.ReorderableItem
@@ -433,3 +435,53 @@ internal fun CollapsibleSectionHeader(
 }
 
 internal fun formatNumber(value: Int): String = String.format(Locale.US, "%,d", value)
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun PinnedAgentCardPreview() {
+    LettaPreviewFrame {
+        PinnedAgentCard(
+            name = "General Assistant",
+            onClick = {},
+            onUnpin = {},
+            onConfigure = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(108.dp),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun DashboardWidgetTilePreview() {
+    LettaPreviewFrame {
+        DashboardWidgetTile(
+            shortcut = DashboardShortcut.CONVERSATIONS,
+            contextualInfo = "12",
+            onClick = {},
+            onUnpin = {},
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(108.dp),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun CollapsibleSectionHeaderPreview() {
+    LettaPreviewFrame {
+        CollapsibleSectionHeader(
+            title = "Pinned",
+            count = 4,
+            expanded = true,
+            onToggle = {},
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+    }
+}
+
+// endregion
