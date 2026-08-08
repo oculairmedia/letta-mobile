@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,6 +64,7 @@ import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemSupporting
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -597,3 +599,58 @@ private fun LettaMessage.toSummary(): String = when (this) {
     is ToolReturnMessage -> toolReturn.funcResponse ?: toolReturn.status
     else -> id
 }
+
+// region Previews
+
+private val previewGroup = Group(
+    id = com.letta.mobile.data.model.GroupId("group-1"),
+    managerType = "round-robin",
+    agentIds = listOf(
+        com.letta.mobile.data.model.AgentId("agent-1"),
+        com.letta.mobile.data.model.AgentId("agent-2"),
+    ),
+    description = "Research team",
+    hidden = false,
+)
+
+@PreviewLightDark
+@Composable
+private fun GroupCardPreview() {
+    LettaPreviewFrame {
+        GroupCard(
+            group = previewGroup,
+            onInspect = {},
+            onEdit = {},
+            onDelete = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun GroupEditorDialogPreview() {
+    LettaPreviewFrame {
+        GroupEditorDialog(
+            title = "Edit group",
+            confirmLabel = "Save",
+            onDismiss = {},
+            onConfirm = { _, _, _, _, _ -> },
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun GroupMessageCardPreview() {
+    LettaPreviewFrame {
+        GroupMessageCard(
+            message = UserMessage(
+                id = "msg-1",
+                date = "2026-08-07T18:30:00Z",
+                contentRaw = kotlinx.serialization.json.JsonPrimitive("Hello, group!"),
+            ),
+        )
+    }
+}
+
+// endregion

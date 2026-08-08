@@ -48,6 +48,8 @@ import com.letta.mobile.data.schedules.ScheduleLibraryItem
 import com.letta.mobile.data.schedules.ScheduleTiming
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.ConfirmDialog
@@ -59,6 +61,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.motion.StaggeredListItem
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -456,3 +459,92 @@ private fun CreateScheduleDialog(
         }
     }
 }
+
+// region Previews
+
+private val previewAgentSummary = AgentSummary(
+    id = AgentId("agent-1"),
+    name = "General Assistant",
+    description = "A general-purpose Letta agent",
+)
+
+private val previewRecurringItem = ScheduleLibraryItem(
+    schedule = ScheduledMessage(
+        id = "schedule-recurring-1",
+        agentId = "agent-1",
+        message = com.letta.mobile.data.model.SchedulePayload(
+            messages = listOf(ScheduleMessage(content = "Send daily summary to user.", role = "user")),
+        ),
+        schedule = ScheduleDefinition(type = "recurring", cronExpression = "0 9 * * *"),
+    ),
+    messagePreview = "Send daily summary to user.",
+    timing = ScheduleTiming.Recurring(cronExpression = "0 9 * * *"),
+)
+
+private val previewOneTimeItem = ScheduleLibraryItem(
+    schedule = ScheduledMessage(
+        id = "schedule-one-time-1",
+        agentId = "agent-1",
+        message = com.letta.mobile.data.model.SchedulePayload(
+            messages = listOf(ScheduleMessage(content = "Remind me about the release tomorrow.", role = "user")),
+        ),
+        schedule = ScheduleDefinition(type = "one-time", scheduledAt = 1725120000.0),
+    ),
+    messagePreview = "Remind me about the release tomorrow.",
+    timing = ScheduleTiming.OneTime(displayTime = "Tomorrow at 09:00"),
+)
+
+private val previewCronTask = CronTask(
+    id = "cron-1",
+    agentId = "agent-1",
+    conversationId = "conv-1",
+    name = "Daily standup",
+    description = "Posts the daily standup prompt each morning.",
+    cron = "0 9 * * 1-5",
+    timezone = "America/Los_Angeles",
+    recurring = true,
+    prompt = "Post the daily standup prompt.",
+)
+
+private val previewAgents = listOf(
+    previewAgentSummary,
+    previewAgentSummary.copy(id = AgentId("agent-2"), name = "Code Helper"),
+)
+
+@PreviewLightDark
+@Composable
+private fun ScheduleCardRecurringPreview() {
+    LettaPreviewFrame {
+        ScheduleCard(item = previewRecurringItem, onDelete = {})
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ScheduleCardOneTimePreview() {
+    LettaPreviewFrame {
+        ScheduleCard(item = previewOneTimeItem, onDelete = {})
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun CronScheduleCardPreview() {
+    LettaPreviewFrame {
+        CronScheduleCard(cron = previewCronTask)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AgentSelectorPreview() {
+    LettaPreviewFrame {
+        AgentSelector(
+            agents = previewAgents,
+            selectedAgentId = previewAgentSummary.id.value,
+            onAgentSelected = {},
+        )
+    }
+}
+
+// endregion
