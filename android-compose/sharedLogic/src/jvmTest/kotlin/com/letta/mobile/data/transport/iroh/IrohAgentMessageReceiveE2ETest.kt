@@ -117,4 +117,60 @@ class IrohAgentMessageReceiveE2ETest {
         scope.coroutineContext[Job]?.cancel()
         Unit
     }
+
+    /**
+     * letta-mobile-5m1qy: an inbound envelope WITH conversationId lands the
+     * deliver decision on that EXACT conversation — not on the most-recent
+     * interactive one.
+     */
+    @Test
+    fun inboundWithExplicitConversationIdLandsOnThatExactConversation() = runBlocking {
+        senderEp = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode()))
+        receiverEp = Endpoint.bind(EndpointOptions(relayMode = RelayMode.defaultMode(), alpns = listOf(IrohAgentMessage.ALPN)))
+        receiverEp.online(); senderEp.online()
+
+        val turns = AtomicInteger(0)
+        val landed = CompletableDeferred<String>()
+        val router = IrohAgentMessageRouter(ownAgentId = "agent-recv")
+        val receiver = IrohAgentMessageReceiver(
+            endpoint = receiverEp,
+            router = router,
+            conversationsFor = {
+                listOf(
+                    heartbeat("hb", "2026-07-17T12:00:00Z"),
+                    interactive("chat", "2026-07-17T11:00:00Z"),
+                    // The explicit target is the OLDEST interactive conversation.
+                    interactive("working-conv", "2026-07-17T09:00:00Z"),
+                )
+            },
+            onDeliver = { _, decision ->
+                if (decision is IrohAgentMessageRouter.RoutingDecision.Deliver) {
+                    turns.incrementAndGet()
+                    landed.complete(decision.conversationId)
+                }
+            },
+        )
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val job = receiver.start(scope)
+
+        // Publish the receiver address + send.
+        val store = FileIrohAgentAddressStore(File.createTempFile("5m1qy", ".kv").apply { deleteOnExit() })
+        val addr = receiverEp.addr()
+        val nodeHex = addr.id().toBytes().joinToString("") { "%02x".format(it) }
+        val direct = withContext(Dispatchers.IO) { addr.directAddresses() }
+        store.register(IrohAgentAddress("agent-recv", nodeHex, direct))
+        val sender = IrohAgentMessageSender(senderEp, IrohAgentAddressResolver(store))
+
+        val result = sender.send(
+            IrohAgentMessage("agent-sender", "agent-recv", "hi", "m-target", 1L, conversationId = "working-conv"),
+        )
+        assertIs<AgentSendResult.Delivered>(result)
+
+        val landedConv = withTimeout(15.seconds) { landed.await() }
+        assertEquals("working-conv", landedConv, "must land on the explicit target conversation, not the most-recent one")
+        assertEquals(1, turns.get(), "exactly one turn triggered")
+        job.cancel()
+        scope.coroutineContext[Job]?.cancel()
+        Unit
+    }
 }

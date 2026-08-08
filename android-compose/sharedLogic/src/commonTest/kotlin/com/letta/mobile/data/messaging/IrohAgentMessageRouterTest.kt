@@ -143,4 +143,90 @@ class IrohAgentMessageRouterTest {
         val capped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(r.route("s", "m-3", candidates))
         assertEquals("per_sender_cap_exceeded", capped.reason)
     }
+
+    // letta-mobile-5m1qy: explicit target conversation routing.
+
+    private fun convState(
+        id: String,
+        cls: ConversationClass?,
+        lastMessageAt: String,
+        busy: Boolean,
+    ) = IrohAgentMessageRouter.ConversationState(
+        conversation = Conversation(
+            id = ConversationId(id),
+            agentId = AgentId("agent-target"),
+            conversationClass = cls,
+            lastMessageAt = lastMessageAt,
+        ),
+        busy = busy,
+    )
+
+    @Test
+    fun explicitTargetPresentAndIdleDeliversToThatConversationNotMostRecent() {
+        val decision = router().route(
+            fromAgentId = "agent-sender",
+            msgId = "m-1",
+            candidates = listOf(
+                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
+                convState("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = false),
+            ),
+            targetConversationId = "target-conv",
+        )
+        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
+        assertEquals("target-conv", deliver.conversationId)
+    }
+
+    @Test
+    fun explicitTargetPresentAndBusyQueuesOnThatConversation() {
+        val decision = router().route(
+            fromAgentId = "agent-sender",
+            msgId = "m-1",
+            candidates = listOf(
+                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
+                convState("target-conv", ConversationClass.INTERACTIVE, "2026-07-17T09:00:00Z", busy = true),
+            ),
+            targetConversationId = "target-conv",
+        )
+        val queue = assertIs<IrohAgentMessageRouter.RoutingDecision.Queue>(decision)
+        assertEquals("target-conv", queue.conversationId)
+    }
+
+    @Test
+    fun explicitTargetAbsentDropsWithDistinctReasonNeverCreates() {
+        val decision = router().route(
+            fromAgentId = "agent-sender",
+            msgId = "m-1",
+            candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z")),
+            targetConversationId = "missing-conv",
+        )
+        val dropped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(decision)
+        assertEquals("target_conversation_not_found", dropped.reason)
+    }
+
+    @Test
+    fun pingPongGuardFiresBeforeExplicitTarget() {
+        val decision = router().route(
+            fromAgentId = "agent-target", // own id — ping-pong guard must win over explicit target
+            msgId = "m-1",
+            candidates = listOf(conv("c", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z")),
+            targetConversationId = "c",
+        )
+        val dropped = assertIs<IrohAgentMessageRouter.RoutingDecision.Dropped>(decision)
+        assertEquals("ping_pong_own_or_sibling", dropped.reason)
+    }
+
+    @Test
+    fun nullExplicitTargetKeepsMostRecentInteractiveBehavior() {
+        val decision = router().route(
+            fromAgentId = "agent-sender",
+            msgId = "m-1",
+            candidates = listOf(
+                conv("older", ConversationClass.INTERACTIVE, "2026-07-17T10:00:00Z"),
+                conv("newest", ConversationClass.INTERACTIVE, "2026-07-17T12:00:00Z"),
+            ),
+            targetConversationId = null,
+        )
+        val deliver = assertIs<IrohAgentMessageRouter.RoutingDecision.Deliver>(decision)
+        assertEquals("newest", deliver.conversationId)
+    }
 }
