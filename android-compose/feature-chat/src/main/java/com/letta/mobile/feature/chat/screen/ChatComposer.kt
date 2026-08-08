@@ -720,17 +720,28 @@ private fun rememberAttachmentImageBitmap(base64: String) = remember(base64) {
 
 // region Previews
 
+private sealed interface ChatComposerPreviewMode {
+    data object Idle : ChatComposerPreviewMode
+    data object Draft : ChatComposerPreviewMode
+    data object Streaming : ChatComposerPreviewMode
+}
+
 private val previewChatComposerNoop: () -> Unit = {}
 private val previewChatComposerNoopInt: (Int) -> Unit = { _ -> }
 
-@PreviewLightDark
+private fun previewChatComposerInputText(mode: ChatComposerPreviewMode): String = when (mode) {
+    ChatComposerPreviewMode.Idle -> ""
+    ChatComposerPreviewMode.Draft -> "Draft a release announcement for v0.4.2."
+    ChatComposerPreviewMode.Streaming -> "Drafting the announcement, give me a moment…"
+}
+
 @Composable
-private fun ChatComposerIdlePreview() {
+private fun PreviewChatComposer(mode: ChatComposerPreviewMode) {
     LettaPreviewFrame {
         ChatComposer(
-            inputText = "",
+            inputText = previewChatComposerInputText(mode),
             pendingAttachments = kotlinx.collections.immutable.persistentListOf(),
-            isStreaming = false,
+            isStreaming = mode is ChatComposerPreviewMode.Streaming,
             canSendMessages = true,
             onTextChange = { _ -> },
             onSend = { _ -> },
@@ -739,42 +750,24 @@ private fun ChatComposerIdlePreview() {
             onAttachImage = previewChatComposerNoop,
         )
     }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChatComposerIdlePreview() {
+    PreviewChatComposer(ChatComposerPreviewMode.Idle)
 }
 
 @PreviewLightDark
 @Composable
 private fun ChatComposerDraftPreview() {
-    LettaPreviewFrame {
-        ChatComposer(
-            inputText = "Draft a release announcement for v0.4.2.",
-            pendingAttachments = kotlinx.collections.immutable.persistentListOf(),
-            isStreaming = false,
-            canSendMessages = true,
-            onTextChange = { _ -> },
-            onSend = { _ -> },
-            onStop = previewChatComposerNoop,
-            onRemoveAttachment = previewChatComposerNoopInt,
-            onAttachImage = previewChatComposerNoop,
-        )
-    }
+    PreviewChatComposer(ChatComposerPreviewMode.Draft)
 }
 
 @PreviewLightDark
 @Composable
 private fun ChatComposerStreamingPreview() {
-    LettaPreviewFrame {
-        ChatComposer(
-            inputText = "Drafting the announcement, give me a moment…",
-            pendingAttachments = kotlinx.collections.immutable.persistentListOf(),
-            isStreaming = true,
-            canSendMessages = true,
-            onTextChange = { _ -> },
-            onSend = { _ -> },
-            onStop = previewChatComposerNoop,
-            onRemoveAttachment = previewChatComposerNoopInt,
-            onAttachImage = previewChatComposerNoop,
-        )
-    }
+    PreviewChatComposer(ChatComposerPreviewMode.Streaming)
 }
 
 // endregion

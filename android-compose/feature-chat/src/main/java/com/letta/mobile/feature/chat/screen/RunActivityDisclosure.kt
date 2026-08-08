@@ -245,52 +245,75 @@ private fun previewRunActivity(
     failureCount = failureCount,
 )
 
+private data class PreviewRunActivityDisclosureState(
+    val state: RunActivityState,
+    val durationMs: Long?,
+    val toolCount: Int,
+    val failureCount: Int,
+    val collapsed: Boolean,
+    val chatMode: String,
+)
+
+@Composable
+private fun PreviewRunActivityDisclosure(state: PreviewRunActivityDisclosureState) {
+    LettaPreviewFrame {
+        RunActivityDisclosure(
+            activity = previewRunActivity(
+                state = state.state,
+                durationMs = state.durationMs,
+                toolCount = state.toolCount,
+                failureCount = state.failureCount,
+            ),
+            collapsed = state.collapsed,
+            onToggleCollapsed = {},
+            chatMode = state.chatMode,
+        )
+    }
+}
+
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureWorkingPreview() {
-    LettaPreviewFrame {
-        RunActivityDisclosure(
-            activity = previewRunActivity(state = RunActivityState.Working),
+    PreviewRunActivityDisclosure(
+        PreviewRunActivityDisclosureState(
+            state = RunActivityState.Working,
+            durationMs = null,
+            toolCount = 0,
+            failureCount = 0,
             collapsed = false,
-            onToggleCollapsed = {},
             chatMode = "interactive",
-        )
-    }
+        ),
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureThoughtPreview() {
-    LettaPreviewFrame {
-        RunActivityDisclosure(
-            activity = previewRunActivity(
-                state = RunActivityState.Thought,
-                durationMs = 2_400,
-                toolCount = 3,
-            ),
+    PreviewRunActivityDisclosure(
+        PreviewRunActivityDisclosureState(
+            state = RunActivityState.Thought,
+            durationMs = 2_400,
+            toolCount = 3,
+            failureCount = 0,
             collapsed = false,
-            onToggleCollapsed = {},
             chatMode = "interactive",
-        )
-    }
+        ),
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun RunActivityDisclosureCollapsedPreview() {
-    LettaPreviewFrame {
-        RunActivityDisclosure(
-            activity = previewRunActivity(
-                state = RunActivityState.Worked,
-                durationMs = 8_200,
-                toolCount = 5,
-                failureCount = 1,
-            ),
+    PreviewRunActivityDisclosure(
+        PreviewRunActivityDisclosureState(
+            state = RunActivityState.Worked,
+            durationMs = 8_200,
+            toolCount = 5,
+            failureCount = 1,
             collapsed = true,
-            onToggleCollapsed = {},
             chatMode = "simple",
-        )
-    }
+        ),
+    )
 }
 
 // endregion

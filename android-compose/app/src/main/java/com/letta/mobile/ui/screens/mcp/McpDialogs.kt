@@ -404,52 +404,46 @@ private val previewFormStdioState = McpServerFormState(
     envText = "DEBUG=1\nLOG_LEVEL=info",
 )
 
-@PreviewLightDark
 @Composable
-private fun ServerFormDialogCreatePreview() {
+private fun PreviewServerFormDialog(
+    formState: McpServerFormState? = null,
+    initialServer: McpServer? = null,
+) {
     LettaPreviewFrame {
         ServerFormDialog(
-            initialServer = null,
-            initialFormStateOverride = previewFormHttpState,
+            initialServer = initialServer,
+            initialFormStateOverride = formState,
             onDismiss = {},
             onCreate = {},
             onUpdate = { _, _ -> },
         )
     }
+}
+
+private val previewFormEditServer = McpServer(
+    id = McpServerId("server-1"),
+    serverName = "Existing Server",
+    serverUrl = "https://mcp.example.com/edit",
+    authHeader = "X-Api-Key",
+    type = "streamable_http",
+)
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogCreatePreview() {
+    PreviewServerFormDialog(formState = previewFormHttpState)
 }
 
 @PreviewLightDark
 @Composable
 private fun ServerFormDialogStdioPreview() {
-    LettaPreviewFrame {
-        ServerFormDialog(
-            initialServer = null,
-            initialFormStateOverride = previewFormStdioState,
-            onDismiss = {},
-            onCreate = {},
-            onUpdate = { _, _ -> },
-        )
-    }
+    PreviewServerFormDialog(formState = previewFormStdioState)
 }
 
 @PreviewLightDark
 @Composable
 private fun ServerFormDialogEditPreview() {
-    LettaPreviewFrame {
-        ServerFormDialog(
-            initialServer = McpServer(
-                id = McpServerId("server-1"),
-                serverName = "Existing Server",
-                serverUrl = "https://mcp.example.com/edit",
-                authHeader = "X-Api-Key",
-                type = "streamable_http",
-            ),
-            initialFormStateOverride = null,
-            onDismiss = {},
-            onCreate = {},
-            onUpdate = { _, _ -> },
-        )
-    }
+    PreviewServerFormDialog(initialServer = previewFormEditServer)
 }
 
 // endregion

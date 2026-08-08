@@ -376,13 +376,12 @@ private fun CreateProjectSummaryChipPreview() {
     }
 }
 
-@PreviewLightDark
 @Composable
-private fun CreateProjectBottomBarPreview() {
+private fun PreviewCreateProjectBottomBar(submitting: Boolean = false) {
     LettaPreviewFrame {
         CreateProjectBottomBar(
-            step = ConversationalProjectStep.Goal,
-            isSubmitting = false,
+            step = if (submitting) ConversationalProjectStep.Review else ConversationalProjectStep.Goal,
+            isSubmitting = submitting,
             canAdvance = true,
             onBack = {},
             onAdvance = {},
@@ -392,16 +391,14 @@ private fun CreateProjectBottomBarPreview() {
 
 @PreviewLightDark
 @Composable
+private fun CreateProjectBottomBarPreview() {
+    PreviewCreateProjectBottomBar()
+}
+
+@PreviewLightDark
+@Composable
 private fun CreateProjectBottomBarSubmittingPreview() {
-    LettaPreviewFrame {
-        CreateProjectBottomBar(
-            step = ConversationalProjectStep.Review,
-            isSubmitting = true,
-            canAdvance = true,
-            onBack = {},
-            onAdvance = {},
-        )
-    }
+    PreviewCreateProjectBottomBar(submitting = true)
 }
 
 @PreviewLightDark

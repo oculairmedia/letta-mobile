@@ -414,57 +414,56 @@ private fun previewUiMessage(
     isError = isError,
 )
 
-@PreviewLightDark
 @Composable
-private fun MessageBubbleSurfaceUserPreview() {
+private fun PreviewMessageBubble(
+    role: String,
+    content: String,
+    latencyMs: Long? = null,
+    isError: Boolean = false,
+) {
     LettaPreviewFrame {
         LettaChatTheme {
             MessageBubbleSurface(
                 message = previewUiMessage(
-                    role = "user",
-                    content = "Can you summarize the latest sales numbers?",
+                    role = role,
+                    content = content,
+                    latencyMs = latencyMs,
+                    isError = isError,
                 ),
                 groupPosition = GroupPosition.None,
                 isStreaming = false,
             )
         }
     }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageBubbleSurfaceUserPreview() {
+    PreviewMessageBubble(
+        role = "user",
+        content = "Can you summarize the latest sales numbers?",
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun MessageBubbleSurfaceAssistantPreview() {
-    LettaPreviewFrame {
-        LettaChatTheme {
-            MessageBubbleSurface(
-                message = previewUiMessage(
-                    role = "assistant",
-                    content = "Here is the summary you asked for.",
-                    latencyMs = 1_240,
-                ),
-                groupPosition = GroupPosition.None,
-                isStreaming = false,
-            )
-        }
-    }
+    PreviewMessageBubble(
+        role = "assistant",
+        content = "Here is the summary you asked for.",
+        latencyMs = 1_240,
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun MessageBubbleSurfaceErrorPreview() {
-    LettaPreviewFrame {
-        LettaChatTheme {
-            MessageBubbleSurface(
-                message = previewUiMessage(
-                    role = "assistant",
-                    content = "The request failed: server returned 503.",
-                    isError = true,
-                ),
-                groupPosition = GroupPosition.None,
-                isStreaming = false,
-            )
-        }
-    }
+    PreviewMessageBubble(
+        role = "assistant",
+        content = "The request failed: server returned 503.",
+        isError = true,
+    )
 }
 
 // endregion

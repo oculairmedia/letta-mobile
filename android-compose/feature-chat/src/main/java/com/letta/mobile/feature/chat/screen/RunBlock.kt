@@ -586,20 +586,22 @@ private fun UiMessage.runStepDotCenterY() = when {
 
 // region Previews
 
-private fun previewRunMessage(
-    id: String,
-    content: String,
-    runId: String = "preview-run",
-    stepId: String? = "step-$id",
-    latencyMs: Long? = null,
-): UiMessage = UiMessage(
-    id = id,
+private data class PreviewRunMessageSpec(
+    val id: String,
+    val content: String,
+    val runId: String = "preview-run",
+    val stepId: String? = "step-$id",
+    val latencyMs: Long? = null,
+)
+
+private fun previewRunMessage(spec: PreviewRunMessageSpec): UiMessage = UiMessage(
+    id = spec.id,
     role = "assistant",
-    content = content,
+    content = spec.content,
     timestamp = "2026-08-08T00:00:00Z",
-    runId = runId,
-    stepId = stepId,
-    latencyMs = latencyMs,
+    runId = spec.runId,
+    stepId = spec.stepId,
+    latencyMs = spec.latencyMs,
 )
 
 @Composable
@@ -617,18 +619,17 @@ private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowMod
     }
 }
 
-@PreviewLightDark
 @Composable
-private fun RunBlockExpandedPreview() {
+private fun PreviewRunBlock(expanded: Boolean = true) {
     LettaPreviewFrame {
         LettaChatTheme {
             RunBlock(
                 messages = listOf(
-                    previewRunMessage("step-1", "I will search the codebase for matching patterns."),
-                    previewRunMessage("step-2", "Found three candidates, let me check each."),
-                    previewRunMessage("step-3", "All three confirmed, here is the summary."),
+                    previewRunMessage(PreviewRunMessageSpec("step-1", "I will search the codebase for matching patterns.")),
+                    previewRunMessage(PreviewRunMessageSpec("step-2", "Found three candidates, let me check each.")),
+                    previewRunMessage(PreviewRunMessageSpec("step-3", "All three confirmed, here is the summary.")),
                 ),
-                collapsed = false,
+                collapsed = !expanded,
                 onToggleCollapsed = {},
                 isStreaming = false,
                 renderRow = ::previewRunBubble,
@@ -639,22 +640,14 @@ private fun RunBlockExpandedPreview() {
 
 @PreviewLightDark
 @Composable
+private fun RunBlockExpandedPreview() {
+    PreviewRunBlock(expanded = true)
+}
+
+@PreviewLightDark
+@Composable
 private fun RunBlockCollapsedPreview() {
-    LettaPreviewFrame {
-        LettaChatTheme {
-            RunBlock(
-                messages = listOf(
-                    previewRunMessage("step-1", "I will search the codebase for matching patterns."),
-                    previewRunMessage("step-2", "Found three candidates, let me check each."),
-                    previewRunMessage("step-3", "All three confirmed, here is the summary."),
-                ),
-                collapsed = true,
-                onToggleCollapsed = {},
-                isStreaming = false,
-                renderRow = ::previewRunBubble,
-            )
-        }
-    }
+    PreviewRunBlock(expanded = false)
 }
 
 @PreviewLightDark
@@ -664,7 +657,7 @@ private fun RunBlockWorkingPreview() {
         LettaChatTheme {
             RunBlock(
                 messages = listOf(
-                    previewRunMessage("step-1", "Starting the diagnostic sweep…"),
+                    previewRunMessage(PreviewRunMessageSpec("step-1", "Starting the diagnostic sweep…")),
                 ),
                 collapsed = false,
                 onToggleCollapsed = {},

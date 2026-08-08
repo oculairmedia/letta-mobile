@@ -637,81 +637,83 @@ private fun String.toDisplayCommand(): String {
 
 // region Previews
 
-private fun previewProjectedToolCall(
-    name: String,
-    arguments: String,
-    result: String? = null,
-    status: String? = "success",
-    toolCallId: String? = "preview-tool-call",
-    executionTimeMs: Long? = null,
-): UiToolCall = UiToolCall(
-    name = name,
-    arguments = arguments,
-    result = result,
-    status = status,
-    toolCallId = toolCallId,
-    executionTimeMs = executionTimeMs,
+private data class PreviewToolCallSpec(
+    val name: String,
+    val arguments: String,
+    val result: String? = null,
+    val status: String? = "success",
+    val toolCallId: String? = "preview-tool-call",
+    val executionTimeMs: Long? = null,
 )
+
+private fun previewProjectedToolCall(spec: PreviewToolCallSpec): UiToolCall = UiToolCall(
+    name = spec.name,
+    arguments = spec.arguments,
+    result = spec.result,
+    status = spec.status,
+    toolCallId = spec.toolCallId,
+    executionTimeMs = spec.executionTimeMs,
+)
+
+@Composable
+private fun PreviewProjectedMessageToolCalls(call: UiToolCall, messageId: String) {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            ProjectedMessageToolCalls(
+                toolCalls = listOf(call),
+                messageId = messageId,
+            )
+        }
+    }
+}
 
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsBashPreview() {
-    LettaPreviewFrame {
-        LettaChatTheme {
-            ProjectedMessageToolCalls(
-                toolCalls = listOf(
-                    previewProjectedToolCall(
-                        name = "Bash",
-                        arguments = """{"command":"ls -la /tmp"}""",
-                        result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
-                        executionTimeMs = 220,
-                    ),
-                ),
-                messageId = "preview-message-1",
-            )
-        }
-    }
+    PreviewProjectedMessageToolCalls(
+        call = previewProjectedToolCall(
+            PreviewToolCallSpec(
+                name = "Bash",
+                arguments = """{"command":"ls -la /tmp"}""",
+                result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
+                executionTimeMs = 220,
+            ),
+        ),
+        messageId = "preview-message-1",
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsSearchPreview() {
-    LettaPreviewFrame {
-        LettaChatTheme {
-            ProjectedMessageToolCalls(
-                toolCalls = listOf(
-                    previewProjectedToolCall(
-                        name = "search",
-                        arguments = """{"query":"letta-mobile compose previews"}""",
-                        result = "3 results found.",
-                        executionTimeMs = 1_280,
-                    ),
-                ),
-                messageId = "preview-message-2",
-            )
-        }
-    }
+    PreviewProjectedMessageToolCalls(
+        call = previewProjectedToolCall(
+            PreviewToolCallSpec(
+                name = "search",
+                arguments = """{"query":"letta-mobile compose previews"}""",
+                result = "3 results found.",
+                executionTimeMs = 1_280,
+            ),
+        ),
+        messageId = "preview-message-2",
+    )
 }
 
 @PreviewLightDark
 @Composable
 private fun ProjectedMessageToolCallsFailedPreview() {
-    LettaPreviewFrame {
-        LettaChatTheme {
-            ProjectedMessageToolCalls(
-                toolCalls = listOf(
-                    previewProjectedToolCall(
-                        name = "Bash",
-                        arguments = """{"command":"rm -rf /missing/path"}""",
-                        result = "rm: cannot remove '/missing/path': No such file or directory",
-                        status = "error",
-                        executionTimeMs = 80,
-                    ),
-                ),
-                messageId = "preview-message-3",
-            )
-        }
-    }
+    PreviewProjectedMessageToolCalls(
+        call = previewProjectedToolCall(
+            PreviewToolCallSpec(
+                name = "Bash",
+                arguments = """{"command":"rm -rf /missing/path"}""",
+                result = "rm: cannot remove '/missing/path': No such file or directory",
+                status = "error",
+                executionTimeMs = 80,
+            ),
+        ),
+        messageId = "preview-message-3",
+    )
 }
 
 // endregion

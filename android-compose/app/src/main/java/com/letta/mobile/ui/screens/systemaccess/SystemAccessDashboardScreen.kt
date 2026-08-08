@@ -501,7 +501,15 @@ private fun String.toDisplayLabel(): String = replace('_', ' ')
 
 // region Previews
 
-private fun previewCapabilityGranted(): SystemAccessCapability {
+private fun previewCapability(
+    status: SystemAccessCapabilityStatus,
+    statusReason: String,
+    toolIds: Set<String>,
+    approvalPolicy: SystemAccessApprovalPolicy,
+    audit: SystemAccessAuditPolicy,
+    policyRiskRationale: String,
+    summary: String,
+): SystemAccessCapability {
     val flavorSupport = SystemAccessFlavorSupport(
         play = SystemAccessFlavorAvailability.Supported,
         sideload = SystemAccessFlavorAvailability.Supported,
@@ -517,76 +525,55 @@ private fun previewCapabilityGranted(): SystemAccessCapability {
     )
     val policyRisk = SystemAccessPolicyRisk(
         level = SystemAccessPolicyRiskLevel.Medium,
-        rationale = "Requests a runtime permission to read recent inbox metadata.",
-    )
-    val audit = SystemAccessAuditPolicy(
-        loggedFields = listOf("tool_id", "timestamp"),
-        redactedFields = listOf("body"),
-        localOnlyByDefault = true,
+        rationale = policyRiskRationale,
     )
     val definition = SystemAccessCapabilityDefinition(
         id = "notifications.post",
         title = "Post notifications",
-        summary = "Lets the app post user-visible notifications while a tool is running.",
+        summary = summary,
         flavorAvailability = flavorSupport,
         permissionIntents = intents,
         dataSensitivity = SystemAccessDataSensitivity.AppPrivate,
-        toolIds = setOf("send_email"),
-        approvalPolicy = SystemAccessApprovalPolicy.RememberPerSession,
+        toolIds = toolIds,
+        approvalPolicy = approvalPolicy,
         auditPolicy = audit,
         policyRisk = policyRisk,
         probe = SystemAccessProbe.AlwaysGranted,
     )
     return SystemAccessCapability(
         definition = definition,
-        status = SystemAccessCapabilityStatus.Granted,
-        statusReason = "Notification permission granted.",
+        status = status,
+        statusReason = statusReason,
         userEnabled = true,
     )
 }
 
-private fun previewCapabilityNeedsSetup(): SystemAccessCapability {
-    val flavorSupport = SystemAccessFlavorSupport(
-        play = SystemAccessFlavorAvailability.Supported,
-        sideload = SystemAccessFlavorAvailability.Supported,
-        root = SystemAccessFlavorAvailability.Supported,
-    )
-    val intents = listOf(
-        SystemAccessPermissionIntent(
-            id = "open_settings",
-            label = "Open settings",
-            kind = SystemAccessPermissionIntentKind.SettingsDeepLink,
-            settingsAction = "android.settings.APP_NOTIFICATION_SETTINGS",
-        ),
-    )
-    val policyRisk = SystemAccessPolicyRisk(
-        level = SystemAccessPolicyRiskLevel.Medium,
-        rationale = "Requires user opt-in via system settings.",
-    )
-    val audit = SystemAccessAuditPolicy(
+private fun previewCapabilityGranted(): SystemAccessCapability = previewCapability(
+    status = SystemAccessCapabilityStatus.Granted,
+    statusReason = "Notification permission granted.",
+    toolIds = setOf("send_email"),
+    approvalPolicy = SystemAccessApprovalPolicy.RememberPerSession,
+    audit = SystemAccessAuditPolicy(
+        loggedFields = listOf("tool_id", "timestamp"),
+        redactedFields = listOf("body"),
+        localOnlyByDefault = true,
+    ),
+    policyRiskRationale = "Requests a runtime permission to read recent inbox metadata.",
+    summary = "Lets the app post user-visible notifications while a tool is running.",
+)
+
+private fun previewCapabilityNeedsSetup(): SystemAccessCapability = previewCapability(
+    status = SystemAccessCapabilityStatus.AvailableNeedsSetup,
+    statusReason = "Enable notifications in system settings to use this capability.",
+    toolIds = emptySet(),
+    approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
+    audit = SystemAccessAuditPolicy(
         loggedFields = listOf("tool_id"),
         localOnlyByDefault = true,
-    )
-    val definition = SystemAccessCapabilityDefinition(
-        id = "notifications.post",
-        title = "Post notifications",
-        summary = "Lets the app post user-visible notifications.",
-        flavorAvailability = flavorSupport,
-        permissionIntents = intents,
-        dataSensitivity = SystemAccessDataSensitivity.AppPrivate,
-        toolIds = emptySet(),
-        approvalPolicy = SystemAccessApprovalPolicy.AskEveryTime,
-        auditPolicy = audit,
-        policyRisk = policyRisk,
-        probe = SystemAccessProbe.AlwaysGranted,
-    )
-    return SystemAccessCapability(
-        definition = definition,
-        status = SystemAccessCapabilityStatus.AvailableNeedsSetup,
-        statusReason = "Enable notifications in system settings to use this capability.",
-        userEnabled = true,
-    )
-}
+    ),
+    policyRiskRationale = "Requires user opt-in via system settings.",
+    summary = "Lets the app post user-visible notifications.",
+)
 
 @PreviewLightDark
 @Composable
