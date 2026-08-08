@@ -904,6 +904,20 @@ private fun previewPmAgent() = PmAgentMetadata(
     name = "PM agent",
 )
 
+private data class PreviewStatusBadgeSpec(
+    val text: String,
+    val containerColor: Color,
+    val contentColor: Color,
+)
+
+private data class PreviewMetaRowSpec(
+    val statusLabel: String,
+    val statusContainerColor: Color,
+    val statusContentColor: Color,
+    val issueCount: Int,
+    val isPinned: Boolean,
+)
+
 @PreviewLightDark
 @Composable
 private fun ProjectStatusBadgePreview() {
@@ -912,21 +926,29 @@ private fun ProjectStatusBadgePreview() {
             modifier = Modifier.padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            StatusBadge(
-                text = "Active",
-                containerColor = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            StatusBadge(
-                text = "Archived",
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            StatusBadge(
-                text = "3 issues",
-                containerColor = MaterialTheme.customColors.harmonizedErrorContainer,
-                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            )
+            listOf(
+                PreviewStatusBadgeSpec(
+                    text = "Active",
+                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                ),
+                PreviewStatusBadgeSpec(
+                    text = "Archived",
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+                PreviewStatusBadgeSpec(
+                    text = "3 issues",
+                    containerColor = MaterialTheme.customColors.harmonizedErrorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                ),
+            ).forEach { spec ->
+                StatusBadge(
+                    text = spec.text,
+                    containerColor = spec.containerColor,
+                    contentColor = spec.contentColor,
+                )
+            }
         }
     }
 }
@@ -939,20 +961,30 @@ private fun ProjectTileMetaRowPreview() {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ProjectTileMetaRow(
-                statusLabel = "Active",
-                statusContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                issueCount = 3,
-                isPinned = false,
-            )
-            ProjectTileMetaRow(
-                statusLabel = "Archived",
-                statusContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                statusContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                issueCount = 0,
-                isPinned = true,
-            )
+            listOf(
+                PreviewMetaRowSpec(
+                    statusLabel = "Active",
+                    statusContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                    statusContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    issueCount = 3,
+                    isPinned = false,
+                ),
+                PreviewMetaRowSpec(
+                    statusLabel = "Archived",
+                    statusContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                    statusContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    issueCount = 0,
+                    isPinned = true,
+                ),
+            ).forEach { spec ->
+                ProjectTileMetaRow(
+                    statusLabel = spec.statusLabel,
+                    statusContainerColor = spec.statusContainerColor,
+                    statusContentColor = spec.statusContentColor,
+                    issueCount = spec.issueCount,
+                    isPinned = spec.isPinned,
+                )
+            }
         }
     }
 }

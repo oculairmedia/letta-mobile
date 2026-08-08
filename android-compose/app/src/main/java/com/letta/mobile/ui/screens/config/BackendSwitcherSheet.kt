@@ -327,18 +327,20 @@ private fun BackendSwitcherRow(
 
 // region Previews
 
-private fun previewServerConfig(
-    id: String,
-    mode: ServerMode,
-    url: String,
-    isActive: Boolean,
-    health: ServerHealthState,
-) = ServerConfig(
-    id = id,
-    mode = mode,
-    url = url,
-    isActive = isActive,
-    health = health,
+private data class PreviewServerConfig(
+    val id: String,
+    val mode: ServerMode,
+    val url: String,
+    val isActive: Boolean,
+    val health: ServerHealthState,
+)
+
+private fun previewServerConfig(spec: PreviewServerConfig) = ServerConfig(
+    id = spec.id,
+    mode = spec.mode,
+    url = spec.url,
+    isActive = spec.isActive,
+    health = spec.health,
 )
 
 @PreviewLightDark
@@ -352,11 +354,13 @@ private fun BackendSwitcherRowPreview() {
         ) {
             BackendSwitcherRow(
                 config = previewServerConfig(
-                    id = "config-1",
-                    mode = ServerMode.SELF_HOSTED,
-                    url = "https://letta.example.com",
-                    isActive = true,
-                    health = ServerHealthState.ONLINE,
+                    PreviewServerConfig(
+                        id = "config-1",
+                        mode = ServerMode.SELF_HOSTED,
+                        url = "https://letta.example.com",
+                        isActive = true,
+                        health = ServerHealthState.ONLINE,
+                    ),
                 ),
                 onSelect = {},
                 onEdit = {},
@@ -364,11 +368,13 @@ private fun BackendSwitcherRowPreview() {
             )
             BackendSwitcherRow(
                 config = previewServerConfig(
-                    id = "config-2",
-                    mode = ServerMode.CLOUD,
-                    url = "https://api.letta.com",
-                    isActive = false,
-                    health = ServerHealthState.OFFLINE,
+                    PreviewServerConfig(
+                        id = "config-2",
+                        mode = ServerMode.CLOUD,
+                        url = "https://api.letta.com",
+                        isActive = false,
+                        health = ServerHealthState.OFFLINE,
+                    ),
                 ),
                 onSelect = {},
                 onEdit = {},

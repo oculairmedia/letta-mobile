@@ -438,6 +438,15 @@ internal fun formatNumber(value: Int): String = String.format(Locale.US, "%,d", 
 
 // region Previews
 
+private data class PreviewTileModifier(
+    val widthFill: Boolean = true,
+    val height: androidx.compose.ui.unit.Dp = 108.dp,
+)
+
+private fun Modifier.previewTile(spec: PreviewTileModifier): Modifier =
+    then(if (spec.widthFill) Modifier.fillMaxWidth() else Modifier)
+        .height(spec.height)
+
 @PreviewLightDark
 @Composable
 private fun PinnedAgentCardPreview() {
@@ -447,9 +456,7 @@ private fun PinnedAgentCardPreview() {
             onClick = {},
             onUnpin = {},
             onConfigure = {},
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(108.dp),
+            modifier = Modifier.previewTile(PreviewTileModifier()),
         )
     }
 }
@@ -463,9 +470,7 @@ private fun DashboardWidgetTilePreview() {
             contextualInfo = "12",
             onClick = {},
             onUnpin = {},
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(108.dp),
+            modifier = Modifier.previewTile(PreviewTileModifier()),
         )
     }
 }

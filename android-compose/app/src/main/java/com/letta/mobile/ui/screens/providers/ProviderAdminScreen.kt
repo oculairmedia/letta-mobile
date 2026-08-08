@@ -577,25 +577,31 @@ private val previewProvider = Provider(
     apiKey = "sk-ant-sample",
 )
 
+@Composable
+private fun PreviewProviderCard() = LettaPreviewFrame {
+    ProviderCard(
+        provider = previewProvider,
+        onInspect = {},
+        onEdit = {},
+        onDelete = {},
+    )
+}
+
+@Composable
+private fun PreviewProviderDetailRefreshStatus() = LettaPreviewFrame {
+    ProviderDetailRefreshStatus(isRefreshing = true)
+}
+
 @PreviewLightDark
 @Composable
 private fun ProviderCardPreview() {
-    LettaPreviewFrame {
-        ProviderCard(
-            provider = previewProvider,
-            onInspect = {},
-            onEdit = {},
-            onDelete = {},
-        )
-    }
+    PreviewProviderCard()
 }
 
 @PreviewLightDark
 @Composable
 private fun ProviderDetailRefreshStatusPreview() {
-    LettaPreviewFrame {
-        ProviderDetailRefreshStatus(isRefreshing = true)
-    }
+    PreviewProviderDetailRefreshStatus()
 }
 
 // endregion

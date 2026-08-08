@@ -602,15 +602,22 @@ private fun LettaMessage.toSummary(): String = when (this) {
 
 // region Previews
 
+private val previewGroupSpec = PreviewGroupSpec()
+
+private data class PreviewGroupSpec(
+    val id: String = "group-1",
+    val managerType: String = "round-robin",
+    val agentIdStrings: List<String> = listOf("agent-1", "agent-2"),
+    val description: String = "Research team",
+    val hidden: Boolean = false,
+)
+
 private val previewGroup = Group(
-    id = com.letta.mobile.data.model.GroupId("group-1"),
-    managerType = "round-robin",
-    agentIds = listOf(
-        com.letta.mobile.data.model.AgentId("agent-1"),
-        com.letta.mobile.data.model.AgentId("agent-2"),
-    ),
-    description = "Research team",
-    hidden = false,
+    id = com.letta.mobile.data.model.GroupId(previewGroupSpec.id),
+    managerType = previewGroupSpec.managerType,
+    agentIds = previewGroupSpec.agentIdStrings.map { com.letta.mobile.data.model.AgentId(it) },
+    description = previewGroupSpec.description,
+    hidden = previewGroupSpec.hidden,
 )
 
 @PreviewLightDark
