@@ -205,6 +205,50 @@ class A2aWiringTest {
         }
     }
 
+    /**
+     * letta-mobile-oi147: the identity migration must actually RUN at bind. It is
+     * wired into `publishLocalAgents`, whose other paths need a native endpoint —
+     * so this exercises `migrateLegacyIdentities` directly, which is the same
+     * function the bind path calls. Without this the migration could be quietly
+     * unreachable and every test of it would still pass.
+     */
+    @Test
+    fun `bind-time identity migration collapses legacy namespaced files`() {
+        // Pure-Kotlin — does NOT touch iroh, so it runs on the default gate.
+        val tmp = Files.createTempDirectory("oi147-migrate").toFile()
+        try {
+            val identities = File(tmp, "identities").also { it.mkdirs() }
+            val liveKey = Base64.getEncoder().encodeToString(ByteArray(32) { 1 })
+            File(identities, "agent-X.json").writeText("""{"agentId":"agent-X","secretKeyB64":"$liveKey"}""")
+            File(identities, "letta_agent-X.json")
+                .writeText("""{"agentId":"letta_agent-X","secretKeyB64":"${Base64.getEncoder().encodeToString(ByteArray(32) { 2 })}"}""")
+            File(identities, "letta_agent-Y.json")
+                .writeText("""{"agentId":"letta_agent-Y","secretKeyB64":"${Base64.getEncoder().encodeToString(ByteArray(32) { 3 })}"}""")
+
+            migrateLegacyIdentities(identities)
+
+            val names = identities.listFiles()!!.map { it.name }.sorted()
+            assertEquals(listOf("agent-X.json", "agent-Y.json"), names)
+            assertTrue(
+                File(identities, "agent-X.json").readText().contains(liveKey),
+                "the live canonical keypair must survive the collapse untouched",
+            )
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
+    /** A missing identity dir at bind must be a no-op, never an exception. */
+    @Test
+    fun `bind-time identity migration tolerates a missing identity dir`() {
+        val tmp = Files.createTempDirectory("oi147-migrate-missing").toFile()
+        try {
+            migrateLegacyIdentities(File(tmp, "no-such-dir"))
+        } finally {
+            tmp.deleteRecursively()
+        }
+    }
+
     // ---------------------------------------------------------------------
     // N5 (PR #1125): hermetic default-gate coverage for the routing logic
     // that the receiver calls on every inbound message. These do NOT bring
