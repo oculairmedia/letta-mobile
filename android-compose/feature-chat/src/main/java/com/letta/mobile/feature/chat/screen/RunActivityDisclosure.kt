@@ -31,10 +31,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 internal object RunActivityDisclosureTestTags {
     const val Header = "run-activity-disclosure"
@@ -227,3 +230,67 @@ private const val WorkingIndicatorDimAlpha = 0.44f
 private const val WorkingIndicatorRestingAlpha = 0.72f
 private const val WorkingIndicatorBrightAlpha = 0.92f
 private const val WorkingIndicatorPulseDurationMillis = 1_400
+
+// region Previews
+
+private fun previewRunActivity(
+    state: RunActivityState,
+    durationMs: Long? = null,
+    toolCount: Int = 0,
+    failureCount: Int = 0,
+): RunActivityProjection = RunActivityProjection(
+    state = state,
+    durationMs = durationMs,
+    toolCount = toolCount,
+    failureCount = failureCount,
+)
+
+@PreviewLightDark
+@Composable
+private fun RunActivityDisclosureWorkingPreview() {
+    LettaPreviewFrame {
+        RunActivityDisclosure(
+            activity = previewRunActivity(state = RunActivityState.Working),
+            collapsed = false,
+            onToggleCollapsed = {},
+            chatMode = "interactive",
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RunActivityDisclosureThoughtPreview() {
+    LettaPreviewFrame {
+        RunActivityDisclosure(
+            activity = previewRunActivity(
+                state = RunActivityState.Thought,
+                durationMs = 2_400,
+                toolCount = 3,
+            ),
+            collapsed = false,
+            onToggleCollapsed = {},
+            chatMode = "interactive",
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RunActivityDisclosureCollapsedPreview() {
+    LettaPreviewFrame {
+        RunActivityDisclosure(
+            activity = previewRunActivity(
+                state = RunActivityState.Worked,
+                durationMs = 8_200,
+                toolCount = 5,
+                failureCount = 1,
+            ),
+            collapsed = true,
+            onToggleCollapsed = {},
+            chatMode = "simple",
+        )
+    }
+}
+
+// endregion

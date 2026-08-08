@@ -23,12 +23,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
+import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.chatTypography
 
 /**
@@ -222,3 +226,85 @@ private fun buildAnswers(
     }
     return out
 }
+
+// region Previews
+
+private fun previewAskUserQuestionApproval(
+    requestId: String = "preview-request",
+    toolCallId: String = "preview-tool-call",
+    argumentsJson: String,
+): UiApprovalRequest = UiApprovalRequest(
+    requestId = requestId,
+    toolCalls = listOf(
+        UiApprovalToolCall(
+            toolCallId = toolCallId,
+            name = AskUserQuestion.ASK_USER_QUESTION_TOOL,
+            arguments = argumentsJson,
+        ),
+    ),
+)
+
+private const val PreviewAskUserQuestionSingleArguments: String = """{
+  "questions": [
+    {
+      "header": "Format",
+      "question": "Which output format do you prefer?",
+      "multiSelect": false,
+      "options": [
+        {"label": "Markdown", "description": "Rendered with headings and lists."},
+        {"label": "Plain text", "description": "Single-block ASCII output."},
+        {"label": "JSON", "description": "Structured fields for downstream tooling."}
+      ]
+    }
+  ]
+}"""
+
+private const val PreviewAskUserQuestionMultiArguments: String = """{
+  "questions": [
+    {
+      "header": "Channels",
+      "question": "Which delivery channels should I enable?",
+      "multiSelect": true,
+      "options": [
+        {"label": "Email"},
+        {"label": "Slack"},
+        {"label": "SMS"},
+        {"label": "Webhook"}
+      ]
+    }
+  ]
+}"""
+
+@PreviewLightDark
+@Composable
+private fun AskUserQuestionCardSinglePreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            AskUserQuestionCard(
+                approval = previewAskUserQuestionApproval(
+                    argumentsJson = PreviewAskUserQuestionSingleArguments,
+                ),
+                isSubmitting = false,
+                onDecision = { _, _, _, _ -> },
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun AskUserQuestionCardMultiPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            AskUserQuestionCard(
+                approval = previewAskUserQuestionApproval(
+                    argumentsJson = PreviewAskUserQuestionMultiArguments,
+                ),
+                isSubmitting = false,
+                onDecision = { _, _, _, _ -> },
+            )
+        }
+    }
+}
+
+// endregion

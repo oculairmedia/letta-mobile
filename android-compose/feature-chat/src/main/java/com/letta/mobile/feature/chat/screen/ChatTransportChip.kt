@@ -19,7 +19,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.chat.render.ChatTransport
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 
 /**
@@ -116,3 +118,37 @@ private fun chipStyle(transport: ChatTransport, a2uiFrameCount: Int): ChipStyle 
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun ChatTransportChipRestPreview() {
+    LettaPreviewFrame {
+        ChatTransportChip(transport = ChatTransport.Rest, a2uiFrameCount = 0)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChatTransportChipWsA2uiPreview() {
+    LettaPreviewFrame {
+        ChatTransportChip(
+            transport = ChatTransport.WsConnected(a2uiEnabled = true, catalog = "standard"),
+            a2uiFrameCount = 12,
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ChatTransportChipWsDisconnectedPreview() {
+    LettaPreviewFrame {
+        ChatTransportChip(
+            transport = ChatTransport.WsDisconnected(code = 1006, reason = "abnormal closure"),
+            a2uiFrameCount = 0,
+        )
+    }
+}
+
+// endregion

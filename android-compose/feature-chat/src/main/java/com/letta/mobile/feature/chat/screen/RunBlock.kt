@@ -35,6 +35,9 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.ui.chat.render.runStepDotColor
 import com.letta.mobile.data.chat.projection.runStepDotIcon
@@ -580,3 +583,96 @@ private fun UiMessage.runStepDotCenterY() = when {
     !toolCalls.isNullOrEmpty() -> ToolCallStepDotCenterY
     else -> DefaultStepDotCenterY
 }
+
+// region Previews
+
+private fun previewRunMessage(
+    id: String,
+    content: String,
+    runId: String = "preview-run",
+    stepId: String? = "step-$id",
+    latencyMs: Long? = null,
+): UiMessage = UiMessage(
+    id = id,
+    role = "assistant",
+    content = content,
+    timestamp = "2026-08-08T00:00:00Z",
+    runId = runId,
+    stepId = stepId,
+    latencyMs = latencyMs,
+)
+
+@Composable
+private fun previewRunBubble(message: UiMessage, position: GroupPosition, rowModifier: Modifier) {
+    androidx.compose.material3.Surface(
+        modifier = rowModifier.padding(vertical = 4.dp),
+        color = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainerLow,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+    ) {
+        androidx.compose.material3.Text(
+            text = message.content,
+            modifier = androidx.compose.ui.Modifier.padding(12.dp),
+            style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RunBlockExpandedPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            RunBlock(
+                messages = listOf(
+                    previewRunMessage("step-1", "I will search the codebase for matching patterns."),
+                    previewRunMessage("step-2", "Found three candidates, let me check each."),
+                    previewRunMessage("step-3", "All three confirmed, here is the summary."),
+                ),
+                collapsed = false,
+                onToggleCollapsed = {},
+                isStreaming = false,
+                renderRow = ::previewRunBubble,
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RunBlockCollapsedPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            RunBlock(
+                messages = listOf(
+                    previewRunMessage("step-1", "I will search the codebase for matching patterns."),
+                    previewRunMessage("step-2", "Found three candidates, let me check each."),
+                    previewRunMessage("step-3", "All three confirmed, here is the summary."),
+                ),
+                collapsed = true,
+                onToggleCollapsed = {},
+                isStreaming = false,
+                renderRow = ::previewRunBubble,
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun RunBlockWorkingPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            RunBlock(
+                messages = listOf(
+                    previewRunMessage("step-1", "Starting the diagnostic sweep…"),
+                ),
+                collapsed = false,
+                onToggleCollapsed = {},
+                isStreaming = true,
+                renderRow = ::previewRunBubble,
+            )
+        }
+    }
+}
+
+// endregion

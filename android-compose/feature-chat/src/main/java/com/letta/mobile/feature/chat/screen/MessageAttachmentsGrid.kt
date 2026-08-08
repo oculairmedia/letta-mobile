@@ -17,10 +17,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.image.decodeImageBitmap
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import kotlinx.collections.immutable.persistentListOf
 
 /**
  * Renders attached images for a chat bubble. Up to 4 images per row in a wrap-
@@ -145,3 +148,42 @@ internal fun chatAttachmentImageDataUrl(base64: String, mediaType: String): Stri
 
 internal fun chatAttachmentImageCacheKey(base64: String, mediaType: String): String =
     "chat-attachment-image:$mediaType:${base64.length}:${base64.hashCode()}"
+
+// region Previews
+
+private fun previewAttachment(): UiImageAttachment = UiImageAttachment(
+    base64 = "",
+    mediaType = "image/jpeg",
+)
+
+@PreviewLightDark
+@Composable
+private fun MessageAttachmentsGridEmptyPreview() {
+    LettaPreviewFrame {
+        MessageAttachmentsGrid(attachments = persistentListOf())
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageAttachmentsGridOnePreview() {
+    LettaPreviewFrame {
+        MessageAttachmentsGrid(attachments = persistentListOf(previewAttachment()))
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageAttachmentsGridThreePreview() {
+    LettaPreviewFrame {
+        MessageAttachmentsGrid(
+            attachments = persistentListOf(
+                previewAttachment(),
+                previewAttachment(),
+                previewAttachment(),
+            ),
+        )
+    }
+}
+
+// endregion

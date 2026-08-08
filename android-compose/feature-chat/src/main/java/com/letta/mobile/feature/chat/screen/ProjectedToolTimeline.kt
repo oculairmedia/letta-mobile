@@ -55,6 +55,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.delay
 import com.letta.mobile.ui.chat.render.RenderDiagnostics
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
+import androidx.compose.ui.tooling.preview.PreviewLightDark
+import com.letta.mobile.ui.preview.LettaPreviewFrame
+import com.letta.mobile.ui.theme.LettaChatTheme
 
 const val DEFAULT_AUTO_EXPAND_DELAY_MS = 1500L
 const val DEFAULT_STAGED_COLLAPSE_DELAY_MS = 300L
@@ -631,3 +634,84 @@ private fun String.toDisplayCommand(): String {
         trimmed
     }
 }
+
+// region Previews
+
+private fun previewProjectedToolCall(
+    name: String,
+    arguments: String,
+    result: String? = null,
+    status: String? = "success",
+    toolCallId: String? = "preview-tool-call",
+    executionTimeMs: Long? = null,
+): UiToolCall = UiToolCall(
+    name = name,
+    arguments = arguments,
+    result = result,
+    status = status,
+    toolCallId = toolCallId,
+    executionTimeMs = executionTimeMs,
+)
+
+@PreviewLightDark
+@Composable
+private fun ProjectedMessageToolCallsBashPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            ProjectedMessageToolCalls(
+                toolCalls = listOf(
+                    previewProjectedToolCall(
+                        name = "Bash",
+                        arguments = """{"command":"ls -la /tmp"}""",
+                        result = "total 8\ndrwxr-xr-x  2 user user 4096 Aug  7 12:00 .\ndrwxr-xr-x 18 user user 4096 Aug  7 11:55 ..",
+                        executionTimeMs = 220,
+                    ),
+                ),
+                messageId = "preview-message-1",
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectedMessageToolCallsSearchPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            ProjectedMessageToolCalls(
+                toolCalls = listOf(
+                    previewProjectedToolCall(
+                        name = "search",
+                        arguments = """{"query":"letta-mobile compose previews"}""",
+                        result = "3 results found.",
+                        executionTimeMs = 1_280,
+                    ),
+                ),
+                messageId = "preview-message-2",
+            )
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProjectedMessageToolCallsFailedPreview() {
+    LettaPreviewFrame {
+        LettaChatTheme {
+            ProjectedMessageToolCalls(
+                toolCalls = listOf(
+                    previewProjectedToolCall(
+                        name = "Bash",
+                        arguments = """{"command":"rm -rf /missing/path"}""",
+                        result = "rm: cannot remove '/missing/path': No such file or directory",
+                        status = "error",
+                        executionTimeMs = 80,
+                    ),
+                ),
+                messageId = "preview-message-3",
+            )
+        }
+    }
+}
+
+// endregion

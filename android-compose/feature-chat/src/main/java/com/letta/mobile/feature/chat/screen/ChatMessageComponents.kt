@@ -25,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
@@ -36,6 +37,7 @@ import com.letta.mobile.data.chat.projection.messageActionAvailability
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
@@ -261,3 +263,31 @@ internal fun buildMessageCopyText(message: UiMessage): String {
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun MessageAvatarUserPreview() {
+    LettaPreviewFrame {
+        MessageAvatar(role = "user")
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageAvatarAssistantPreview() {
+    LettaPreviewFrame {
+        MessageAvatar(role = "assistant")
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun MessageAvatarToolPreview() {
+    LettaPreviewFrame {
+        MessageAvatar(role = "tool")
+    }
+}
+
+// endregion
