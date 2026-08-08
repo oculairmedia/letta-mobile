@@ -31,10 +31,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.chat.projection.RunActivityState
 import com.letta.mobile.feature.chat.R
 import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 internal object RunActivityDisclosureTestTags {
     const val Header = "run-activity-disclosure"
@@ -227,3 +230,101 @@ private const val WorkingIndicatorDimAlpha = 0.44f
 private const val WorkingIndicatorRestingAlpha = 0.72f
 private const val WorkingIndicatorBrightAlpha = 0.92f
 private const val WorkingIndicatorPulseDurationMillis = 1_400
+
+// region Previews
+
+private data class PreviewRunActivityConfig(
+    val durationMs: Long? = null,
+    val toolCount: Int = 0,
+    val failureCount: Int = 0,
+)
+
+private fun previewRunActivity(
+    state: RunActivityState,
+    config: PreviewRunActivityConfig = PreviewRunActivityConfig(),
+): RunActivityProjection = RunActivityProjection(
+    state = state,
+    durationMs = config.durationMs,
+    toolCount = config.toolCount,
+    failureCount = config.failureCount,
+)
+
+private data class PreviewRunActivityDisclosureState(
+    val state: RunActivityState,
+    val durationMs: Long?,
+    val toolCount: Int,
+    val failureCount: Int,
+    val collapsed: Boolean,
+    val chatMode: String,
+)
+
+@Composable
+private fun PreviewRunActivityDisclosure(state: PreviewRunActivityDisclosureState) {
+    LettaPreviewFrame {
+        RunActivityDisclosure(
+            activity = previewRunActivity(
+                state = state.state,
+                config = PreviewRunActivityConfig(
+                    durationMs = state.durationMs,
+                    toolCount = state.toolCount,
+                    failureCount = state.failureCount,
+                ),
+            ),
+            collapsed = state.collapsed,
+            onToggleCollapsed = {},
+            chatMode = state.chatMode,
+        )
+    }
+}
+
+private val previewWorkingState = PreviewRunActivityDisclosureState(
+    state = RunActivityState.Working,
+    durationMs = null,
+    toolCount = 0,
+    failureCount = 0,
+    collapsed = false,
+    chatMode = "interactive",
+)
+
+private val previewThoughtState = PreviewRunActivityDisclosureState(
+    state = RunActivityState.Thought,
+    durationMs = 2_400,
+    toolCount = 3,
+    failureCount = 0,
+    collapsed = false,
+    chatMode = "interactive",
+)
+
+private val previewCollapsedState = PreviewRunActivityDisclosureState(
+    state = RunActivityState.Worked,
+    durationMs = 8_200,
+    toolCount = 5,
+    failureCount = 1,
+    collapsed = true,
+    chatMode = "simple",
+)
+
+@PreviewLightDark
+@Composable
+private fun RunActivityDisclosureWorkingPreview() {
+    RunActivityDisclosurePreviewByState(previewWorkingState)
+}
+
+@PreviewLightDark
+@Composable
+private fun RunActivityDisclosureThoughtPreview() {
+    RunActivityDisclosurePreviewByState(previewThoughtState)
+}
+
+@PreviewLightDark
+@Composable
+private fun RunActivityDisclosureCollapsedPreview() {
+    RunActivityDisclosurePreviewByState(previewCollapsedState)
+}
+
+@Composable
+private fun RunActivityDisclosurePreviewByState(state: PreviewRunActivityDisclosureState) {
+    PreviewRunActivityDisclosure(state)
+}
+
+// endregion

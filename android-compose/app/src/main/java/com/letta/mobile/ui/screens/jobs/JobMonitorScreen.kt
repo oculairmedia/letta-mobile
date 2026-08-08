@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +57,7 @@ import com.letta.mobile.ui.theme.listItemMetadata
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.util.formatRelativeTime
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -437,3 +439,61 @@ private fun JobDetailDialog(
 private fun Job.isTerminalStatus(): Boolean {
     return status in setOf("completed", "failed", "cancelled", "expired")
 }
+
+// region Previews
+
+private val previewJobActive = Job(
+    id = "job-abc-123",
+    status = "running",
+    createdAt = "2026-08-07T18:30:00Z",
+    jobType = "batch",
+    agentId = "agent-research",
+    userId = "user-alice",
+)
+
+private val previewJobTerminal = Job(
+    id = "job-def-456",
+    status = "completed",
+    createdAt = "2026-08-06T12:00:00Z",
+    completedAt = "2026-08-06T12:05:00Z",
+    stopReason = "finished",
+    jobType = "chat",
+    agentId = "agent-helper",
+)
+
+@PreviewLightDark
+@Composable
+private fun JobCardActivePreview() {
+    LettaPreviewFrame {
+        JobCard(
+            job = previewJobActive,
+            onInspect = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun JobCardTerminalPreview() {
+    LettaPreviewFrame {
+        JobCard(
+            job = previewJobTerminal,
+            onInspect = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun JobDetailDialogPreview() {
+    LettaPreviewFrame {
+        JobDetailDialog(
+            job = previewJobActive,
+            onDismiss = {},
+            onCancel = {},
+            onDelete = null,
+        )
+    }
+}
+
+// endregion

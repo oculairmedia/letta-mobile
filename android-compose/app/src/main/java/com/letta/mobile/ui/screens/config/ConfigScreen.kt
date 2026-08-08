@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -47,6 +48,7 @@ import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
@@ -1088,3 +1090,45 @@ private fun themePresetLabel(themePreset: ThemePreset): String {
         ThemePreset.SPRING -> stringResource(R.string.screen_config_theme_preset_spring)
     }
 }
+
+// region Previews
+
+private val previewEmbeddedRuntimeStatus = EmbeddedLettaCodeRuntimeStatus(
+    nativeEnabled = true,
+    assetsEnabled = true,
+    version = "0.1.0",
+    integrity = "ok",
+)
+
+@PreviewLightDark
+@Composable
+private fun ConnectionModeSelectorPreview() {
+    LettaPreviewFrame {
+        ConnectionModeSelector(
+            mode = ServerMode.SELF_HOSTED,
+            onModeChange = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun EmbeddedRuntimeStatusItemPreview() {
+    LettaPreviewFrame {
+        EmbeddedRuntimeStatusItem(status = previewEmbeddedRuntimeStatus)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ConfigRefreshStatusErrorPreview() {
+    LettaPreviewFrame {
+        ConfigRefreshStatus(
+            isRefreshing = false,
+            error = "Failed to refresh configuration",
+            onRetry = {},
+        )
+    }
+}
+
+// endregion

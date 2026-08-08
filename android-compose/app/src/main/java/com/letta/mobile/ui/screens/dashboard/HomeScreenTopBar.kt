@@ -12,17 +12,20 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.ui.components.ExpandableSearchField
 import com.letta.mobile.ui.components.ExpandableTitleSearch
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.customColors
 
 internal data class HomeScreenTopBarParams(
@@ -128,3 +131,45 @@ private fun HomeScreenTopBarSearchField(params: HomeScreenTopBarParams) {
         placeholder = stringResource(R.string.screen_home_search_placeholder),
     )
 }
+
+// region Previews
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun previewTopBarParams(
+    isSearchExpanded: Boolean = false,
+    activeBackendLabel: String? = "Local",
+) = HomeScreenTopBarParams(
+    title = "Letta",
+    state = DashboardUiState(
+        isConnected = true,
+        searchQuery = if (isSearchExpanded) "plan" else "",
+    ),
+    isSearchExpanded = isSearchExpanded,
+    onSearchExpandedChange = {},
+    onSearchQueryChange = {},
+    onSearchClear = {},
+    onOpenDrawer = {},
+    onNavigateToSettings = {},
+    activeBackendLabel = activeBackendLabel,
+    onNavigateToBackendSwitcher = {},
+    scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(),
+)
+
+@PreviewLightDark
+@Composable
+private fun HomeScreenTopBarPreview() {
+    LettaPreviewFrame {
+        HomeScreenTopBar(params = previewTopBarParams())
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HomeScreenTopBarSearchExpandedPreview() {
+    LettaPreviewFrame {
+        HomeScreenTopBar(params = previewTopBarParams(isSearchExpanded = true))
+    }
+}
+
+// endregion

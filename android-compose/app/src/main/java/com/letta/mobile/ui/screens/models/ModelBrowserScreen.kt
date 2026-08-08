@@ -44,6 +44,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -55,6 +56,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -577,3 +579,68 @@ private fun buildModelListKey(
     val identity = id.ifBlank { handle.orEmpty() }.ifBlank { name }.ifBlank { providerType }.ifBlank { "model" }
     return "$prefix:$identity:$index"
 }
+
+// region Previews
+
+private val previewLlmModel = LlmModel(
+    id = "llm-1",
+    name = "claude-3-5-sonnet",
+    handle = "anthropic/claude-3-5-sonnet",
+    providerType = "anthropic",
+    providerName = "Anthropic",
+    providerCategory = "Hosted",
+    contextWindow = 200_000,
+    maxOutputTokens = 8192,
+    temperature = 0.7,
+    enableReasoner = true,
+    reasoningEffort = "medium",
+    maxReasoningTokens = 4000,
+    tier = "premium",
+    parallelToolCalls = true,
+)
+
+private val previewEmbeddingModel = EmbeddingModel(
+    id = "emb-1",
+    name = "text-embedding-3-large",
+    handle = "openai/text-embedding-3-large",
+    embeddingModel = "text-embedding-3-large",
+    providerType = "openai",
+    providerName = "OpenAI",
+    embeddingDim = 3072,
+    embeddingChunkSize = 512,
+    batchSize = 64,
+)
+
+@PreviewLightDark
+@Composable
+private fun LlmModelCardPreview() {
+    LettaPreviewFrame {
+        LlmModelCard(model = previewLlmModel, onClick = {})
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun EmbeddingModelCardPreview() {
+    LettaPreviewFrame {
+        EmbeddingModelCard(model = previewEmbeddingModel, onClick = {})
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun LlmModelDetailDialogPreview() {
+    LettaPreviewFrame {
+        LlmModelDetailDialog(model = previewLlmModel, onDismiss = {})
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun EmbeddingModelDetailDialogPreview() {
+    LettaPreviewFrame {
+        EmbeddingModelDetailDialog(model = previewEmbeddingModel, onDismiss = {})
+    }
+}
+
+// endregion

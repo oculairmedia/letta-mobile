@@ -5,12 +5,15 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -18,9 +21,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.health.ServerHealthState
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
@@ -125,3 +130,40 @@ fun HealthRowShell(
         content()
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun HealthDotPreview() {
+    LettaPreviewFrame {
+        Box(modifier = Modifier.padding(16.dp)) {
+            Column {
+                HealthDot(health = ServerHealthState.ONLINE, modifier = Modifier.padding(4.dp))
+                HealthDot(health = ServerHealthState.OFFLINE, modifier = Modifier.padding(4.dp))
+                HealthDot(health = ServerHealthState.PROBING, modifier = Modifier.padding(4.dp))
+                HealthDot(health = ServerHealthState.UNKNOWN, modifier = Modifier.padding(4.dp))
+            }
+        }
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun HealthRowShellPreview() {
+    LettaPreviewFrame {
+        HealthRowShell(
+            baseContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            refusalTrigger = 0,
+            modifier = Modifier.padding(16.dp),
+        ) {
+            Text(
+                text = "Backend row",
+                modifier = Modifier.padding(16.dp),
+            )
+        }
+    }
+}
+
+// endregion

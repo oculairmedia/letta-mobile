@@ -28,17 +28,87 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.ParsedSearchMessage
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.ui.components.highlightSearchMatches
 import com.letta.mobile.ui.components.rememberSearchHighlightColors
 import com.letta.mobile.ui.components.searchResultSnippet
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import androidx.compose.material3.Text
+
+private fun <T> androidx.compose.foundation.lazy.LazyListScope.SearchSection(
+    keyPrefix: String,
+    headerTitle: String,
+    items: List<T>,
+    expanded: Boolean,
+    onExpandedChange: () -> Unit,
+    topPadding: Boolean,
+    cardIcon: androidx.compose.ui.graphics.vector.ImageVector,
+    primaryText: (T) -> androidx.compose.ui.text.AnnotatedString,
+    secondaryText: (T) -> androidx.compose.ui.text.AnnotatedString?,
+    onClick: (T) -> Unit,
+    idOf: (T) -> Any,
+) {
+    if (items.isEmpty()) return
+    item(key = "$keyPrefix-header") {
+        CollapsibleSectionHeader(
+            state = CollapsibleSectionHeaderState(
+                title = headerTitle,
+                count = items.size,
+                expanded = expanded,
+                topPadding = topPadding,
+            ),
+            onToggle = onExpandedChange,
+        )
+    }
+    if (expanded) {
+        items(items, key = { "$keyPrefix-${idOf(it)}" }) { item ->
+            Card(
+                onClick = { onClick(item) },
+                modifier = Modifier.fillMaxWidth().animateItem(),
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        cardIcon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text(
+                            text = primaryText(item),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        secondaryText(item)?.let { secondary ->
+                            Text(
+                                text = secondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalFoundationApi::class)
 @Composable
@@ -56,6 +126,10 @@ internal fun SearchResultsContent(
     modifier: Modifier = Modifier,
 ) {
     val highlightColors = rememberSearchHighlightColors()
+    val agentsHeader = stringResource(R.string.screen_home_search_agents_section)
+    val toolsHeader = stringResource(R.string.screen_home_search_tools_section)
+    val blocksHeader = stringResource(R.string.screen_home_search_blocks_section)
+    val unnamedBlock = stringResource(R.string.screen_home_search_unnamed_block)
 
     var agentsExpanded by rememberSaveable { mutableStateOf(true) }
     var toolsExpanded by rememberSaveable { mutableStateOf(true) }
@@ -67,164 +141,61 @@ internal fun SearchResultsContent(
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 0.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        if (agentResults.isNotEmpty()) {
-            item(key = "agents-header") {
-                CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_agents_section),
-                    count = agentResults.size,
-                    expanded = agentsExpanded,
-                    onToggle = { agentsExpanded = !agentsExpanded },
-                )
-            }
-            if (agentsExpanded) {
-                items(agentResults, key = { "agent-${it.id}" }) { agent ->
-                    Card(
-                        onClick = { onAgentClick(agent) },
-                        modifier = Modifier.fillMaxWidth().animateItem(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                LettaIcons.Agent,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = highlightSearchMatches(agent.name, searchQuery, highlightColors),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                agent.description?.let { desc ->
-                                    Text(
-                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SearchSection(
+            keyPrefix = "agents",
+            headerTitle = agentsHeader,
+            items = agentResults,
+            expanded = agentsExpanded,
+            onExpandedChange = { agentsExpanded = !agentsExpanded },
+            topPadding = false,
+            cardIcon = LettaIcons.Agent,
+            primaryText = { highlightSearchMatches(it.name, searchQuery, highlightColors) },
+            secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
+            onClick = { onAgentClick(it) },
+            idOf = { it.id },
+        )
 
-        if (toolResults.isNotEmpty()) {
-            item(key = "tools-header") {
-                CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_tools_section),
-                    count = toolResults.size,
-                    expanded = toolsExpanded,
-                    onToggle = { toolsExpanded = !toolsExpanded },
-                    topPadding = true,
-                )
-            }
-            if (toolsExpanded) {
-                items(toolResults, key = { "tool-${it.id}" }) { tool ->
-                    Card(
-                        onClick = { onToolClick(tool.id.value) },
-                        modifier = Modifier.fillMaxWidth().animateItem(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                LettaIcons.Tool,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    text = highlightSearchMatches(tool.name, searchQuery, highlightColors),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                tool.description?.let { desc ->
-                                    Text(
-                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SearchSection(
+            keyPrefix = "tools",
+            headerTitle = toolsHeader,
+            items = toolResults,
+            expanded = toolsExpanded,
+            onExpandedChange = { toolsExpanded = !toolsExpanded },
+            topPadding = true,
+            cardIcon = LettaIcons.Tool,
+            primaryText = { highlightSearchMatches(it.name, searchQuery, highlightColors) },
+            secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
+            onClick = { onToolClick(it.id.value) },
+            idOf = { it.id },
+        )
 
-        if (blockResults.isNotEmpty()) {
-            item(key = "blocks-header") {
-                CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_blocks_section),
-                    count = blockResults.size,
-                    expanded = blocksExpanded,
-                    onToggle = { blocksExpanded = !blocksExpanded },
-                    topPadding = true,
-                )
-            }
-            if (blocksExpanded) {
-                items(blockResults, key = { "block-${it.id}" }) { block ->
-                    Card(
-                        onClick = { onBlockClick(block.id.value) },
-                        modifier = Modifier.fillMaxWidth().animateItem(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                LettaIcons.ViewModule,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp),
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                val blockLabel = block.label ?: stringResource(R.string.screen_home_search_unnamed_block)
-                                Text(
-                                    text = highlightSearchMatches(blockLabel, searchQuery, highlightColors),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                block.description?.let { desc ->
-                                    Text(
-                                        text = highlightSearchMatches(desc, searchQuery, highlightColors),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SearchSection(
+            keyPrefix = "blocks",
+            headerTitle = blocksHeader,
+            items = blockResults,
+            expanded = blocksExpanded,
+            onExpandedChange = { blocksExpanded = !blocksExpanded },
+            topPadding = true,
+            cardIcon = LettaIcons.ViewModule,
+            primaryText = { block ->
+                val label = block.label ?: unnamedBlock
+                highlightSearchMatches(label, searchQuery, highlightColors)
+            },
+            secondaryText = { it.description?.let { desc -> highlightSearchMatches(desc, searchQuery, highlightColors) } },
+            onClick = { onBlockClick(it.id.value) },
+            idOf = { it.id },
+        )
 
         if (messageResults.isNotEmpty()) {
             item(key = "messages-header") {
                 CollapsibleSectionHeader(
-                    title = stringResource(R.string.screen_home_search_messages_section),
-                    count = messageResults.size,
-                    expanded = messagesExpanded,
+                    state = CollapsibleSectionHeaderState(
+                        title = stringResource(R.string.screen_home_search_messages_section),
+                        count = messageResults.size,
+                        expanded = messagesExpanded,
+                        topPadding = true,
+                    ),
                     onToggle = { messagesExpanded = !messagesExpanded },
-                    topPadding = true,
                 )
             }
             if (messagesExpanded) {
@@ -308,3 +279,70 @@ internal fun SearchResultsContent(
         }
     }
 }
+
+// region Previews
+
+private const val previewSearchQuery = "plan"
+
+private val previewSearchAgents = listOf(
+    Agent(id = AgentId("agent-1"), name = "Planner", model = "letta/letta-free", description = "Plans the week"),
+)
+
+private val previewSearchTools = listOf(
+    Tool(id = ToolId("tool-1"), name = "web_search", description = "Search the web for planning data"),
+)
+
+private val previewSearchBlocks = listOf(
+    Block(id = BlockId("block-1"), label = "plan_scratchpad", value = "week 32", description = "Scratchpad for plans"),
+)
+
+private val previewSearchMessages = listOf(
+    ParsedSearchMessage(
+        messageId = "msg-1",
+        agentId = "agent-1",
+        role = "assistant",
+        content = "Here is the plan for this week.",
+        date = "2026-08-07T18:30:00Z",
+        conversationId = "conv-1",
+    ),
+)
+
+@PreviewLightDark
+@Composable
+private fun SearchResultsContentPreview() {
+    LettaPreviewFrame {
+        SearchResultsContent(
+            agentResults = previewSearchAgents,
+            messageResults = previewSearchMessages,
+            toolResults = previewSearchTools,
+            blockResults = previewSearchBlocks,
+            isSearching = false,
+            searchQuery = previewSearchQuery,
+            onAgentClick = {},
+            onMessageClick = {},
+            onToolClick = {},
+            onBlockClick = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun SearchResultsContentEmptyPreview() {
+    LettaPreviewFrame {
+        SearchResultsContent(
+            agentResults = emptyList(),
+            messageResults = emptyList(),
+            toolResults = emptyList(),
+            blockResults = emptyList(),
+            isSearching = false,
+            searchQuery = previewSearchQuery,
+            onAgentClick = {},
+            onMessageClick = {},
+            onToolClick = {},
+            onBlockClick = {},
+        )
+    }
+}
+
+// endregion

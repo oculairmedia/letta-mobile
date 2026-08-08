@@ -52,12 +52,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.MultiFieldInputDialog
@@ -68,6 +70,7 @@ import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.haptics.HapticEffects
 import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.customColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -615,3 +618,65 @@ private fun AgentMultiSelectDialog(
         }
     }
 }
+
+// region Previews
+
+private fun previewBlock(
+    id: String = "block-1",
+    label: String = "core_memory",
+    description: String? = "Persona and user details for the primary agent",
+    limit: Int? = 2000,
+    isTemplate: Boolean? = false,
+    readOnly: Boolean? = false,
+) = Block(
+    id = BlockId(id),
+    label = label,
+    value = "You are a helpful assistant.",
+    limit = limit,
+    description = description,
+    isTemplate = isTemplate,
+    readOnly = readOnly,
+)
+
+private val previewBlockAgents = listOf(
+    Agent(id = com.letta.mobile.data.model.AgentId("1"), name = "General Assistant"),
+    Agent(id = com.letta.mobile.data.model.AgentId("2"), name = "Code Helper"),
+)
+
+@PreviewLightDark
+@Composable
+private fun BlockLibraryCardPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            BlockLibraryCard(
+                block = previewBlock(),
+                agents = previewBlockAgents,
+                isSelected = false,
+                isSelectionMode = false,
+                onTap = {},
+                onLongPress = {},
+            )
+            BlockLibraryCard(
+                block = previewBlock(
+                    id = "block-2",
+                    label = "archival_memory",
+                    description = null,
+                    isTemplate = true,
+                    readOnly = true,
+                ),
+                agents = emptyList(),
+                isSelected = true,
+                isSelectionMode = true,
+                onTap = {},
+                onLongPress = {},
+            )
+        }
+    }
+}
+
+// endregion

@@ -12,8 +12,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 @Composable
 fun EmptyDetailPane(modifier: Modifier = Modifier) {
@@ -37,3 +39,15 @@ fun EmptyDetailPane(modifier: Modifier = Modifier) {
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun EmptyDetailPanePreview() {
+    LettaPreviewFrame {
+        EmptyDetailPane()
+    }
+}
+
+// endregion

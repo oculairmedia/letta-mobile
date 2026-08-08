@@ -44,8 +44,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.Telemetry
 import java.time.Instant
 import java.time.ZoneId
@@ -292,3 +294,79 @@ private fun copyToClipboard(context: Context) {
     clipboard.setPrimaryClip(ClipData.newPlainText("telemetry", Telemetry.exportText()))
     Toast.makeText(context, "Copied telemetry to clipboard", Toast.LENGTH_SHORT).show()
 }
+
+// region Previews
+
+private val previewEventHttpInfo = Telemetry.Event(
+    timestampMs = 1_726_000_000_000L,
+    tag = "Http",
+    name = "request",
+    durationMs = 145L,
+    attrs = mapOf("url" to "/v1/agents", "status" to 200),
+    level = Telemetry.Level.INFO,
+)
+
+private val previewEventHttpError = Telemetry.Event(
+    timestampMs = 1_726_000_050_000L,
+    tag = "Http",
+    name = "request:failed",
+    durationMs = 2_500L,
+    attrs = mapOf("url" to "/v1/tools", "status" to 503),
+    level = Telemetry.Level.ERROR,
+    throwable = RuntimeException("Service Unavailable"),
+)
+
+private val previewEventTimeline = Telemetry.Event(
+    timestampMs = 1_726_000_120_000L,
+    tag = "TimelineSync",
+    name = "hydrate",
+    durationMs = 18L,
+    attrs = mapOf("messages" to 42),
+    level = Telemetry.Level.DEBUG,
+)
+
+private val previewTelemetryEvents = listOf(
+    previewEventHttpInfo,
+    previewEventHttpError,
+    previewEventTimeline,
+)
+
+@PreviewLightDark
+@Composable
+private fun TelemetryEventRowInfoPreview() {
+    LettaPreviewFrame {
+        TelemetryEventRow(ev = previewEventHttpInfo)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun TelemetryEventRowErrorPreview() {
+    LettaPreviewFrame {
+        TelemetryEventRow(ev = previewEventHttpError)
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun TelemetryEventListPopulatedPreview() {
+    LettaPreviewFrame {
+        TelemetryEventList(
+            visibleEvents = previewTelemetryEvents,
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun TelemetryEventListEmptyPreview() {
+    LettaPreviewFrame {
+        TelemetryEventList(
+            visibleEvents = emptyList(),
+            modifier = Modifier.fillMaxSize(),
+        )
+    }
+}
+
+// endregion

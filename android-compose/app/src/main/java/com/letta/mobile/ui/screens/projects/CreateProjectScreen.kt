@@ -41,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -48,6 +49,7 @@ import com.letta.mobile.R
 import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 
 /**
  * letta-mobile-cygd: full-screen replacement for the conversational
@@ -355,6 +357,63 @@ private fun CreateProjectStepContent(
         }
     }
 }
+
+// region Previews
+
+@PreviewLightDark
+@Composable
+private fun CreateProjectSummaryChipPreview() {
+    LettaPreviewFrame {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            SummaryChip(label = "Description", value = "A new tool for capturing design decisions.")
+            SummaryChip(label = "Project name", value = "letta-mobile")
+            SummaryChip(label = "Filesystem path", value = "/home/dev/projects/letta-mobile")
+            SummaryChip(label = "Git URL", value = "https://github.com/letta/letta-mobile")
+        }
+    }
+}
+
+@Composable
+private fun PreviewCreateProjectBottomBar(submitting: Boolean = false) {
+    LettaPreviewFrame {
+        CreateProjectBottomBar(
+            step = if (submitting) ConversationalProjectStep.Review else ConversationalProjectStep.Goal,
+            isSubmitting = submitting,
+            canAdvance = true,
+            onBack = {},
+            onAdvance = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun CreateProjectBottomBarPreview() {
+    PreviewCreateProjectBottomBar()
+}
+
+@PreviewLightDark
+@Composable
+private fun CreateProjectBottomBarSubmittingPreview() {
+    PreviewCreateProjectBottomBar(submitting = true)
+}
+
+@PreviewLightDark
+@Composable
+private fun CreateProjectStepProgressPreview() {
+    LettaPreviewFrame {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            CreateProjectStepProgress(ConversationalProjectStep.Goal)
+            CreateProjectStepProgress(ConversationalProjectStep.FilesystemPath)
+            CreateProjectStepProgress(ConversationalProjectStep.Review)
+        }
+    }
+}
+
+// endregion
 
 @Composable
 private fun SummaryChip(

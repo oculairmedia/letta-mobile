@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.letta.mobile.R
@@ -47,7 +48,9 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.components.TextInputDialog
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.util.formatRelativeTime
+import kotlinx.collections.immutable.toImmutableList
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -309,3 +312,76 @@ private fun AddPassageDialog(
         minLines = 3,
     )
 }
+
+// region Previews
+
+private val previewPassages = listOf(
+    Passage(
+        id = "passage-1",
+        text = "The user prefers concise answers and works primarily in the Pacific timezone.",
+        sourceId = "source-42",
+        createdAt = "2026-08-01T12:00:00Z",
+        metadata = mapOf("origin" to "core_memory"),
+    ),
+    Passage(
+        id = "passage-2",
+        text = "Project notes: the mobile client talks to a self-hosted Letta server behind a reverse proxy.",
+        createdAt = "2026-08-05T09:30:00Z",
+    ),
+)
+
+private fun previewArchivalUiState(
+    searchQuery: String = "",
+    filterHasSource: Boolean = false,
+    filterHasMetadata: Boolean = false,
+) = ArchivalUiState(
+    passages = previewPassages.toImmutableList(),
+    searchQuery = searchQuery,
+    filterHasSource = filterHasSource,
+    filterHasMetadata = filterHasMetadata,
+)
+
+@Composable
+private fun PreviewArchivalContent(
+    state: ArchivalUiState = previewArchivalUiState(),
+    filteredPassages: List<Passage> = previewPassages,
+) {
+    LettaPreviewFrame {
+        ArchivalContent(
+            state = state,
+            onSearchChange = {},
+            onToggleHasSource = {},
+            onToggleHasMetadata = {},
+            filteredPassages = filteredPassages,
+            onInspectPassage = {},
+            onDeletePassage = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ArchivalContentPreview() {
+    PreviewArchivalContent()
+}
+
+@PreviewLightDark
+@Composable
+private fun ArchivalContentEmptyPreview() {
+    PreviewArchivalContent(filteredPassages = emptyList())
+}
+
+@PreviewLightDark
+@Composable
+private fun PassageCardPreview() {
+    LettaPreviewFrame {
+        PassageCard(
+            passage = previewPassages.first(),
+            onInspect = {},
+            onDelete = {},
+            modifier = Modifier.padding(16.dp),
+        )
+    }
+}
+
+// endregion

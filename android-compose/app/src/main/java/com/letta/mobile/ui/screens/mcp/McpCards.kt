@@ -29,10 +29,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.data.model.McpServer
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.effectiveArgs
 import com.letta.mobile.data.model.effectiveAuthHeader
 import com.letta.mobile.data.model.effectiveAuthToken
@@ -47,6 +50,7 @@ import com.letta.mobile.ui.components.ConfirmDialog
 import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.expressiveContentSize
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.dialogSectionHeading
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadata
@@ -448,3 +452,84 @@ internal fun serverActivityText(server: McpServer): String? {
     val relative = formatRelativeTime(timestamp).takeIf { it.isNotBlank() } ?: return null
     return if (updatedAt != null) "Updated $relative" else "Created $relative"
 }
+
+// region Previews
+
+private val previewTool = Tool(
+    id = ToolId("tool-1"),
+    name = "send_email",
+    description = "Send an email to a recipient with optional attachments.",
+    toolType = "composio",
+)
+
+private val previewToolParent = McpToolParent(
+    serverId = McpServerId("server-1"),
+    serverName = "Gmail MCP",
+)
+
+private val previewServer = McpServer(
+    id = McpServerId("server-1"),
+    serverName = "Gmail MCP",
+    serverUrl = "https://mcp.example.com/gmail",
+    type = "streamable_http",
+    authHeader = "Authorization",
+    organizationId = "org-42",
+    createdById = "user-1",
+    updatedAt = "2026-08-07T18:30:00Z",
+)
+
+private val previewServerCheckReachable = McpServerCheckState(
+    isChecking = false,
+    isReachable = true,
+    message = "Reachable in 124ms.",
+)
+
+private fun previewServerTools(): List<Tool> = listOf(
+    Tool(
+        id = ToolId("tool-1"),
+        name = "send_email",
+        description = "Send an email to a recipient.",
+    ),
+    Tool(
+        id = ToolId("tool-2"),
+        name = "list_inbox",
+        description = "List the most recent inbox messages.",
+    ),
+)
+
+@PreviewLightDark
+@Composable
+private fun PhoneBridgeCardPreview() {
+    LettaPreviewFrame {
+        PhoneBridgeCard(onConnectPhone = {})
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ToolCardPreview() {
+    LettaPreviewFrame {
+        ToolCard(
+            tool = previewTool,
+            parent = previewToolParent,
+            onNavigateToServerTools = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ServerCardPreview() {
+    LettaPreviewFrame {
+        ServerCard(
+            server = previewServer,
+            tools = previewServerTools(),
+            checkState = previewServerCheckReachable,
+            onEdit = {},
+            onDelete = {},
+            onCheck = {},
+        )
+    }
+}
+
+// endregion
