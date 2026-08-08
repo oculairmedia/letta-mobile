@@ -18,10 +18,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.R
 import com.letta.mobile.data.model.McpServer
 import com.letta.mobile.data.model.McpServerCreateParams
+import com.letta.mobile.data.model.McpServerId
 import com.letta.mobile.data.model.McpServerUpdateParams
 import com.letta.mobile.data.model.effectiveArgs
 import com.letta.mobile.data.model.effectiveAuthHeader
@@ -34,6 +36,7 @@ import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.components.CardGroup
 import com.letta.mobile.ui.components.FormItem
 import com.letta.mobile.ui.components.MultiFieldInputDialog
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -380,3 +383,73 @@ internal fun parseKeyValueObject(text: String): Result<JsonObject?> {
         }
     }
 }
+
+// region Previews
+
+private val previewFormHttpState = McpServerFormState(
+    serverName = "Sample Server",
+    transportType = MCP_TYPE_STREAMABLE_HTTP,
+    serverUrl = "https://mcp.example.com/stream",
+    command = "",
+    argsText = "",
+    authHeader = "Authorization",
+    authToken = "sample-token",
+)
+
+private val previewFormStdioState = McpServerFormState(
+    serverName = "Local Stdio Server",
+    transportType = MCP_TYPE_STDIO,
+    command = "npx",
+    argsText = "-y @modelcontextprotocol/server-filesystem /tmp",
+    envText = "DEBUG=1\nLOG_LEVEL=info",
+)
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogCreatePreview() {
+    LettaPreviewFrame {
+        ServerFormDialog(
+            initialServer = null,
+            initialFormStateOverride = previewFormHttpState,
+            onDismiss = {},
+            onCreate = {},
+            onUpdate = { _, _ -> },
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogStdioPreview() {
+    LettaPreviewFrame {
+        ServerFormDialog(
+            initialServer = null,
+            initialFormStateOverride = previewFormStdioState,
+            onDismiss = {},
+            onCreate = {},
+            onUpdate = { _, _ -> },
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ServerFormDialogEditPreview() {
+    LettaPreviewFrame {
+        ServerFormDialog(
+            initialServer = McpServer(
+                id = McpServerId("server-1"),
+                serverName = "Existing Server",
+                serverUrl = "https://mcp.example.com/edit",
+                authHeader = "X-Api-Key",
+                type = "streamable_http",
+            ),
+            initialFormStateOverride = null,
+            onDismiss = {},
+            onCreate = {},
+            onUpdate = { _, _ -> },
+        )
+    }
+}
+
+// endregion

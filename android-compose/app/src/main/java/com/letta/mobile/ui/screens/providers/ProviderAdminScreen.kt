@@ -37,11 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.R
 import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.ui.components.ActionSheet
 import com.letta.mobile.ui.components.ActionSheetItem
@@ -56,6 +58,7 @@ import com.letta.mobile.ui.components.LettaCardDefaults
 import com.letta.mobile.ui.components.MultiFieldInputDialog
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemSupporting
 
@@ -561,3 +564,38 @@ private fun ProviderEditorDialog(
         }
     }
 }
+
+// region Previews
+
+private val previewProvider = Provider(
+    id = ProviderId("prov-1"),
+    name = "Anthropic Prod",
+    providerType = "anthropic",
+    providerCategory = "Hosted",
+    baseUrl = "https://api.anthropic.com",
+    region = "us-east-1",
+    apiKey = "sk-ant-sample",
+)
+
+@PreviewLightDark
+@Composable
+private fun ProviderCardPreview() {
+    LettaPreviewFrame {
+        ProviderCard(
+            provider = previewProvider,
+            onInspect = {},
+            onEdit = {},
+            onDelete = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun ProviderDetailRefreshStatusPreview() {
+    LettaPreviewFrame {
+        ProviderDetailRefreshStatus(isRefreshing = true)
+    }
+}
+
+// endregion

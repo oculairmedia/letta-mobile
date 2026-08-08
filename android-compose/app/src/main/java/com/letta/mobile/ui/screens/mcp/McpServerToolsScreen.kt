@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -50,6 +51,7 @@ import com.letta.mobile.R
 import com.letta.mobile.data.model.McpServerResyncResult
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
+import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.model.effectiveServerType
 import com.letta.mobile.data.model.effectiveServerUrl
 import com.letta.mobile.ui.common.UiState
@@ -62,6 +64,7 @@ import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.components.ErrorContent
 import com.letta.mobile.ui.components.ShimmerCard
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
 import com.letta.mobile.ui.theme.listItemSupporting
 
@@ -436,3 +439,45 @@ private fun copyToClipboard(
         Toast.makeText(context, context.getString(R.string.action_copied), Toast.LENGTH_SHORT).show()
     }
 }
+
+// region Previews
+
+private val previewMcpTool = Tool(
+    id = ToolId("tool-1"),
+    name = "send_email",
+    description = "Send an email to a recipient with the provided body.",
+    toolType = "composio",
+)
+
+private val previewMcpToolRunning = Tool(
+    id = ToolId("tool-2"),
+    name = "fetch_inbox",
+    description = "Fetch recent inbox messages.",
+    toolType = "composio",
+)
+
+@PreviewLightDark
+@Composable
+private fun McpServerToolCardPreview() {
+    LettaPreviewFrame {
+        McpServerToolCard(
+            tool = previewMcpTool,
+            isRunning = false,
+            onRun = {},
+        )
+    }
+}
+
+@PreviewLightDark
+@Composable
+private fun McpServerToolCardRunningPreview() {
+    LettaPreviewFrame {
+        McpServerToolCard(
+            tool = previewMcpToolRunning,
+            isRunning = true,
+            onRun = {},
+        )
+    }
+}
+
+// endregion
