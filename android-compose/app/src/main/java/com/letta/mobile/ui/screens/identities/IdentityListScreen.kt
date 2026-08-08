@@ -681,44 +681,53 @@ private val previewAgent = Agent(
     description = "A general-purpose agent",
 )
 
+@Composable
+private fun PreviewIdentityCard() = LettaPreviewFrame {
+    IdentityCard(
+        identity = previewIdentity,
+        onInspect = {},
+        onEdit = {},
+        onDelete = {},
+    )
+}
+
+@Composable
+private fun PreviewIdentityDetailDialog() = LettaPreviewFrame {
+    IdentityDetailDialog(
+        identity = previewIdentity,
+        knownAgents = listOf(previewAgent),
+        onDismiss = {},
+        onEdit = {},
+        onAttachAgent = {},
+        onDetachAgent = {},
+    )
+}
+
+@Composable
+private fun PreviewAgentAttachDialog() = LettaPreviewFrame {
+    AgentAttachDialog(
+        agents = listOf(previewAgent),
+        onDismiss = {},
+        onAttach = {},
+    )
+}
+
 @PreviewLightDark
 @Composable
 private fun IdentityCardPreview() {
-    LettaPreviewFrame {
-        IdentityCard(
-            identity = previewIdentity,
-            onInspect = {},
-            onEdit = {},
-            onDelete = {},
-        )
-    }
+    PreviewIdentityCard()
 }
 
 @PreviewLightDark
 @Composable
 private fun IdentityDetailDialogPreview() {
-    LettaPreviewFrame {
-        IdentityDetailDialog(
-            identity = previewIdentity,
-            knownAgents = listOf(previewAgent),
-            onDismiss = {},
-            onEdit = {},
-            onAttachAgent = {},
-            onDetachAgent = {},
-        )
-    }
+    PreviewIdentityDetailDialog()
 }
 
 @PreviewLightDark
 @Composable
 private fun AgentAttachDialogPreview() {
-    LettaPreviewFrame {
-        AgentAttachDialog(
-            agents = listOf(previewAgent),
-            onDismiss = {},
-            onAttach = {},
-        )
-    }
+    PreviewAgentAttachDialog()
 }
 
 // endregion
