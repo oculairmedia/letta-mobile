@@ -16,6 +16,8 @@ data class IrohAgentMessage(
     val body: String,
     val msgId: String,
     val ts: Long,
+    /** letta-mobile-5m1qy: optional explicit target conversation on the recipient. */
+    val conversationId: String? = null,
 ) {
     fun encode(): String = wireJson.encodeToString(serializer(), this)
 
