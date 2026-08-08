@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -148,17 +149,21 @@ fun ConversationCard(
 private fun conversationCardTitle(display: ConversationDisplay): String =
     display.conversation.summary?.takeIf { it.isNotBlank() } ?: "Conversation"
 
+private val ConversationCardShape = RoundedCornerShape(12.dp)
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ConversationCardSurface(params: ConversationCardSurfaceParams) {
     Card(
         modifier = params.modifier
             .fillMaxWidth()
+            // Clip before the click handler so press/ripple indication stays inside the rounded corners.
+            .clip(ConversationCardShape)
             .combinedClickable(
                 onClick = params.clicks.onClick,
                 onLongClick = params.clicks.onLongClick,
             ),
-        shape = RoundedCornerShape(12.dp),
+        shape = ConversationCardShape,
         colors = LettaCardDefaults.listCardColors(),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
