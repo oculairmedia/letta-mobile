@@ -161,7 +161,11 @@ private fun rememberChatListFadeAlphas(listState: LazyListState): ChatListFadeAl
     // Soft gradient fade at the bottom of the list so content dissolves into
     // the composer instead of hard-clipping (mirrors the mobile chat fading
     // edges). Top has no fade — the pinned prompt card owns that edge.
-    val showBottomFade by remember(listState) { derivedStateOf { listState.canScrollForward } }
+
+    // ⚡ Bolt Optimization: `listState.canScrollForward` is already backed by Compose State.
+    // Wrapping it in `derivedStateOf` is redundant and wastes memory and observation overhead.
+    val showBottomFade = listState.canScrollForward
+
     val bottomFadeAlpha by animateFloatAsState(
         targetValue = if (showBottomFade) 1f else 0f,
         animationSpec = tween(durationMillis = 250),
