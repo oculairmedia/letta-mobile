@@ -46,6 +46,7 @@ class ConversationCardTest {
                         onRename = {},
                         onTogglePinned = {},
                         onFork = {},
+                        onArchiveToggle = {},
                     ),
                 )
         }
@@ -81,6 +82,7 @@ class ConversationCardTest {
                         onRename = {},
                         onTogglePinned = {},
                         onFork = {},
+                        onArchiveToggle = {},
                     ),
                 )
         }

@@ -319,7 +319,7 @@ class ConversationsViewModelTest {
     }
 
     @Test
-    fun `setConversationArchived updates state`() = runTest {
+    fun `setConversationArchived removes conversation from visible list`() = runTest {
         val conversation = TestData.conversation(id = "1", agentId = "a1").copy(archived = false)
         fakeAllRepo.setConversations(listOf(conversation))
         viewModel.loadConversations()
@@ -328,7 +328,7 @@ class ConversationsViewModelTest {
         viewModel.setConversationArchived(display, true)
 
         assertTrue(fakeConvRepo.archivedUpdates.contains("1" to true))
-        assertTrue(viewModel.uiState.value.conversations.first().conversation.archived == true)
+        assertTrue(viewModel.uiState.value.conversations.none { it.conversation.id == ConversationId("1") })
     }
 
     @Test

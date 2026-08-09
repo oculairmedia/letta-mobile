@@ -163,6 +163,7 @@ fun ConversationsScreen(
                     )
                 }
             },
+            onArchiveToggle = { display -> viewModel.setConversationArchived(display, display.conversation.archived != true) },
             onRefresh = viewModel::refresh,
         )
     }
@@ -196,6 +197,7 @@ fun ConversationsScreen(
             onRenameConversation = listActions.onRenameConversation,
             onTogglePinned = listActions.onTogglePinned,
             onForkConversation = listActions.onForkConversation,
+            onArchiveToggle = listActions.onArchiveToggle,
             onRefresh = listActions.onRefresh,
             onRetryLoad = viewModel::loadConversations,
             navigation = navigation,
@@ -270,6 +272,7 @@ internal data class ConversationsScreenCallbacks(
     val onRenameConversation: (ConversationDisplay, String) -> Unit,
     val onTogglePinned: (ConversationDisplay) -> Unit,
     val onForkConversation: (ConversationDisplay) -> Unit,
+    val onArchiveToggle: (ConversationDisplay) -> Unit,
     val onRefresh: () -> Unit,
     val onRetryLoad: () -> Unit,
     val navigation: ConversationsNavigation,
@@ -283,6 +286,7 @@ private fun ConversationsScreenCallbacks.toListActions() = ConversationListActio
     onRenameConversation = onRenameConversation,
     onTogglePinned = onTogglePinned,
     onForkConversation = onForkConversation,
+    onArchiveToggle = onArchiveToggle,
     onRefresh = onRefresh,
 )
 
@@ -434,6 +438,7 @@ internal fun ConversationsScreenBody(
                                 onRename = { newName -> callbacks.onRenameConversation(display, newName) },
                                 onTogglePinned = { callbacks.onTogglePinned(display) },
                                 onFork = { callbacks.onForkConversation(display) },
+                                onArchiveToggle = { callbacks.onArchiveToggle(display) },
                             ),
                         )
                     }
@@ -523,6 +528,7 @@ private fun previewConversationsScreenCallbacks() = ConversationsScreenCallbacks
     onRenameConversation = { _, _ -> },
     onTogglePinned = {},
     onForkConversation = {},
+    onArchiveToggle = {},
     onRefresh = {},
     onRetryLoad = {},
     navigation = previewConversationsNavigation(),
