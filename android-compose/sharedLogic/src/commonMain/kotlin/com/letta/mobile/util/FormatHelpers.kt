@@ -63,4 +63,12 @@ object FormatHelpers {
         durationMs < 60_000L -> "s"
         else -> "m"
     }
+
+    /**
+     * Truncates provider prefix from model identifier (e.g. "openai/gpt-4o" -> "gpt-4o").
+     */
+    fun truncateModelId(model: String): String {
+        val lastSlash = model.lastIndexOf('/')
+        return if (lastSlash >= 0 && lastSlash < model.length - 1) model.substring(lastSlash + 1) else model
+    }
 }

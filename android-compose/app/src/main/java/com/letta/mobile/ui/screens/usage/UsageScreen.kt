@@ -478,32 +478,21 @@ private fun RunSummaryCard(run: RunSummary) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.screen_usage_tokens_label, formatCompact(run.totalTokens)),
+                    text = stringResource(R.string.screen_usage_tokens_label, com.letta.mobile.util.FormatHelpers.formatCompactCount(run.totalTokens)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                run.durationMs?.let { ms ->
-                    Text(
-                        text = stringResource(R.string.screen_usage_duration_label, formatCompact(ms.toInt())),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                val durationStr = run.durationMs?.let { 
+                    "${com.letta.mobile.util.FormatHelpers.formatDurationValue(it)}${com.letta.mobile.util.FormatHelpers.formatDurationSuffix(it)}"
+                } ?: "—"
+                Text(
+                    text = stringResource(R.string.screen_usage_duration_label, durationStr),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
-}
-
-private fun formatCompact(value: Int): String = when {
-    value >= 1_000_000 -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
-    value >= 10_000 -> String.format(Locale.US, "%.1fK", value / 1_000.0)
-    value >= 1_000 -> String.format(Locale.US, "%,d", value)
-    else -> value.toString()
-}
-
-private fun truncateModel(model: String): String {
-    val lastSlash = model.lastIndexOf('/')
-    return if (lastSlash >= 0 && lastSlash < model.length - 1) model.substring(lastSlash + 1) else model
 }
 
 // region Previews
