@@ -107,7 +107,7 @@ kotlin {
                 // NOT in commonMain — native lib doesn't work with Kotlin/Native.
                 // Use implementation (not api): iroh 1.0 requires JVM 21 and must
                 // not leak onto downstream JVM-17 compile classpaths (:core:domain).
-                implementation("computer.iroh:iroh:1.0.0")
+                implementation("computer.iroh:iroh:1.1.0")
                 // CIO engine for the admin-proxy PATCH path: HttpURLConnection
                 // cannot send PATCH (JDK ProtocolException), which broke
                 // admin_rpc agent.update → the drawer model switch.

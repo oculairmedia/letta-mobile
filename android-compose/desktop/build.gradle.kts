@@ -134,7 +134,7 @@ dependencies {
     // transitively for desktop compilation — declare it directly here. The JAR
     // bundles host-OS native libs (linux/darwin/win, x86-64 + aarch64), so no
     // native packaging is needed.
-    implementation("computer.iroh:iroh:1.0.0")
+    implementation("computer.iroh:iroh:1.1.0")
     // Avatar companion: renderer bridge + loopback web host (brings :avatar:core).
     implementation(project(":avatar:renderer-web"))
     // Avatar library: import pipeline + local catalog (license capture/display).
