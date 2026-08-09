@@ -39,7 +39,16 @@ object FormatHelpers {
         return "${formatOneDecimal(kb)} KB"
     }
 
-    private fun formatOneDecimal(value: Double): String = "%.1f".format(value)
+    private fun formatOneDecimal(value: Double): String {
+        // Manual formatting — KMP-safe (no String.format which is JVM-only).
+        // Truncates to one decimal place.
+        val negative = value < 0
+        val absValue = if (negative) -value else value
+        val intPart = absValue.toLong()
+        val tenths = ((absValue - intPart) * 10).toLong()
+        val sign = if (negative) "-" else ""
+        return "$sign$intPart.$tenths"
+    }
 
     /**
      * Formats duration in milliseconds to value string ("—" when <= 0).
