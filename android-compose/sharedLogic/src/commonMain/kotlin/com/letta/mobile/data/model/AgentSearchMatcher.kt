@@ -38,7 +38,7 @@ object AgentSearchMatcher {
     fun matches(agent: AgentSummary, query: String): Boolean {
         val tokens = tokenize(query)
         if (tokens.isEmpty()) return true
-        val haystack = haystackOf(agent.name, agent.description, null, agent.id.value, emptyList())
+        val haystack = haystackOf(listOf(agent.name, agent.description, agent.id.value))
         return tokens.all { haystack.contains(it) }
     }
 
@@ -56,20 +56,10 @@ object AgentSearchMatcher {
         query.trim().lowercase().split(WHITESPACE).filter { it.isNotEmpty() }
 
     private fun haystackOf(agent: Agent): String =
-        haystackOf(agent.name, agent.description, agent.model, agent.id.value, agent.tags)
+        haystackOf(listOf(agent.name, agent.description, agent.model, agent.id.value) + agent.tags)
 
-    private fun haystackOf(
-        name: String?,
-        description: String?,
-        model: String?,
-        id: String?,
-        tags: List<String>,
-    ): String = buildString {
-        appendField(name)
-        appendField(description)
-        appendField(model)
-        appendField(id)
-        tags.forEach { appendField(it) }
+    private fun haystackOf(fields: Iterable<String?>): String = buildString {
+        fields.forEach { appendField(it) }
     }.lowercase()
 
     private fun StringBuilder.appendField(value: String?) {
