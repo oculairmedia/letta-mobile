@@ -1,5 +1,8 @@
 package com.letta.mobile.runtime
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -9,8 +12,8 @@ data class RuntimeProjection(
     val lastOffset: RuntimeEventOffset = RuntimeEventOffset(0),
     val seenEventIds: Set<RuntimeEventId> = emptySet(),
     val ignoredEventIds: Set<RuntimeEventId> = emptySet(),
-    val localMessages: List<RuntimeLocalMessage> = emptyList(),
-    val frames: List<RuntimeFrame> = emptyList(),
+    val localMessages: ImmutableList<RuntimeLocalMessage> = persistentListOf(),
+    val frames: ImmutableList<RuntimeFrame> = persistentListOf(),
     val toolExecutions: Map<ToolCallId, ToolExecutionProjection> = emptyMap(),
     val pendingApprovals: Map<ToolApprovalId, ToolApprovalRequest> = emptyMap(),
     val resolvedApprovals: Map<ToolApprovalId, ToolApprovalDecision> = emptyMap(),
@@ -76,29 +79,29 @@ object RuntimeEventProjector {
 
         return when (val payload = event.payload) {
             is RuntimeEventPayload.LocalUserAppend -> next.copy(
-                localMessages = next.localMessages + RuntimeLocalMessage(
+                localMessages = (next.localMessages + RuntimeLocalMessage(
                     localMessageId = payload.localMessageId,
                     text = payload.text,
-                ),
+                )).toPersistentList(),
             )
 
             is RuntimeEventPayload.RemoteStreamFrame -> next.copy(
-                frames = next.frames + RuntimeFrame(
+                frames = (next.frames + RuntimeFrame(
                     frameId = payload.frameId,
                     source = event.source,
                     body = payload.body,
                     messageId = payload.messageId,
                     messageType = payload.messageType,
-                ),
+                )).toPersistentList(),
             )
 
             is RuntimeEventPayload.ExternalTransportFrame -> next.copy(
-                frames = next.frames + RuntimeFrame(
+                frames = (next.frames + RuntimeFrame(
                     frameId = payload.frameId,
                     source = event.source,
                     body = payload.body,
                     messageId = payload.transportMessageId,
-                ),
+                )).toPersistentList(),
             )
 
             is RuntimeEventPayload.RestSnapshotReconcile -> next.copy(
@@ -175,13 +178,13 @@ object RuntimeEventProjector {
     ): RuntimeProjection = events.fold(seed, ::reduce)
 }
 
-private fun List<RuntimeLocalMessage>.updateLocal(
+private fun ImmutableList<RuntimeLocalMessage>.updateLocal(
     localMessageId: String,
     transform: (RuntimeLocalMessage) -> RuntimeLocalMessage,
-): List<RuntimeLocalMessage> =
+): ImmutableList<RuntimeLocalMessage> =
     map { message ->
         if (message.localMessageId == localMessageId) transform(message) else message
-    }
+    }.toPersistentList()
 
 private fun ToolExecutionProjection?.mergeCall(
     payload: RuntimeEventPayload.ToolCallObserved,

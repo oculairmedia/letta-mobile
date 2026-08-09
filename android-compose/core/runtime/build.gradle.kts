@@ -36,6 +36,7 @@ kotlin {
                 api(project(":core:ids"))
                 api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
+                api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
             }
         }
     }
