@@ -60,9 +60,9 @@ fun SkillEnvelopeChip(
     val fontScale = LocalChatFontScale.current
 
     Card(
+        onClick = { userExpanded = !userExpanded },
         modifier = modifier
             .fillMaxWidth()
-            .clickable { userExpanded = !userExpanded }
             .animateContentSize(),
         shape = RoundedCornerShape(8.dp),
         border = BorderStroke(

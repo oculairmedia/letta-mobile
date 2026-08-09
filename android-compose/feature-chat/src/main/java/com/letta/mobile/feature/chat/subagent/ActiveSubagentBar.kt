@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -222,7 +223,7 @@ private fun ActiveBarChip(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(LettaSpacing.BUBBLE_RADIUS))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .background(palette.container)
             // letta-mobile-xrth2: homogeneous min-height + SYMMETRIC vertical
             // padding so the chip is not bottom-heavy and matches other tool
@@ -324,7 +325,7 @@ private fun ViewConversationAction(
         contentDescription = "View conversation: $description",
         modifier = Modifier
             .clip(RoundedCornerShape(LettaSpacing.SM))
-            .clickable(onClick = onClick)
+            .clickable(role = Role.Button, onClick = onClick)
             .padding(LettaSpacing.XXXS)
             .size(LettaIconSizing.Inline),
         tint = tint,
