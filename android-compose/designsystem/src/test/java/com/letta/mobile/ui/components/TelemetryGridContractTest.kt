@@ -16,6 +16,8 @@ class TelemetryGridContractTest {
 
     @Test
     fun `formats duration value and suffix`() {
+        assertEquals("—", formatDurationValue(0))
+        assertEquals("", formatDurationSuffix(0))
         assertEquals("850", formatDurationValue(850))
         assertEquals("ms", formatDurationSuffix(850))
         assertEquals("2.5", formatDurationValue(2_500))

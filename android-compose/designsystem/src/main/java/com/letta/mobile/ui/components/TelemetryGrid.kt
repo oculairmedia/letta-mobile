@@ -199,7 +199,7 @@ internal fun formatDurationValue(durationMs: Long): String = when {
 }
 
 internal fun formatDurationSuffix(durationMs: Long): String = when {
-    durationMs <= 0L -> "ms"
+    durationMs <= 0L -> ""
     durationMs < 1_000L -> "ms"
     durationMs < 60_000L -> "s"
     else -> "m"
