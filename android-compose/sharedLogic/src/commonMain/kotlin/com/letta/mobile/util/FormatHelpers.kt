@@ -1,0 +1,66 @@
+package com.letta.mobile.util
+
+import kotlin.math.roundToInt
+
+/**
+ * Common platform-neutral formatting helpers for tokens, bytes, durations, and USD amounts.
+ */
+object FormatHelpers {
+
+    /**
+     * Formats integer count into compact representation (e.g., 987 -> "987", 12345 -> "12.3k", 1240000 -> "1.2M").
+     */
+    fun formatCompactCount(value: Int): String = when {
+        value >= 1_000_000 -> {
+            val rounded = (value / 100_000.0).roundToInt() / 10.0
+            "${rounded}M"
+        }
+        value >= 10_000 -> {
+            val rounded = (value / 100.0).roundToInt() / 10.0
+            "${rounded}k"
+        }
+        else -> value.toString()
+    }
+
+    /**
+     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB).
+     */
+    fun formatByteSize(bytes: Long): String = when {
+        bytes <= 0L -> "0 B"
+        bytes < 1024L -> "$bytes B"
+        bytes < 1024L * 1024L -> {
+            val kb = (bytes / 102.4).roundToInt() / 10.0
+            "$kb KB"
+        }
+        else -> {
+            val mb = (bytes / (1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
+            "$mb MB"
+        }
+    }
+
+    /**
+     * Formats duration in milliseconds to value string ("—" when <= 0).
+     */
+    fun formatDurationValue(durationMs: Long): String = when {
+        durationMs <= 0L -> "—"
+        durationMs < 1_000L -> durationMs.toString()
+        durationMs < 60_000L -> {
+            val sec = (durationMs / 100.0).roundToInt() / 10.0
+            "$sec"
+        }
+        else -> {
+            val min = (durationMs / 6000.0).roundToInt() / 10.0
+            "$min"
+        }
+    }
+
+    /**
+     * Formats duration unit suffix ("" when <= 0).
+     */
+    fun formatDurationSuffix(durationMs: Long): String = when {
+        durationMs <= 0L -> ""
+        durationMs < 1_000L -> "ms"
+        durationMs < 60_000L -> "s"
+        else -> "m"
+    }
+}
