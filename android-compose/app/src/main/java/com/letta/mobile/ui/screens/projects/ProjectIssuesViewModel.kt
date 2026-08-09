@@ -272,109 +272,136 @@ class ProjectIssuesViewModel @Inject constructor(
                     "timezone=${analyticsParams.timezone} timelineLimit=${analyticsParams.timelineLimit}",
             )
 
-            val (readyResult, issuesResult, analyticsResult) = supervisorScope {
-                val readyDeferred = async {
-                    projectWorkRepository.refreshReadyWork(route.projectId, limit = ISSUE_PAGE_SIZE)
-                }
-                val issuesDeferred = async {
-                    projectWorkRepository.refreshIssuePage(
-                        projectId = route.projectId,
-                        params = ProjectIssueListParams(limit = ISSUE_PAGE_SIZE, sort = "updated_desc"),
-                    )
-                }
-                val analyticsDeferred = async {
-                    projectWorkRepository.refreshIssueAnalytics(
-                        projectId = route.projectId,
-                        params = analyticsParams,
-                    )
-                }
-                Triple(
-                    runCatching { readyDeferred.await() },
-                    runCatching { issuesDeferred.await() },
-                    runCatching { analyticsDeferred.await() },
-                )
-            }
+            val (readyResult, issuesResult, analyticsResult) = fetchProjectData(analyticsParams)
 
             issuesResult.onSuccess { issuePage ->
-                val issues = issuePage.items
-                val ready = readyResult.getOrElse { emptyList() }
-                val analyticsError = analyticsResult.exceptionOrNull()
-                val analyticsResponse = analyticsResult.getOrNull()
-                if (analyticsResponse == null) {
-                    Log.w(
-                        TAG,
-                        "Analytics unavailable; using client fallback project=${route.projectId} " +
-                            "issues=${issues.size} error=${analyticsError?.message}",
-                        analyticsError,
-                    )
-                } else {
-                    Log.i(
-                        TAG,
-                        "Analytics raw project=${route.projectId} createdBuckets=${analyticsResponse.createdBuckets.size} " +
-                            "createdTotal=${analyticsResponse.createdBuckets.sumOf { it.createdCount }} " +
-                            "completedBuckets=${analyticsResponse.completedBuckets.size} " +
-                            "completedTotal=${analyticsResponse.completedBuckets.sumOf { it.completedCount }} " +
-                            "timeline=${analyticsResponse.completedTimeline.size} " +
-                            "summaryCreated=${analyticsResponse.summary.totalCreatedInRange} " +
-                            "summaryCompleted=${analyticsResponse.summary.totalCompletedInRange} " +
-                            "source=${analyticsResponse.completionSource} partial=${analyticsResponse.isPartial} " +
-                            "hasMore=${analyticsResponse.timelinePage.hasMore}",
-                    )
-                }
-                val analytics = withContext(Dispatchers.Default) {
-                    analyticsResponse?.toProjectIssueAnalytics()
-                        ?: buildFallbackProjectIssueAnalytics(issues)
-                }
-                Log.i(
-                    TAG,
-                    "Analytics UI project=${route.projectId} issues=${issues.size} ready=${ready.size} " +
-                        "buckets=${analytics.creationBuckets.size} createdChartTotal=${analytics.creationBuckets.sumOf { it.count }} " +
-                        "completedBucketTotal=${analytics.creationBuckets.sumOf { it.completedCount }} " +
-                        "timeline=${analytics.completedTimeline.size} summary=${analytics.summary.analyticsSummaryLog()} " +
-                        "source=${analytics.completionSource} partial=${analytics.isPartial} hasMore=${analytics.timelineHasMore}",
+                applyIssuesSuccessState(
+                    current = current,
+                    issuePage = issuePage,
+                    readyResult = readyResult,
+                    analyticsResult = analyticsResult,
                 )
-                _uiState.value = UiState.Success(
-                    ProjectIssuesUiState(
-                        projectId = route.projectId,
-                        projectName = route.projectName,
-                        readyWork = ready.toImmutableList(),
-                        issues = issues.toImmutableList(),
-                        completedTimeline = analytics.completedTimeline,
-                        creationBuckets = analytics.creationBuckets,
-                        analyticsSubstate = ProjectIssueAnalyticsSubstate.Ready(
-                            summary = analytics.summary,
-                            isPartial = analytics.isPartial,
-                            completionSource = analytics.completionSource,
-                            notice = analyticsError?.let { error ->
-                                mapErrorToUserMessage(
-                                    error.toException(),
-                                    "Issue analytics is unavailable. Check that Server URL points to Vibesync.",
-                                )
-                            },
-                        ),
-                        timelineHasMore = analytics.timelineHasMore,
-                        searchQuery = current?.searchQuery.orEmpty(),
-                        selectedStatus = current?.selectedStatus,
-                        isRefreshing = false,
-                        hasMoreIssues = issuePage.page.hasMore,
-                        nextIssueCursor = issuePage.page.nextCursor,
-                    )
-                )
-                readyResult.exceptionOrNull()?.let { error ->
-                    _events.trySend(ProjectIssuesUiEvent.ShowMessage(mapErrorToUserMessage(error.toException(), "Ready work is unavailable")))
-                }
-                analyticsResult.exceptionOrNull()?.let { error ->
-                    _events.trySend(ProjectIssuesUiEvent.ShowMessage(mapErrorToUserMessage(error.toException(), "Issue analytics is unavailable")))
-                }
             }.onFailure { error ->
-                val message = mapErrorToUserMessage(error.toException(), "Failed to load project issues")
-                if (current == null || forceRefresh.not()) {
-                    _uiState.value = UiState.Error(message)
-                } else {
-                    _uiState.value = UiState.Success(current.copy(isRefreshing = false))
-                    _events.trySend(ProjectIssuesUiEvent.ShowMessage(message))
-                }
+                handleIssuesLoadFailure(current = current, forceRefresh = forceRefresh, error = error)
             }
+        }
+    }
+
+    private suspend fun fetchProjectData(
+        analyticsParams: ProjectIssueAnalyticsParams,
+    ): Triple<Result<List<ProjectWorkItem>>, Result<ProjectIssuePage>, Result<ProjectIssueAnalyticsResponse>> =
+        supervisorScope {
+            val readyDeferred = async {
+                projectWorkRepository.refreshReadyWork(route.projectId, limit = ISSUE_PAGE_SIZE)
+            }
+            val issuesDeferred = async {
+                projectWorkRepository.refreshIssuePage(
+                    projectId = route.projectId,
+                    params = ProjectIssueListParams(limit = ISSUE_PAGE_SIZE, sort = "updated_desc"),
+                )
+            }
+            val analyticsDeferred = async {
+                projectWorkRepository.refreshIssueAnalytics(
+                    projectId = route.projectId,
+                    params = analyticsParams,
+                )
+            }
+            Triple(
+                runCatching { readyDeferred.await() },
+                runCatching { issuesDeferred.await() },
+                runCatching { analyticsDeferred.await() },
+            )
+        }
+
+    private suspend fun applyIssuesSuccessState(
+        current: ProjectIssuesUiState?,
+        issuePage: ProjectIssuePage,
+        readyResult: Result<List<ProjectWorkItem>>,
+        analyticsResult: Result<ProjectIssueAnalyticsResponse>,
+    ) {
+        val issues = issuePage.items
+        val ready = readyResult.getOrElse { emptyList() }
+        val analyticsError = analyticsResult.exceptionOrNull()
+        val analyticsResponse = analyticsResult.getOrNull()
+        if (analyticsResponse == null) {
+            Log.w(
+                TAG,
+                "Analytics unavailable; using client fallback project=${route.projectId} " +
+                    "issues=${issues.size} error=${analyticsError?.message}",
+                analyticsError,
+            )
+        } else {
+            Log.i(
+                TAG,
+                "Analytics raw project=${route.projectId} createdBuckets=${analyticsResponse.createdBuckets.size} " +
+                    "createdTotal=${analyticsResponse.createdBuckets.sumOf { it.createdCount }} " +
+                    "completedBuckets=${analyticsResponse.completedBuckets.size} " +
+                    "completedTotal=${analyticsResponse.completedBuckets.sumOf { it.completedCount }} " +
+                    "timeline=${analyticsResponse.completedTimeline.size} " +
+                    "summaryCreated=${analyticsResponse.summary.totalCreatedInRange} " +
+                    "summaryCompleted=${analyticsResponse.summary.totalCompletedInRange} " +
+                    "source=${analyticsResponse.completionSource} partial=${analyticsResponse.isPartial} " +
+                    "hasMore=${analyticsResponse.timelinePage.hasMore}",
+            )
+        }
+        val analytics = withContext(Dispatchers.Default) {
+            analyticsResponse?.toProjectIssueAnalytics()
+                ?: buildFallbackProjectIssueAnalytics(issues)
+        }
+        Log.i(
+            TAG,
+            "Analytics UI project=${route.projectId} issues=${issues.size} ready=${ready.size} " +
+                "buckets=${analytics.creationBuckets.size} createdChartTotal=${analytics.creationBuckets.sumOf { it.count }} " +
+                "completedBucketTotal=${analytics.creationBuckets.sumOf { it.completedCount }} " +
+                "timeline=${analytics.completedTimeline.size} summary=${analytics.summary.analyticsSummaryLog()} " +
+                "source=${analytics.completionSource} partial=${analytics.isPartial} hasMore=${analytics.timelineHasMore}",
+        )
+        _uiState.value = UiState.Success(
+            ProjectIssuesUiState(
+                projectId = route.projectId,
+                projectName = route.projectName,
+                readyWork = ready.toImmutableList(),
+                issues = issues.toImmutableList(),
+                completedTimeline = analytics.completedTimeline,
+                creationBuckets = analytics.creationBuckets,
+                analyticsSubstate = ProjectIssueAnalyticsSubstate.Ready(
+                    summary = analytics.summary,
+                    isPartial = analytics.isPartial,
+                    completionSource = analytics.completionSource,
+                    notice = analyticsError?.let { error ->
+                        mapErrorToUserMessage(
+                            error.toException(),
+                            "Issue analytics is unavailable. Check that Server URL points to Vibesync.",
+                        )
+                    },
+                ),
+                timelineHasMore = analytics.timelineHasMore,
+                searchQuery = current?.searchQuery.orEmpty(),
+                selectedStatus = current?.selectedStatus,
+                isRefreshing = false,
+                hasMoreIssues = issuePage.page.hasMore,
+                nextIssueCursor = issuePage.page.nextCursor,
+            )
+        )
+        readyResult.exceptionOrNull()?.let { error ->
+            _events.trySend(ProjectIssuesUiEvent.ShowMessage(mapErrorToUserMessage(error.toException(), "Ready work is unavailable")))
+        }
+        analyticsResult.exceptionOrNull()?.let { error ->
+            _events.trySend(ProjectIssuesUiEvent.ShowMessage(mapErrorToUserMessage(error.toException(), "Issue analytics is unavailable")))
+        }
+    }
+
+    private fun handleIssuesLoadFailure(
+        current: ProjectIssuesUiState?,
+        forceRefresh: Boolean,
+        error: Throwable,
+    ) {
+        val message = mapErrorToUserMessage(error.toException(), "Failed to load project issues")
+        if (current == null || forceRefresh.not()) {
+            _uiState.value = UiState.Error(message)
+        } else {
+            _uiState.value = UiState.Success(current.copy(isRefreshing = false))
+            _events.trySend(ProjectIssuesUiEvent.ShowMessage(message))
         }
     }
 
