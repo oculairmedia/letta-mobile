@@ -229,10 +229,7 @@ private fun formatMemory(used: Long?, total: Long?): String {
     return "${formatBytes(usedBytes)} / ${formatBytes(totalBytes)}"
 }
 
-private fun formatBytes(bytes: Long): String {
-    val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    return if (gib >= 1.0) "%.1f GiB".format(gib) else "${bytes / (1024 * 1024)} MiB"
-}
+private fun formatBytes(bytes: Long): String = com.letta.mobile.util.FormatHelpers.formatByteSize(bytes)
 
 // sRGB Color.value keeps ARGB in the upper 32 bits; toArgb() yields the packed
 // 32-bit form whose low 24 bits are the actual RGB channels.

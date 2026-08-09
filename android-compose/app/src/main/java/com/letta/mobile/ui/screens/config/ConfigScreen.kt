@@ -1028,11 +1028,7 @@ private fun EmbeddedModelCatalogRow(
     }
 }
 
-private fun formatBytes(bytes: Long): String {
-    val gib = bytes.toDouble() / (1024.0 * 1024.0 * 1024.0)
-    val mib = bytes.toDouble() / (1024.0 * 1024.0)
-    return if (gib >= 1.0) "%.1f GiB".format(gib) else "%.0f MiB".format(mib)
-}
+private fun formatBytes(bytes: Long): String = com.letta.mobile.util.FormatHelpers.formatByteSize(bytes)
 
 fun embeddedModelDownloadProgress(bytesDownloaded: Long, totalBytes: Long?): Float? {
     val total = totalBytes?.takeIf { it > 0L } ?: return null
