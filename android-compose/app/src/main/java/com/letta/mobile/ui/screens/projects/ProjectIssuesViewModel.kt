@@ -46,7 +46,7 @@ sealed interface ProjectIssueAnalyticsSubstate {
 
     @androidx.compose.runtime.Immutable
     data class Ready(
-        val summary: IssueAnalyticsSummaryUi,
+        val summary: IssueAnalyticsSummaryUi? = null,
         val isPartial: Boolean = false,
         val completionSource: String? = null,
         val notice: String? = null,

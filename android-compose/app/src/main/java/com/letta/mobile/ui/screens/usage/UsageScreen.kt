@@ -157,7 +157,7 @@ private fun UsageContent(
             ChartCard(
                 title = stringResource(R.string.screen_usage_tokens_by_model),
                 values = analytics?.modelBreakdowns?.map { it.totalTokens } ?: emptyList(),
-                labels = analytics?.modelBreakdowns?.map { truncateModel(it.model) } ?: emptyList(),
+                labels = analytics?.modelBreakdowns?.map { com.letta.mobile.util.FormatHelpers.truncateModelId(it.model) } ?: emptyList(),
             )
         }
 
@@ -240,19 +240,19 @@ private fun SummaryStatsRow(analytics: UsageAnalytics?) {
     ) {
         StatMiniCard(
             label = stringResource(R.string.screen_usage_total_tokens),
-            value = formatCompact(analytics?.totalTokens ?: 0),
+            value = com.letta.mobile.util.FormatHelpers.formatCompactCount(analytics?.totalTokens ?: 0),
             icon = LettaIcons.Database,
             modifier = Modifier.weight(1f),
         )
         StatMiniCard(
             label = stringResource(R.string.screen_usage_total_runs),
-            value = formatCompact(analytics?.totalRuns ?: 0),
+            value = com.letta.mobile.util.FormatHelpers.formatCompactCount(analytics?.totalRuns ?: 0),
             icon = LettaIcons.Play,
             modifier = Modifier.weight(1f),
         )
         StatMiniCard(
             label = stringResource(R.string.screen_usage_avg_latency),
-            value = "${formatCompact((analytics?.averageLatencyMs ?: 0).toInt())}ms",
+            value = "${com.letta.mobile.util.FormatHelpers.formatCompactCount((analytics?.averageLatencyMs ?: 0).toInt())}ms",
             icon = LettaIcons.AccessTime,
             modifier = Modifier.weight(1f),
         )
@@ -349,7 +349,7 @@ private fun TokenBreakdownRow(analytics: UsageAnalytics) {
 private fun TokenChip(label: String, count: Int) {
     Column {
         Text(
-            text = formatCompact(count),
+            text = com.letta.mobile.util.FormatHelpers.formatCompactCount(count),
             style = MaterialTheme.typography.titleSmall,
         )
         Text(
