@@ -94,7 +94,7 @@ dependencies {
     // irohNativeBindingIsOnTheDistributionRuntimeClasspath test still passes
     // after the removal (it resolves `computer.iroh.Endpoint` through the
     // production `implementation` declaration).
-    implementation("computer.iroh:iroh:1.0.0")
+    implementation("computer.iroh:iroh:1.1.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")

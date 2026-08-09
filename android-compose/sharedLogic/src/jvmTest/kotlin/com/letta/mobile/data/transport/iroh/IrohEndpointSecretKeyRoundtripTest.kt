@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport.iroh
 
 import computer.iroh.Endpoint
+import computer.iroh.EndpointBuilder
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
 import kotlinx.coroutines.runBlocking
@@ -60,6 +61,23 @@ class IrohEndpointSecretKeyRoundtripTest {
             }
         } finally {
             first.shutdown()
+        }
+    }
+
+    @Test
+    fun endpointSecretKeyReturnsBoundSecretKeyIn110() = runBlocking {
+        val bytes = ByteArray(32) { (it + 1).toByte() }
+        val endpoint = Endpoint.bind(
+            EndpointOptions(relayMode = RelayMode.disabled(), secretKey = bytes)
+        )
+        try {
+            val retrievedKey = endpoint.secretKey()
+            assertContentEquals(
+                bytes, retrievedKey.toBytes(),
+                "Endpoint.secretKey() MUST return the exact secret key bytes passed to bind()",
+            )
+        } finally {
+            endpoint.shutdown()
         }
     }
 }
