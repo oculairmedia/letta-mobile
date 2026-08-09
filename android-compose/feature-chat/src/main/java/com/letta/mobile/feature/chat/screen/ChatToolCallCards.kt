@@ -186,9 +186,10 @@ internal fun MessageToolCalls(
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                toolCalls.forEachIndexed { index, toolCall ->
+                toolCalls.forEach { toolCall ->
                     val motionKey = toolCall.toolCallMotionKey()
-                    key(index, motionKey) {
+                    val stableKey = toolCall.toolCallId ?: motionKey
+                    key(stableKey) {
                         val entranceKey = remember(messageId, motionKey) {
                             "tool|${messageId.orEmpty()}|$motionKey"
                         }
@@ -1298,9 +1299,10 @@ internal fun CompactToolCallGroupCard(
                     ToolMetaChip(text = "$completedCount/${toolCalls.size} done")
                 }
             }
-            toolCalls.forEachIndexed { index, toolCall ->
+            toolCalls.forEach { toolCall ->
                 val motionKey = toolCall.toolCallMotionKey()
-                key(index, motionKey) {
+                val stableKey = toolCall.toolCallId ?: motionKey
+                key(stableKey) {
                     val entranceKey = remember(rowAnimationKeyPrefix, motionKey) {
                         "compact-tool-row|$rowAnimationKeyPrefix|$motionKey"
                     }
