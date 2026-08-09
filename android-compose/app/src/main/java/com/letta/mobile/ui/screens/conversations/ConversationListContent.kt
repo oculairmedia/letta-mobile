@@ -293,26 +293,6 @@ private enum class SwipeSide { Archive, Delete }
 
 /**
  * Resolved color pair for a given swipe state. Pulling the three-branch `when`s out of the
- * composable keeps the body's cyclomatic complexity flat - each branch of the original
- * selection now lives in exactly one place.
- */
-private data class SwipeBackgroundColors(val background: Color, val onBackground: Color)
-
-/** Visual outcome for a single side of a conversation card swipe. */
-private enum class SwipeSide { Archive, Delete }
-
-/**
- * Resolved color pair for a given swipe state. Pulling the three-branch `when`s out of the
- * composable keeps the body's cyclomatic complexity flat — each branch of the original
- * selection now lives in exactly one place.
- */
-private data class SwipeBackgroundColors(val background: Color, val onBackground: Color)
-
-/** Visual outcome for a single side of a conversation card swipe. */
-private enum class SwipeSide { Archive, Delete }
-
-/**
- * Resolved color pair for a given swipe state. Pulling the three-branch `when`s out of the
  * composable keeps the body's cyclomatic complexity flat — each branch of the original
  * selection now lives in exactly one place.
  */
