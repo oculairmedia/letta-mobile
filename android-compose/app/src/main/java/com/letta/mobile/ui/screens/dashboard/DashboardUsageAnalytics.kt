@@ -3,6 +3,10 @@ package com.letta.mobile.ui.screens.dashboard
 import com.letta.mobile.data.model.Step
 import kotlin.math.roundToInt
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.persistentListOf
+
 @androidx.compose.runtime.Immutable
 data class ModelTokenUsage(
     val model: String,
@@ -15,7 +19,7 @@ data class DashboardUsageSummary(
     val totalTokens: Int,
     val averageTokensPerHour: Int,
     val sampledSteps: Int,
-    val modelUsage: List<ModelTokenUsage>,
+    val modelUsage: ImmutableList<ModelTokenUsage> = persistentListOf(),
 )
 
 object DashboardUsageCalculator {
@@ -53,8 +57,9 @@ object DashboardUsageCalculator {
                     )
                 }
                 .sortedWith(compareByDescending<ModelTokenUsage> { it.totalTokens }.thenBy { it.model })
+                .toImmutableList()
         } else {
-            emptyList()
+            persistentListOf()
         }
 
         return DashboardUsageSummary(
