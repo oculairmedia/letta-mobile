@@ -65,6 +65,7 @@
         <item quantity="other">%d items</item>
     </plurals>
     <string name="screen_home_usage_empty">No token activity recorded in the last 24 hours.</string>
+    <string name="screen_usage_empty_runs">No recent runs recorded for the selected time range.</string>
 
     <string name="screen_projects_title">Projects</string>
     <string name="screen_projects_unavailable_message">This backend doesn\'t support projects.</string>

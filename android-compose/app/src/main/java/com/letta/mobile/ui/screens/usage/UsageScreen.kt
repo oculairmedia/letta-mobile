@@ -196,7 +196,7 @@ private fun UsageContent(
         if (state.recentRuns.isEmpty()) {
             item("recent_runs_empty") {
                 Text(
-                    text = stringResource(R.string.screen_home_usage_empty),
+                    text = stringResource(R.string.screen_usage_empty_runs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp),
