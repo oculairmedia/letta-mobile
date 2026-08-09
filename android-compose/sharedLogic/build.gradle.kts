@@ -105,9 +105,12 @@ kotlin {
                 api("com.mikepenz:multiplatform-markdown-renderer-code:0.41.0")
                 // Iroh QUIC transport binding (JNI-backed, Android + JVM only).
                 // NOT in commonMain — native lib doesn't work with Kotlin/Native.
-                // Use implementation (not api): iroh 1.0 requires JVM 21 and must
-                // not leak onto downstream JVM-17 compile classpaths (:core:domain).
-                implementation("computer.iroh:iroh:1.0.0")
+                // The 1.1.0 split is: computer.iroh:iroh (JVM jar) +
+                // computer.iroh:iroh-android (AAR carrying the IrohAndroid
+                // class for the JNI ndk_context init). See letta-mobile-eakk8.
+                // We declare the dep on the per-target source sets below so
+                // Android pulls the AAR (with IrohAndroid) and JVM (desktop)
+                // pulls the plain jar — AAR has no JVM variant.
                 // CIO engine for the admin-proxy PATCH path: HttpURLConnection
                 // cannot send PATCH (JDK ProtocolException), which broke
                 // admin_rpc agent.update → the drawer model switch.
@@ -118,10 +121,23 @@ kotlin {
         // Wire android and jvm source sets to jvmAndAndroid
         getByName("androidMain") {
             dependsOn(jvmAndAndroid)
+            dependencies {
+                // Iroh AAR: brings the JVM iroh classes transitively + the
+                // Android-only IrohAndroid class (the JNI entry point for
+                // ndk_context::initialize_android_context, called from
+                // IrohAndroidInit.kt). See letta-mobile-eakk8.
+                implementation("computer.iroh:iroh-android:1.1.0")
+            }
         }
 
         getByName("jvmMain") {
             dependsOn(jvmAndAndroid)
+            dependencies {
+                // Iroh JVM jar: no IrohAndroid class (Android-only), no
+                // Android-specific AAR/manifest. The desktop and iroh-wrapper-cli
+                // modules don't need the JNI context init.
+                implementation("computer.iroh:iroh:1.1.0")
+            }
         }
 
         getByName("jvmTest") {
