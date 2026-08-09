@@ -105,17 +105,15 @@ open class AgentRepository(
         if (isLocalRuntimeActive()) {
             return super.listAgentSummaries()
         }
-        // letta-mobile-71orq: no slim admin_rpc handler exists; the raw HTTP
-        // listAgentsSlim hard-fails at the purity choke-point in iroh:// mode.
-        // Project summaries from the full agent.list result instead.
         if (irohAgentSource?.shouldUseIroh() == true) {
             return irohAgentSource.listAgents()
                 .distinctBy { it.id }
                 .map { AgentSummary(id = it.id, name = it.name, description = it.description) }
         }
-        // Page through the slim projection so pickers see every agent, not
-        // just the first page. Each item is tiny ({id, name, description}),
-        // so this stays far below the full-agents wire cost even across pages.
+        return fetchSlimAgentSummaries()
+    }
+
+    private suspend fun fetchSlimAgentSummaries(): List<AgentSummary> {
         val merged = mutableListOf<AgentSummary>()
         var offset = AgentPagingSource.INITIAL_OFFSET
         while (true) {
@@ -125,7 +123,7 @@ open class AgentRepository(
             val newAgents = page.filter { it.id !in existingIds }
             if (newAgents.isEmpty()) break
             merged += newAgents
-            if (page.size < CACHE_REFRESH_PAGE_SIZE && page.size % 20 != 0) break
+            if (isFinalPage(page.size)) break
             offset += page.size
         }
         return merged
@@ -205,6 +203,12 @@ open class AgentRepository(
             if (agents.isNotEmpty()) onProgress(agents)
             return agents
         }
+        return fetchRemoteAgentsLoop(onProgress)
+    }
+
+    private suspend fun fetchRemoteAgentsLoop(
+        onProgress: suspend (List<Agent>) -> Unit,
+    ): List<Agent> {
         val merged = mutableListOf<Agent>()
         var offset = AgentPagingSource.INITIAL_OFFSET
         while (true) {
@@ -220,11 +224,14 @@ open class AgentRepository(
 
             merged += newAgents
             onProgress(merged.toList())
-            if (page.size < CACHE_REFRESH_PAGE_SIZE && page.size % 20 != 0) break
+            if (isFinalPage(page.size)) break
             offset += page.size
         }
         return merged
     }
+
+    private fun isFinalPage(pageSize: Int): Boolean =
+        pageSize < CACHE_REFRESH_PAGE_SIZE && pageSize % 20 != 0
 
     private suspend fun fetchAgentsWithoutOffsetFallback(
         onProgress: suspend (List<Agent>) -> Unit,
