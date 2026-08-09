@@ -41,6 +41,19 @@ import java.util.Locale
 import javax.inject.Inject
 
 @androidx.compose.runtime.Immutable
+sealed interface ProjectIssueAnalyticsSubstate {
+    object Empty : ProjectIssueAnalyticsSubstate
+
+    @androidx.compose.runtime.Immutable
+    data class Ready(
+        val summary: IssueAnalyticsSummaryUi,
+        val isPartial: Boolean = false,
+        val completionSource: String? = null,
+        val notice: String? = null,
+    ) : ProjectIssueAnalyticsSubstate
+}
+
+@androidx.compose.runtime.Immutable
 data class ProjectIssuesUiState(
     val projectId: String,
     val projectName: String?,
@@ -48,10 +61,7 @@ data class ProjectIssuesUiState(
     val issues: ImmutableList<ProjectIssueSummary> = persistentListOf(),
     val completedTimeline: ImmutableList<ProjectIssueTimelineItem> = persistentListOf(),
     val creationBuckets: ImmutableList<ProjectIssueCreationBucket> = persistentListOf(),
-    val analyticsSummary: IssueAnalyticsSummaryUi? = null,
-    val analyticsIsPartial: Boolean = false,
-    val analyticsCompletionSource: String? = null,
-    val analyticsNotice: String? = null,
+    val analyticsSubstate: ProjectIssueAnalyticsSubstate = ProjectIssueAnalyticsSubstate.Empty,
     val timelineHasMore: Boolean = false,
     val searchQuery: String = "",
     val selectedStatus: String? = null,
@@ -59,7 +69,12 @@ data class ProjectIssuesUiState(
     val isLoadingMoreIssues: Boolean = false,
     val hasMoreIssues: Boolean = false,
     val nextIssueCursor: String? = null,
-)
+) {
+    val analyticsSummary: IssueAnalyticsSummaryUi? get() = (analyticsSubstate as? ProjectIssueAnalyticsSubstate.Ready)?.summary
+    val analyticsIsPartial: Boolean get() = (analyticsSubstate as? ProjectIssueAnalyticsSubstate.Ready)?.isPartial ?: false
+    val analyticsCompletionSource: String? get() = (analyticsSubstate as? ProjectIssueAnalyticsSubstate.Ready)?.completionSource
+    val analyticsNotice: String? get() = (analyticsSubstate as? ProjectIssueAnalyticsSubstate.Ready)?.notice
+}
 
 @androidx.compose.runtime.Immutable
 data class ProjectIssueTimelineItem(
@@ -326,15 +341,17 @@ class ProjectIssuesViewModel @Inject constructor(
                         issues = issues.toImmutableList(),
                         completedTimeline = analytics.completedTimeline,
                         creationBuckets = analytics.creationBuckets,
-                        analyticsSummary = analytics.summary,
-                        analyticsIsPartial = analytics.isPartial,
-                        analyticsCompletionSource = analytics.completionSource,
-                        analyticsNotice = analyticsError?.let { error ->
-                            mapErrorToUserMessage(
-                                error.toException(),
-                                "Issue analytics is unavailable. Check that Server URL points to Vibesync.",
-                            )
-                        },
+                        analyticsSubstate = ProjectIssueAnalyticsSubstate.Ready(
+                            summary = analytics.summary,
+                            isPartial = analytics.isPartial,
+                            completionSource = analytics.completionSource,
+                            notice = analyticsError?.let { error ->
+                                mapErrorToUserMessage(
+                                    error.toException(),
+                                    "Issue analytics is unavailable. Check that Server URL points to Vibesync.",
+                                )
+                            },
+                        ),
                         timelineHasMore = analytics.timelineHasMore,
                         searchQuery = current?.searchQuery.orEmpty(),
                         selectedStatus = current?.selectedStatus,

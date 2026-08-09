@@ -34,12 +34,22 @@ data class RunSummary(
 )
 
 @androidx.compose.runtime.Immutable
+sealed interface UsageAnalyticsSubstate {
+    object Empty : UsageAnalyticsSubstate
+
+    @androidx.compose.runtime.Immutable
+    data class Ready(val data: UsageAnalytics) : UsageAnalyticsSubstate
+}
+
+@androidx.compose.runtime.Immutable
 data class UsageUiState(
     val selectedTimeRange: TimeRange = TimeRange.TWENTY_FOUR_HOURS,
-    val analytics: UsageAnalytics? = null,
+    val analyticsSubstate: UsageAnalyticsSubstate = UsageAnalyticsSubstate.Empty,
     val recentRuns: ImmutableList<RunSummary> = persistentListOf(),
     val operationError: String? = null,
-)
+) {
+    val analytics: UsageAnalytics? get() = (analyticsSubstate as? UsageAnalyticsSubstate.Ready)?.data
+}
 
 @HiltViewModel
 class UsageViewModel @Inject constructor(
@@ -116,7 +126,7 @@ class UsageViewModel @Inject constructor(
                 _uiState.value = UiState.Success(
                     UsageUiState(
                         selectedTimeRange = timeRange,
-                        analytics = analytics,
+                        analyticsSubstate = UsageAnalyticsSubstate.Ready(analytics),
                         recentRuns = runSummaries.toImmutableList(),
                     ),
                 )
