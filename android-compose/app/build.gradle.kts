@@ -313,6 +313,112 @@ val prepareEmbeddedNodeCli = tasks.register<Exec>("prepareEmbeddedNodeCli") {
     commandLine("bash", script.asFile.absolutePath)
 }
 
+// ---------------------------------------------------------------------------
+// 16 KB LOAD-segment realignment for prebuilt Iroh / Nimbus JNI libraries
+// (letta-mobile, 2026-08-09)
+//
+// The prebuilt libiroh_ffi.so (computer.iroh:iroh-android:1.1.0 AAR) and
+// libjnidispatch.so (Nimbus JOSE/JWT) ship with 4 KB ELF alignment, which
+// Google Play rejects for apps targeting Android 15+ starting Nov 1, 2025
+// (developer.android.com/16kb-page-size). 1.1.0 is the latest iroh-android
+// release on Maven Central, and the .so inside the AAR is byte-identical
+// to the one we vendor in src/rootDebug/jniLibs/, so a version bump would
+// not fix the warning.
+//
+// We rewrite the program headers in place to lift each PT_LOAD to the next
+// 16 KB-aligned offset, padding with zero bytes between segments where
+// needed. This is the same trick Chromium / Flutter use for the same
+// problem: we don't vendor the upstream Rust / C source for these libs
+// (iroh-ffi is not built here, Nimbus's libjnidispatch has no public
+// source), so relinking with -Wl,-z,max-page-size=16384 is not an option.
+//
+// Idempotent: realign-16kb.py is a no-op when all PT_LOAD offsets are
+// already 16 KB-aligned, so repeated builds don't churn inputs.
+//
+// Falls back gracefully if Python 3 is missing: prints a one-time warning
+// and leaves the prebuilt .so files alone, mirroring the
+// `scripts/build-android-*.sh` pattern (when absent, the runtime keeps
+// the feature disabled instead of failing the build).
+// ---------------------------------------------------------------------------
+val realign16KbJniLibs = tasks.register("realign16KbJniLibs") {
+    group = "build"
+    description = "Rewrites prebuilt .so files under src/rootDebug/jniLibs/ for 16 KB LOAD alignment."
+    notCompatibleWithConfigurationCache(
+        "Resolves Python from the host PATH at execution time."
+    )
+    val scriptFile = project.layout.projectDirectory.file("scripts/realign-16kb.py")
+    inputs.file(scriptFile)
+    val jniLibsRoot = project.layout.projectDirectory.dir("src/rootDebug/jniLibs")
+    // Track every .so under jniLibs as both inputs and outputs so Gradle's
+    // incremental cache sees content changes and re-runs when needed.
+    val soFiles = fileTree(jniLibsRoot) {
+        include("**/*.so")
+    }
+    soFiles.forEach { inputs.file(it) }
+    outputs.files(soFiles)
+    doLast {
+        val python = listOf("python3", "python", "py").firstOrNull { cmd ->
+            try {
+                val probe = ProcessBuilder(cmd, "-c", "import sys; sys.exit(0)")
+                    .redirectErrorStream(true)
+                    .start()
+                probe.waitFor() == 0
+            } catch (_: Exception) {
+                false
+            }
+        }
+        if (python == null) {
+            logger.warn(
+                "[realign16KbJniLibs] Python 3 not found on PATH; skipping " +
+                    "16 KB realignment. Prebuilt .so files in " +
+                    "src/rootDebug/jniLibs/ will keep their 4 KB alignment, " +
+                    "and app-play-*.apk will be flagged by Play Console."
+            )
+            return@doLast
+        }
+        jniLibsRoot.asFileTree.forEach { soFile ->
+            if (!soFile.isFile) return@forEach
+            val result = try {
+                val proc = ProcessBuilder(
+                    python,
+                    scriptFile.asFile.absolutePath,
+                    soFile.absolutePath,
+                )
+                    .redirectErrorStream(true)
+                    .start()
+                proc.waitFor()
+            } catch (_: Exception) {
+                -1
+            }
+            if (result != 0) {
+                logger.warn(
+                    "[realign16KbJniLibs] realignment failed for ${soFile.name} " +
+                        "(exit $result); the prebuilt .so will keep its " +
+                        "original alignment."
+                )
+            }
+        }
+    }
+}
+
+// Hook the realignment task into every merge*JniLibFolders / merge*NativeLibs
+// task. These are the AGP tasks that walk src/rootDebug/jniLibs/ and copy
+// the .so files into the APK staging directory; running realign16KbJniLibs
+// before them guarantees the staged files are already 16 KB-aligned.
+//
+// Unlike the embedded-LettaCode prebuilts (which only matter when
+// embeddedLettaCodeNativeEnabled is true), the Iroh / Nimbus prebuilts
+// are required by every variant that exposes the Iroh transport, so this
+// dependsOn runs unconditionally.
+tasks.configureEach {
+    if (
+        (name.startsWith("merge") && name.endsWith("JniLibFolders")) ||
+        (name.startsWith("merge") && name.endsWith("NativeLibs"))
+    ) {
+        dependsOn(realign16KbJniLibs)
+    }
+}
+
 val prepareEmbeddedLettaCodeAssets = tasks.register("prepareEmbeddedLettaCodeAssets") {
     onlyIf { embeddedLettaCodeAssetsEnabled.get() }
     notCompatibleWithConfigurationCache("Runs npm install and copies embedded LettaCode assets.")
