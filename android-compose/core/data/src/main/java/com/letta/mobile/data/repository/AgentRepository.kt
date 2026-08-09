@@ -125,7 +125,6 @@ open class AgentRepository(
             val newAgents = page.filter { it.id !in existingIds }
             if (newAgents.isEmpty()) break
             merged += newAgents
-            if (page.size < CACHE_REFRESH_PAGE_SIZE) break
             offset += page.size
         }
         return merged
@@ -220,7 +219,6 @@ open class AgentRepository(
 
             merged += newAgents
             onProgress(merged.toList())
-            if (page.size < CACHE_REFRESH_PAGE_SIZE) break
             offset += page.size
         }
         return merged
