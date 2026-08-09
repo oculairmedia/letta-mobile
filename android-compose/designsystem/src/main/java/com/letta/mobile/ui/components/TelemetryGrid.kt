@@ -185,25 +185,14 @@ private data class TelemetryMetric(
     val suffix: String,
 )
 
-internal fun formatCompactCount(value: Int): String = when {
-    value >= 1_000_000 -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
-    value >= 10_000 -> String.format(Locale.US, "%.1fk", value / 1_000.0)
-    else -> String.format(Locale.US, "%,d", value)
-}
+internal fun formatCompactCount(value: Int): String =
+    com.letta.mobile.util.FormatHelpers.formatCompactCount(value)
 
-internal fun formatDurationValue(durationMs: Long): String = when {
-    durationMs <= 0L -> "—"
-    durationMs < 1_000L -> durationMs.toString()
-    durationMs < 60_000L -> String.format(Locale.US, "%.1f", durationMs / 1_000.0)
-    else -> String.format(Locale.US, "%.1f", durationMs / 60_000.0)
-}
+internal fun formatDurationValue(durationMs: Long): String =
+    com.letta.mobile.util.FormatHelpers.formatDurationValue(durationMs)
 
-internal fun formatDurationSuffix(durationMs: Long): String = when {
-    durationMs <= 0L -> "ms"
-    durationMs < 1_000L -> "ms"
-    durationMs < 60_000L -> "s"
-    else -> "m"
-}
+internal fun formatDurationSuffix(durationMs: Long): String =
+    com.letta.mobile.util.FormatHelpers.formatDurationSuffix(durationMs)
 
 internal fun formatSpeedValue(completionTokens: Int, durationMs: Long): String {
     if (completionTokens <= 0 || durationMs <= 0L) return "—"

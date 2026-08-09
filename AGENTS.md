@@ -399,6 +399,15 @@ before changing widget payloads, catalog IDs, bindings, or renderer dispatch.
 - Let container components own their default motion unless a reusable design-system wrapper needs a documented adjustment.
 - Contextual actions should appear from sheets or menus, not from bespoke animated overlays.
 
+### 6. Compose Compiler Metrics & Performance Audits
+
+- Enable compiler metrics and stability reports locally using:
+  ```bash
+  ./gradlew :app:compileRootDebugKotlin -Pplugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=build/compose_compiler -Pplugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=build/compose_compiler
+  ```
+- Inspect generated `*_skippable.txt` and `*_unstable.txt` under `build/compose_compiler/` to detect restartable vs skippable composables and unstable class parameters.
+- Ensure UI state holders and model parameters used in frequent re-render paths are marked `@Stable` or `@Immutable`, or use `ImmutableList` / primitive parameters.
+
 #### Micro-interactions
 
 - Use expressive motion for local content changes only after layout geometry is correct.

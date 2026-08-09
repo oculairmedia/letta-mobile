@@ -607,4 +607,20 @@ class AgentRepositoryTest {
         repo.deleteAgent(AgentId("a1"))
         assertEquals(1, transport.adminRpcCalls.size)
     }
+
+    @Test
+    fun `refreshAgents pages past small server page sizes`() = runTest {
+        val totalAgents = (1..60).map { TestData.agent(id = "agent-$it", name = "Agent $it") }
+        val apiWithSmallPageCap = object : FakeAgentApi() {
+            override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<com.letta.mobile.data.model.Agent> {
+                val currentOffset = offset ?: 0
+                val serverCap = 20
+                if (currentOffset >= totalAgents.size) return emptyList()
+                return totalAgents.drop(currentOffset).take(serverCap)
+            }
+        }
+        val repo = AgentRepository(apiWithSmallPageCap, FakeAgentDao())
+        repo.refreshAgents()
+        assertEquals(60, repo.agents.value.size)
+    }
 }

@@ -157,7 +157,7 @@ private fun UsageContent(
             ChartCard(
                 title = stringResource(R.string.screen_usage_tokens_by_model),
                 values = analytics?.modelBreakdowns?.map { it.totalTokens } ?: emptyList(),
-                labels = analytics?.modelBreakdowns?.map { truncateModel(it.model) } ?: emptyList(),
+                labels = analytics?.modelBreakdowns?.map { com.letta.mobile.util.FormatHelpers.truncateModelId(it.model) } ?: emptyList(),
             )
         }
 
@@ -196,7 +196,7 @@ private fun UsageContent(
         if (state.recentRuns.isEmpty()) {
             item("recent_runs_empty") {
                 Text(
-                    text = stringResource(R.string.screen_home_usage_empty),
+                    text = stringResource(R.string.screen_usage_empty_runs),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = 8.dp),
@@ -240,19 +240,19 @@ private fun SummaryStatsRow(analytics: UsageAnalytics?) {
     ) {
         StatMiniCard(
             label = stringResource(R.string.screen_usage_total_tokens),
-            value = formatCompact(analytics?.totalTokens ?: 0),
+            value = com.letta.mobile.util.FormatHelpers.formatCompactCount(analytics?.totalTokens ?: 0),
             icon = LettaIcons.Database,
             modifier = Modifier.weight(1f),
         )
         StatMiniCard(
             label = stringResource(R.string.screen_usage_total_runs),
-            value = formatCompact(analytics?.totalRuns ?: 0),
+            value = com.letta.mobile.util.FormatHelpers.formatCompactCount(analytics?.totalRuns ?: 0),
             icon = LettaIcons.Play,
             modifier = Modifier.weight(1f),
         )
         StatMiniCard(
             label = stringResource(R.string.screen_usage_avg_latency),
-            value = "${formatCompact((analytics?.averageLatencyMs ?: 0).toInt())}ms",
+            value = "${com.letta.mobile.util.FormatHelpers.formatCompactCount((analytics?.averageLatencyMs ?: 0).toInt())}ms",
             icon = LettaIcons.AccessTime,
             modifier = Modifier.weight(1f),
         )
@@ -349,7 +349,7 @@ private fun TokenBreakdownRow(analytics: UsageAnalytics) {
 private fun TokenChip(label: String, count: Int) {
     Column {
         Text(
-            text = formatCompact(count),
+            text = com.letta.mobile.util.FormatHelpers.formatCompactCount(count),
             style = MaterialTheme.typography.titleSmall,
         )
         Text(
@@ -478,32 +478,21 @@ private fun RunSummaryCard(run: RunSummary) {
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.screen_usage_tokens_label, formatCompact(run.totalTokens)),
+                    text = stringResource(R.string.screen_usage_tokens_label, com.letta.mobile.util.FormatHelpers.formatCompactCount(run.totalTokens)),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                run.durationMs?.let { ms ->
-                    Text(
-                        text = stringResource(R.string.screen_usage_duration_label, formatCompact(ms.toInt())),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                val durationStr = run.durationMs?.let { 
+                    "${com.letta.mobile.util.FormatHelpers.formatDurationValue(it)}${com.letta.mobile.util.FormatHelpers.formatDurationSuffix(it)}"
+                } ?: "—"
+                Text(
+                    text = stringResource(R.string.screen_usage_duration_label, durationStr),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
-}
-
-private fun formatCompact(value: Int): String = when {
-    value >= 1_000_000 -> String.format(Locale.US, "%.1fM", value / 1_000_000.0)
-    value >= 10_000 -> String.format(Locale.US, "%.1fK", value / 1_000.0)
-    value >= 1_000 -> String.format(Locale.US, "%,d", value)
-    else -> value.toString()
-}
-
-private fun truncateModel(model: String): String {
-    val lastSlash = model.lastIndexOf('/')
-    return if (lastSlash >= 0 && lastSlash < model.length - 1) model.substring(lastSlash + 1) else model
 }
 
 // region Previews

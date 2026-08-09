@@ -45,6 +45,11 @@ detekt {
     parallel = true
 }
 
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose_compiler")
+    metricsDestination = layout.buildDirectory.dir("compose_compiler")
+}
+
 sentry {
     telemetry.set(false)
     autoInstallation.enabled.set(true)

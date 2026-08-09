@@ -48,6 +48,11 @@ plugins {
     id("dev.nucleusframework")
 }
 
+composeCompiler {
+    reportsDestination = layout.buildDirectory.dir("compose_compiler")
+    metricsDestination = layout.buildDirectory.dir("compose_compiler")
+}
+
 java {
     // JVM 21: the desktop module transitively consumes sharedLogic's Iroh QUIC
     // transport binding (computer.iroh:iroh:1.0.0), which requires JVM 21+.

@@ -391,7 +391,7 @@ private fun LlmModelDetailDialog(
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
 
             model.contextWindow?.let {
-                DetailRow(stringResource(R.string.screen_models_detail_context_window, formatNumber(it)))
+                DetailRow(stringResource(R.string.screen_models_detail_context_window, com.letta.mobile.util.FormatHelpers.formatCompactCount(it)))
             }
             model.maxOutputTokens?.let {
                 DetailRow(pluralStringResource(R.plurals.screen_models_detail_max_output, it, it))
@@ -528,15 +528,7 @@ private fun DetailRow(text: String) {
     )
 }
 
-private fun formatNumber(value: Int): String {
-    return if (value >= 1000) {
-        val thousands = value / 1000
-        val remainder = value % 1000
-        if (remainder == 0) "$thousands,000" else "$thousands,${remainder.toString().padStart(3, '0')}"
-    } else {
-        value.toString()
-    }
-}
+
 
 private fun llmModelListKey(index: Int, model: LlmModel): String {
     return model.stableModelListKey(index, prefix = "llm")
