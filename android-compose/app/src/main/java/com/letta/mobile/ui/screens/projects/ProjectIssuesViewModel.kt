@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.IssueAnalyticsResponse
 import com.letta.mobile.data.model.ProjectIssueAnalyticsParams
 import com.letta.mobile.data.model.ProjectIssueDetail
 import com.letta.mobile.data.model.ProjectIssueListParams
+import com.letta.mobile.data.model.ProjectIssueListResponse
 import com.letta.mobile.data.model.ProjectIssueSummary
 import com.letta.mobile.data.repository.api.IProjectWorkRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
@@ -289,7 +290,7 @@ class ProjectIssuesViewModel @Inject constructor(
 
     private suspend fun fetchProjectData(
         analyticsParams: ProjectIssueAnalyticsParams,
-    ): Triple<Result<List<ProjectWorkItem>>, Result<ProjectIssuePage>, Result<ProjectIssueAnalyticsResponse>> =
+    ): Triple<Result<List<ProjectIssueSummary>>, Result<ProjectIssueListResponse>, Result<IssueAnalyticsResponse>> =
         supervisorScope {
             val readyDeferred = async {
                 projectWorkRepository.refreshReadyWork(route.projectId, limit = ISSUE_PAGE_SIZE)
@@ -315,11 +316,11 @@ class ProjectIssuesViewModel @Inject constructor(
 
     private suspend fun applyIssuesSuccessState(
         current: ProjectIssuesUiState?,
-        issuePage: ProjectIssuePage,
-        readyResult: Result<List<ProjectWorkItem>>,
-        analyticsResult: Result<ProjectIssueAnalyticsResponse>,
+        issuePage: ProjectIssueListResponse,
+        readyResult: Result<List<ProjectIssueSummary>>,
+        analyticsResult: Result<IssueAnalyticsResponse>,
     ) {
-        val issues = issuePage.items
+        val issues = issuePage.issues
         val ready = readyResult.getOrElse { emptyList() }
         val analyticsError = analyticsResult.exceptionOrNull()
         val analyticsResponse = analyticsResult.getOrNull()
