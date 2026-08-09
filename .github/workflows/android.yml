@@ -346,6 +346,45 @@ jobs:
           path: ${{ matrix.artifact_path }}
           if-no-files-found: error
 
+  # Builds the iroh-wrapper-cli distribution and uploads it as a CI artifact.
+  # The wrapper connects the device (iroh-1.1.0) to the app-server; it MUST
+  # match the iroh-ffi version used by the device APK, otherwise the QUIC
+  # handshake fails with error 120 ("peer doesn't support any known protocol").
+  # The artifact is downloaded on PR merge to redeploy into
+  # /opt/meridian/iroh-wrapper/releases/<sha>/ via the deployment runbook.
+  build-iroh-wrapper:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android-compose
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Build wrapper distribution
+        run: ./gradlew :iroh-wrapper-cli:installDist
+
+      - name: Upload iroh-wrapper distribution
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-iroh-wrapper-${{ github.run_number }}
+          path: android-compose/iroh-wrapper-cli/build/install/meridian-iroh-wrapper
+          if-no-files-found: error
+
   # Aggregator job: reports a single stable status check that branch
   # protection can require. The `build-apk` job above runs as a matrix,
   # so each matrix entry produces its own check context whose name
@@ -385,3 +424,21 @@ jobs:
             exit 1
           fi
           echo "shared-multiplatform succeeded"
+
+  # Stable status check for branch protection that the iroh-wrapper artifact
+  # was built and uploaded. Required so the merge-train can't land a PR whose
+  # wrapper was never produced — otherwise we'd rediscover the protocol-
+  # mismatch at device runtime instead of at merge time.
+  build-iroh-wrapper-pass:
+    runs-on: ubuntu-latest
+    needs: build-iroh-wrapper
+    if: always()
+    steps:
+      - name: Verify build-iroh-wrapper succeeded
+        run: |
+          result="${{ needs.build-iroh-wrapper.result }}"
+          if [ "$result" != "success" ]; then
+            echo "build-iroh-wrapper did not succeed (result=$result)"
+            exit 1
+          fi
+          echo "build-iroh-wrapper succeeded"
