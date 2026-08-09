@@ -518,7 +518,7 @@ private fun ProjectIssueCreationChartCard(
             } else {
                 val modelProducer = remember { CartesianChartModelProducer() }
 
-                LaunchedEffect(values) {
+                LaunchedEffect(values.hashCode()) {
                     modelProducer.runTransaction {
                         columnSeries { series(values) }
                     }
