@@ -21,12 +21,16 @@ object FormatHelpers {
     }
 
     /**
-     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB).
+     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB, 3.0 GB).
      */
     fun formatByteSize(bytes: Long): String {
         if (bytes <= 0L) return "0 B"
         if (bytes < 1024L) return "$bytes B"
         val kb = (bytes / 102.4).roundToInt() / 10.0
+        if (kb >= 1024.0 * 1024.0) {
+            val gb = (bytes / (1024.0 * 1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
+            return "$gb GB"
+        }
         if (kb >= 1024.0) {
             val mb = (bytes / (1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
             return "$mb MB"
