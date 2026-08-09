@@ -188,7 +188,10 @@ internal fun MessageToolCalls(
             ) {
                 toolCalls.forEachIndexed { index, toolCall ->
                     val motionKey = toolCall.toolCallMotionKey()
-                    key(index, motionKey) {
+                    // letta-mobile-h5706: use stable toolCallId instead of index to prevent
+                    // cascade recomposition when one tool-call result arrives (updating index+motionKey
+                    // for one card would trigger unnecessary recomposition of all sibling cards)
+                    key(toolCall.toolCallId ?: motionKey) {
                         val entranceKey = remember(messageId, motionKey) {
                             "tool|${messageId.orEmpty()}|$motionKey"
                         }
@@ -1300,7 +1303,8 @@ internal fun CompactToolCallGroupCard(
             }
             toolCalls.forEachIndexed { index, toolCall ->
                 val motionKey = toolCall.toolCallMotionKey()
-                key(index, motionKey) {
+                // letta-mobile-h5706: use stable toolCallId instead of index (same fix as line 191)
+                key(toolCall.toolCallId ?: motionKey) {
                     val entranceKey = remember(rowAnimationKeyPrefix, motionKey) {
                         "compact-tool-row|$rowAnimationKeyPrefix|$motionKey"
                     }
