@@ -8,34 +8,30 @@ import kotlin.math.roundToInt
 object FormatHelpers {
 
     /**
-     * Formats integer count into compact representation (e.g., 987 -> "987", 12345 -> "12.3k", 1240000 -> "1.2M").
+     * Formats integer count into compact representation (e.g., 987 -> "987", 12345 -> "12.3k", 999999 -> "1M").
      */
-    fun formatCompactCount(value: Int): String = when {
-        value >= 1_000_000 -> {
-            val rounded = (value / 100_000.0).roundToInt() / 10.0
-            "${rounded}M"
+    fun formatCompactCount(value: Int): String {
+        if (value < 9_950) return value.toString()
+        val inThousands = (value / 100.0).roundToInt() / 10.0
+        if (inThousands >= 1000.0) {
+            val inMillions = (value / 100_000.0).roundToInt() / 10.0
+            return "${inMillions}M"
         }
-        value >= 10_000 -> {
-            val rounded = (value / 100.0).roundToInt() / 10.0
-            "${rounded}k"
-        }
-        else -> value.toString()
+        return "${inThousands}k"
     }
 
     /**
      * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB).
      */
-    fun formatByteSize(bytes: Long): String = when {
-        bytes <= 0L -> "0 B"
-        bytes < 1024L -> "$bytes B"
-        bytes < 1024L * 1024L -> {
-            val kb = (bytes / 102.4).roundToInt() / 10.0
-            "$kb KB"
-        }
-        else -> {
+    fun formatByteSize(bytes: Long): String {
+        if (bytes <= 0L) return "0 B"
+        if (bytes < 1024L) return "$bytes B"
+        val kb = (bytes / 102.4).roundToInt() / 10.0
+        if (kb >= 1024.0) {
             val mb = (bytes / (1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
-            "$mb MB"
+            return "$mb MB"
         }
+        return "$kb KB"
     }
 
     /**

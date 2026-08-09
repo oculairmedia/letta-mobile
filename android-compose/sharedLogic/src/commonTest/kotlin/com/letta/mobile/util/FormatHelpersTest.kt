@@ -8,7 +8,9 @@ class FormatHelpersTest {
     @Test
     fun testFormatCompactCount() {
         assertEquals("987", FormatHelpers.formatCompactCount(987))
+        assertEquals("10k", FormatHelpers.formatCompactCount(9_950))
         assertEquals("12.3k", FormatHelpers.formatCompactCount(12_345))
+        assertEquals("1M", FormatHelpers.formatCompactCount(999_950))
         assertEquals("1.2M", FormatHelpers.formatCompactCount(1_240_000))
     }
 
@@ -17,6 +19,7 @@ class FormatHelpersTest {
         assertEquals("0 B", FormatHelpers.formatByteSize(0))
         assertEquals("500 B", FormatHelpers.formatByteSize(500))
         assertEquals("4.2 KB", FormatHelpers.formatByteSize(4300))
+        assertEquals("1 MB", FormatHelpers.formatByteSize(1_048_575))
         assertEquals("1.5 MB", FormatHelpers.formatByteSize(1_572_864))
     }
 
