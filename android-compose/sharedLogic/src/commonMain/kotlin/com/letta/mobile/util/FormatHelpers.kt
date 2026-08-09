@@ -21,17 +21,33 @@ object FormatHelpers {
     }
 
     /**
-     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB).
+     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB, 3.0 GB).
+     * Always one decimal place for KB/MB/GB to keep widths stable in UI.
      */
     fun formatByteSize(bytes: Long): String {
         if (bytes <= 0L) return "0 B"
         if (bytes < 1024L) return "$bytes B"
         val kb = (bytes / 102.4).roundToInt() / 10.0
+        if (kb >= 1024.0 * 1024.0) {
+            val gb = (bytes / (1024.0 * 1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
+            return "${formatOneDecimal(gb)} GB"
+        }
         if (kb >= 1024.0) {
             val mb = (bytes / (1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
-            return "$mb MB"
+            return "${formatOneDecimal(mb)} MB"
         }
-        return "$kb KB"
+        return "${formatOneDecimal(kb)} KB"
+    }
+
+    private fun formatOneDecimal(value: Double): String {
+        // Manual formatting — KMP-safe (no String.format which is JVM-only).
+        // Truncates to one decimal place.
+        val negative = value < 0
+        val absValue = if (negative) -value else value
+        val intPart = absValue.toLong()
+        val tenths = ((absValue - intPart) * 10).toLong()
+        val sign = if (negative) "-" else ""
+        return "$sign$intPart.$tenths"
     }
 
     /**

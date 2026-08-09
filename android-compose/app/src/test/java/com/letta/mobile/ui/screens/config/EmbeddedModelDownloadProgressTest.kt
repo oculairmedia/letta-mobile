@@ -14,7 +14,7 @@ class EmbeddedModelDownloadProgressTest {
 
         val label = embeddedModelDownloadProgressLabel(downloaded, total)
 
-        assertEquals("384 MB / 3.0 GB · 13%", label)
+        assertEquals("384.0 MB / 3.0 GB · 13%", label)
     }
 
     @Test
@@ -23,7 +23,7 @@ class EmbeddedModelDownloadProgressTest {
 
         val label = embeddedModelDownloadProgressLabel(downloaded, null)
 
-        assertEquals("384 MB", label)
+        assertEquals("384.0 MB", label)
     }
 
     @Test
