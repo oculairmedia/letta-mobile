@@ -21,7 +21,9 @@ object FormatHelpers {
     }
 
     /**
-     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 1.5 MB, 3.0 GB).
+     * Formats byte size into human readable string (e.g. 500 B, 4.2 KB, 384 MB, 3.0 GB).
+     * Whole-number MB values render without trailing ".0" (e.g. "384 MB" not "384.0 MB").
+     * GB always keeps one decimal for precision (e.g. "3.0 GB").
      */
     fun formatByteSize(bytes: Long): String {
         if (bytes <= 0L) return "0 B"
@@ -29,13 +31,20 @@ object FormatHelpers {
         val kb = (bytes / 102.4).roundToInt() / 10.0
         if (kb >= 1024.0 * 1024.0) {
             val gb = (bytes / (1024.0 * 1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
-            return "$gb GB"
+            return "${formatOneDecimal(gb)} GB"
         }
         if (kb >= 1024.0) {
             val mb = (bytes / (1024.0 * 1024.0 / 10.0)).roundToInt() / 10.0
-            return "$mb MB"
+            return "${trimTrailingZero(mb)} MB"
         }
-        return "$kb KB"
+        return "${formatOneDecimal(kb)} KB"
+    }
+
+    private fun formatOneDecimal(value: Double): String = "%.1f".format(value)
+
+    private fun trimTrailingZero(value: Double): String {
+        val asLong = value.toLong()
+        return if (asLong.toDouble() == value) asLong.toString() else value.toString()
     }
 
     /**
