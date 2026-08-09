@@ -332,15 +332,24 @@ class ConversationsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 conversationRepository.setConversationArchived(display.conversation.id, display.conversation.agentId, archived)
+                val updatedConversations = _uiState.value.conversations.mapNotNull {
+                    if (it.conversation.id == display.conversation.id) {
+                        // Archived conversations are filtered out of the visible list
+                        // (see displayConversations()'s TODO(letta-mobile-587dn)); drop the
+                        // row here too so a swipe-to-archive doesn't linger until the next
+                        // refresh re-runs that projection.
+                        if (archived) null else it.copy(conversation = it.conversation.copy(archived = archived))
+                    } else it
+                }
                 _uiState.value = _uiState.value.copy(
-                    conversations = _uiState.value.conversations.map {
-                        if (it.conversation.id == display.conversation.id) {
-                            it.copy(conversation = it.conversation.copy(archived = archived))
-                        } else it
-                    }.toImmutableList(),
-                    selectedConversation = _uiState.value.selectedConversation?.takeIf { it.conversation.id == display.conversation.id }
-                        ?.copy(conversation = display.conversation.copy(archived = archived))
-                        ?: _uiState.value.selectedConversation,
+                    conversations = updatedConversations.toImmutableList(),
+                    selectedConversation = _uiState.value.selectedConversation?.let { selected ->
+                        when {
+                            selected.conversation.id != display.conversation.id -> selected
+                            archived -> null
+                            else -> selected.copy(conversation = display.conversation.copy(archived = archived))
+                        }
+                    },
                 )
             } catch (e: Exception) {
                 Log.w("ConversationsVM", "Archive toggle failed", e)
@@ -446,9 +455,14 @@ class ConversationsViewModel @Inject constructor(
         agents: List<Agent>,
         activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
     ): List<Conversation> {
-        if (!activeConfigIsLocalRuntime) return conversations
+        // TODO(letta-mobile-587dn): archived conversations currently vanish from the
+        // visible list with no UI to revisit them. Future work adds an "Archived"
+        // location mirroring desktop's ConversationArchiveFilter segmented control;
+        // the filter should then move out of this projection into a UI-driven toggle.
+        val unarchivedConversations = conversations.filterNot { it.archived == true }
+        if (!activeConfigIsLocalRuntime) return unarchivedConversations
         val localAgentIds = agents.map { it.id }.toSet()
-        return conversations.filter { conversation ->
+        return unarchivedConversations.filter { conversation ->
             conversation.id.value.startsWith("local-conv-") || conversation.agentId in localAgentIds
         }
     }
