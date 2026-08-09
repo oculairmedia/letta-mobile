@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
@@ -287,6 +288,36 @@ private val ConversationSwipeBackgroundShape = RoundedCornerShape(12.dp)
 /** Material's disabled-content alpha, used for the archive icon on rows that refuse the swipe. */
 private const val BlockedSwipeIconAlpha = 0.38f
 
+/** Visual outcome for a single side of a conversation card swipe. */
+private enum class SwipeSide { Archive, Delete }
+
+/**
+ * Resolved color pair for a given swipe state. Pulling the three-branch `when`s out of the
+ * composable keeps the body's cyclomatic complexity flat - each branch of the original
+ * selection now lives in exactly one place.
+ */
+private data class SwipeBackgroundColors(val background: Color, val onBackground: Color)
+
+/** Visual outcome for a single side of a conversation card swipe. */
+private enum class SwipeSide { Archive, Delete }
+
+/**
+ * Resolved color pair for a given swipe state. Pulling the three-branch `when`s out of the
+ * composable keeps the body's cyclomatic complexity flat — each branch of the original
+ * selection now lives in exactly one place.
+ */
+private data class SwipeBackgroundColors(val background: Color, val onBackground: Color)
+
+/** Visual outcome for a single side of a conversation card swipe. */
+private enum class SwipeSide { Archive, Delete }
+
+/**
+ * Resolved color pair for a given swipe state. Pulling the three-branch `when`s out of the
+ * composable keeps the body's cyclomatic complexity flat — each branch of the original
+ * selection now lives in exactly one place.
+ */
+private data class SwipeBackgroundColors(val background: Color, val onBackground: Color)
+
 /**
  * The [SwipeToDismissBox] background: a rounded rect (matching [ConversationCard]'s own
  * `RoundedCornerShape(12.dp)`, so color doesn't leak into the corner gaps) that stays neutral
@@ -318,36 +349,53 @@ internal fun ConversationSwipeBackground(
         // At rest: nothing is being dragged, so there is no side to paint or an icon to show.
         return
     }
-    val isArchive = dismissDirection == SwipeToDismissBoxValue.StartToEnd
-    val blocked = isArchive && archiveBlocked
-    val committed = targetValue != SwipeToDismissBoxValue.Settled && !blocked
+    val side = if (dismissDirection == SwipeToDismissBoxValue.StartToEnd) SwipeSide.Archive else SwipeSide.Delete
+    val colors = swipeColors(
+        side = side,
+        committed = targetValue != SwipeToDismissBoxValue.Settled,
+        blocked = archiveBlocked,
+    )
     val backgroundColor by animateColorAsState(
-        targetValue = when {
-            committed && isArchive -> MaterialTheme.colorScheme.tertiaryContainer
-            committed && !isArchive -> MaterialTheme.colorScheme.errorContainer
-            else -> MaterialTheme.colorScheme.surfaceVariant
-        },
+        targetValue = colors.background,
         label = "conversationSwipeBackgroundColor",
     )
-    val iconTint = when {
-        committed && isArchive -> MaterialTheme.colorScheme.onTertiaryContainer
-        committed && !isArchive -> MaterialTheme.colorScheme.onErrorContainer
-        blocked -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = BlockedSwipeIconAlpha)
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
-    }
     Box(
         modifier = Modifier
             .fillMaxSize()
             .clip(ConversationSwipeBackgroundShape)
             .background(backgroundColor)
             .padding(horizontal = 24.dp),
-        contentAlignment = if (isArchive) Alignment.CenterStart else Alignment.CenterEnd,
+        contentAlignment = if (side == SwipeSide.Archive) Alignment.CenterStart else Alignment.CenterEnd,
     ) {
         Icon(
-            imageVector = if (isArchive) LettaIcons.Archive else LettaIcons.Delete,
+            imageVector = if (side == SwipeSide.Archive) LettaIcons.Archive else LettaIcons.Delete,
             contentDescription = null,
-            tint = iconTint,
+            tint = colors.onBackground,
         )
+    }
+}
+
+/**
+ * Resolves the background + icon tint pair for a swipe side. [blocked] is the pinned-row muted
+ * state, applied only on the archive side — the delete side has no muted counterpart because the
+ * delete swipe never actually dismisses (the confirm dialog vetoes it in `confirmValueChange`).
+ */
+@Composable
+private fun swipeColors(side: SwipeSide, committed: Boolean, blocked: Boolean): SwipeBackgroundColors {
+    val scheme = MaterialTheme.colorScheme
+    val archivedAndBlocked = side == SwipeSide.Archive && blocked
+    return when {
+        committed && side == SwipeSide.Archive && !archivedAndBlocked ->
+            SwipeBackgroundColors(scheme.tertiaryContainer, scheme.onTertiaryContainer)
+        committed && side == SwipeSide.Delete ->
+            SwipeBackgroundColors(scheme.errorContainer, scheme.onErrorContainer)
+        archivedAndBlocked ->
+            SwipeBackgroundColors(
+                scheme.surfaceVariant,
+                scheme.onSurfaceVariant.copy(alpha = BlockedSwipeIconAlpha),
+            )
+        else ->
+            SwipeBackgroundColors(scheme.surfaceVariant, scheme.onSurfaceVariant)
     }
 }
 
