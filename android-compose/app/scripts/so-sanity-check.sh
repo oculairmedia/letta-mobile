@@ -97,9 +97,15 @@ fi
 
 # Verify HASH / GNU_HASH entries are non-null. A HASH line with d_ptr=0
 # is corrupt (hash table with 0 buckets). Libre instant crasher.
+#
+# Note on pipefail: `grep -E ... | awk ...` inside a command substitution
+# would normally propagate grep's exit-1 to pipefail, killing the script
+# under `set -e` before we can print the diagnostic. We sidestep this
+# by adding `|| true` to the substitution so a no-match grep produces
+# an empty val (without aborting), and the diagnostic below still fires.
 for tag in HASH GNU_HASH; do
     if grep -qE "\(\s*${tag}\b" <<<"$dump"; then
-        val="$(grep -E "\(\s*${tag}\b" <<<"$dump" | awk '{print $NF}')"
+        val="$(grep -E "\(\s*${tag}\b" <<<"$dump" | awk '{print $NF}' || true)"
         if [[ "$val" == "0x0" || "$val" == "0x0000000000000000" ]]; then
             echo "so-sanity-check: $SO DT_${tag} has d_ptr=0 (empty hash table)" >&2
             bad=1
@@ -112,7 +118,7 @@ done
 # don't bound-check.
 for tag in STRTAB SYMTAB; do
     if grep -qE "\(\s*${tag}\b" <<<"$dump"; then
-        val="$(grep -E "\(\s*${tag}\b" <<<"$dump" | awk '{print $NF}')"
+        val="$(grep -E "\(\s*${tag}\b" <<<"$dump" | awk '{print $NF}' || true)"
         if [[ "$val" == "0x0" || "$val" == "0x0000000000000000" ]]; then
             echo "so-sanity-check: $SO DT_${tag} has d_ptr=0 (NULL ${tag,,})" >&2
             bad=1
