@@ -472,11 +472,14 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
         // (CI runners rarely have llvm-readelf on PATH; this matches the
         // path AGP uses for llvm-objdump). Falls back to PATH for hosts
         // that have it installed system-wide.
+        val ndkRootEnv = System.getenv("ANDROID_NDK_HOME") ?: ""
         val ndkCandidates = listOf(
+            "$ndkRootEnv/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
+            "$ndkRootEnv/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf.exe",
             "/opt/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
             "/opt/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
             "/opt/stacks/ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
-        )
+        ).filter { it.isNotBlank() }
         val readelf = ndkCandidates.firstOrNull { path ->
             file(path).exists() && file(path).canExecute()
         } ?: listOf("llvm-readelf", "readelf").firstOrNull { cmd ->
@@ -489,12 +492,19 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
                 false
             }
         } ?: run {
-            logger.warn(
-                "[verifyJniLibSanity] llvm-readelf not found; skipping " +
-                    "DT_HASH/DT_GNU_HASH verification. Install an NDK toolchain " +
-                    "or add llvm-readelf to PATH to enable this check."
+            // If we can't find llvm-readelf at all, that itself is a real
+            // failure -- not "skip the check." Letting the build proceed
+            // would silently lose the fire #53 protection, so surface
+            // the missing dependency as a GradleException instead.
+            throw GradleException(
+                "[verifyJniLibSanity] llvm-readelf not found. Tried: " +
+                    ndkCandidates.joinToString(", ") +
+                    ", and PATH lookup for 'llvm-readelf'/'readelf'. " +
+                    "Set ANDROID_NDK_HOME to your NDK install root (e.g. " +
+                    "/opt/android-sdk/ndk/28.2.13676358) or add llvm-readelf " +
+                    "to PATH. Without readelf we cannot enforce the " +
+                    "DT_HASH/DT_GNU_HASH fire #53 guard."
             )
-            return@doLast
         }
 
         val failures = mutableListOf<String>()
