@@ -473,13 +473,23 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
         // path AGP uses for llvm-objdump). Falls back to PATH for hosts
         // that have it installed system-wide.
         val ndkRootEnv = System.getenv("ANDROID_NDK_HOME") ?: ""
-        val ndkCandidates = listOf(
+        val sdkRootEnv = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT") ?: ""
+        // Probe for any installed NDK by globbing the SDK's ndk/ directory.
+        // The CI runner at $ANDROID_HOME/ndk/27.3.13750724 wasn't covered
+        // by the previous hardcoded list, so we now scan for any installed
+        // NDK version and pick the first one. Falls back to fixed paths
+        // when the SDK root isn't readable.
+        val sdkNdkDir = if (sdkRootEnv.isNotBlank()) file("$sdkRootEnv/ndk") else null
+        val ndkRootsFromSdk = sdkNdkDir?.listFiles { f -> f.isDirectory }
+            ?.map { "${it.absolutePath}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" }
+            ?: emptyList()
+        val ndkCandidates = (listOf(
             "$ndkRootEnv/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
             "$ndkRootEnv/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf.exe",
             "/opt/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
             "/opt/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
             "/opt/stacks/ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
-        ).filter { it.isNotBlank() }
+        ) + ndkRootsFromSdk).filter { it.isNotBlank() }
         val readelf = ndkCandidates.firstOrNull { path ->
             file(path).exists() && file(path).canExecute()
         } ?: listOf("llvm-readelf", "readelf").firstOrNull { cmd ->
