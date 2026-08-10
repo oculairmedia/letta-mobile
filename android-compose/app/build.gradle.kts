@@ -449,6 +449,12 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
     notCompatibleWithConfigurationCache(
         "Resolves llvm-readelf from the AGP NDK toolchain at execution time."
     )
+    // Explicit dependency on realign16KbJniLibs: both tasks read the
+    // same .so files in src/rootDebug/jniLibs/, so Gradle's implicit
+    // dependency detection can't disambiguate which task produces those
+    // files. Without this dependsOn the configuration cache rejects the
+    // build with "Property has implicit dependency" errors.
+    dependsOn(realign16KbJniLibs)
     val scriptFile = project.layout.projectDirectory.file("scripts/so-sanity-check.sh")
     inputs.file(scriptFile)
     val jniLibsRoot = project.layout.projectDirectory.dir("src/rootDebug/jniLibs")
@@ -456,7 +462,11 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
         include("**/*.so")
     }
     soFiles.forEach { inputs.file(it) }
-    outputs.files(soFiles)
+    // No outputs.files() here -- this task only reads the .so files
+    // and raises a GradleException on failure; it does not modify them.
+    // The previous outputs.files(soFiles) declaration created a cycle
+    // with realign16KbJniLibs (which also lists the same files as
+    // outputs), which Gradle's configuration cache rejects.
     doLast {
         // Resolve llvm-readelf from the AGP NDK toolchain when possible
         // (CI runners rarely have llvm-readelf on PATH; this matches the
