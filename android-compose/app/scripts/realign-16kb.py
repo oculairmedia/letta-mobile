@@ -38,7 +38,12 @@
 #      the module is byte-for-byte identical before and after realignment
 #      — only where each segment's bytes live IN THE FILE changes.
 #   4. Shift each PT_LOAD's data to its new offset.
-#   5. Update section header table offsets to track segment moves.
+#   5. Shift sh_offset for every SECTION header whose original sh_offset
+#      fell inside a moved PT_LOAD, by that segment's delta (see
+#      _apply_section_header_offsets — section headers are NOT purely
+#      cosmetic here; Android's bionic linker cross-validates the
+#      .dynamic section's sh_offset against PT_DYNAMIC's p_offset and
+#      refuses to dlopen() on mismatch).
 #   6. Rewrite program headers with new offsets + p_align = 0x4000.
 #   7. Atomically replace the original file via a sibling tempfile +
 #      os.replace(): a crash mid-write leaves the original .so intact
@@ -256,9 +261,68 @@ def _compute_new_load_offsets(load_phdrs: list[dict]) -> list[int]:
     return new_offsets
 
 
-def _copy_section_headers(out: bytearray, src: bytes, e_shoff: int, sh_size: int, new_shoff: int) -> None:
-    if sh_size and e_shoff and e_shoff + sh_size <= len(src):
-        out[new_shoff : new_shoff + sh_size] = src[e_shoff : e_shoff + sh_size]
+# Elf64_Shdr field byte offsets (total size 64 bytes):
+#   sh_name(4) sh_type(4) sh_flags(8) sh_addr(8) sh_offset(8) sh_size(8)
+#   sh_link(4) sh_info(4) sh_addralign(8) sh_entsize(8)
+_SH_OFFSET_FIELD_OFFSET = 4 + 4 + 8 + 8  # byte offset of sh_offset within Elf64_Shdr
+ELF64_SHDR_SIZE = 64
+SHT_NULL = 0
+
+
+def _apply_section_header_offsets(
+    out: bytearray,
+    src: bytes,
+    e_shoff: int,
+    e_shentsize: int,
+    e_shnum: int,
+    new_shoff: int,
+    orig_load_offsets: list[int],
+    orig_load_fileszs: list[int],
+    new_load_offsets: list[int],
+    tail_start: int,
+    tail_delta: int,
+) -> None:
+    """Shift sh_offset for every section header, by whichever delta
+    applies to the region its ORIGINAL sh_offset falls in: a moved
+    PT_LOAD's range, or the relocated tail blob (see `realign()`) for
+    sections beyond the last PT_LOAD (.shstrtab, the section header
+    table itself, and — for an unstripped .so — .symtab/.strtab).
+
+    Android's bionic linker cross-validates the .dynamic SECTION's
+    sh_offset against the PT_DYNAMIC PROGRAM HEADER's p_offset on
+    builds that enforce the 16 KB migration, and refuses to dlopen()
+    the library if they disagree ("$.dynamic section has invalid
+    offset ... expected to match PT_DYNAMIC offset ..."). So — contrary
+    to this script's other comments about section headers being
+    tooling-only — sh_offset is load-bearing for this one check. We
+    conservatively fix up every section's sh_offset (not just
+    .dynamic's), since other bionic paths may perform similar
+    cross-checks. sh_addr is left untouched, matching this script's
+    vaddr-preservation policy for program headers.
+    """
+    if not e_shnum or not e_shoff or not new_shoff:
+        return
+    if e_shoff + e_shentsize * e_shnum > len(src):
+        return
+    for i in range(e_shnum):
+        src_off = e_shoff + i * e_shentsize
+        _sh_name, sh_type, _sh_flags, _sh_addr, sh_offset = struct.unpack_from(
+            "<IIQQQ", src, src_off
+        )
+        if sh_type == SHT_NULL:
+            continue
+        new_sh_offset = None
+        for orig_off, orig_filesz, new_off in zip(
+            orig_load_offsets, orig_load_fileszs, new_load_offsets, strict=True
+        ):
+            if orig_off <= sh_offset < orig_off + orig_filesz:
+                new_sh_offset = sh_offset + (new_off - orig_off)
+                break
+        if new_sh_offset is None and sh_offset >= tail_start:
+            new_sh_offset = sh_offset + tail_delta
+        if new_sh_offset is not None and new_sh_offset != sh_offset:
+            out_off = new_shoff + i * e_shentsize + _SH_OFFSET_FIELD_OFFSET
+            struct.pack_into("<Q", out, out_off, new_sh_offset)
 
 
 def _apply_load_offsets(phdrs: list[dict], load_phdrs: list[dict], new_offsets: list[int]) -> None:
@@ -350,17 +414,25 @@ def realign(buf: bytearray, phdrs: list[dict], e_phoff: int, e_phentsize: int) -
     """Rewrite the ELF so every PT_LOAD segment is 16 KB-aligned.
 
     Strategy:
-      1. Start by copying the entire original file into `out`. This
-         preserves non-PT_LOAD bytes (PT_DYNAMIC blobs, .note blobs,
-         .eh_frame blobs, .dynsym, .dynstr, etc.) at their original
-         file offsets — phdrs that point at them by p_offset stay valid.
-      2. For each PT_LOAD, splice its relocated data into the right
-         place: bytes that were at buf[orig_off:orig_end] now live at
-         out[new_off:new_off+filesz]. The original location is left as
-         stale bytes that the linker never reads (because phdr p_offsets
-         for non-PT_LOAD entries inside the moved range are shifted
-         in lockstep by _apply_load_offsets).
-      3. Rewrite the program header table and any moved section headers.
+      1. Capture every PT_LOAD's data, AND the "tail" — everything from
+         the end of the last PT_LOAD's ORIGINAL data through EOF (the
+         section header table, .shstrtab, and for an unstripped .so
+         .symtab/.strtab) — as plain bytes objects, before mutating
+         anything. This is required, not just tidy: writing a PT_LOAD's
+         data to its new (shifted-right) position can otherwise land on
+         top of the OLD, not-yet-relocated tail bytes, silently
+         corrupting them (hit in practice: .shstrtab got clobbered by
+         the last PT_LOAD's relocated data, breaking section-name
+         lookups; see PR #1158 device repro history).
+      2. Build `out` by writing each PT_LOAD's data at its new offset,
+         then the tail as one contiguous blob immediately after the
+         last relocated PT_LOAD. The tail moves by a single uniform
+         delta, so its internal layout (section header table position
+         relative to .shstrtab, etc.) is preserved automatically.
+      3. Rewrite the program header table and every section header's
+         sh_offset (see _apply_section_header_offsets — the tail's
+         uniform delta covers sections beyond the last PT_LOAD; the
+         existing per-PT_LOAD delta covers sections inside one).
 
     Non-PT_LOAD phdrs that sit inside a moved PT_LOAD get their
     p_offset shifted by the same delta — see _apply_load_offsets. Their
@@ -393,44 +465,68 @@ def realign(buf: bytearray, phdrs: list[dict], e_phoff: int, e_phentsize: int) -
             )
         segment_data.append(data)
 
-    new_offsets = _compute_new_load_offsets(load_phdrs)
-    last_end = new_offsets[-1] + len(segment_data[-1]) if load_phdrs else 0
+    # Captured BEFORE _apply_load_offsets mutates load_phdrs in place —
+    # needed by _apply_section_header_offsets below to compute the same
+    # per-PT_LOAD deltas that _apply_load_offsets applies to phdrs.
+    orig_load_offsets = [ph["p_offset"] for ph in load_phdrs]
+    orig_load_fileszs = [ph["p_filesz"] for ph in load_phdrs]
 
-    # Section header table (if present) goes after the last segment,
-    # aligned to 8 bytes per the ELF64 spec.
+    # Everything from the end of the highest-ending PT_LOAD's ORIGINAL
+    # data through EOF moves as one blob — see the docstring above.
+    tail_start = (
+        max(o + f for o, f in zip(orig_load_offsets, orig_load_fileszs, strict=True))
+        if load_phdrs
+        else len(buf)
+    )
+    tail_data = bytes(buf[tail_start:])
+
+    new_offsets = _compute_new_load_offsets(load_phdrs)
+    last_end = new_offsets[-1] + len(segment_data[-1]) if load_phdrs else tail_start
+    new_tail_start = last_end
+    tail_delta = new_tail_start - tail_start
+
     e_shoff = struct.unpack_from("<Q", buf, 0x28)[0]
     e_shentsize = struct.unpack_from("<H", buf, 0x3A)[0]
     e_shnum = struct.unpack_from("<H", buf, 0x3C)[0]
-    sh_size = e_shentsize * e_shnum if e_shnum else 0
-    new_shoff = ((last_end + 7) // 8) * 8 if sh_size else 0
+    new_e_shoff = e_shoff + tail_delta if e_shoff else 0
 
-    # Initialize the output buffer by COPYING THE ENTIRE ORIGINAL FILE.
-    # This preserves all non-PT_LOAD bytes (PT_DYNAMIC blobs, .note
-    # blobs, .eh_frame blobs, .dynsym/.dynstr tables, etc.) at their
-    # original file offsets so phdrs that point at them by p_offset stay
-    # valid. We then overwrite the PT_LOAD regions with their relocated
-    # data, and _apply_load_offsets updates any phdrs that point inside
-    # a moved PT_LOAD. The end size is whichever is bigger.
     out = bytearray(buf)
-    if new_shoff + sh_size > len(out):
-        out.extend(b"\x00" * (new_shoff + sh_size - len(out)))
-    elif len(out) < phdr_table_end:
-        out.extend(b"\x00" * (phdr_table_end - len(out)))
+    needed_len = max(new_tail_start + len(tail_data), phdr_table_end)
+    if needed_len > len(out):
+        out.extend(b"\x00" * (needed_len - len(out)))
 
-    # Overwrite each PT_LOAD's data at its new offset. The original
-    # location still holds the stale bytes — they don't matter because
-    # _apply_load_offsets shifts any phdrs that pointed there.
+    # Overwrite each PT_LOAD's data at its new offset. Safe even where a
+    # new position overlaps an old one, because segment_data/tail_data
+    # were captured from `buf` up front, before any writes to `out`.
     for data, new_off in zip(segment_data, new_offsets, strict=True):
         if new_off + len(data) > len(out):
             out.extend(b"\x00" * (new_off + len(data) - len(out)))
         out[new_off : new_off + len(data)] = data
-    _copy_section_headers(out, buf, e_shoff, sh_size, new_shoff)
+
+    if tail_data:
+        if new_tail_start + len(tail_data) > len(out):
+            out.extend(b"\x00" * (new_tail_start + len(tail_data) - len(out)))
+        out[new_tail_start : new_tail_start + len(tail_data)] = tail_data
+
+    _apply_section_header_offsets(
+        out,
+        bytes(buf),
+        e_shoff,
+        e_shentsize,
+        e_shnum,
+        new_e_shoff,
+        orig_load_offsets,
+        orig_load_fileszs,
+        new_offsets,
+        tail_start,
+        tail_delta,
+    )
 
     _apply_load_offsets(phdrs, load_phdrs, new_offsets)
     _write_program_headers(out, phdrs, e_phoff, e_phentsize)
 
-    if sh_size:
-        struct.pack_into("<Q", out, 0x28, new_shoff)
+    if e_shoff:
+        struct.pack_into("<Q", out, 0x28, new_e_shoff)
     return bytes(out)
 
 
