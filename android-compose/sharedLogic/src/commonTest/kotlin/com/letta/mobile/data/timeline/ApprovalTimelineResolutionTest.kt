@@ -29,6 +29,41 @@ class ApprovalTimelineResolutionTest {
     }
 
     @Test
+    fun autoApprovalEchoWithoutDecisionStillCountsAsAnyResponse() {
+        // Regression for the duplicate approval-chip bug: the Letta server
+        // sends an approve=null echo for auto-approved (bypassPermissions)
+        // tool calls. hasExplicitApprovalResponse correctly ignores it (no
+        // approved/rejected label to show), but hasAnyApprovalResponse must
+        // still treat it as evidence the request is resolved, or a stale
+        // approval-request card resurfaces on the next history hydration.
+        val request = event("request-1", "run-1", "call-1")
+        val evidence = approvalTimelineEvidence(
+            listOf(ApprovalResponseMessage("response-1", approvalRequestId = "request-1", runId = "run-1")),
+        )
+
+        assertFalse(request.hasExplicitApprovalResponse(evidence))
+        assertTrue(request.hasAnyApprovalResponse(evidence))
+    }
+
+    @Test
+    fun noResponseAtAllDoesNotCountAsAnyResponse() {
+        val request = event("request-1", "run-1", "call-1")
+        val evidence = approvalTimelineEvidence(emptyList())
+
+        assertFalse(request.hasAnyApprovalResponse(evidence))
+    }
+
+    @Test
+    fun mismatchedRunEchoDoesNotCountAsAnyResponse() {
+        val request = event("request-1", "run-1", "call-1")
+        val evidence = approvalTimelineEvidence(
+            listOf(ApprovalResponseMessage("response-1", approvalRequestId = "request-1", runId = "run-other")),
+        )
+
+        assertFalse(request.hasAnyApprovalResponse(evidence))
+    }
+
+    @Test
     fun mismatchedRunFailsOpen() {
         val request = event("request-1", "run-1", "call-1")
         val evidence = approvalTimelineEvidence(
