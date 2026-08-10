@@ -519,9 +519,19 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
 
         val failures = mutableListOf<String>()
         val failureDetails = mutableListOf<String>()
-        val tmpOut = layout.buildDirectory.file("verifyJniLibSanity-output.txt").get().asFile
+        // Capture each .so's stderr to a SEPARATE file, NOT the same
+        // tmpOut that gets truncated each iteration. Otherwise the
+        // LAST iteration's stderr overwrites earlier ones, and we lose
+        // diagnostic information when multiple files fail.
+        val tmpOutPattern = layout.buildDirectory.dir("verifyJniLibSanity-out")
         jniLibsRoot.asFileTree.forEach { soFile ->
             if (!soFile.isFile) return@forEach
+            // Per-.so output file: each .so gets its own stderr captured
+            // to its own file. This is critical because the previous
+            // single-tmpOut design overwrote the file each iteration,
+            // so only the LAST .so's stderr survived. With per-.so files,
+            // we preserve every failed .so's diagnostic.
+            val tmpOut = tmpOutPattern.get().asFile.resolve("${soFile.name}.txt")
             tmpOut.parentFile.mkdirs()
             val result = try {
                 // Call the script with two positional args:
@@ -551,7 +561,7 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
                 } else {
                     "(no output captured)"
                 }
-                failureDetails.add("${soFile.name}: $detail")
+                failureDetails.add("${soFile.name} (exit=$result): $detail")
             }
         }
         if (failures.isNotEmpty()) {
