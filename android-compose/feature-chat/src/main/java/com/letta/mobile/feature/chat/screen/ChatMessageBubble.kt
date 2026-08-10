@@ -35,7 +35,7 @@ import com.letta.mobile.feature.chat.render.resolveRenderer
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
-import com.letta.mobile.ui.components.LatencyText
+import com.letta.mobile.ui.components.DeliveryTimeText
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -360,12 +360,10 @@ internal fun MessageBubbleSurface(
                 )
             }
             if (!isLastAssistant && message.role == "assistant" && !message.isReasoning) {
-                message.latencyMs?.let { latencyMs ->
-                    LatencyText(
-                        latencyMs = latencyMs.toFloat(),
-                        modifier = Modifier.padding(top = LettaSpacing.XXXS),
-                    )
-                }
+                DeliveryTimeText(
+                    timestamp = message.timestamp,
+                    modifier = Modifier.padding(top = LettaSpacing.XXXS),
+                )
             }
         }
     }

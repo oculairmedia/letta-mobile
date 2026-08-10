@@ -1272,61 +1272,55 @@ internal fun CompactToolCallGroupCard(
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
     val reducedMotion = rememberReducedMotionEnabled()
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.82f),
-        ),
+    // letta-mobile: dropped the Card's background fill + outline border — a
+    // tool-call row is chrome enough on its own (icon, name, status chip);
+    // the extra surface just added visual weight without conveying anything.
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = "${toolCalls.size} tool calls",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                val completedCount = toolCalls.count { it.result != null }
-                if (completedCount > 0) {
-                    ToolMetaChip(text = "$completedCount/${toolCalls.size} done")
+            Text(
+                text = "${toolCalls.size} tool calls",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            val completedCount = toolCalls.count { it.result != null }
+            if (completedCount > 0) {
+                ToolMetaChip(text = "$completedCount/${toolCalls.size} done")
+            }
+        }
+        toolCalls.forEachIndexed { index, toolCall ->
+            val motionKey = toolCall.toolCallMotionKey()
+            // letta-mobile-h5706: use stable toolCallId instead of index (same fix as line 191)
+            key(toolCall.toolCallId ?: motionKey) {
+                val entranceKey = remember(rowAnimationKeyPrefix, motionKey) {
+                    "compact-tool-row|$rowAnimationKeyPrefix|$motionKey"
+                }
+                val shouldAnimateEntrance = remember(animateRows, entranceKey) {
+                    shouldRunToolCallEntranceAnimation(animateRows, entranceKey)
+                }
+                ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
+                    CompactToolCallRow(
+                        toolCall = toolCall,
+                        approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
+                        onAttachmentImageTap = onAttachmentImageTap,
+                    )
                 }
             }
-            toolCalls.forEachIndexed { index, toolCall ->
-                val motionKey = toolCall.toolCallMotionKey()
-                // letta-mobile-h5706: use stable toolCallId instead of index (same fix as line 191)
-                key(toolCall.toolCallId ?: motionKey) {
-                    val entranceKey = remember(rowAnimationKeyPrefix, motionKey) {
-                        "compact-tool-row|$rowAnimationKeyPrefix|$motionKey"
-                    }
-                    val shouldAnimateEntrance = remember(animateRows, entranceKey) {
-                        shouldRunToolCallEntranceAnimation(animateRows, entranceKey)
-                    }
-                    ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
-                        CompactToolCallRow(
-                            toolCall = toolCall,
-                            approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
-                            onAttachmentImageTap = onAttachmentImageTap,
-                        )
-                    }
-                }
-            }
-            approvalRequests.forEach { approval ->
-                ApprovalRequestControls(
-                    approval = approval,
-                    isSubmitting = activeApprovalRequestId == approval.requestId,
-                    onDecision = onApprovalDecision,
-                )
-            }
+        }
+        approvalRequests.forEach { approval ->
+            ApprovalRequestControls(
+                approval = approval,
+                isSubmitting = activeApprovalRequestId == approval.requestId,
+                onDecision = onApprovalDecision,
+            )
         }
     }
 }
