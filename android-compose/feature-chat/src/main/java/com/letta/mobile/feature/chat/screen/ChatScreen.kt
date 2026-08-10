@@ -5,7 +5,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -17,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.theme.ChatBackground
@@ -42,7 +40,6 @@ internal fun ChatScreen(
     val composerState by viewModel.composerState.collectAsStateWithLifecycle()
     val fontScale by viewModel.chatFontScale.collectAsStateWithLifecycle()
     val hapticsEnabled by viewModel.hapticsEnabled.collectAsStateWithLifecycle()
-    val timelineMode by viewModel.chatTimelineMode.collectAsStateWithLifecycle()
 
     var activeFontScale by remember { mutableFloatStateOf(fontScale) }
     LaunchedEffect(fontScale) { activeFontScale = fontScale }
@@ -60,72 +57,68 @@ internal fun ChatScreen(
         )
     }
 
-    CompositionLocalProvider(
-        LocalUseProjectedToolTimeline provides (timelineMode == ChatTimelineMode.TIMELINE_V1),
-    ) {
-        LettaChatTheme(fontScale = activeFontScale) {
-            var floatingBannerMessage by remember { mutableStateOf("") }
-            val density = LocalDensity.current
-            val currentConversationId = viewModel.conversationId?.value
-            val subagentBarState = rememberChatScreenSubagentBarState(
-                resolvedSubagentSource = resolvedSubagentSource,
-                resolvedSelfTodoSource = resolvedSelfTodoSource,
-                currentConversationId = currentConversationId,
-            )
-            // letta-mobile-6237v.2: outer .imePadding() (line 103) shrinks the layout
-            // to the top of the keyboard when IME is open, so the composer
-            // Column has no bottom-padding work to do. Hardcoding 0.dp here
-            // makes the composer fill to the screen bottom edge when the
-            // keyboard is down — the home indicator gesture bar overlays the
-            // composer's bottom region, which is intended (composer bg is
-            // opaque, so the gesture bar is still visually distinct).
-            val bottomInsetDp = 0.dp
-            val ambient = rememberChatScreenAmbientState()
-            val streamingRevealPulse = rememberStreamingRevealHapticPulse(hapticsEnabled)
+    LettaChatTheme(fontScale = activeFontScale) {
+        var floatingBannerMessage by remember { mutableStateOf("") }
+        val density = LocalDensity.current
+        val currentConversationId = viewModel.conversationId?.value
+        val subagentBarState = rememberChatScreenSubagentBarState(
+            resolvedSubagentSource = resolvedSubagentSource,
+            resolvedSelfTodoSource = resolvedSelfTodoSource,
+            currentConversationId = currentConversationId,
+        )
+        // letta-mobile-6237v.2: outer .imePadding() (line 103) shrinks the layout
+        // to the top of the keyboard when IME is open, so the composer
+        // Column has no bottom-padding work to do. Hardcoding 0.dp here
+        // makes the composer fill to the screen bottom edge when the
+        // keyboard is down — the home indicator gesture bar overlays the
+        // composer's bottom region, which is intended (composer bg is
+        // opaque, so the gesture bar is still visually distinct).
+        val bottomInsetDp = 0.dp
+        val ambient = rememberChatScreenAmbientState()
+        val streamingRevealPulse = rememberStreamingRevealHapticPulse(hapticsEnabled)
 
-            ChatScreenEffects(
-                params = ChatScreenEffectsParams(
+        ChatScreenEffects(
+            params = ChatScreenEffectsParams(
+                state = state,
+                composerState = composerState,
+                hapticsEnabled = hapticsEnabled,
+                viewModel = viewModel,
+                floatingBannerMessage = floatingBannerMessage,
+                onFloatingBannerMessageChange = { floatingBannerMessage = it },
+                ambient = ambient,
+            ),
+        )
+
+        // letta-mobile-6237v.2: outer .imePadding() binds BOTH the
+        // shader canvas and the ChatScreenLayout to keyboard height so
+        // the shader shrinks with the keyboard. The Column inside still
+        // receives `bottomInsetDp` for navbar-clearance.
+        AmbientShaderAgentBackground(
+            agentStatus = ambient.status,
+            modifier = modifier
+                .fillMaxSize()
+                .imePadding()
+                .then(backgroundModifier),
+        ) {
+            ChatScreenLayout(
+                params = ChatScreenLayoutParams(
                     state = state,
                     composerState = composerState,
-                    hapticsEnabled = hapticsEnabled,
                     viewModel = viewModel,
+                    contentPadding = contentPadding,
+                    chatBackground = chatBackground,
+                    chatMode = chatMode,
+                    navigation = navigation,
+                    resolvedSubagentSource = resolvedSubagentSource,
+                    subagentBarState = subagentBarState,
+                    activeFontScale = activeFontScale,
+                    onActiveFontScaleChange = { activeFontScale = it },
+                    bottomInsetDp = bottomInsetDp,
                     floatingBannerMessage = floatingBannerMessage,
                     onFloatingBannerMessageChange = { floatingBannerMessage = it },
-                    ambient = ambient,
+                    streamingRevealPulse = streamingRevealPulse,
                 ),
             )
-
-            // letta-mobile-6237v.2: outer .imePadding() binds BOTH the
-            // shader canvas and the ChatScreenLayout to keyboard height so
-            // the shader shrinks with the keyboard. The Column inside still
-            // receives `bottomInsetDp` for navbar-clearance.
-            AmbientShaderAgentBackground(
-                agentStatus = ambient.status,
-                modifier = modifier
-                    .fillMaxSize()
-                    .imePadding()
-                    .then(backgroundModifier),
-            ) {
-                ChatScreenLayout(
-                    params = ChatScreenLayoutParams(
-                        state = state,
-                        composerState = composerState,
-                        viewModel = viewModel,
-                        contentPadding = contentPadding,
-                        chatBackground = chatBackground,
-                        chatMode = chatMode,
-                        navigation = navigation,
-                        resolvedSubagentSource = resolvedSubagentSource,
-                        subagentBarState = subagentBarState,
-                        activeFontScale = activeFontScale,
-                        onActiveFontScaleChange = { activeFontScale = it },
-                        bottomInsetDp = bottomInsetDp,
-                        floatingBannerMessage = floatingBannerMessage,
-                        onFloatingBannerMessageChange = { floatingBannerMessage = it },
-                        streamingRevealPulse = streamingRevealPulse,
-                    ),
-                )
-            }
         }
     }
 }

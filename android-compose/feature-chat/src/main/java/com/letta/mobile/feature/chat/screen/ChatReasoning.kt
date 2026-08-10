@@ -39,6 +39,7 @@ import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LocalChatIsPinching
+import com.letta.mobile.ui.theme.chatDimens
 import com.letta.mobile.ui.theme.listItemSupporting
 import com.letta.mobile.ui.theme.sectionTitle
 
@@ -113,7 +114,14 @@ internal fun MessageReasoning(
         modifier = modifier
             .fillMaxWidth()
             .then(sizeAnimation)
-            .padding(vertical = 4.dp),
+            // letta-mobile: MessageReasoning renders standalone (bypasses
+            // ChatMessageBubble, which is where every other run-step row gets
+            // its horizontal inset from `chatDimens.bubblePaddingHorizontal`).
+            // Without matching it here, the "Thought" title sits flush
+            // against the run gutter while sibling tool-call rows sit 10dp
+            // further right, so their content doesn't line up under a
+            // shared run's dot/rail — match the same token.
+            .padding(horizontal = MaterialTheme.chatDimens.bubblePaddingHorizontal, vertical = 4.dp),
     ) {
         Row(
             modifier = Modifier

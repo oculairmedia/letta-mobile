@@ -1,7 +1,6 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.session.BackendSwitchClearResult
@@ -283,40 +282,6 @@ class SettingsRepositoryTest {
 
         val dynamicColor = repository.getDynamicColor().first()
         assertEquals(false, dynamicColor)
-    }
-
-    @Test
-    fun `getChatTimelineMode returns default matching rollout stage`() = runTest {
-        val mode = repository.getChatTimelineMode().first()
-        val expected = if (com.letta.mobile.core.BuildConfig.DEBUG) {
-            ChatTimelineMode.TIMELINE_V1
-        } else {
-            ChatTimelineMode.LEGACY
-        }
-        assertEquals(expected, mode)
-        assertEquals(expected, repository.chatTimelineMode.value)
-    }
-
-    @Test
-    fun `setChatTimelineMode persists selection across repository instances`() = runTest {
-        val secureStore = InMemorySecureSettingsStore()
-        val dataStore = createTestPreferencesDataStore()
-        val initialRepo = SettingsRepository(
-            dataStore = dataStore,
-            secureSettingsStore = secureStore,
-        )
-
-        initialRepo.setChatTimelineMode(ChatTimelineMode.LEGACY)
-        assertEquals(ChatTimelineMode.LEGACY, initialRepo.getChatTimelineMode().first())
-
-        val restoredRepo = SettingsRepository(
-            dataStore = dataStore,
-            secureSettingsStore = secureStore,
-        )
-        assertEquals(ChatTimelineMode.LEGACY, restoredRepo.getChatTimelineMode().first())
-
-        initialRepo.setChatTimelineMode(ChatTimelineMode.TIMELINE_V1)
-        assertEquals(ChatTimelineMode.TIMELINE_V1, restoredRepo.getChatTimelineMode().first())
     }
 
     // letta-mobile-etib9: a blank agentName from a cold-start nav arg must not

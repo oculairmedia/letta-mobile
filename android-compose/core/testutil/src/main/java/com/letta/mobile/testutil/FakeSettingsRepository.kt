@@ -1,7 +1,6 @@
 package com.letta.mobile.testutil
 
 import com.letta.mobile.data.model.AppTheme
-import com.letta.mobile.data.model.ChatTimelineMode
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.repository.LastChatSelection
@@ -29,14 +28,10 @@ import kotlinx.coroutines.flow.filterNotNull
 class FakeSettingsRepository(
     initialActiveConfig: LettaConfig? = null,
     initialResumeRecentConversation: Boolean = false,
-    initialChatTimelineMode: ChatTimelineMode = ChatTimelineMode.TIMELINE_V1,
 ) : ISettingsRepository {
 
     val activeConfigState: MutableStateFlow<LettaConfig?> =
         MutableStateFlow(initialActiveConfig)
-
-    val chatTimelineModeState: MutableStateFlow<ChatTimelineMode> =
-        MutableStateFlow(initialChatTimelineMode)
 
     val resumeRecentConversation: MutableStateFlow<Boolean> =
         MutableStateFlow(initialResumeRecentConversation)
@@ -69,14 +64,6 @@ class FakeSettingsRepository(
     override val configs: StateFlow<List<LettaConfig>> = configsState.asStateFlow()
 
     override val activeConfig: StateFlow<LettaConfig?> = activeConfigState.asStateFlow()
-
-    override val chatTimelineMode: StateFlow<ChatTimelineMode> = chatTimelineModeState.asStateFlow()
-
-    override fun getChatTimelineMode(): Flow<ChatTimelineMode> = chatTimelineModeState
-
-    override suspend fun setChatTimelineMode(mode: ChatTimelineMode) {
-        chatTimelineModeState.value = mode
-    }
 
     override val activeConfigChanges: Flow<LettaConfig> = activeConfigState
         .drop(1)

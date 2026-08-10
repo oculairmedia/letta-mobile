@@ -71,7 +71,11 @@ class RunBlockCompactToolApprovalTest {
             }
         }
 
-        composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
+        // letta-mobile: TIMELINE_V1 is the only tool-call rendering path now — the
+        // legacy CompactToolCallGroupCard's "N tool calls" header no longer exists.
+        // The projected timeline renders one row per call instead.
+        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(ls)").assertIsDisplayed()
         composeRule.onNodeWithText("Review the requested tool actions before continuing.").assertIsDisplayed()
         composeRule.onNodeWithText("Reject").assertIsDisplayed()
         composeRule.onNodeWithText("Approve").assertIsDisplayed()

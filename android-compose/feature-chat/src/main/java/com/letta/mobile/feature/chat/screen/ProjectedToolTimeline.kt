@@ -1,12 +1,9 @@
 package com.letta.mobile.feature.chat.screen
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -196,56 +193,46 @@ internal fun ProjectedToolTimelineGroupCard(
     autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,
     stagedCollapseDelayMs: Long = DEFAULT_STAGED_COLLAPSE_DELAY_MS,
 ) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.82f),
-        ),
+    // Dropped the Card's background fill + outline border — chrome enough on its own.
+    Column(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (RenderDiagnostics.enabled()) {
-                RenderDiagnostics.onVisibleGroups(
-                    conversationId = "",
-                    totalGroups = groups.size,
-                    visibleGroups = groups.size,
-                )
-            }
+        if (RenderDiagnostics.enabled()) {
+            RenderDiagnostics.onVisibleGroups(
+                conversationId = "",
+                totalGroups = groups.size,
+                visibleGroups = groups.size,
+            )
+        }
 
-            // Render all tool groups through a single StatusTimeline component family
-            groups.forEach { group ->
-                key(group.key) {
-                    StatusTimeline(
-                        items = group.calls,
-                        modifier = Modifier.fillMaxWidth(),
-                        key = { call -> call.key },
-                    ) { call, isFirst, isLast ->
-                        ProjectedToolTimelineCallRow(
-                            call = call,
-                            isFirst = isFirst,
-                            isLast = isLast,
-                            onAttachmentImageTap = onAttachmentImageTap,
-                            autoExpandDelayMs = autoExpandDelayMs,
-                            stagedCollapseDelayMs = stagedCollapseDelayMs,
-                        )
-                    }
+        // Render all tool groups through a single StatusTimeline component family
+        groups.forEach { group ->
+            key(group.key) {
+                StatusTimeline(
+                    items = group.calls,
+                    modifier = Modifier.fillMaxWidth(),
+                    key = { call -> call.key },
+                ) { call, isFirst, isLast ->
+                    ProjectedToolTimelineCallRow(
+                        call = call,
+                        isFirst = isFirst,
+                        isLast = isLast,
+                        onAttachmentImageTap = onAttachmentImageTap,
+                        autoExpandDelayMs = autoExpandDelayMs,
+                        stagedCollapseDelayMs = stagedCollapseDelayMs,
+                    )
                 }
             }
+        }
 
-            // Approvals survive hydration; render ApprovalRequestControls if approval requests exist
-            approvalRequests.forEach { approval ->
-                ApprovalRequestControls(
-                    approval = approval,
-                    isSubmitting = activeApprovalRequestId == approval.requestId,
-                    onDecision = onApprovalDecision,
-                )
-            }
+        // Approvals survive hydration; render ApprovalRequestControls if approval requests exist
+        approvalRequests.forEach { approval ->
+            ApprovalRequestControls(
+                approval = approval,
+                isSubmitting = activeApprovalRequestId == approval.requestId,
+                onDecision = onApprovalDecision,
+            )
         }
     }
 }

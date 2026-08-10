@@ -28,7 +28,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.feature.chat.screen.ChatImageViewer
 import com.letta.mobile.feature.chat.screen.ChatImageViewerScaleKey
 import com.letta.mobile.feature.chat.screen.ChatMessageList
-import com.letta.mobile.feature.chat.screen.CompactToolCallGroupCard
+import com.letta.mobile.feature.chat.screen.ProjectedMessageToolCalls
 import com.letta.mobile.feature.chat.screen.ToolCallCard
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.common.GroupPosition
@@ -195,7 +195,7 @@ class GeneratedImageToolCardTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompactToolCallGroupCard(
+                    ProjectedMessageToolCalls(
                         toolCalls = listOf(
                             UiToolCall(
                                 name = "Bash",
@@ -205,7 +205,7 @@ class GeneratedImageToolCardTest {
                             ),
                             generatedImageToolCall(),
                         ),
-                        pendingApprovalToolCallIds = emptySet(),
+                        messageId = "msg-image-group",
                         onAttachmentImageTap = { attachments, index -> viewerState = attachments to index },
                     )
                     viewerState?.let { (attachments, index) ->
@@ -219,7 +219,8 @@ class GeneratedImageToolCardTest {
             }
         }
 
-        composeRule.onNodeWithText("generate_image", substring = true).performClick()
+        // The projected timeline renders the generated-image special card
+        // immediately (no click-to-expand needed for special cards).
         composeRule.onNodeWithContentDescription("Open image").performClick()
 
         composeRule.onNodeWithText("1 / 1").assertIsDisplayed()

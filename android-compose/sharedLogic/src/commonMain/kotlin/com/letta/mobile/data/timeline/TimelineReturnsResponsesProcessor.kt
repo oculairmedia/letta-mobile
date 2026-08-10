@@ -21,7 +21,7 @@ fun applyReturnsAndResponsesFromSnapshot(
         }
         val matchingReturns = ev.matchingToolReturns(evidence)
         val matchingReturn = matchingReturns.firstOrNull()?.second
-        val byResponse = ev.hasExplicitApprovalResponse(evidence)
+        val byResponse = ev.hasAnyApprovalResponse(evidence)
         val byReturn = if (ev.approvalRequestId == null) matchingReturns.isNotEmpty()
             else ev.allApprovalCallsReturned(matchingReturns)
         if (matchingReturn == null && !byResponse && !byReturn) return@map ev
