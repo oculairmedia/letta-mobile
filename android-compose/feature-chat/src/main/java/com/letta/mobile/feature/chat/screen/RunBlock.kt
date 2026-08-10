@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,12 +41,6 @@ import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.data.chat.projection.StepDotIcon
 import com.letta.mobile.ui.chat.render.runStepDotColor
 import com.letta.mobile.data.chat.projection.runStepDotIcon
-
-/**
- * Kill switch for projected tool timeline rendering in RunBlock.
- * Defaults to LEGACY (false). Bead .14 will persist this value.
- */
-val LocalUseProjectedToolTimeline = compositionLocalOf { false }
 
 /**
  * Width of the timeline gutter on the left of a run block. Sized to fit a
@@ -136,7 +129,6 @@ internal fun RunBlock(
     // the run expand/collapse the same way the tool-card lifecycle does â€” when
     // the OS animation scale is 0, swap instantly instead of playing the ramp.
     val reducedMotion = rememberReducedMotionEnabled()
-    val useProjectedTimeline = LocalUseProjectedToolTimeline.current
 
     // Stable run keys can also wrap one message. The disclosure still renders
     // for that work, while the body avoids a degenerate one-dot gutter below.
@@ -189,12 +181,11 @@ internal fun RunBlock(
         // Keep the historical one-step geometry: the disclosure is additive,
         // but a single message still has no degenerate gutter or connector.
         //
-        // Exception (letta-mobile-8kdjm.7): under the projected timeline a lone tool-call
-        // message must still reach the timeline rather than fall out to a legacy row —
-        // otherwise a one-tool-call turn shows none of the new presentation. Non-tool
-        // single messages keep the original short circuit.
-        val singleToolCallGoesToTimeline = useProjectedTimeline &&
-            messages.size == 1 &&
+        // Exception (letta-mobile-8kdjm.7): a lone tool-call message must still
+        // reach the projected timeline rather than fall out to a plain message
+        // row — otherwise a one-tool-call turn shows none of the timeline
+        // presentation. Non-tool single messages keep the original short circuit.
+        val singleToolCallGoesToTimeline = messages.size == 1 &&
             messages.single().isRunCompactableToolCallMessage()
         if (messages.size == 1 && !singleToolCallGoesToTimeline) {
             renderRow(messages.single(), GroupPosition.None, Modifier.fillMaxWidth())
@@ -248,8 +239,8 @@ internal fun RunBlock(
                     } else {
                         messages
                     }
-                    val visibleSteps = remember(visibleMessages, useProjectedTimeline) {
-                        compactRunToolCallSteps(visibleMessages, groupSingleToolCall = useProjectedTimeline)
+                    val visibleSteps = remember(visibleMessages) {
+                        compactRunToolCallSteps(visibleMessages)
                     }
                     Column(modifier = Modifier.fillMaxWidth()) {
                         visibleSteps.forEachIndexed { idx, step ->
@@ -273,7 +264,7 @@ internal fun RunBlock(
                                         renderRow = renderRow,
                                     )
 
-                                    is RunTimelineStep.ToolCallGroup -> RunToolCallGroupStepRow(
+                                    is RunTimelineStep.ToolCallGroup -> ProjectedToolTimelineGroupStepRow(
                                         step = step,
                                         runIdentityColor = runIdentityColor,
                                         drawLineAbove = drawLineAbove,
@@ -312,13 +303,13 @@ internal sealed interface RunTimelineStep {
 }
 
 /**
- * [groupSingleToolCall] lets the projected timeline (letta-mobile-8kdjm.7) render a LONE
- * tool call through the same component family as a multi-call group. Legacy leaves it
- * false so a single call stays a plain message row exactly as before.
+ * Compacts a run's messages into timeline steps, grouping contiguous tool-call
+ * messages (including a lone tool call — letta-mobile-8kdjm.7) into a single
+ * [RunTimelineStep.ToolCallGroup] so they render through one component family
+ * ([ProjectedToolTimelineGroupCard]) regardless of call count.
  */
 internal fun compactRunToolCallSteps(
     messages: List<UiMessage>,
-    groupSingleToolCall: Boolean = false,
 ): List<RunTimelineStep> {
     if (messages.isEmpty()) return emptyList()
     val steps = ArrayList<RunTimelineStep>(messages.size)
@@ -327,9 +318,7 @@ internal fun compactRunToolCallSteps(
     fun flushToolMessages() {
         when (pendingToolMessages.size) {
             0 -> Unit
-            1 -> if (!groupSingleToolCall) {
-                steps.add(RunTimelineStep.Message(pendingToolMessages.single()))
-            } else {
+            1 -> {
                 val single = pendingToolMessages.single()
                 steps.add(
                     RunTimelineStep.ToolCallGroup(
@@ -456,55 +445,6 @@ private fun RunMessageStepRow(
         // for an actual icon trivially).
         @Suppress("UNUSED_EXPRESSION") icon
         renderRow(message, position, rowModifier.padding(start = 6.dp))
-    }
-}
-
-@Composable
-private fun RunToolCallGroupStepRow(
-    step: RunTimelineStep.ToolCallGroup,
-    runIdentityColor: androidx.compose.ui.graphics.Color,
-    drawLineAbove: Boolean,
-    drawLineBelow: Boolean,
-    animateRows: Boolean,
-    activeApprovalRequestId: String?,
-    onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
-) {
-    if (LocalUseProjectedToolTimeline.current) {
-        ProjectedToolTimelineGroupStepRow(
-            step = step,
-            runIdentityColor = runIdentityColor,
-            drawLineAbove = drawLineAbove,
-            drawLineBelow = drawLineBelow,
-            animateRows = animateRows,
-            activeApprovalRequestId = activeApprovalRequestId,
-            onApprovalDecision = onApprovalDecision,
-        )
-        return
-    }
-
-    val dotColor = if (step.pendingApprovalToolCallIds.isNotEmpty()) {
-        MaterialTheme.colorScheme.secondary
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-    RunStepRow(
-        stepKey = step.key,
-        dotColor = dotColor,
-        stepDotCenterY = CompactToolCallGroupStepDotCenterY,
-        runIdentityColor = runIdentityColor,
-        drawLineAbove = drawLineAbove,
-        drawLineBelow = drawLineBelow,
-    ) { rowModifier ->
-        CompactToolCallGroupCard(
-            toolCalls = step.toolCalls,
-            pendingApprovalToolCallIds = step.pendingApprovalToolCallIds,
-            modifier = rowModifier.padding(start = 6.dp),
-            approvalRequests = step.approvalRequests,
-            activeApprovalRequestId = activeApprovalRequestId,
-            onApprovalDecision = onApprovalDecision,
-            animateRows = animateRows,
-            rowAnimationKeyPrefix = "run|${step.key}",
-        )
     }
 }
 

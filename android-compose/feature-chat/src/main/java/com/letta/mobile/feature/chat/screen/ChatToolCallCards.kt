@@ -38,7 +38,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -75,7 +74,6 @@ import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.ui.theme.scaledBy
 import com.letta.mobile.ui.theme.sectionTitle
 import com.letta.mobile.util.Telemetry
-import java.util.LinkedHashMap
 import kotlinx.collections.immutable.toImmutableList
 import com.letta.mobile.ui.chat.render.ToolDisplayInfo
 import com.letta.mobile.ui.chat.render.ToolDisplayRegistry
@@ -91,13 +89,14 @@ import com.letta.mobile.ui.components.shimmerColor
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 
-private const val TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE = 512
-
-private val toolCallEntranceAnimationHistory =
-    RecentStringSet(TOOL_CALL_ENTRANCE_ANIMATION_HISTORY_SIZE)
-
 internal val LocalChatShouldDeferHeavyToolCards = compositionLocalOf { false }
 
+/**
+ * letta-mobile-nfaks: this is the NON-run tool card path (a tool-call message
+ * that never got grouped into a RunBlock step). It routes through the same
+ * projected-timeline presentation ([ProjectedMessageToolCalls]) that run-grouped
+ * calls use, so a conversation never mixes two different tool card styles.
+ */
 @Composable
 internal fun MessageToolCalls(
     toolCalls: kotlinx.collections.immutable.ImmutableList<UiToolCall>,
@@ -107,111 +106,15 @@ internal fun MessageToolCalls(
     approvalRequest: UiApprovalRequest? = null,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
 ) {
-    // letta-mobile-nfaks: this composable is the NON-run tool card path (a tool-call
-    // message that never got grouped into a RunBlock step). It previously ignored
-    // LocalUseProjectedToolTimeline entirely, so with the projected timeline on, one
-    // conversation could show two different tool card styles: run-grouped calls came
-    // out as projected StatusTimeline rows while a standalone message still rendered
-    // the legacy ToolCallCard / CompactToolCallGroupCard. Route through the same
-    // projection so the presentation is decided by the flag, not by whether the
-    // message happened to land inside a multi-message run.
-    if (LocalUseProjectedToolTimeline.current) {
-        ProjectedMessageToolCalls(
-            toolCalls = toolCalls,
-            modifier = modifier,
-            messageId = messageId,
-            animateEntrance = animateEntrance,
-            approvalRequest = approvalRequest,
-            onAttachmentImageTap = onAttachmentImageTap,
-        )
-        return
-    }
-
-    val pendingApprovalToolCallIds = remember(approvalRequest) {
-        approvalRequest?.toolCalls
-            ?.mapTo(mutableSetOf()) { it.toolCallId }
-            .orEmpty()
-    }
-    val reducedMotion = rememberReducedMotionEnabled()
-
-    // letta-mobile-7kpxn: a streaming message can flip from a single
-    // ToolCallCard to the multi-tool CompactToolCallGroupCard as additional
-    // tool calls land. Previously this was a bare `if/else` swap that popped
-    // the new layout in with no transition. Wrap the single<->group decision
-    // in an AnimatedContent keyed *only* on the grouped flag so that:
-    //  - flipping single -> group (or back) crossfades + size-morphs through
-    //    the canonical ChatMotion content ramp instead of snapping, and
-    //  - streaming token / result updates that flow through the *same* branch
-    //    do NOT re-trigger the transition (the targetState is unchanged), so
-    //    we keep the rmzmo streaming-jank guarantees (cheap, draw-phase, no
-    //    per-frame full rebuild).
-    // Reduced-motion users get an instant swap (no animation) per the design
-    // system's reduced-motion contract.
-    val useCompactGroup = shouldUseCompactToolCallGroup(toolCalls)
-    AnimatedContent(
-        targetState = useCompactGroup,
+    ProjectedMessageToolCalls(
+        toolCalls = toolCalls,
         modifier = modifier,
-        transitionSpec = {
-            if (reducedMotion) {
-                (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
-                    .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
-            } else {
-                // Soft crossfade + height morph so the single card visually
-                // "becomes" the grouped card rather than being replaced.
-                (ChatMotion.expandEnter() togetherWith ChatMotion.expandExit())
-                    .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
-            }
-        },
-        contentAlignment = Alignment.TopStart,
-        label = "ToolCallsSingleVsGroup",
-    ) { grouped ->
-        if (grouped) {
-            val entranceKey = remember(messageId, toolCalls.firstOrNull()?.toolCallMotionKey()) {
-                "tool-group|${messageId.orEmpty()}|${toolCalls.firstOrNull()?.toolCallMotionKey().orEmpty()}"
-            }
-            val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
-                shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
-            }
-            ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
-                CompactToolCallGroupCard(
-                    toolCalls = toolCalls,
-                    pendingApprovalToolCallIds = pendingApprovalToolCallIds,
-                    modifier = Modifier,
-                    animateRows = animateEntrance,
-                    rowAnimationKeyPrefix = "message|${messageId.orEmpty()}",
-                    onAttachmentImageTap = onAttachmentImageTap,
-                )
-            }
-        } else {
-            Column(
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                toolCalls.forEachIndexed { index, toolCall ->
-                    val motionKey = toolCall.toolCallMotionKey()
-                    // letta-mobile-h5706: use stable toolCallId instead of index to prevent
-                    // cascade recomposition when one tool-call result arrives (updating index+motionKey
-                    // for one card would trigger unnecessary recomposition of all sibling cards)
-                    key(toolCall.toolCallId ?: motionKey) {
-                        val entranceKey = remember(messageId, motionKey) {
-                            "tool|${messageId.orEmpty()}|$motionKey"
-                        }
-                        val shouldAnimateEntrance = remember(animateEntrance, entranceKey) {
-                            shouldRunToolCallEntranceAnimation(animateEntrance, entranceKey)
-                        }
-                        val approvalState = toolCall.approvalState(pendingApprovalToolCallIds)
-                        ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
-                            ToolCallCard(
-                                toolCall = toolCall,
-                                approvalStateOverride = approvalState,
-                                onAttachmentImageTap = onAttachmentImageTap,
-                            )
-                        }
-                    }
-                }
-            }
-            }
-        }
-    }
+        messageId = messageId,
+        animateEntrance = animateEntrance,
+        approvalRequest = approvalRequest,
+        onAttachmentImageTap = onAttachmentImageTap,
+    )
+}
 /**
  * Agent-return card for a completed (or failed) subagent.
  *
@@ -1101,118 +1004,6 @@ private fun ToolCallExpandedBodyContentInner(
 }
 
 @Composable
-internal fun ToolCallExpandedBody(
-    toolCall: UiToolCall,
-    display: ToolDisplayInfo,
-    executionTimeText: String?,
-    displayResult: String?,
-    isError: Boolean,
-    isWarning: Boolean = false,
-    fontScale: Float,
-) {
-    val parentVisible = LocalToolCardBodyParentVisible.current
-    val renderEligibility = remember(parentVisible) {
-        toolCardBodyRenderEligibility(
-            expanded = true,
-            parentVisible = parentVisible,
-        )
-    }
-    if (!renderEligibility.shouldRenderBody) return
-
-    val codeStyle = MaterialTheme.chatTypography.codeBlock
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    CompositionLocalProvider(
-        LocalToolCardBodyRenderEligibility provides renderEligibility,
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
-        ) {
-            // letta-mobile (toolcard-dedup): removed the "Tool: <name>" line
-            // (header already names the tool). Timing/detail kept below.
-            executionTimeText?.let { time ->
-                Text(
-                    text = "Execution time: $time",
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-                )
-            }
-            display.detailLine?.let { detail ->
-                Text(
-                    text = detail,
-                    style = MaterialTheme.typography.listItemSupporting.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.76f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            // letta-mobile (toolcard-dedup): removed the duplicate raw-JSON
-            // "Arguments" block (same content as the header summary above).
-            displayResult?.takeIf { it.isNotBlank() }?.let { result ->
-                var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
-                val resultChevronRotation by animateFloatAsState(
-                    targetValue = if (resultExpanded) 180f else 0f,
-                    animationSpec = ChatMotion.chipCrossfadeSpec,
-                    label = "ToolOutputChevronRotation",
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .semantics(mergeDescendants = true) { }
-                        .clickable {
-                            HapticEffects.segmentTick(haptic, view)
-                            resultExpanded = !resultExpanded
-                        },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = if (isError) "Error" else "Output",
-                        style = MaterialTheme.typography.sectionTitle.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                        color = if (isError) {
-                            MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
-                    val lineCount = result.count { it == '\n' } + 1
-                    if (lineCount > 1 || result.length > 80) {
-                        Text(
-                            text = if (resultExpanded) "collapse" else "$lineCount line${if (lineCount == 1) "" else "s"}",
-                            style = MaterialTheme.typography.labelSmall.scaledBy(fontScale),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f),
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                    }
-                    Icon(
-                        imageVector = LettaIcons.ExpandMore,
-                        contentDescription = if (resultExpanded) "Collapse output" else "Expand output",
-                        modifier = Modifier
-                            .size(14.dp)
-                            .rotate(resultChevronRotation),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-                    )
-                }
-                ToolOutputRenderer(
-                    raw = result,
-                    expanded = resultExpanded,
-                    isError = isError,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            HapticEffects.segmentTick(haptic, view)
-                            resultExpanded = !resultExpanded
-                        },
-                )
-            }
-        }
-    }
-}
-
-@Composable
 internal fun ToolCallExpandedSummary(
     toolCall: UiToolCall,
     argumentSummary: ToolArgumentSummary?,
@@ -1246,305 +1037,6 @@ internal fun ToolCallExpandedSummary(
     }
 }
 
-@Composable
-internal fun CompactToolCallGroupCard(
-    toolCalls: List<UiToolCall>,
-    pendingApprovalToolCallIds: Set<String>,
-    modifier: Modifier = Modifier,
-    approvalRequests: List<UiApprovalRequest> = emptyList(),
-    activeApprovalRequestId: String? = null,
-    onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
-    animateRows: Boolean = false,
-    rowAnimationKeyPrefix: String = "",
-    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
-) {
-    val reducedMotion = rememberReducedMotionEnabled()
-    // letta-mobile: dropped the Card's background fill + outline border — a
-    // tool-call row is chrome enough on its own (icon, name, status chip);
-    // the extra surface just added visual weight without conveying anything.
-    Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = "${toolCalls.size} tool calls",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
-            val completedCount = toolCalls.count { it.result != null }
-            if (completedCount > 0) {
-                ToolMetaChip(text = "$completedCount/${toolCalls.size} done")
-            }
-        }
-        toolCalls.forEachIndexed { index, toolCall ->
-            val motionKey = toolCall.toolCallMotionKey()
-            // letta-mobile-h5706: use stable toolCallId instead of index (same fix as line 191)
-            key(toolCall.toolCallId ?: motionKey) {
-                val entranceKey = remember(rowAnimationKeyPrefix, motionKey) {
-                    "compact-tool-row|$rowAnimationKeyPrefix|$motionKey"
-                }
-                val shouldAnimateEntrance = remember(animateRows, entranceKey) {
-                    shouldRunToolCallEntranceAnimation(animateRows, entranceKey)
-                }
-                ToolCallEntrance(animate = shouldAnimateEntrance && !reducedMotion) {
-                    CompactToolCallRow(
-                        toolCall = toolCall,
-                        approvalState = toolCall.approvalState(pendingApprovalToolCallIds),
-                        onAttachmentImageTap = onAttachmentImageTap,
-                    )
-                }
-            }
-        }
-        approvalRequests.forEach { approval ->
-            ApprovalRequestControls(
-                approval = approval,
-                isSubmitting = activeApprovalRequestId == approval.requestId,
-                onDecision = onApprovalDecision,
-            )
-        }
-    }
-}
-
-@Composable
-internal fun CompactToolCallRow(
-    toolCall: UiToolCall,
-    approvalState: ToolApprovalState?,
-    onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
-) {
-    val fontScale = LocalChatFontScale.current
-    val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
-    val reducedMotion = rememberReducedMotionEnabled()
-    var expanded by remember(toolCall.toolCallMotionKey()) { mutableStateOf(false) }
-    RequestFullToolResultOnExpand(toolCall = toolCall, expanded = expanded)
-    val parentVisible = LocalToolCardBodyParentVisible.current
-    val deferHeavyCards = LocalChatShouldDeferHeavyToolCards.current
-    val canRenderFullOutput = expanded && parentVisible && !deferHeavyCards
-    val deferHeavyOutput = toolCall.result != null && !canRenderFullOutput
-    val renderStartedAtMs = System.currentTimeMillis()
-    val display = remember(toolCall.name, toolCall.arguments) {
-        ToolDisplayRegistry.resolve(toolCall.name, toolCall.arguments)
-    }
-    val argumentSummary = remember(toolCall.arguments) { summarizeToolArguments(toolCall.arguments) }
-    val executionTimeText = remember(toolCall.executionTimeMs) { toolCall.executionTimeMs?.let(::formatToolExecutionTime) }
-    val displayResult = remember(toolCall.result, deferHeavyOutput) {
-        if (deferHeavyOutput) toolCall.result?.deferredToolResultPreview() else toolCall.result?.displayToolResult()
-    }
-    val resultPreview = remember(displayResult) { displayResult?.takeIf { it.isNotBlank() } }
-    val summary = remember(toolCall.name, toolCall.arguments, displayResult, toolCall.status, display.detailLine) {
-        compactToolCallSummary(toolCall, display.detailLine, displayResult)
-    }
-    val compactTitle = remember(toolCall.name, summary, argumentSummary) {
-        // letta-mobile-mtis: Prefer command-first summaries in Bash compact tool rows.
-        if (toolCall.name == "Bash" && argumentSummary?.value != null) {
-            val command = argumentSummary.value
-            if (summary.startsWith("Result: ") || summary.startsWith("Error: ")) {
-                "$command - $summary"
-            } else {
-                command
-            }
-        } else {
-            "${toolCall.name} - $summary"
-        }
-    }
-    val isError = ToolReturnStatus.isError(toolCall.status)
-    val isWarning = toolCall.status == "warning"
-    val isComplete = toolCall.result != null || toolCall.status == "success" || toolCall.status == "warning"
-    LaunchedEffect(toolCall.toolCallMotionKey(), expanded, deferHeavyOutput, toolCall.result?.length) {
-        if (Telemetry.isChatHotPathDebugEnabled()) {
-            Telemetry.event(
-                "ChatToolCard",
-                "compactRow.composed",
-                "toolName" to toolCall.name,
-                "hasResult" to (toolCall.result != null),
-                "isExpanded" to expanded,
-                "deferredHeavyOutput" to deferHeavyOutput,
-                "resultChars" to (toolCall.result?.length ?: 0),
-                "effectDispatchDelayMs" to (System.currentTimeMillis() - renderStartedAtMs),
-                level = Telemetry.Level.DEBUG,
-            )
-        }
-    }
-    val chevronRotation by animateFloatAsState(
-        targetValue = if (expanded) 180f else 0f,
-        animationSpec = ChatMotion.chipCrossfadeSpec,
-        label = "CompactToolCallChevronRotation",
-    )
-
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics(mergeDescendants = true) { }
-                .clickable(
-                    onClickLabel = if (expanded) "Collapse tool details" else "Expand tool details",
-                ) {
-                    HapticEffects.segmentTick(haptic, view)
-                    expanded = !expanded
-                }
-                .padding(vertical = 3.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Text(display.emoji, style = MaterialTheme.chatTypography.codeBlock)
-            Text(
-                text = compactTitle,
-                style = MaterialTheme.typography.chatBubbleSender
-                    .copy(fontFamily = MaterialTheme.chatTypography.codeBlock.fontFamily)
-                    .scaledBy(fontScale),
-                color = if (isError) MaterialTheme.colorScheme.error else if (isWarning) MaterialTheme.customColors.warningTextColor else MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            // letta-mobile-gbsq: suppress the "Approved" chip once the tool has
-            // produced a result — the success checkmark conveys the same
-            // information and dropping the chip reclaims width for the result
-            // preview. RequestingInput and Rejected still render (they carry
-            // information the checkmark can't).
-            if (shouldShowCompactApprovalChip(approvalState, hasResult = isComplete)) {
-                AnimatedToolApprovalChip(state = approvalState)
-            }
-            executionTimeText?.let { time ->
-                ToolMetaChip(text = time)
-            }
-            when {
-                isError -> Icon(
-                    imageVector = LettaIcons.Error,
-                    contentDescription = "Error",
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = MaterialTheme.colorScheme.error,
-                )
-                isWarning -> Icon(
-                    imageVector = LettaIcons.Warning,
-                    contentDescription = "Warning",
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = MaterialTheme.customColors.warningTextColor,
-                )
-                isComplete -> Icon(
-                    imageVector = LettaIcons.CheckCircle,
-                    contentDescription = if (approvalState == ToolApprovalState.Approved) {
-                        "Approved, success"
-                    } else {
-                        "Success"
-                    },
-                    modifier = Modifier.size(LettaIconSizing.Inline),
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                else -> {
-                    // perf/frame-budget-audit + reduced-motion contract: skip
-                    // the infinite spin under reduced motion (static icon, no
-                    // per-frame compositor work).
-                    val a = if (reducedMotion) {
-                        0f
-                    } else {
-                        val t = rememberInfiniteTransition(label = "compactSpin")
-                        val animated by t.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 360f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1200, easing = LinearEasing),
-                            ),
-                            label = "compactSpinAngle",
-                        )
-                        animated
-                    }
-                    Icon(
-                        imageVector = LettaIcons.Refresh,
-                        contentDescription = "Running",
-                        modifier = Modifier
-                            .size(LettaIconSizing.Inline)
-                            .graphicsLayer { rotationZ = a },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            Icon(
-                imageVector = LettaIcons.ExpandMore,
-                contentDescription = if (expanded) "Collapse tool details" else "Expand tool details",
-                modifier = Modifier
-                    .size(14.dp)
-                    .rotate(chevronRotation),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-            )
-        }
-        // letta-mobile-7kpxn (polish audit): the compact row's disclosure
-        // previously used a bare `if (expanded)` cut, which popped the body in
-        // with no transition while the single ToolCallCard unfurled smoothly —
-        // an inconsistency in the lifecycle. Route the row through the SAME
-        // unfurl AnimatedContent (with the instant path for pinch / reduced
-        // motion) so single-card and grouped-row disclosure feel identical.
-        val suppressLayoutAnimation = LocalChatIsPinching.current || reducedMotion
-        AnimatedContent(
-            targetState = expanded,
-            modifier = Modifier.fillMaxWidth(),
-            transitionSpec = {
-                if (suppressLayoutAnimation) {
-                    (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
-                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
-                } else {
-                    (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
-                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
-                }
-            },
-            contentAlignment = Alignment.TopStart,
-            label = "CompactToolCallRowExpanded",
-        ) { expandedNow ->
-            if (expandedNow) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 2.dp, bottom = 4.dp),
-                ) {
-                    if (toolCall.name == "generate_image") {
-                        GeneratedImageToolCard(
-                            toolCall = toolCall,
-                            onAttachmentImageTap = onAttachmentImageTap,
-                        )
-                    } else {
-                        ToolCallExpandedSummary(
-                            toolCall = toolCall,
-                            argumentSummary = argumentSummary,
-                            resultPreview = resultPreview,
-                            isError = isError,
-                            isWarning = isWarning,
-                            fontScale = fontScale,
-                        )
-                        ToolCallExpandedBody(
-                            toolCall = toolCall,
-                            display = display,
-                            executionTimeText = executionTimeText,
-                            displayResult = displayResult,
-                            isError = isError,
-                            isWarning = isWarning,
-                            fontScale = fontScale,
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-internal fun compactToolCallSummary(
-    toolCall: UiToolCall,
-    displayDetailLine: String?,
-    displayResult: String? = toolCall.result?.displayToolResult(),
-): String {
-    val result = displayResult?.takeIf { it.isNotBlank() }
-    if (result != null) return "${if (ToolReturnStatus.isError(toolCall.status)) "Error" else "Result"}: $result"
-    val argumentSummary = summarizeToolArguments(toolCall.arguments)
-    if (argumentSummary != null) return "${argumentSummary.label}: ${argumentSummary.value}"
-    return displayDetailLine ?: if (toolCall.result == null) "Running" else "Completed"
-}
-
 internal fun String.displayToolResult(): String = ToolOutputParser.sanitizeResultFieldText(this)
 
 internal fun String.deferredToolResultPreview(): String {
@@ -1553,70 +1045,11 @@ internal fun String.deferredToolResultPreview(): String {
     return if (length > preview.length) "$preview…" else preview
 }
 
-internal fun shouldUseCompactToolCallGroup(toolCalls: List<UiToolCall>): Boolean {
-    if (toolCalls.isEmpty()) return false
-    // Single specialized Agent/image cards keep ToolCallCard (subagent dispatch /
-    // notification chrome). Ordinary singles and all multi-tool groups stay on
-    // the compact group path so layout does not flash when a second call lands.
-    if (toolCalls.size == 1 && usesSpecializedToolCallCard(toolCalls.first())) {
-        return false
-    }
-    return true
-}
-
-internal fun usesSpecializedToolCallCard(toolCall: UiToolCall): Boolean =
-    toolCall.name == "generate_image" ||
-        toolCall.subagentDispatch != null ||
-        toolCall.result?.let(::parseTaskNotificationForToolCard) != null
-
-internal fun shouldRunToolCallEntranceAnimation(
-    animateEntrance: Boolean,
-    key: String,
-): Boolean =
-    animateEntrance && toolCallEntranceAnimationHistory.addIfAbsent(key)
-
-internal fun clearToolCallEntranceAnimationHistoryForTest() {
-    toolCallEntranceAnimationHistory.clear()
-}
 
 internal fun UiToolCall.toolCallMotionKey(): String = buildString {
     append(toolCallId ?: name)
     append('|')
     append(arguments.hashCode())
-}
-
-/**
- * Plays a one-shot ENTER transition the first time a tool card appears in the
- * timeline (letta-mobile-7kpxn). The card fades + slides + expands from the top
- * edge via the canonical [ChatMotion.verticalEnter] ramp so a freshly-streamed
- * tool call eases into place instead of popping in.
- *
- * When [animate] is false (reduced-motion enabled, or the entrance has already
- * played for this card's stable key) the content renders immediately with no
- * transition — Compose's `AnimatedVisibility` with `visible = true` from the
- * first frame is skipped entirely so we never pay for an off-screen animation
- * pass. This keeps the reduced-motion contract and avoids replaying entrance
- * motion on lazy-list recycling.
- */
-@Composable
-internal fun ToolCallEntrance(
-    animate: Boolean = true,
-    content: @Composable () -> Unit,
-) {
-    if (!animate) {
-        content()
-        return
-    }
-    var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
-
-    AnimatedVisibility(
-        visible = visible,
-        enter = ChatMotion.verticalEnter(slideDivisor = 10),
-        exit = ChatMotion.expandExit(),
-    ) {
-        content()
-    }
 }
 
 @Composable
@@ -1782,27 +1215,6 @@ internal fun UiToolCall.approvalState(pendingApprovalToolCallIds: Set<String>): 
 }
 
 /**
- * Whether to render the inline approval chip in a [CompactToolCallRow].
- *
- * - `RequestingInput` always renders — the user needs to know an approval is
- *   pending.
- * - `Rejected` always renders — the decision is the row's payload.
- * - `Approved` renders only while the tool is still running; once a result is
- *   in hand, the success checkmark on the same row carries the same signal
- *   and dropping the chip reclaims width for the result preview.
- * - `null` (no approval involvement) never shows a chip.
- */
-internal fun shouldShowCompactApprovalChip(
-    approvalState: ToolApprovalState?,
-    hasResult: Boolean,
-): Boolean = when (approvalState) {
-    null -> false
-    ToolApprovalState.RequestingInput -> true
-    ToolApprovalState.Rejected -> true
-    ToolApprovalState.Approved -> !hasResult
-}
-
-/**
  * Compact, inline approval chip shown in the `ToolCallCard` header. Pending
  * requests and folded decisions share the same slot so the chip can crossfade
  * from "requesting input" to "approved" instead of popping in as new chrome.
@@ -1828,35 +1240,6 @@ internal enum class ToolApprovalState {
     RequestingInput,
     Approved,
     Rejected,
-}
-
-private class RecentStringSet(
-    private val maxEntries: Int,
-) {
-    private val lock = Any()
-    private val values = object : LinkedHashMap<String, Unit>(maxEntries, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?): Boolean =
-            size > maxEntries
-    }
-
-    fun contains(value: String): Boolean = synchronized(lock) {
-        values.containsKey(value)
-    }
-
-    fun addIfAbsent(value: String): Boolean = synchronized(lock) {
-        if (values.containsKey(value)) {
-            false
-        } else {
-            values[value] = Unit
-            true
-        }
-    }
-
-    fun clear() {
-        synchronized(lock) {
-            values.clear()
-        }
-    }
 }
 
 /**
