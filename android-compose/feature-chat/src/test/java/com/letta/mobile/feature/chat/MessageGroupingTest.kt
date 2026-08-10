@@ -562,10 +562,13 @@ class MessageGroupingTest {
         )
 
         assertEquals(3, steps.size)
-        val firstTool = steps[0] as RunTimelineStep.Message
+        // letta-mobile: a lone tool-call message now groups the same as a multi-call
+        // run (letta-mobile-8kdjm.7) so it renders through the same projected timeline
+        // component family, instead of staying a plain Message step.
+        val firstTool = steps[0] as RunTimelineStep.ToolCallGroup
         val text = steps[1] as RunTimelineStep.Message
         val group = steps[2] as RunTimelineStep.ToolCallGroup
-        assertEquals(listOf("tc1"), listOf(firstTool.message.id))
+        assertEquals(listOf("tc1"), firstTool.messages.map { it.id })
         assertEquals("about to run ls", text.message.content)
         assertTrue(text.message.toolCalls.isNullOrEmpty())
         assertEquals(listOf("tc2", "tc3"), group.messages.map { it.id })

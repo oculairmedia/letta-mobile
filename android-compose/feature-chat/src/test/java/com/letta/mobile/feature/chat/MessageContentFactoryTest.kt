@@ -3,9 +3,6 @@ package com.letta.mobile.feature.chat
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.feature.chat.render.shouldAnimateToolCallEntrance
-import com.letta.mobile.feature.chat.screen.clearToolCallEntranceAnimationHistoryForTest
-import com.letta.mobile.feature.chat.screen.shouldRunToolCallEntranceAnimation
-import com.letta.mobile.feature.chat.screen.shouldUseCompactToolCallGroup
 import com.letta.mobile.feature.chat.screen.buildMessageCopyText
 import com.letta.mobile.feature.chat.render.isStreamingBoundary
 import org.junit.Assert.assertEquals
@@ -19,60 +16,6 @@ class MessageContentFactoryTest {
     fun `tool call entrance animation is limited to active streaming`() {
         assertTrue(shouldAnimateToolCallEntrance(isStreaming = true))
         assertFalse(shouldAnimateToolCallEntrance(isStreaming = false))
-    }
-
-    @Test
-    fun `tool call entrance animation is claimed synchronously`() {
-        clearToolCallEntranceAnimationHistoryForTest()
-
-        assertTrue(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-a"))
-        assertFalse(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-a"))
-
-        assertFalse(shouldRunToolCallEntranceAnimation(animateEntrance = false, key = "tool|call-b"))
-        assertTrue(shouldRunToolCallEntranceAnimation(animateEntrance = true, key = "tool|call-b"))
-    }
-
-    @Test
-    fun `tool calls use compact group renderer from the first call`() {
-        assertFalse(shouldUseCompactToolCallGroup(emptyList()))
-        assertTrue(
-            shouldUseCompactToolCallGroup(
-                listOf(UiToolCall(name = "Bash", arguments = "{}", result = null))
-            )
-        )
-        assertTrue(
-            shouldUseCompactToolCallGroup(
-                listOf(
-                    UiToolCall(name = "Bash", arguments = "{\"command\":\"a\"}", result = null),
-                    UiToolCall(name = "Bash", arguments = "{\"command\":\"b\"}", result = null),
-                )
-            )
-        )
-    }
-
-    @Test
-    fun `single Agent subagent call keeps specialized ToolCallCard path`() {
-        val agentCall = UiToolCall(
-            name = "Agent",
-            arguments = "{\"description\":\"Investigate\"}",
-            result = null,
-            subagentDispatch = com.letta.mobile.data.model.UiSubagentDispatch(
-                toolCallId = "tool-1",
-                description = "Investigate",
-                subagentType = "researcher",
-                runInBackground = true,
-                prompt = "do the thing",
-            ),
-        )
-        assertFalse(shouldUseCompactToolCallGroup(listOf(agentCall)))
-        assertTrue(
-            shouldUseCompactToolCallGroup(
-                listOf(
-                    agentCall,
-                    UiToolCall(name = "Bash", arguments = "{}", result = null),
-                ),
-            ),
-        )
     }
 
     @Test

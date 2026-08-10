@@ -145,7 +145,7 @@ object TimelineHydrationReducer {
     private fun TimelineEvent.Confirmed.withHydratedToolReturns(
         evidence: ApprovalTimelineEvidence,
     ): TimelineEvent.Confirmed {
-        val byResponse = hasExplicitApprovalResponse(evidence)
+        val byResponse = hasAnyApprovalResponse(evidence)
         val matchingReturns = matchingToolReturns(evidence)
         val byReturn = if (approvalRequestId == null) matchingReturns.isNotEmpty()
             else allApprovalCallsReturned(matchingReturns)

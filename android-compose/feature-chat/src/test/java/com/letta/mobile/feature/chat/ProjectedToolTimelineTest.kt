@@ -1,9 +1,7 @@
 package com.letta.mobile.feature.chat
 
 import androidx.compose.material3.Text
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -16,7 +14,6 @@ import com.letta.mobile.data.model.UiApprovalToolCall
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
-import com.letta.mobile.feature.chat.screen.LocalUseProjectedToolTimeline
 import com.letta.mobile.feature.chat.screen.MessageToolCalls
 import com.letta.mobile.feature.chat.screen.RunBlock
 import kotlinx.collections.immutable.persistentListOf
@@ -32,6 +29,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+// letta-mobile: TIMELINE_V1 is now the only tool-call rendering path (the
+// ChatTimelineMode flag and LocalUseProjectedToolTimeline kill switch were
+// removed), so these tests no longer need to opt into the projected
+// presentation via a CompositionLocalProvider — RunBlock / MessageToolCalls
+// always render through it.
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 @Tag("unit")
@@ -40,7 +42,7 @@ class ProjectedToolTimelineTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun projectedToolTimeline_rendersSingleAndMultipleCallsWhenFlagOn() {
+    fun projectedToolTimeline_rendersSingleAndMultipleCalls() {
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -48,23 +50,21 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        RunBlock(
-                            messages = listOf(
-                                toolMessage(
-                                    id = "tc-a",
-                                    command = "pwd",
-                                ),
-                                toolMessage(
-                                    id = "tc-b",
-                                    command = "ls",
-                                ),
+                    RunBlock(
+                        messages = listOf(
+                            toolMessage(
+                                id = "tc-a",
+                                command = "pwd",
                             ),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = message.id, modifier = rowModifier)
-                        }
+                            toolMessage(
+                                id = "tc-b",
+                                command = "ls",
+                            ),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier ->
+                        Text(text = message.id, modifier = rowModifier)
                     }
                 }
             }
@@ -89,28 +89,26 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        RunBlock(
-                            messages = listOf(
-                                toolMessage(
-                                    id = "tc-a",
-                                    command = "pwd",
-                                    approvalRequest = approvalRequest(),
-                                ),
-                                toolMessage(id = "tc-b", command = "ls"),
+                    RunBlock(
+                        messages = listOf(
+                            toolMessage(
+                                id = "tc-a",
+                                command = "pwd",
+                                approvalRequest = approvalRequest(),
                             ),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                            activeApprovalRequestId = null,
-                            onApprovalDecision = { requestId, toolCallIds, approve, reason ->
-                                submittedRequestId = requestId
-                                submittedToolCallIds = toolCallIds
-                                submittedApprove = approve
-                                submittedReason = reason
-                            },
-                        ) { message, _, rowModifier ->
-                            Text(text = message.id, modifier = rowModifier)
-                        }
+                            toolMessage(id = "tc-b", command = "ls"),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                        activeApprovalRequestId = null,
+                        onApprovalDecision = { requestId, toolCallIds, approve, reason ->
+                            submittedRequestId = requestId
+                            submittedToolCallIds = toolCallIds
+                            submittedApprove = approve
+                            submittedReason = reason
+                        },
+                    ) { message, _, rowModifier ->
+                        Text(text = message.id, modifier = rowModifier)
                     }
                 }
             }
@@ -139,41 +137,39 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        RunBlock(
-                            messages = listOf(
-                                UiMessage(
-                                    id = "msg-subagent",
-                                    role = "assistant",
-                                    content = "",
-                                    timestamp = "2026-05-09T00:00:00Z",
-                                    runId = "run-1",
-                                    toolCalls = listOf(
-                                        UiToolCall(
-                                            name = "dispatch_agent",
-                                            arguments = """{"prompt":"Search repo"}""",
-                                            result = null,
+                    RunBlock(
+                        messages = listOf(
+                            UiMessage(
+                                id = "msg-subagent",
+                                role = "assistant",
+                                content = "",
+                                timestamp = "2026-05-09T00:00:00Z",
+                                runId = "run-1",
+                                toolCalls = listOf(
+                                    UiToolCall(
+                                        name = "dispatch_agent",
+                                        arguments = """{"prompt":"Search repo"}""",
+                                        result = null,
+                                        toolCallId = "call-sub",
+                                        subagentDispatch = UiSubagentDispatch(
                                             toolCallId = "call-sub",
-                                            subagentDispatch = UiSubagentDispatch(
-                                                toolCallId = "call-sub",
-                                                subagentType = "researcher",
-                                                description = "Search codebase for usages",
-                                                runInBackground = false,
-                                                prompt = "Search repo",
-                                            ),
-                                        )
-                                    ),
+                                            subagentType = "researcher",
+                                            description = "Search codebase for usages",
+                                            runInBackground = false,
+                                            prompt = "Search repo",
+                                        ),
+                                    )
                                 ),
-                                // A second message is required: RunBlock short-circuits a
-                                // single-message run straight to renderRow, which never
-                                // reaches the grouped tool-call path the fallback lives on.
-                                toolMessage(id = "tc-b", command = "ls"),
                             ),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = message.id, modifier = rowModifier)
-                        }
+                            // A second message is required: RunBlock short-circuits a
+                            // single-message run straight to renderRow, which never
+                            // reaches the grouped tool-call path the fallback lives on.
+                            toolMessage(id = "tc-b", command = "ls"),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier ->
+                        Text(text = message.id, modifier = rowModifier)
                     }
                 }
             }
@@ -181,35 +177,6 @@ class ProjectedToolTimelineTest {
 
         // Verify dedicated subagent dispatch card fallback is rendered
         composeRule.onNodeWithText("Dispatched: Search codebase for usages").assertIsDisplayed()
-    }
-
-    @Test
-    fun projectedToolTimeline_restoresLegacyRenderingWhenFlagOff() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides false) {
-                        RunBlock(
-                            messages = listOf(
-                                toolMessage(id = "tc-a", command = "pwd"),
-                                toolMessage(id = "tc-b", command = "ls"),
-                            ),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = message.id, modifier = rowModifier)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Legacy rendering uses "2 tool calls" header
-        composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
     }
 
     @Test
@@ -413,17 +380,15 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        RunBlock(
-                            messages = listOf(
-                                rawToolMessage("tc-a", rawArgsA, "Linux 6.17.9-1-pve x86_64"),
-                                rawToolMessage("tc-b", rawArgsB, "root"),
-                            ),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
-                        }
+                    RunBlock(
+                        messages = listOf(
+                            rawToolMessage("tc-a", rawArgsA, "Linux 6.17.9-1-pve x86_64"),
+                            rawToolMessage("tc-b", rawArgsB, "root"),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier ->
+                        Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
                     }
                 }
             }
@@ -442,7 +407,7 @@ class ProjectedToolTimelineTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText(rawArgsA).assertDoesNotExist()
 
-        // And no legacy row was emitted alongside the projected cards.
+        // And no unexpected fallback row was emitted alongside the projected cards.
         composeRule.onNodeWithText("LEGACY-ROW-tc-a").assertDoesNotExist()
         composeRule.onNodeWithText("LEGACY-ROW-tc-b").assertDoesNotExist()
     }
@@ -464,11 +429,11 @@ class ProjectedToolTimelineTest {
         ),
     )
 
-    // A run holding a LONE tool call must still reach the projected timeline. Two gates
-    // used to send it to a legacy row instead: RunBlock's single-message short circuit,
-    // and compactRunToolCallSteps emitting a plain Message for a group of one.
+    // A run holding a LONE tool call must still reach the projected timeline — it used to
+    // fall out to a plain message row instead (RunBlock's single-message short circuit, and
+    // compactRunToolCallSteps emitting a plain Message for a group of one).
     @Test
-    fun singleToolCallRunStillRendersThroughTheProjectedTimeline() {
+    fun singleToolCallRunRendersThroughTheProjectedTimeline() {
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -476,15 +441,13 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        RunBlock(
-                            messages = listOf(toolMessage(id = "tc-only", command = "pwd")),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            // Reaching this means the run fell out to the legacy row path.
-                            Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
-                        }
+                    RunBlock(
+                        messages = listOf(toolMessage(id = "tc-only", command = "pwd")),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier ->
+                        // Reaching this means the run fell out to the plain message row path.
+                        Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
                     }
                 }
             }
@@ -492,32 +455,6 @@ class ProjectedToolTimelineTest {
 
         composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
         composeRule.onNodeWithText("LEGACY-ROW-tc-only").assertDoesNotExist()
-    }
-
-    // With the flag OFF, that same lone tool call must keep the legacy behaviour.
-    @Test
-    fun singleToolCallRunKeepsLegacyRowWhenFlagOff() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides false) {
-                        RunBlock(
-                            messages = listOf(toolMessage(id = "tc-only", command = "pwd")),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = "LEGACY-ROW-${message.id}", modifier = rowModifier)
-                        }
-                    }
-                }
-            }
-        }
-
-        composeRule.onNodeWithText("LEGACY-ROW-tc-only").assertIsDisplayed()
     }
 
     // Regression: an expanded row rendered the cleaned summary AND the raw arguments
@@ -532,17 +469,15 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        RunBlock(
-                            messages = listOf(
-                                toolMessage(id = "tc-a", command = "pwd"),
-                                toolMessage(id = "tc-b", command = "ls"),
-                            ),
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = message.id, modifier = rowModifier)
-                        }
+                    RunBlock(
+                        messages = listOf(
+                            toolMessage(id = "tc-a", command = "pwd"),
+                            toolMessage(id = "tc-b", command = "ls"),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier ->
+                        Text(text = message.id, modifier = rowModifier)
                     }
                 }
             }
@@ -557,19 +492,11 @@ class ProjectedToolTimelineTest {
         composeRule.onNodeWithText("""{"command":"pwd"}""").assertDoesNotExist()
     }
 
+    // letta-mobile-nfaks: MessageToolCalls is the standalone (non-run) tool card path — it
+    // must render through the same projected timeline as run-grouped calls so a single
+    // conversation never shows two different tool card styles.
     @Test
-    fun togglingTimelineMode_preservesCanonicalDataAndKeys() {
-        val messageA = toolMessage(id = "tc-a", command = "pwd")
-        val messageB = toolMessage(id = "tc-b", command = "ls")
-        val messages = listOf(messageA, messageB)
-
-        val stepKeysBefore = com.letta.mobile.feature.chat.screen
-            .compactRunToolCallSteps(messages).map { it.key }
-
-        // The mode is toggled inside ONE composition. Calling setContent twice throws
-        // ("has already set content") and would not exercise a live switch anyway.
-        var useProjected by mutableStateOf(false)
-
+    fun messageToolCalls_usesProjectedTimeline() {
         composeRule.setContent {
             LettaTheme(
                 appTheme = AppTheme.LIGHT,
@@ -577,120 +504,23 @@ class ProjectedToolTimelineTest {
                 dynamicColor = false,
             ) {
                 LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides useProjected) {
-                        RunBlock(
-                            messages = messages,
-                            collapsed = false,
-                            onToggleCollapsed = {},
-                        ) { message, _, rowModifier ->
-                            Text(text = message.id, modifier = rowModifier)
-                        }
-                    }
-                }
-            }
-        }
-
-        // Legacy presentation renders the compact group card.
-        composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
-
-        composeRule.runOnIdle { useProjected = true }
-        composeRule.waitForIdle()
-
-        // Projected presentation renders per-call rows from the same messages.
-        composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
-        composeRule.onNodeWithText("Bash(ls)").assertIsDisplayed()
-
-        // The canonical step keys are unchanged by the switch — no migration, no rewrite.
-        val stepKeysAfter = com.letta.mobile.feature.chat.screen
-            .compactRunToolCallSteps(messages).map { it.key }
-        assertEquals(stepKeysBefore, stepKeysAfter)
-        assertEquals(listOf(messageA, messageB), messages)
-    }
-
-    private fun approvalRequest() = UiApprovalRequest(
-        requestId = "approval-1",
-        toolCalls = listOf(
-            UiApprovalToolCall(
-                toolCallId = "call-a",
-                name = "Bash",
-                arguments = """{"command":"pwd"}""",
-            ),
-            UiApprovalToolCall(
-                toolCallId = "call-b",
-                name = "Bash",
-                arguments = """{"command":"ls"}""",
-            ),
-        ),
-    )
-
-    // letta-mobile-nfaks: MessageToolCalls is the standalone (non-run) tool card path.
-    // It used to ignore LocalUseProjectedToolTimeline, so a conversation could show two
-    // different tool card styles at once. These two tests pin the flag as the single
-    // decider: projected rows when on, legacy card when off.
-    @Test
-    fun messageToolCalls_usesProjectedTimelineWhenFlagOn() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides true) {
-                        MessageToolCalls(
-                            toolCalls = persistentListOf(
-                                UiToolCall(
-                                    name = "Bash",
-                                    arguments = """{"command":"pwd"}""",
-                                    result = null,
-                                    toolCallId = "call-a",
-                                ),
+                    MessageToolCalls(
+                        toolCalls = persistentListOf(
+                            UiToolCall(
+                                name = "Bash",
+                                arguments = """{"command":"pwd"}""",
+                                result = null,
+                                toolCallId = "call-a",
                             ),
-                            messageId = "msg-standalone",
-                        )
-                    }
+                        ),
+                        messageId = "msg-standalone",
+                    )
                 }
             }
         }
 
         // The projected row family renders the projector's summary label.
         composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
-    }
-
-    @Test
-    fun messageToolCalls_usesLegacyCardWhenFlagOff() {
-        composeRule.setContent {
-            LettaTheme(
-                appTheme = AppTheme.LIGHT,
-                themePreset = ThemePreset.DEFAULT,
-                dynamicColor = false,
-            ) {
-                LettaChatTheme {
-                    CompositionLocalProvider(LocalUseProjectedToolTimeline provides false) {
-                        MessageToolCalls(
-                            toolCalls = persistentListOf(
-                                UiToolCall(
-                                    name = "Bash",
-                                    arguments = """{"command":"pwd"}""",
-                                    result = null,
-                                    toolCallId = "call-a",
-                                ),
-                                UiToolCall(
-                                    name = "Bash",
-                                    arguments = """{"command":"ls"}""",
-                                    result = null,
-                                    toolCallId = "call-b",
-                                ),
-                            ),
-                            messageId = "msg-standalone",
-                        )
-                    }
-                }
-            }
-        }
-
-        // Legacy grouped card keeps its "N tool calls" header.
-        composeRule.onNodeWithText("2 tool calls").assertIsDisplayed()
     }
 
     private fun toolMessage(
@@ -711,6 +541,22 @@ class ProjectedToolTimelineTest {
                 result = null,
                 toolCallId = if (id == "tc-a") "call-a" else "call-b",
             )
+        ),
+    )
+
+    private fun approvalRequest() = UiApprovalRequest(
+        requestId = "approval-1",
+        toolCalls = listOf(
+            UiApprovalToolCall(
+                toolCallId = "call-a",
+                name = "Bash",
+                arguments = """{"command":"pwd"}""",
+            ),
+            UiApprovalToolCall(
+                toolCallId = "call-b",
+                name = "Bash",
+                arguments = """{"command":"ls"}""",
+            ),
         ),
     )
 }

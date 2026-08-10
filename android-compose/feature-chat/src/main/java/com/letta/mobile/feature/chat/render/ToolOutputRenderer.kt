@@ -10,10 +10,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.compositionLocalOf
@@ -77,6 +78,17 @@ import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000
 internal const val ToolOutputPreviewMaxRenderedChars = 1_200
+
+// letta-mobile: cap the EXPANDED tool-result pane at a bounded height with an
+// internal scroll, instead of letting a huge result (e.g. long command
+// output, deep diff, big stack trace — up to ToolOutputMaxRenderedLines/Chars
+// worth of text) render at full content height and force the surrounding
+// chat timeline LazyColumn item to grow unboundedly. 360dp is comfortably
+// under half a typical phone screen (~700-900dp tall) while still showing a
+// meaningful window of output before the user has to scroll. The collapsed
+// preview (ToolOutputPreviewMaxRenderedChars) is already small and is NOT
+// subject to this cap.
+private val ToolOutputExpandedMaxHeight = 360.dp
 
 internal data class ToolCardBodyRenderEligibility(
     val expanded: Boolean,
@@ -204,8 +216,23 @@ private fun ToolOutputBody(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (expanded) {
-            document.blocks.forEach { block ->
-                ToolOutputBlockView(block = block, isError = isError)
+            // Shared cap point: every result surface (code/JSON/log,
+            // diff, stack trace) is rendered here via ToolOutputBlockView,
+            // so a single heightIn+verticalScroll wrapper covers all three
+            // without duplicating the modifier in each *OutputSurface.
+            // heightIn(max = ...) gives verticalScroll() the bounded height
+            // it requires; below that height the Column just wraps content
+            // normally with no visible scroll affordance.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = ToolOutputExpandedMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                document.blocks.forEach { block ->
+                    ToolOutputBlockView(block = block, isError = isError)
+                }
             }
         } else {
             ToolOutputPreview(document = document, isError = isError)
@@ -312,133 +339,133 @@ private fun CodeOutputSurface(
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
     var measuredContentWidthPx by remember { mutableIntStateOf(0) }
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-        tonalElevation = 0.dp,
+    // Dropped the Surface's background fill + rounded shape — the monospace
+    // text is chrome enough on its own; no bounding box needed. Horizontal
+    // inset trimmed from 8dp to 4dp: it used to clear the Surface's own
+    // rounded edge, which no longer exists, and 8dp stacked on top of the
+    // group card's own horizontal padding read as an unexplained gap between
+    // the collapsed header text and the expanded result text. 4dp matches
+    // CollapsibleStatusRow's header-row inset so both share a left edge.
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 7.dp),
     ) {
-        BoxWithConstraints(
+        val constrainedWidthPx = remember(maxWidth, density) {
+            if (maxWidth.value.isFinite()) {
+                with(density) { maxWidth.roundToPx() }
+            } else {
+                0
+            }
+        }
+        val contentWidthPx = measuredContentWidthPx.takeIf { it > 0 } ?: constrainedWidthPx
+        val limited = remember(
+            text,
+            maxRenderedLines,
+            maxRenderedChars,
+            contentWidthPx,
+            textStyle,
+            density.density,
+            density.fontScale,
+            layoutDirection,
+            geometryMeasurer,
+        ) {
+            if (contentWidthPx > 0) {
+                geometryMeasurer.clipToVisualLines(
+                    text = text,
+                    style = textStyle,
+                    widthPx = contentWidthPx,
+                    density = density,
+                    layoutDirection = layoutDirection,
+                    mode = ChatTextLayoutMode.Code,
+                    maxLines = maxRenderedLines,
+                    maxChars = maxRenderedChars,
+                ).toLimitedText()
+            } else {
+                limitRenderedText(text, maxLines = maxRenderedLines, maxChars = maxRenderedChars)
+            }
+        }
+        val highlightInBackground = limited.text.length > ToolOutputBackgroundHighlightThresholdChars &&
+            highlightMode != ToolOutputHighlightMode.None
+        val highlightCacheKey = remember(limited.text, highlightMode, languageHint) {
+            ToolOutputHighlightCacheKey(
+                content = limited.text.toolOutputContentKey(),
+                mode = highlightMode,
+                languageHint = languageHint,
+            )
+        }
+        val cachedSpans = remember(highlightCacheKey) { ToolOutputCaches.getHighlightSpans(highlightCacheKey) }
+        val initialAnnotatedText = remember(
+            limited.text,
+            highlightMode,
+            languageHint,
+            syntaxColors,
+            highlightInBackground,
+            cachedSpans,
+        ) {
+            when {
+                highlightMode == ToolOutputHighlightMode.None -> AnnotatedString(limited.text)
+                cachedSpans != null -> annotatedToolOutputText(
+                    text = limited.text,
+                    spans = cachedSpans,
+                    colors = syntaxColors,
+                )
+                highlightInBackground -> AnnotatedString(limited.text)
+                else -> annotatedToolOutputText(
+                    text = limited.text,
+                    spans = cachedToolOutputHighlightSpans(
+                        text = limited.text,
+                        mode = highlightMode,
+                        languageHint = languageHint,
+                    ),
+                    colors = syntaxColors,
+                )
+            }
+        }
+        val annotatedText by produceState(
+            initialValue = initialAnnotatedText,
+            limited.text,
+            highlightMode,
+            languageHint,
+            syntaxColors,
+            highlightInBackground,
+            cachedSpans,
+        ) {
+            if (highlightInBackground && cachedSpans == null) {
+                val spans = withContext(Dispatchers.Default) {
+                    cachedToolOutputHighlightSpans(
+                        text = limited.text,
+                        mode = highlightMode,
+                        languageHint = languageHint,
+                    )
+                }
+                value = annotatedToolOutputText(
+                    text = limited.text,
+                    spans = spans,
+                    colors = syntaxColors,
+                )
+            }
+        }
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
+                .onSizeChanged { size -> measuredContentWidthPx = size.width },
+            verticalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            val constrainedWidthPx = remember(maxWidth, density) {
-                if (maxWidth.value.isFinite()) {
-                    with(density) { maxWidth.roundToPx() }
-                } else {
-                    0
-                }
-            }
-            val contentWidthPx = measuredContentWidthPx.takeIf { it > 0 } ?: constrainedWidthPx
-            val limited = remember(
-                text,
-                maxRenderedLines,
-                maxRenderedChars,
-                contentWidthPx,
-                textStyle,
-                density.density,
-                density.fontScale,
-                layoutDirection,
-                geometryMeasurer,
-            ) {
-                if (contentWidthPx > 0) {
-                    geometryMeasurer.clipToVisualLines(
-                        text = text,
-                        style = textStyle,
-                        widthPx = contentWidthPx,
-                        density = density,
-                        layoutDirection = layoutDirection,
-                        mode = ChatTextLayoutMode.Code,
-                        maxLines = maxRenderedLines,
-                        maxChars = maxRenderedChars,
-                    ).toLimitedText()
-                } else {
-                    limitRenderedText(text, maxLines = maxRenderedLines, maxChars = maxRenderedChars)
-                }
-            }
-            val highlightInBackground = limited.text.length > ToolOutputBackgroundHighlightThresholdChars &&
-                highlightMode != ToolOutputHighlightMode.None
-            val highlightCacheKey = remember(limited.text, highlightMode, languageHint) {
-                ToolOutputHighlightCacheKey(
-                    content = limited.text.toolOutputContentKey(),
-                    mode = highlightMode,
-                    languageHint = languageHint,
-                )
-            }
-            val cachedSpans = remember(highlightCacheKey) { ToolOutputCaches.getHighlightSpans(highlightCacheKey) }
-            val initialAnnotatedText = remember(
-                limited.text,
-                highlightMode,
-                languageHint,
-                syntaxColors,
-                highlightInBackground,
-                cachedSpans,
-            ) {
+            MonospaceText(
+                text = annotatedText,
+                color = syntaxColors.default,
+                maxLines = maxLines,
+                style = textStyle,
+            )
+            if (showLimitNotice) {
                 when {
-                    highlightMode == ToolOutputHighlightMode.None -> AnnotatedString(limited.text)
-                    cachedSpans != null -> annotatedToolOutputText(
-                        text = limited.text,
-                        spans = cachedSpans,
-                        colors = syntaxColors,
+                    limited.omittedLines > 0 -> ToolOutputLimitNotice(
+                        text = ChatRenderStrings.linesOmitted(limited.omittedLines),
                     )
-                    highlightInBackground -> AnnotatedString(limited.text)
-                    else -> annotatedToolOutputText(
-                        text = limited.text,
-                        spans = cachedToolOutputHighlightSpans(
-                            text = limited.text,
-                            mode = highlightMode,
-                            languageHint = languageHint,
-                        ),
-                        colors = syntaxColors,
+                    limited.omittedChars > 0 -> ToolOutputLimitNotice(
+                        text = ChatRenderStrings.charsOmitted(limited.omittedChars),
                     )
-                }
-            }
-            val annotatedText by produceState(
-                initialValue = initialAnnotatedText,
-                limited.text,
-                highlightMode,
-                languageHint,
-                syntaxColors,
-                highlightInBackground,
-                cachedSpans,
-            ) {
-                if (highlightInBackground && cachedSpans == null) {
-                    val spans = withContext(Dispatchers.Default) {
-                        cachedToolOutputHighlightSpans(
-                            text = limited.text,
-                            mode = highlightMode,
-                            languageHint = languageHint,
-                        )
-                    }
-                    value = annotatedToolOutputText(
-                        text = limited.text,
-                        spans = spans,
-                        colors = syntaxColors,
-                    )
-                }
-            }
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .onSizeChanged { size -> measuredContentWidthPx = size.width },
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                MonospaceText(
-                    text = annotatedText,
-                    color = syntaxColors.default,
-                    maxLines = maxLines,
-                    style = textStyle,
-                )
-                if (showLimitNotice) {
-                    when {
-                        limited.omittedLines > 0 -> ToolOutputLimitNotice(
-                            text = ChatRenderStrings.linesOmitted(limited.omittedLines),
-                        )
-                        limited.omittedChars > 0 -> ToolOutputLimitNotice(
-                            text = ChatRenderStrings.charsOmitted(limited.omittedChars),
-                        )
-                    }
                 }
             }
         }
@@ -448,40 +475,36 @@ private fun CodeOutputSurface(
 @Composable
 private fun DiffOutputSurface(block: ToolOutputBlock.Diff) {
     val limited = remember(block.files) { limitDiffFilesForRendering(block.files) }
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-        tonalElevation = 0.dp,
+    // Dropped the Surface's background fill + rounded shape — the diff
+    // markers/colors are chrome enough on their own; no bounding box needed.
+    // See CodeOutputSurface for why the horizontal inset is 4dp, not 8dp.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(1.dp),
-            ) {
-                limited.files.forEach { file ->
-                    Text(
-                        text = file.newPath ?: file.oldPath ?: ChatRenderStrings.diffFile(),
-                        style = MaterialTheme.typography.labelSmall.copy(fontFamily = LettaCodeFont)
-                            .scaledBy(LocalChatFontScale.current),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.86f),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    file.lines.forEach { line ->
-                        DiffLineText(line)
-                    }
+            limited.files.forEach { file ->
+                Text(
+                    text = file.newPath ?: file.oldPath ?: ChatRenderStrings.diffFile(),
+                    style = MaterialTheme.typography.labelSmall.copy(fontFamily = LettaCodeFont)
+                        .scaledBy(LocalChatFontScale.current),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.86f),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                file.lines.forEach { line ->
+                    DiffLineText(line)
                 }
             }
-            if (limited.omittedLines > 0) {
-                ToolOutputLimitNotice(
-                    text = ChatRenderStrings.linesOmitted(limited.omittedLines),
-                )
-            }
+        }
+        if (limited.omittedLines > 0) {
+            ToolOutputLimitNotice(
+                text = ChatRenderStrings.linesOmitted(limited.omittedLines),
+            )
         }
     }
 }
@@ -501,40 +524,36 @@ private fun DiffLineText(line: DiffLine) {
 @Composable
 private fun StackTraceOutputSurface(block: ToolOutputBlock.StackTrace) {
     val syntaxColors = toolOutputSyntaxColors(isError = false)
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(6.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.5f),
-        tonalElevation = 0.dp,
+    // Dropped the Surface's background fill + rounded shape — the
+    // error-colored headline is chrome enough on its own; no bounding box needed.
+    // See CodeOutputSurface for why the horizontal inset is 4dp, not 8dp.
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 7.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 7.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
-        ) {
-            MonospaceText(text = block.headline, color = MaterialTheme.colorScheme.error)
-            block.frames.take(ToolOutputMaxRenderedLines).forEach { frame ->
-                val location = buildString {
-                    frame.file?.let { append(it) }
-                    frame.line?.let { append(":").append(it) }
-                }
-                val frameText = if (location.isBlank()) frame.text else "${frame.symbol.orEmpty()}  $location"
-                MonospaceText(
-                    text = highlightedToolOutputText(
-                        text = frameText,
-                        mode = ToolOutputHighlightMode.Code,
-                        languageHint = block.languageHint,
-                        colors = syntaxColors,
-                    ),
-                    color = syntaxColors.default,
-                )
+        MonospaceText(text = block.headline, color = MaterialTheme.colorScheme.error)
+        block.frames.take(ToolOutputMaxRenderedLines).forEach { frame ->
+            val location = buildString {
+                frame.file?.let { append(it) }
+                frame.line?.let { append(":").append(it) }
             }
-            if (block.frames.size > ToolOutputMaxRenderedLines) {
-                ToolOutputLimitNotice(
-                    text = ChatRenderStrings.linesOmitted(block.frames.size - ToolOutputMaxRenderedLines),
-                )
-            }
+            val frameText = if (location.isBlank()) frame.text else "${frame.symbol.orEmpty()}  $location"
+            MonospaceText(
+                text = highlightedToolOutputText(
+                    text = frameText,
+                    mode = ToolOutputHighlightMode.Code,
+                    languageHint = block.languageHint,
+                    colors = syntaxColors,
+                ),
+                color = syntaxColors.default,
+            )
+        }
+        if (block.frames.size > ToolOutputMaxRenderedLines) {
+            ToolOutputLimitNotice(
+                text = ChatRenderStrings.linesOmitted(block.frames.size - ToolOutputMaxRenderedLines),
+            )
         }
     }
 }

@@ -25,6 +25,7 @@ import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -38,6 +39,7 @@ import com.letta.mobile.ui.chat.render.ToolOutputHighlightKind
 import com.letta.mobile.ui.chat.render.ToolOutputHighlightMode
 import com.letta.mobile.ui.chat.render.ToolOutputHighlightSpan
 import com.letta.mobile.feature.chat.render.ToolOutputRenderer
+import com.letta.mobile.feature.chat.render.toolCardBodyRenderEligibility
 import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedChars
 import com.letta.mobile.feature.chat.render.initialToolOutputDocument
 import com.letta.mobile.ui.chat.render.clearToolOutputRenderCachesForTest
@@ -405,4 +407,24 @@ class ToolOutputRendererTest {
             DiffLine(DiffLineType.Context, " $path line $index")
         },
     )
+
+    // Relocated from the now-deleted CompactToolCallGroupCardTest (letta-mobile
+    // TIMELINE_V1-only migration): toolCardBodyRenderEligibility is still live —
+    // ToolCallCard's expanded body content gates on it — so this coverage moves
+    // here rather than getting deleted with the legacy compact-card test file.
+    @Test
+    fun toolCardBodyRenderEligibility_rules() {
+        assertTrue(
+            toolCardBodyRenderEligibility(expanded = true, parentVisible = true).shouldRenderBody,
+        )
+        assertFalse(
+            toolCardBodyRenderEligibility(expanded = false, parentVisible = true).shouldRenderBody,
+        )
+        assertFalse(
+            toolCardBodyRenderEligibility(expanded = true, parentVisible = false).shouldRenderBody,
+        )
+        assertFalse(
+            toolCardBodyRenderEligibility(expanded = false, parentVisible = false).shouldRenderBody,
+        )
+    }
 }
