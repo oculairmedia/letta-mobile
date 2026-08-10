@@ -193,7 +193,15 @@ internal object NativeAdmin {
         return buildJsonObject {
             present.forEach { (key, value) ->
                 val v = value!!
-                v.toLongOrNull()?.let { put(key, JsonPrimitive(it)) } ?: put(key, JsonPrimitive(v))
+                // NB: JsonObjectBuilder.put returns the PREVIOUS value for the key,
+                // which is null for a fresh key — so `put(...)?.let { } ?: put(...)`
+                // would always fall through to the elvis branch and overwrite the
+                // numeric primitive with a string one. The App Server rejects a
+                // non-number `limit` and silently falls back to a page size of 20
+                // (`typeof body.limit === "number" ? body.limit : 20`), which
+                // clamped every paginated admin call. Keep this as a plain if/else.
+                val asLong = v.toLongOrNull()
+                if (asLong != null) put(key, JsonPrimitive(asLong)) else put(key, JsonPrimitive(v))
             }
         }
     }
