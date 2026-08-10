@@ -551,13 +551,27 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
                     .redirectOutput(ProcessBuilder.Redirect.to(tmpOut))
                     .start()
                 proc.waitFor()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                // Capture the exception type and message so the build
+                // log shows WHY the script failed to spawn. Common causes
+                // in CI: file not found (script path wrong), permission
+                // denied (script not +x on a host that requires it), or
+                // working directory not existing.
+                val tmpErr = tmpOutPattern.get().asFile.resolve("${soFile.name}.err.txt")
+                tmpErr.writeText(
+                    "Exception type: ${e.javaClass.name}\n" +
+                        "Message: ${e.message}\n" +
+                        "Stack trace:\n${e.stackTraceToString()}\n"
+                )
                 -1
             }
             if (result != 0) {
                 failures.add(soFile.name)
-                val detail = if (tmpOut.exists()) {
+                val tmpErr = tmpOutPattern.get().asFile.resolve("${soFile.name}.err.txt")
+                val detail = if (tmpOut.exists() && tmpOut.length() > 0) {
                     tmpOut.readText().trim()
+                } else if (tmpErr.exists()) {
+                    "SCRIPT FAILED TO SPAWN: ${tmpErr.readText().trim()}"
                 } else {
                     "(no output captured)"
                 }
