@@ -498,15 +498,27 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
         }
 
         val failures = mutableListOf<String>()
+        val failureDetails = mutableListOf<String>()
+        val tmpOut = layout.buildDirectory.file("verifyJniLibSanity-output.txt").get().asFile
         jniLibsRoot.asFileTree.forEach { soFile ->
             if (!soFile.isFile) return@forEach
+            tmpOut.parentFile.mkdirs()
             val result = try {
+                // Call the script with two positional args:
+                //   $1 = path to llvm-readelf
+                //   $2 = path to the .so to verify
+                // (The previous build passed 3 args -- readelf, script, so --
+                // which made the script treat the script-path as the readelf
+                // and the script-path as the .so file, causing it to invoke
+                // readelf against itself and report "not a valid object file"
+                // for every .so file.)
                 val proc = ProcessBuilder(
-                    readelf,
                     scriptFile.asFile.absolutePath,
+                    readelf,
                     soFile.absolutePath,
                 )
                     .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.to(tmpOut))
                     .start()
                 proc.waitFor()
             } catch (_: Exception) {
@@ -514,6 +526,12 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
             }
             if (result != 0) {
                 failures.add(soFile.name)
+                val detail = if (tmpOut.exists()) {
+                    tmpOut.readText().trim()
+                } else {
+                    "(no output captured)"
+                }
+                failureDetails.add("${soFile.name}: $detail")
             }
         }
         if (failures.isNotEmpty()) {
@@ -521,6 +539,7 @@ val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
                 "[verifyJniLibSanity] the following .so files are missing " +
                     "DT_HASH/DT_GNU_HASH/DT_STRTAB/DT_SYMTAB/DT_DYNAMIC and will " +
                     "fail to dlopen() at runtime:\n  " + failures.joinToString("\n  ") +
+                    "\n\nScript stderr:\n  " + failureDetails.joinToString("\n  ") +
                     "\n\nThis is the bookend check to check-elf-16kb-alignment.sh: " +
                     "the alignment is OK, but the dynamic linker needs the hash + " +
                     "strtab + symtab + dynamic tables to load the .so. Re-run " +
