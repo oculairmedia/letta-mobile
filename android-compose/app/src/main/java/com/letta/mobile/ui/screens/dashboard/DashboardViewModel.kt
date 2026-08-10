@@ -310,70 +310,85 @@ class DashboardViewModel @Inject constructor(
             }
                 .distinctUntilChanged()
                 .collect { snapshot ->
-                    // Cancel any in-flight message search from the previous query.
-                    messageSearchJob?.cancel()
-
-                    if (snapshot.query.isBlank()) {
-                        _uiState.value = _uiState.value.copy(
-                            agentResults = persistentListOf(),
-                            messageResults = persistentListOf(),
-                            toolResults = persistentListOf(),
-                            blockResults = persistentListOf(),
-                            isSearching = false,
-                        )
-                        return@collect
-                    }
-
-                    // Local filtering is instant — apply immediately.
-                    val q = snapshot.query.trim().lowercase()
-                    val agents = AgentSearchMatcher.filter(snapshot.agents, snapshot.query)
-                    val tools = snapshot.tools.filter { tool ->
-                        tool.name.lowercase().contains(q) ||
-                            (tool.description?.lowercase()?.contains(q) == true)
-                    }
-                    val blocks = snapshot.blocks.filter { block ->
-                        (block.label?.lowercase()?.contains(q) == true) ||
-                            (block.description?.lowercase()?.contains(q) == true) ||
-                            block.value.lowercase().contains(q)
-                    }
-                    Log.d(
-                        "DashboardVM",
-                        "Search '$q': ${agents.size} agents, ${tools.size} tools, ${blocks.size} blocks " +
-                            "(from ${snapshot.agents.size} agents, ${snapshot.tools.size} tools, ${snapshot.blocks.size} blocks)",
-                    )
-                    _uiState.value = _uiState.value.copy(
-                        agentResults = agents.toImmutableList(),
-                        toolResults = tools.toImmutableList(),
-                        blockResults = blocks.toImmutableList(),
-                        messageResults = persistentListOf(),
-                        isSearching = true,
-                    )
-
-                    // Remote message search runs in a separate job so it doesn't
-                    // block the collect loop from processing the next query.
-                    messageSearchJob = viewModelScope.launch {
-                        delay(REMOTE_MESSAGE_SEARCH_DEBOUNCE_MS.milliseconds)
-                        try {
-                            val results = messageRepository.searchMessages(
-                                MessageSearchRequest(
-                                    query = snapshot.query,
-                                    searchMode = "fts",
-                                    roles = listOf("user", "assistant"),
-                                    limit = 20,
-                                )
-                            )
-                            _uiState.value = _uiState.value.copy(
-                                messageResults = results.map { it.toParsed() }.toImmutableList(),
-                                isSearching = false,
-                            )
-                        } catch (e: kotlinx.coroutines.CancellationException) {
-                            throw e
-                        } catch (e: Exception) {
-                            Log.w("DashboardVM", "Message search failed", e)
-                            _uiState.value = _uiState.value.copy(isSearching = false)
-                        }
-                    }
+                    handleSearchSnapshot(snapshot)
                 }
+        }
+    }
+
+    private fun handleSearchSnapshot(snapshot: SearchSnapshot) {
+        // Cancel any in-flight message search from the previous query.
+        messageSearchJob?.cancel()
+
+        if (snapshot.query.isBlank()) {
+            applyEmptyState()
+            return
+        }
+
+        applyLocalResults(snapshot)
+        launchRemoteMessageSearch(snapshot)
+    }
+
+    private fun applyEmptyState() {
+        _uiState.value = _uiState.value.copy(
+            agentResults = persistentListOf(),
+            messageResults = persistentListOf(),
+            toolResults = persistentListOf(),
+            blockResults = persistentListOf(),
+            isSearching = false,
+        )
+    }
+
+    private fun applyLocalResults(snapshot: SearchSnapshot) {
+        // Local filtering is instant — apply immediately.
+        val q = snapshot.query.trim().lowercase()
+        val agents = AgentSearchMatcher.filter(snapshot.agents, snapshot.query)
+        val tools = snapshot.tools.filter { tool ->
+            tool.name.lowercase().contains(q) ||
+                (tool.description?.lowercase()?.contains(q) == true)
+        }
+        val blocks = snapshot.blocks.filter { block ->
+            (block.label?.lowercase()?.contains(q) == true) ||
+                (block.description?.lowercase()?.contains(q) == true) ||
+                block.value.lowercase().contains(q)
+        }
+        Log.d(
+            "DashboardVM",
+            "Search '$q': ${agents.size} agents, ${tools.size} tools, ${blocks.size} blocks " +
+                "(from ${snapshot.agents.size} agents, ${snapshot.tools.size} tools, ${snapshot.blocks.size} blocks)",
+        )
+        _uiState.value = _uiState.value.copy(
+            agentResults = agents.toImmutableList(),
+            toolResults = tools.toImmutableList(),
+            blockResults = blocks.toImmutableList(),
+            messageResults = persistentListOf(),
+            isSearching = true,
+        )
+    }
+
+    private fun launchRemoteMessageSearch(snapshot: SearchSnapshot) {
+        // Remote message search runs in a separate job so it doesn't
+        // block the collect loop from processing the next query.
+        messageSearchJob = viewModelScope.launch {
+            delay(REMOTE_MESSAGE_SEARCH_DEBOUNCE_MS.milliseconds)
+            try {
+                val results = messageRepository.searchMessages(
+                    MessageSearchRequest(
+                        query = snapshot.query,
+                        searchMode = "fts",
+                        roles = listOf("user", "assistant"),
+                        limit = 20,
+                    )
+                )
+                _uiState.value = _uiState.value.copy(
+                    messageResults = results.map { it.toParsed() }.toImmutableList(),
+                    isSearching = false,
+                )
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("DashboardVM", "Message search failed", e)
+                _uiState.value = _uiState.value.copy(isSearching = false)
+            }
         }
     }
 
