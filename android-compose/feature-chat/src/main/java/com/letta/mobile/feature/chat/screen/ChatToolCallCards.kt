@@ -642,154 +642,141 @@ internal fun ToolCallCard(
         }
     }
 
-    // letta-mobile-23h5 (polish 2026-04-19): give the tool card a touch
-    // more presence — slightly stronger surface tint and a 1.dp outline
-    // so it reads as a distinct artifact in a stack of bubbles, without
-    // shouting like a colored pill would.
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.78f),
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.86f),
-        ),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            // Single-line header — tap to expand/collapse
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(enabled = !keepExpanded) {
-                        HapticEffects.segmentTick(haptic, view)
-                        expanded = !expanded
-                    },
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(display.emoji, style = codeStyle)
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = compactTitle,
-                    style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                // letta-mobile-23h5: folded-in approval decision. Rendered as
-                // a compact chip so the user can see "approved" / "rejected"
-                // without the old stack of redundant standalone pill bubbles.
-                // Pending approval requests use the same slot so the tool card
-                // animates from "requesting input" to "approved".
-                if (approvalState != null) {
-                    AnimatedToolApprovalChip(state = approvalState)
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                executionTimeText?.let { time ->
-                    ToolMetaChip(text = time)
-                    Spacer(modifier = Modifier.width(4.dp))
-                }
-                if (isError) {
-                    Icon(
-                        imageVector = LettaIcons.Error,
-                        contentDescription = "Error",
-                        modifier = Modifier.size(LettaIconSizing.Inline),
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                } else if (isWarning) {
-                    Icon(
-                        imageVector = LettaIcons.Warning,
-                        contentDescription = "Warning",
-                        modifier = Modifier.size(LettaIconSizing.Inline),
-                        tint = MaterialTheme.customColors.warningTextColor,
-                    )
-                } else if (isComplete) {
-                    Icon(
-                        imageVector = LettaIcons.CheckCircle,
-                        contentDescription = "Success",
-                        modifier = Modifier.size(LettaIconSizing.Inline),
-                        tint = MaterialTheme.colorScheme.primary,
-                    )
-                } else {
-                    // perf/frame-budget-audit + reduced-motion contract: only
-                    // run the infinite spin animation when reduced-motion is
-                    // OFF. Under reduced motion show a static icon (no
-                    // per-frame compositor invalidation), matching the
-                    // disclosure/entrance animations which already honour it.
-                    val angle = if (reducedMotion) {
-                        0f
-                    } else {
-                        val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
-                        val animated by infiniteTransition.animateFloat(
-                            initialValue = 0f,
-                            targetValue = 360f,
-                            animationSpec = infiniteRepeatable(
-                                animation = tween(1200, easing = LinearEasing),
-                            ),
-                            label = "toolSpinAngle",
-                        )
-                        animated
-                    }
-                    Icon(
-                        imageVector = LettaIcons.Refresh,
-                        contentDescription = "Running",
-                        modifier = Modifier
-                            .size(LettaIconSizing.Inline)
-                            .graphicsLayer { rotationZ = angle },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-
-            // letta-mobile-2o63: animate the expand/collapse with the same
-            // ChatMotion ramp + SizeTransform(clip = true) used by
-            // ToolOutputRenderer and RunBlock. The previous bare
-            // `if (showDetails) { ... }` cut produced a hard pop. The
-            // SizeTransform clip prevents the un-collapsing content from
-            // overshooting its bounds during the transition, which keeps the
-            // LazyColumn's scroll anchor stable (the same trade-off
-            // ToolOutputRenderer relies on; see letta-mobile-3wjn). Pinch
-            // gestures keep the AnimatedContent wrapper mounted but switch to
-            // instant transitions so the content tree does not disappear and
-            // remount on finger-up.
-            // letta-mobile-7kpxn (polish audit): reduced-motion users also get
-            // the instant path so disclosure never animates when the OS
-            // animation scale is 0 — matching the contract honoured elsewhere
-            // in the tool-card lifecycle (enter / single<->group).
-            val suppressLayoutAnimation = LocalChatIsPinching.current || reducedMotion
-            AnimatedContent(
-                targetState = showDetails,
-                modifier = Modifier.fillMaxWidth(),
-                transitionSpec = {
-                    if (suppressLayoutAnimation) {
-                        (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
-                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
-                    } else {
-                        // letta-mobile-vui8q: tool card disclosure now unfurls
-                        // from the leading edge (horizontal + vertical expand
-                        // + fade) instead of a plain vertical expand. Reads
-                        // as 'the card is opening' rather than 'content
-                        // appeared.'
-                        (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
-                            .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
-                    }
+    // Dropped the Card's background fill + outline border — chrome enough on its own.
+    Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+        // Single-line header — tap to expand/collapse
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = !keepExpanded) {
+                    HapticEffects.segmentTick(haptic, view)
+                    expanded = !expanded
                 },
-                contentAlignment = Alignment.TopStart,
-                label = "ToolCallCardExpanded",
-            ) { expandedNow ->
-                ToolCallExpandedBodyContent(
-                    visible = expandedNow,
-                    toolCall = toolCall,
-                    argumentSummary = argumentSummary,
-                    resultPreview = resultPreview,
-                    isError = isError,
-                    fontScale = fontScale,
-                    codeStyle = codeStyle,
-                    display = display,
-                    executionTimeText = executionTimeText,
-                    displayResult = displayResult,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(display.emoji, style = codeStyle)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = compactTitle,
+                style = MaterialTheme.typography.chatBubbleSender.copy(fontFamily = codeStyle.fontFamily).scaledBy(fontScale),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            // letta-mobile-23h5: folded-in approval decision. Rendered as
+            // a compact chip so the user can see "approved" / "rejected"
+            // without the old stack of redundant standalone pill bubbles.
+            // Pending approval requests use the same slot so the tool card
+            // animates from "requesting input" to "approved".
+            if (approvalState != null) {
+                AnimatedToolApprovalChip(state = approvalState)
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            executionTimeText?.let { time ->
+                ToolMetaChip(text = time)
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            if (isError) {
+                Icon(
+                    imageVector = LettaIcons.Error,
+                    contentDescription = "Error",
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.colorScheme.error,
+                )
+            } else if (isWarning) {
+                Icon(
+                    imageVector = LettaIcons.Warning,
+                    contentDescription = "Warning",
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.customColors.warningTextColor,
+                )
+            } else if (isComplete) {
+                Icon(
+                    imageVector = LettaIcons.CheckCircle,
+                    contentDescription = "Success",
+                    modifier = Modifier.size(LettaIconSizing.Inline),
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                // perf/frame-budget-audit + reduced-motion contract: only
+                // run the infinite spin animation when reduced-motion is
+                // OFF. Under reduced motion show a static icon (no
+                // per-frame compositor invalidation), matching the
+                // disclosure/entrance animations which already honour it.
+                val angle = if (reducedMotion) {
+                    0f
+                } else {
+                    val infiniteTransition = rememberInfiniteTransition(label = "toolSpin")
+                    val animated by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = LinearEasing),
+                        ),
+                        label = "toolSpinAngle",
+                    )
+                    animated
+                }
+                Icon(
+                    imageVector = LettaIcons.Refresh,
+                    contentDescription = "Running",
+                    modifier = Modifier
+                        .size(LettaIconSizing.Inline)
+                        .graphicsLayer { rotationZ = angle },
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        // letta-mobile-2o63: animate the expand/collapse with the same
+        // ChatMotion ramp + SizeTransform(clip = true) used by
+        // ToolOutputRenderer and RunBlock. The previous bare
+        // `if (showDetails) { ... }` cut produced a hard pop. The
+        // SizeTransform clip prevents the un-collapsing content from
+        // overshooting its bounds during the transition, which keeps the
+        // LazyColumn's scroll anchor stable (the same trade-off
+        // ToolOutputRenderer relies on; see letta-mobile-3wjn). Pinch
+        // gestures keep the AnimatedContent wrapper mounted but switch to
+        // instant transitions so the content tree does not disappear and
+        // remount on finger-up.
+        // letta-mobile-7kpxn (polish audit): reduced-motion users also get
+        // the instant path so disclosure never animates when the OS
+        // animation scale is 0 — matching the contract honoured elsewhere
+        // in the tool-card lifecycle (enter / single<->group).
+        val suppressLayoutAnimation = LocalChatIsPinching.current || reducedMotion
+        AnimatedContent(
+            targetState = showDetails,
+            modifier = Modifier.fillMaxWidth(),
+            transitionSpec = {
+                if (suppressLayoutAnimation) {
+                    (ChatMotion.instantEnter() togetherWith ChatMotion.instantExit())
+                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.instantSizeSpec })
+                } else {
+                    // letta-mobile-vui8q: tool card disclosure now unfurls
+                    // from the leading edge (horizontal + vertical expand
+                    // + fade) instead of a plain vertical expand. Reads
+                    // as 'the card is opening' rather than 'content
+                    // appeared.'
+                    (ChatMotion.unfurlEnter() togetherWith ChatMotion.unfurlExit())
+                        .using(SizeTransform(clip = true) { _, _ -> ChatMotion.contentSizeSpec })
+                }
+            },
+            contentAlignment = Alignment.TopStart,
+            label = "ToolCallCardExpanded",
+        ) { expandedNow ->
+            ToolCallExpandedBodyContent(
+                visible = expandedNow,
+                toolCall = toolCall,
+                argumentSummary = argumentSummary,
+                resultPreview = resultPreview,
+                isError = isError,
+                fontScale = fontScale,
+                codeStyle = codeStyle,
+                display = display,
+                executionTimeText = executionTimeText,
+                displayResult = displayResult,
+            )
         }
     }
 }

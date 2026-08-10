@@ -340,11 +340,16 @@ private fun CodeOutputSurface(
     val layoutDirection = LocalLayoutDirection.current
     var measuredContentWidthPx by remember { mutableIntStateOf(0) }
     // Dropped the Surface's background fill + rounded shape — the monospace
-    // text is chrome enough on its own; no bounding box needed.
+    // text is chrome enough on its own; no bounding box needed. Horizontal
+    // inset trimmed from 8dp to 4dp: it used to clear the Surface's own
+    // rounded edge, which no longer exists, and 8dp stacked on top of the
+    // group card's own horizontal padding read as an unexplained gap between
+    // the collapsed header text and the expanded result text. 4dp matches
+    // CollapsibleStatusRow's header-row inset so both share a left edge.
     BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 4.dp, vertical = 7.dp),
     ) {
         val constrainedWidthPx = remember(maxWidth, density) {
             if (maxWidth.value.isFinite()) {
@@ -472,10 +477,11 @@ private fun DiffOutputSurface(block: ToolOutputBlock.Diff) {
     val limited = remember(block.files) { limitDiffFilesForRendering(block.files) }
     // Dropped the Surface's background fill + rounded shape — the diff
     // markers/colors are chrome enough on their own; no bounding box needed.
+    // See CodeOutputSurface for why the horizontal inset is 4dp, not 8dp.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 4.dp, vertical = 7.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Column(
@@ -520,10 +526,11 @@ private fun StackTraceOutputSurface(block: ToolOutputBlock.StackTrace) {
     val syntaxColors = toolOutputSyntaxColors(isError = false)
     // Dropped the Surface's background fill + rounded shape — the
     // error-colored headline is chrome enough on its own; no bounding box needed.
+    // See CodeOutputSurface for why the horizontal inset is 4dp, not 8dp.
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 7.dp),
+            .padding(horizontal = 4.dp, vertical = 7.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         MonospaceText(text = block.headline, color = MaterialTheme.colorScheme.error)
