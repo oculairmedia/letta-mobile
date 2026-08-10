@@ -113,13 +113,18 @@ internal fun ProjectedToolTimelineGroupStepRow(
         runIdentityColor = runIdentityColor,
         drawLineAbove = drawLineAbove,
         drawLineBelow = drawLineBelow,
+        // letta-mobile-2huuc: tool cards inside a RunBlock render with a
+        // narrower gutter so the card body sits flush-left of the canvas,
+        // matching the standalone tool cards outside the run. The dot and
+        // connector line still mark the run visually.
+        gutterWidth = ToolCallRunGutterWidth,
     ) { rowModifier ->
         ProjectedToolTimelineGroupCard(
             groups = groups,
             approvalRequests = step.approvalRequests,
             activeApprovalRequestId = activeApprovalRequestId,
             onApprovalDecision = onApprovalDecision,
-            modifier = rowModifier.then(modifier).padding(start = 6.dp),
+            modifier = rowModifier.then(modifier),
             animateRows = animateRows,
             onAttachmentImageTap = onAttachmentImageTap,
         )
@@ -238,6 +243,17 @@ internal fun ProjectedToolTimelineGroupCard(
 }
 
 /**
+ * letta-mobile-2huuc: shrunk status-node dimensions for tool timeline rows.
+ * The default 24dp filled circle in a 32dp rail was a heavy visual cue that
+ * drowned the tool-name + body. Desktop renders tool rows with a small
+ * tinted glyph, not a filled circle. 16dp / 12dp / 20dp keeps the rail
+ * visually quiet while still marking the run timeline.
+ */
+private val ToolTimelineRailWidth = 20.dp
+private val ToolTimelineNodeSize = 16.dp
+private val ToolTimelineNodeIconSize = 12.dp
+
+/**
  * Renders a single [ToolTimelineCall] inside a [StatusTimelineItem].
  *
  * Keys come strictly from [ToolTimelineCall.key] (the projector's stable key).
@@ -319,12 +335,20 @@ private fun ProjectedToolTimelineCallRow(
 
     StatusTimelineItem(
         node = {
+            // letta-mobile-2huuc: shrink the tool-call status node so the
+            // checkmark icon no longer dominates the row. The 24dp filled
+            // circle was an overly-heavy visual cue — desktop uses a small
+            // tinted glyph instead. 16dp circle with a 12dp icon, anchored
+            // in a 20dp rail, keeps the row's left edge tidy.
             TimelineNode(
                 containerColor = nodeContainerColor,
                 contentColor = nodeContentColor,
                 icon = nodeIcon,
+                size = ToolTimelineNodeSize,
+                iconSize = ToolTimelineNodeIconSize,
             )
         },
+        railWidth = ToolTimelineRailWidth,
         showTopConnector = !isFirst,
         showBottomConnector = !isLast,
     ) {

@@ -49,6 +49,14 @@ import com.letta.mobile.data.chat.projection.runStepDotIcon
  */
 private val RunGutterWidth = 12.dp
 
+/**
+ * letta-mobile-2huuc: gutter width for tool-card step rows. Sized just wider
+ * than the dot so tool cards inside a RunBlock render flush-left of the
+ * canvas (matching their standalone counterparts), with only the dot and
+ * connector line eating into the left edge.
+ */
+internal val ToolCallRunGutterWidth = 6.dp
+
 /** Diameter of the per-step indicator dot painted in the gutter. */
 private val StepDotSize = 3.dp
 
@@ -444,7 +452,11 @@ private fun RunMessageStepRow(
         // dependency chain (and so a future visual upgrade can swap the dot
         // for an actual icon trivially).
         @Suppress("UNUSED_EXPRESSION") icon
-        renderRow(message, position, rowModifier.padding(start = 6.dp))
+        // letta-mobile-2huuc: drop the 6.dp left padding inside RunMessageStepRow.
+        // The 12.dp RunGutterWidth gutter already aligns content with the dot
+        // axis; the extra 6.dp pushed tool cards inside runs further right than
+        // standalone tool cards outside runs, with no design rationale.
+        renderRow(message, position, rowModifier)
     }
 }
 
@@ -456,6 +468,7 @@ internal fun RunStepRow(
     runIdentityColor: androidx.compose.ui.graphics.Color,
     drawLineAbove: Boolean,
     drawLineBelow: Boolean,
+    gutterWidth: androidx.compose.ui.unit.Dp = RunGutterWidth,
     content: @Composable (Modifier) -> Unit,
 ) {
     val stepDotTopPadding = stepDotCenterY - (StepDotSize / 2f)
@@ -465,7 +478,7 @@ internal fun RunStepRow(
             .drawWithContent {
                 drawContent()
 
-                val cx = RunGutterWidth.toPx() / 2f
+                val cx = gutterWidth.toPx() / 2f
                 val dotCenterY = stepDotCenterY.toPx()
                 val stroke = RunIdentityLineWidth.toPx()
                 val dotPattern = PathEffect.dashPathEffect(
@@ -498,9 +511,14 @@ internal fun RunStepRow(
         // and the dot. We keep this layout-stable so successive rows align
         // pixel-perfect (letta-mobile-m772.9: dots centred on the gutter axis,
         // lines on the same axis so there's no horizontal jitter).
+        //
+        // letta-mobile-2huuc: gutter width is now parameterised. Tool-card
+        // rows pass a narrower gutter (just wider than the dot) so the card
+        // body sits flush-left of the canvas, matching standalone tool cards
+        // outside the run.
         Box(
             modifier = Modifier
-                .width(RunGutterWidth),
+                .width(gutterWidth),
             contentAlignment = Alignment.TopCenter,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
