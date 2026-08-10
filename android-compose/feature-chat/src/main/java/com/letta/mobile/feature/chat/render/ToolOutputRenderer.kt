@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,6 +78,17 @@ import com.letta.mobile.ui.chat.render.ToolOutputMaxRenderedLines
 internal const val ToolOutputBackgroundParseThresholdChars = 12_000
 internal const val ToolOutputBackgroundHighlightThresholdChars = 4_000
 internal const val ToolOutputPreviewMaxRenderedChars = 1_200
+
+// letta-mobile: cap the EXPANDED tool-result pane at a bounded height with an
+// internal scroll, instead of letting a huge result (e.g. long command
+// output, deep diff, big stack trace — up to ToolOutputMaxRenderedLines/Chars
+// worth of text) render at full content height and force the surrounding
+// chat timeline LazyColumn item to grow unboundedly. 360dp is comfortably
+// under half a typical phone screen (~700-900dp tall) while still showing a
+// meaningful window of output before the user has to scroll. The collapsed
+// preview (ToolOutputPreviewMaxRenderedChars) is already small and is NOT
+// subject to this cap.
+private val ToolOutputExpandedMaxHeight = 360.dp
 
 internal data class ToolCardBodyRenderEligibility(
     val expanded: Boolean,
@@ -202,8 +216,23 @@ private fun ToolOutputBody(
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         if (expanded) {
-            document.blocks.forEach { block ->
-                ToolOutputBlockView(block = block, isError = isError)
+            // Shared cap point: every result surface (code/JSON/log,
+            // diff, stack trace) is rendered here via ToolOutputBlockView,
+            // so a single heightIn+verticalScroll wrapper covers all three
+            // without duplicating the modifier in each *OutputSurface.
+            // heightIn(max = ...) gives verticalScroll() the bounded height
+            // it requires; below that height the Column just wraps content
+            // normally with no visible scroll affordance.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = ToolOutputExpandedMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                document.blocks.forEach { block ->
+                    ToolOutputBlockView(block = block, isError = isError)
+                }
             }
         } else {
             ToolOutputPreview(document = document, isError = isError)
