@@ -51,7 +51,15 @@ fi
 required_tags=(STRTAB SYMTAB)
 
 bad=0
-dump="$("$READELF" -d "$SO")"
+# Capture both stdout AND stderr from readelf into $dump. `set -e` is
+# disabled for this one call via `|| true` because a failing readelf
+# should be reported as "missing tags" (bad=1) rather than aborting
+# the whole script before the user sees why; without `|| true` the
+# set -e + pipefail combination would silently exit 2 with no output,
+# which is exactly what was happening on the CI runner when readelf
+# hit an unrelated error (e.g. not finding the file due to a
+# different Android NDK toolchain layout).
+dump="$("$READELF" -d "$SO" 2>&1 || true)"
 
 # Parse "(HASH)" or "(GNU_HASH)" or "(STRTAB)" lines for tag presence.
 # llvm-readelf prints e.g. "  (HASH)               0x00000000012345".
