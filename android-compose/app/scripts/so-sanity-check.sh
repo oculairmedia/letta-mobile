@@ -26,6 +26,16 @@
 # =============================================================================
 set -euo pipefail
 
+# Verify the basic utilities the script relies on exist. On minimal CI
+# images (Alpine, distroless, etc.) grep/awk may be missing, and the
+# subsequent commands would silently fail under `set -e` without this.
+for util in grep awk; do
+    if ! command -v "$util" >/dev/null 2>&1; then
+        echo "so-sanity-check: required utility '$util' not found in PATH" >&2
+        exit 1
+    fi
+done
+
 if [[ $# -ne 2 ]]; then
     echo "usage: so-sanity-check.sh <llvm-readelf> <shared-object>" >&2
     exit 1
@@ -33,6 +43,13 @@ fi
 
 READELF="$1"
 SO="$2"
+
+# Trap ANY early-exit so the failure surfaces a useful diagnostic
+# instead of an empty stderr that the gradle task can't act on.
+# This handles the fire #73 failure mode where the CI runner's shell
+# lacked one of the basic utilities (grep / awk) and the script exited
+# via `set -e` without writing any output.
+trap 'echo "so-sanity-check: script aborted (exit=$?, line=$LINENO)" >&2; echo "so-sanity-check: \$READELF=$READELF \$SO=$SO" >&2' ERR
 
 if [[ ! -x "$READELF" ]]; then
     echo "so-sanity-check: llvm-readelf not found or not executable: $READELF" >&2
