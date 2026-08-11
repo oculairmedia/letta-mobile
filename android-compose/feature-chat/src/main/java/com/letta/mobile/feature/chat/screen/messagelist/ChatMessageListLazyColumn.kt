@@ -150,7 +150,6 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
         MeasuredChatRenderItem(
             signature = geometrySignature,
             geometryState = context.itemGeometryState,
-            isStreaming = isStreamingRenderItem,
         ) {
             ChatMessageListRenderItemBody(
                 params = ChatMessageListRenderItemBodyParams(
@@ -212,7 +211,6 @@ private fun ChatMessageListRenderSingleItem(
             messages = listOf(msg),
             collapsed = runId in context.itemState.collapsedRunIds,
             onToggleCollapsed = {
-                context.itemGeometryState.clearStreamingFloors()
                 context.callbacks.onToggleRunCollapsed(runId)
             },
             modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
@@ -260,7 +258,6 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         messages = renderItem.messages.map { it.first },
         collapsed = renderItem.runId in context.itemState.collapsedRunIds,
         onToggleCollapsed = {
-            context.itemGeometryState.clearStreamingFloors()
             context.callbacks.onToggleRunCollapsed(renderItem.runId)
         },
         modifier = highlightModifier.padding(top = params.chatDimens.ungroupedMessageSpacing),

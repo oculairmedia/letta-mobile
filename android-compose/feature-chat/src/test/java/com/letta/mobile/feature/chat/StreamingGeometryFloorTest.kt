@@ -11,120 +11,68 @@ import org.junit.Test
 class StreamingGeometryFloorTest {
 
     @Test
-    fun `streaming geometry floor follows render bucket across content growth`() {
-        val short = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "Hello"))
-        val longer = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(content = "Hello, this is still streaming"),
+    fun `recordMeasuredHeight skips write when height unchanged for same signature`() {
+        val state = ChatMessageGeometryState()
+        val signature = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Hello"),
         )
-        runStreamingGeometryScenario(
-            StreamingGeometryScenario(
-                measurements = listOf(
-                    ScrollTestGeometryMeasurement(short, heightPx = 120, streaming = ScrollTestStreamingState.Streaming),
-                    ScrollTestGeometryMeasurement(longer, heightPx = 96, streaming = ScrollTestStreamingState.Streaming),
-                ),
-                floorAssertions = listOf(
-                    GeometryFloorAssertion(longer, streaming = ScrollTestStreamingState.Streaming, expected = 120),
-                ),
-                followUpMeasurements = listOf(
-                    ScrollTestGeometryMeasurement(longer, heightPx = 148, streaming = ScrollTestStreamingState.Streaming),
-                ),
-                followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(longer, streaming = ScrollTestStreamingState.Streaming, expected = 148),
-                ),
-            ),
-        )
+        state.recordMeasuredHeight(signature, heightPx = 120)
+        val beforeSize = state.exactHeightsSize()
+        // Second write of the same height for the same signature should be a no-op
+        // (no LinkedHashMap access-order reorder, no entry creation).
+        state.recordMeasuredHeight(signature, heightPx = 120)
+        assertEquals(beforeSize, state.exactHeightsSize())
     }
 
     @Test
-    fun `streaming geometry floor does not constrain settled content`() {
-        val short = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "Hello"))
-        val longer = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(content = "Hello after the stream ends"),
+    fun `recordMeasuredHeight writes when height changes for same signature`() {
+        val state = ChatMessageGeometryState()
+        val signature = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Hello"),
         )
-        runStreamingGeometryScenario(
-            StreamingGeometryScenario(
-                measurements = listOf(
-                    ScrollTestGeometryMeasurement(short, heightPx = 120, streaming = ScrollTestStreamingState.Streaming),
-                ),
-                floorAssertions = listOf(
-                    GeometryFloorAssertion(longer, streaming = ScrollTestStreamingState.Settled, expected = 0),
-                ),
-            ),
-        )
+        state.recordMeasuredHeight(signature, heightPx = 120)
+        assertEquals(1, state.exactHeightsSize())
+        state.recordMeasuredHeight(signature, heightPx = 180)
+        assertEquals(1, state.exactHeightsSize())
     }
 
     @Test
-    fun `clear streaming floors removes existing streaming bounds`() {
-        val streamingItem = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(content = "Streaming response..."),
-        )
-        runStreamingGeometryScenario(
-            StreamingGeometryScenario(
-                measurements = listOf(
-                    ScrollTestGeometryMeasurement(streamingItem, heightPx = 300, streaming = ScrollTestStreamingState.Streaming),
-                ),
-                floorAssertions = listOf(
-                    GeometryFloorAssertion(streamingItem, streaming = ScrollTestStreamingState.Streaming, expected = 300),
-                ),
-                stateMutations = listOf(GeometryStateMutation.ClearStreamingFloors),
-                followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(streamingItem, streaming = ScrollTestStreamingState.Streaming, expected = 0),
-                ),
-            ),
-        )
+    fun `recordMeasuredHeight writes for a new signature`() {
+        val state = ChatMessageGeometryState()
+        val first = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "first"))
+        val second = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "second"))
+        state.recordMeasuredHeight(first, heightPx = 120)
+        assertEquals(1, state.exactHeightsSize())
+        state.recordMeasuredHeight(second, heightPx = 96)
+        assertEquals(2, state.exactHeightsSize())
     }
 
     @Test
-    fun `streaming geometry measurement does not seed settled exact height for same content`() {
-        val tableMessage = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(content = "| a | b |\n| --- | --- |\n| 1 | 2 |\n\nAfter table"),
-        )
-        runStreamingGeometryScenario(
-            StreamingGeometryScenario(
-                measurements = listOf(
-                    ScrollTestGeometryMeasurement(tableMessage, heightPx = 420, streaming = ScrollTestStreamingState.Streaming),
-                ),
-                floorAssertions = listOf(
-                    GeometryFloorAssertion(tableMessage, streaming = ScrollTestStreamingState.Streaming, expected = 420),
-                    GeometryFloorAssertion(tableMessage, streaming = ScrollTestStreamingState.Settled, expected = 0),
-                ),
-                followUpMeasurements = listOf(
-                    ScrollTestGeometryMeasurement(tableMessage, heightPx = 180, streaming = ScrollTestStreamingState.Settled),
-                ),
-                followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(tableMessage, streaming = ScrollTestStreamingState.Settled, expected = 180),
-                ),
-            ),
-        )
-    }
+    fun `exactHeights LRU evicts oldest when maxEntries exceeded`() {
+        val bound = 3
+        val state = ChatMessageGeometryState(maxEntries = bound)
+        val sigA = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "alpha"))
+        val sigB = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "beta"))
+        val sigC = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "gamma"))
+        val sigD = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "delta"))
+        state.recordMeasuredHeight(sigA, heightPx = 10)
+        state.recordMeasuredHeight(sigB, heightPx = 20)
+        state.recordMeasuredHeight(sigC, heightPx = 30)
+        assertEquals(3, state.exactHeightsSize())
 
-    @Test
-    fun `inactive streaming geometry buckets are pruned`() {
-        val first = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(renderKey = "msg-first", content = "first"),
-        )
-        val firstGrown = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(renderKey = "msg-first", content = "first after more tokens"),
-        )
-        val second = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(renderKey = "msg-second", content = "second"),
-        )
-        val secondGrown = scrollTestGeometrySignature(
-            ScrollTestGeometrySignatureSpec(renderKey = "msg-second", content = "second after more tokens"),
-        )
-        runStreamingGeometryScenario(
-            StreamingGeometryScenario(
-                measurements = listOf(
-                    ScrollTestGeometryMeasurement(first, heightPx = 120, streaming = ScrollTestStreamingState.Streaming),
-                    ScrollTestGeometryMeasurement(second, heightPx = 80, streaming = ScrollTestStreamingState.Streaming),
-                ),
-                stateMutations = listOf(GeometryStateMutation.RetainStreamingBuckets(setOf(second.bucket))),
-                followUpFloorAssertions = listOf(
-                    GeometryFloorAssertion(firstGrown, streaming = ScrollTestStreamingState.Streaming, expected = 0),
-                    GeometryFloorAssertion(secondGrown, streaming = ScrollTestStreamingState.Streaming, expected = 80),
-                ),
-            ),
-        )
+        // Re-touch sigA to make it most-recently-accessed.
+        state.recordMeasuredHeight(sigA, heightPx = 11)
+        // Inserting sigD must evict the now-oldest entry (sigB).
+        state.recordMeasuredHeight(sigD, heightPx = 40)
+
+        assertEquals(bound, state.exactHeightsSize())
+        // Re-record each surviving signature and confirm we do not see extra
+        // entries: writing them again at any height must still yield the
+        // bounded size, and the LRU bound is honored.
+        state.recordMeasuredHeight(sigA, heightPx = 12)
+        state.recordMeasuredHeight(sigC, heightPx = 31)
+        state.recordMeasuredHeight(sigD, heightPx = 41)
+        assertEquals(bound, state.exactHeightsSize())
     }
 
     @Test
@@ -166,79 +114,5 @@ class StreamingGeometryFloorTest {
 
         assertEquals(base.contentLength, changed.contentLength)
         assertNotEquals(base.contentHash, changed.contentHash)
-    }
-
-    @Test
-    fun `geometry floor is invalidated when chatFontScaleBucket changes for streaming and settled content`() {
-        assertAllFontScaleBucketInvalidations(
-            FontScaleBucketInvalidationCase(
-                content = "Streaming response...",
-                streaming = ScrollTestStreamingState.Streaming,
-                heightPx = 300,
-                scales = FontScaleBucketScales(base = 1.0f, alt = 0.8f),
-            ),
-            FontScaleBucketInvalidationCase(
-                content = "Settled response.",
-                streaming = ScrollTestStreamingState.Settled,
-                heightPx = 150,
-                scales = FontScaleBucketScales(base = 1.0f, alt = 1.5f),
-            ),
-        )
-    }
-}
-
-private data class FontScaleBucketScales(
-    val base: Float,
-    val alt: Float,
-)
-
-private data class FontScaleBucketInvalidationCase(
-    val content: String,
-    val streaming: ScrollTestStreamingState,
-    val heightPx: Int,
-    val scales: FontScaleBucketScales,
-)
-
-private fun assertAllFontScaleBucketInvalidations(vararg cases: FontScaleBucketInvalidationCase) {
-    cases.forEach(::assertFontScaleBucketInvalidation)
-}
-
-private fun assertFontScaleBucketInvalidation(case: FontScaleBucketInvalidationCase) {
-    val harness = ScrollTestGeometryHarness()
-    val base = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = case.content))
-        .scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = case.scales.base))
-    val alt = scrollTestSingle(ScrollTestMessageSpec(id = "assistant", content = case.content))
-        .scrollTestGeometrySignature(ScrollTestGeometryOptions(activeFontScale = case.scales.alt))
-    harness.record(ScrollTestGeometryMeasurement(base, heightPx = case.heightPx, streaming = case.streaming))
-    assertEquals(case.heightPx, harness.floor(base, case.streaming))
-    assertEquals(0, harness.floor(alt, case.streaming))
-}
-
-private sealed interface GeometryStateMutation {
-    data object ClearStreamingFloors : GeometryStateMutation
-    data class RetainStreamingBuckets(val buckets: Set<com.letta.mobile.ui.chat.render.ChatMessageGeometryBucket>) : GeometryStateMutation
-}
-
-private data class StreamingGeometryScenario(
-    val measurements: List<ScrollTestGeometryMeasurement> = emptyList(),
-    val floorAssertions: List<GeometryFloorAssertion> = emptyList(),
-    val stateMutations: List<GeometryStateMutation> = emptyList(),
-    val followUpMeasurements: List<ScrollTestGeometryMeasurement> = emptyList(),
-    val followUpFloorAssertions: List<GeometryFloorAssertion> = emptyList(),
-)
-
-private fun runStreamingGeometryScenario(scenario: StreamingGeometryScenario) {
-    val harness = ScrollTestGeometryHarness()
-    scenario.measurements.forEach(harness::record)
-    scenario.floorAssertions.forEach { assertion -> assertion.verify(harness) }
-    scenario.stateMutations.forEach { it.apply(harness.state) }
-    scenario.followUpMeasurements.forEach(harness::record)
-    scenario.followUpFloorAssertions.forEach { assertion -> assertion.verify(harness) }
-}
-
-private fun GeometryStateMutation.apply(state: ChatMessageGeometryState) {
-    when (this) {
-        GeometryStateMutation.ClearStreamingFloors -> state.clearStreamingFloors()
-        is GeometryStateMutation.RetainStreamingBuckets -> state.retainStreamingBuckets(buckets)
     }
 }

@@ -16,7 +16,6 @@ import com.letta.mobile.feature.chat.screen.StreamingSnapTimestampMs
 import com.letta.mobile.feature.chat.screen.autoScrollAction
 import com.letta.mobile.feature.chat.screen.calculateLazyIndexForRenderItem
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryBucket
-import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatRenderItemGeometrySignature
 import com.letta.mobile.ui.chat.render.ChatUiState
 import com.letta.mobile.ui.chat.render.chatGeometrySignature
@@ -108,38 +107,7 @@ internal data class ScrollTestLazyIndexExpectation(
     val items: List<ChatRenderItem>,
 )
 
-internal data class ScrollTestGeometryMeasurement(
-    val signature: ChatRenderItemGeometrySignature,
-    val heightPx: Int,
-    val streaming: ScrollTestStreamingState,
-)
 
-internal data class GeometryFloorAssertion(
-    val signature: ChatRenderItemGeometrySignature,
-    val streaming: ScrollTestStreamingState,
-    val expected: Int,
-) {
-    fun verify(harness: ScrollTestGeometryHarness) {
-        assertEquals(expected, harness.floor(signature, streaming))
-    }
-}
-
-internal class ScrollTestGeometryHarness {
-    val state = ChatMessageGeometryState(maxEntries = 8)
-
-    fun record(measurement: ScrollTestGeometryMeasurement) {
-        state.recordMeasuredHeight(
-            signature = measurement.signature,
-            heightPx = measurement.heightPx,
-            isStreaming = measurement.streaming.isStreaming,
-        )
-    }
-
-    fun floor(
-        signature: ChatRenderItemGeometrySignature,
-        streaming: ScrollTestStreamingState,
-    ): Int = state.heightFloorFor(signature, isStreaming = streaming.isStreaming)
-}
 
 internal fun scrollTestSignature(
     spec: ScrollTestSignatureSpec = ScrollTestSignatureSpec(),

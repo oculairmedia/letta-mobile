@@ -73,15 +73,6 @@ internal data class ChatMessageListLazyColumnParams(
     val chatShapes: com.letta.mobile.ui.theme.ChatShapes,
 )
 
-internal data class ActiveStreamingGeometryInput(
-    val bodyParams: ChatMessageListBodyParams,
-    val itemState: com.letta.mobile.ui.chat.render.ChatRenderItemState,
-    val newestMessageId: String?,
-    val contentWidthPx: Int,
-    val density: androidx.compose.ui.unit.Density,
-    val layoutDirection: androidx.compose.ui.unit.LayoutDirection,
-)
-
 internal data class ChatMessageListBodyParams(
     val state: com.letta.mobile.ui.chat.render.ChatUiState,
     val renderItems: List<com.letta.mobile.data.chat.projection.ChatRenderItem>,
