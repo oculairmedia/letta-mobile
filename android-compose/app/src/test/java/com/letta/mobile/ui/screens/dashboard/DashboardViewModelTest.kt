@@ -300,12 +300,16 @@ class DashboardViewModelTest {
 
     @Test
     fun `search returns results across agents tools and blocks simultaneously`() = runTest(testDispatcher) {
-        // Setup data with overlapping name "test" across categories
+        // Setup data with overlapping name "test" across categories.
+        // TestData.agent defaults tags=listOf("test"), which would
+        // inadvertently match the query via the haystack -- we pass
+        // empty tags explicitly so the assertions verify the
+        // name/description matching path, not the tag path.
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                TestData.agent(id = "a1", name = "Test Agent", description = "desc"),
-                TestData.agent(id = "a2", name = "Other Agent", description = "a test description"),
-                TestData.agent(id = "a3", name = "Unrelated", description = "nothing"),
+                TestData.agent(id = "a1", name = "Test Agent", description = "desc", tags = emptyList()),
+                TestData.agent(id = "a2", name = "Other Agent", description = "a test description", tags = emptyList()),
+                TestData.agent(id = "a3", name = "Unrelated", description = "nothing", tags = emptyList()),
             )
         )
         every { toolRepository.getTools() } returns MutableStateFlow(

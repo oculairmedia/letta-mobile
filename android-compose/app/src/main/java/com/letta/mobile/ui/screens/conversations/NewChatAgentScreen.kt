@@ -37,6 +37,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentSearchMatcher
 import com.letta.mobile.ui.components.EmptyState
 import com.letta.mobile.ui.theme.listItemHeadline
 import com.letta.mobile.ui.theme.listItemMetadataMonospace
@@ -98,15 +99,8 @@ private fun rememberFilteredAgents(agents: List<Agent>, query: String): List<Age
     return remember(agents, query) { filterAgentsForNewChat(agents, query) }
 }
 
-private fun filterAgentsForNewChat(agents: List<Agent>, query: String): List<Agent> {
-    val needle = query.trim()
-    if (needle.isBlank()) return agents
-    return agents.filter { agent ->
-        agent.name.contains(needle, ignoreCase = true) ||
-            agent.description.orEmpty().contains(needle, ignoreCase = true) ||
-            agent.model.orEmpty().contains(needle, ignoreCase = true)
-    }
-}
+private fun filterAgentsForNewChat(agents: List<Agent>, query: String): List<Agent> =
+    AgentSearchMatcher.filter(agents, query)
 
 @Composable
 private fun NewChatAgentBody(
