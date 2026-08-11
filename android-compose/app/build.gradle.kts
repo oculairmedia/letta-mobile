@@ -416,6 +416,182 @@ tasks.configureEach {
         (name.startsWith("merge") && name.endsWith("NativeLibs"))
     ) {
         dependsOn(realign16KbJniLibs)
+        dependsOn(verifyJniLibSanity)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Post-realignment ELF sanity check (letta-mobile, 2026-08-10)
+//
+// Runs AFTER realign16KbJniLibs but BEFORE the merge*JniLibFolders task
+// copies the .so files into the APK staging directory. Verifies every
+// realigned .so in src/rootDebug/jniLibs/ has the dynamic-metadata tables
+// the linker needs to load it (DT_HASH or DT_GNU_HASH + DT_STRTAB + DT_SYMTAB +
+// DT_DYNAMIC, all non-null). The existing check-elf-16kb-alignment.sh only
+// checks LOAD-segment alignment; it can't catch the
+// "DT_HASH/DT_GNU_HASH was clobbered" case that the user hit in fire #53
+// (the .so WAS 16 KB-aligned but the dynamic linker still couldn't read
+// the symbol hash table, so the app died with SIGSEGV at 0.79s).
+//
+// Exit codes:
+//   0 - all .so files have the required dynamic metadata
+//   2 - one or more .so files are missing DT_HASH/DT_GNU_HASH/DT_STRTAB/
+//       DT_SYMTAB/DT_DYNAMIC
+//
+// On failure this task throws GradleException, which fails the build.
+// The .so files are NOT deleted (so the dev can still inspect them with
+// llvm-readelf to see what went wrong); the user sees the actual table
+// names that are missing in the build output.
+// ---------------------------------------------------------------------------
+val verifyJniLibSanity = tasks.register("verifyJniLibSanity") {
+    group = "build"
+    description = "Refuses to ship .so files missing DT_HASH/DT_GNU_HASH/DT_STRTAB/DT_SYMTAB (fire #53 crash)."
+    notCompatibleWithConfigurationCache(
+        "Resolves llvm-readelf from the AGP NDK toolchain at execution time."
+    )
+    // Explicit dependency on realign16KbJniLibs: both tasks read the
+    // same .so files in src/rootDebug/jniLibs/, so Gradle's implicit
+    // dependency detection can't disambiguate which task produces those
+    // files. Without this dependsOn the configuration cache rejects the
+    // build with "Property has implicit dependency" errors.
+    dependsOn(realign16KbJniLibs)
+    val scriptFile = project.layout.projectDirectory.file("scripts/so-sanity-check.sh")
+    inputs.file(scriptFile)
+    val jniLibsRoot = project.layout.projectDirectory.dir("src/rootDebug/jniLibs")
+    val soFiles = fileTree(jniLibsRoot) {
+        include("**/*.so")
+    }
+    soFiles.forEach { inputs.file(it) }
+    // No outputs.files() here -- this task only reads the .so files
+    // and raises a GradleException on failure; it does not modify them.
+    // The previous outputs.files(soFiles) declaration created a cycle
+    // with realign16KbJniLibs (which also lists the same files as
+    // outputs), which Gradle's configuration cache rejects.
+    doLast {
+        // Resolve llvm-readelf from the AGP NDK toolchain when possible
+        // (CI runners rarely have llvm-readelf on PATH; this matches the
+        // path AGP uses for llvm-objdump). Falls back to PATH for hosts
+        // that have it installed system-wide.
+        val ndkRootEnv = System.getenv("ANDROID_NDK_HOME") ?: ""
+        val sdkRootEnv = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT") ?: ""
+        // Probe for any installed NDK by globbing the SDK's ndk/ directory.
+        // The CI runner at $ANDROID_HOME/ndk/27.3.13750724 wasn't covered
+        // by the previous hardcoded list, so we now scan for any installed
+        // NDK version and pick the first one. Falls back to fixed paths
+        // when the SDK root isn't readable.
+        val sdkNdkDir = if (sdkRootEnv.isNotBlank()) file("$sdkRootEnv/ndk") else null
+        val ndkRootsFromSdk = sdkNdkDir?.listFiles { f -> f.isDirectory }
+            ?.map { "${it.absolutePath}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" }
+            ?: emptyList()
+        val ndkCandidates = (listOf(
+            "$ndkRootEnv/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
+            "$ndkRootEnv/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf.exe",
+            "/opt/android-sdk/ndk/28.2.13676358/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
+            "/opt/android-sdk/ndk/27.0.12077973/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
+            "/opt/stacks/ndk-r26d/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf",
+        ) + ndkRootsFromSdk).filter { it.isNotBlank() }
+        val readelf = ndkCandidates.firstOrNull { path ->
+            file(path).exists() && file(path).canExecute()
+        } ?: listOf("llvm-readelf", "readelf").firstOrNull { cmd ->
+            try {
+                val probe = ProcessBuilder(cmd, "--version")
+                    .redirectErrorStream(true)
+                    .start()
+                probe.waitFor() == 0
+            } catch (_: Exception) {
+                false
+            }
+        } ?: run {
+            // If we can't find llvm-readelf at all, that itself is a real
+            // failure -- not "skip the check." Letting the build proceed
+            // would silently lose the fire #53 protection, so surface
+            // the missing dependency as a GradleException instead.
+            throw GradleException(
+                "[verifyJniLibSanity] llvm-readelf not found. Tried: " +
+                    ndkCandidates.joinToString(", ") +
+                    ", and PATH lookup for 'llvm-readelf'/'readelf'. " +
+                    "Set ANDROID_NDK_HOME to your NDK install root (e.g. " +
+                    "/opt/android-sdk/ndk/28.2.13676358) or add llvm-readelf " +
+                    "to PATH. Without readelf we cannot enforce the " +
+                    "DT_HASH/DT_GNU_HASH fire #53 guard."
+            )
+        }
+
+        val failures = mutableListOf<String>()
+        val failureDetails = mutableListOf<String>()
+        // Capture each .so's stderr to a SEPARATE file, NOT the same
+        // tmpOut that gets truncated each iteration. Otherwise the
+        // LAST iteration's stderr overwrites earlier ones, and we lose
+        // diagnostic information when multiple files fail.
+        val tmpOutPattern = layout.buildDirectory.dir("verifyJniLibSanity-out")
+        jniLibsRoot.asFileTree.forEach { soFile ->
+            if (!soFile.isFile) return@forEach
+            // Per-.so output file: each .so gets its own stderr captured
+            // to its own file. This is critical because the previous
+            // single-tmpOut design overwrote the file each iteration,
+            // so only the LAST .so's stderr survived. With per-.so files,
+            // we preserve every failed .so's diagnostic.
+            val tmpOut = tmpOutPattern.get().asFile.resolve("${soFile.name}.txt")
+            tmpOut.parentFile.mkdirs()
+            val result = try {
+                // Call the script with two positional args:
+                //   $1 = path to llvm-readelf
+                //   $2 = path to the .so to verify
+                // (The previous build passed 3 args -- readelf, script, so --
+                // which made the script treat the script-path as the readelf
+                // and the script-path as the .so file, causing it to invoke
+                // readelf against itself and report "not a valid object file"
+                // for every .so file.)
+                val proc = ProcessBuilder(
+                    scriptFile.asFile.absolutePath,
+                    readelf,
+                    soFile.absolutePath,
+                )
+                    .redirectErrorStream(true)
+                    .redirectOutput(ProcessBuilder.Redirect.to(tmpOut))
+                    .start()
+                proc.waitFor()
+            } catch (e: Exception) {
+                // Capture the exception type and message so the build
+                // log shows WHY the script failed to spawn. Common causes
+                // in CI: file not found (script path wrong), permission
+                // denied (script not +x on a host that requires it), or
+                // working directory not existing.
+                val tmpErr = tmpOutPattern.get().asFile.resolve("${soFile.name}.err.txt")
+                tmpErr.writeText(
+                    "Exception type: ${e.javaClass.name}\n" +
+                        "Message: ${e.message}\n" +
+                        "Stack trace:\n${e.stackTraceToString()}\n"
+                )
+                -1
+            }
+            if (result != 0) {
+                failures.add(soFile.name)
+                val tmpErr = tmpOutPattern.get().asFile.resolve("${soFile.name}.err.txt")
+                val detail = if (tmpOut.exists() && tmpOut.length() > 0) {
+                    tmpOut.readText().trim()
+                } else if (tmpErr.exists()) {
+                    "SCRIPT FAILED TO SPAWN: ${tmpErr.readText().trim()}"
+                } else {
+                    "(no output captured)"
+                }
+                failureDetails.add("${soFile.name} (exit=$result): $detail")
+            }
+        }
+        if (failures.isNotEmpty()) {
+            throw GradleException(
+                "[verifyJniLibSanity] the following .so files are missing " +
+                    "DT_HASH/DT_GNU_HASH/DT_STRTAB/DT_SYMTAB/DT_DYNAMIC and will " +
+                    "fail to dlopen() at runtime:\n  " + failures.joinToString("\n  ") +
+                    "\n\nScript stderr:\n  " + failureDetails.joinToString("\n  ") +
+                    "\n\nThis is the bookend check to check-elf-16kb-alignment.sh: " +
+                    "the alignment is OK, but the dynamic linker needs the hash + " +
+                    "strtab + symtab + dynamic tables to load the .so. Re-run " +
+                    "realig-16kb.py with RUST_BACKTRACE=1 to find the bug, or " +
+                    "revert to the pre-realign .so on build host.\n\nTo skim just the " +
+                    "problem, run on the host:\n  $readelf -d <path-to-.so>"
+            )
+        }
     }
 }
 

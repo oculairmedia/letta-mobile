@@ -89,8 +89,16 @@ class NativeAdminHandlersTest {
 
         override suspend fun agentList(command: AppServerCommand.AgentList): AppServerInboundFrame.AgentListResponse {
             lastAgentListQuery = command.query
-            val limit = command.query?.get("limit")
-                ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() }
+            // Mirrors the real App Server, which honours the limit only when it is a
+            // JSON *number* (`typeof body.limit === "number" ? body.limit : 20`) and
+            // silently falls back to a 20-row page otherwise. Rejecting string-encoded
+            // limits here is deliberate: the previous string-tolerant fake accepted
+            // exactly what the backend rejects, which is why letta-mobile-f2ap5
+            // (queryOf emitting "50" instead of 50) shipped undetected.
+            val limit = (command.query?.get("limit") as? kotlinx.serialization.json.JsonPrimitive)
+                ?.takeIf { !it.isString }
+                ?.content
+                ?.toIntOrNull()
                 ?: 20
             return record(
                 "agent_list",
@@ -205,9 +213,16 @@ class NativeAdminHandlersTest {
         assertTrue("agent-3" in response && "agent-4" in response, "expected page 2, got: $response")
         assertFalse("agent-1\"" in response, "page 2 must not repeat page 1: $response")
         // The single native read must cover offset+limit rows.
-        val requestedLimit = client.lastAgentListQuery?.get("limit")
-            ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
-        assertEquals("4", requestedLimit)
+        val requestedLimitPrimitive =
+            client.lastAgentListQuery?.get("limit") as? kotlinx.serialization.json.JsonPrimitive
+        assertEquals("4", requestedLimitPrimitive?.content)
+        // letta-mobile-f2ap5: it must go out as a JSON *number*. Sending "4" makes the
+        // App Server discard the limit and clamp the page to 20, which silently defeats
+        // this whole offset emulation (fetch = offset + limit can never exceed 20 rows).
+        assertFalse(
+            requestedLimitPrimitive?.isString ?: true,
+            "limit must be an unquoted JSON number, got: $requestedLimitPrimitive",
+        )
     }
 
     @Test
