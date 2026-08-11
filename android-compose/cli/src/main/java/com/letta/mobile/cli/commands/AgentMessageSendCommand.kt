@@ -5,7 +5,7 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.letta.mobile.data.transport.iroh.AgentSendResult
-import com.letta.mobile.data.transport.iroh.FileIrohAgentAddressStore
+import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
@@ -28,6 +28,14 @@ import kotlin.system.exitProcess
  *
  * Usage: meridian agent-message send --from <agentId> --to <agentId> --body <text>
  * [--conversation-id <convId>]  (5m1qy: target an existing conversation on the recipient)
+ *
+ * letta-mobile-xmpqm: the address book is the host-level
+ * [HostEndpointAddressStore]. No backend membership oracle is wired here
+ * (this is a sender-only CLI; the recipient's wrapper owns the host record).
+ * Membership is therefore disabled — resolve() returns Found for any agentId
+ * the caller asks about as long as the host record is present. The previous
+ * [FileIrohAgentAddressStore] answer was stricter (per-agent row required);
+ * the new contract is "ask the host, not the row".
  */
 class AgentMessageSendCommand : CliktCommand(name = "send") {
     private val fromAgentId by option("--from", help = "Sender agentId.").required()
@@ -52,7 +60,13 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
         )
         try {
             endpoint.online()
-            val resolver = IrohAgentAddressResolver(FileIrohAgentAddressStore(File(addressStore)))
+            // No backend store injected — this CLI is a sender, not a
+            // membership oracle. The host record is the recipient's
+            // wrapper's responsibility; resolve() here returns Found for any
+            // agentId the caller asks about as long as the host record is
+            // present. Garbage ids still surface as `unknown_host` (no host
+            // record on disk) — not silently Found.
+            val resolver = IrohAgentAddressResolver(HostEndpointAddressStore(File(addressStore)))
             val sender = IrohAgentMessageSender(endpoint, resolver)
             val result = sender.send(
                 IrohAgentMessage(

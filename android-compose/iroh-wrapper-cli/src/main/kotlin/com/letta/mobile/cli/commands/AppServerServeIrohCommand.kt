@@ -306,14 +306,12 @@ class AppServerServeIrohCommand : CliktCommand(
             "Default: ~/.letta/iroh/identities. Loaded lazily via IrohAgentIdentity.loadOrCreate.",
     )
 
-    private val a2aPublishAgents by option(
-        "--a2a-publish-agents",
-        envvar = "LETTA_A2A_PUBLISH_AGENTS",
-        help = "letta-mobile-bn008.6: comma-separated agentIds whose addresses THIS wrapper " +
-            "publishes into the address book on bind (so peers can dial Meridian and PM-letta-mobile). " +
-            "Default: empty (no publish). The seed script can also pre-populate — these writes " +
-            "coexist and overwrite on collision.",
-    ).default("")
+    // letta-mobile-xmpqm: the previous `LETTA_A2A_PUBLISH_AGENTS` allowlist
+    // (and its --a2a-publish-agents CLI option) is GONE. Reachability is now
+    // gated by `LocalBackendAdminStore.agentExists` — the wrapper publishes
+    // exactly ONE host record per bind, and any agent present in the local
+    // backend dir is automatically addressable. Scaling the per-agent list
+    // was the wrong answer; this seam is removed, not enumerated.
 
     /**
      * o5bqk: process-lifetime cache of the last-known enabled channel accounts, so
@@ -425,10 +423,6 @@ class AppServerServeIrohCommand : CliktCommand(
                 val effectiveIdentityDir: java.io.File = a2aIdentityDir
                     ?.let { java.io.File(it) }
                     ?: java.io.File(irohHome, "identities")
-                val publishList = a2aPublishAgents
-                    .split(",")
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
                 val localBackendFile = (localBackendDir ?: System.getenv("LETTA_LOCAL_BACKEND_DIR"))
                     ?.takeIf { it.isNotBlank() }
                     ?.let { java.io.File(it) }
@@ -440,14 +434,14 @@ class AppServerServeIrohCommand : CliktCommand(
                     secretKeyPath = irohSecretKeyPath,
                     identityDir = effectiveIdentityDir,
                     addressBook = effectiveAddressBook,
-                    publishAgents = publishList,
                 )
                 // B1 (PR #1125): degrade gracefully when the a2a receiver can't
-                // be built (e.g. the address-book seed is missing on a first run
-                // that doesn't pass --a2a-publish-agents). The wrapper stays up so
-                // the rest of the surface — app-server ALPN, admin_rpc — keeps
-                // serving; the a2a receiver is just unavailable until the operator
-                // seeds the address book or sets the publish flag.
+                // be built. letta-mobile-xmpqm: the address-book seed is no
+                // longer required for the receiver to come up — the host record
+                // is written by [publishHost] during the build itself. The
+                // fallback here still exists for any setup-time failure (e.g.
+                // permission denied on the kv file, or a host record that can't
+                // be written for some other reason).
                 val wiring = runCatching {
                     buildA2aWiring(
                         config = a2aCfg,
@@ -457,7 +451,7 @@ class AppServerServeIrohCommand : CliktCommand(
                 }.getOrElse { t ->
                     println(
                         "[iroh-app-server] a2a receiver: DISABLED (${t.message}). " +
-                            "Seed $effectiveAddressBook or pass --a2a-publish-agents to enable.",
+                            "Check $effectiveAddressBook is writable.",
                     )
                     null
                 }
@@ -471,8 +465,7 @@ class AppServerServeIrohCommand : CliktCommand(
                         "[iroh-app-server] a2a receiver: BOUND " +
                             "(node=${wiring.nodeIdHex}, port=$a2aPort, " +
                             "address_book=${effectiveAddressBook.absolutePath}, " +
-                            "publish_agents=${publishList.size}, " +
-                            "local_backend=${localBackendFile?.absolutePath ?: "UNSET (CreateAndDeliver->Dropped)"})",
+                            "local_backend=${localBackendFile?.absolutePath ?: "UNSET (membership gate disabled)"})",
                     )
                 }
             }

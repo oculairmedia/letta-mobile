@@ -6,9 +6,9 @@ import com.letta.mobile.data.model.ConversationClass
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
-import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
+import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
 import java.io.File
 import java.nio.file.Files
@@ -39,9 +39,11 @@ import org.junit.jupiter.api.Test
  *  - the build returns an [A2aWiring] with a non-blank node id,
  *  - the receiver/router references are wired (same router instance the wiring
  *    received, accept-loop job is reachable),
- *  - the publish path writes per-agent entries into the kv store,
- *  - the helper refuses to bind with neither a non-empty publishAgents list
- *    nor an existing address book.
+ *  - letta-mobile-xmpqm: [publishHost] writes EXACTLY ONE host record into
+ *    the kv store on bind, regardless of how many agents share the host —
+ *    O(1) per bind, NOT O(agents),
+ *  - the bind path migrates a legacy per-agent file to the single host
+ *    record (no stale per-agent rows can survive migration).
  *
  * Native bind (which talks QUIC) requires the iroh-ffi jar + a usable port.
  * Gated by `runIrohNativeE2E=true` so the default `:iroh-wrapper-cli:test`
@@ -63,7 +65,6 @@ class A2aWiringTest {
                 secretKeyPath = null,
                 identityDir = identitiesDir,
                 addressBook = addressBook,
-                publishAgents = listOf(),
             )
             val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
             try {
@@ -86,10 +87,15 @@ class A2aWiringTest {
         }
     }
 
+    /**
+     * letta-mobile-xmpqm: [publishHost] must write EXACTLY ONE `host:` line to
+     * the kv file, regardless of how many agents share the host. This is the
+     * regression-pin for the O(1) bind-time write count.
+     */
     @Test
-    fun `publish writes the per-agent entry into the kv store`() {
+    fun `publishHost writes exactly one host record per bind`() {
         assumeTrue(nativeEnabled(), "set -DrunIrohNativeE2E=true to run the loopback a2a build probe")
-        val tmp = Files.createTempDirectory("bn008-6-wire").toFile()
+        val tmp = Files.createTempDirectory("xmpqm-publish-host").toFile()
         try {
             val addressBook = File(tmp, "agents.kv").also { it.createNewFile() }
             val identitiesDir = File(tmp, "identities")
@@ -98,16 +104,24 @@ class A2aWiringTest {
                 secretKeyPath = null,
                 identityDir = identitiesDir,
                 addressBook = addressBook,
-                publishAgents = listOf("Meridian", "PM-letta-mobile"),
             )
             val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
             try {
-                val published = runBlocking { publishLocalAgents(cfg, wiring.endpoint) }
-                assertEquals(listOf("Meridian", "PM-letta-mobile"), published)
+                val record = runBlocking { publishHost(cfg, wiring.endpoint, wiring.addressStore) }
+                assertNotNull(record, "publishHost must return the HostEndpointRecord it wrote")
                 val content = addressBook.readText()
-                assertTrue("Meridian" in content, "Meridian missing from kv: $content")
-                assertTrue("PM-letta-mobile" in content, "PM-letta-mobile missing from kv: $content")
-                assertTrue(wiring.nodeIdHex in content, "node id missing from kv: $content")
+                val lines = content.lines().filter { it.isNotBlank() }
+                assertEquals(
+                    1,
+                    lines.size,
+                    "kv file must hold EXACTLY ONE line after publishHost; got ${lines.size}: $content",
+                )
+                assertTrue(lines.single().startsWith("host:"), "kv line must use the host: prefix")
+                assertTrue(
+                    content.contains(wiring.nodeIdHex),
+                    "host record must carry the live node id: $content",
+                )
+                assertEquals(wiring.nodeIdHex.take(HostEndpointAddressStore.HOST_KEY_LENGTH), record.hostKey)
             } finally {
                 wiring.close()
             }
@@ -116,13 +130,26 @@ class A2aWiringTest {
         }
     }
 
+    /**
+     * letta-mobile-xmpqm: [buildA2aWiring] must call [publishHost] exactly
+     * ONCE per wrapper start, not once per agent. Pinned here against the
+     * regression of per-agent publishing returning in a future refactor.
+     */
     @Test
-    fun `publishLocalAgents auto-publishes seeded empty-wire agents when publishAgents is empty`() {
+    fun `build calls publishHost exactly once and never writes per-agent rows`() {
         assumeTrue(nativeEnabled(), "set -DrunIrohNativeE2E=true to run the loopback a2a build probe")
-        val tmp = Files.createTempDirectory("ymew7-wire").toFile()
+        val tmp = Files.createTempDirectory("xmpqm-build-once").toFile()
         try {
+            // Pre-populate a legacy per-agent file. The build MUST collapse it
+            // to a single host record — no per-agent rows can survive migration.
             val addressBook = File(tmp, "agents.kv").also {
-                it.writeText("agent-seeded-1=\nagent-seeded-2=  \nagent-bound=node123@1.2.3.4:1234\n")
+                it.writeText(
+                    """
+                    agent-1=nodehex@1.2.3.4:1
+                    agent-2=nodehex@1.2.3.4:2
+                    agent-3=nodehex@1.2.3.4:3
+                    """.trimIndent(),
+                )
             }
             val identitiesDir = File(tmp, "identities")
             val cfg = A2aWiringConfig(
@@ -130,17 +157,20 @@ class A2aWiringTest {
                 secretKeyPath = null,
                 identityDir = identitiesDir,
                 addressBook = addressBook,
-                publishAgents = emptyList(),
             )
             val wiring = runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) }
             try {
                 val content = addressBook.readText()
-                assertTrue("agent-seeded-1" in content, "agent-seeded-1 missing from kv: $content")
-                assertTrue("agent-seeded-2" in content, "agent-seeded-2 missing from kv: $content")
-                assertTrue(wiring.nodeIdHex in content, "node id missing from kv: $content")
-                assertTrue(content.contains("agent-seeded-1=${wiring.nodeIdHex}"), "agent-seeded-1 wire not updated: $content")
-                assertTrue(content.contains("agent-seeded-2=${wiring.nodeIdHex}"), "agent-seeded-2 wire not updated: $content")
-                assertTrue(content.contains("agent-bound=node123@1.2.3.4:1234"), "pre-existing bound agent altered: $content")
+                val lines = content.lines().filter { it.isNotBlank() }
+                assertEquals(
+                    1,
+                    lines.size,
+                    "build must collapse the legacy file to one host record; got ${lines.size} lines: $content",
+                )
+                assertTrue(lines.single().startsWith("host:"))
+                assertTrue("agent-1=" !in content, "legacy per-agent rows must NOT survive")
+                assertTrue("agent-2=" !in content)
+                assertTrue("agent-3=" !in content)
             } finally {
                 wiring.close()
             }
@@ -149,65 +179,9 @@ class A2aWiringTest {
         }
     }
 
-    @Test
-    fun `resolveTargetAgentsToPublish combines seeded empty-wire entries with publishAgents`() {
-        // Pure-Kotlin hermetic test: does NOT touch iroh native endpoint.
-        val tmp = Files.createTempDirectory("ymew7-hermetic").toFile()
-        try {
-            val addressBook = File(tmp, "agents.kv").also {
-                it.writeText(
-                    """
-                    # comment line
-                    agent-seeded-1=
-                    agent-seeded-2=  
-                    agent-already-bound=nodehex123@1.2.3.4:5678
-                    =invalid_empty_key
-                    invalid_no_equals
-                    """.trimIndent(),
-                )
-            }
-            val seeded = findSeededEmptyAgents(addressBook)
-            assertEquals(listOf("agent-seeded-1", "agent-seeded-2"), seeded)
-
-            // Combine with publishAgents: preserves order, deduplicates, removes blanks
-            val resolved = resolveTargetAgentsToPublish(
-                publishAgents = listOf("agent-explicit-1", "agent-seeded-2", "  "),
-                addressBook = addressBook,
-            )
-            assertEquals(listOf("agent-explicit-1", "agent-seeded-2", "agent-seeded-1"), resolved)
-        } finally {
-            tmp.deleteRecursively()
-        }
-    }
-
-    @Test
-    fun `build refuses empty publishAgents and missing addressBook`() {
-        // Pure-Kotlin guard — does NOT touch iroh, so it runs without opt-in.
-        val tmp = Files.createTempDirectory("bn008-6-wire").toFile()
-        try {
-            val cfg = A2aWiringConfig(
-                port = 0,
-                secretKeyPath = null,
-                identityDir = File(tmp, "identities"),
-                addressBook = File(tmp, "does-not-exist.kv"),
-                publishAgents = emptyList(),
-            )
-            val ex = runCatching { runBlocking { buildA2aWiring(cfg, client = null, localBackendDir = null) } }
-                .exceptionOrNull()
-            assertNotNull(ex, "build must refuse empty publishAgents + missing addressBook")
-            assertTrue(
-                ex!!.message?.contains("nothing to bind") == true ||
-                    ex.message?.contains("publishAgents is empty") == true,
-                "unexpected error: ${ex.message}",
-            )
-        } finally {
-            tmp.deleteRecursively()
-        }
-    }
-
     /**
      * letta-mobile-oi147: the identity migration must actually RUN at bind. It is
-     * wired into `publishLocalAgents`, whose other paths need a native endpoint —
+     * wired into `publishHost`, whose other paths need a native endpoint —
      * so this exercises `migrateLegacyIdentities` directly, which is the same
      * function the bind path calls. Without this the migration could be quietly
      * unreachable and every test of it would still pass.
@@ -223,7 +197,7 @@ class A2aWiringTest {
             File(identities, "letta_agent-X.json")
                 .writeText("""{"agentId":"letta_agent-X","secretKeyB64":"${Base64.getEncoder().encodeToString(ByteArray(32) { 2 })}"}""")
             File(identities, "letta_agent-Y.json")
-                .writeText("""{"agentId":"letta_agent-Y","secretKeyB64":"${Base64.getEncoder().encodeToString(ByteArray(32) { 3 })}"}""")
+                .writeText("""{"agentId":"letta_agent-Y","secretKeyB64":"${Base64.getEncoder().encodeToString(ByteArray(32) { 3 })}""")
 
             migrateLegacyIdentities(identities)
 

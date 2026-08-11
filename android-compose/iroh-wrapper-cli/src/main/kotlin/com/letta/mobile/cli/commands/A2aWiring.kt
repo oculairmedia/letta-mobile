@@ -13,7 +13,7 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInputMessage
 import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
-import com.letta.mobile.data.transport.iroh.FileIrohAgentAddressStore
+import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IdentityMigrationAction
 import com.letta.mobile.data.transport.iroh.IrohAgentAddress
 import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
@@ -56,7 +56,7 @@ class A2aWiring internal constructor(
     val endpoint: Endpoint,
     val receiver: IrohAgentMessageReceiver,
     val router: IrohAgentMessageRouter,
-    val addressStore: FileIrohAgentAddressStore,
+    val addressStore: HostEndpointAddressStore,
     val identityDir: File,
     /**
      * M2 (PR #1125): the a2a node id (hex, 64 chars). Equal to the app-server
@@ -85,6 +85,12 @@ class A2aWiring internal constructor(
 /**
  * Configuration for [buildA2aWiring]. Knobs are the ones the CLI exposes
  * (see `AppServerServeIrohCommand` --a2a-* options).
+ *
+ * letta-mobile-xmpqm: the previous `publishAgents` allowlist is gone. The host
+ * record is written once per bind (in [publishHost]), and agent reachability
+ * is resolved at dial time via [com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore.agentExists].
+ * No enumeration of agents at boot — that was the O(agents²) bind-time cost
+ * this phase deletes.
  */
 data class A2aWiringConfig(
     /** UDP port for the a2a endpoint. 0 = OS-assigned random. */
@@ -95,11 +101,6 @@ data class A2aWiringConfig(
     val identityDir: File,
     /** Address-book kv file (parent dir must exist with mode 0700). */
     val addressBook: File,
-    /**
-     * Comma-separated agentIds to publish on bind. Each one writes its entry
-     * into [addressBook] pointing at THIS node id + direct addrs.
-     */
-    val publishAgents: List<String>,
 )
 
 /**
@@ -123,6 +124,11 @@ suspend fun buildA2aWiring(
      * busy state from `<root>/runs/...`. Null = no candidates supplied
      * (the router falls through to CreateAndDeliver, which the wrapper
      * downgrades to Dropped).
+     *
+     * letta-mobile-xmpqm: this is now also the membership oracle for the
+     * host-level address book — [HostEndpointAddressStore] is wired to the
+     * same [LocalBackendAdminStore] so an agent is addressable iff it exists
+     * in the backend dir, regardless of whether it was published.
      */
     localBackendDir: File?,
     /**
@@ -133,13 +139,14 @@ suspend fun buildA2aWiring(
      */
     ownAgentId: String = "",
 ): A2aWiring {
-    require(config.publishAgents.isNotEmpty() || config.addressBook.exists()) {
-        "publishAgents is empty AND addressBook ${config.addressBook} does not exist; nothing to bind"
-    }
-    // M3 (PR #1125): ONE [FileIrohAgentAddressStore] instance per bind. Sharing
-    // it between publishLocalAgents and the closures below prevents divergent
+    // letta-mobile-xmpqm: no more `publishAgents` allowlist, no more
+    // "nothing to bind" guard. The host record is written once at bind
+    // (publishHost), and the membership gate at resolve() decides which
+    // agents are addressable from the local backend dir.
+    // M3 (PR #1125): ONE [HostEndpointAddressStore] instance per bind. Sharing
+    // it between publishHost and the closures below prevents divergent
     // in-memory state in the kv file (each new instance re-reads the file).
-    val store = FileIrohAgentAddressStore(config.addressBook)
+    val store = HostEndpointAddressStore.withBackend(config.addressBook, localBackendDir)
     val secretKeyBytes = loadSecretKey(config.secretKeyPath)  // suspend (FileIrohSecretKeyStore.loadOrCreate)
     val bindAddr = "0.0.0.0:${config.port}"
     val endpoint = Endpoint.bind(
@@ -165,11 +172,11 @@ suspend fun buildA2aWiring(
         }
     }
     // letta-mobile-bn008.6 sweep round 2 (PR #1125): the endpoint is now BOUND
-    // but every subsequent step (endpointIdHex, publishLocalAgents,
+    // but every subsequent step (endpointIdHex, publishHost,
     // LocalBackendAdminStore construction, A2aWiring wiring) can still throw.
     // Without this guard a post-bind failure would leak the bound Endpoint —
     // the receiver would never start, so A2aWiring.close() would never run,
-    // and the address book entry that publishLocalAgents just wrote would point
+    // and the address book entry that publishHost just wrote would point
     // at a dead node. Wrap the post-bind init in try/catch; on failure
     // shutdown() the endpoint (best-effort, runBlocking on the suspending call)
     // and rethrow so the AppServerServeIrohCommand.run wrapper can degrade
@@ -180,7 +187,7 @@ suspend fun buildA2aWiring(
         // on A2aWiring as a plain `val`.
         val nodeIdHex = endpointIdHex(endpoint)
 
-        publishLocalAgents(config, endpoint, store)
+        publishHost(config, endpoint, store)
 
         // M4 (PR #1125): construct the [LocalBackendAdminStore] exactly once at
         // bind time (sync file I/O had been running on the receiver's
@@ -188,6 +195,10 @@ suspend fun buildA2aWiring(
         // `conversationsFor` closure now captures it; if either client is null or
         // the backend dir is null we short-circuit to an empty list (router
         // falls through to CreateAndDeliver -> Dropped).
+        //
+        // letta-mobile-xmpqm: the same store instance backs the host endpoint
+        // address book (`store`) above, so membership checks via
+        // agentExists() and conversation reads share one file handle.
         val backendStore = localBackendDir?.let { LocalBackendAdminStore(it) }
         val conversationsFor: suspend (String) -> List<IrohAgentMessageRouter.ConversationState> = { agentId ->
             if (client == null || backendStore == null) emptyList()
@@ -228,56 +239,81 @@ suspend fun buildA2aWiring(
 }
 
 /**
- * Publish the given agentIds into the kv file pointed at [config.addressBook]
- * using the host's own node id + dialable direct addrs. Mirrors the
- * `IrohAgentAddressResolver.publish(...)` write pattern so the wire format
- * matches what the seed script and the sender expect.
+ * The single record the wrapper writes on bind (letta-mobile-xmpqm).
  *
- * Returns the list of agents actually published (skips empty ids).
+ * One kv line: `host:<hostKey>=<wire>`. The previous shape wrote one row
+ * per agent (`agentId=<wire>`); every row carried the SAME (nodeId,
+ * directAddrs) pair, so the file grew O(agents) duplicates of O(1)
+ * information. At bind that was `register() = readAll() + writeAll()` of the
+ * WHOLE file per agent — O(agents²) bytes of I/O. With this call the kv file
+ * stays at exactly one line regardless of how many agents share the host,
+ * and rebind updates that one line in place.
  *
- * M3 (PR #1125): accepts [store] as a parameter so callers can share one
- * [FileIrohAgentAddressStore] across publish + receiver wiring (preventing
- * divergent in-memory kv state). The default still constructs one for
- * direct callers that don't have a store handy (e.g. tests).
+ * Reachability is no longer pinned to a per-agent row: the
+ * [HostEndpointAddressStore.resolve] call gates on
+ * [LocalBackendAdminStore.agentExists], so an agent is addressable iff it
+ * exists in the local backend dir — no enumeration at bind, no allowlist
+ * to scale (LETTA_A2A_PUBLISH_AGENTS is gone, replaced by backend
+ * membership + gossip-cached peer roster in Phase 3).
  *
- * M2 follow-on (PR #1125): this is `suspend` because it reads the host's
- * own node id via [endpointIdHex], which is `suspend` (the underlying
- * `Endpoint.addr().id()` is async). Both production callers (`buildA2aWiring`,
- * the test below) are already inside `runBlocking { ... }` so the suspend
- * marker does not change the call ergonomics — only makes the async I/O
- * visible in the type system.
+ * Returns the [HostEndpointRecord] actually written — the host key + the
+ * wire — so callers can log or assert on what hit disk. The legacy
+ * `publishLocalAgents(...): List<String>` returned the list of agents
+ * published; that list no longer exists in this phase (no enumeration, no
+ * return value that names agents).
+ *
+ * The legacy identity migration still runs here (the wrapper is the only
+ * process guaranteed to own the identity dir, and there is no per-agent
+ * pre-touch to fold it into). Per-agent identities are loaded lazily at
+ * dial time by [IrohAgentIdentity.loadOrCreate] — no pre-touch at bind.
  */
-suspend fun publishLocalAgents(
+suspend fun publishHost(
     config: A2aWiringConfig,
     endpoint: Endpoint,
-    store: FileIrohAgentAddressStore = FileIrohAgentAddressStore(config.addressBook),
-): List<String> {
-    val resolver = IrohAgentAddressResolver(store)
+    store: HostEndpointAddressStore = HostEndpointAddressStore(config.addressBook),
+): HostEndpointRecord {
     val addr = endpoint.addr()
     val nodeHex = endpointIdHex(endpoint)
     val direct = sortDirectAddresses(addr.directAddresses())
-    val published = mutableListOf<String>()
+    // Collapse any legacy per-agent rows on the first write — `register()`
+    // rewrites the file with exactly one host record, evicting all of the
+    // O(agents) duplicates the previous shape left behind.
     migrateLegacyIdentities(config.identityDir)
-    val targetAgents = resolveTargetAgentsToPublish(config.publishAgents, config.addressBook)
-    targetAgents.forEach { rawAgentId ->
-        val agentId = AgentIdNamespace.normalizeToBareId(rawAgentId)
-        // Touch the per-agent identity dir so a future dial can load-or-create
-        // its IrohAgentIdentity file (the seed only writes the README + dir).
-        runCatching {
-            IrohAgentIdentity.loadOrCreate(agentId, config.identityDir)
-        }
-        resolver.publish(IrohAgentAddress(agentId, nodeHex, direct))
-        published += agentId
-        Telemetry.event(
-            "A2aHost",
-            "agent.published",
-            "agentId" to agentId,
-            "nodeId" to nodeHex,
-            "directAddrs" to direct.joinToString(","),
-        )
-    }
-    return published
+    val hostAddr = IrohAgentAddress(
+        agentId = HOST_ONLY_AGENT_ID,
+        nodeIdHex = nodeHex,
+        directAddrs = direct,
+    )
+    store.register(hostAddr)
+    Telemetry.event(
+        "A2aHost",
+        "host.published",
+        "nodeId" to nodeHex,
+        "directAddrs" to direct.joinToString(","),
+        "addressBook" to config.addressBook.absolutePath,
+    )
+    return HostEndpointRecord(
+        hostKey = hostAddr.nodeIdHex.take(HostEndpointAddressStore.HOST_KEY_LENGTH),
+        nodeIdHex = nodeHex,
+        directAddrs = direct,
+    )
 }
+
+/** The single record the wrapper writes on bind (letta-mobile-xmpqm). */
+data class HostEndpointRecord(
+    val hostKey: String,
+    val nodeIdHex: String,
+    val directAddrs: List<String>,
+)
+
+/**
+ * The "agentId" written into the host-record wire is an internal sentinel —
+ * it is never used for membership; [HostEndpointAddressStore.resolve] calls
+ * the membership oracle with the CALLER's agentId, not the one in the
+ * wire. Keeping a placeholder means the wire stays shaped like the prior
+ * kv format (still parses as `nodeIdHex@directAddrs`).
+ */
+private const val HOST_ONLY_AGENT_ID = "host"
 
 /**
  * letta-mobile-oi147: collapse identity files left under the retired `letta_`
@@ -288,6 +324,9 @@ suspend fun publishLocalAgents(
  * moves SECRET KEY MATERIAL, so it must be greppable after the fact rather than
  * happening silently. Failures are reported at WARN and do not abort the bind — a
  * stranded legacy file is a cleanup problem, not a reason to take messaging down.
+ *
+ * letta-mobile-xmpqm: still runs at bind, but is no longer coupled to
+ * per-agent publishing — it is its own concern.
  */
 internal fun migrateLegacyIdentities(identityDir: File) {
     val actions = runCatching { IrohAgentIdentity.migrateLegacyNamespacedFiles(identityDir) }
@@ -317,38 +356,6 @@ internal fun migrateLegacyIdentities(identityDir: File) {
                 "reason" to action.reason,
                 level = Telemetry.Level.WARN,
             )
-        }
-    }
-}
-
-/**
- * Resolve the list of target agent IDs to publish on bind by combining
- * [publishAgents] with seeded empty-wire entries from [addressBook] (if present).
- * Preserves order, removes duplicates, and filters out blank agent IDs.
- */
-internal fun resolveTargetAgentsToPublish(
-    publishAgents: List<String>,
-    addressBook: File,
-): List<String> {
-    val seededEmptyAgents = findSeededEmptyAgents(addressBook)
-    return (publishAgents.map { AgentIdNamespace.normalizeToBareId(it.trim()) } +
-            seededEmptyAgents.map { AgentIdNamespace.normalizeToBareId(it) })
-        .filterNot { it.isBlank() }
-        .distinct()
-}
-
-/**
- * Read [addressBook] if it exists and find all agent IDs whose wire value is empty or blank
- * (e.g. `agentId=` or `agentId=  `).
- */
-internal fun findSeededEmptyAgents(addressBook: File): List<String> {
-    if (!addressBook.exists()) return emptyList()
-    return addressBook.readLines().mapNotNull { line ->
-        val eq = line.indexOf('=')
-        if (eq <= 0) null else {
-            val key = line.substring(0, eq).trim()
-            val value = line.substring(eq + 1).trim()
-            if (key.isNotEmpty() && value.isBlank()) key else null
         }
     }
 }
@@ -622,7 +629,7 @@ private suspend fun loadSecretKey(path: String?): ByteArray {
  * async FFI call); the subsequent `EndpointId.toBytes()` is not. Wrapping
  * here lets `buildA2aWiring` compute the hex once at bind time and store it
  * on [A2aWiring] as a plain `val`, so the many property reads elsewhere do
- * not pay for a `runBlocking` apiece. Also used by [publishLocalAgents] when
+ * not pay for a `runBlocking` apiece. Also used by [publishHost] when
  * it writes the address book — one helper, two callers, zero divergence.
  */
 private suspend fun endpointIdHex(endpoint: Endpoint): String {
