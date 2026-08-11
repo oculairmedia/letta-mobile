@@ -978,11 +978,11 @@ internal fun DrawerContent(
     onNewConversation: () -> Unit,
     onConversationSelected: (String) -> Unit,
     onEditAgent: () -> Unit,
+    modifier: Modifier = Modifier,
     onResetMessages: () -> Unit = {},
     onRefreshContextWindow: () -> Unit,
     navigation: DrawerNavigationCallbacks = DrawerNavigationCallbacks(),
     onClose: () -> Unit,
-    modifier: Modifier = Modifier,
 ) {
     val haptic = LocalHapticFeedback.current
     val view = LocalView.current

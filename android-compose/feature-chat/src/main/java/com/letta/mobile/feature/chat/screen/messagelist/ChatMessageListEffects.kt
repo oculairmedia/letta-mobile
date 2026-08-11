@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -87,7 +88,7 @@ private fun ChatMessageListAutoScrollEffect(params: ChatMessageListEffectsParams
     val isStreamingForAutoScroll by rememberUpdatedState(params.state.isStreaming)
     val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
 
-    var lastStreamingSnapMs by remember { mutableStateOf(0L) }
+    var lastStreamingSnapMs by remember { mutableLongStateOf(0L) }
     var followLatest by remember(conversationId) { mutableStateOf(true) }
     val lastAutoScrollSignature = remember { mutableStateOf<ChatAutoScrollSignature?>(null) }
 

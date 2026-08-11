@@ -60,9 +60,9 @@ internal fun RenderChatMessage(
     chatMode: String,
     highlightedMessageId: String?,
     callbacks: ChatMessageRenderCallbacks,
+    modifier: Modifier = Modifier,
     reasoningCollapsed: Boolean = false,
     onToggleReasoning: (() -> Unit)? = null,
-    modifier: Modifier = Modifier,
 ) {
     val spacingBelow = when {
         position == GroupPosition.Middle || position == GroupPosition.Last -> MaterialTheme.chatDimens.groupedMessageSpacing

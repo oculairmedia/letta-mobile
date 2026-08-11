@@ -555,7 +555,7 @@ private fun ChatScreenSubagentTodoSheet(params: ChatScreenSubagentTodoSheetParam
 
 @Composable
 private fun ChatScreenVoiceOverlay(modifier: Modifier = Modifier) {
-    val voiceActivity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    val voiceActivity = androidx.activity.compose.LocalActivity.current
     val voiceIsHiltHost = voiceActivity is dagger.hilt.internal.GeneratedComponentManager<*>
     if (voiceIsHiltHost) {
         val voiceVm: com.letta.mobile.feature.chat.voice.VoiceInputViewModel =

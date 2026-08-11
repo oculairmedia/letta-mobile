@@ -58,8 +58,8 @@ internal fun MessageReasoning(
     message: UiMessage,
     isStreaming: Boolean,
     collapsed: Boolean,
-    onToggleCollapsed: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    onToggleCollapsed: (() -> Unit)? = null,
 ) {
     val motionPolicy = rememberChatMotionPolicy()
     // [isStreaming] is ALREADY scoped to this render item by the caller:

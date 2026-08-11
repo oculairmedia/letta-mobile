@@ -189,10 +189,10 @@ internal fun ProjectedMessageToolCalls(
 @Composable
 internal fun ProjectedToolTimelineGroupCard(
     groups: List<ToolTimelineGroup>,
+    modifier: Modifier = Modifier,
     approvalRequests: List<UiApprovalRequest> = emptyList(),
     activeApprovalRequestId: String? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
-    modifier: Modifier = Modifier,
     animateRows: Boolean = false,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     autoExpandDelayMs: Long = DEFAULT_AUTO_EXPAND_DELAY_MS,

@@ -29,7 +29,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
     ) {
         Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             if (message.content.isNotBlank()) {
-                renderToolCallMessageText(
+                RenderToolCallMessageText(
                     message = message,
                     textColor = textColor,
                     isStreaming = isStreaming,
@@ -55,7 +55,7 @@ internal object ToolCallRenderer : MessageContentRenderer {
 }
 
 @Composable
-private fun renderToolCallMessageText(
+private fun RenderToolCallMessageText(
     message: UiMessage,
     textColor: Color,
     isStreaming: Boolean,

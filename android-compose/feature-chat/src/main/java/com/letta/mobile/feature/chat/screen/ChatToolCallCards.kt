@@ -137,9 +137,9 @@ internal fun MessageToolCalls(
 @Composable
 internal fun SubagentNotificationCard(
     notification: UiSubagentNotification,
+    modifier: Modifier = Modifier,
     toolCallId: String? = null,
     fallbackDescription: String = "Subagent",
-    modifier: Modifier = Modifier,
 ) {
     val opener = LocalSubagentTodoSheetOpener.current
     val haptic = LocalHapticFeedback.current

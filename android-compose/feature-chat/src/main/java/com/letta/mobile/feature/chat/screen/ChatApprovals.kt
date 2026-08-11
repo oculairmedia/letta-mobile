@@ -33,7 +33,7 @@ internal fun ApprovalRequestCard(
 ) {
     // letta-mobile-vilsn: runtime user-input tools (AskUserQuestion) render a
     // structured question/answer card instead of the generic approve/reject card.
-    if (AskUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) return
+    if (askUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) return
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
             text = stringResource(R.string.screen_chat_approval_request_title),
@@ -82,7 +82,7 @@ internal fun ApprovalRequestControls(
         // letta-mobile-vilsn: structured question/answer card for
         // runtime user-input tools (AskUserQuestion); falls back to the
         // generic approve/reject controls otherwise.
-        if (!AskUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) {
+        if (!askUserQuestionCard(approval = approval, isSubmitting = isSubmitting, onDecision = onDecision)) {
             Text(
                 text = stringResource(R.string.screen_chat_approval_request_body),
                 style = MaterialTheme.chatTypography.toolDetail,

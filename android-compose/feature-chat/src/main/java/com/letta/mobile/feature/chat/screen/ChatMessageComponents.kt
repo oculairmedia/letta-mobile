@@ -64,6 +64,7 @@ internal fun ChatMessageItem(
     message: UiMessage,
     groupPosition: GroupPosition,
     isStreaming: Boolean,
+    modifier: Modifier = Modifier,
     reasoningCollapsed: Boolean = true,
     onToggleReasoning: (() -> Unit)? = null,
     onGeneratedUiMessage: ((String) -> Unit)? = null,
@@ -72,7 +73,6 @@ internal fun ChatMessageItem(
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
-    modifier: Modifier = Modifier,
 ) {
     val isUser = message.role == "user"
     val showAvatar = false

@@ -46,7 +46,7 @@ import com.letta.mobile.ui.theme.chatTypography
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AskUserQuestionCard(
+internal fun askUserQuestionCard(
     approval: UiApprovalRequest,
     isSubmitting: Boolean,
     onDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
@@ -280,7 +280,7 @@ private const val PREVIEW_ASK_USER_QUESTION_MULTI_ARGUMENTS: String = """{
 private fun AskUserQuestionCardSinglePreview() {
     LettaPreviewFrame {
         LettaChatTheme {
-            AskUserQuestionCard(
+            askUserQuestionCard(
                 approval = previewAskUserQuestionApproval(
                     argumentsJson = PREVIEW_ASK_USER_QUESTION_SINGLE_ARGUMENTS,
                 ),
@@ -296,7 +296,7 @@ private fun AskUserQuestionCardSinglePreview() {
 private fun AskUserQuestionCardMultiPreview() {
     LettaPreviewFrame {
         LettaChatTheme {
-            AskUserQuestionCard(
+            askUserQuestionCard(
                 approval = previewAskUserQuestionApproval(
                     argumentsJson = PREVIEW_ASK_USER_QUESTION_MULTI_ARGUMENTS,
                 ),

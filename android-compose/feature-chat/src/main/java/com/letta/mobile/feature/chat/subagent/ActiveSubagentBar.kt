@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -492,10 +493,12 @@ private fun ringColor(state: RingState): Color = when (state) {
 @Preview(name = "Single active")
 @Composable
 private fun ActiveSubagentBarSinglePreview() {
+    val sample = FakeActiveSubagentSource.sample(1)
+    val subagents by sample.activeSubagents.collectAsState()
     LettaChatTheme {
         Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
             ActiveSubagentBar(
-                subagents = FakeActiveSubagentSource.sample(1).activeSubagents.value,
+                subagents = subagents,
             )
         }
     }
@@ -504,10 +507,12 @@ private fun ActiveSubagentBarSinglePreview() {
 @Preview(name = "Two active")
 @Composable
 private fun ActiveSubagentBarTwoPreview() {
+    val sample = FakeActiveSubagentSource.sample(2)
+    val subagents by sample.activeSubagents.collectAsState()
     LettaChatTheme {
         Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
             ActiveSubagentBar(
-                subagents = FakeActiveSubagentSource.sample(2).activeSubagents.value,
+                subagents = subagents,
             )
         }
     }
@@ -516,10 +521,12 @@ private fun ActiveSubagentBarTwoPreview() {
 @Preview(name = "Condensed (4 active)")
 @Composable
 private fun ActiveSubagentBarCondensedPreview() {
+    val sample = FakeActiveSubagentSource.sample(4)
+    val subagents by sample.activeSubagents.collectAsState()
     LettaChatTheme {
         Box(modifier = Modifier.background(MaterialTheme.colorScheme.surface)) {
             ActiveSubagentBar(
-                subagents = FakeActiveSubagentSource.sample(4).activeSubagents.value,
+                subagents = subagents,
             )
         }
     }

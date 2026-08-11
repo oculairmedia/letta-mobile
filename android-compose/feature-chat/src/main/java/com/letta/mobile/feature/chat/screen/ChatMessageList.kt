@@ -27,6 +27,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -44,6 +45,7 @@ internal fun ChatMessageList(
     chatMode: String,
     scrollToMessageId: String?,
     activeFontScale: Float,
+    modifier: Modifier = Modifier,
     onActiveFontScaleChange: (Float) -> Unit,
     onFontScaleChange: (Float) -> Unit,
     onLoadOlderMessages: () -> Unit,
@@ -54,7 +56,6 @@ internal fun ChatMessageList(
     onToggleRunCollapsed: (String) -> Unit,
     onToggleReasoningExpanded: (String) -> Unit,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)?,
-    modifier: Modifier = Modifier,
     chatBackground: ChatBackground = ChatBackground.Default,
     topPadding: Dp = 0.dp,
     bottomPadding: Dp = 0.dp,
@@ -88,8 +89,8 @@ internal fun ChatMessageList(
     var highlightedMessageId by remember { mutableStateOf<String?>(null) }
     var hasScrolledToTarget by remember { mutableStateOf(false) }
     var showFontIndicator by remember { mutableStateOf(false) }
-    var pinchTick by remember { mutableStateOf(0L) }
-    var pinchAnimationSuppressionTick by remember { mutableStateOf(0L) }
+    var pinchTick by remember { mutableLongStateOf(0L) }
+    var pinchAnimationSuppressionTick by remember { mutableLongStateOf(0L) }
     var suppressPinchLayoutAnimations by remember { mutableStateOf(false) }
     val pinchFontScaleController = remember {
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
@@ -125,7 +126,13 @@ internal fun ChatMessageList(
     }
 
     val scaleWindowIndexRange: IntRange = if (pinchFontScaleController.isPinching) {
-        val visible = listState.layoutInfo.visibleItemsInfo
+        // derivedStateOf wraps the @FrequentlyChangingValue read so this
+        // composition only recomposes when the derived IntRange actually
+        // changes (letta-mobile-lint-fix: FrequentlyChangingValue).
+        val visibleInfo by remember(listState) {
+            derivedStateOf { listState.layoutInfo.visibleItemsInfo }
+        }
+        val visible = visibleInfo
         if (visible.isEmpty()) {
             IntRange.EMPTY
         } else {

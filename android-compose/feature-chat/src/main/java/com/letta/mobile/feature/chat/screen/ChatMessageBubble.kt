@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -91,33 +92,17 @@ internal fun UiMessage.shouldRenderBubbleLess(): Boolean {
 internal fun Modifier.longPressPassthrough(
     accessibilityLabel: String = "",
     onLongPress: (() -> Unit)?,
-): Modifier = LongPressInteraction.applyTo(
-    modifier = this,
-    accessibilityLabel = accessibilityLabel,
-    onLongPress = onLongPress,
-)
+): Modifier {
+    val handler = onLongPress ?: return this
+    return with(LongPressInteraction(handler)) {
+        this@longPressPassthrough.applyTo(accessibilityLabel = accessibilityLabel)
+    }
+}
 
 private class LongPressInteraction(
     private val onLongPress: () -> Unit,
 ) {
-    companion object {
-        fun applyTo(
-            modifier: Modifier,
-            accessibilityLabel: String,
-            onLongPress: (() -> Unit)?,
-        ): Modifier {
-            if (onLongPress == null) return modifier
-            return LongPressInteraction(onLongPress).applyTo(
-                modifier = modifier,
-                accessibilityLabel = accessibilityLabel,
-            )
-        }
-    }
-
-    fun applyTo(
-        modifier: Modifier,
-        accessibilityLabel: String,
-    ): Modifier = modifier
+    fun Modifier.applyTo(accessibilityLabel: String): Modifier = this
         .semantics(mergeDescendants = false) {
             onLongClick(label = accessibilityLabel) {
                 onLongPress()
@@ -247,7 +232,7 @@ internal fun MessageBubbleSurface(
     // mid-stream growth animation (the original reason this exists) still
     // fires for subsequent text chunks landing in the streaming bubble.
     val hasFirstPaintSettled = remember(message.id) { mutableStateOf(false) }
-    val lastObservedHeight = remember(message.id) { mutableStateOf(0) }
+    val lastObservedHeight = remember(message.id) { mutableIntStateOf(0) }
     val bubbleSizeAnimation = if (isLastAssistant && !isPinchingForBubble && hasFirstPaintSettled.value) {
         Modifier.animateContentSize(
             animationSpec = ChatMotion.streamingSizeSpec,
@@ -258,12 +243,12 @@ internal fun MessageBubbleSurface(
     val firstPaintGate = Modifier.onSizeChanged { size ->
         val height = size.height
         if (height <= 0) return@onSizeChanged
-        if (lastObservedHeight.value == 0) {
-            lastObservedHeight.value = height
+        if (lastObservedHeight.intValue == 0) {
+            lastObservedHeight.intValue = height
         } else if (!hasFirstPaintSettled.value) {
             // Saw at least two non-zero measurements → first paint settled.
             hasFirstPaintSettled.value = true
-            lastObservedHeight.value = height
+            lastObservedHeight.intValue = height
         }
     }
 

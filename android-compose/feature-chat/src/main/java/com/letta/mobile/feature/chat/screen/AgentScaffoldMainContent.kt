@@ -62,14 +62,14 @@ private fun ColumnScope.AgentScaffoldChatSection(
     if (state.uiState.isSearchActive) {
         AgentScaffoldSearchResultsPane(
             state = state,
-            chatModifier = chatModifier,
+            modifier = chatModifier,
             contentTopPadding = contentTopPadding,
             bottomPadding = paddingValues.calculateBottomPadding(),
         )
     } else {
         AgentScaffoldChatScreenPane(
             state = state,
-            chatModifier = chatModifier,
+            modifier = chatModifier,
             contentTopPadding = contentTopPadding,
         )
     }
@@ -78,7 +78,7 @@ private fun ColumnScope.AgentScaffoldChatSection(
 @Composable
 private fun AgentScaffoldSearchResultsPane(
     state: AgentScaffoldRuntimeState,
-    chatModifier: Modifier,
+    modifier: Modifier,
     contentTopPadding: androidx.compose.ui.unit.Dp,
     bottomPadding: androidx.compose.ui.unit.Dp,
 ) {
@@ -102,19 +102,19 @@ private fun AgentScaffoldSearchResultsPane(
                 }
             },
         ),
-        modifier = chatModifier.padding(top = contentTopPadding, bottom = bottomPadding),
+        modifier = modifier.padding(top = contentTopPadding, bottom = bottomPadding),
     )
 }
 
 @Composable
 private fun AgentScaffoldChatScreenPane(
     state: AgentScaffoldRuntimeState,
-    chatModifier: Modifier,
+    modifier: Modifier,
     contentTopPadding: androidx.compose.ui.unit.Dp,
 ) {
     val params = state.params
     ChatScreen(
-        modifier = chatModifier,
+        modifier = modifier,
         contentPadding = PaddingValues(top = contentTopPadding, bottom = 0.dp),
         chatBackground = state.chatBackground,
         chatMode = params.chatMode,

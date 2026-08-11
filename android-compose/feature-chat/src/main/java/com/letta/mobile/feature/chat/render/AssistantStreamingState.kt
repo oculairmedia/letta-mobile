@@ -3,6 +3,7 @@ package com.letta.mobile.feature.chat.render
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -58,7 +59,7 @@ internal fun rememberAssistantSmoothedText(
     if (!streamingState.useStreamingRenderer) return text
 
     var lastHapticRevealLength by remember(messageId) {
-        mutableStateOf(streamingState.initialText.length)
+        mutableIntStateOf(streamingState.initialText.length)
     }
     val streamingRevealHapticPulse = LocalStreamingRevealHapticPulse.current
     return com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText(

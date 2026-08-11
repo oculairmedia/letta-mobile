@@ -18,6 +18,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -57,7 +59,9 @@ internal fun MessageActionsSheet(
     val timestampHeader = remember(state.message.timestamp, locale) {
         formatMessageActionTimestamp(state.message.timestamp, locale = locale)
     } ?: stringResource(R.string.message_actions_title)
-    val availableHeight = LocalConfiguration.current.screenHeightDp.dp
+    val containerSize = LocalWindowInfo.current.containerSize
+    val density = LocalDensity.current
+    val availableHeight = with(density) { containerSize.height.toDp() }
     val actionListMaxHeight = (availableHeight - 112.dp)
         .coerceAtLeast(96.dp)
         .coerceAtMost(320.dp)
