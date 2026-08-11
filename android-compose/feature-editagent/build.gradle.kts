@@ -29,7 +29,7 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.feature.editagent"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
