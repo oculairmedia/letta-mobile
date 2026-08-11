@@ -187,6 +187,89 @@ class StreamingMarkdownRecompositionGateTest {
     }
 
     /**
+     * The internal `stableFloorHeightPx` must re-seed upward (never shrink)
+     * when committed-block boundaries advance, so that the `heightIn(min=...)`
+     * modifier applied to the streaming column always covers the current
+     * rendered height. This guards against the case where the bubble-level
+     * floor was removed and the per-block floor takes over entirely — if
+     * either layer regresses, content clips or the column re-measures at
+     * paint cadence.
+     */
+    @Test
+    fun stableFloorHeightPxReseedsWhenCommittedBlockBoundaryAdvances() {
+        val sourceText = """
+            # Floor Reseed Test
+
+            First paragraph that is short enough to fit on one line.
+
+            Second paragraph is also short. Boundary must advance and the
+            floor must grow upward to match the new column height.
+        """.trimIndent()
+
+        val floorHistory = mutableListOf<Int>()
+        val text = mutableStateOf("")
+
+        composeRule.setContent {
+            LettaTheme {
+                Surface(color = MaterialTheme.colorScheme.background) {
+                    Column {
+                        StreamingMarkdownText(
+                            text = text.value,
+                            onStableFloorHeightPxChanged = { px ->
+                                floorHistory.add(px)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+
+        // Drive text through to the end in coarse chunks so multiple
+        // committed-block boundaries cross during the test.
+        composeRule.waitForIdle()
+        val chunkSize = 20
+        var offset = 0
+        while (offset < sourceText.length) {
+            val end = minOf(offset + chunkSize, sourceText.length)
+            composeRule.runOnIdle {
+                text.value = sourceText.substring(0, end)
+            }
+            composeRule.waitForIdle()
+            offset = end
+        }
+        composeRule.runOnIdle {
+            text.value = sourceText
+        }
+        composeRule.waitForIdle()
+
+        // The floor must have been reported at least once — the bubble
+        // composed and onSizeChanged fired at the first boundary advance.
+        assertTrue(
+            "Expected stableFloorHeightPx to be reported at least once, got $floorHistory",
+            floorHistory.isNotEmpty(),
+        )
+        // Monotone-up invariant: each reported floor value must be >=
+        // every prior value. The floor is allowed to be re-reported with
+        // the same value when the column height does not grow at a
+        // boundary, but never to shrink.
+        val violations = floorHistory
+            .zipWithNext()
+            .filter { (a, b) -> b < a }
+        assertTrue(
+            "stableFloorHeightPx must not shrink across boundary advances, " +
+                "got violations=$violations in history=$floorHistory",
+            violations.isEmpty(),
+        )
+        // The final reported value must cover the rendered column at the
+        // end of the stream (i.e. be > 0).
+        val last = floorHistory.last()
+        assertTrue(
+            "Expected final stableFloorHeightPx to be > 0, got $last",
+            last > 0,
+        )
+    }
+
+    /**
      * Records per-block composition counts and, for each block, the count at the
      * instant it was committed (displaced from the tail).
      *

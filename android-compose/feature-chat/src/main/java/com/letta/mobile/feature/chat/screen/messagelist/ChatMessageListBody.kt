@@ -5,7 +5,6 @@ import com.letta.mobile.feature.chat.screen.ChatFadeEdgeLength
 import com.letta.mobile.feature.chat.screen.ChatFadingEdgesBox
 import com.letta.mobile.feature.chat.screen.chatFadeTargetColor
 import com.letta.mobile.feature.chat.screen.toChatViewportSnapshot
-import com.letta.mobile.ui.chat.render.chatGeometrySignature
 import com.letta.mobile.ui.chat.render.toChatRenderItemState
 import com.letta.mobile.ui.components.ScrollToBottomFab
 import com.letta.mobile.ui.theme.LocalChatFontScale
@@ -25,7 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.SideEffect
+
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -103,20 +102,6 @@ private fun ChatMessageListBodyContent(
             chatDimens = chatDimens,
             chatShapes = chatShapes,
         )
-        val activeStreamingGeometryBuckets = rememberActiveStreamingGeometryBuckets(
-            ActiveStreamingGeometryInput(
-                bodyParams = params,
-                itemState = itemState,
-                newestMessageId = newestMessageId,
-                contentWidthPx = contentWidthPx,
-                density = density,
-                layoutDirection = layoutDirection,
-            ),
-        )
-        SideEffect {
-            params.itemGeometryState.retainStreamingBuckets(activeStreamingGeometryBuckets)
-        }
-
         CompositionLocalProvider(
             LocalChatIsPinching provides params.suppressPinchLayoutAnimations,
             LocalChatFontScale provides params.liveFontScale,
@@ -127,45 +112,6 @@ private fun ChatMessageListBodyContent(
 
         ChatMessageListScrollFab(params)
         ChatMessageListFontIndicator(params)
-    }
-}
-
-@Composable
-private fun rememberActiveStreamingGeometryBuckets(
-    input: ActiveStreamingGeometryInput,
-): Set<com.letta.mobile.ui.chat.render.ChatMessageGeometryBucket> {
-    val params = input.bodyParams
-    return remember(
-        params.state.isStreaming,
-        input.newestMessageId,
-        params.renderItems,
-        input.contentWidthPx,
-        params.appearance.activeFontScale,
-        input.density.density,
-        input.density.fontScale,
-        input.layoutDirection,
-        params.appearance.chatMode,
-        params.state.collapsedRunIds,
-        params.state.expandedReasoningMessageIds,
-        params.state.activeApprovalRequestId,
-    ) {
-        if (!params.state.isStreaming || input.newestMessageId == null) {
-            emptySet()
-        } else {
-            params.renderItems
-                .filter { it.containsMessageId(input.newestMessageId) }
-                .map {
-                    it.chatGeometrySignature(
-                        state = input.itemState,
-                        chatMode = params.appearance.chatMode,
-                        widthPx = input.contentWidthPx,
-                        density = input.density,
-                        layoutDirection = input.layoutDirection,
-                        activeFontScale = params.appearance.activeFontScale,
-                    ).bucket
-                }
-                .toSet()
-        }
     }
 }
 

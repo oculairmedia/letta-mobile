@@ -38,52 +38,30 @@ class ChatMessageGeometryState(
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ChatRenderItemGeometrySignature, Int>?): Boolean =
             size > maxEntries
     }
-    private val streamingFloors = LinkedHashMap<ChatMessageGeometryBucket, Int>()
 
-    fun heightFloorFor(
-        signature: ChatRenderItemGeometrySignature,
-        isStreaming: Boolean,
-    ): Int {
-        val exact = exactHeights[signature] ?: 0
-        val streaming = if (isStreaming) streamingFloors[signature.bucket] ?: 0 else 0
-        return maxOf(exact, streaming)
-    }
-
+    /**
+     * Records a measured height for [signature]. Skips the write when the
+     * stored height is already exactly [heightPx] — this dedups per-frame
+     * `onSizeChanged` callbacks during scroll for items whose measured size
+     * has not changed, eliminating the LinkedHashMap reorder that previously
+     * caused a hitch when scrolling past user prompts.
+     */
     fun recordMeasuredHeight(
         signature: ChatRenderItemGeometrySignature,
         heightPx: Int,
-        isStreaming: Boolean,
     ) {
         val safeHeight = heightPx.coerceAtLeast(0)
-        if (isStreaming) {
-            val current = streamingFloors[signature.bucket] ?: 0
-            if (safeHeight > current) {
-                streamingFloors[signature.bucket] = safeHeight
-            }
-            return
-        }
+        if (exactHeights[signature] == safeHeight) return
         exactHeights[signature] = safeHeight
     }
 
     /**
-     * letta-mobile-<collapse-floor>: drop ALL monotone-up streaming floors so
-     * they re-seed from the next measurement. Called ONCE per collapse/expand
-     * toggle (a rare, deliberate user action) at the toggle chokepoint — an
-     * intentional shrink that must not stay floored at the previous, larger
-     * (expanded) height. O(streamingFloors) on a rare event; zero per-frame
-     * cost (the streaming hot path never touches this).
+     * Test-only probe for the number of cached exact heights. Used by the LRU
+     * eviction test; not part of the supported runtime API but exposed so
+     * callers in other modules can assert against the LRU bound without
+     * reaching into internals.
      */
-    fun clearStreamingFloors() {
-        streamingFloors.clear()
-    }
-
-    fun retainStreamingBuckets(activeBuckets: Set<ChatMessageGeometryBucket>) {
-        if (activeBuckets.isEmpty()) {
-            streamingFloors.clear()
-            return
-        }
-        streamingFloors.keys.removeAll { it !in activeBuckets }
-    }
+    fun exactHeightsSize(): Int = exactHeights.size
 }
 
 fun ChatRenderItem.chatGeometrySignature(

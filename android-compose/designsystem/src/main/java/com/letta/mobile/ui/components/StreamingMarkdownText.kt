@@ -103,6 +103,7 @@ fun StreamingMarkdownText(
     isStreaming: Boolean = true,
     animateSettledSize: Boolean = true,
     fadeAppendedText: Boolean = false,
+    onStableFloorHeightPxChanged: (Int) -> Unit = {},
 ) {
     if (text.isEmpty()) return
 
@@ -305,6 +306,7 @@ fun StreamingMarkdownText(
                     // Only grow the floor upward. Never shrink it.
                     if (size.height > stableFloorHeightPx) {
                         stableFloorHeightPx = size.height
+                        onStableFloorHeightPxChanged(stableFloorHeightPx)
                     }
                 }
             },
