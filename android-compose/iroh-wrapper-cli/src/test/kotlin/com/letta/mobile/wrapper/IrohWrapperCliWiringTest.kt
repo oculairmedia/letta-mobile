@@ -55,13 +55,14 @@ class IrohWrapperCliWiringTest {
             // systemd unit can pass them. Regression guard: a refactor that
             // renames or drops them would silently disable the receiver.
             //
-            // N7 (PR #1125): the publish flag is plural (`--a2a-publish-agents`)
-            // because the envvar and value are both lists — matching the
-            // singular here would silently break the systemd unit's argv.
+            // letta-mobile-xmpqm: --a2a-publish-agents and its LETTA_A2A_PUBLISH_AGENTS
+            // env var are GONE — reachability is gated by backend membership,
+            // not enumeration of agents at bind. The systemd unit's argv is
+            // updated to drop the flag (and the deployment runbook updated to
+            // remove the envvar), so this list tracks the post-xmpqm surface.
             "--a2a-port",
             "--a2a-address-book",
             "--a2a-identity-dir",
-            "--a2a-publish-agents",
         ).forEach { option ->
             assertTrue(option in options, "expected $option in $options")
         }

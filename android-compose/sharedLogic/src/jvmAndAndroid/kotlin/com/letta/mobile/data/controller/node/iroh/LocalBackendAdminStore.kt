@@ -31,8 +31,13 @@ import java.io.File
  * This class is a thin facade: it wires the shared [LocalBackendStoreSupport]
  * into the per-concern readers (agent / conversation / message / block / run /
  * context) and delegates each public query.
+ *
+ * `open` so tests in the host-endpoint address-book module can supply an
+ * in-memory subclass (the [com.letta.mobile.data.transport.iroh.HostEndpointAddressStore]
+ * membership gate does not need a real on-disk backend to exercise the
+ * resolve() contract — see `HostEndpointAddressStoreBackendMembershipTest`).
  */
-class LocalBackendAdminStore(
+open class LocalBackendAdminStore(
     private val baseDir: File,
     /** Mirrors admin-shim's `process.env.LMSTUDIO_BASE_URL || "https://api.openai.com/v1"`. */
     private val lmstudioBaseUrl: String =
@@ -53,8 +58,13 @@ class LocalBackendAdminStore(
     /** See [LocalBackendAgentReader.countAgents]. */
     fun countAgents(): Int? = agentReader.countAgents()
 
-    /** Checks whether an agent JSON record or directory exists under baseDir/agents. */
-    fun agentExists(agentId: String): Boolean {
+    /**
+     * Checks whether an agent JSON record or directory exists under baseDir/agents.
+     *
+     * `open` so the host-endpoint address-book membership tests can supply an
+     * in-memory subclass that answers membership without a real on-disk backend.
+     */
+    open fun agentExists(agentId: String): Boolean {
         val agentsDir = File(baseDir, "agents")
         if (!agentsDir.exists()) return true
         return File(agentsDir, agentId).exists() || File(agentsDir, "$agentId.json").exists()

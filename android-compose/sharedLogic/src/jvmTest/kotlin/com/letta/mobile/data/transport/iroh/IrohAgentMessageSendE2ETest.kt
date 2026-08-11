@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import computer.iroh.Endpoint
 import computer.iroh.EndpointOptions
 import computer.iroh.RelayMode
@@ -17,12 +18,17 @@ import org.junit.Assume.assumeTrue
 import org.junit.Before
 
 /**
- * letta-mobile-bn008.2: OPT-IN real-loopback probe for the direct agent-to-agent
- * send path. Dials a second in-process Iroh endpoint (the "receiver") over the a2a
- * ALPN and asserts the envelope arrives exactly once and is acked. Gated like the
- * other iroh-ffi loopback tests (System property runIrohLiveE2E=true) so it never
- * runs (or flakes) in the default :sharedLogic:allTests gate; opt in to validate
- * against a real QUIC connection.
+ * letta-mobile-bn008.2 + letta-mobile-xmpqm: OPT-IN real-loopback probe for the
+ * direct agent-to-agent send path. Dials a second in-process Iroh endpoint
+ * (the "receiver") over the a2a ALPN and asserts the envelope arrives exactly
+ * once and is acked. Gated like the other iroh-ffi loopback tests (System
+ * property runIrohLiveE2E=true) so it never runs (or flakes) in the default
+ * :sharedLogic:allTests gate; opt in to validate against a real QUIC
+ * connection.
+ *
+ * letta-mobile-xmpqm: the receiver address is published as ONE host record
+ * with a permissive fake [LocalBackendAdminStore]; the host record is the
+ * kv line that lets resolve() return the address under any agentId.
  */
 class IrohAgentMessageSendE2ETest {
 
@@ -38,6 +44,10 @@ class IrohAgentMessageSendE2ETest {
             if (::senderEndpoint.isInitialized) runCatching { senderEndpoint.shutdown() }
             if (::receiverEndpoint.isInitialized) runCatching { receiverEndpoint.shutdown() }
         }
+    }
+
+    private class AlwaysPresentFakeBackend : LocalBackendAdminStore(File.createTempFile("bn008-2-fake", "")) {
+        override fun agentExists(agentId: String): Boolean = true
     }
 
     @Test
@@ -70,12 +80,15 @@ class IrohAgentMessageSendE2ETest {
             }
         }
 
-        // Publish the receiver's address so the resolver can find it.
-        val store = FileIrohAgentAddressStore(File.createTempFile("bn008-2", ".kv").apply { deleteOnExit() })
+        // Publish the host record (ONE kv line per letta-mobile-xmpqm).
+        val store = HostEndpointAddressStore(
+            File.createTempFile("bn008-2", ".kv").apply { deleteOnExit() },
+            AlwaysPresentFakeBackend(),
+        )
         val recvAddr = receiverEndpoint.addr()
         val nodeHex = recvAddr.id().toBytes().joinToString("") { "%02x".format(it) }
         val direct = withContext(Dispatchers.IO) { recvAddr.directAddresses().map { it } }
-        store.register(IrohAgentAddress("agent-recv", nodeHex, direct))
+        store.register(IrohAgentAddress("host", nodeHex, direct))
         val resolver = IrohAgentAddressResolver(store)
 
         val sender = IrohAgentMessageSender(senderEndpoint, resolver)

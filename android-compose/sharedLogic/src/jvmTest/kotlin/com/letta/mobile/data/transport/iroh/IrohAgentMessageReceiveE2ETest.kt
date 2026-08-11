@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
@@ -31,6 +32,11 @@ import kotlin.time.Duration.Companion.seconds
  * A sender (bn008.2) dials a receiver; the inbound message lands in the correct
  * INTERACTIVE conversation and triggers exactly one turn — and never lands in the
  * heartbeat (autonomous) conversation.
+ *
+ * letta-mobile-xmpqm: the receiver address is now published as ONE host
+ * record, with backend membership letting the sender resolve any agent it
+ * asks about. The membership gate is wired to a fake [LocalBackendAdminStore]
+ * that always answers true for the test agent.
  */
 class IrohAgentMessageReceiveE2ETest {
 
@@ -54,6 +60,15 @@ class IrohAgentMessageReceiveE2ETest {
     private fun heartbeat(id: String, at: String) = IrohAgentMessageRouter.ConversationState(
         Conversation(ConversationId(id), AgentId("agent-recv"), conversationClass = ConversationClass.AUTONOMOUS, lastMessageAt = at), busy = false,
     )
+
+    /**
+     * E2E membership fake: every test agent resolves true; everything else
+     * resolves false. The store's host record is what the resolver needs;
+     * membership is the gate.
+     */
+    private class AlwaysPresentFakeBackend : LocalBackendAdminStore(File.createTempFile("bn008-3-fake", "")) {
+        override fun agentExists(agentId: String): Boolean = true
+    }
 
     @Test
     fun inboundLandsInInteractiveTriggersOneTurnAndSkipsHeartbeat() = runBlocking {
@@ -84,12 +99,15 @@ class IrohAgentMessageReceiveE2ETest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val job = receiver.start(scope)
 
-        // Publish the receiver address + send.
-        val store = FileIrohAgentAddressStore(File.createTempFile("bn008-3", ".kv").apply { deleteOnExit() })
+        // Publish the host record (ONE kv line per letta-mobile-xmpqm) + send.
+        val store = HostEndpointAddressStore(
+            File.createTempFile("bn008-3", ".kv").apply { deleteOnExit() },
+            AlwaysPresentFakeBackend(),
+        )
         val addr = receiverEp.addr()
         val nodeHex = addr.id().toBytes().joinToString("") { "%02x".format(it) }
         val direct = withContext(Dispatchers.IO) { addr.directAddresses() }
-        store.register(IrohAgentAddress("agent-recv", nodeHex, direct))
+        store.register(IrohAgentAddress("host", nodeHex, direct))
         val sender = IrohAgentMessageSender(senderEp, IrohAgentAddressResolver(store))
 
         val initialEventCount = com.letta.mobile.util.Telemetry.events.value.size
@@ -153,12 +171,15 @@ class IrohAgentMessageReceiveE2ETest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val job = receiver.start(scope)
 
-        // Publish the receiver address + send.
-        val store = FileIrohAgentAddressStore(File.createTempFile("5m1qy", ".kv").apply { deleteOnExit() })
+        // Publish the host record (ONE kv line per letta-mobile-xmpqm) + send.
+        val store = HostEndpointAddressStore(
+            File.createTempFile("5m1qy", ".kv").apply { deleteOnExit() },
+            AlwaysPresentFakeBackend(),
+        )
         val addr = receiverEp.addr()
         val nodeHex = addr.id().toBytes().joinToString("") { "%02x".format(it) }
         val direct = withContext(Dispatchers.IO) { addr.directAddresses() }
-        store.register(IrohAgentAddress("agent-recv", nodeHex, direct))
+        store.register(IrohAgentAddress("host", nodeHex, direct))
         val sender = IrohAgentMessageSender(senderEp, IrohAgentAddressResolver(store))
 
         val result = sender.send(
