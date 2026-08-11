@@ -1346,7 +1346,7 @@ tasks.named("check") {
 
 android {
     namespace = "com.letta.mobile"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.letta.mobile"
