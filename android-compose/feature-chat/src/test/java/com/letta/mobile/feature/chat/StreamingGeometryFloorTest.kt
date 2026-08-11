@@ -48,31 +48,57 @@ class StreamingGeometryFloorTest {
     }
 
     @Test
-    fun `exactHeights LRU evicts oldest when maxEntries exceeded`() {
-        val bound = 3
-        val state = ChatMessageGeometryState(maxEntries = bound)
+    fun `exactHeights evicts the oldest inserted signature when over maxEntries`() {
+        val state = ChatMessageGeometryState(maxEntries = 3)
         val sigA = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "alpha"))
         val sigB = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "beta"))
         val sigC = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "gamma"))
         val sigD = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "delta"))
+
         state.recordMeasuredHeight(sigA, heightPx = 10)
         state.recordMeasuredHeight(sigB, heightPx = 20)
         state.recordMeasuredHeight(sigC, heightPx = 30)
-        assertEquals(3, state.exactHeightsSize())
+        state.recordMeasuredHeight(sigD, heightPx = 40) // triggers eviction of sigA
 
-        // Re-touch sigA to make it most-recently-accessed.
-        state.recordMeasuredHeight(sigA, heightPx = 11)
-        // Inserting sigD must evict the now-oldest entry (sigB).
+        assertEquals(3, state.exactHeightsSize())
+        assertEquals(false, state.contains(sigA))
+        assertEquals(true, state.contains(sigB))
+        assertEquals(true, state.contains(sigC))
+        assertEquals(true, state.contains(sigD))
+        assertEquals(20, state.heightFor(sigB))
+        assertEquals(30, state.heightFor(sigC))
+        assertEquals(40, state.heightFor(sigD))
+    }
+
+    @Test
+    fun `recordMeasuredHeight with unchanged height does not refresh LRU recency`() {
+        val state = ChatMessageGeometryState(maxEntries = 3)
+        val sigA = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "alpha"))
+        val sigB = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "beta"))
+        val sigC = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "gamma"))
+        val sigD = scrollTestGeometrySignature(ScrollTestGeometrySignatureSpec(content = "delta"))
+
+        state.recordMeasuredHeight(sigA, heightPx = 10)
+        state.recordMeasuredHeight(sigB, heightPx = 20)
+        state.recordMeasuredHeight(sigC, heightPx = 30)
+
+        // Re-record sigA with the same height. With accessOrder = true, this
+        // would refresh sigA's recency and sigA would survive the next
+        // eviction. With accessOrder = false (and the dedup early-return),
+        // sigA stays in its original insertion slot and is the oldest entry —
+        // sigA gets evicted when sigD arrives.
+        state.recordMeasuredHeight(sigA, heightPx = 10)
+
         state.recordMeasuredHeight(sigD, heightPx = 40)
 
-        assertEquals(bound, state.exactHeightsSize())
-        // Re-record each surviving signature and confirm we do not see extra
-        // entries: writing them again at any height must still yield the
-        // bounded size, and the LRU bound is honored.
-        state.recordMeasuredHeight(sigA, heightPx = 12)
-        state.recordMeasuredHeight(sigC, heightPx = 31)
-        state.recordMeasuredHeight(sigD, heightPx = 41)
-        assertEquals(bound, state.exactHeightsSize())
+        assertEquals(3, state.exactHeightsSize())
+        assertEquals(false, state.contains(sigA)) // sigA evicted (oldest insertion)
+        assertEquals(true, state.contains(sigB))
+        assertEquals(true, state.contains(sigC))
+        assertEquals(true, state.contains(sigD))
+        assertEquals(20, state.heightFor(sigB))
+        assertEquals(30, state.heightFor(sigC))
+        assertEquals(40, state.heightFor(sigD))
     }
 
     @Test
