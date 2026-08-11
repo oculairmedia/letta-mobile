@@ -34,7 +34,7 @@ data class ChatRenderItemGeometrySignature(
 class ChatMessageGeometryState(
     private val maxEntries: Int = 240,
 ) {
-    private val exactHeights = object : LinkedHashMap<ChatRenderItemGeometrySignature, Int>(maxEntries, 0.75f, true) {
+    private val exactHeights = object : LinkedHashMap<ChatRenderItemGeometrySignature, Int>(maxEntries, 0.75f, false) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ChatRenderItemGeometrySignature, Int>?): Boolean =
             size > maxEntries
     }
@@ -45,6 +45,15 @@ class ChatMessageGeometryState(
      * `onSizeChanged` callbacks during scroll for items whose measured size
      * has not changed, eliminating the LinkedHashMap reorder that previously
      * caused a hitch when scrolling past user prompts.
+     *
+     * The backing cache is intentionally constructed with `accessOrder = false`
+     * (insertion-order) so that the dedup's `get` lookup does NOT promote the
+     * signature to the MRU position. With `accessOrder = true`, every `get` of
+     * an existing entry would relink it to the tail of the internal list —
+     * which would defeat the per-frame dedup on any subsequent scroll frame
+     * for a recycled slot. Recency-based eviction is not desired here; the
+     * cache only needs to be bounded by size and evict old-by-insertion when
+     * full.
      */
     fun recordMeasuredHeight(
         signature: ChatRenderItemGeometrySignature,
@@ -62,6 +71,24 @@ class ChatMessageGeometryState(
      * reaching into internals.
      */
     fun exactHeightsSize(): Int = exactHeights.size
+
+    /**
+     * Test-only probe: whether [signature] is currently cached. Used by
+     * eviction tests (in `:feature-chat`) to assert which signatures survive
+     * and which get evicted by the insertion-order bound. Not part of the
+     * supported runtime API; do not call from production code.
+     */
+    fun contains(signature: ChatRenderItemGeometrySignature): Boolean =
+        exactHeights.containsKey(signature)
+
+    /**
+     * Test-only probe: the cached height for [signature], or `null` if not
+     * cached. Used by eviction tests (in `:feature-chat`) to assert that
+     * surviving entries still hold their previously-recorded height. Not part
+     * of the supported runtime API; do not call from production code.
+     */
+    fun heightFor(signature: ChatRenderItemGeometrySignature): Int? =
+        exactHeights[signature]
 }
 
 fun ChatRenderItem.chatGeometrySignature(
