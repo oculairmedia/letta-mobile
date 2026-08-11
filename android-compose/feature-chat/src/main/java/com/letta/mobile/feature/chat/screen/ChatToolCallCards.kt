@@ -40,6 +40,7 @@ import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -943,7 +944,16 @@ private fun ToolCallExpandedBodyContentInner(
             // Default collapsed: show the result-label row with a
             // chevron + first-line preview. Tap expands to full.
             displayResult?.takeIf { it.isNotBlank() }?.let { result ->
-                var resultExpanded by remember(toolCall.result) { mutableStateOf(false) }
+                // letta-mobile (toolcard-result-expand): was keyed on
+                // toolCall.result, which mutates on every streamed chunk
+                // and reset resultExpanded to false mid-stream, collapsing
+                // the user's expanded card while output was still arriving.
+                // Key on toolCallId (stable across the lifetime of one tool
+                // call, changes only when a different tool starts) and use
+                // rememberSaveable so a new tool starts collapsed but a
+                // config change (rotation, process death) preserves the
+                // user's current expand/collapse choice.
+                var resultExpanded by rememberSaveable(toolCall.toolCallId) { mutableStateOf(false) }
                 val resultChevronRotation by animateFloatAsState(
                     targetValue = if (resultExpanded) 180f else 0f,
                     animationSpec = ChatMotion.chipCrossfadeSpec,
