@@ -229,7 +229,7 @@ class ExternalToolDispatcherTest {
         override val description: String = "test echo tool"
         override val capability: Capability = Capability.SlimAgents
         override val inputSchema: JsonObject? = null
-        override suspend fun invoke(input: JsonObject): ExternalToolResult = body()
+        override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = body()
     }
 
     private companion object {

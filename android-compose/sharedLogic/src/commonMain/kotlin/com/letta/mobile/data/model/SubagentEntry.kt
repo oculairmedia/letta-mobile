@@ -65,6 +65,15 @@ data class SubagentEntry(
     @SerialName("todo_progress") val todoProgress: SubagentTodoProgressWire? = null,
     /** Client-owned lifecycle timestamp; never encoded onto the wire. */
     @Transient val terminalAtEpochMs: Long? = null,
+    /** letta-mobile-ve08r AC#4 (stream-timeout watchdog): last observed progress
+     *  timestamp (any push mentioning this entry counts as progress). Used by
+     *  SubagentRepository to flip running entries to FAILED with failureReason =
+     *  "stream_timeout" once `now - lastSeenAtMs > STREAM_TIMEOUT_MS`. */
+    @Transient val lastSeenAtMs: Long = 0L,
+    /** letta-mobile-ve08r AC#4: human-readable terminal-failure reason for the
+     *  UI (e.g. "stream_timeout"). Set when `status` flips to a terminal failure;
+     *  remains null for success/cancelled/no-terminal outcomes. */
+    @Transient val failureReason: String? = null,
 )
 
 object SubagentStatus {

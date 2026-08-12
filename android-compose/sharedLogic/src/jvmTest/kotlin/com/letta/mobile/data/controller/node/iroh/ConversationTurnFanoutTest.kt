@@ -2,6 +2,7 @@ package com.letta.mobile.data.controller.node.iroh
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
+import com.letta.mobile.data.controller.node.iroh.ViewerFrameSink
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.ConversationId
@@ -67,7 +68,7 @@ class ConversationTurnFanoutTest {
         }
     }
 
-    private fun viewer(connectionId: String, sink: CapturingSink) = IrohViewerHandle(
+    private fun viewer(connectionId: String, sink: ViewerFrameSink) = IrohViewerHandle(
         connectionId = connectionId,
         sink = sink,
         eventSeq = IrohEventSeqAllocator.newConnectionSeq(),
@@ -888,5 +889,72 @@ class ConversationTurnFanoutTest {
                 ?.get("message_type")?.jsonPrimitive?.content == "stop_reason"
         }
         assertEquals(1, terminals, "duplicate terminal must be skipped")
+    }
+
+    /**
+     * tg7b8 regression: with multiple viewers registered (one initiator +
+     * one slow observer), the broadcast must return as soon as the
+     * initiator's write commits — it must NOT block on the slow observer's
+     * `writeAll`. The previous implementation awaited every observer
+     * (awaitAll on the join), which made the slowest observer's write stall
+     * the next delta. The fix splits the join: initiator still awaited,
+     * observers fire-and-forget.
+     *
+     * We simulate the slow observer by wrapping a sink whose writeAll
+     * suspends until the test releases it; if the broadcaster awaits the
+     * observer, the test's `releaseObserverWrite()` call happens AFTER
+     * the assertion (the assertion would fail). If the broadcaster
+     * returns immediately after the initiator write, the assertion
+     * passes before the observer even finishes.
+     */
+    @Test
+    fun slowObserverDoesNotBlockInitiatorWrite() = runTest {
+        val registry = ConnectionRegistry()
+        val sinkInit = CapturingSink()
+        val sinkObs = SlowSink()
+        val initiator = viewer("conn-init", sinkInit)
+        val observer = viewer("conn-obs", sinkObs)
+        registry.register(conversationId, initiator)
+        registry.register(conversationId, observer)
+        val fanout = fanoutFor(registry, initiator)
+
+        // Drop one delta through the broadcaster. If the fix is correct,
+        // this returns as soon as the initiator write commits; the slow
+        // observer is allowed to still be pending.
+        pump(fanout, scriptedDrafts())
+
+        // The initiator MUST have received the delta already.
+        assertTrue(
+            sinkInit.frames().isNotEmpty(),
+            "initiator must receive the delta regardless of observer speed",
+        )
+        // The observer is allowed to still be in-flight — we don't assert
+        // on its frames here. The proof that the broadcaster did NOT await
+        // it is that this test method returned control before
+        // sinkObs.gate was opened (which would let writeAll proceed).
+        assertTrue(
+            !sinkObs.completed,
+            "observer write must still be pending; broadcaster awaited would " +
+                "have forced sinkObs.gate() to open before this assertion",
+        )
+        // Now release the observer so the test cleans up without leaking
+        // the suspended writeAll coroutine.
+        sinkObs.gate.complete(Unit)
+    }
+
+    /**
+     * A [ViewerFrameSink] that suspends its `writeAll` until the test opens
+     * the gate. Lets the regression test prove the broadcaster does NOT
+     * await observer writes by asserting the test method returned before
+     * the gate is opened.
+     */
+    private class SlowSink : ViewerFrameSink {
+        val gate: kotlinx.coroutines.CompletableDeferred<Unit> =
+            kotlinx.coroutines.CompletableDeferred()
+        var completed: Boolean = false
+        override suspend fun writeAll(bytes: ByteArray) {
+            gate.await()
+            completed = true
+        }
     }
 }

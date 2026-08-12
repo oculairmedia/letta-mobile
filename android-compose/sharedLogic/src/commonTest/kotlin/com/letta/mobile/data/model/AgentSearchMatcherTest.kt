@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import kotlinx.collections.immutable.toImmutableList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -12,7 +13,7 @@ class AgentSearchMatcherTest {
         name = "PM-letta-mobile",
         description = "Project manager for the mobile client",
         model = "anthropic/claude-opus-4-8",
-        tags = listOf("origin:letta-code", "pm"),
+        tags = listOf("origin:letta-code", "pm").toImmutableList(),
     )
 
     private val meridian = Agent(

@@ -6,6 +6,8 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.data.controller.DefaultAppServerController
+import com.letta.mobile.data.controller.capability.RemoteCapabilities
+import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.ReconnectCoordinator
@@ -314,6 +316,24 @@ class AppServerServeIrohCommand : CliktCommand(
     // was the wrong answer; this seam is removed, not enumerated.
 
     /**
+     * letta-mobile-bn008-phase2-custom-tool (1vuec): path to the `meridian`
+     * binary whose `agent-message send` subcommand the wrapper invokes when an
+     * agent calls the `agent_message_send` tool. The wrapper distribution
+     * itself does not ship the `agent-message` subcommand (deliberately —
+     * only `app-server-serve-iroh` is built into `meridian-iroh-wrapper`); the
+     * operator deploys the developer `meridian` binary separately and points
+     * this option at it. Empty string disables the tool entirely (the
+     * registry drops `agent_message_send` and the agent sees no Iroh surface).
+     */
+    private val meridianBinary by option(
+        "--meridian-binary",
+        envvar = "LETTA_MERIDIAN_BINARY",
+        help = "Path to the `meridian` CLI binary whose `agent-message send` subcommand " +
+            "the wrapper invokes when an agent calls `agent_message_send`. Empty disables " +
+            "the tool. Default: empty (no Iroh agent-to-agent tool advertised).",
+    ).default("")
+
+    /**
      * o5bqk: process-lifetime cache of the last-known enabled channel accounts, so
      * every reconnect can re-wire channel ingress in its first round trip instead
      * of after a full enumeration. Held here (not in the coordinator) because a
@@ -579,13 +599,46 @@ class AppServerServeIrohCommand : CliktCommand(
             client = reconnectingClient,
             runtimeRegistry = runtimeRegistry,
             turnContextPreflight = AppServerContextWindowPreflight(reconnectingClient),
-            externalToolRegistry = ExternalToolRegistry.factoryDefault(),
+            // letta-mobile-bn008-phase2-custom-tool (1vuec): wire the Iroh
+            // agent-message CLI as an external tool, gated by --meridian-binary.
+            // When unset the registry advertises no extras, preserving the
+            // previous (factoryDefault) behavior. When set, every agent's
+            // runtime_start includes the `agent_message_send` tool in
+            // external_tools so the model sees it without operator
+            // intervention. The CLI binary is the same `meridian agent-message
+            // send` the operator flow already uses; this is purely additive.
+            externalToolRegistry = buildProductionExternalToolRegistry(),
         )
         controllerRef = controller
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
         reconnectingClient.start(scope)
         return controller to reconnectingClient
     }
+
+    /**
+     * letta-mobile-bn008-phase2-custom-tool (1vuec): build the production
+     * [ExternalToolRegistry] for the wrapper.
+     *
+     * Returns [ExternalToolRegistry.factoryDefault] (advertises nothing) when
+     * `--meridian-binary` is empty, so an unconfigured wrapper has the same
+     * observable behavior as before this bead.
+     *
+     * Returns a registry with the Iroh agent-message tool wired in (and
+     * capability [com.letta.mobile.data.controller.capability.Capability.AgentMessaging]
+     * enabled) when `--meridian-binary` points at a real binary. The tool is
+     * constructed with the binary path and the wrapper's a2a identity /
+     * address-book directories so the subprocess invocation reads from the
+     * same kv files the operator flow already populated.
+     *
+     * Test seam: `buildProductionExternalToolRegistryForTesting` exposes the
+     * same logic without the class-private option fields.
+     */
+    private fun buildProductionExternalToolRegistry(): ExternalToolRegistry =
+        buildProductionExternalToolRegistryForTesting(
+            binary = meridianBinary,
+            identityDir = a2aIdentityDir,
+            addressStore = a2aAddressBook,
+        )
 
     /**
      * Mint one connection generation: a fresh WS transport + client on a job
@@ -778,6 +831,44 @@ internal fun isRealNetworkInterface(iface: java.net.NetworkInterface): Boolean {
     } catch (_: Exception) {
         false
     }
+}
+
+/**
+ * letta-mobile-bn008-phase2-custom-tool (1vuec): build the production
+ * [ExternalToolRegistry] for the wrapper, given the resolved CLI binary path
+ * and a2a directory overrides. Exposed at top level (instead of as a private
+ * method on the CliktCommand) so unit tests in `:iroh-wrapper-cli` can drive
+ * the same logic with throwaway binary paths without spinning up a clikt
+ * invocation.
+ *
+ * Behavior:
+ *  - `binary` blank OR equals a sentinel => [ExternalToolRegistry.factoryDefault]
+ *    (advertises nothing; matches the pre-1vuec behavior).
+ *  - `binary` non-blank => registry advertises the Iroh agent-message tool
+ *    with `agentMessaging` capability enabled.
+ *
+ * The agent-message tool uses `identityDir` and `addressStore` only when
+ * non-null — the underlying CLI falls back to its own defaults
+ * (`~/.letta/iroh/identities`, `~/.letta/iroh/agent-addresses.kv`).
+ */
+internal fun buildProductionExternalToolRegistryForTesting(
+    binary: String,
+    identityDir: String?,
+    addressStore: String?,
+): ExternalToolRegistry {
+    if (binary.isBlank()) {
+        return ExternalToolRegistry.factoryDefault()
+    }
+    val capabilities = RemoteCapabilities(agentMessaging = true)
+    val tool = CustomIrohMessagingTool(
+        binary = binary,
+        identityDir = identityDir,
+        addressStore = addressStore,
+    )
+    return ExternalToolRegistry.standard(
+        capabilities = capabilities,
+        customIrohMessagingTool = tool,
+    )
 }
 
 /**

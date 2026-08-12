@@ -401,15 +401,47 @@ internal class ConversationTurnFanout(
             "initiatorId" to (initiatorViewer?.connectionId?.take(12) ?: "none"),
         )
         if (viewers.isEmpty()) return
+        // tg7b8: split the join. The initiator MUST receive every frame for
+        // redial parity (q71yi parking) — keep awaitAll on its single write.
+        // OBSERVERS are best-effort and the previous awaitAll on them made
+        // the slowest observer block the next delta — the user-perceptible
+        // hitch on send. Fire-and-forget observer writes so the call site
+        // returns as soon as the initiator's write commits.
+        val (initiatorWrite, observerWrites) = partitionViewersByInitiator(viewers)
         supervisorScope {
-            viewers.map { viewer ->
-                async {
-                    val isInitiator = viewer === initiatorViewer ||
-                        (initiatorViewer != null && viewer.connectionId == initiatorViewer.connectionId)
-                    writeToViewerIsolated(viewer, delta, isInitiator)
-                }
+            // Observers: launch in parallel, do NOT await. Their failures are
+            // already absorbed by writeToViewerIsolated (which de-registers on
+            // persistent failure); the launch is enough.
+            observerWrites.forEach { viewer ->
+                async { writeToViewerIsolated(viewer, delta, isInitiator = false) }
+            }
+            // Initiator (0 or 1 writes): await. This is the join the
+            // dispatcher thread blocks on; we want it back as fast as the
+            // initiator's write can commit.
+            initiatorWrite.map { viewer ->
+                async { writeToViewerIsolated(viewer, delta, isInitiator = true) }
             }.awaitAll()
         }
+    }
+
+    /**
+     * tg7b8: partition a viewer snapshot into the initiator (0 or 1 entry)
+     * and the observers (the rest). Centralized here so the call site
+     * doesn't need to repeat the `===` / `connectionId` identity dance
+     * — the same identity check [broadcastDeltaBodyNoPark] used inline.
+     */
+    private fun partitionViewersByInitiator(
+        viewers: Set<ViewerHandle>,
+    ): Pair<List<ViewerHandle>, List<ViewerHandle>> {
+        val initiatorId = initiatorViewer?.connectionId
+        val initiators = mutableListOf<ViewerHandle>()
+        val observers = mutableListOf<ViewerHandle>()
+        viewers.forEach { viewer ->
+            val isInitiator = viewer === initiatorViewer ||
+                (initiatorId != null && viewer.connectionId == initiatorId)
+            if (isInitiator) initiators += viewer else observers += viewer
+        }
+        return initiators to observers
     }
 
     /**

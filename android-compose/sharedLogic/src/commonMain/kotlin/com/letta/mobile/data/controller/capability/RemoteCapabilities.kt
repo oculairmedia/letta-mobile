@@ -57,6 +57,17 @@ data class RemoteCapabilities(
      * Conversation-scoped push: server supports conversation-scoped push notifications.
      */
     val scopedPush: Boolean = false,
+
+    /**
+     * letta-mobile-bn008-phase2-custom-tool (1vuec): agent-to-agent direct
+     * messaging via the Iroh CLI binary. When enabled, the
+     * [CustomIrohMessagingTool] (`agent_message_send`) is advertised in every
+     * agent's runtime_start `external_tools`, so the model can call it
+     * directly. Distinct from the upstream `matrix_agent_message` tool which
+     * is the agent↔human surface — see bn008-phase2-handoff §1
+     * "Architecture distinction".
+     */
+    val agentMessaging: Boolean = false,
 ) {
     companion object {
         /**
@@ -85,6 +96,7 @@ data class RemoteCapabilities(
                 reflection = "reflection" in advertised,
                 slimAgents = "slim_agents" in advertised,
                 scopedPush = "scoped_push" in advertised,
+                agentMessaging = "agent_messaging" in advertised,
             )
         }
 
@@ -108,6 +120,7 @@ data class RemoteCapabilities(
                 reflection = capabilities.any { it.reflection },
                 slimAgents = capabilities.any { it.slimAgents },
                 scopedPush = capabilities.any { it.scopedPush },
+                agentMessaging = capabilities.any { it.agentMessaging },
             )
         }
     }
@@ -131,6 +144,7 @@ data class RemoteCapabilities(
             Capability.Reflection -> reflection
             Capability.SlimAgents -> slimAgents
             Capability.ScopedPush -> scopedPush
+            Capability.AgentMessaging -> agentMessaging
         }
     }
 
@@ -147,6 +161,7 @@ data class RemoteCapabilities(
             if (reflection) add(Capability.Reflection)
             if (slimAgents) add(Capability.SlimAgents)
             if (scopedPush) add(Capability.ScopedPush)
+            if (agentMessaging) add(Capability.AgentMessaging)
         }
     }
 }
@@ -163,4 +178,10 @@ enum class Capability {
     Reflection,
     SlimAgents,
     ScopedPush,
+    /**
+     * letta-mobile-bn008-phase2-custom-tool (1vuec): see
+     * [RemoteCapabilities.agentMessaging] for the agent↔agent Iroh surface
+     * this gates.
+     */
+    AgentMessaging,
 }

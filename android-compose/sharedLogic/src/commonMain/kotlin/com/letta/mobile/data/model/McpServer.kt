@@ -1,5 +1,7 @@
 package com.letta.mobile.data.model
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -14,7 +16,7 @@ data class McpServer(
     @SerialName("server_name") val serverName: String,
     @SerialName("server_url") val serverUrl: String? = null,
     val command: String? = null,
-    val args: List<String> = emptyList(),
+    @Serializable(with = ImmutableListSerializer::class) val args: ImmutableList<String> = persistentListOf(),
     val env: Map<String, String>? = null,
     @SerialName("auth_header") val authHeader: String? = null,
     @SerialName("auth_token") val authToken: String? = null,
@@ -46,9 +48,9 @@ data class McpServerUpdateParams(
 
 @Serializable
 data class McpServerResyncResult(
-    val deleted: List<ToolId> = emptyList(),
-    val updated: List<ToolId> = emptyList(),
-    val added: List<ToolId> = emptyList(),
+    @Serializable(with = ImmutableListSerializer::class) val deleted: ImmutableList<ToolId> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val updated: ImmutableList<ToolId> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val added: ImmutableList<ToolId> = persistentListOf(),
 )
 
 @Serializable
