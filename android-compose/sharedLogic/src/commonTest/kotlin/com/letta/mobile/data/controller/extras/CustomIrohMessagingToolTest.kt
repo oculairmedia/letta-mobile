@@ -79,7 +79,7 @@ class CustomIrohMessagingToolTest {
             runner = captured,
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "x"); put("body", "y") },
+            input = inputWithBody(to = "x", body = "y"),
             agentId = "from-x",
         )
         assertIs<ExternalToolResult.Success>(result)
@@ -96,7 +96,7 @@ class CustomIrohMessagingToolTest {
             runner = FixedRunner(IrohCliSendResult.Delivered("msg-fixed-1")),
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "tgt"); put("body", "hi") },
+            input = inputWithBody(),
             agentId = "src",
         )
         val success = assertIs<ExternalToolResult.Success>(result)
@@ -117,7 +117,7 @@ class CustomIrohMessagingToolTest {
             runner = FixedRunner(IrohCliSendResult.Unaddressable("tgt", "no_kv_row")),
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "tgt"); put("body", "hi") },
+            input = inputWithBody(),
             agentId = "src",
         )
         val err = assertIs<ExternalToolResult.Error>(result)
@@ -133,7 +133,7 @@ class CustomIrohMessagingToolTest {
             runner = FixedRunner(IrohCliSendResult.Failed("tgt", "no_ack")),
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "tgt"); put("body", "hi") },
+            input = inputWithBody(),
             agentId = "src",
         )
         val err = assertIs<ExternalToolResult.Error>(result)
@@ -149,7 +149,7 @@ class CustomIrohMessagingToolTest {
             runner = captured,
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "tgt"); put("body", "hi") },
+            input = inputWithBody(),
             agentId = null, // The dispatcher's request.runtime was unset
         )
         val err = assertIs<ExternalToolResult.Error>(result)
@@ -203,7 +203,7 @@ class CustomIrohMessagingToolTest {
             runner = captured,
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "   "); put("body", "hi") },
+            input = inputWithBody(to = "   "),
             agentId = "src",
         )
         val err = assertIs<ExternalToolResult.Error>(result)
@@ -224,7 +224,7 @@ class CustomIrohMessagingToolTest {
             runner = captured,
         )
         val result = tool.invoke(
-            input = buildJsonObject { put("to", "self"); put("body", "hi") },
+            input = inputWithBody(to = "self"),
             agentId = "self",
         )
         val err = assertIs<ExternalToolResult.Error>(result)
@@ -294,6 +294,19 @@ class CustomIrohMessagingToolTest {
             identityDir: String?,
             addressStore: String?,
         ): IrohCliSendResult = result
+    }
+
+    /**
+     * Build a valid input payload with the standard `to` + `body` keys.
+     * Pulled out as a helper because the literal appears 8+ times across
+     * the suite; CodeScene flags the duplication.
+     */
+    private fun inputWithBody(
+        to: String = "tgt",
+        body: String = "hi",
+    ): JsonObject = buildJsonObject {
+        put("to", to)
+        put("body", body)
     }
 }
 

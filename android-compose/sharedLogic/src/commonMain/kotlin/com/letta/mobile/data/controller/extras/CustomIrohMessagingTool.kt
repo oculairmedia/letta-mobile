@@ -50,6 +50,12 @@ import kotlinx.serialization.json.put
  * the controller's binary-path config point at whatever `meridian` binary
  * the operator has deployed. This keeps the wire path
  * (`a2a.create_and_deliver`) identical to the operator flow.
+ *
+ * ## Code health
+ * The validation chain and the runner dispatch are extracted into private
+ * helpers ([validateInputs], [dispatchValidated]) so [invoke] stays a
+ * thin dispatcher — CodeScene flags a guard-chain of 5+ early returns
+ * inside a single suspend fun as Complex Method.
  */
 class CustomIrohMessagingTool(
     /**
@@ -105,43 +111,78 @@ class CustomIrohMessagingTool(
     }
 
     override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult {
-        // Validate the runtime context: this tool cannot function without
-        // knowing who is sending. The runtime scope on the inbound frame is
-        // the source of truth for agentId; if it's missing, the dispatcher's
-        // `agentId` param is null and we report a structured error rather
-        // than synthesizing a wrong --from.
-        val fromAgentId = agentId
-            ?: return ExternalToolResult.Error(
-                "agent_message_send: cannot determine calling agentId " +
-                    "(inbound frame has no runtime scope); refusing to send.",
+        // Validation lives in a helper; the call site just dispatches on
+        // the result. The helper extracts the CodeScene complex-method
+        // guard-chain into a separate function and returns a sealed result
+        // so we don't need a parallel error channel or nullable return.
+        return when (val v = validateInputs(agentId, input)) {
+            is Validated.Error -> ExternalToolResult.Error(
+                "agent_message_send: ${v.reason}",
             )
+            is Validated.Ok -> dispatchValidated(v.fromAgentId, v.toAgentId, v.body)
+        }
+    }
 
-        // Parse input fields. The schema marks both required, but the App
-        // Server may still hand us a partial payload (or an LLM may
-        // omit/rename a field); validate here rather than relying on schema
-        // enforcement alone.
+    /**
+     * Sealed result of the validation chain. Replaces the prior "nullable
+     * triple + parallel mutable error channel" anti-pattern with a single
+     * return value that's both typesafe and side-effect-free.
+     */
+    private sealed interface Validated {
+        data class Ok(
+            val fromAgentId: String,
+            val toAgentId: String,
+            val body: String,
+        ) : Validated
+        data class Error(val reason: String) : Validated
+    }
+
+    /**
+     * Validate the call surface against the schema and runtime constraints.
+     * Returns the first failure as [Validated.Error] or the parsed triple
+     * as [Validated.Ok]. Order of checks matters for the error message:
+     * runtime-context (caller identity) first, then schema, then semantic.
+     */
+    private fun validateInputs(agentId: String?, input: JsonObject): Validated {
+        // Runtime context: cannot function without knowing who is sending.
+        val fromAgentId = agentId ?: return Validated.Error(
+            "cannot determine calling agentId " +
+                "(inbound frame has no runtime scope); refusing to send.",
+        )
+        // Schema marks both required, but the App Server may still hand us
+        // a partial payload (or an LLM may omit/rename a field); validate
+        // here rather than relying on schema enforcement alone.
         val toAgentId = input["to"]?.jsonPrimitive?.contentOrNull
-            ?: return ExternalToolResult.Error("agent_message_send: missing required input field 'to'")
+            ?: return Validated.Error("missing required input field 'to'")
         val body = input["body"]?.jsonPrimitive?.contentOrNull
-            ?: return ExternalToolResult.Error("agent_message_send: missing required input field 'body'")
-
+            ?: return Validated.Error("missing required input field 'body'")
         if (toAgentId.isBlank()) {
-            return ExternalToolResult.Error("agent_message_send: 'to' must not be blank")
+            return Validated.Error("'to' must not be blank")
         }
         if (fromAgentId == toAgentId) {
             // Self-echo guard (letta-mobile-hj69d sibling): the receiver's
             // a2a-recv handler also filters this, but failing fast here
             // saves a round trip and surfaces a clearer error to the agent.
-            return ExternalToolResult.Error(
-                "agent_message_send: refusing to send to self (from == to: $fromAgentId)",
-            )
+            return Validated.Error("refusing to send to self (from == to: $fromAgentId)")
         }
+        return Validated.Ok(fromAgentId, toAgentId, body)
+    }
 
-        // Resolve the runner: tests pass an explicit one; production relies
-        // on the JVM/Android `DefaultIrohCliRunner` resolved at invoke time.
-        // If no runner is available (e.g. this tool somehow ended up on a
-        // platform with neither — currently only the iOS/js targets are
-        // missing it), surface a clear error rather than crashing.
+    /**
+     * Resolve the runner, dispatch the CLI subprocess invocation, and map
+     * the typed result to [ExternalToolResult]. Split out of [invoke] for
+     * the same code-health reason as [validateInputs].
+     */
+    private suspend fun dispatchValidated(
+        fromAgentId: String,
+        toAgentId: String,
+        body: String,
+    ): ExternalToolResult {
+        // Tests pass an explicit runner; production relies on the
+        // platform-specific `DefaultIrohCliRunner` resolved at invoke time.
+        // If no runner is available (e.g. iOS/js targets without a
+        // ProcessBuilder equivalent), surface a clear error rather than
+        // crashing.
         val effectiveRunner = runner ?: resolveDefaultRunner()
             ?: return ExternalToolResult.Error(
                 "agent_message_send: no IrohCliRunner available on this platform; " +
@@ -156,7 +197,6 @@ class CustomIrohMessagingTool(
             identityDir = identityDir,
             addressStore = addressStore,
         )
-
         return when (result) {
             is IrohCliSendResult.Delivered -> ExternalToolResult.Success(
                 """{"ok":true,"delivered":true,"msgId":"${result.msgId}","to":"$toAgentId"}""",
