@@ -15,6 +15,7 @@ class IrohPeerCapabilitiesTest {
     }
 
     private val desktopRole = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE
+    private val vibesyncRole = IrohPeerCapabilities.VIBESYNC_ROLE
     private val adminFull = setOf(IrohPeerCapabilities.ADMIN_FULL)
 
     @Test
@@ -125,13 +126,16 @@ class IrohPeerCapabilitiesTest {
             "the default desktop role must be allowed agent.update (model selection)",
         )
 
-        // Agent LIFECYCLE (create/delete) is unchanged: still admin.full via the
-        // else branch, denied to the default desktop role.
-        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("agent.create"))
+        // Agent LIFECYCLE: letta-mobile-qjncd reclassified agent.create from the
+        // deny-by-default ADMIN_FULL bucket into the new SUBAGENT_SPAWN tier so
+        // Vibesync peers (VIBESYNC_ROLE) can spawn subagents without admin.full.
+        // The default desktop role still doesn't hold SUBAGENT_SPAWN, so it stays
+        // denied. agent.delete is unchanged — still admin.full via the else branch.
+        assertEquals(IrohPeerCapabilities.SUBAGENT_SPAWN, IrohPeerCapabilities.forAdminMethod("agent.create"))
         assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("agent.delete"))
         assertFalse(
             IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.create")),
-            "the default desktop role must NOT allow agent.create",
+            "the default desktop role must NOT allow agent.create (lacks SUBAGENT_SPAWN)",
         )
         assertFalse(
             IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.forAdminMethod("agent.delete")),
@@ -180,5 +184,56 @@ class IrohPeerCapabilitiesTest {
             IrohPeerCapabilities.ADMIN_FULL in checkNotNull(pairing.peer("a".repeat(64))).capabilities,
             "explicit admin.full grant must persist",
         )
+    }
+
+    @Test
+    fun vibesyncRoleGrantsSubagentSpawnAndWorkactivityWithoutAdminFull() {
+        // letta-mobile-qjncd: SUBAGENT_SPAWN gates agent.create (was admin.full
+        // before this PR — now in the new SUBAGENT_SPAWN tier so Vibesync peers
+        // can spawn subagents without the rest of admin.full).
+        assertEquals(IrohPeerCapabilities.SUBAGENT_SPAWN, IrohPeerCapabilities.forAdminMethod("agent.create"))
+        // WORKACTIVITY_REPORT gates the workactivity.* stream — the report verb
+        // lands in lgns8.25.1 (server handler), this PR only ships the gate so
+        // callers fail-closed with authz.denied until the handler ships.
+        assertEquals(
+            IrohPeerCapabilities.WORKACTIVITY_REPORT,
+            IrohPeerCapabilities.forAdminMethod("workactivity.report"),
+        )
+        assertEquals(
+            IrohPeerCapabilities.WORKACTIVITY_REPORT,
+            IrohPeerCapabilities.forAdminMethod("workactivity.list"),
+        )
+        assertEquals(
+            IrohPeerCapabilities.WORKACTIVITY_REPORT,
+            IrohPeerCapabilities.forAdminMethod("workactivity.get"),
+        )
+        // Regression: the pre-existing CHAT_READ classification of subagent.list
+        // must NOT be shadowed by the new SUBAGENT_SPAWN arm.
+        assertEquals(IrohPeerCapabilities.CHAT_READ, IrohPeerCapabilities.forAdminMethod("subagent.list"))
+        // Deny-by-default preserved: unrelated verbs still fall to admin.full.
+        assertEquals(IrohPeerCapabilities.ADMIN_FULL, IrohPeerCapabilities.forAdminMethod("unrelated.verb"))
+
+        // VIBESYNC_ROLE holds the two new caps + the chat/conversation surface.
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(vibesyncRole, IrohPeerCapabilities.SUBAGENT_SPAWN),
+            "vibesync role must be granted SUBAGENT_SPAWN",
+        )
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(vibesyncRole, IrohPeerCapabilities.WORKACTIVITY_REPORT),
+            "vibesync role must be granted WORKACTIVITY_REPORT",
+        )
+
+        // Least-privilege desktop role intentionally lacks the new caps — the
+        // Vibesync grant is opt-in via setCapabilities at pairing time.
+        assertFalse(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.SUBAGENT_SPAWN),
+            "default desktop role must NOT hold SUBAGENT_SPAWN",
+        )
+        assertFalse(
+            IrohPeerCapabilities.isAllowed(desktopRole, IrohPeerCapabilities.WORKACTIVITY_REPORT),
+            "default desktop role must NOT hold WORKACTIVITY_REPORT",
+        )
+        // And admin.full is never implicit in any role constant.
+        assertFalse(IrohPeerCapabilities.ADMIN_FULL in vibesyncRole, "vibesync role must not implicitly hold admin.full")
     }
 }

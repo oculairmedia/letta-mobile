@@ -18,10 +18,19 @@ object IrohPeerCapabilities {
     const val TOOLS_MANAGE = "tools.manage"
     const val PROJECTS_MANAGE = "projects.manage"
     const val ADMIN_FULL = "admin.full"
+    // letta-mobile-qjncd: new capabilities gating the Vibesync cross-project consumer.
+    // Both are CLIENT-side authorization constructs (not letta-code RPC verbs): the gate
+    // here authorizes the canonical admin_rpc methods (agent.create / conversation.create
+    // for spawn; workactivity.{report,list,get}) ahead of the workactivity.report server
+    // handler (lgns8.25.1) which lands in a follow-up PR. Auth-first: the gate ships
+    // before the handler, so callers fail fail-closed with `authz.denied` until then.
+    const val SUBAGENT_SPAWN = "subagent.spawn"
+    const val WORKACTIVITY_REPORT = "workactivity.report"
 
     val ALL: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE, ADMIN_FULL,
+        SUBAGENT_SPAWN, WORKACTIVITY_REPORT,
     )
 
     /**
@@ -34,6 +43,19 @@ object IrohPeerCapabilities {
     val DEFAULT_DESKTOP_ROLE: Set<String> = setOf(
         CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE, MEMORY_READ, MEMORY_WRITE,
         SCHEDULE_MANAGE, SKILLS_MANAGE, TOOLS_MANAGE, PROJECTS_MANAGE,
+    )
+
+    /**
+     * Vibesync consumer role (letta-mobile-qjncd): a paired desktop that may
+     * additionally spawn subagents (agent.create + conversation.create,
+     * without the rest of admin.full) and read/write the workactivity stream.
+     * Lighter than ADMIN_FULL, broader than DEFAULT_DESKTOP_ROLE on the two
+     * surfaces Vibesync specifically needs. Pairing callers (operator-side
+     * config) pass this set to IrohPairingService.setCapabilities.
+     */
+    val VIBESYNC_ROLE: Set<String> = setOf(
+        CHAT_READ, CHAT_SEND, CONVERSATION_MANAGE,
+        SUBAGENT_SPAWN, WORKACTIVITY_REPORT,
     )
 
     /** Capability required for the runtime-protocol commands on the control channel. */
@@ -89,6 +111,12 @@ object IrohPeerCapabilities {
         // devices (d6e8g.7). Explicit so it never silently downgrades if a
         // future prefix rule is added above.
         method.startsWith("pair.") -> ADMIN_FULL
+        // letta-mobile-qjncd: Vibesync consumer may spawn subagents (via the
+        // canonical agent.create + conversation.create verbs) and report on the
+        // workactivity stream. Both arms sit above the deny-by-default else so
+        // Vibesync peers get SUBAGENT_SPAWN/WORKACTIVITY_REPORT without admin.full.
+        method in SUBAGENT_SPAWN_METHODS -> SUBAGENT_SPAWN
+        method in WORKACTIVITY_METHODS -> WORKACTIVITY_REPORT
         else -> ADMIN_FULL
     }
 
@@ -143,5 +171,30 @@ object IrohPeerCapabilities {
     private val CONVERSATION_MANAGE_METHODS = setOf(
         "conversation.create", "conversation.update", "conversation.archive",
         "conversation.restore", "conversation.delete",
+    )
+
+    // letta-mobile-qjncd: SUBAGENT_SPAWN is a CLIENT-side authorization construct.
+    // letta-code has no RPC verb literally named "subagent.spawn" — the cap gates
+    // the canonical verbs a Vibesync peer uses to spawn an agent + conversation
+    // (agent.create + conversation.create) without granting admin.full. The second
+    // verb is already in CONVERSATION_MANAGE_METHODS for the trusted-desktop surface;
+    // here it's classified for the narrower Vibesync surface. Reusing the
+    // ownership-matrix classification already used for the general peer roles
+    // (lgns8.13) keeps the lgns8.25.1 follow-up (the workactivity.report server
+    // handler) decoupled from this gate.
+    private val SUBAGENT_SPAWN_METHODS = setOf(
+        "agent.create",
+        "conversation.create",
+    )
+
+    // WORKACTIVITY_REPORT gates the workactivity stream that Vibesync reports into.
+    // Includes the canonical write (workactivity.report, lands in lgns8.25.1) plus
+    // the list/get reads so a Vibesync peer can fetch its own reports back. Gate
+    // ships first; the report handler lands second, callers fail-closed with
+    // authz.denied until then.
+    private val WORKACTIVITY_METHODS = setOf(
+        "workactivity.report",
+        "workactivity.list",
+        "workactivity.get",
     )
 }
