@@ -38,10 +38,7 @@ class CustomIrohMessagingToolTest {
     @Test
     fun multiLineBodyRoundTripsViaStdin() = runTest {
         val captured = CapturingRunner()
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true", // ignored — runner is stubbed
-            runner = captured,
-        )
+        val tool = toolWithRunner(captured)
 
         val multiline = """
             Status update from PM:
@@ -91,10 +88,7 @@ class CustomIrohMessagingToolTest {
 
     @Test
     fun runnerDeliveredMapsToStructuredSuccess() = runTest {
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = FixedRunner(IrohCliSendResult.Delivered("msg-fixed-1")),
-        )
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Delivered("msg-fixed-1")))
         val result = tool.invoke(
             input = inputWithBody(),
             agentId = "src",
@@ -112,10 +106,7 @@ class CustomIrohMessagingToolTest {
 
     @Test
     fun runnerUnaddressableMapsToDescriptiveError() = runTest {
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = FixedRunner(IrohCliSendResult.Unaddressable("tgt", "no_kv_row")),
-        )
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Unaddressable("tgt", "no_kv_row")))
         val result = tool.invoke(
             input = inputWithBody(),
             agentId = "src",
@@ -128,10 +119,7 @@ class CustomIrohMessagingToolTest {
 
     @Test
     fun runnerFailedMapsToDescriptiveError() = runTest {
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = FixedRunner(IrohCliSendResult.Failed("tgt", "no_ack")),
-        )
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Failed("tgt", "no_ack")))
         val result = tool.invoke(
             input = inputWithBody(),
             agentId = "src",
@@ -144,10 +132,7 @@ class CustomIrohMessagingToolTest {
     @Test
     fun missingAgentIdSurfacesStructuredError() = runTest {
         val captured = CapturingRunner()
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = captured,
-        )
+        val tool = toolWithRunner(captured)
         val result = tool.invoke(
             input = inputWithBody(),
             agentId = null, // The dispatcher's request.runtime was unset
@@ -163,10 +148,7 @@ class CustomIrohMessagingToolTest {
     @Test
     fun missingToFieldSurfacesStructuredError() = runTest {
         val captured = CapturingRunner()
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = captured,
-        )
+        val tool = toolWithRunner(captured)
         val result = tool.invoke(
             input = buildJsonObject { put("body", "hi") }, // 'to' missing
             agentId = "src",
@@ -182,10 +164,7 @@ class CustomIrohMessagingToolTest {
     @Test
     fun missingBodyFieldSurfacesStructuredError() = runTest {
         val captured = CapturingRunner()
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = captured,
-        )
+        val tool = toolWithRunner(captured)
         val result = tool.invoke(
             input = buildJsonObject { put("to", "tgt") }, // 'body' missing
             agentId = "src",
@@ -198,10 +177,7 @@ class CustomIrohMessagingToolTest {
     @Test
     fun blankToFieldRejected() = runTest {
         val captured = CapturingRunner()
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = captured,
-        )
+        val tool = toolWithRunner(captured)
         val result = tool.invoke(
             input = inputWithBody(to = "   "),
             agentId = "src",
@@ -219,10 +195,7 @@ class CustomIrohMessagingToolTest {
     @Test
     fun selfSendRejected() = runTest {
         val captured = CapturingRunner()
-        val tool = CustomIrohMessagingTool(
-            binary = "/bin/true",
-            runner = captured,
-        )
+        val tool = toolWithRunner(captured)
         val result = tool.invoke(
             input = inputWithBody(to = "self"),
             agentId = "self",
@@ -234,7 +207,7 @@ class CustomIrohMessagingToolTest {
 
     @Test
     fun toolMetadataAdvertised() {
-        val tool = CustomIrohMessagingTool(binary = "/bin/true", runner = CapturingRunner())
+        val tool = toolWithRunner()
         assertEquals("agent_message_send", tool.name)
         assertEquals(Capability.AgentMessaging, tool.capability)
         assertTrue(
@@ -308,6 +281,17 @@ class CustomIrohMessagingToolTest {
         put("to", to)
         put("body", body)
     }
+
+    /**
+     * Build a tool with the standard `binary = /bin/true` plus a captured
+     * runner. Pulled out as a helper because the construction appeared
+     * 7+ times across the suite (CodeScene code-duplication flag).
+     * Tests that need a fixed-result runner pass `runner = FixedRunner(...)`;
+     * tests that need to observe what reached the runner pass
+     * `runner = CapturingRunner()` (the default).
+     */
+    private fun toolWithRunner(runner: IrohCliRunner = CapturingRunner()) =
+        CustomIrohMessagingTool(binary = "/bin/true", runner = runner)
 }
 
 /**
