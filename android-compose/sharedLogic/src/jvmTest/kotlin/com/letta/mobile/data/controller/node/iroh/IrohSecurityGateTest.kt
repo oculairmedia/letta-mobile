@@ -216,6 +216,47 @@ class IrohSecurityGateTest {
         )
     }
 
+    // --- Vibesync consumer (letta-mobile-qjncd) ---
+
+    @Test
+    fun vibesyncRoleAdmitsSubagentSpawnAndWorkactivityWhereDesktopIsDenied() {
+        // letta-mobile-qjncd: the new SUBAGENT_SPAWN and WORKACTIVITY_REPORT tiers
+        // must gate agent.create / workactivity.* verbs at the authz layer. A
+        // Vibesync peer (VIBESYNC_ROLE) is admitted; the default desktop role
+        // (DEFAULT_DESKTOP_ROLE) is denied — proving the gate distinguishes the
+        // two and isn't a free-pass for any non-admin peer.
+        val vibesync = IrohPeerCapabilities.VIBESYNC_ROLE
+        val desktop = IrohPeerCapabilities.DEFAULT_DESKTOP_ROLE
+        val spy = SideEffectSpy()
+
+        // agent.create: Vibesync admitted via SUBAGENT_SPAWN; desktop denied.
+        val spawnRequired = IrohPeerCapabilities.forAdminMethod("agent.create")
+        assertEquals(IrohPeerCapabilities.SUBAGENT_SPAWN, spawnRequired)
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(vibesync, spawnRequired),
+            "vibesync role must be admitted to agent.create via SUBAGENT_SPAWN",
+        )
+        assertFalse(
+            IrohPeerCapabilities.isAllowed(desktop, spawnRequired),
+            "default desktop role must NOT be admitted to agent.create (lacks SUBAGENT_SPAWN)",
+        )
+
+        // workactivity.report: Vibesync admitted via WORKACTIVITY_REPORT; desktop denied.
+        val workactivityRequired = IrohPeerCapabilities.forAdminMethod("workactivity.report")
+        assertEquals(IrohPeerCapabilities.WORKACTIVITY_REPORT, workactivityRequired)
+        assertTrue(
+            IrohPeerCapabilities.isAllowed(vibesync, workactivityRequired),
+            "vibesync role must be admitted to workactivity.report via WORKACTIVITY_REPORT",
+        )
+        assertFalse(
+            IrohPeerCapabilities.isAllowed(desktop, workactivityRequired),
+            "default desktop role must NOT be admitted to workactivity.report (lacks WORKACTIVITY_REPORT)",
+        )
+
+        // The deny-by-default invariant must NOT be touched by the new caps.
+        spy.assertUntouched("vibesync vs desktop gate distinction")
+    }
+
     private fun authorizeOrNot(outcome: IrohBearerAuthVerifier.Outcome, spy: SideEffectSpy) {
         if (outcome is IrohBearerAuthVerifier.Outcome.Authenticated) {
             spy.runtimeStarted = true

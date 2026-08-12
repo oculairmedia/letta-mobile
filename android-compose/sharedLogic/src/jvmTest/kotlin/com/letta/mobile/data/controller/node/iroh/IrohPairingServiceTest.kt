@@ -1,9 +1,12 @@
 package com.letta.mobile.data.controller.node.iroh
 
+import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.TelemetryDelegate
 import java.nio.file.Files
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
+import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -12,6 +15,32 @@ import kotlin.test.assertTrue
 
 class IrohPairingServiceTest {
     private class FakeClock(var now: Long = 1_000L)
+
+    private object CapturingDelegate : TelemetryDelegate {
+        val lines = mutableListOf<String>()
+
+        override fun logToLogcat(level: Telemetry.Level, tag: String, body: String, throwable: Throwable?) {
+            lines.add("$tag $body")
+        }
+
+        override fun isLoggable(tag: String, level: Int): Boolean = true
+
+        override fun isTraceEnabled(): Boolean = false
+
+        override fun beginSection(name: String) = Unit
+
+        override fun endSection() = Unit
+
+        override fun beginAsyncSection(name: String, cookie: Int) = Unit
+
+        override fun endAsyncSection(name: String, cookie: Int) = Unit
+    }
+
+    @AfterTest
+    fun tearDown() {
+        Telemetry.delegate = null
+        CapturingDelegate.lines.clear()
+    }
 
     private fun service(
         store: PairedPeerStore = InMemoryPairedPeerStore(),
@@ -116,6 +145,42 @@ class IrohPairingServiceTest {
         val (pairing, _) = service()
         assertEquals(null, pairing.rename("z".repeat(64), "ghost"))
         assertEquals(null, pairing.setCapabilities("z".repeat(64), setOf(IrohPeerCapabilities.CHAT_READ)))
+    }
+
+    @Test
+    fun setCapabilitiesPersistsVibesyncRoleAndEmitsTelemetry() {
+        // letta-mobile-qjncd: pairing callers opt a peer into the Vibesync consumer
+        // surface by passing VIBESYNC_ROLE to setCapabilities. The per-pair wiring
+        // site (IrohPairingService.setCapabilities) already accepts an arbitrary
+        // capability set, so this test exercises the end-to-end persistence +
+        // telemetry contract that operator-side config relies on.
+        Telemetry.delegate = CapturingDelegate
+        val (pairing, _) = service()
+        val vibesyncNodeId = "v".repeat(64)
+        pairing.redeem(pairing.createInvite("vibesync-rig").secret, vibesyncNodeId)
+
+        // Mirror L107's pattern: setCapabilities returns the persisted peer,
+        // and a subsequent peer(nodeId) lookup reflects the new capability set.
+        val recapped = pairing.setCapabilities(vibesyncNodeId, IrohPeerCapabilities.VIBESYNC_ROLE)
+        assertEquals(IrohPeerCapabilities.VIBESYNC_ROLE, recapped?.capabilities)
+        assertEquals(
+            IrohPeerCapabilities.VIBESYNC_ROLE,
+            pairing.peer(vibesyncNodeId)?.capabilities,
+            "vibesync role must persist on the paired peer after setCapabilities",
+        )
+
+        // Telemetry contract: every setCapabilities emits peer.capabilities_set
+        // (IrohPairingService.kt:111) — operator-side dashboards rely on this to
+        // detect role changes; the brief calls this out explicitly. The delegate
+        // receives tag as "Telemetry/<origTag>" (Telemetry.logToLogcat prefixes
+        // every line), so check the trailing tag + event-name fragment.
+        assertTrue(
+            CapturingDelegate.lines.any { line ->
+                line.endsWith("IrohPairing peer.capabilities_set") ||
+                    (line.contains("IrohPairing") && line.contains("peer.capabilities_set"))
+            },
+            "setCapabilities must emit a peer.capabilities_set telemetry event, got: ${CapturingDelegate.lines}",
+        )
     }
 
     @Test
