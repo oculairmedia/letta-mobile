@@ -13,6 +13,7 @@ import com.letta.mobile.data.repository.McpServerRepository
 import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.common.UiState
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -87,7 +88,7 @@ class McpServerToolsViewModelTest {
     fun `refreshServerTools stores resync summary`() = runTest {
         fakeRepo.setServers(listOf(TestData.mcpServer(id = "s1", serverName = "Server 1")))
         fakeRepo.setServerTools(McpServerId("s1"), listOf(TestData.tool(id = "t1")))
-        fakeRepo.resyncResult = McpServerResyncResult(added = listOf(ToolId("t2")), updated = listOf(ToolId("t1")))
+        fakeRepo.resyncResult = McpServerResyncResult(added = persistentListOf(ToolId("t2")), updated = persistentListOf(ToolId("t1")))
 
         viewModel.loadServerTools()
         viewModel.refreshServerTools()

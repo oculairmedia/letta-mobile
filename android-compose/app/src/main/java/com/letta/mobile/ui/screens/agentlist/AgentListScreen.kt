@@ -38,6 +38,7 @@ import com.letta.mobile.ui.common.LocalSnackbarDispatcher
 import com.letta.mobile.ui.icons.LettaIcons
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaTopBarDefaults
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 
@@ -344,9 +345,9 @@ private fun AgentListScaffold(params: AgentListScaffoldParams) {
 // region Previews
 
 private val previewAgents = listOf(
-    Agent(id = com.letta.mobile.data.model.AgentId("1"), name = "General Assistant", model = "letta/letta-free", description = "A general-purpose agent", tags = listOf("default", "chat")),
-    Agent(id = com.letta.mobile.data.model.AgentId("2"), name = "Code Helper", model = "openai/gpt-4o", description = "Specialized in programming", tags = listOf("code")),
-    Agent(id = com.letta.mobile.data.model.AgentId("3"), name = "Research Bot", model = "anthropic/claude-3.5-sonnet", tags = listOf("research", "analysis")),
+    Agent(id = com.letta.mobile.data.model.AgentId("1"), name = "General Assistant", model = "letta/letta-free", description = "A general-purpose agent", tags = persistentListOf("default", "chat")),
+    Agent(id = com.letta.mobile.data.model.AgentId("2"), name = "Code Helper", model = "openai/gpt-4o", description = "Specialized in programming", tags = persistentListOf("code")),
+    Agent(id = com.letta.mobile.data.model.AgentId("3"), name = "Research Bot", model = "anthropic/claude-3.5-sonnet", tags = persistentListOf("research", "analysis")),
 )
 
 private fun previewAgentListUiState(

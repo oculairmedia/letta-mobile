@@ -24,6 +24,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import java.util.UUID
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -415,7 +416,7 @@ open class AgentRepository(
             embeddingConfig = params.embeddingConfig,
             contextWindowLimit = params.contextWindowLimit,
             responseFormat = params.responseFormat,
-            tags = params.tags.orEmpty(),
+            tags = params.tags ?: persistentListOf(),
             system = params.system,
             enableSleeptime = params.enableSleeptime,
             agentType = params.agentType,

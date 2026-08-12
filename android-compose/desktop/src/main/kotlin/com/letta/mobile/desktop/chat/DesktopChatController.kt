@@ -23,6 +23,7 @@ import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
 import com.letta.mobile.data.model.ModelRouteIdentity
+import kotlinx.collections.immutable.persistentListOf
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.withCatalogModelRouting
 import com.letta.mobile.data.timeline.Timeline
@@ -618,7 +619,7 @@ class DesktopChatController(
                         model = catalogModel?.selectionValue,
                         embedding = embedding,
                         includeBaseTools = true,
-                        memoryBlocks = listOf(
+                        memoryBlocks = persistentListOf(
                             BlockCreateParams(label = "human", value = "The user has not shared details yet."),
                             BlockCreateParams(label = "persona", value = "I am $agentName, a helpful assistant."),
                         ),

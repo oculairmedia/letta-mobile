@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.McpToolExecuteParams
 import com.letta.mobile.data.model.McpToolExecutionResult
 import com.letta.mobile.data.model.Tool
 import io.mockk.mockk
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -38,7 +39,7 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
             serverName = params.serverName,
             serverUrl = config["server_url"]?.toString()?.trim('"'),
             command = config["command"]?.toString()?.trim('"'),
-            args = parseArgsFast(config["args"]),
+            args = parseArgsFast(config["args"]).toImmutableList(),
             env = config["env"]?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content },
             authHeader = config["auth_header"]?.toString()?.trim('"'),
             authToken = config["auth_token"]?.toString()?.trim('"') ?: config["token"]?.toString()?.trim('"'),
@@ -61,7 +62,7 @@ class FakeMcpServerApi : McpServerApi(mockk(relaxed = true)) {
             serverName = params.serverName ?: current.serverName,
             serverUrl = config?.get("server_url")?.toString()?.trim('"') ?: current.serverUrl,
             command = config?.get("command")?.toString()?.trim('"') ?: current.command,
-            args = if (config?.containsKey("args") == true) parseArgsFast(config["args"]) else current.args,
+            args = if (config?.containsKey("args") == true) parseArgsFast(config["args"]).toImmutableList() else current.args,
             env = config?.get("env")?.jsonObject?.mapValues { (_, value) -> value.jsonPrimitive.content } ?: current.env,
             authHeader = config?.get("auth_header")?.toString()?.trim('"') ?: current.authHeader,
             authToken = config?.get("auth_token")?.toString()?.trim('"') ?: config?.get("token")?.toString()?.trim('"') ?: current.authToken,

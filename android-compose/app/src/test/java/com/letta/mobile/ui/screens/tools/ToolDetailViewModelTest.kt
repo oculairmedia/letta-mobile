@@ -14,6 +14,7 @@ import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import io.mockk.mockk
 import com.letta.mobile.ui.common.UiState
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.filterNotNull
@@ -163,8 +164,8 @@ class ToolDetailViewModelTest {
     private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
         private val agentsFlow = kotlinx.coroutines.flow.MutableStateFlow(
             listOf(
-                Agent(id = AgentId("a1"), name = "Agent One", tools = listOf(TestData.tool(id = "t1", name = "my_tool"))),
-                Agent(id = AgentId("a2"), name = "Agent Two", tools = emptyList()),
+                Agent(id = AgentId("a1"), name = "Agent One", tools = persistentListOf(TestData.tool(id = "t1", name = "my_tool"))),
+                Agent(id = AgentId("a2"), name = "Agent Two", tools = persistentListOf()),
             )
         )
 
