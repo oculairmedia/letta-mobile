@@ -305,7 +305,7 @@ class AppServerTurnEngineExternalToolRemainderTest {
         override val description = "test echo tool"
         override val inputSchema: JsonObject? = null
         override val capability = Capability.SlimAgents
-        override suspend fun invoke(input: JsonObject): ExternalToolResult = body()
+        override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult = body()
     }
 
     private object EchoTool : ExternalTool {
@@ -313,7 +313,7 @@ class AppServerTurnEngineExternalToolRemainderTest {
         override val description = "test echo tool"
         override val inputSchema: JsonObject? = null
         override val capability = Capability.SlimAgents
-        override suspend fun invoke(input: JsonObject): ExternalToolResult =
+        override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
             ExternalToolResult.Success("echoed")
     }
 

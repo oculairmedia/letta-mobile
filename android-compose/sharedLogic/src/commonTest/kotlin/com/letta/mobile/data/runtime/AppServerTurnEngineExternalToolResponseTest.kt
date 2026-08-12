@@ -124,7 +124,7 @@ class AppServerTurnEngineExternalToolResponseTest {
                     override val description = "counting echo"
                     override val inputSchema: JsonObject? = null
                     override val capability = Capability.SlimAgents
-                    override suspend fun invoke(input: JsonObject): ExternalToolResult {
+                    override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult {
                         invokeCount += 1
                         return ExternalToolResult.Success("ok")
                     }
@@ -170,7 +170,7 @@ class AppServerTurnEngineExternalToolResponseTest {
         override val description = "test echo tool"
         override val inputSchema: JsonObject? = null
         override val capability = Capability.SlimAgents
-        override suspend fun invoke(input: JsonObject): ExternalToolResult =
+        override suspend fun invoke(input: JsonObject, agentId: String?): ExternalToolResult =
             ExternalToolResult.Success("echoed: ${input["text"]?.jsonPrimitive?.content}")
     }
 

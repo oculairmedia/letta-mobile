@@ -53,9 +53,14 @@ interface ExternalTool {
      * Invokes the tool with the given input arguments.
      *
      * @param input The input arguments from the ExternalToolCallRequest
+     * @param agentId The id of the agent invoking this tool, when known (derived
+     *   from the `runtime` field of the inbound request). Tools that don't need
+     *   agent context ignore it. Default `null` preserves the pre-letting
+     *   agent-context contract for the existing extra tools (image_hydration,
+     *   goals, etc.) which never needed to know the caller.
      * @return The tool result (success or error)
      */
-    suspend fun invoke(input: JsonObject): ExternalToolResult
+    suspend fun invoke(input: JsonObject, agentId: String? = null): ExternalToolResult
 }
 
 /**
