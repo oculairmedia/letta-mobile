@@ -88,6 +88,19 @@ open class SubagentRepository(
 
     private val pushJob = scope.launch { observePushEvents() }
     private val reconnectJob = scope.launch { observeReconnects() }
+    // letta-mobile-ve08r AC#4: stream-timeout watchdog. Periodic sweep that flips
+    // RUNNING entries to FAILED once they have been silent (no observed progress)
+    // for STREAM_TIMEOUT_MS. Coarser than the typical push cadence but finer than
+    // the threshold; cheap O(N) over the snapshot.
+    private val watchdogJob = scope.launch { observeStreamTimeout() }
+
+    /** Stops the periodic stream-timeout sweep. */
+    private suspend fun observeStreamTimeout() {
+        while (true) {
+            kotlinx.coroutines.delay(STREAM_TIMEOUT_SWEEP_INTERVAL_MS)
+            sweepStreamTimeouts()
+        }
+    }
 
     /**
      * Stops this registry's collectors. Required when the owner replaces the
@@ -99,6 +112,7 @@ open class SubagentRepository(
     fun close() {
         pushJob.cancel()
         reconnectJob.cancel()
+        watchdogJob.cancel()
     }
 
     /**
@@ -312,8 +326,48 @@ open class SubagentRepository(
             // Mark initialized so a later first-subscriber doesn't kick off a
             // redundant subagent_list (the cache is already warm).
             initialized.value = true
-            state.value = mergeSnapshot(frame.subagentsActive, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
+            val now = clock()
+            // letta-mobile-ve08r AC#4: stamp lastSeenAtMs on every push that
+            // mentions each entry, so the stream-timeout watchdog knows it's alive.
+            val stamped = frame.subagentsActive.map { entry ->
+                if (entry.status == SubagentStatus.RUNNING && entry.lastSeenAtMs == 0L) {
+                    entry.copy(lastSeenAtMs = now)
+                } else entry
+            }
+            state.value = mergeSnapshot(stamped, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
         }
+    }
+
+    /**
+     * letta-mobile-ve08r AC#4: stream-timeout watchdog. Walks the current snapshot,
+     * flips RUNNING entries to FAILED with [FAILURE_REASON_STREAM_TIMEOUT] once
+     * `now - lastSeenAtMs > STREAM_TIMEOUT_MS`. Mutates state once per call (single
+     * publication via atomic StateFlow).
+     */
+    private fun sweepStreamTimeouts() {
+        val now = clock()
+        val current = state.value
+        if (current.isEmpty()) return
+        val timed = current.filter { it.status == SubagentStatus.RUNNING && (now - it.lastSeenAtMs) > STREAM_TIMEOUT_MS }
+        if (timed.isEmpty()) return
+        val byKey = current.associateBy { it.cacheKey() }
+        val updated = current.map { entry ->
+            val expired = timed.firstOrNull { it.cacheKey() == entry.cacheKey() }
+            if (expired != null && entry.status == SubagentStatus.RUNNING) {
+                Telemetry.event(
+                    "SubagentRepo",
+                    "merge.timeoutFlippedToFailed",
+                    "cacheKey" to entry.cacheKey(),
+                    "ageMs" to (now - entry.lastSeenAtMs),
+                )
+                entry.copy(
+                    status = SubagentStatus.FAILED,
+                    failureReason = FAILURE_REASON_STREAM_TIMEOUT,
+                    terminalAtEpochMs = entry.terminalAtEpochMs ?: now,
+                )
+            } else entry
+        }
+        state.value = updated.distinctBy { it.cacheKey() }
     }
 
     private suspend fun observeReconnects() {
@@ -332,10 +386,18 @@ open class SubagentRepository(
     companion object {
         private const val TERMINAL_LINGER_MS = 8_000L
         private const val RUNNING_ABSENCE_LINGER_MS = 60_000L
+        // letta-mobile-ve08r AC#4: stream-timeout watchdog. A RUNNING entry with
+        // no observed progress (no push mentioning it) for this long is flipped
+        // to FAILED with failureReason = "stream_timeout".
+        internal const val STREAM_TIMEOUT_MS = 120_000L
+        // Coarser than the typical push cadence but finer than STREAM_TIMEOUT_MS.
+        internal const val STREAM_TIMEOUT_SWEEP_INTERVAL_MS = 30_000L
         private val TERMINAL_STATUSES = setOf(
             SubagentStatus.COMPLETED,
             SubagentStatus.FAILED,
             SubagentStatus.CANCELLED,
         )
+        /** Public for testability. */
+        internal const val FAILURE_REASON_STREAM_TIMEOUT = "stream_timeout"
     }
 }
