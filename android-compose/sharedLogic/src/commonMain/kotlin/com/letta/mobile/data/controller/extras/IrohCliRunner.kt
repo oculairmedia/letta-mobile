@@ -44,6 +44,27 @@ expect fun defaultIrohCliRunnerOrNull(): IrohCliRunner?
  * `agent-message send` subcommand the `:cli` module's `AgentMessageSendCommand`
  * already implements (do not duplicate the send path; reuse the existing CLI).
  */
+/**
+ * letta-mobile-bn008-phase2-custom-tool (1vuec): the pair of optional Iroh
+ * filesystem paths a CLI invocation may override.
+ *
+ * Grouped into a single value class so the runner's `send` signature stays
+ * under CodeScene's "≤4 function arguments" threshold and so callers that
+ * override both directories do so via named fields rather than positional
+ * nulls. `identityDir` and `addressStore` are independent overrides — null
+ * means "use the CLI's default" (`~/.letta/iroh/identities` and
+ * `~/.letta/iroh/agent-addresses.kv` respectively).
+ */
+data class IrohCliPaths(
+    val identityDir: String? = null,
+    val addressStore: String? = null,
+) {
+    companion object {
+        /** The path triple that means "no overrides — let the CLI default." */
+        val DEFAULTS: IrohCliPaths = IrohCliPaths()
+    }
+}
+
 interface IrohCliRunner {
     /**
      * Run `meridian agent-message send --from <fromAgentId> --to <toAgentId>
@@ -60,10 +81,9 @@ interface IrohCliRunner {
      *   this is the regression pinned by the
      *   `multiLineBodyRoundTripsViaStdin` unit test. Empty body is allowed
      *   (the CLI treats it as a ping).
-     * @param identityDir Optional override for the per-agent Iroh identity
-     *   directory (defaults to `~/.letta/iroh/identities`).
-     * @param addressStore Optional override for the agent-address kv file
-     *   (defaults to `~/.letta/iroh/agent-addresses.kv`).
+     * @param paths Optional overrides for the Iroh filesystem layout
+     *   (identity dir + address-book kv). Pass [IrohCliPaths.DEFAULTS] for
+     *   "no overrides — let the CLI default."
      * @return Typed outcome — never throws to the caller (the dispatcher
      *   contract is "always answer"; throwing would surface as a tool error
      *   and break the turn's answer guarantee).
@@ -73,8 +93,7 @@ interface IrohCliRunner {
         fromAgentId: String,
         toAgentId: String,
         body: String,
-        identityDir: String?,
-        addressStore: String?,
+        paths: IrohCliPaths = IrohCliPaths.DEFAULTS,
     ): IrohCliSendResult
 }
 

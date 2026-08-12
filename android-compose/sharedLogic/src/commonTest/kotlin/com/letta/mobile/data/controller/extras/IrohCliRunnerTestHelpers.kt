@@ -15,8 +15,7 @@ internal class CapturingRunner : IrohCliRunner {
         val fromAgentId: String,
         val toAgentId: String,
         val body: String,
-        val identityDir: String?,
-        val addressStore: String?,
+        val paths: IrohCliPaths,
     )
     val calls: MutableList<Call> = mutableListOf()
     override suspend fun send(
@@ -24,10 +23,9 @@ internal class CapturingRunner : IrohCliRunner {
         fromAgentId: String,
         toAgentId: String,
         body: String,
-        identityDir: String?,
-        addressStore: String?,
+        paths: IrohCliPaths,
     ): IrohCliSendResult {
-        calls += Call(binary, fromAgentId, toAgentId, body, identityDir, addressStore)
+        calls += Call(binary, fromAgentId, toAgentId, body, paths)
         return IrohCliSendResult.Delivered("captured-${calls.size}")
     }
 }
@@ -39,7 +37,6 @@ internal class FixedRunner(private val result: IrohCliSendResult) : IrohCliRunne
         fromAgentId: String,
         toAgentId: String,
         body: String,
-        identityDir: String?,
-        addressStore: String?,
+        paths: IrohCliPaths,
     ): IrohCliSendResult = result
 }

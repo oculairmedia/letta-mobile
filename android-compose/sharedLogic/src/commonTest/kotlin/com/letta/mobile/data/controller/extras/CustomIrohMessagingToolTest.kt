@@ -82,8 +82,8 @@ class CustomIrohMessagingToolTest {
         assertIs<ExternalToolResult.Success>(result)
         val call = captured.calls.single()
         assertEquals("/opt/custom/meridian", call.binary)
-        assertEquals("/custom/identities", call.identityDir)
-        assertEquals("/custom/addresses.kv", call.addressStore)
+        assertEquals("/custom/identities", call.paths.identityDir)
+        assertEquals("/custom/addresses.kv", call.paths.addressStore)
     }
 
     @Test
@@ -131,60 +131,44 @@ class CustomIrohMessagingToolTest {
 
     @Test
     fun missingAgentIdSurfacesStructuredError() = runTest {
-        val captured = CapturingRunner()
-        val tool = toolWithRunner(captured)
-        val result = tool.invoke(
+        // Dispatcher's request.runtime was unset. Tool must refuse without
+        // synthesizing a wrong --from, and must NOT invoke the runner.
+        assertValidationError(
             input = inputWithBody(),
-            agentId = null, // The dispatcher's request.runtime was unset
+            agentId = null,
+            errorFragment = "agentId",
+            description = "missing agentId context",
         )
-        val err = assertIs<ExternalToolResult.Error>(result)
-        assertTrue(
-            err.error.contains("agentId"),
-            "error must mention the missing agentId context, got: ${err.error}",
-        )
-        assertEquals(0, captured.calls.size, "runner must NOT be invoked when fromAgentId is unknown")
     }
 
     @Test
     fun missingToFieldSurfacesStructuredError() = runTest {
-        val captured = CapturingRunner()
-        val tool = toolWithRunner(captured)
-        val result = tool.invoke(
+        assertValidationError(
             input = buildJsonObject { put("body", "hi") }, // 'to' missing
             agentId = "src",
+            errorFragment = "'to'",
+            description = "missing 'to' field",
         )
-        val err = assertIs<ExternalToolResult.Error>(result)
-        assertTrue(
-            err.error.contains("'to'"),
-            "error must name the missing field, got: ${err.error}",
-        )
-        assertEquals(0, captured.calls.size, "runner must NOT be invoked when input is invalid")
     }
 
     @Test
     fun missingBodyFieldSurfacesStructuredError() = runTest {
-        val captured = CapturingRunner()
-        val tool = toolWithRunner(captured)
-        val result = tool.invoke(
+        assertValidationError(
             input = buildJsonObject { put("to", "tgt") }, // 'body' missing
             agentId = "src",
+            errorFragment = "'body'",
+            description = "missing 'body' field",
         )
-        val err = assertIs<ExternalToolResult.Error>(result)
-        assertTrue(err.error.contains("'body'"))
-        assertEquals(0, captured.calls.size, "runner must NOT be invoked when input is invalid")
     }
 
     @Test
     fun blankToFieldRejected() = runTest {
-        val captured = CapturingRunner()
-        val tool = toolWithRunner(captured)
-        val result = tool.invoke(
+        assertValidationError(
             input = inputWithBody(to = "   "),
             agentId = "src",
+            errorFragment = "blank",
+            description = "blank 'to'",
         )
-        val err = assertIs<ExternalToolResult.Error>(result)
-        assertTrue(err.error.contains("blank"))
-        assertEquals(0, captured.calls.size)
     }
 
     /**
@@ -194,15 +178,42 @@ class CustomIrohMessagingToolTest {
      */
     @Test
     fun selfSendRejected() = runTest {
-        val captured = CapturingRunner()
-        val tool = toolWithRunner(captured)
-        val result = tool.invoke(
+        assertValidationError(
             input = inputWithBody(to = "self"),
             agentId = "self",
+            errorFragment = "self",
+            description = "self-echo",
         )
+    }
+
+    /**
+     * Shared assertion for the validation-error test surface: every "tool
+     * must refuse this input before invoking the runner" test follows the
+     * same shape (build input, invoke, expect Error containing a fragment,
+     * assert the runner was never called). Extracted so CodeScene's
+     * code-duplication heuristic sees a single call site per test rather
+     * than 5 copy-pasted bodies. Pulled the assertion up so each test
+     * reads as "expect this error for this input".
+     */
+    private suspend fun assertValidationError(
+        input: JsonObject,
+        agentId: String?,
+        errorFragment: String,
+        description: String,
+    ) {
+        val captured = CapturingRunner()
+        val tool = toolWithRunner(captured)
+        val result = tool.invoke(input = input, agentId = agentId)
         val err = assertIs<ExternalToolResult.Error>(result)
-        assertTrue(err.error.contains("self"), "error must reference self-echo, got: ${err.error}")
-        assertEquals(0, captured.calls.size, "runner must NOT be invoked for self-send")
+        assertTrue(
+            err.error.contains(errorFragment),
+            "expected error fragment '$errorFragment' for $description, got: ${err.error}",
+        )
+        assertEquals(
+            0,
+            captured.calls.size,
+            "runner must NOT be invoked when input is invalid ($description)",
+        )
     }
 
     @Test

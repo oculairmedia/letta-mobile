@@ -65,8 +65,7 @@ class DefaultIrohCliRunner(
         fromAgentId: String,
         toAgentId: String,
         body: String,
-        identityDir: String?,
-        addressStore: String?,
+        paths: IrohCliPaths,
     ): IrohCliSendResult {
         // Generate the idempotency id at the wrapper so the CLI's default
         // `msg-${UUID}` only fires when an upstream caller didn't pin one.
@@ -79,8 +78,7 @@ class DefaultIrohCliRunner(
             fromAgentId = fromAgentId,
             toAgentId = toAgentId,
             msgId = msgId,
-            identityDir = identityDir,
-            addressStore = addressStore,
+            paths = paths,
         )
 
         return try {
@@ -207,8 +205,7 @@ class DefaultIrohCliRunner(
         fromAgentId: String,
         toAgentId: String,
         msgId: String,
-        identityDir: String?,
-        addressStore: String?,
+        paths: IrohCliPaths,
     ): List<String> = buildList {
         add(binary)
         add("agent-message")
@@ -217,11 +214,11 @@ class DefaultIrohCliRunner(
         add("--to"); add(toAgentId)
         add("--msg-id"); add(msgId)
         add("--body-file"); add("-")
-        if (identityDir != null) {
-            add("--identity-dir"); add(identityDir)
+        if (paths.identityDir != null) {
+            add("--identity-dir"); add(paths.identityDir)
         }
-        if (addressStore != null) {
-            add("--address-store"); add(addressStore)
+        if (paths.addressStore != null) {
+            add("--address-store"); add(paths.addressStore)
         }
     }
 

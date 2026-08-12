@@ -51,8 +51,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "agent-sender",
             toAgentId = "agent-target",
             body = bodyIn,
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertEquals(
             bodyIn,
@@ -85,8 +84,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from",
             toAgentId = "to",
             body = "hi",
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertTrue(
             result is IrohCliSendResult.Delivered,
@@ -114,8 +112,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from",
             toAgentId = "to",
             body = "hi",
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertTrue(
             result is IrohCliSendResult.Unaddressable,
@@ -146,8 +143,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from",
             toAgentId = "to",
             body = "hi",
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertTrue(
             result is IrohCliSendResult.Failed,
@@ -183,8 +179,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from",
             toAgentId = "to",
             body = "hi",
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertTrue(
             result is IrohCliSendResult.Failed,
@@ -212,8 +207,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from",
             toAgentId = "to",
             body = "hi",
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertTrue(
             result is IrohCliSendResult.Failed,
@@ -235,8 +229,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from",
             toAgentId = "to",
             body = "hi",
-            identityDir = null,
-            addressStore = null,
+            paths = IrohCliPaths(),
         )
         assertTrue(
             result is IrohCliSendResult.Failed,
@@ -284,8 +277,7 @@ class DefaultIrohCliRunnerTest {
             fromAgentId = "from-argv-test",
             toAgentId = "to-argv-test",
             body = "body content with spaces and \"quotes\"",
-            identityDir = "/identities",
-            addressStore = "/addresses.kv",
+            paths = IrohCliPaths(identityDir = "/identities", addressStore = "/addresses.kv"),
         )
         val argv = argvFile.readText().lines().filter { it.isNotEmpty() }
         // Expected argv: agent-message, send, --from, from-argv-test,
@@ -321,8 +313,8 @@ class DefaultIrohCliRunnerTest {
         tmp: File,
         name: String,
         stdoutFile: File,
-        extraPlaceholders: Map<String, String> = emptyMap(),
         body: String,
+        extraPlaceholders: Map<String, String> = emptyMap(),
     ): File {
         val script = File(tmp, name)
         val replacements = buildMap {

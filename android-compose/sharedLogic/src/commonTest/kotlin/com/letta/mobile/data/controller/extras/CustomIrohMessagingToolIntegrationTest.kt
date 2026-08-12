@@ -118,14 +118,16 @@ class CustomIrohMessagingToolIntegrationTest {
         // request as if it arrived over the WebSocket from the App Server.
         val body = "pm->meridian: status update\nline 2 with \"quotes\" & ampersand https://x.test?a=1"
         client.emitExternalToolCallRequest(
-            requestId = "ext-1",
-            toolCallId = "tc-1",
-            toolName = CustomIrohMessagingTool.TOOL_NAME,
-            runtime = runtimeAgentPm,
-            input = buildJsonObject {
-                put("to", "agent-meridian")
-                put("body", body)
-            },
+            AppServerInboundFrame.ExternalToolCallRequest(
+                requestId = "ext-1",
+                toolCallId = "tc-1",
+                toolName = CustomIrohMessagingTool.TOOL_NAME,
+                runtime = runtimeAgentPm,
+                input = buildJsonObject {
+                    put("to", "agent-meridian")
+                    put("body", body)
+                },
+            ),
         )
 
         // Drive the dispatcher until the runner was hit and the response was
@@ -153,8 +155,8 @@ class CustomIrohMessagingToolIntegrationTest {
         assertEquals("agent-meridian", call.toAgentId)
         assertEquals(body, call.body, "body must round-trip exactly (multi-line, quotes, ampersands, URL)")
         assertEquals("/usr/local/bin/meridian", call.binary)
-        assertEquals("/iroh/identities", call.identityDir)
-        assertEquals("/iroh/agent-addresses.kv", call.addressStore)
+        assertEquals("/iroh/identities", call.paths.identityDir)
+        assertEquals("/iroh/agent-addresses.kv", call.paths.addressStore)
 
         // The dispatcher sends a matched response so the App Server
         // unblocks the turn. Success carries the runner's msgId.
@@ -191,14 +193,16 @@ class CustomIrohMessagingToolIntegrationTest {
             resultCache = ExternalToolResultCache(),
         )
         client.emitExternalToolCallRequest(
-            requestId = "ext-2",
-            toolCallId = "tc-2",
-            toolName = CustomIrohMessagingTool.TOOL_NAME,
-            runtime = runtimeAgentPm,
-            input = buildJsonObject {
-                put("to", "agent-meridian")
-                put("body", "hi")
-            },
+            AppServerInboundFrame.ExternalToolCallRequest(
+                requestId = "ext-2",
+                toolCallId = "tc-2",
+                toolName = CustomIrohMessagingTool.TOOL_NAME,
+                runtime = runtimeAgentPm,
+                input = buildJsonObject {
+                    put("to", "agent-meridian")
+                    put("body", "hi")
+                },
+            ),
         )
         dispatcher.answer(
             request = client.receivedRequests.first(),
@@ -313,27 +317,22 @@ class CustomIrohMessagingToolIntegrationTest {
 
         override val events: Flow<AppServerReceivedFrame> = inbound
 
+        /**
+     * Forward an [AppServerInboundFrame.ExternalToolCallRequest] straight to
+     * the dispatcher's received-requests queue. Takes the data class
+     * directly so callers don't pay the 5-positional-arg cost (CodeScene
+     * flags "Excess Number of Function Arguments" on this method).
+     */
         fun emitExternalToolCallRequest(
-            requestId: String,
-            toolCallId: String,
-            toolName: String,
-            runtime: AppServerRuntimeScope?,
-            input: JsonObject,
+            request: AppServerInboundFrame.ExternalToolCallRequest,
         ) {
-            val frame = AppServerInboundFrame.ExternalToolCallRequest(
-                requestId = requestId,
-                runtime = runtime,
-                toolCallId = toolCallId,
-                toolName = toolName,
-                input = input,
-            )
-            receivedRequests += frame
+            receivedRequests += request
             // Wrap in a `AppServerReceivedFrame` because the channel is the
             // wire-level shape the events flow exposes.
             inbound.tryEmit(
                 AppServerReceivedFrame(
                     channel = AppServerChannel.Control,
-                    frame = frame,
+                    frame = request,
                     raw = kotlinx.serialization.json.buildJsonObject { },
                 ),
             )
