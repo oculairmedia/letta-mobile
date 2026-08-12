@@ -1,5 +1,7 @@
 package com.letta.mobile.data.model
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -74,7 +76,7 @@ data class SourceStats(
     @SerialName("source_name") val sourceName: String,
     val fileCount: Int = 0,
     val totalSize: Int = 0,
-    val files: List<FileStats> = emptyList(),
+    val files: ImmutableList<FileStats> = persistentListOf(),
 )
 
 @Serializable
