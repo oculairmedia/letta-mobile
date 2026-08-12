@@ -23,7 +23,7 @@ import kotlinx.serialization.json.put
  */
 @Serializable
 data class AskUserQuestionSpec(
-    val questions: ImmutableList<AskUserQuestionItem> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val questions: ImmutableList<AskUserQuestionItem> = persistentListOf(),
 )
 
 @Serializable
@@ -31,7 +31,7 @@ data class AskUserQuestionItem(
     val question: String = "",
     val header: String? = null,
     val multiSelect: Boolean = false,
-    val options: ImmutableList<AskUserQuestionOption> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val options: ImmutableList<AskUserQuestionOption> = persistentListOf(),
 )
 
 @Serializable

@@ -76,7 +76,7 @@ data class SourceStats(
     @SerialName("source_name") val sourceName: String,
     val fileCount: Int = 0,
     val totalSize: Int = 0,
-    val files: ImmutableList<FileStats> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val files: ImmutableList<FileStats> = persistentListOf(),
 )
 
 @Serializable

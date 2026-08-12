@@ -16,7 +16,7 @@ data class McpServer(
     @SerialName("server_name") val serverName: String,
     @SerialName("server_url") val serverUrl: String? = null,
     val command: String? = null,
-    val args: ImmutableList<String> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val args: ImmutableList<String> = persistentListOf(),
     val env: Map<String, String>? = null,
     @SerialName("auth_header") val authHeader: String? = null,
     @SerialName("auth_token") val authToken: String? = null,
@@ -48,9 +48,9 @@ data class McpServerUpdateParams(
 
 @Serializable
 data class McpServerResyncResult(
-    val deleted: ImmutableList<ToolId> = persistentListOf(),
-    val updated: ImmutableList<ToolId> = persistentListOf(),
-    val added: ImmutableList<ToolId> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val deleted: ImmutableList<ToolId> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val updated: ImmutableList<ToolId> = persistentListOf(),
+    @Serializable(with = ImmutableListSerializer::class) val added: ImmutableList<ToolId> = persistentListOf(),
 )
 
 @Serializable
