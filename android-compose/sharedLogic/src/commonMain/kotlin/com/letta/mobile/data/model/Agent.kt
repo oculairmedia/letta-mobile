@@ -1,5 +1,7 @@
 package com.letta.mobile.data.model
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -77,7 +79,7 @@ data class Agent(
     @SerialName("embedding_config") val embeddingConfig: EmbeddingConfig? = null,
     @SerialName("context_window_limit") val contextWindowLimit: Int? = null,
     @SerialName("response_format") val responseFormat: JsonElement? = null,
-    val blocks: List<Block>? = null,
+    val blocks: ImmutableList<Block>? = null,
     /**
      * Canonical Letta `AgentState` nests core-memory blocks HERE; only the admin
      * shim also duplicates them to the top-level [blocks]. Decoding both shapes
@@ -85,26 +87,26 @@ data class Agent(
      * anywhere you want "this agent's core memory".
      */
     val memory: AgentMemory? = null,
-    val tools: List<Tool> = emptyList(),
-    val sources: List<JsonObject> = emptyList(),
-    val tags: List<String> = emptyList(),
-    @SerialName("tool_rules") val toolRules: List<JsonObject> = emptyList(),
-    @SerialName("tool_exec_environment_variables") val toolExecEnvironmentVariables: List<AgentEnvironmentVariable> = emptyList(),
-    val secrets: List<AgentEnvironmentVariable> = emptyList(),
+    val tools: ImmutableList<Tool> = persistentListOf(),
+    val sources: ImmutableList<JsonObject> = persistentListOf(),
+    val tags: ImmutableList<String> = persistentListOf(),
+    @SerialName("tool_rules") val toolRules: ImmutableList<JsonObject> = persistentListOf(),
+    @SerialName("tool_exec_environment_variables") val toolExecEnvironmentVariables: ImmutableList<AgentEnvironmentVariable> = persistentListOf(),
+    val secrets: ImmutableList<AgentEnvironmentVariable> = persistentListOf(),
     @SerialName("project_id") val projectId: ProjectId? = null,
     @SerialName("template_id") val templateId: String? = null,
     @SerialName("base_template_id") val baseTemplateId: String? = null,
     @SerialName("compaction_settings") val compactionSettings: CompactionSettings? = null,
     @SerialName("deployment_id") val deploymentId: String? = null,
     @SerialName("entity_id") val entityId: String? = null,
-    @SerialName("identity_ids") val identityIds: List<String> = emptyList(),
-    val identities: List<Identity> = emptyList(),
+    @SerialName("identity_ids") val identityIds: ImmutableList<String> = persistentListOf(),
+    val identities: ImmutableList<Identity> = persistentListOf(),
     @SerialName("created_at") val createdAt: String? = null,
     @SerialName("updated_at") val updatedAt: String? = null,
     val system: String? = null,
     @SerialName("enable_sleeptime") val enableSleeptime: Boolean? = null,
     @SerialName("agent_type") val agentType: String? = null,
-    @SerialName("message_ids") val messageIds: List<String> = emptyList(),
+    @SerialName("message_ids") val messageIds: ImmutableList<String> = persistentListOf(),
     @SerialName("message_buffer_autoclear") val messageBufferAutoclear: Boolean? = null,
     @SerialName("last_run_completion") val lastRunCompletion: String? = null,
     @SerialName("last_run_duration_ms") val lastRunDurationMs: Int? = null,
@@ -122,14 +124,14 @@ data class Agent(
      * this — reading [blocks] directly renders 0 blocks against a backend that
      * only emits the canonical shape.
      */
-    val coreBlocks: List<Block> get() = blocks ?: memory?.blocks.orEmpty()
+    val coreBlocks: ImmutableList<Block> get() = blocks ?: memory?.blocks ?: persistentListOf()
 }
 
 /** The `memory` sub-object of a canonical Letta `AgentState`. */
 @Serializable
 data class AgentMemory(
-    val blocks: List<Block> = emptyList(),
-    @SerialName("file_blocks") val fileBlocks: List<Block> = emptyList(),
+    val blocks: ImmutableList<Block> = persistentListOf(),
+    @SerialName("file_blocks") val fileBlocks: ImmutableList<Block> = persistentListOf(),
 )
 
 @Serializable
@@ -140,19 +142,19 @@ data class AgentCreateParams(
     @SerialName("model_settings") val modelSettings: ModelSettings? = null,
     @SerialName("llm_config") val llmConfig: LlmConfig? = null,
     @SerialName("embedding_config") val embeddingConfig: EmbeddingConfig? = null,
-    @SerialName("memory_blocks") val memoryBlocks: List<BlockCreateParams>? = null,
-    val tools: List<String>? = null,
-    @SerialName("tool_ids") val toolIds: List<ToolId>? = null,
-    @SerialName("source_ids") val sourceIds: List<String>? = null,
-    @SerialName("block_ids") val blockIds: List<BlockId>? = null,
-    @SerialName("tool_rules") val toolRules: List<JsonObject>? = null,
-    val tags: List<String>? = null,
+    @SerialName("memory_blocks") val memoryBlocks: ImmutableList<BlockCreateParams>? = null,
+    val tools: ImmutableList<String>? = null,
+    @SerialName("tool_ids") val toolIds: ImmutableList<ToolId>? = null,
+    @SerialName("source_ids") val sourceIds: ImmutableList<String>? = null,
+    @SerialName("block_ids") val blockIds: ImmutableList<BlockId>? = null,
+    @SerialName("tool_rules") val toolRules: ImmutableList<JsonObject>? = null,
+    val tags: ImmutableList<String>? = null,
     val system: String? = null,
     val description: String? = null,
     val metadata: Map<String, JsonElement>? = null,
     @SerialName("enable_sleeptime") val enableSleeptime: Boolean? = null,
     @SerialName("agent_type") val agentType: String? = null,
-    @SerialName("initial_message_sequence") val initialMessageSequence: List<MessageCreate>? = null,
+    @SerialName("initial_message_sequence") val initialMessageSequence: ImmutableList<MessageCreate>? = null,
     @SerialName("include_base_tools") val includeBaseTools: Boolean? = null,
     @SerialName("include_multi_agent_tools") val includeMultiAgentTools: Boolean? = null,
     @SerialName("include_base_tool_rules") val includeBaseToolRules: Boolean? = null,
@@ -169,7 +171,7 @@ data class AgentCreateParams(
     @SerialName("project_id") val projectId: ProjectId? = null,
     @SerialName("template_id") val templateId: String? = null,
     @SerialName("base_template_id") val baseTemplateId: String? = null,
-    @SerialName("identity_ids") val identityIds: List<String>? = null,
+    @SerialName("identity_ids") val identityIds: ImmutableList<String>? = null,
     @SerialName("message_buffer_autoclear") val messageBufferAutoclear: Boolean? = null,
     val timezone: String? = null,
     @SerialName("max_files_open") val maxFilesOpen: Int? = null,
@@ -190,19 +192,19 @@ data class AgentUpdateParams(
     @SerialName("llm_config") val llmConfig: LlmConfig? = null,
     @SerialName("embedding_config") val embeddingConfig: EmbeddingConfig? = null,
     val system: String? = null,
-    @SerialName("tool_ids") val toolIds: List<ToolId>? = null,
-    @SerialName("source_ids") val sourceIds: List<String>? = null,
-    @SerialName("block_ids") val blockIds: List<BlockId>? = null,
-    val tags: List<String>? = null,
-    @SerialName("tool_rules") val toolRules: List<JsonObject>? = null,
-    @SerialName("message_ids") val messageIds: List<String>? = null,
+    @SerialName("tool_ids") val toolIds: ImmutableList<ToolId>? = null,
+    @SerialName("source_ids") val sourceIds: ImmutableList<String>? = null,
+    @SerialName("block_ids") val blockIds: ImmutableList<BlockId>? = null,
+    val tags: ImmutableList<String>? = null,
+    @SerialName("tool_rules") val toolRules: ImmutableList<JsonObject>? = null,
+    @SerialName("message_ids") val messageIds: ImmutableList<String>? = null,
     val metadata: Map<String, JsonElement>? = null,
     @SerialName("tool_exec_environment_variables") val toolExecEnvironmentVariables: Map<String, String>? = null,
     val secrets: Map<String, String>? = null,
     @SerialName("project_id") val projectId: ProjectId? = null,
     @SerialName("template_id") val templateId: String? = null,
     @SerialName("base_template_id") val baseTemplateId: String? = null,
-    @SerialName("identity_ids") val identityIds: List<String>? = null,
+    @SerialName("identity_ids") val identityIds: ImmutableList<String>? = null,
     @SerialName("message_buffer_autoclear") val messageBufferAutoclear: Boolean? = null,
     @SerialName("context_window_limit") val contextWindowLimit: Int? = null,
     @SerialName("max_tokens") val maxTokens: Int? = null,
