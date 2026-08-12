@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
@@ -37,7 +38,7 @@ data class AgentEntity(
         enableSleeptime = enableSleeptime,
         createdAt = createdAt,
         updatedAt = updatedAt,
-        tags = decodeTags(tagsJson),
+        tags = decodeTags(tagsJson).toImmutableList(),
         metadata = decodeMetadata(metadataJson),
     )
 

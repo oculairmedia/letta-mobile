@@ -12,6 +12,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeChannelTransport
 import com.letta.mobile.testutil.TestData
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -345,7 +346,7 @@ class AgentRepositoryTest {
                 name = "Local",
                 model = "google/gemma-3n-E2B-it-litert-lm",
                 metadata = mapOf(LocalAgentRuntimeMetadata.RUNTIME_KEY to kotlinx.serialization.json.JsonPrimitive(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME)),
-                toolIds = listOf(com.letta.mobile.data.model.ToolId("tool-1")),
+                toolIds = persistentListOf(com.letta.mobile.data.model.ToolId("tool-1")),
                 includeBaseTools = true,
             )
         )

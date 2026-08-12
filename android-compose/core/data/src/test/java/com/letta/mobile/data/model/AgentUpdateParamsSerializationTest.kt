@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -57,7 +58,7 @@ class AgentUpdateParamsSerializationTest {
                 put("type", JsonPrimitive("json_object"))
             },
             parallelToolCalls = false,
-            toolRules = listOf(
+            toolRules = persistentListOf(
                 buildJsonObject {
                     put("type", JsonPrimitive("requires_approval"))
                     put("tool_name", JsonPrimitive("shell"))

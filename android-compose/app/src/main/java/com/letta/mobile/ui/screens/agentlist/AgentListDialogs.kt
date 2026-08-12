@@ -18,6 +18,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import kotlinx.collections.immutable.toImmutableList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -214,7 +215,7 @@ internal fun buildAgentCreateParams(
         toolIds = if (isLocal) {
             null
         } else {
-            formState.selectedToolIds.map { ToolId(it) }.ifEmpty { null }
+            formState.selectedToolIds.map { ToolId(it) }.ifEmpty { null }?.toImmutableList()
         },
         system = formState.systemPrompt.ifBlank { null },
         enableSleeptime = if (isLocal) false else formState.enableSleeptime,
