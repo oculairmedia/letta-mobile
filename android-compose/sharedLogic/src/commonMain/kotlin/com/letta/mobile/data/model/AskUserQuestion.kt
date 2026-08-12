@@ -1,5 +1,8 @@
 package com.letta.mobile.data.model
 
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -20,7 +23,7 @@ import kotlinx.serialization.json.put
  */
 @Serializable
 data class AskUserQuestionSpec(
-    val questions: List<AskUserQuestionItem> = emptyList(),
+    @Serializable(with = ImmutableListSerializer::class) val questions: ImmutableList<AskUserQuestionItem> = persistentListOf(),
 )
 
 @Serializable
@@ -28,7 +31,7 @@ data class AskUserQuestionItem(
     val question: String = "",
     val header: String? = null,
     val multiSelect: Boolean = false,
-    val options: List<AskUserQuestionOption> = emptyList(),
+    @Serializable(with = ImmutableListSerializer::class) val options: ImmutableList<AskUserQuestionOption> = persistentListOf(),
 )
 
 @Serializable
@@ -84,7 +87,7 @@ object AskUserQuestion {
         val spec = runCatching { json.decodeFromJsonElement(AskUserQuestionSpec.serializer(), obj) }.getOrNull()
             ?: return null
         val usable = spec.questions.filter { it.question.isNotBlank() }
-        return if (usable.isEmpty()) null else AskUserQuestionSpec(usable)
+        return if (usable.isEmpty()) null else AskUserQuestionSpec(usable.toImmutableList())
     }
 
     /**
