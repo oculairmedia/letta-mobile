@@ -195,7 +195,12 @@ internal suspend fun runStreamSubscriber(
                 "TimelineSync", "streamSubscriber.networkError", t,
                 "conversationId" to conversationId,
             )
-            delay(STREAM_BACKOFF_MAX_MS.milliseconds)
+            // M5 (data-efficiency-audit): jitter the error-path backoff so 5
+            // concurrent persistent streams don't all retry on the same
+            // millisecond when the network drops. Mirrors the silence-timeout
+            // path above.
+            val jitteredDelay = streamErrorBackoffMs()
+            delay(jitteredDelay.milliseconds)
         }
     }
 }
@@ -212,3 +217,17 @@ private const val STREAM_BACKOFF_START_MS = 1000L
 private const val STREAM_BACKOFF_MAX_MS = 8000L
 private const val STREAM_IDLE_BACKOFF_MAX_MS = 32000L
 private const val HEARTBEAT_TELEMETRY_MIN_INTERVAL_MS = 30000L
+
+/**
+ * M5 (data-efficiency-audit): jitter the network-error backoff so multiple
+ * persistent streams don't retry on the same millisecond when the network
+ * drops. Returns a value in `[STREAM_BACKOFF_MAX_MS, 2 * STREAM_BACKOFF_MAX_MS)`,
+ * matching the silence-timeout path inside [runStreamSubscriber].
+ *
+ * Exposed `internal` so the backoff math can be unit-tested without spinning
+ * up the full coroutine + transport rig.
+ */
+internal fun streamErrorBackoffMs(
+    random: Random = Random.Default,
+    maxMs: Long = STREAM_BACKOFF_MAX_MS,
+): Long = maxMs + random.nextLong(maxMs)

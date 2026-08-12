@@ -270,6 +270,40 @@ class AllConversationsRepositoryTest {
         assertTrue(fakeApi.calls.none { it == "listConversations" })
     }
 
+    // M6 (data-efficiency-audit): refresh() and loadNextPage() must be
+    // serialized by the same mutex, otherwise concurrent calls can race on
+    // `currentCursor` / `_conversations` / `_hasMore`.
+    @Test
+    fun `concurrent refresh and loadNextPage are serialized by mutex`() = runTest {
+        // Seed enough conversations so refresh's first page AND loadNextPage's
+        // second page both have work to do. PAGE_SIZE is 50.
+        val total = 120
+        repeat(total) { index ->
+            fakeApi.conversations.add(TestData.conversation(id = "conv-$index"))
+        }
+        fakeApi.listDelayMillis = 5L
+        fakeApi.calls.clear()
+
+        val refreshJob = launch { repository.refresh() }
+        val loadJob = launch { repository.loadNextPage() }
+        joinAll(refreshJob, loadJob)
+
+        val listCalls = fakeApi.calls.count { it == "listConversations" }
+        // Each distinct cursor position can issue at most one listConversations.
+        // With the mutex, refresh's after=null and loadNextPage's after=<last-of-page-1>
+        // can't collide; pre-fix this could fire 3+ due to a race on the cursor.
+        assertTrue(
+            "expected \u2264 2 listConversations calls, got $listCalls (${fakeApi.calls})",
+            listCalls <= 2,
+        )
+        // No duplicates: each conversation id is present at most once.
+        val ids = repository.conversations.value.map { it.id.value }
+        assertEquals(ids.size, ids.toSet().size)
+        // The union of all loaded pages must equal the conversations set in
+        // order — we got at least one page back.
+        assertTrue(ids.size >= 50)
+    }
+
     private class FakeLocalRuntimeConversationSource(
         private val conversationsProvider: suspend () -> List<Conversation>,
     ) : LocalRuntimeConversationSource {

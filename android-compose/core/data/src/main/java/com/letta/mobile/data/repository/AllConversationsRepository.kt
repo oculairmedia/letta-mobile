@@ -129,9 +129,13 @@ open class AllConversationsRepository(
         ).flow
     }
 
-    override suspend fun loadNextPage() {
-        if (!_hasMore.value) return
-
+    override suspend fun loadNextPage() = refreshMutex.withLock {
+        // M6 (data-efficiency-audit): serialize against [refresh] so
+        // concurrent refresh+loadNextPage calls can't race on
+        // `currentCursor` / `_conversations` / `_hasMore`. Held across the
+        // Room `cacheConversations` write to match the `refresh()` lock
+        // discipline; in-memory mutex, no Room-deadlock risk.
+        if (!_hasMore.value) return@withLock
         val newConversations = fetchPage(after = currentCursor)
         applyLoadedPage(newConversations)
     }
