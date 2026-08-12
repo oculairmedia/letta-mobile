@@ -1,7 +1,7 @@
 package com.letta.mobile.data.transport.appserver
 
 import io.ktor.client.plugins.websocket.WebSockets
-import io.ktor.client.plugins.websocket.WebSocketDeflateExtension
+import io.ktor.websocket.WebSocketDeflateExtension
 
 /**
  * letta-mobile data-efficiency Phase 2 (Q2): WebSocket frame compression on the
@@ -9,8 +9,9 @@ import io.ktor.client.plugins.websocket.WebSocketDeflateExtension
  *
  * The shared commonMain helper [applyAppServerFrameLimits] only sets the inbound
  * frame ceiling. It deliberately stops short of `extensions { install(...) }`
- * because `WebSocketDeflateExtension` is JVM-only — it lives in the CIO engine
- * artifact, not in the multiplatform `ktor-client-core` that commonMain can see.
+ * because `WebSocketDeflateExtension` is JVM-only — it lives in the
+ * `ktor-websockets-jvm` shared commons (package `io.ktor.websocket`), which
+ * commonMain cannot see.
  *
  * Call sites that talk to the App Server on a JVM-or-desktop HttpClient(CIO)
  * should call [applyAppServerDefaults] instead of [applyAppServerFrameLimits]
