@@ -104,15 +104,20 @@ class ExternalToolRegistry(
      *
      * @param toolName The name of the tool to invoke
      * @param input The input arguments for the tool
+     * @param agentId The id of the agent invoking this tool, when known (derived
+     *   from the inbound request's runtime scope). Tools that need an
+     *   `fromAgentId` (e.g. the Iroh agent-message sender) consume this;
+     *   others ignore it. Default `null` preserves the pre-agent-context
+     *   contract for the existing extras (image_hydration, goals, ...).
      * @return The tool result (success or error)
      * @throws ToolNotFoundException if the tool is not found or not advertised
      */
-    suspend fun invoke(toolName: String, input: JsonObject): ExternalToolResult {
+    suspend fun invoke(toolName: String, input: JsonObject, agentId: String? = null): ExternalToolResult {
         val tool = toolsByName[toolName]
             ?: return ExternalToolResult.Error("Tool not found or not advertised: $toolName")
 
         return try {
-            tool.invoke(input)
+            tool.invoke(input, agentId)
         } catch (e: Exception) {
             ExternalToolResult.Error("Tool invocation failed: ${e.message}")
         }
@@ -146,19 +151,39 @@ class ExternalToolRegistry(
          * Creates a registry with the standard set of extra tools.
          *
          * @param capabilities The advertised capabilities that gate which tools are registered
-         * @return A registry with all standard extra tools
+         * @param customIrohMessagingTool Optional
+         *   [CustomIrohMessagingTool] to include when [RemoteCapabilities.agentMessaging]
+         *   is enabled. The wrapper distribution supplies this when it has the
+         *   `meridian agent-message send` CLI binary available. Null in
+         *   factory-default Android controllers, which have no CLI to call.
+         * @return A registry with all standard extra tools (and the Iroh
+         *   tool, when its capability is enabled AND a tool instance was
+         *   supplied).
          */
-        fun standard(capabilities: RemoteCapabilities): ExternalToolRegistry {
+        fun standard(
+            capabilities: RemoteCapabilities,
+            customIrohMessagingTool: CustomIrohMessagingTool? = null,
+        ): ExternalToolRegistry {
+            val baseTools = listOf(
+                ImageHydrationTool(),
+                GoalsTool(),
+                SchedulesTool(),
+                SlashCommandsTool(),
+                SubagentChipsTool(),
+                ReflectionTool(),
+                SlimAgentsTool(),
+            )
+            // The Iroh tool is only added to the candidate list when both the
+            // capability is enabled AND the controller supplied an instance.
+            // The registry filters by capability at lookup time; the candidate
+            // list is the superset of "tools we know how to advertise".
+            val toolsWithIroh = if (customIrohMessagingTool != null) {
+                baseTools + customIrohMessagingTool
+            } else {
+                baseTools
+            }
             return ExternalToolRegistry(
-                tools = listOf(
-                    ImageHydrationTool(),
-                    GoalsTool(),
-                    SchedulesTool(),
-                    SlashCommandsTool(),
-                    SubagentChipsTool(),
-                    ReflectionTool(),
-                    SlimAgentsTool(),
-                ),
+                tools = toolsWithIroh,
                 capabilities = capabilities,
             )
         }

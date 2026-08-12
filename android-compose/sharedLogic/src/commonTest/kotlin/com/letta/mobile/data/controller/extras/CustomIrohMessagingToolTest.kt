@@ -1,0 +1,276 @@
+package com.letta.mobile.data.controller.extras
+
+import com.letta.mobile.data.controller.capability.Capability
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import kotlin.test.assertFalse
+
+/**
+ * letta-mobile-bn008-phase2-custom-tool (1vuec): the agent-visible Iroh
+ * messaging tool — the new `agent_message_send` that lets agents message each
+ * other over Iroh, distinct from `matrix_agent_message` which is the
+ * agent↔human (Matrix / Messenger) surface.
+ *
+ * These tests pin the tool's behaviour end-to-end (input parsing → runner
+ * invocation → result mapping). The runner is stubbed so the suite stays
+ * hermetic; the runner itself has its own tests in [DefaultIrohCliRunnerTest].
+ */
+class CustomIrohMessagingToolTest {
+
+    /**
+     * The regression test pinned from bn008-phase2-handoff risk #1:
+     * Meridian→Lester sent a multi-line body and it collapsed to "" because
+     * shell quoting + `tr '\n' ' '` mangled it. This test exercises the FULL
+     * tool surface with a multi-line body (newlines, quotes, ampersands, a
+     * URL) and asserts the runner receives every byte verbatim.
+     */
+    @Test
+    fun multiLineBodyRoundTripsViaStdin() = runTest {
+        val captured = CapturingRunner()
+        val tool = toolWithRunner(captured)
+
+        val multiline = """
+            Status update from PM:
+              - closed 3 beads
+              - opened 1 bead
+              - see https://example.com/path?x=1&y=2
+
+            No action needed.
+        """.trimIndent() + "\n"
+
+        val input = buildJsonObject {
+            put("to", "agent-target")
+            put("body", multiline)
+        }
+
+        val result = tool.invoke(input, agentId = "agent-sender")
+        assertIs<ExternalToolResult.Success>(result, "delivered must surface as Success")
+
+        // The captured stdin bytes must equal the input body EXACTLY — every
+        // newline, every quote, every ampersand, the trailing newline.
+        assertEquals(1, captured.calls.size, "runner must be called exactly once")
+        val call = captured.calls.single()
+        assertEquals(multiline, call.body, "multi-line body must round-trip unchanged via stdin")
+        assertEquals("agent-sender", call.fromAgentId, "--from must come from the dispatcher-provided agentId")
+        assertEquals("agent-target", call.toAgentId)
+    }
+
+    @Test
+    fun invokesRunnerWithBinaryIdentityAndAddressBook() = runTest {
+        val captured = CapturingRunner()
+        val tool = CustomIrohMessagingTool(
+            binary = "/opt/custom/meridian",
+            identityDir = "/custom/identities",
+            addressStore = "/custom/addresses.kv",
+            runner = captured,
+        )
+        val result = tool.invoke(
+            input = inputWithBody(to = "x", body = "y"),
+            agentId = "from-x",
+        )
+        assertIs<ExternalToolResult.Success>(result)
+        val call = captured.calls.single()
+        assertEquals("/opt/custom/meridian", call.binary)
+        assertEquals("/custom/identities", call.paths.identityDir)
+        assertEquals("/custom/addresses.kv", call.paths.addressStore)
+    }
+
+    @Test
+    fun runnerDeliveredMapsToStructuredSuccess() = runTest {
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Delivered("msg-fixed-1")))
+        val result = tool.invoke(
+            input = inputWithBody(),
+            agentId = "src",
+        )
+        val success = assertIs<ExternalToolResult.Success>(result)
+        // The success payload must carry the msgId back so the agent's log
+        // shows the wire identity, not just "ok:true".
+        assertTrue(
+            success.content.contains("\"msgId\":\"msg-fixed-1\""),
+            "success content must include the runner's msgId, got: ${success.content}",
+        )
+        assertTrue(success.content.contains("\"to\":\"tgt\""))
+        assertTrue(success.content.contains("\"delivered\":true"))
+    }
+
+    @Test
+    fun runnerUnaddressableMapsToDescriptiveError() = runTest {
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Unaddressable("tgt", "no_kv_row")))
+        val result = tool.invoke(
+            input = inputWithBody(),
+            agentId = "src",
+        )
+        val err = assertIs<ExternalToolResult.Error>(result)
+        assertTrue(err.error.contains("unaddressable"))
+        assertTrue(err.error.contains("no_kv_row"))
+        assertTrue(err.error.contains("tgt"))
+    }
+
+    @Test
+    fun runnerFailedMapsToDescriptiveError() = runTest {
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Failed("tgt", "no_ack")))
+        val result = tool.invoke(
+            input = inputWithBody(),
+            agentId = "src",
+        )
+        val err = assertIs<ExternalToolResult.Error>(result)
+        assertTrue(err.error.contains("failed"))
+        assertTrue(err.error.contains("no_ack"))
+    }
+
+    @Test
+    fun missingAgentIdSurfacesStructuredError() = runTest {
+        // Dispatcher's request.runtime was unset. Tool must refuse without
+        // synthesizing a wrong --from, and must NOT invoke the runner.
+        assertValidationError(
+            input = inputWithBody(),
+            agentId = null,
+            errorFragment = "agentId",
+            description = "missing agentId context",
+        )
+    }
+
+    @Test
+    fun missingToFieldSurfacesStructuredError() = runTest {
+        assertValidationError(
+            input = buildJsonObject { put("body", "hi") }, // 'to' missing
+            agentId = "src",
+            errorFragment = "'to'",
+            description = "missing 'to' field",
+        )
+    }
+
+    @Test
+    fun missingBodyFieldSurfacesStructuredError() = runTest {
+        assertValidationError(
+            input = buildJsonObject { put("to", "tgt") }, // 'body' missing
+            agentId = "src",
+            errorFragment = "'body'",
+            description = "missing 'body' field",
+        )
+    }
+
+    @Test
+    fun blankToFieldRejected() = runTest {
+        assertValidationError(
+            input = inputWithBody(to = "   "),
+            agentId = "src",
+            errorFragment = "blank",
+            description = "blank 'to'",
+        )
+    }
+
+    /**
+     * Self-echo guard (letta-mobile-hj69d sibling): the receiver's a2a-recv
+     * handler also filters this, but failing fast here saves a round trip
+     * and surfaces a clearer error to the agent.
+     */
+    @Test
+    fun selfSendRejected() = runTest {
+        assertValidationError(
+            input = inputWithBody(to = "self"),
+            agentId = "self",
+            errorFragment = "self",
+            description = "self-echo",
+        )
+    }
+
+    /**
+     * Shared assertion for the validation-error test surface: every "tool
+     * must refuse this input before invoking the runner" test follows the
+     * same shape (build input, invoke, expect Error containing a fragment,
+     * assert the runner was never called). Extracted so CodeScene's
+     * code-duplication heuristic sees a single call site per test rather
+     * than 5 copy-pasted bodies. Pulled the assertion up so each test
+     * reads as "expect this error for this input".
+     */
+    private suspend fun assertValidationError(
+        input: JsonObject,
+        agentId: String?,
+        errorFragment: String,
+        description: String,
+    ) {
+        val captured = CapturingRunner()
+        val tool = toolWithRunner(captured)
+        val result = tool.invoke(input = input, agentId = agentId)
+        val err = assertIs<ExternalToolResult.Error>(result)
+        assertTrue(
+            err.error.contains(errorFragment),
+            "expected error fragment '$errorFragment' for $description, got: ${err.error}",
+        )
+        assertEquals(
+            0,
+            captured.calls.size,
+            "runner must NOT be invoked when input is invalid ($description)",
+        )
+    }
+
+    @Test
+    fun toolMetadataAdvertised() {
+        val tool = toolWithRunner()
+        assertEquals("agent_message_send", tool.name)
+        assertEquals(Capability.AgentMessaging, tool.capability)
+        assertTrue(
+            tool.description.contains("Iroh"),
+            "description should make the agent↔agent Iroh surface obvious to the model",
+        )
+        assertTrue(
+            tool.description.contains("matrix_agent_message"),
+            "description should cross-reference matrix_agent_message so the model " +
+                "picks the right tool for each relationship (agent↔agent vs agent�human)",
+        )
+        // Schema sanity: both fields are required (the dispatcher enforces
+        // this server-side too, but a schema-only contract is what the
+        // App Server validates the tool list against).
+        val required = tool.inputSchema!!.requiredFields()
+        assertTrue("to" in required, "'to' must be required")
+        assertTrue("body" in required, "'body' must be required")
+    }
+
+    // === test helpers ===
+
+    /**
+     * Build a valid input payload with the standard `to` + `body` keys.
+     * Pulled out as a helper because the literal appears 8+ times across
+     * the suite; CodeScene flags the duplication.
+     */
+    private fun inputWithBody(
+        to: String = "tgt",
+        body: String = "hi",
+    ): JsonObject = buildJsonObject {
+        put("to", to)
+        put("body", body)
+    }
+
+    /**
+     * Build a tool with the standard `binary = /bin/true` plus a captured
+     * runner. Pulled out as a helper because the construction appeared
+     * 7+ times across the suite (CodeScene code-duplication flag).
+     * Tests that need a fixed-result runner pass `runner = FixedRunner(...)`;
+     * tests that need to observe what reached the runner pass
+     * `runner = CapturingRunner()` (the default).
+     */
+    private fun toolWithRunner(runner: IrohCliRunner = CapturingRunner()) =
+        CustomIrohMessagingTool(binary = "/bin/true", runner = runner)
+}
+
+/**
+ * Read the JSON-Schema `required` array out of a tool's input schema. Helper
+ * for the metadata test above; lifted to top level so future tests can reuse.
+ */
+internal fun JsonObject.requiredFields(): Set<String> {
+    val required = this["required"] ?: return emptySet()
+    val arr = required as? JsonArray ?: return emptySet()
+    return arr.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }.toSet()
+}

@@ -185,7 +185,16 @@ internal class ExternalToolDispatcher(
                 null
             } else {
                 withTimeoutOrNull(invocationTimeoutMs.milliseconds) {
-                    externalToolRegistry.invoke(request.toolName, request.input)
+                    // letta-mobile-bn008-phase2-custom-tool (1vuec): forward the
+                    // runtime's agent_id so agent-context tools (the Iroh
+                    // agent-message sender) know which `--from` to drive. Null
+                    // when the inbound frame has no runtime scope — the existing
+                    // extra tools ignore agentId, so this is a non-breaking seam.
+                    externalToolRegistry.invoke(
+                        toolName = request.toolName,
+                        input = request.input,
+                        agentId = request.runtime?.agentId,
+                    )
                 } ?: run {
                     Telemetry.event(
                         TELEMETRY_SOURCE, "externalTool.invocationTimedOut",
