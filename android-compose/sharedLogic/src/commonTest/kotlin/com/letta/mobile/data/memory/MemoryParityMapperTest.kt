@@ -17,6 +17,7 @@ import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.RuntimeId
+import kotlinx.collections.immutable.toImmutableList
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -335,8 +336,8 @@ class MemoryParityMapperTest {
                 value = "Keeps a concise research voice.\nUse tool:search_docs when grounded research is needed.",
                 limit = 2_000,
             ),
-        ),
-        tools = listOf(sampleTool("tool-1")),
+        ).toImmutableList(),
+        tools = listOf(sampleTool("tool-1")).toImmutableList(),
         contextWindowLimit = 8_000,
     )
 
