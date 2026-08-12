@@ -13,7 +13,7 @@ import com.letta.mobile.data.transport.SubagentListFrame
 import com.letta.mobile.data.transport.SubagentTodosFrame
 import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
-import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
+import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
 import com.letta.mobile.data.transport.encodeJson
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -282,7 +282,7 @@ class DesktopWsChannelTransport(
                     trustManager = NativeTrustManager.trustManager
                 }
             }
-            install(WebSockets) { applyAppServerFrameLimits() }
+            install(WebSockets) { applyAppServerDefaults() }
         }
     }
 }
