@@ -16,24 +16,74 @@ import kotlinx.serialization.json.put
  * connection's authentication gate, so only an already-authenticated peer can
  * mint invites or manage pairings. Invite secrets appear ONLY in the response
  * to the caller who minted them — never in telemetry or errors.
+ *
+ * letta-mobile-gw0h1 (sixv8.2): the canonical blessed pair.invite.create
+ * extension is wired through here. When the caller sets `qr: true`, the
+ * response carries an additive `qr_invite` field (the `letta-qr-v1.<base64url>`
+ * wire format from `reference/qr-pairing-protocol.md` §5.1 + §7.1). The
+ * existing fields (`invite`, `deep_link`, `expires_at_ms`, `suggested_name`)
+ * are unchanged, so v0 callers keep working — the protocol decision in §4 is
+ * "additive and versioned".
  */
-internal object PairingAdminHandlers {
+object PairingAdminHandlers {
     private val json = Json { ignoreUnknownKeys = true }
 
+    /** Backward-compatible registration (no QR support). */
     fun register(router: AdminRpcRouter, pairing: IrohPairingService?) {
+        register(router, pairing, qrSigner = NoOpPairQrSigner, qrNodeIdHex = null)
+    }
+
+    /**
+     * Register with QR minting enabled. `qrSigner` produces the protocol
+     * signature; `qrNodeIdHex` is the minting identity the wrap it signs under
+     * (the wrapper's Iroh node id). When the caller sets `qr: true` AND
+     * both signer + node id are wired, we emit the `qr_invite` field;
+     * otherwise the field is omitted and the response shape is byte-identical
+     * to the pre-extension one.
+     *
+     * Safety: a null or blank `qrNodeIdHex` collapses to the no-signer path
+     * so a misconfigured wrapper never publishes an unsigned QR. Production
+     * callers (the wrapper command) always pass both.
+     */
+    fun register(
+        router: AdminRpcRouter,
+        pairing: IrohPairingService?,
+        qrSigner: PairQrSigner,
+        qrNodeIdHex: String?,
+    ) {
         if (pairing == null) return
+        val qrEnabled = qrSigner !is NoOpPairQrSigner &&
+            qrNodeIdHex != null && qrNodeIdHex.isNotBlank()
+        val effectiveSigner = if (qrEnabled) qrSigner else NoOpPairQrSigner
+        val effectiveNodeId = qrNodeIdHex?.takeIf { it.isNotBlank() } ?: ""
+
         router.register("pair.invite.create") { params ->
             val name = params?.get("name")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                 ?: "paired-peer"
             val ttlMs = params?.get("ttl_ms")?.jsonPrimitive?.contentOrNull?.toLongOrNull()
                 ?: IrohPairingService.DEFAULT_TTL_MS
+            val wantQr = params?.get("qr")?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull() == true
             pairing.pruneExpired()
             val invite = pairing.createInvite(suggestedName = name, ttlMs = ttlMs)
+            val signedSecret = IrohPairingService.INVITE_TOKEN_PREFIX + invite.secret
             buildJsonObject {
-                put("invite", IrohPairingService.INVITE_TOKEN_PREFIX + invite.secret)
+                put("invite", signedSecret)
                 put("deep_link", invite.deepLink())
                 put("expires_at_ms", invite.expiresAtMs)
                 put("suggested_name", invite.suggestedName)
+                if (wantQr && qrEnabled) {
+                    val qr = PairQrEnvelope.encode(
+                        nodeIdHex = effectiveNodeId,
+                        signedSecret = signedSecret,
+                        expiresAtMs = invite.expiresAtMs,
+                        // The signed_secret in the QR carries the `invite:` prefix
+                        // by the protocol's choice (§5.1); the secret returned
+                        // to the QR consumer is therefore the same string the
+                        // RPC issuer will hand to the redemption path.
+                        signature = effectiveSigner.sign(effectiveNodeId, signedSecret, invite.expiresAtMs),
+                    )
+                    put("qr_invite", qr)
+                }
             }
         }
         router.register("pair.peer.list") { _ ->
