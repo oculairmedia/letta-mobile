@@ -293,40 +293,6 @@ class CustomIrohMessagingToolIntegrationTest {
         customIrohMessagingTool = customTool,
     )
 
-    private class CapturingRunner : IrohCliRunner {
-        data class Call(
-            val binary: String,
-            val fromAgentId: String,
-            val toAgentId: String,
-            val body: String,
-            val identityDir: String?,
-            val addressStore: String?,
-        )
-        val calls: MutableList<Call> = mutableListOf()
-        override suspend fun send(
-            binary: String,
-            fromAgentId: String,
-            toAgentId: String,
-            body: String,
-            identityDir: String?,
-            addressStore: String?,
-        ): IrohCliSendResult {
-            calls += Call(binary, fromAgentId, toAgentId, body, identityDir, addressStore)
-            return IrohCliSendResult.Delivered("captured-${calls.size}")
-        }
-    }
-
-    private class FixedRunner(private val result: IrohCliSendResult) : IrohCliRunner {
-        override suspend fun send(
-            binary: String,
-            fromAgentId: String,
-            toAgentId: String,
-            body: String,
-            identityDir: String?,
-            addressStore: String?,
-        ): IrohCliSendResult = result
-    }
-
     /**
      * Minimal [AppServerClient] that captures inbound frames and outbound
      * responses. Lets us drive the dispatcher from a unit test without

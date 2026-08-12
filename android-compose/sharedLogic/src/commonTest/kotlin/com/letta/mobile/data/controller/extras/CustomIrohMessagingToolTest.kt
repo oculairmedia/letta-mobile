@@ -230,46 +230,6 @@ class CustomIrohMessagingToolTest {
     // === test helpers ===
 
     /**
-     * Records every (binary, fromAgentId, toAgentId, body, identityDir,
-     * addressStore) tuple passed to [send], so tests can assert exactly
-     * what reached the runner without spawning a process.
-     */
-    private class CapturingRunner : IrohCliRunner {
-        data class Call(
-            val binary: String,
-            val fromAgentId: String,
-            val toAgentId: String,
-            val body: String,
-            val identityDir: String?,
-            val addressStore: String?,
-        )
-        val calls: MutableList<Call> = mutableListOf()
-        override suspend fun send(
-            binary: String,
-            fromAgentId: String,
-            toAgentId: String,
-            body: String,
-            identityDir: String?,
-            addressStore: String?,
-        ): IrohCliSendResult {
-            calls += Call(binary, fromAgentId, toAgentId, body, identityDir, addressStore)
-            return IrohCliSendResult.Delivered("captured-${calls.size}")
-        }
-    }
-
-    /** Always returns the same result — for the mapping tests. */
-    private class FixedRunner(private val result: IrohCliSendResult) : IrohCliRunner {
-        override suspend fun send(
-            binary: String,
-            fromAgentId: String,
-            toAgentId: String,
-            body: String,
-            identityDir: String?,
-            addressStore: String?,
-        ): IrohCliSendResult = result
-    }
-
-    /**
      * Build a valid input payload with the standard `to` + `body` keys.
      * Pulled out as a helper because the literal appears 8+ times across
      * the suite; CodeScene flags the duplication.
