@@ -1370,6 +1370,10 @@ class IrohChannelTransport(
             "runId" to turn.runId,
         )
         scope.launch {
+            // Guard against stale ActiveTurn race: if send(A) was called twice
+            // quickly and this cancel captured the old ActiveTurn, aborting would
+            // target the NEW turn. Only proceed if this is still the active turn.
+            if (activeTurns[conversationId] !== turn) return@launch
             // 1. Ask the server to abort the active run so it emits its own
             //    authoritative terminal (and, per 8s45p, closes open tool_calls).
             //    A still-synthetic run id means the real run id has not streamed
