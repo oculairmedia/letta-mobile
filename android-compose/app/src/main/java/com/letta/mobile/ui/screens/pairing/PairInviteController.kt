@@ -12,6 +12,7 @@ import com.letta.mobile.data.controller.node.iroh.PairQrSigner
 import com.letta.mobile.data.controller.node.iroh.PairedPeerStore
 import com.letta.mobile.data.controller.node.iroh.PairingAdminHandlers
 import com.letta.mobile.qr.QrCode
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +58,15 @@ class PairInviteController(
     private val scope: CoroutineScope,
     private val router: AdminRpcRouter,
     private val initialName: String = "paired-peer",
+    /**
+     * Dispatchers are injected so tests can drive [mint] on the test
+     * scheduler. Left on the real dispatchers they hop off the test's
+     * scheduler mid-flight, so `advanceUntilIdle()` races the background
+     * work and assertions fire against half-applied state. Same pattern as
+     * `ChatTimelineObserver.projectionDispatcher`.
+     */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     private val _uiState = MutableStateFlow(PairInviteUiState())
     val uiState: StateFlow<PairInviteUiState> = _uiState.asStateFlow()
@@ -70,7 +80,7 @@ class PairInviteController(
         _uiState.update { it.copy(loading = true, error = null) }
         scope.launch {
             try {
-                val response = withContext(Dispatchers.IO) {
+                val response = withContext(ioDispatcher) {
                     router.dispatch(
                         AdminRpcInvocation(
                             requestId = "pair-mobile-${System.nanoTime()}",
@@ -110,7 +120,7 @@ class PairInviteController(
                     fail("qr_invite has empty signature (signer misconfigured?)")
                     return@launch
                 }
-                val matrix = withContext(Dispatchers.Default) { QrCode.encode(qrInvite) }
+                val matrix = withContext(computeDispatcher) { QrCode.encode(qrInvite) }
                 _uiState.update {
                     it.copy(
                         loading = false,
@@ -164,12 +174,20 @@ class PairInviteController(
             nodeIdHex: String,
             pairingStore: PairedPeerStore,
             suggestedName: String = "paired-peer",
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
         ): PairInviteController {
             val pairing = IrohPairingService(store = pairingStore)
             val router = AdminRpcRouter().also { r ->
                 PairingAdminHandlers.register(r, pairing, signer, nodeIdHex)
             }
-            return PairInviteController(scope = scope, router = router, initialName = suggestedName)
+            return PairInviteController(
+                scope = scope,
+                router = router,
+                initialName = suggestedName,
+                ioDispatcher = ioDispatcher,
+                computeDispatcher = computeDispatcher,
+            )
         }
     }
 }

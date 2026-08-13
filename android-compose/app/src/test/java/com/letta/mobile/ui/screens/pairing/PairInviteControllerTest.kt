@@ -5,7 +5,9 @@ import com.letta.mobile.data.controller.node.iroh.NoOpPairQrSigner
 import com.letta.mobile.data.controller.node.iroh.PairQrSigner
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -18,15 +20,17 @@ import org.junit.Test
  * Exercises [PairInviteController], the plain (non-Hilt) state machine
  * backing the server-mode invite screen.
  *
- * `mint()` hops onto real `Dispatchers.IO`/`Dispatchers.Default` internally
- * (same as `desktop/.../qr/DesktopPairInviteController.kt`, which this
- * mirrors), so `advanceUntilIdle()` alone is not sufficient — it only
- * drains the test scheduler's own queue and returns before the real
- * background dispatcher has necessarily posted its continuation back. This
- * uses the same fix the desktop test module already applies
- * (`DesktopPairInstallScreen.mintForTest()`): a suspend helper that calls
- * `mint()` then polls with `delay()` against a wall-clock deadline until
- * `loading` flips back to `false`.
+ * `mint()`'s dispatchers are constructor-injected, so these tests hand it
+ * the `runTest` scheduler and `advanceUntilIdle()` is fully sufficient —
+ * no wall-clock polling, no timeouts, deterministic.
+ *
+ * This deliberately differs from `desktop/.../qr/DesktopPairInviteController.kt`
+ * (which this otherwise mirrors) and its `mintForTest()` polling helper.
+ * That helper polls a real deadline because the desktop controller hard-codes
+ * `Dispatchers.IO`/`Default`; injecting them is the better fix and the one
+ * used here. See `ChatTimelineObserver.projectionDispatcher` for the same
+ * pattern elsewhere in the repo. Porting the desktop controller to injected
+ * dispatchers is tracked separately.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PairInviteControllerTest {
@@ -34,7 +38,7 @@ class PairInviteControllerTest {
     private val testSigner = PairQrSigner { _, _, _ -> "test-signature" }
     private val nodeIdHex = "ab".repeat(32)
 
-    private fun controller(
+    private fun TestScope.controller(
         scope: CoroutineScope,
         signer: PairQrSigner = testSigner,
     ): PairInviteController = PairInviteController.forTest(
@@ -42,15 +46,14 @@ class PairInviteControllerTest {
         signer = signer,
         nodeIdHex = nodeIdHex,
         pairingStore = InMemoryPairedPeerStore(),
+        ioDispatcher = StandardTestDispatcher(testScheduler),
+        computeDispatcher = StandardTestDispatcher(testScheduler),
     )
 
-    /** Calls [PairInviteController.mint] and waits (real wall-clock, polled via [delay]) for it to settle. */
-    private suspend fun PairInviteController.mintAndAwait(timeoutMs: Long = 5_000L) {
-        mint()
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (uiState.value.loading && System.currentTimeMillis() < deadline) {
-            delay(50L)
-        }
+    /** Calls [PairInviteController.mint] and drains the test scheduler until it settles. */
+    private fun TestScope.mintAndAwait(controller: PairInviteController) {
+        controller.mint()
+        advanceUntilIdle()
     }
 
     @Test
@@ -66,7 +69,7 @@ class PairInviteControllerTest {
     @Test
     fun `mint success populates wireValue matrix suggestedName and expiresAtMs`() = runTest {
         val c = controller(this)
-        c.mintAndAwait()
+        mintAndAwait(c)
         val state = c.uiState.value
         assertFalse(state.loading)
         assertNull(state.error)
@@ -84,7 +87,7 @@ class PairInviteControllerTest {
         // so qr_invite is omitted entirely from the response — the
         // controller must report that distinctly, not silently succeed.
         val c = controller(this, signer = NoOpPairQrSigner)
-        c.mintAndAwait()
+        mintAndAwait(c)
         val state = c.uiState.value
         assertFalse(state.loading)
         assertNotNull(state.error)
@@ -95,7 +98,7 @@ class PairInviteControllerTest {
     @Test
     fun `clearInvite drops wireValue matrix and expiresAtMs`() = runTest {
         val c = controller(this)
-        c.mintAndAwait()
+        mintAndAwait(c)
         assertNotNull(c.uiState.value.wireValue)
 
         c.clearInvite()
@@ -104,16 +107,16 @@ class PairInviteControllerTest {
         assertNull(cleared.matrix)
         assertNull(cleared.expiresAtMs)
 
-        c.mintAndAwait()
+        mintAndAwait(c)
         assertNotNull(c.uiState.value.wireValue)
     }
 
     @Test
     fun `successive mints produce different invite secrets`() = runTest {
         val c = controller(this)
-        c.mintAndAwait()
+        mintAndAwait(c)
         val first = c.uiState.value.wireValue
-        c.mintAndAwait()
+        mintAndAwait(c)
         val second = c.uiState.value.wireValue
         assertNotNull(first)
         assertNotNull(second)
