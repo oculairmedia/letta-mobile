@@ -15,6 +15,7 @@ import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.Tool
 import com.letta.mobile.data.model.ToolId
 import java.time.Instant
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.serialization.json.JsonPrimitive
 
 object TestData {
@@ -31,9 +32,9 @@ object TestData {
         name = name,
         model = model,
         description = description,
-        tags = tags,
+        tags = tags.toImmutableList(),
         system = system,
-        blocks = blocks,
+        blocks = blocks.toImmutableList(),
     )
 
     fun conversation(

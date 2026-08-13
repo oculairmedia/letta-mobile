@@ -193,6 +193,9 @@ private fun conversationCardMetadata(display: ConversationDisplay): String {
         if (display.isPinned) {
             append("Pinned • ")
         }
+        if (display.conversation.archived == true) {
+            append("Archived • ")
+        }
         append(display.agentName)
         if (timeText != null) {
             append(" • ")

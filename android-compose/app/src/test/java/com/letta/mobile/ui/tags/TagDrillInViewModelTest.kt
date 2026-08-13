@@ -13,6 +13,7 @@ import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,7 +47,7 @@ class TagDrillInViewModelTest {
         stepRepository = mockk(relaxed = true)
 
         every { agentRepository.agents } returns MutableStateFlow(
-            listOf(Agent(id = AgentId("agent-1"), name = "Starter Agent", tags = listOf("starter", "general")))
+            listOf(Agent(id = AgentId("agent-1"), name = "Starter Agent", tags = persistentListOf("starter", "general")))
         )
         every { toolRepository.getTools() } returns MutableStateFlow(
             listOf(Tool(id = ToolId("tool-1"), name = "Starter Tool", tags = listOf("starter", "utility")))

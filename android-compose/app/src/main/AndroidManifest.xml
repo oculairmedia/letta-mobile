@@ -33,6 +33,15 @@
         </intent>
     </queries>
 
+    <!-- letta-mobile-g2d2i: CameraX QR scanner for the "scan a pairing code"
+         (client mode) flow. Requested at runtime by QrScanScreen on first
+         entry; required=false so devices/emulators without a camera (and
+         the Root/Sideload flavors that may run on such hardware) still
+         install and simply can't use the scan flow. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
     <!-- Provider read CRUD (capability epic riq2i P3): runtime-gated normal
          dangerous permissions for reading contacts and calendar data. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />

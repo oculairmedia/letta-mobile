@@ -14,6 +14,8 @@ import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.data.repository.MessageRepository
 import com.letta.mobile.ui.common.UiState
 import com.letta.mobile.util.mapErrorToUserMessage
+import kotlinx.collections.immutable.ImmutableList
+import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -203,8 +205,8 @@ internal class EditAgentUseCases(
         )
     }
 
-    private fun EditAgentUiState.toToolRules(): List<JsonObject>? {
-        return parseOptionalJsonObjectArray(toolRulesJson, "Tool rules")
+    private fun EditAgentUiState.toToolRules(): ImmutableList<JsonObject>? {
+        return parseOptionalJsonObjectArray(toolRulesJson, "Tool rules")?.toImmutableList()
     }
 
     private fun Boolean.toNullableOverride(original: Boolean?): Boolean? {

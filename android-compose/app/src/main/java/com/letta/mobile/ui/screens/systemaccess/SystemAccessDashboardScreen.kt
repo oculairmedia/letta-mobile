@@ -86,6 +86,7 @@ import java.util.Locale
 @Composable
 fun SystemAccessDashboardScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToPairingScan: () -> Unit = {},
     viewModel: SystemAccessDashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,6 +113,21 @@ fun SystemAccessDashboardScreen(
                     }
                 },
                 actions = {
+                    // letta-mobile-g2d2i: device pairing entry point. This
+                    // dashboard is the closest existing "device identity /
+                    // capability" surface; a dedicated pairing hub screen
+                    // would be a cleaner home but is out of scope here.
+                    //
+                    // Only "scan" is wired here, not "show my code": the
+                    // phone doesn't run an Iroh listener (IrohNodeEndpoint
+                    // is only ever constructed in cli/ and
+                    // iroh-wrapper-cli/), so a phone-minted invite could
+                    // never be redeemed by anything. See the comment at
+                    // PairingInviteRoute's registration in AdminGraph.kt
+                    // and at the top of PairInviteScreen.kt.
+                    IconButton(onClick = onNavigateToPairingScan) {
+                        Icon(LettaIcons.Camera, stringResource(R.string.action_pair_scan))
+                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
                     }

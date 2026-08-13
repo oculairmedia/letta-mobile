@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
 import com.letta.mobile.ui.common.UiState
+import kotlinx.collections.immutable.persistentListOf
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -197,10 +198,10 @@ class BlockLibraryViewModelTest {
             Block(id = BlockId("b2"), label = "human", value = "Human block"),
         )
         agentsFlow.value = listOf(
-            Agent(id = AgentId("a1"), name = "Agent One", blocks = listOf(
+            Agent(id = AgentId("a1"), name = "Agent One", blocks = persistentListOf(
                 Block(id = BlockId("b1"), label = "persona", value = "Persona block"),
             )),
-            Agent(id = AgentId("a2"), name = "Agent Two", blocks = listOf(
+            Agent(id = AgentId("a2"), name = "Agent Two", blocks = persistentListOf(
                 Block(id = BlockId("b1"), label = "persona", value = "Persona block"),
                 Block(id = BlockId("b2"), label = "human", value = "Human block"),
             )),

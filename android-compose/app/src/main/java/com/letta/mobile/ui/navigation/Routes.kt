@@ -40,6 +40,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object CreateProjectRoute
 @Serializable data object TelemetryRoute
 @Serializable data object SystemAccessRoute
+@Serializable data object PairingScanRoute
+@Serializable data object PairingInviteRoute
 @Serializable data object VibesyncDebugRoute
 @Serializable
 data class ProjectIssuesRoute(

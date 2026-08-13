@@ -23,6 +23,7 @@ import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelCatalogItem
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDefaultConfig
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelDownloadState
 import com.letta.mobile.runtime.local.modelcatalog.EmbeddedModelRepository
+import kotlinx.collections.immutable.persistentListOf
 import io.mockk.clearMocks
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -132,7 +133,7 @@ class AgentListViewModelTest {
                 name = "Agent",
                 model = "openai/gpt-4o",
                 embedding = "openai/text-embedding-3-small",
-                toolIds = listOf(ToolId("t1"), ToolId("t2")),
+                toolIds = persistentListOf(ToolId("t1"), ToolId("t2")),
                 includeBaseTools = true,
             )
         ) { createdId = it }
@@ -157,7 +158,7 @@ class AgentListViewModelTest {
             AgentCreateParams(
                 name = "Local",
                 embedding = "remote/embed",
-                toolIds = listOf(ToolId("t1")),
+                toolIds = persistentListOf(ToolId("t1")),
                 includeBaseTools = true,
                 enableSleeptime = true,
             ),
@@ -236,7 +237,7 @@ class AgentListViewModelTest {
             name = "Remote",
             model = "openai/gpt-4o",
             embedding = "openai/text-embedding-3-small",
-            toolIds = listOf(ToolId("t1")),
+            toolIds = persistentListOf(ToolId("t1")),
             includeBaseTools = true,
         )
         val paramsSlot = slot<AgentCreateParams>()
@@ -345,9 +346,9 @@ class AgentListViewModelTest {
     fun `getAllTags returns sorted distinct tags from all agents`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = AgentId("a1"), name = "Agent1", tags = listOf("beta", "alpha")),
-                Agent(id = AgentId("a2"), name = "Agent2", tags = listOf("alpha", "gamma")),
-                Agent(id = AgentId("a3"), name = "Agent3", tags = emptyList()),
+                Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("beta", "alpha")),
+                Agent(id = AgentId("a2"), name = "Agent2", tags = persistentListOf("alpha", "gamma")),
+                Agent(id = AgentId("a3"), name = "Agent3", tags = persistentListOf()),
             )
         )
         viewModel = newViewModel()
@@ -401,9 +402,9 @@ class AgentListViewModelTest {
     fun `getFilteredAgents filters by selected tags with AND logic`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = AgentId("a1"), name = "Agent1", tags = listOf("alpha", "beta")),
-                Agent(id = AgentId("a2"), name = "Agent2", tags = listOf("alpha")),
-                Agent(id = AgentId("a3"), name = "Agent3", tags = listOf("beta", "gamma")),
+                Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha", "beta")),
+                Agent(id = AgentId("a2"), name = "Agent2", tags = persistentListOf("alpha")),
+                Agent(id = AgentId("a3"), name = "Agent3", tags = persistentListOf("beta", "gamma")),
             )
         )
         viewModel = newViewModel()
@@ -429,9 +430,9 @@ class AgentListViewModelTest {
     fun `getFilteredAgents combines tag filter with search query`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = AgentId("a1"), name = "ChatBot", tags = listOf("production")),
-                Agent(id = AgentId("a2"), name = "HelperBot", tags = listOf("production")),
-                Agent(id = AgentId("a3"), name = "TestBot", tags = listOf("staging")),
+                Agent(id = AgentId("a1"), name = "ChatBot", tags = persistentListOf("production")),
+                Agent(id = AgentId("a2"), name = "HelperBot", tags = persistentListOf("production")),
+                Agent(id = AgentId("a3"), name = "TestBot", tags = persistentListOf("staging")),
             )
         )
         viewModel = newViewModel()
@@ -448,7 +449,7 @@ class AgentListViewModelTest {
     fun `getFilteredAgents returns all when no tags selected and no search`() = runTest {
         every { agentRepository.agents } returns MutableStateFlow(
             listOf(
-                Agent(id = AgentId("a1"), name = "Agent1", tags = listOf("alpha")),
+                Agent(id = AgentId("a1"), name = "Agent1", tags = persistentListOf("alpha")),
                 Agent(id = AgentId("a2"), name = "Agent2"),
             )
         )

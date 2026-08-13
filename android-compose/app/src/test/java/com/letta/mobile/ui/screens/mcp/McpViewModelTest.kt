@@ -18,6 +18,7 @@ import com.letta.mobile.testutil.FakeMcpServerApi
 import com.letta.mobile.testutil.FakeToolApi
 import com.letta.mobile.testutil.TestData
 import com.letta.mobile.ui.common.UiState
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -157,7 +158,7 @@ class McpViewModelTest {
         val server = TestData.mcpServer(id = "s1")
         fakeMcpRepo.setServers(listOf(server))
         fakeMcpRepo.setServerTools(McpServerId("s1"), listOf(TestData.tool(id = "t1")))
-        fakeMcpRepo.resyncResult = McpServerResyncResult(added = listOf(ToolId("t1")))
+        fakeMcpRepo.resyncResult = McpServerResyncResult(added = persistentListOf(ToolId("t1")))
         viewModel.loadData()
 
         viewModel.checkServer(McpServerId("s1"))

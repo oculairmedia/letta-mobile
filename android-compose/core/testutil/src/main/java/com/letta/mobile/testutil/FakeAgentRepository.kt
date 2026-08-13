@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.ContextWindowOverview
 import com.letta.mobile.data.model.AgentImportParams
 import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.IAgentRepository
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -96,7 +97,7 @@ class FakeAgentRepository(
             model = params.model,
             description = params.description,
             tags = params.tags.orEmpty(),
-        ).copy(metadata = params.metadata.orEmpty(), tools = emptyList())
+        ).copy(metadata = params.metadata.orEmpty(), tools = persistentListOf())
         agentsState.value += agent
         return agent
     }
