@@ -16,6 +16,7 @@ import com.letta.mobile.data.session.BackendSwitchClearResult
 import com.letta.mobile.data.session.BackendSwitchInvalidator
 import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.backendIdentity
 import com.letta.mobile.data.storage.SecureSettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,21 +72,25 @@ class SettingsRepository internal constructor(
     override val activeConfig: StateFlow<LettaConfig?> = _activeConfig.asStateFlow()
 
     /**
-     * letta-mobile-ze5l: emits whenever the active backend's config id
-     * changes (drops the initial value at subscription time). Top-level
+     * letta-mobile-ze5l: emits whenever the active backend changes
+     * (drops the initial value at subscription time). Top-level
      * data ViewModels collect this to call their existing refresh entry
      * points so the currently-visible screen re-fetches against the new
      * server without requiring the user to navigate away and back.
      *
      * The first-emission drop is intentional: subscribers do not need
-     * to refresh on attach, only on subsequent changes. The id-based
-     * distinctness avoids redundant emissions if [_activeConfig] is
-     * re-emitted with the same identity (e.g. token rotation).
+     * to refresh on attach, only on subsequent changes. The
+     * backend-identity distinctness (id + mode + serverUrl — see
+     * [BackendIdentity]) avoids redundant emissions if [_activeConfig] is
+     * re-emitted with the same backend identity (e.g. token rotation),
+     * while still emitting when a same-id edit flips the mode or server
+     * URL — the config-edit mode dropdown reuses the active config's id
+     * (letta-mobile-xzoy3).
      */
     override val activeConfigChanges: Flow<LettaConfig> = activeConfig
         .drop(1)
         .filterNotNull()
-        .distinctUntilChanged { old, new -> old.id == new.id }
+        .distinctUntilChanged { old, new -> old.backendIdentity() == new.backendIdentity() }
 
     private val _favoriteAgentId = MutableStateFlow<String?>(null)
     override val favoriteAgentId: StateFlow<String?> = _favoriteAgentId.asStateFlow()

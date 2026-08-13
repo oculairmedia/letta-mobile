@@ -7,6 +7,7 @@ import com.letta.mobile.data.repository.LastChatSelection
 import com.letta.mobile.data.repository.LastChatSelectionStorage
 import com.letta.mobile.data.repository.mergeLastChatSelection
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.backendIdentity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -70,7 +71,7 @@ class FakeSettingsRepository(
     override val activeConfigChanges: Flow<LettaConfig> = activeConfigState
         .drop(1)
         .filterNotNull()
-        .distinctUntilChanged { old, new -> old.id == new.id }
+        .distinctUntilChanged { old, new -> old.backendIdentity() == new.backendIdentity() }
 
     override val favoriteAgentId: StateFlow<String?> = favoriteAgentIdState.asStateFlow()
 

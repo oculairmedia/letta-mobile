@@ -90,3 +90,21 @@ interface ISettingsRepository {
     suspend fun setEnableProjects(enabled: Boolean)
     suspend fun setHapticsEnabled(enabled: Boolean)
 }
+
+/**
+ * Backend identity of a [LettaConfig]: the fields that determine which
+ * backend the active config points at. Used as the distinctness key for
+ * [ISettingsRepository.activeConfigChanges] (letta-mobile-xzoy3).
+ *
+ * Same-id edits that flip [LettaConfig.Mode] (CLOUD<->LOCAL) or the server
+ * URL are real backend switches and MUST be observed by consumers; a
+ * token-only rotation is not a backend switch, so [LettaConfig.accessToken]
+ * is deliberately excluded from the identity.
+ */
+data class BackendIdentity(
+    val id: String,
+    val mode: LettaConfig.Mode,
+    val serverUrl: String,
+)
+
+fun LettaConfig.backendIdentity(): BackendIdentity = BackendIdentity(id, mode, serverUrl)
