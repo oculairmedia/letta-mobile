@@ -98,6 +98,36 @@ internal class ChatConversationCoordinator(
         setRouteConversationId(conversationId)
     }
 
+    /**
+     * letta-mobile-6bqi1: true when the current conversation's messages are
+     * already on screen. Reads the VM-level render cache, which survives device
+     * rotation (the VM outlives the Activity) and same-VM re-entry. A fresh VM
+     * (new route key) starts with empty messages, so genuine first loads still
+     * show the loader.
+     */
+    private val isConversationAlreadyHydrated: Boolean
+        get() = uiState.value.messages.isNotEmpty()
+
+    /**
+     * letta-mobile-6bqi1: mark the selected conversation loaded without
+     * re-entering Loading when its messages are already on screen. Both reducers
+     * are generation-guarded identically from the post-`conversationsLoaded`
+     * generation, so the swap is transparent to the timeline observer's
+     * generation source — only the Loading transition is skipped.
+     */
+    private fun hydrateOrShowLoading(
+        current: ChatSessionState,
+        summary: ChatConversationSummary,
+        hydrated: Boolean,
+    ): ChatSessionState {
+        val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
+        return if (hydrated) {
+            ChatSessionReducer.hydrateCompleted(next, next.selectionGeneration)
+        } else {
+            ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+        }
+    }
+
     fun resolveConversationAndLoad(useClientModeForResolve: Boolean) {
         val isFirstResolve = !hasResolvedConversationOnce
         hasResolvedConversationOnce = true
@@ -105,7 +135,14 @@ internal class ChatConversationCoordinator(
             setRouteConversationId(null)
         }
         scope.launch {
-            updateSessionState { ChatSessionReducer.beginConversationLoad(it) }
+            // letta-mobile-6bqi1: skip the eager Loading flash when the
+            // conversation's messages are already on screen (re-entry / device
+            // rotation). The resolve below still runs — conversationsLoaded +
+            // the guarded hydrate keep the session Live — so the background
+            // reconcile still re-fills the conversation.
+            if (!isConversationAlreadyHydrated) {
+                updateSessionState { ChatSessionReducer.beginConversationLoad(it) }
+            }
 
             try {
                 if (useClientModeForResolve) {
@@ -282,8 +319,7 @@ internal class ChatConversationCoordinator(
                 lastMessagePreview = "",
             )
             updateSessionState { current ->
-                val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
-                ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+                hydrateOrShowLoading(current, summary, isConversationAlreadyHydrated)
             }
             agent?.name?.let { uiState.value = uiState.value.copy(agentName = it) }
             loadMessagesInternal()
@@ -374,8 +410,7 @@ internal class ChatConversationCoordinator(
                     lastMessagePreview = "",
                 )
                 updateSessionState { current ->
-                    val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
-                    ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+                    hydrateOrShowLoading(current, summary, isConversationAlreadyHydrated)
                 }
                 uiState.value = uiState.value.copy(
                     agentName = cachedAgent.name ?: uiState.value.agentName,
@@ -385,16 +420,15 @@ internal class ChatConversationCoordinator(
             }
         } else {
             if (requestedConversationId == currentConversationId) {
+                val summary = ChatConversationSummary(
+                    id = requestedConversationId,
+                    title = uiState.value.agentName,
+                    agentName = uiState.value.agentName,
+                    updatedAtLabel = "",
+                    lastMessagePreview = "",
+                )
                 updateSessionState { current ->
-                    val summary = ChatConversationSummary(
-                        id = requestedConversationId,
-                        title = uiState.value.agentName,
-                        agentName = uiState.value.agentName,
-                        updatedAtLabel = "",
-                        lastMessagePreview = "",
-                    )
-                    val next = ChatSessionReducer.conversationsLoaded(current, listOf(summary))
-                    ChatSessionReducer.beginSelectedConversationHydrate(next, next.selectionGeneration)
+                    hydrateOrShowLoading(current, summary, isConversationAlreadyHydrated)
                 }
             }
         }

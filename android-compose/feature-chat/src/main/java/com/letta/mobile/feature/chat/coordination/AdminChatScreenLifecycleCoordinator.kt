@@ -26,6 +26,14 @@ internal class AdminChatScreenLifecycleCoordinator(
      * reconnect ran. Probing first makes that branch reachable.
      */
     private val probeConnection: () -> Unit = {},
+    /**
+     * letta-mobile-6bqi1: true when the on-screen messages are still present in
+     * the VM render cache (device rotation wipes the SESSION state via
+     * retryConnection, but the VM-level uiState messages survive). When true,
+     * skip the destructive wipe — resolveConversationAndLoad re-establishes the
+     * connection without re-entering Loading, so there is no reload flash.
+     */
+    private val isAlreadyHydrated: () -> Boolean = { false },
 ) {
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
@@ -45,11 +53,13 @@ internal class AdminChatScreenLifecycleCoordinator(
             currentConversationTracker.setCurrent(currentId)
             val conn = sessionState.value.connectionState
             if (conn == ChatConnectionState.Offline || conn == ChatConnectionState.StreamDisconnected) {
-                updateSessionState { current ->
-                    ChatSessionReducer.retryConnection(
-                        current = current,
-                        initial = ChatSessionState(),
-                    )
+                if (!isAlreadyHydrated()) {
+                    updateSessionState { current ->
+                        ChatSessionReducer.retryConnection(
+                            current = current,
+                            initial = ChatSessionState(),
+                        )
+                    }
                 }
                 resolveConversationAndLoad()
             }
