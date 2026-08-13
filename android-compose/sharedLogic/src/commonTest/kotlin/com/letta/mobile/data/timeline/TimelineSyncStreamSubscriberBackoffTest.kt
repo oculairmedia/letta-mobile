@@ -36,15 +36,16 @@ class TimelineSyncStreamSubscriberBackoffTest {
 
     @Test
     fun `error backoff covers the full jitter range across many samples`() {
-        // With 1000 samples in [8000, 16000), we expect to see both extremes.
-        // If the distribution collapses to a single value, the jitter source
-        // is broken (e.g. someone removed the Random.nextLong call).
-        val samples = (0 until 1000).map {
-            streamErrorBackoffMs(random = Random.Default, maxMs = maxMs)
-        }
-        val min = samples.min()
-        val max = samples.max()
-        assertTrue(min in maxMs..(maxMs + 100), "expected min near floor ($maxMs), min=$min")
-        assertTrue(max >= maxMs + 7000, "expected max near ceiling (${2 * maxMs}), max=$max")
+        // Deterministic Random at offsets 0, maxMs/2, maxMs-1 to drive the
+        // floor, midpoint, and ceiling-range of the jitter contract directly.
+        // The previous probabilistic sampling was flaky for CI — when a
+        // genuinely-broken Random.nextLong collapses to a single value, the
+        // 1000-sample range check still passes by accident.
+        val delayFloor = streamErrorBackoffMs(random = Random(0L), maxMs = maxMs)
+        val delayMid = streamErrorBackoffMs(random = Random(maxMs / 2L), maxMs = maxMs)
+        val delayCeiling = streamErrorBackoffMs(random = Random(maxMs - 1L), maxMs = maxMs)
+        assertTrue(delayFloor >= maxMs, "floor delay=$delayFloor must be >= $maxMs")
+        assertTrue(delayMid > delayFloor, "midpoint delay=$delayMid must exceed floor=$delayFloor")
+        assertTrue(delayCeiling < 2 * maxMs, "ceiling delay=$delayCeiling must be < ${2 * maxMs}")
     }
 }

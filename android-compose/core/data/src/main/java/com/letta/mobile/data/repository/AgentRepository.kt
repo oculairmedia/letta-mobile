@@ -285,15 +285,20 @@ open class AgentRepository(
     }
 
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
-        val cached = _agents.value.find { it.id == id }
+        // H5 (data-efficiency-audit): read the cached entry + the bulk
+        // freshness marker from ONE synchronized snapshot so a concurrent
+        // refreshAgents() cannot race us into emitting a pre-refresh cached
+        // value the user no longer has.
+        val snapshot = refreshMutex.withLock {
+            val cached = _agents.value.find { it.id == id }
+            cached to System.currentTimeMillis()
+        }
+        val cached = snapshot.first
+        val snapshotAgeMs = snapshot.second - lastRefreshAtMillis
         if (cached != null) {
             emit(cached)
         }
-        // H5 (data-efficiency-audit): if the bulk agent list was refreshed
-        // recently, the cached agent is already server-fresh. Skip the
-        // per-agent GET so opening the same chat twice in quick succession
-        // doesn't double the network cost.
-        if (shouldSkipRemoteFetch(cached)) return@flow
+        if (cached != null && snapshotAgeMs <= SINGLE_AGENT_FRESH_WINDOW_MS) return@flow
         val localSource = localAgentSource
         if (localSource != null && isLocalRuntimeActive()) {
             // No remote API for local agents; serve the durable store copy
@@ -310,14 +315,6 @@ open class AgentRepository(
         emit(fresh)
         updateAgentInCache(fresh)
     }
-
-    /**
-     * H5 (data-efficiency-audit): true when [getAgent] can trust the cached
-     * copy and skip the per-agent GET — there was a cache hit and the bulk
-     * agent list is still within [SINGLE_AGENT_FRESH_WINDOW_MS].
-     */
-    private fun shouldSkipRemoteFetch(cached: Agent?): Boolean =
-        cached != null && hasFreshAgents(SINGLE_AGENT_FRESH_WINDOW_MS)
 
     /**
      * Fetch a single agent from the active backend. Routes over the Iroh admin

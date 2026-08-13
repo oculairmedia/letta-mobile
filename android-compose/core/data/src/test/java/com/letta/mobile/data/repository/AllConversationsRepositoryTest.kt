@@ -296,6 +296,15 @@ class AllConversationsRepositoryTest {
             "expected \u2264 2 listConversations calls, got $listCalls (${fakeApi.calls})",
             listCalls <= 2,
         )
+        // The mutex serializes fetchPage + refresh: the peak number of
+        // concurrent listConversations() in-flight at any moment must be 1.
+        // Without the mutex, refresh and loadNextPage would both call
+        // listConversations simultaneously and the peak would be >= 2.
+        assertEquals(
+            "mutex must serialize; observed peak concurrent listConversations calls=${fakeApi.peakConcurrentListConversations.get()}",
+            1,
+            fakeApi.peakConcurrentListConversations.get(),
+        )
         // No duplicates: each conversation id is present at most once.
         val ids = repository.conversations.value.map { it.id.value }
         assertEquals(ids.size, ids.toSet().size)
