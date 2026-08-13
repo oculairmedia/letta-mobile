@@ -533,7 +533,11 @@ class TimelineSyncLoop(
 
     companion object {
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
-        private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 12
+        // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
+        // Previously 12x (6 minutes) — a dead stream could go undetected
+        // for too long. 6x still tolerates 6 missed heartbeats (plenty of
+        // margin for network jitter) while detecting stuck streams faster.
+        private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 6
         private const val MAX_SEEN_STREAM_MESSAGES = 512
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
