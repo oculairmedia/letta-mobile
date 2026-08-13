@@ -204,6 +204,13 @@ class ConversationsViewModel @Inject constructor(
             try {
                 val activeConfigIsLocalRuntime = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value)
                 allConversationsRepository.refresh()
+                // letta-mobile-i7qpp: a backend switch empties the roster
+                // (clearForBackendSwitch); refetch before reading agents.value
+                // or rows degrade to agent-id prefixes. Same guard
+                // loadConversations() uses. Agent failures must not block the
+                // conversation list refresh.
+                runCatching { agentRepository.refreshAgentsIfStale(LIST_CACHE_TTL_MS) }
+                    .onFailure { Log.w("ConversationsVM", "Agent refresh failed", it) }
                 val displayAgents = displayAgents(agentRepository.agents.value, activeConfigIsLocalRuntime)
                 val displayConversations = displayConversations(
                     allConversationsRepository.conversations.value,

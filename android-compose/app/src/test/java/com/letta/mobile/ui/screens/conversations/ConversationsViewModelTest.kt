@@ -257,6 +257,49 @@ class ConversationsViewModelTest {
     }
 
     @Test
+    fun `backend switch auto-refresh refetches agents so names resolve`() = runTest {
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
+        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
+        settingsRepository.saveConfig(remoteConfig())
+        viewModel = newViewModel()
+        viewModel.loadConversations()
+        assertEquals("Agent One", viewModel.uiState.value.conversations.first().agentName)
+
+        // The switch path races the graph rebuild: the roster is empty when
+        // refresh() runs (clearForBackendSwitch), and must be refetched before
+        // the name cache is rebuilt — otherwise rows fall back to ID prefixes.
+        fakeAgentRepo.setAgents(emptyList())
+        fakeAgentRepo.refreshFetchResult = listOf(Agent(id = AgentId("a1"), name = "Agent One"))
+        fakeAgentRepo.didRefresh = false
+
+        // Same config id, different serverUrl -> distinct BackendIdentity ->
+        // activeConfigChanges emits, driving refresh().
+        settingsRepository.saveConfig(remoteConfigOther())
+
+        assertTrue(fakeAgentRepo.didRefresh)
+        assertEquals("Agent One", viewModel.uiState.value.conversations.first().agentName)
+    }
+
+    @Test
+    fun `backend switch auto-refresh keeps conversations when agent refetch fails`() = runTest {
+        fakeAllRepo.setConversations(listOf(TestData.conversation(id = "1", agentId = "a1")))
+        fakeAgentRepo.setAgents(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
+        settingsRepository.saveConfig(remoteConfig())
+        viewModel = newViewModel()
+        viewModel.loadConversations()
+        assertEquals("Agent One", viewModel.uiState.value.conversations.first().agentName)
+
+        fakeAgentRepo.setAgents(emptyList())
+        fakeAgentRepo.refreshFailure = IllegalStateException("Agents failed")
+        fakeAgentRepo.didRefresh = false
+
+        settingsRepository.saveConfig(remoteConfigOther())
+
+        assertFalse(viewModel.uiState.value.isRefreshing)
+        assertEquals(1, viewModel.uiState.value.conversations.size)
+    }
+
+    @Test
     fun `local config without model exposes setup readiness`() = runTest {
         settingsRepository.saveConfig(
             LettaConfig(
@@ -386,6 +429,12 @@ class ConversationsViewModelTest {
         serverUrl = "https://api.letta.example",
     )
 
+    private fun remoteConfigOther(): LettaConfig = LettaConfig(
+        id = "remote",
+        mode = LettaConfig.Mode.CLOUD,
+        serverUrl = "https://api.letta.other",
+    )
+
     private fun localAgent(id: String, name: String): Agent = Agent(
         id = AgentId(id),
         name = name,
@@ -455,6 +504,7 @@ class ConversationsViewModelTest {
         var fresh: Boolean = false
         var didRefresh: Boolean = false
         var refreshFailure: Throwable? = null
+        var refreshFetchResult: List<Agent>? = null
         override suspend fun refreshAgents() { didRefresh = true }
         override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
             refreshFailure?.let { error ->
@@ -464,6 +514,7 @@ class ConversationsViewModelTest {
             if (fresh) return false
             _refreshError.value = null
             didRefresh = true
+            refreshFetchResult?.let { _agents.value = it }
             return true
         }
         override fun getAgent(id: AgentId) = flow { emit(_agents.value.first()) }
