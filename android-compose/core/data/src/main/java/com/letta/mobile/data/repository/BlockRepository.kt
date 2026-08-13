@@ -36,7 +36,7 @@ class BlockRepository @Inject constructor(
     /**
      * In iroh:// mode the HTTP admin route is hard-failed at the LettaApiClient
      * choke-point, so this must go through admin_rpc. The paged `block.list`
-     * envelope carries an authoritative `total`, which is a truthful exact count —
+     * envelope carries an authoritative `total`, which is a truthful exact count --
      * unlike inferring one from however many rows a pager managed to accumulate.
      */
     override suspend fun countBlocks(): Int {
@@ -108,11 +108,37 @@ class BlockRepository @Inject constructor(
         if (irohSource != null && irohSource.shouldUseIroh()) {
             return irohSource.listAllBlocks(label, isTemplate)
         }
-        return blockApi.listAllBlocks(label = label, isTemplate = isTemplate, limit = 1000)
+        return exhaustPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, offset ->
+                blockApi.listAllBlocks(
+                    label = label,
+                    isTemplate = isTemplate,
+                    limit = limit,
+                    offset = offset,
+                )
+            },
+            dedupKey = { block -> block.id.value },
+        )
     }
 
     override suspend fun listAgentsForBlock(blockId: String): List<Agent> {
-        return blockApi.listAgentsForBlock(blockId = blockId, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                blockApi.listAgentsForBlock(
+                    blockId = blockId,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { agent -> agent.id.value },
+            dedupKey = { agent -> agent.id.value },
+        )
     }
 
     override suspend fun attachIdentityToBlock(blockId: String, identityId: String): Block {

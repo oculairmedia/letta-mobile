@@ -159,6 +159,12 @@ kotlin {
                 // transitive dep references javax.imageio.spi classes that
                 // don't exist on Android and break R8 shrinking.
                 implementation("com.google.zxing:javase:3.5.3")
+                // ktor-websockets carries the JVM WebSocketDeflateExtension
+                // class used by AppServerWebSocketExtensions.kt
+                // (data-efficiency Phase 2 / Q2). The class itself lives in the
+                // shared commons under package io.ktor.websocket; the JVM
+                // variant bundles the Deflater-backed deflate implementation.
+                api("io.ktor:ktor-websockets:3.5.0")
             }
         }
 

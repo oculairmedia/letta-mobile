@@ -131,11 +131,40 @@ open class MessageRepository @Inject constructor(
     }
 
     override suspend fun listBatches(): List<Job> {
-        return messageApi.listBatches(limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
+            fetch = { limit, after ->
+                messageApi.listBatches(
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { job -> job.id },
+            dedupKey = { job -> job.id },
+        )
     }
 
     override suspend fun listBatchMessages(batchId: String, agentId: AgentId?): BatchMessagesResponse {
-        return messageApi.listBatchMessages(batchId = batchId, limit = 1000, agentId = agentId?.value)
+        val messages = exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
+            fetch = { limit, after ->
+                messageApi.listBatchMessages(
+                    batchId = batchId,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                    agentId = agentId?.value,
+                ).messages
+            },
+            extractCursor = { message -> message.id },
+            dedupKey = { message -> message.id },
+        )
+        return BatchMessagesResponse(messages = messages)
     }
 
     override suspend fun cancelBatch(batchId: String) {

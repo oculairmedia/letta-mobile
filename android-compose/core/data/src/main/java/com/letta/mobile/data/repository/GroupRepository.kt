@@ -30,7 +30,23 @@ class GroupRepository(
             _groups.value = irohSource.listGroups(managerType, projectId?.value, showHiddenGroups)
             return
         }
-        _groups.value = groupApi.listGroups(limit = 1000, managerType = managerType, projectId = projectId?.value, showHiddenGroups = showHiddenGroups)
+        _groups.value = exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                groupApi.listGroups(
+                    managerType = managerType,
+                    before = null,
+                    after = after,
+                    limit = limit,
+                    order = null,
+                    projectId = projectId?.value,
+                    showHiddenGroups = showHiddenGroups,
+                )
+            },
+            extractCursor = { group -> group.id.value },
+            dedupKey = { group -> group.id.value },
+        )
     }
 
     override suspend fun countGroups(): Int = groupApi.countGroups()
@@ -69,7 +85,21 @@ class GroupRepository(
     }
 
     override suspend fun listGroupMessages(groupId: GroupId): List<LettaMessage> {
-        return groupApi.listGroupMessages(groupId = groupId.value, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
+            fetch = { limit, after ->
+                groupApi.listGroupMessages(
+                    groupId = groupId.value,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { message -> message.id },
+            dedupKey = { message -> message.id },
+        )
     }
 
     override suspend fun resetGroupMessages(groupId: GroupId) {

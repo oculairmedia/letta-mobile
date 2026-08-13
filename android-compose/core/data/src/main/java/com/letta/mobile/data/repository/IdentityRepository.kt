@@ -82,11 +82,39 @@ class IdentityRepository(
     }
 
     override suspend fun listAgentsForIdentity(identityId: IdentityId): List<Agent> {
-        return identityApi.listAgentsForIdentity(identityId = identityId.value, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                identityApi.listAgentsForIdentity(
+                    identityId = identityId.value,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { agent -> agent.id.value },
+            dedupKey = { agent -> agent.id.value },
+        )
     }
 
     override suspend fun listBlocksForIdentity(identityId: IdentityId): List<Block> {
-        return identityApi.listBlocksForIdentity(identityId = identityId.value, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                identityApi.listBlocksForIdentity(
+                    identityId = identityId.value,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { block -> block.id.value },
+            dedupKey = { block -> block.id.value },
+        )
     }
 
     private fun upsertIdentityInCache(identity: Identity) {
