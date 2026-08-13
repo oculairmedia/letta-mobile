@@ -122,7 +122,7 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `activeConfigChanges emits first real selection after initial null and deduplicates by id`() = runTest {
+    fun `activeConfigChanges emits first real selection after initial null and deduplicates by backend identity`() = runTest {
         val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             repository.activeConfigChanges.collect { emissions.send(it) }
@@ -135,11 +135,48 @@ class SettingsRepositoryTest {
         repository.saveConfig(c1)
         assertEquals("c1", emissions.receive().id)
 
+        // Token-only rotation keeps the same backend identity -> suppressed.
         repository.saveConfig(c1Updated)
         assertNull(withTimeoutOrNull(100.milliseconds) { emissions.receive() })
 
         repository.saveConfig(c2)
         assertEquals("c2", emissions.receive().id)
+    }
+
+    // letta-mobile-xzoy3: the config-edit mode dropdown reuses the active
+    // config's id (ConfigViewModel.saveConfig with asNewEntry=false), so a
+    // same-id mode flip must still emit or no consumer refreshes.
+    @Test
+    fun `activeConfigChanges emits on same-id mode flip`() = runTest {
+        val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.activeConfigChanges.collect { emissions.send(it) }
+        }
+
+        val cloud = LettaConfig(id = "c1", mode = LettaConfig.Mode.CLOUD, serverUrl = "https://api.letta.com")
+        repository.saveConfig(cloud)
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(cloud.copy(mode = LettaConfig.Mode.LOCAL, serverUrl = "local-lettacode://device"))
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(cloud.copy(mode = LettaConfig.Mode.CLOUD, serverUrl = "https://api.letta.com"))
+        assertEquals("c1", emissions.receive().id)
+    }
+
+    @Test
+    fun `activeConfigChanges emits on same-id server url change`() = runTest {
+        val emissions = Channel<LettaConfig>(Channel.UNLIMITED)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            repository.activeConfigChanges.collect { emissions.send(it) }
+        }
+
+        val c1 = LettaConfig(id = "c1", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://old.com")
+        repository.saveConfig(c1)
+        assertEquals("c1", emissions.receive().id)
+
+        repository.saveConfig(c1.copy(serverUrl = "http://new.com"))
+        assertEquals("c1", emissions.receive().id)
     }
 
     @Test
