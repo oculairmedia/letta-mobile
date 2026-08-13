@@ -368,6 +368,7 @@ internal class AdminChatViewModel @Inject constructor(
             resolveConversationAndLoad = ::resolveConversationAndLoad,
             updateSessionState = ::updateSessionState,
             probeConnection = wsChatBridge::probeNow,
+            isAlreadyHydrated = { _uiState.value.messages.isNotEmpty() },
         )
     }
 

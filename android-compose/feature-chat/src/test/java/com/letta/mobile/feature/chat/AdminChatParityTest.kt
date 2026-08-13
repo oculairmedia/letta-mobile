@@ -21,6 +21,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -155,6 +157,70 @@ class AdminChatParityTest {
         // the resolver's getAgent.
         val resolverCalls = harness.coordinator.rosterNameResolverForTest.resolveCallsForTest()
         assertEquals(0, resolverCalls)
+    }
+
+    @Test
+    fun `already hydrated conversation skips the Loading flash on re-entry`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+        harness.sessionState.value = ChatSessionState(
+            conversations = listOf(
+                com.letta.mobile.data.chat.runtime.ChatConversationSummary(
+                    id = "conversation-1",
+                    title = "Ada",
+                    agentName = "Ada",
+                    updatedAtLabel = "",
+                    lastMessagePreview = "",
+                )
+            ),
+            selectedConversationId = "conversation-1",
+            connectionState = ChatConnectionState.Live,
+        )
+        harness.uiState.value = harness.uiState.value.copy(
+            messages = persistentListOf(
+                UiMessage(
+                    id = "m1",
+                    role = "assistant",
+                    content = "hello",
+                    timestamp = "2026-05-16T00:00:00Z",
+                )
+            )
+        )
+
+        val seen = mutableListOf<ChatConnectionState>()
+        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.sessionState.collect { seen += it.connectionState }
+        }
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+        collector.cancel()
+
+        // letta-mobile-6bqi1: the eager Loading transition must never appear
+        // when the conversation's messages are already on screen (re-entry /
+        // rotation). beginConversationLoad and beginSelectedConversationHydrate
+        // both set connectionState = Loading; the guard routes to
+        // hydrateCompleted instead, which lands on Live.
+        assertTrue("Loading flash observed: $seen", ChatConnectionState.Loading !in seen)
+        assertEquals(ChatConnectionState.Live, harness.sessionState.value.connectionState)
+    }
+
+    @Test
+    fun `fresh conversation still shows the Loading flash`() = runTest {
+        val harness = Harness(this)
+        harness.routeConversationId = "conversation-1"
+
+        val seen = mutableListOf<ChatConnectionState>()
+        val collector = launch(UnconfinedTestDispatcher(testScheduler)) {
+            harness.sessionState.collect { seen += it.connectionState }
+        }
+        harness.coordinator.resolveConversationAndLoad(useClientModeForResolve = false)
+        advanceUntilIdle()
+        collector.cancel()
+
+        // letta-mobile-6bqi1: a genuine first load (empty VM render cache)
+        // must still enter Loading so the skeleton shows.
+        assertTrue("expected Loading transition, saw: $seen", ChatConnectionState.Loading in seen)
+        assertEquals(ChatConnectionState.Live, harness.sessionState.value.connectionState)
     }
 
     private class Harness(scope: CoroutineScope) {
