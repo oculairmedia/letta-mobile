@@ -2,11 +2,14 @@ package com.letta.mobile.ui.screens.conversations
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -177,6 +180,7 @@ fun ConversationsScreen(
             isRefreshing = uiState.isRefreshing,
             searchQuery = uiState.searchQuery,
             isSearchExpanded = isSearchExpanded,
+            showArchived = uiState.showArchived,
             localReadiness = uiState.localLettaCodeReadiness,
             showFirstRunOnboarding = uiState.shouldShowFirstRunOnboarding(),
             activeBackendLabel = activeBackendLabel,
@@ -189,6 +193,7 @@ fun ConversationsScreen(
             onSearchQueryChange = viewModel::updateSearchQuery,
             onSearchExpandedChange = { isSearchExpanded = it },
             onShowOverflowMenuChange = { showOverflowMenu = it },
+            onToggleShowArchived = viewModel::toggleShowArchived,
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToBackendSwitcher = onNavigateToBackendSwitcher,
             onConversationClick = listActions.onConversationClick,
@@ -251,6 +256,7 @@ internal data class ConversationsScreenState(
     val isRefreshing: Boolean,
     val searchQuery: String,
     val isSearchExpanded: Boolean,
+    val showArchived: Boolean,
     val localReadiness: LocalLettaCodeCreateReadiness,
     val showFirstRunOnboarding: Boolean,
     val activeBackendLabel: String?,
@@ -264,6 +270,7 @@ internal data class ConversationsScreenCallbacks(
     val onSearchQueryChange: (String) -> Unit,
     val onSearchExpandedChange: (Boolean) -> Unit,
     val onShowOverflowMenuChange: (Boolean) -> Unit,
+    val onToggleShowArchived: () -> Unit,
     val onNavigateToSettings: () -> Unit,
     val onNavigateToBackendSwitcher: (() -> Unit)?,
     val onConversationClick: (ConversationDisplay) -> Unit,
@@ -347,19 +354,41 @@ internal fun ConversationsScreenContent(
                 )
             }
             else -> {
-                ConversationListContent(
-                    state = ConversationListContentState(
-                        conversations = state.conversations,
-                        isRefreshing = state.isRefreshing,
-                        isSearchActive = state.searchQuery.isNotBlank(),
-                        showFirstRunOnboarding = state.showFirstRunOnboarding,
-                        localReadiness = state.localReadiness,
-                        onCreateFirstAgent = state.onCreateFirstAgent,
-                        onOpenLocalSettings = state.onOpenLocalSettings,
-                    ),
-                    actions = callbacks.toListActions(),
-                    modifier = Modifier.padding(paddingValues),
-                )
+                Column(modifier = Modifier.padding(paddingValues)) {
+                    // Archive filter chip row
+                    if (state.hasConversations) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilterChip(
+                                selected = !state.showArchived,
+                                onClick = { if (!state.showArchived) callbacks.onToggleShowArchived() },
+                                label = { Text(stringResource(R.string.screen_conversations_active_label)) },
+                            )
+                            FilterChip(
+                                selected = state.showArchived,
+                                onClick = { if (state.showArchived) callbacks.onToggleShowArchived() },
+                                label = { Text(stringResource(R.string.screen_conversations_archived_label)) },
+                            )
+                        }
+                    }
+                    ConversationListContent(
+                        state = ConversationListContentState(
+                            conversations = state.conversations,
+                            isRefreshing = state.isRefreshing,
+                            isSearchActive = state.searchQuery.isNotBlank(),
+                            showFirstRunOnboarding = state.showFirstRunOnboarding,
+                            localReadiness = state.localReadiness,
+                            onCreateFirstAgent = state.onCreateFirstAgent,
+                            onOpenLocalSettings = state.onOpenLocalSettings,
+                        ),
+                        actions = callbacks.toListActions(),
+                        modifier = Modifier.weight(1f),
+                    )
+                }
             }
         }
     }
@@ -477,6 +506,7 @@ private fun previewConversationsScreenState(
     showFirstRunOnboarding: Boolean = false,
     isSearchExpanded: Boolean = false,
     searchQuery: String = "",
+    showArchived: Boolean = false,
 ) = ConversationsScreenState(
     isLoading = isLoading,
     error = error,
@@ -485,6 +515,7 @@ private fun previewConversationsScreenState(
     isRefreshing = false,
     searchQuery = searchQuery,
     isSearchExpanded = isSearchExpanded,
+    showArchived = showArchived,
     localReadiness = LocalLettaCodeCreateReadiness(),
     showFirstRunOnboarding = showFirstRunOnboarding,
     activeBackendLabel = null,
@@ -520,6 +551,7 @@ private fun previewConversationsScreenCallbacks() = ConversationsScreenCallbacks
     onSearchQueryChange = {},
     onSearchExpandedChange = {},
     onShowOverflowMenuChange = {},
+    onToggleShowArchived = {},
     onNavigateToSettings = {},
     onNavigateToBackendSwitcher = null,
     onConversationClick = {},

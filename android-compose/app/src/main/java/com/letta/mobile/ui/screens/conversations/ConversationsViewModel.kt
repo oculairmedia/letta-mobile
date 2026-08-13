@@ -50,6 +50,7 @@ data class ConversationsUiState(
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
     val searchQuery: String = "",
+    val showArchived: Boolean = false,
     val selectedConversation: ConversationDisplay? = null,
     val inspectorMessages: ImmutableList<ConversationInspectorMessage> = persistentListOf(),
     val isInspectorLoading: Boolean = false,
@@ -244,13 +245,22 @@ class ConversationsViewModel @Inject constructor(
 
     fun getFilteredConversations(): List<ConversationDisplay> {
         val state = _uiState.value
-        if (state.searchQuery.isBlank()) return state.conversations
+        val conversations = if (state.showArchived) {
+            state.conversations.filter { it.conversation.archived == true }
+        } else {
+            state.conversations.filter { it.conversation.archived != true }
+        }
+        if (state.searchQuery.isBlank()) return conversations
         val q = state.searchQuery.trim().lowercase()
-        return state.conversations.filter { display ->
+        return conversations.filter { display ->
             (display.conversation.summary?.lowercase()?.contains(q) == true) ||
                 display.agentName.lowercase().contains(q) ||
                 display.conversation.id.value.lowercase().contains(q)
         }
+    }
+
+    fun toggleShowArchived() {
+        _uiState.value = _uiState.value.copy(showArchived = !_uiState.value.showArchived)
     }
 
     fun renameConversation(conversationId: ConversationId, agentId: AgentId, newName: String) {
@@ -332,23 +342,17 @@ class ConversationsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 conversationRepository.setConversationArchived(display.conversation.id, display.conversation.agentId, archived)
-                val updatedConversations = _uiState.value.conversations.mapNotNull {
+                val updatedConversations = _uiState.value.conversations.map {
                     if (it.conversation.id == display.conversation.id) {
-                        // Archived conversations are filtered out of the visible list
-                        // (see displayConversations()'s TODO(letta-mobile-587dn)); drop the
-                        // row here too so a swipe-to-archive doesn't linger until the next
-                        // refresh re-runs that projection.
-                        if (archived) null else it.copy(conversation = it.conversation.copy(archived = archived))
+                        it.copy(conversation = it.conversation.copy(archived = archived))
                     } else it
                 }
                 _uiState.value = _uiState.value.copy(
                     conversations = updatedConversations.toImmutableList(),
                     selectedConversation = _uiState.value.selectedConversation?.let { selected ->
-                        when {
-                            selected.conversation.id != display.conversation.id -> selected
-                            archived -> null
-                            else -> selected.copy(conversation = display.conversation.copy(archived = archived))
-                        }
+                        if (selected.conversation.id == display.conversation.id) {
+                            selected.copy(conversation = display.conversation.copy(archived = archived))
+                        } else selected
                     },
                 )
             } catch (e: Exception) {
@@ -455,14 +459,9 @@ class ConversationsViewModel @Inject constructor(
         agents: List<Agent>,
         activeConfigIsLocalRuntime: Boolean = AgentRuntimeBinding.isLocalRuntime(settingsRepository.activeConfig.value),
     ): List<Conversation> {
-        // TODO(letta-mobile-587dn): archived conversations currently vanish from the
-        // visible list with no UI to revisit them. Future work adds an "Archived"
-        // location mirroring desktop's ConversationArchiveFilter segmented control;
-        // the filter should then move out of this projection into a UI-driven toggle.
-        val unarchivedConversations = conversations.filterNot { it.archived == true }
-        if (!activeConfigIsLocalRuntime) return unarchivedConversations
+        if (!activeConfigIsLocalRuntime) return conversations
         val localAgentIds = agents.map { it.id }.toSet()
-        return unarchivedConversations.filter { conversation ->
+        return conversations.filter { conversation ->
             conversation.id.value.startsWith("local-conv-") || conversation.agentId in localAgentIds
         }
     }
