@@ -19,6 +19,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
+import com.letta.mobile.util.Telemetry
 
 // Inner A2UI message version (createSurface / updateComponents / …).
 // Wire-format protocol revision — leading "v" matches spec §3.
@@ -296,7 +297,9 @@ fun decodeA2uiMessagesLenient(json: Json, raw: String): List<A2uiMessage>? {
         try {
             val element = json.parseToJsonElement(bounded)
             return decodeA2uiMessages(json, element)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Telemetry.error("A2uiProtocol", "parseBoundedJson.failed", e)
+        }
     }
 
     if (endIdx >= 0) {
@@ -340,7 +343,8 @@ fun decodeA2uiMessagesLenient(json: Json, raw: String): List<A2uiMessage>? {
     return try {
         val element = json.parseToJsonElement(substr)
         decodeA2uiMessages(json, element)
-    } catch (_: Exception) {
+    } catch (e: Exception) {
+        Telemetry.error("A2uiProtocol", "parseFallback.failed", e)
         null
     }
 }
