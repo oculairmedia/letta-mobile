@@ -86,6 +86,8 @@ import java.util.Locale
 @Composable
 fun SystemAccessDashboardScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToPairingScan: () -> Unit = {},
+    onNavigateToPairingInvite: () -> Unit = {},
     viewModel: SystemAccessDashboardViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -112,6 +114,16 @@ fun SystemAccessDashboardScreen(
                     }
                 },
                 actions = {
+                    // letta-mobile-g2d2i: device pairing entry points. This
+                    // dashboard is the closest existing "device identity /
+                    // capability" surface; a dedicated pairing hub screen
+                    // would be a cleaner home but is out of scope here.
+                    IconButton(onClick = onNavigateToPairingScan) {
+                        Icon(LettaIcons.Camera, stringResource(R.string.action_pair_scan))
+                    }
+                    IconButton(onClick = onNavigateToPairingInvite) {
+                        Icon(LettaIcons.QrCode, stringResource(R.string.action_pair_invite))
+                    }
                     IconButton(onClick = viewModel::refresh) {
                         Icon(LettaIcons.Refresh, stringResource(R.string.action_refresh))
                     }

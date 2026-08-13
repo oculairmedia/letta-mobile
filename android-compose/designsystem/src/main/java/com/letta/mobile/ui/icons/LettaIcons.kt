@@ -93,6 +93,13 @@ object LettaIcons {
     val Play: ImageVector get() = Lucide.Play
     val ManageSearch: ImageVector get() = Lucide.TextSearch
 
+    // letta-mobile-g2d2i: device pairing (QR scan / invite generation).
+    // UNVERIFIED: `Lucide.QrCode` and `Lucide.Camera` are guesses at the
+    // com.composables:icons-lucide 1.1.0 binding's naming for Lucide's
+    // "qr-code" and "camera" icons — not confirmed to compile.
+    val QrCode: ImageVector get() = Lucide.QrCode
+    val Camera: ImageVector get() = Lucide.Camera
+
     // Status
     val Check: ImageVector get() = Lucide.Check
     val CheckCircle: ImageVector get() = Lucide.CircleCheck

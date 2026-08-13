@@ -28,6 +28,8 @@ import com.letta.mobile.ui.screens.schedules.ScheduleListScreen
 import com.letta.mobile.ui.screens.templates.TemplatesScreen
 import com.letta.mobile.ui.screens.tools.AllToolsScreen
 import com.letta.mobile.ui.screens.tools.ToolDetailScreen
+import com.letta.mobile.ui.screens.pairing.PairInviteScreen
+import com.letta.mobile.ui.screens.pairing.QrScanScreen
 import com.letta.mobile.ui.screens.systemaccess.SystemAccessDashboardScreen
 import com.letta.mobile.ui.screens.telemetry.TelemetryScreen
 import com.letta.mobile.ui.screens.usage.UsageScreen
@@ -111,7 +113,43 @@ fun NavGraphBuilder.adminGraph(
         popEnterTransition = drillInPopEnter,
         popExitTransition = drillInPopExit,
     ) {
-        SystemAccessDashboardScreen(onNavigateBack = { navController.popBackStack() })
+        SystemAccessDashboardScreen(
+            onNavigateBack = { navController.popBackStack() },
+            onNavigateToPairingScan = { navController.navigate(PairingScanRoute) },
+            onNavigateToPairingInvite = { navController.navigate(PairingInviteRoute) },
+        )
+    }
+
+    // letta-mobile-g2d2i: mobile QR scanner (client mode) + invite
+    // generation (server mode). Entry point is the System Access dashboard
+    // (device-identity/pairing adjacent surface); see that screen's
+    // top-bar actions.
+    composable<PairingScanRoute>(
+        enterTransition = drillInEnter,
+        exitTransition = drillInExit,
+        popEnterTransition = drillInPopEnter,
+        popExitTransition = drillInPopExit,
+    ) {
+        QrScanScreen(
+            onValidScan = {
+                // The actual "dial this node id" step is out of scope for
+                // this bead — the app has no manual/QR "connect to a node"
+                // flow at all yet (see PairingQrDecoder's trust-model doc
+                // comment). For now, popping back is the only wired action;
+                // a follow-on bead replaces this with a real connect call.
+                navController.popBackStack()
+            },
+            onNavigateBack = { navController.popBackStack() },
+        )
+    }
+
+    composable<PairingInviteRoute>(
+        enterTransition = drillInEnter,
+        exitTransition = drillInExit,
+        popEnterTransition = drillInPopEnter,
+        popExitTransition = drillInPopExit,
+    ) {
+        PairInviteScreen(onNavigateBack = { navController.popBackStack() })
     }
 
     composable<TemplatesRoute>(

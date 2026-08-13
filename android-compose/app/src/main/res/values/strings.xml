@@ -46,6 +46,15 @@
     <string name="screen_nav_usage">Usage</string>
     <string name="screen_nav_favorite_agent">Favorite Agent</string>
     <string name="screen_system_access_title">System Access</string>
+    <string name="action_pair_scan">Scan a pairing code</string>
+    <string name="action_pair_invite">Show my pairing code</string>
+    <string name="screen_pairing_scan_title">Scan pairing code</string>
+    <string name="screen_pairing_invite_title">Pair a device</string>
+    <string name="pairing_camera_permission_rationale">Letta needs camera access to scan a pairing QR code.</string>
+    <string name="pairing_camera_permission_denied">Camera access was denied. Grant it in Settings to scan a pairing code.</string>
+    <string name="pairing_open_settings">Open Settings</string>
+    <string name="pairing_scan_again">Scan again</string>
+    <string name="pairing_regenerate">Regenerate</string>
     <string name="screen_system_access_entry_description">Review Android permissions, special access, and privileged-tool exposure.</string>
     <string name="screen_system_access_summary_headline">Capability registry</string>
     <plurals name="screen_system_access_summary_body">
