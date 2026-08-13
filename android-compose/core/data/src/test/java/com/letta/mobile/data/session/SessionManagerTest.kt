@@ -1133,6 +1133,56 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `embedded local model selection on same config id rebuilds session graph`() = runTest {
+        // letta-mobile-mlyhq: model selection edits the same config id, which
+        // the id-distinct activeConfigChanges never emitted; graph must rebuild.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = localConfig("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                FakeAgentApi(),
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeLettaApiClient(),
+                FakeMcpServerApi(),
+                FakeModelApi(),
+                FakePassageApi(),
+                FakeProjectApi(),
+                FakeProjectWorkApi(),
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                FakeToolApi(),
+                appContext = mockk(relaxed = true),
+                settingsRepository = settingsRepository,
+                localRuntimeOptions = localRuntimeOptions(),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        advanceUntilIdle()
+
+        val firstGraph = sessionManager.current
+        settingsRepository.activeConfigState.value = localConfig("backend-a").copy(
+            localModelPath = "/data/user/0/com.letta.mobile.dev/files/embedded-models/gemma.litertlm",
+            localModelHandle = "google/gemma-3n-E2B-it-litert-lm",
+        )
+        advanceUntilIdle()
+
+        val secondGraph = sessionManager.current
+        assertNotEquals(firstGraph.id, secondGraph.id)
+        assertTrue(firstGraph.scope.coroutineContext.job.isCancelled)
+        assertTrue(!secondGraph.scope.coroutineContext.job.isCancelled)
+    }
+
+    @Test
     fun `channel transport proxy switches to rebuilt graph state`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))

@@ -42,9 +42,12 @@ class SessionManager internal constructor(
 
     init {
         managerScope.launch {
-            settingsRepository.activeConfigChanges.collect { config ->
+            // letta-mobile-mlyhq: raw activeConfig, not id-distinct
+            // activeConfigChanges — selecting an embedded local model edits the
+            // SAME config id, which the id-distinct flow never emits.
+            settingsRepository.activeConfig.collect { config ->
                 try {
-                    rebuildIfBackendChanged(config)
+                    if (config != null) rebuildIfBackendChanged(config)
                 } catch (t: Throwable) {
                     Log.e("SessionManager", "Failed to auto-rebuild session graph on config change", t)
                 }
@@ -91,11 +94,29 @@ class SessionManager internal constructor(
 }
 
 private data class BackendConnectionKey(
+    val mode: LettaConfig.Mode,
     val serverUrl: String,
     val accessToken: String?,
+    val localModelPath: String?,
+    val localModelHandle: String?,
+    val localModelRuntime: String?,
+    val localModelAccelerator: String?,
+    val localModelMaxTokens: Int?,
+    val localProviderBaseUrl: String?,
+    val localProviderApiKey: String?,
+    val localProviderModel: String?,
 )
 
 private fun LettaConfig.backendConnectionKey(): BackendConnectionKey = BackendConnectionKey(
+    mode = mode,
     serverUrl = serverUrl,
     accessToken = accessToken,
+    localModelPath = localModelPath,
+    localModelHandle = localModelHandle,
+    localModelRuntime = localModelRuntime,
+    localModelAccelerator = localModelAccelerator,
+    localModelMaxTokens = localModelMaxTokens,
+    localProviderBaseUrl = localProviderBaseUrl,
+    localProviderApiKey = localProviderApiKey,
+    localProviderModel = localProviderModel,
 )
