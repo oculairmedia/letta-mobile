@@ -28,7 +28,21 @@ class FolderRepository(
             _folders.value = irohSource.listFolders(name)
             return
         }
-        _folders.value = folderApi.listFolders(limit = 1000, name = name)
+        _folders.value = exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                folderApi.listFolders(
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                    name = name,
+                )
+            },
+            extractCursor = { folder -> folder.id.value },
+            dedupKey = { folder -> folder.id.value },
+        )
     }
 
     override suspend fun countFolders(): Int = folderApi.countFolders()
@@ -70,15 +84,58 @@ class FolderRepository(
     }
 
     override suspend fun listAgentsForFolder(folderId: FolderId): List<String> {
-        return folderApi.listAgentsForFolder(folderId = folderId.value, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                folderApi.listAgentsForFolder(
+                    folderId = folderId.value,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { agentId -> agentId },
+            dedupKey = { agentId -> agentId },
+        )
     }
 
     override suspend fun listFolderPassages(folderId: FolderId): List<Passage> {
-        return folderApi.listFolderPassages(folderId = folderId.value, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
+            fetch = { limit, after ->
+                folderApi.listFolderPassages(
+                    folderId = folderId.value,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { passage -> passage.id },
+            dedupKey = { passage -> passage.id },
+        )
     }
 
     override suspend fun listFolderFiles(folderId: FolderId, includeContent: Boolean): List<FileMetadata> {
-        return folderApi.listFolderFiles(folderId = folderId.value, limit = 1000, includeContent = includeContent)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
+            fetch = { limit, after ->
+                folderApi.listFolderFiles(
+                    folderId = folderId.value,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                    includeContent = includeContent,
+                )
+            },
+            extractCursor = { file -> file.id },
+            dedupKey = { file -> file.id },
+        )
     }
 
     override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String) {

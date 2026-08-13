@@ -19,14 +19,27 @@ open class ArchiveRepository(
     override val archives: StateFlow<List<Archive>> = _archives.asStateFlow()
 
     override suspend fun refreshArchives(name: String?, agentId: String?) {
-        _archives.value = irohAdminRouteList(
-            client = irohAdminRpcClient,
-            method = "archive.list",
-            path = "/v1/archives",
-            body = "{}"
-        ) {
-            archiveApi.listArchives(limit = 1000, name = name, agentId = agentId)
+        val irohSource = irohAdminRpcClient
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            _archives.value = irohSource.callList<Archive>("archive.list", "/v1/archives", "{}")
+            return
         }
+        _archives.value = exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                archiveApi.listArchives(
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                    name = name,
+                    agentId = agentId,
+                )
+            },
+            extractCursor = { archive -> archive.id },
+            dedupKey = { archive -> archive.id },
+        )
     }
 
     override suspend fun getArchive(archiveId: String): Archive {
@@ -52,7 +65,21 @@ open class ArchiveRepository(
     }
 
     override suspend fun listAgentsForArchive(archiveId: String): List<Agent> {
-        return archiveApi.listAgentsForArchive(archiveId = archiveId, limit = 1000)
+        return exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                archiveApi.listAgentsForArchive(
+                    archiveId = archiveId,
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                )
+            },
+            extractCursor = { agent -> agent.id.value },
+            dedupKey = { agent -> agent.id.value },
+        )
     }
 
     override suspend fun deletePassageFromArchive(archiveId: String, passageId: String) {
