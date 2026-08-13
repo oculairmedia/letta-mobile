@@ -79,6 +79,7 @@ object AppServerProtocol {
         "channel_accounts_list_response",
         "channel_start_response",
         "channel_account_update_response",
+        "app_server_info_response",
     )
 
     private val redactedPrimitive = JsonPrimitive(REDACTED_PLACEHOLDER)
@@ -632,6 +633,22 @@ sealed interface AppServerCommand {
         @SerialName("account_id") val accountId: String,
         val patch: AppServerChannelAccountPatch,
     ) : AppServerCommand
+
+    /**
+     * Capability discovery request (lgns8.24).
+     *
+     * Sent over the WebSocket after connect to discover server capabilities
+     * before using protocol features. The response [AppServerInfoResponse]
+     * carries the Letta Code version, numeric protocol version, active backend,
+     * and capability flags such as `runtime_start` and `split_channels`.
+     *
+     * This is the WebSocket alternative to `GET /app-server-info` over HTTP.
+     */
+    @Serializable
+    @SerialName("app_server_info")
+    data class AppServerInfo(
+        @SerialName("request_id") val requestId: String,
+    ) : AppServerCommand
 }
 
 /**
@@ -700,6 +717,37 @@ data class AppServerChannelAccount(
         "AppServerChannelAccount(channelId=$channelId, accountId=$accountId, " +
             "enabled=$enabled, configured=$configured, running=$running, " +
             "config=<${config?.size ?: 0} keys withheld>)"
+}
+
+/**
+ * Server capabilities and version info returned by `app_server_info_response`
+ * (lgns8.24). Used for capability discovery before using protocol features.
+ *
+ * @param lettaCodeVersion The Letta Code version string (e.g. "0.29.12")
+ * @param protocolVersion Numeric protocol version for feature detection
+ * @param backend The active backend (e.g. "local", "self-hosted", "hosted")
+ * @param capabilities Map of capability flags (e.g. "runtime_start" -> true,
+ *   "split_channels" -> false). Current App Server versions report
+ *   `split_channels: false`.
+ */
+@Serializable
+data class AppServerInfoData(
+    @SerialName("letta_code_version") val lettaCodeVersion: String? = null,
+    @SerialName("protocol_version") val protocolVersion: Int? = null,
+    val backend: String? = null,
+    val capabilities: JsonObject? = null,
+) {
+    /** Convenience accessor for the `split_channels` capability flag. */
+    val splitChannels: Boolean
+        get() = capabilities?.get("split_channels")?.jsonPrimitive?.booleanOrNull ?: false
+
+    /** Convenience accessor for the `runtime_start` capability flag. */
+    val hasRuntimeStart: Boolean
+        get() = capabilities?.get("runtime_start")?.jsonPrimitive?.booleanOrNull ?: true
+
+    /** Returns a specific capability flag value. */
+    fun hasCapability(name: String): Boolean =
+        capabilities?.get(name)?.jsonPrimitive?.booleanOrNull ?: false
 }
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -1410,6 +1458,26 @@ sealed interface AppServerInboundFrame {
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "conversation_compact_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    /**
+     * Response to `app_server_info` capability discovery request (lgns8.24).
+     *
+     * Carries server version, protocol version, backend, and capability flags.
+     * Callers should inspect [info] before using protocol features that depend
+     * on specific capabilities.
+     */
+    @Serializable
+    @SerialName("app_server_info_response")
+    data class AppServerInfoResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        val info: AppServerInfoData? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "app_server_info_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
