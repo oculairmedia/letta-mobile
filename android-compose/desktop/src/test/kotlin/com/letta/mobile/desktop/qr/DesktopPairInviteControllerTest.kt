@@ -13,9 +13,8 @@ import java.io.File
 import javax.imageio.ImageIO
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -44,8 +43,7 @@ class DesktopPairInviteControllerTest {
     fun installRendersQrPngToFile(@TempDir tmp: File) = runTest {
         val pngFile = File(tmp, "pair.png")
         val (controller, _) = buildControllerForTest(tmp, pngFile)
-        val result = controller.mintForTest()
-        advanceUntilIdle()
+        val result = mintAndAwait(controller)
         assertEquals(pngFile, result, "controller must render to the configured output file")
         assertTrue(pngFile.exists() && pngFile.length() > 0, "PNG must be written and non-empty")
         // PNG magic bytes (89 50 4E 47 0D 0A 1A 0A) — proves we wrote a PNG,
@@ -76,8 +74,7 @@ class DesktopPairInviteControllerTest {
     fun installTextRendererFallbackProducesNonEmptyOutput(@TempDir tmp: File) = runTest {
         val pngFile = File(tmp, "unused.png")
         val (controller, _) = buildControllerForTest(tmp, pngFile)
-        controller.mintForTest()
-        advanceUntilIdle()
+        mintAndAwait(controller)
         assertNotNull(controller.wireValue)
         val matrix = QrCode.encode(controller.wireValue!!)
         val text = QrRenderer.renderText(matrix)
@@ -116,11 +113,9 @@ class DesktopPairInviteControllerTest {
     fun regenerateReplacesWireValueAndFile(@TempDir tmp: File) = runTest {
         val pngFile = File(tmp, "pair.png")
         val (controller, _) = buildControllerForTest(tmp, pngFile)
-        val first = controller.mintForTest()
-        advanceUntilIdle()
+        val first = mintAndAwait(controller)
         assertNotNull(controller.wireValue)
-        controller.mintForTest()
-        advanceUntilIdle()
+        mintAndAwait(controller)
         assertTrue(pngFile.exists())
         assertTrue(controller.wireValue!!.startsWith(DesktopPairInviteController.WIRE_SCHEME + "."))
         // file is overwritten on regenerate (same path, new bytes).
@@ -150,16 +145,11 @@ class DesktopPairInviteControllerTest {
             pairing = pairing,
             pairingStore = store,
             pngOutputFile = pngFile,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            computeDispatcher = StandardTestDispatcher(testScheduler),
         )
         controller.mint()
-        // The controller launches into the test scope but uses Dispatchers.IO
-        // for the RPC + render. Wait for the controller to settle (loading flips
-        // back to false) by polling on the test scheduler with virtual delay.
-        val deadline = System.currentTimeMillis() + 5_000L
-        while (controller.loading && System.currentTimeMillis() < deadline) {
-            delay(50L)
-        }
-        runCurrent()
+        advanceUntilIdle()
         // Misconfigured path: the handler returns a 200 with no qr_invite.
         // The controller surfaces "no qr_invite" rather than silently
         // rendering an empty PNG.
@@ -183,8 +173,25 @@ class DesktopPairInviteControllerTest {
             signer = TestSigner(),
             qrNodeIdHex = nodeId,
             pairingStore = store,
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            computeDispatcher = StandardTestDispatcher(testScheduler),
         )
         return controller to store
+    }
+
+    /**
+     * Local replacement for the former `mintForTest()` helper that lived in
+     * DesktopPairInstallScreen.kt (production code). Dispatchers are now
+     * injected, so draining the test scheduler is sufficient — no wall-clock
+     * polling, no timeout.
+     */
+    private fun TestScope.mintAndAwait(controller: DesktopPairInviteController): File {
+        controller.mint()
+        advanceUntilIdle()
+        val err = controller.error
+        val file = controller.pngFile
+        check(err == null && file != null) { err ?: "mint produced no file" }
+        return file
     }
 
     /** Deterministic test signer — fixed blob, mirrors the CLI test. */

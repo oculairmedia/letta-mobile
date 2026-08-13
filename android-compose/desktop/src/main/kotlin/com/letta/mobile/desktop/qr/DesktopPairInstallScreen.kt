@@ -265,24 +265,3 @@ internal fun rememberQrBitmap(file: File): ImageBitmap? {
 internal fun qrBitmapFromFile(file: File): ImageBitmap? = runCatching {
     Image.makeFromEncoded(file.readBytes()).toComposeImageBitmap()
 }.getOrNull()
-
-/**
- * Suspend helper that performs the install flow mint + render in one call.
- * Exposed for tests that want to assert the controller drives the wire
- * format without going through the Composable. Returns the rendered
- * [File] on success; throws on failure.
- */
-internal suspend fun DesktopPairInviteController.mintForTest(): File {
-    mint()
-    // Spin until the controller settles (loading flips back to false).
-    val deadline = System.currentTimeMillis() + 5_000L
-    while (loading && System.currentTimeMillis() < deadline) {
-        delay(50L)
-    }
-    val err = error
-    val file = pngFile
-    if (err != null || file == null) {
-        throw IllegalStateException(err ?: "mint produced no file")
-    }
-    return file
-}
