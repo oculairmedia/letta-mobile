@@ -135,7 +135,7 @@ fun ConversationsScreen(
         viewModel.clearCreateConversationError()
     }
 
-    val filteredConversations = remember(uiState.conversations, uiState.searchQuery) {
+    val filteredConversations = remember(uiState.conversations, uiState.searchQuery, uiState.showArchived) {
         viewModel.getFilteredConversations()
     }
     val listActions = remember(onNavigateToChat, viewModel) {
@@ -365,12 +365,12 @@ internal fun ConversationsScreenContent(
                         ) {
                             FilterChip(
                                 selected = !state.showArchived,
-                                onClick = { if (!state.showArchived) callbacks.onToggleShowArchived() },
+                                onClick = { if (state.showArchived) callbacks.onToggleShowArchived() },
                                 label = { Text(stringResource(R.string.screen_conversations_active_label)) },
                             )
                             FilterChip(
                                 selected = state.showArchived,
-                                onClick = { if (state.showArchived) callbacks.onToggleShowArchived() },
+                                onClick = { if (!state.showArchived) callbacks.onToggleShowArchived() },
                                 label = { Text(stringResource(R.string.screen_conversations_archived_label)) },
                             )
                         }
