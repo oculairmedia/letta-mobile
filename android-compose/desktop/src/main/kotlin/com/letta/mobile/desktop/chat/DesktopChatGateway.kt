@@ -3,7 +3,7 @@ package com.letta.mobile.desktop.chat
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.http.LettaHttpChatGateway
-import com.letta.mobile.data.transport.appserver.applyAppServerFrameLimits
+import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.HttpTimeout
@@ -79,7 +79,7 @@ fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
     // (DesktopAppServerControllerGatewayFactory.buildWebSocketTransport), which
     // calls httpClient.webSocket(...) — that requires the plugin, and
     // letta-mobile-lgns8.21.7 requires the inbound frame ceiling with it.
-    install(WebSockets) { applyAppServerFrameLimits() }
+    install(WebSockets) { applyAppServerDefaults() }
     install(HttpTimeout) {
         connectTimeoutMillis = 15_000
         requestTimeoutMillis = 60_000

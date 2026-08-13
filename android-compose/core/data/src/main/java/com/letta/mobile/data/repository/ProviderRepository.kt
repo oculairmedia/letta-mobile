@@ -25,7 +25,22 @@ class ProviderRepository(
             _providers.value = irohSource.listProviders()
             return
         }
-        _providers.value = providerApi.listProviders(limit = 1000, name = name, providerType = providerType)
+        _providers.value = exhaustCursorPages(
+            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
+            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
+            fetch = { limit, after ->
+                providerApi.listProviders(
+                    limit = limit,
+                    before = null,
+                    after = after,
+                    order = null,
+                    name = name,
+                    providerType = providerType,
+                )
+            },
+            extractCursor = { provider -> provider.id?.value ?: "" },
+            dedupKey = { provider -> provider.id?.value ?: "" },
+        )
     }
 
     override suspend fun getProvider(providerId: ProviderId): Provider {

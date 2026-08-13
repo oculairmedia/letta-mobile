@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Run
 import com.letta.mobile.data.model.StepListParams
+import com.letta.mobile.data.repository.PaginationConstants
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IRunRepository
 import com.letta.mobile.data.repository.api.IStepRepository
@@ -91,17 +92,21 @@ class UsageViewModel @Inject constructor(
 
                 // Steps endpoint may not be available on all server versions;
                 // degrade gracefully so runs-based data still renders.
+                // Phase 2.2 (data-efficiency-audit Q3): the previous
+                // `limit = 1000` "fetch everything" hack is replaced with
+                // the shared DEFAULT_PAGE_SIZE so the analytics window stops
+                // requesting the worst-case payload.
                 val steps = runCatching {
                     stepRepository.listSteps(
                         StepListParams(
                             startDate = windowStart.toString(),
                             endDate = now.toString(),
-                            limit = 1000,
+                            limit = PaginationConstants.DEFAULT_PAGE_SIZE,
                         ),
                     )
                 }.getOrDefault(emptyList())
 
-                val recentRuns = runRepository.getRecentRuns(200).filter { run ->
+                val recentRuns = runRepository.getRecentRuns(USAGE_RUNS_FETCH_LIMIT).filter { run ->
                     val createdAt = run.createdAt ?: return@filter false
                     runCatching {
                         val ts = Instant.parse(createdAt)
@@ -155,5 +160,14 @@ class UsageViewModel @Inject constructor(
             createdAt = run.createdAt ?: "",
             hasError = run.status == "error" || run.stopReason == "error",
         )
+    }
+
+    companion object {
+        /**
+         * Phase 2.2 (data-efficiency-audit Q3): previously `getRecentRuns(200)` was
+         * called per time-range selection. We keep that bound; the audit replaces
+         * the *repository* 1_000-row hacks, not ViewModel-scoped bounded fetches.
+         */
+        private const val USAGE_RUNS_FETCH_LIMIT = 200
     }
 }
