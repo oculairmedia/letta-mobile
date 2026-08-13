@@ -17,6 +17,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runCurrent
@@ -464,6 +465,53 @@ class AgentRepositoryTest {
 
         assertEquals(listOf("a2"), repository.agents.value.map { it.id.value })
         assertFalse(fakeApi.agents.any { it.id == AgentId("a1") })
+    }
+
+    // H5 (data-efficiency-audit): getAgent should suppress the per-agent GET
+    // when the bulk agent list was refreshed recently.
+    @Test
+    fun `getAgent suppresses per-agent GET when bulk refresh is fresh`() = runTest {
+        fakeApi.agents.add(TestData.agent(id = "agent-1", name = "Fresh"))
+        val repo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            repositoryScope = backgroundScope,
+        )
+        repo.refreshAgents()
+        fakeApi.calls.clear()
+
+        val collected = repo.getAgent(AgentId("agent-1")).toList()
+        runCurrent()
+
+        assertEquals(listOf("Fresh"), collected.map { it.name })
+        assertTrue(
+            "expected no getAgent: call when bulk cache is fresh; got ${fakeApi.calls}",
+            fakeApi.calls.none { it.startsWith("getAgent:") },
+        )
+    }
+
+    @Test
+    fun `getAgent still fetches remote when bulk cache is stale`() = runTest {
+        fakeApi.agents.add(TestData.agent(id = "agent-1", name = "Cached"))
+        val repo = AgentRepository(
+            agentApi = fakeApi,
+            agentDao = fakeDao,
+            repositoryScope = backgroundScope,
+        )
+        repo.refreshAgents()
+        // Force the cache to look stale by rewinding the lastRefresh timestamp
+        // past the fresh-window. No need to sleep the test dispatcher.
+        repo.setLastRefreshForTest(0L)
+        fakeApi.calls.clear()
+
+        val collected = repo.getAgent(AgentId("agent-1")).toList()
+        runCurrent()
+
+        assertTrue(
+            "expected getAgent: call when bulk cache is stale; got ${fakeApi.calls}",
+            fakeApi.calls.any { it.startsWith("getAgent:") },
+        )
+        assertEquals(listOf("Cached", "Cached"), collected.map { it.name })
     }
 
     private class FakeAgentDao : AgentDao {

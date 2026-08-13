@@ -17,6 +17,10 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     var listDelayMillis: Long = 0L
     val calls = mutableListOf<String>()
     val listLimits = mutableListOf<Int?>()
+    
+    // Concurrency tracking for H5 (data-efficiency-audit) test coverage
+    val peakConcurrentListConversations = java.util.concurrent.atomic.AtomicInteger(0)
+    private val inFlightListConversations = java.util.concurrent.atomic.AtomicInteger(0)
 
     override suspend fun listConversations(
         agentId: AgentId?,
@@ -27,10 +31,16 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
         order: String?,
         orderBy: String?,
     ): List<Conversation> {
-        calls.add("listConversations")
-        listLimits.add(limit)
-        if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
-        if (shouldFail) throw ApiException(500, "Server error")
+        val inFlight = inFlightListConversations.incrementAndGet()
+        var observedPeak = peakConcurrentListConversations.get()
+        while (inFlight > observedPeak && !peakConcurrentListConversations.compareAndSet(observedPeak, inFlight)) {
+            observedPeak = peakConcurrentListConversations.get()
+        }
+        try {
+            calls.add("listConversations")
+            listLimits.add(limit)
+            if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
+            if (shouldFail) throw ApiException(500, "Server error")
         val filtered = if (agentId != null) {
             conversations.filter { it.agentId == agentId }
         } else {
@@ -45,9 +55,12 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
         }.filter { conversation ->
             summarySearch == null || conversation.summary?.contains(summarySearch, ignoreCase = true) == true
         }
-        val afterIndex = after?.let { cursor -> matching.indexOfFirst { it.id.value == cursor } } ?: -1
-        val afterPage = if (afterIndex >= 0) matching.drop(afterIndex + 1) else matching
-        return limit?.let { afterPage.take(it) } ?: afterPage
+            val afterIndex = after?.let { cursor -> matching.indexOfFirst { it.id.value == cursor } } ?: -1
+            val afterPage = if (afterIndex >= 0) matching.drop(afterIndex + 1) else matching
+            return limit?.let { afterPage.take(it) } ?: afterPage
+        } finally {
+            inFlightListConversations.decrementAndGet()
+        }
     }
 
     override suspend fun createConversation(params: ConversationCreateParams): Conversation {

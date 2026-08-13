@@ -285,10 +285,20 @@ open class AgentRepository(
     }
 
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
-        val cached = _agents.value.find { it.id == id }
+        // H5 (data-efficiency-audit): read the cached entry + the bulk
+        // freshness marker from ONE synchronized snapshot so a concurrent
+        // refreshAgents() cannot race us into emitting a pre-refresh cached
+        // value the user no longer has.
+        val snapshot = refreshMutex.withLock {
+            val cached = _agents.value.find { it.id == id }
+            cached to System.currentTimeMillis()
+        }
+        val cached = snapshot.first
+        val snapshotAgeMs = snapshot.second - lastRefreshAtMillis
         if (cached != null) {
             emit(cached)
         }
+        if (cached != null && snapshotAgeMs <= SINGLE_AGENT_FRESH_WINDOW_MS) return@flow
         val localSource = localAgentSource
         if (localSource != null && isLocalRuntimeActive()) {
             // No remote API for local agents; serve the durable store copy
@@ -567,5 +577,23 @@ open class AgentRepository(
          * [createLocalAgent].
          */
         const val EPHEMERAL_SUBAGENT_ID_PREFIX = "agent-local-"
+
+        /**
+         * H5 (data-efficiency-audit): if the bulk agent list was refreshed
+         * within this window, [getAgent] trusts the cached copy and skips the
+         * per-agent GET. 30 s covers a chat-open + reply cycle without
+         * risking a stale read for users who keep a chat open across a long
+         * idle period.
+         */
+        const val SINGLE_AGENT_FRESH_WINDOW_MS = 30_000L
+    }
+
+    /**
+     * H5 (data-efficiency-audit) test seam: lets unit tests force the bulk
+     * cache to look stale (or fresh) without sleeping the test dispatcher.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun setLastRefreshForTest(epochMs: Long) {
+        lastRefreshAtMillis = epochMs
     }
 }

@@ -14,6 +14,14 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     var shouldFail = false
     val calls = mutableListOf<String>()
 
+    // Concurrent-call tracking for the AllConversationsRepositoryTest
+    // lockproof: loadNextPage and refresh must not collide on the
+    // underlying API. Increment on entry, decrement on completion, track
+    // the peak we observed across all calls. Tests assert peak == 1 to
+    // prove the mutex serializes the fetch path.
+    private val inFlightListConversations = java.util.concurrent.atomic.AtomicInteger(0)
+    val peakConcurrentListConversations = java.util.concurrent.atomic.AtomicInteger(0)
+
     override suspend fun listConversations(
         agentId: AgentId?,
         limit: Int?,
@@ -24,20 +32,31 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
         orderBy: String?,
     ): List<Conversation> {
         calls.add("listConversations")
-        if (shouldFail) throw ApiException(500, "Server error")
-        val filtered = if (agentId != null) {
-            conversations.filter { it.agentId == agentId }
-        } else {
-            conversations.toList()
+        val inFlight = inFlightListConversations.incrementAndGet()
+        // Update peak using a CAS-style spin so concurrent updates don't
+        // lose updates (Math.max is not atomic across two reads).
+        var observedPeak = peakConcurrentListConversations.get()
+        while (inFlight > observedPeak && !peakConcurrentListConversations.compareAndSet(observedPeak, inFlight)) {
+            observedPeak = peakConcurrentListConversations.get()
         }
-        return filtered.filter { conversation ->
-            when (archiveStatus) {
-                "archived" -> conversation.archived == true
-                "unarchived" -> conversation.archived != true
-                else -> true
+        try {
+            if (shouldFail) throw ApiException(500, "Server error")
+            val filtered = if (agentId != null) {
+                conversations.filter { it.agentId == agentId }
+            } else {
+                conversations.toList()
             }
-        }.filter { conversation ->
-            summarySearch == null || conversation.summary?.contains(summarySearch, ignoreCase = true) == true
+            return filtered.filter { conversation ->
+                when (archiveStatus) {
+                    "archived" -> conversation.archived == true
+                    "unarchived" -> conversation.archived != true
+                    else -> true
+                }
+            }.filter { conversation ->
+                summarySearch == null || conversation.summary?.contains(summarySearch, ignoreCase = true) == true
+            }
+        } finally {
+            inFlightListConversations.decrementAndGet()
         }
     }
 
