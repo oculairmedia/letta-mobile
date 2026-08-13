@@ -106,12 +106,18 @@ kotlin {
                 // letta-mobile-gw0h1: QR Code encoder for the CLI pair command.
                 // ZXing's `core` jar is pure Java (no Android-only deps) and
                 // adds the matrix encoder the CLI needs to render the
-                // `letta-qr-v1.<base64url-json>` payload. The `javase` jar adds
-                // BufferedImage helpers used by the PNG renderer. Android
+                // `letta-qr-v1.<base64url-json>` payload. Android
                 // (letta-mobile-g2d2i) will reuse `core` for the server-mode
                 // invite generation in a follow-on bead.
+                //
+                // `javase` (BufferedImage/ImageIO PNG helpers) is NOT declared
+                // here: it pulls in jai-imageio, which transitively references
+                // javax.imageio.spi classes absent from the Android runtime and
+                // fails R8 shrinking for the play-release APK (letta-mobile-sixv8.1).
+                // QrRenderer.kt — the only consumer of AWT/ImageIO in this
+                // module — lives in jvmMain (desktop/CLI only, not inherited by
+                // androidMain), so the `javase` dependency moves with it below.
                 api("com.google.zxing:core:3.5.3")
-                implementation("com.google.zxing:javase:3.5.3")
                 // Iroh QUIC transport binding (JNI-backed, Android + JVM only).
                 // NOT in commonMain — native lib doesn't work with Kotlin/Native.
                 // The 1.1.0 split is: computer.iroh:iroh (JVM jar) +
@@ -146,6 +152,13 @@ kotlin {
                 // Android-specific AAR/manifest. The desktop and iroh-wrapper-cli
                 // modules don't need the JNI context init.
                 implementation("computer.iroh:iroh:1.1.0")
+                // letta-mobile-gw0h1 / letta-mobile-sixv8.1: PNG rendering
+                // (QrRenderer.kt) needs ZXing's javase (BufferedImage/ImageIO
+                // helpers). Scoped to jvmMain only — it must never be
+                // reachable from androidMain, since its jai-imageio
+                // transitive dep references javax.imageio.spi classes that
+                // don't exist on Android and break R8 shrinking.
+                implementation("com.google.zxing:javase:3.5.3")
             }
         }
 

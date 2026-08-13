@@ -160,21 +160,54 @@ private fun ExpandedList(
             modifier = Modifier.padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            PickerRow(
-                label = localLabel,
-                selected = selectedNodeId == null,
-                onClick = onSelectLocal,
-            )
-            peers.forEach { peer ->
+            expandedPickerRows(peers, selectedNodeId, localLabel).forEach { row ->
                 PickerRow(
-                    label = peer.name,
-                    subtitle = peer.nodeId.take(12) + "…",
-                    selected = selectedNodeId == peer.nodeId,
-                    onClick = { onSelectPeer(peer) },
+                    label = row.label,
+                    subtitle = row.subtitle,
+                    selected = row.selected,
+                    onClick = { if (row.peer != null) onSelectPeer(row.peer) else onSelectLocal() },
                 )
             }
         }
     }
+}
+
+/**
+ * Row data for the expanded peer list: the local fallback row first, then one
+ * row per paired peer, in store order. Pulled out of [ExpandedList] as a pure
+ * function so the "expanding shows the full peer list" behavior is verifiable
+ * without composing through [DesktopSelectableChip] (backed by Jewel's
+ * `Chip`), whose current release (`0.37.0-262.4852.51`) ships a class file
+ * compiled for a newer JDK than the `shared-multiplatform` CI job's pinned
+ * toolchain — see letta-mobile-sixv8.1.
+ */
+internal data class PickerRowSpec(
+    val label: String,
+    val subtitle: String?,
+    val selected: Boolean,
+    val peer: PairedPeer?,
+)
+
+internal fun expandedPickerRows(
+    peers: List<PairedPeer>,
+    selectedNodeId: String?,
+    localLabel: String = "local",
+): List<PickerRowSpec> {
+    val localRow = PickerRowSpec(
+        label = localLabel,
+        subtitle = null,
+        selected = selectedNodeId == null,
+        peer = null,
+    )
+    val peerRows = peers.map { peer ->
+        PickerRowSpec(
+            label = peer.name,
+            subtitle = peer.nodeId.take(12) + "…",
+            selected = selectedNodeId == peer.nodeId,
+            peer = peer,
+        )
+    }
+    return listOf(localRow) + peerRows
 }
 
 @Composable
