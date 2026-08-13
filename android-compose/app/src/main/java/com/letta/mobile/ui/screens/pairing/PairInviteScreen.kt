@@ -42,6 +42,18 @@ import kotlinx.coroutines.delay
  * Server-mode invite-generation screen (letta-mobile-g2d2i): mints a QR via
  * [PairInviteViewModel], renders it with [QrMatrixCanvas], and shows the
  * suggested peer name plus a live countdown to expiry.
+ *
+ * INTENTIONALLY UNREACHABLE from any UI entry point right now (see
+ * `PairingInviteRoute`'s registration in `AdminGraph.kt` for the full
+ * rationale): the phone has no Iroh listener. `IrohNodeEndpoint` — the
+ * actual Iroh accept loop — is constructed ONLY in `cli/` and
+ * `iroh-wrapper-cli/`; nothing in `app/` starts one. So a QR minted by
+ * this screen is real and scannable, but no process on the phone can ever
+ * redeem it. The screen, controller, and canvas/geometry code are kept
+ * (compiling, test-covered) for a future phone-as-host — do not wire a
+ * button to this route until that listener exists and shares the same
+ * `PairedPeerStore` this screen mints against. See letta-mobile-6ub2o and
+ * letta-mobile-sixv8.4.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

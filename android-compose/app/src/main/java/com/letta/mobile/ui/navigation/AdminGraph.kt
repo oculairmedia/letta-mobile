@@ -116,7 +116,6 @@ fun NavGraphBuilder.adminGraph(
         SystemAccessDashboardScreen(
             onNavigateBack = { navController.popBackStack() },
             onNavigateToPairingScan = { navController.navigate(PairingScanRoute) },
-            onNavigateToPairingInvite = { navController.navigate(PairingInviteRoute) },
         )
     }
 
@@ -143,6 +142,22 @@ fun NavGraphBuilder.adminGraph(
         )
     }
 
+    // letta-mobile-g2d2i / letta-mobile-6ub2o / letta-mobile-sixv8.4:
+    // INTENTIONALLY UNREACHABLE. This route stays registered so the
+    // server-mode invite-generation code (PairInviteController /
+    // PairInviteViewModel / PairInviteScreen / QrMatrixCanvas /
+    // QrMatrixGeometry) keeps compiling and stays test-covered for a
+    // future phone-as-host, but NO entry point navigates here today.
+    //
+    // Why: IrohNodeEndpoint (the actual Iroh accept loop / listener) is
+    // constructed ONLY in cli/ and iroh-wrapper-cli/ — nothing in app/
+    // starts one, so the phone never listens as an Iroh endpoint. A
+    // phone-minted invite from PairInviteScreen would render a real,
+    // scannable QR that no process on the phone can ever redeem. Do NOT
+    // "fix" this by wiring a button to this route until the phone runs a
+    // listening endpoint that shares the same PairedPeerStore this screen
+    // mints against — see letta-mobile-6ub2o (execution-location /
+    // host-mode work) and letta-mobile-sixv8.4.
     composable<PairingInviteRoute>(
         enterTransition = drillInEnter,
         exitTransition = drillInExit,
