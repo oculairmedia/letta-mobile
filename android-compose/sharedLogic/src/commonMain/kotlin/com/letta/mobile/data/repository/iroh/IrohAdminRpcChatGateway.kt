@@ -958,7 +958,9 @@ class IrohAdminRpcAgentDirectory(
         // agent object is heavy (full system prompt + core memory): ~10 agents
         // is a few hundred KB, well under the admin_rpc timeout on a slow link,
         // whereas the full set is multiple MB and times out in one shot.
-        const val AGENT_LIST_PAGE_SIZE = 10
+        // Raised from 10 to 25 (letta-mobile-z6w): still 8x below the 200 that
+        // timed out, but cuts round trips at the 2500 cap from 250 to 100.
+        const val AGENT_LIST_PAGE_SIZE = 25
 
         /** Matches ToolAdminHandlers.DEFAULT_BLOCK_LIST_LIMIT. */
         const val AGENT_BLOCK_LIST_PAGE_SIZE = 50

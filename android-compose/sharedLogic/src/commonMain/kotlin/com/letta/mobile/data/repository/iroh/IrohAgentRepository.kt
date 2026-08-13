@@ -35,7 +35,26 @@ class IrohAgentRepository(
     override suspend fun refreshAgents() {
         refreshingFlow.value = true
         try {
-            agentsFlow.value = directory().listAgents()
+            val newAgents = directory().listAgents()
+            val currentAgents = agentsFlow.value
+
+            // Diff against the cached list to avoid unnecessary StateFlow emissions.
+            // StateFlow notifies collectors on every assignment, which triggers
+            // Compose recomposition. By comparing by agent.id and reusing unchanged
+            // instances, we preserve UI state (scroll position, expanded items,
+            // selection) when the agent list hasn't actually changed.
+            val currentById = currentAgents.associateBy { it.id }
+            val idsChanged = currentAgents.map { it.id }.toSet() != newAgents.map { it.id }.toSet()
+            val dataChanged = !idsChanged && newAgents.any { newAgent ->
+                currentById[newAgent.id]?.let { it != newAgent } ?: false
+            }
+
+            if (idsChanged || dataChanged) {
+                agentsFlow.value = newAgents.map { newAgent ->
+                    currentById[newAgent.id]?.takeIf { it == newAgent } ?: newAgent
+                }
+            }
+
             lastRefreshMs = Clock.System.now().toEpochMilliseconds()
             refreshErrorFlow.value = null
         } catch (t: Throwable) {

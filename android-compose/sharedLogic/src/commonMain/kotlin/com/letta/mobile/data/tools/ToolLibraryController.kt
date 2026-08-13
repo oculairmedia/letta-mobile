@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import com.letta.mobile.util.Telemetry
 
 @Immutable
 data class ToolLibraryState(
@@ -158,8 +159,9 @@ class ToolLibraryController(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
                 if (generation != loadGeneration) return@launch
+                Telemetry.error("ToolLibraryController", "loadMoreTools.failed", e)
                 stateFlow.update { it.copy(isLoadingMore = false) }
             }
         }
@@ -218,8 +220,9 @@ class ToolLibraryController(
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled
-            } catch (_: Throwable) {
+            } catch (e: Throwable) {
                 if (generation != loadGeneration) return@launch
+                Telemetry.error("ToolLibraryController", "loadMcpTools.failed", e)
                 stateFlow.update { it.copy(isLoadingMcpTools = false) }
             }
         }
