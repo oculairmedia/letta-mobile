@@ -48,9 +48,13 @@ class SharedChatSessionResolver(
     ): String? {
         mostRecentCachedConversationId(agentId)?.let { cachedConversationId ->
             if (!conversationRepository.hasFreshConversations(AgentId(agentId), maxAgeMs)) {
-                backgroundRefreshScope?.launch {
-                    runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
-                } ?: runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
+                if (backgroundRefreshScope != null) {
+                    backgroundRefreshScope.launch {
+                        runCatching { conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs) }
+                    }
+                } else {
+                    conversationRepository.refreshConversationsIfStale(AgentId(agentId), maxAgeMs)
+                }
             }
             return cachedConversationId
         }
