@@ -4,6 +4,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -21,8 +24,31 @@ interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>
     val isConnected: Flow<Boolean> get() = kotlinx.coroutines.flow.flowOf(true)
 
+    /**
+     * Discovered server capabilities from `app_server_info` (lgns8.24).
+     *
+     * Populated after a successful [appServerInfo] call. Null until discovery
+     * completes. Callers should check this before using protocol features that
+     * depend on specific capabilities.
+     */
+    val serverInfo: StateFlow<AppServerInfoData?> get() = MutableStateFlow(null).asStateFlow()
+
     suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
         AppServerInboundFrame.AuthResponse(requestId = command.requestId, success = true)
+
+    /**
+     * Capability discovery request (lgns8.24).
+     *
+     * Sends `{ type: "app_server_info", request_id: "..." }` over the WebSocket
+     * to discover server capabilities before using protocol features. Call this
+     * BEFORE the first [runtimeStart] and on reconnect.
+     *
+     * On success, updates [serverInfo] with the discovered capabilities.
+     *
+     * @return The server's info response containing version and capability flags.
+     */
+    suspend fun appServerInfo(command: AppServerCommand.AppServerInfo): AppServerInboundFrame.AppServerInfoResponse =
+        throw UnsupportedOperationException("app_server_info is not supported by this client")
 
     suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse
 
@@ -153,6 +179,15 @@ class DefaultAppServerClient(
     override val events: Flow<AppServerReceivedFrame> = transport.mergedFrames()
     override val isConnected: Flow<Boolean> = transport.isConnected
 
+    /**
+     * Discovered server capabilities from `app_server_info` (lgns8.24).
+     *
+     * Updated automatically after a successful [appServerInfo] call. Null until
+     * discovery completes.
+     */
+    private val _serverInfo = MutableStateFlow<AppServerInfoData?>(null)
+    override val serverInfo: StateFlow<AppServerInfoData?> = _serverInfo.asStateFlow()
+
     init {
         // Start the registry's inbound router if a scope is provided.
         // When parentScope is null (e.g. in unit tests using FakeAppServerTransport),
@@ -180,6 +215,19 @@ class DefaultAppServerClient(
             response = { it as? AppServerInboundFrame.AuthResponse },
             send = { transport.sendControl(command) },
         )
+
+    override suspend fun appServerInfo(command: AppServerCommand.AppServerInfo): AppServerInboundFrame.AppServerInfoResponse {
+        val response = registry.request(
+            requestId = command.requestId,
+            response = { it as? AppServerInboundFrame.AppServerInfoResponse },
+            send = { transport.sendControl(command) },
+        )
+        // Store discovered capabilities for later feature checks.
+        if (response.success) {
+            _serverInfo.value = response.info
+        }
+        return response
+    }
 
     override suspend fun runtimeStart(
         command: AppServerCommand.RuntimeStart,

@@ -45,6 +45,8 @@ sealed interface AppServerCommandRetryClass {
             is AppServerCommand.Auth -> SafeRead
             is AppServerCommand.RuntimeStart -> SafeRead
             is AppServerCommand.Sync -> SafeRead
+            // Capability discovery is idempotent read.
+            is AppServerCommand.AppServerInfo -> SafeRead
 
             // AdminRpc: reads are safe; everything else is an ambiguous mutation.
             is AppServerCommand.AdminRpc ->

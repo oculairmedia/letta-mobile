@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerConnectionState
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerInfoData
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
@@ -111,6 +112,18 @@ class ReconnectingAppServerClient(
     private val _events = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = EVENT_BUFFER)
     override val events: Flow<AppServerReceivedFrame> = _events.asSharedFlow()
     override val isConnected: Flow<Boolean> = _state.map { it is ReconnectingClientState.Ready }
+
+    /**
+     * Discovered server capabilities from the current generation (lgns8.24).
+     *
+     * Returns the [AppServerInfoData] from the active generation's client, or
+     * null if no generation is ready or discovery hasn't completed yet.
+     */
+    override val serverInfo: StateFlow<AppServerInfoData?>
+        get() = current
+            ?.takeIf { _state.value is ReconnectingClientState.Ready || _state.value is ReconnectingClientState.Recovering }
+            ?.client?.serverInfo
+            ?: emptyServerInfoFlow
 
     private var current: AppServerClientGeneration? = null
     /**
@@ -269,6 +282,9 @@ class ReconnectingAppServerClient(
     override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =
         ready().auth(command)
 
+    override suspend fun appServerInfo(command: AppServerCommand.AppServerInfo): AppServerInboundFrame.AppServerInfoResponse =
+        ready().appServerInfo(command)
+
     override suspend fun runtimeStart(
         command: AppServerCommand.RuntimeStart,
     ): AppServerInboundFrame.RuntimeStartResponse = ready().runtimeStart(command)
@@ -356,5 +372,6 @@ class ReconnectingAppServerClient(
     companion object {
         private const val EVENT_BUFFER = 256
         const val DEFAULT_MAX_ATTEMPTS = 10
+        private val emptyServerInfoFlow: StateFlow<AppServerInfoData?> = MutableStateFlow(null)
     }
 }

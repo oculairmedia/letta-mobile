@@ -59,6 +59,9 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.ChannelAccountsListResponse,
             is AppServerInboundFrame.ChannelStartResponse,
             is AppServerInboundFrame.ChannelAccountUpdateResponse,
+            // Capability discovery (lgns8.24): correlated by the request registry,
+            // not a runtime turn event.
+            is AppServerInboundFrame.AppServerInfoResponse,
             -> emptyList()
             is AppServerInboundFrame.AbortMessageResponse -> frame.toAbortDraft(command)
             is AppServerInboundFrame.StreamDelta -> frame.toStreamDeltaDraft(command, received.raw)
