@@ -17,6 +17,7 @@ import com.letta.mobile.data.controller.node.iroh.PairedPeerStore
 import com.letta.mobile.qr.QrCode
 import com.letta.mobile.qr.QrRenderer
 import java.io.File
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -52,6 +53,15 @@ internal class DesktopPairInviteController(
     private val pngOutputFile: File,
     /** Suggested name passed to `pair.invite.create` for the next invite. */
     private val initialName: String = "paired-peer",
+    /**
+     * Dispatchers are injected so tests can drive [mint] on the test
+     * scheduler. Hard-coded, they hop off the test's scheduler mid-flight,
+     * so `advanceUntilIdle()` races the background work and assertions fire
+     * against half-applied state. Same pattern as
+     * `ChatTimelineObserver.projectionDispatcher`.
+     */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
     /** Loading state — `true` while a `pair.invite.create` call is in flight. */
     var loading by mutableStateOf(false)
@@ -105,7 +115,7 @@ internal class DesktopPairInviteController(
         error = null
         scope.launch {
             try {
-                val response = withContext(Dispatchers.IO) {
+                val response = withContext(ioDispatcher) {
                     router.dispatch(
                         AdminRpcInvocation(
                             requestId = "pair-desktop-${System.nanoTime()}",
@@ -153,10 +163,10 @@ internal class DesktopPairInviteController(
                 // Decode + render. The QR schema is `letta-qr-v1.<base64>` per
                 // §7.1; we encode the full wire value (not just the body) so
                 // the scanner reads the canonical prefix + envelope.
-                val matrix = withContext(Dispatchers.Default) {
+                val matrix = withContext(computeDispatcher) {
                     QrCode.encode(qrInvite)
                 }
-                val written = withContext(Dispatchers.IO) {
+                val written = withContext(ioDispatcher) {
                     QrRenderer.writePng(matrix, pngOutputFile)
                 }
                 if (written <= 0) {
@@ -230,6 +240,8 @@ internal class DesktopPairInviteController(
             pngOutputFile: File,
             suggestedName: String = "paired-peer",
             qrNodeIdHex: String,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
         ): DesktopPairInviteController {
             val signer: PairQrSigner = HmacPairQrSigner(secretKeyStore)
             val pairing = IrohPairingService(store = pairingStore)
@@ -248,6 +260,8 @@ internal class DesktopPairInviteController(
                 pairingStore = pairingStore,
                 pngOutputFile = pngOutputFile,
                 initialName = suggestedName,
+                ioDispatcher = ioDispatcher,
+                computeDispatcher = computeDispatcher,
             )
         }
 
@@ -258,6 +272,8 @@ internal class DesktopPairInviteController(
             signer: PairQrSigner,
             qrNodeIdHex: String,
             pairingStore: PairedPeerStore,
+            ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+            computeDispatcher: CoroutineDispatcher = Dispatchers.Default,
         ): DesktopPairInviteController {
             val pairing = IrohPairingService(store = pairingStore)
             val router = AdminRpcRouter().also { r ->
@@ -274,6 +290,8 @@ internal class DesktopPairInviteController(
                 pairing = pairing,
                 pairingStore = pairingStore,
                 pngOutputFile = pngOutputFile,
+                ioDispatcher = ioDispatcher,
+                computeDispatcher = computeDispatcher,
             )
         }
 
