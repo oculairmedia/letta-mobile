@@ -15,6 +15,9 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     var conversations = mutableListOf<Conversation>()
     var shouldFail = false
     var listDelayMillis: Long = 0L
+    // letta-mobile-xzoy3: simulates the stale-transport ISE (IChannelTransport
+    // default adminRpc) for the session-switch retry test.
+    var staleTransportIaeCountdown: Int = 0
     val calls = mutableListOf<String>()
     val listLimits = mutableListOf<Int?>()
     
@@ -40,6 +43,10 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
             calls.add("listConversations")
             listLimits.add(limit)
             if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
+            if (staleTransportIaeCountdown > 0) {
+                staleTransportIaeCountdown--
+                throw IllegalStateException("admin_rpc is not supported by this transport")
+            }
             if (shouldFail) throw ApiException(500, "Server error")
         val filtered = if (agentId != null) {
             conversations.filter { it.agentId == agentId }
