@@ -5,6 +5,7 @@ import com.composables.icons.lucide.Archive
 import com.composables.icons.lucide.ArrowLeft
 import com.composables.icons.lucide.Bot
 import com.composables.icons.lucide.Brain
+import com.composables.icons.lucide.Camera
 import com.composables.icons.lucide.Check
 import com.composables.icons.lucide.ChevronDown
 import com.composables.icons.lucide.ChevronRight
@@ -40,6 +41,7 @@ import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.PinOff
 import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Plus
+import com.composables.icons.lucide.QrCode
 import com.composables.icons.lucide.RefreshCw
 import com.composables.icons.lucide.Save
 import com.composables.icons.lucide.Search
@@ -92,6 +94,10 @@ object LettaIcons {
     val MoreVert: ImageVector get() = Lucide.Ellipsis
     val Play: ImageVector get() = Lucide.Play
     val ManageSearch: ImageVector get() = Lucide.TextSearch
+
+    // letta-mobile-g2d2i: device pairing (QR scan / invite generation).
+    val QrCode: ImageVector get() = Lucide.QrCode
+    val Camera: ImageVector get() = Lucide.Camera
 
     // Status
     val Check: ImageVector get() = Lucide.Check
