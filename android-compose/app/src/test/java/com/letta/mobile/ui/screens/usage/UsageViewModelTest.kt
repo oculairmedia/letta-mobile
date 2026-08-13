@@ -205,7 +205,7 @@ class UsageViewModelTest {
 
         coVerify(atLeast = 1) { runRepository.getRecentRuns(200) }
         assert(paramsSlot.isCaptured)
-        assert(paramsSlot.captured.limit == 1000)
+        assert(paramsSlot.captured.limit == com.letta.mobile.data.repository.PaginationConstants.DEFAULT_PAGE_SIZE)
         assert(!paramsSlot.captured.startDate.isNullOrBlank())
         assert(!paramsSlot.captured.endDate.isNullOrBlank())
     }
