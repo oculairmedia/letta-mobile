@@ -2,6 +2,7 @@ package com.letta.mobile.data.chat.send
 
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaConfig
@@ -16,17 +17,23 @@ import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -51,6 +58,139 @@ import kotlin.test.assertTrue
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class ChatSendCoordinatorConcurrentConversationsTest {
+
+    @Test
+    fun drainedRuntimeAuditBatchInvokesSinkOnceInGlobalFifoOrder() = runTest {
+        val timeline = RecordingTimelineWriter()
+        val recorded = mutableListOf<Pair<String?, String>>()
+        var sinkCalls = 0
+        val workerJob = Job()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(), activeChatTurn = true),
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler) + workerJob),
+            recordRuntimeEvents = { events ->
+                sinkCalls++
+                recorded += events.map { scopedEvent ->
+                    scopedEvent.conversationId to requireNotNull(
+                        (scopedEvent.event as? WsTimelineEvent.MessageDelta)?.message?.id,
+                    )
+                }
+            },
+        ) { CONV_B }
+
+        coordinator.handleEvent(messageDelta("audit-a", CONV_A))
+        coordinator.handleEvent(messageDelta("audit-b", CONV_B))
+        runCurrent()
+
+        assertEquals(1, sinkCalls, "one drained coordinator batch must invoke the runtime sink once")
+        assertEquals(
+            listOf<Pair<String?, String>>(CONV_A to "audit-a", CONV_B to "audit-b"),
+            recorded,
+            "accepted runtime audit events must retain coordinator arrival order",
+        )
+        workerJob.cancel()
+    }
+
+    @Test
+    fun blockedRuntimeAuditForConversationADoesNotBlockConversationBTimeline() =
+        runTest(UnconfinedTestDispatcher()) {
+            val timeline = RecordingTimelineWriter()
+            val aSinkEntered = CompletableDeferred<Unit>()
+            val releaseASink = CompletableDeferred<Unit>()
+            val persisted = mutableListOf<String>()
+            val coordinator = coordinator(
+                timeline = timeline,
+                ui = RecordingUiSink(),
+                transport = FakeChannelTransport(mutableListOf(), activeChatTurn = true),
+                recordRuntimeEvent = { event, conversationId ->
+                    val messageId = requireNotNull((event as? WsTimelineEvent.MessageDelta)?.message?.id)
+                    if (conversationId == CONV_A) {
+                        aSinkEntered.complete(Unit)
+                        releaseASink.await()
+                    }
+                    persisted += messageId
+                },
+            ) { CONV_B }
+
+            val aEvent = messageDelta("blocked-a", CONV_A)
+            val bEvent = messageDelta("progress-b-1", CONV_B)
+            val queuedBEvent = messageDelta("progress-b-2", CONV_B)
+            val aHandling = launch { coordinator.handleEvent(aEvent) }
+            aSinkEntered.await()
+            val bHandling = launch { coordinator.handleEvent(bEvent) }
+            val queuedBHandling = launch { coordinator.handleEvent(queuedBEvent) }
+
+            try {
+                assertTrue(
+                    timeline.ingestedMessages.map { it.id }.containsAll(listOf("progress-b-1", "progress-b-2")),
+                    "B timeline must progress while A runtime persistence remains blocked",
+                )
+            } finally {
+                releaseASink.complete(Unit)
+            }
+            aHandling.join()
+            bHandling.join()
+            queuedBHandling.join()
+            advanceUntilIdle()
+
+            assertEquals(listOf("blocked-a", "progress-b-1", "progress-b-2"), persisted)
+        }
+
+    @Test
+    fun runtimeAuditSinkFailureDoesNotStopLaterQueuedRecords() = runTest(UnconfinedTestDispatcher()) {
+        val persisted = mutableListOf<String>()
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(), activeChatTurn = true),
+            recordRuntimeEvent = { event, _ ->
+                val messageId = requireNotNull((event as? WsTimelineEvent.MessageDelta)?.message?.id)
+                if (messageId == "sink-failure") error("expected sink failure")
+                persisted += messageId
+            },
+        ) { CONV_B }
+
+        coordinator.handleEvent(messageDelta("sink-failure", CONV_A))
+        coordinator.handleEvent(messageDelta("after-failure", CONV_B))
+        advanceUntilIdle()
+
+        assertEquals(listOf("after-failure"), persisted)
+    }
+
+    @Test
+    fun cancellingCoordinatorScopeStopsRuntimeAuditBacklog() = runTest(UnconfinedTestDispatcher()) {
+        val workerJob = Job()
+        val workerScope = CoroutineScope(UnconfinedTestDispatcher(testScheduler) + workerJob)
+        val sinkEntered = CompletableDeferred<Unit>()
+        val releaseSink = CompletableDeferred<Unit>()
+        val persisted = mutableListOf<String>()
+        val coordinator = coordinator(
+            timeline = RecordingTimelineWriter(),
+            ui = RecordingUiSink(),
+            transport = FakeChannelTransport(mutableListOf(), activeChatTurn = true),
+            scope = workerScope,
+            recordRuntimeEvent = sink@ { event, _ ->
+                val messageId = requireNotNull((event as? WsTimelineEvent.MessageDelta)?.message?.id)
+                if (messageId == "cancel-worker") {
+                    sinkEntered.complete(Unit)
+                    runCatching { releaseSink.await() }
+                    return@sink
+                }
+                persisted += messageId
+            },
+        ) { CONV_B }
+
+        coordinator.handleEvent(messageDelta("cancel-worker", CONV_A))
+        sinkEntered.await()
+        coordinator.handleEvent(messageDelta("must-not-persist", CONV_B))
+        workerJob.cancel()
+        releaseSink.complete(Unit)
+        advanceUntilIdle()
+
+        assertTrue(persisted.isEmpty(), "scope cancellation must stop queued persistence work")
+    }
 
     /**
      * Regression 1: B's send while A's turn is in flight must not evict A's turn
@@ -394,10 +534,14 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         timeline: RecordingTimelineWriter,
         ui: RecordingUiSink,
         transport: FakeChannelTransport,
+        scope: CoroutineScope = CoroutineScope(UnconfinedTestDispatcher()),
         recordRuntimeEvent: suspend (WsTimelineEvent, String?) -> Unit = { _, _ -> },
+        recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = { events ->
+            events.forEach { event -> recordRuntimeEvent(event.event, event.conversationId) }
+        },
         activeConversationId: () -> String?,
     ) = ChatSendCoordinator(
-        scope = CoroutineScope(UnconfinedTestDispatcher()),
+        scope = scope,
         agentId = AGENT_ID,
         activeConfig = { LettaConfig("shim", LettaConfig.Mode.SELF_HOSTED, "http://localhost:8291", "token") },
         wsChatBridge = WsChatBridge(transport),
@@ -410,7 +554,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         startTimelineObserver = {},
         clientVersion = { "test" },
         otidGenerator = { "otid-${++otid}" },
-        recordRuntimeEvent = recordRuntimeEvent,
+        recordRuntimeEvents = recordRuntimeEvents,
     )
 
     private class RecordingUiSink(
@@ -508,6 +652,16 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation = conversation("fork", agentId.value)
         private fun conversation(id: String, agentId: String) = Conversation(ConversationId(id), AgentId(agentId), "1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z", "1970-01-01T00:00:00Z")
     }
+
+    private fun messageDelta(messageId: String, conversationId: String) =
+        WsTimelineEvent.MessageDelta(
+            message = AssistantMessage(
+                id = messageId,
+                contentRaw = JsonPrimitive(messageId),
+                runId = "run-$conversationId",
+            ),
+            conversationId = conversationId,
+        )
 
     private companion object {
         const val AGENT_ID = "agent-1"

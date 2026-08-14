@@ -63,7 +63,9 @@ interface LettaBackend {
 }
 
 interface RuntimeEventOutbox {
-    suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope
+    suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope = appendAll(listOf(draft)).single()
+
+    suspend fun appendAll(drafts: List<RuntimeEventDraft>): List<RuntimeEventEnvelope>
 
     fun events(afterOffset: RuntimeEventOffset): Flow<RuntimeEventEnvelope>
 }

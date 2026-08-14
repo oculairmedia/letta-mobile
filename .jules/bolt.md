@@ -10,3 +10,6 @@
 ## 2026-08-05 - Remove redundant derivedStateOf wrappers
 **Learning:** In Jetpack Compose, wrapping state-backed properties like `LazyListState.canScrollForward` or `canScrollBackward` inside a `derivedStateOf` block is redundant. These properties are already backed by Compose `State<Boolean>` and their outputs change at the exact same rate as their inputs. Wrapping them wastes memory and observation overhead without reducing recompositions.
 **Action:** Always read natively state-backed boolean properties (like scroll direction states) directly instead of wrapping them in `derivedStateOf`.
+## 2024-10-25 - Replace maxOfOrNull on visibleItemsInfo
+**Learning:** In Jetpack Compose, `LazyListState.layoutInfo.visibleItemsInfo` is inherently sorted by index representing the currently visible items on the screen. Using `maxOfOrNull { it.index }` forces the creation of an iterator and evaluates a lambda for each element. This wastes memory per evaluation frame.
+**Action:** When finding the maximum index of visible items, always use `lastOrNull()?.index` which relies on O(1) list access to get the last element (which will always have the maximum index) and avoids iterator allocations.
