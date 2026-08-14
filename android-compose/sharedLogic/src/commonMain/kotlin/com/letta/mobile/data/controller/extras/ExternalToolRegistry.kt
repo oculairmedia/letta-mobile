@@ -163,6 +163,7 @@ class ExternalToolRegistry(
         fun standard(
             capabilities: RemoteCapabilities,
             customIrohMessagingTool: CustomIrohMessagingTool? = null,
+            agentDiscoveryTool: AgentDiscoveryTool? = null,
         ): ExternalToolRegistry {
             val baseTools = listOf(
                 ImageHydrationTool(),
@@ -177,10 +178,10 @@ class ExternalToolRegistry(
             // capability is enabled AND the controller supplied an instance.
             // The registry filters by capability at lookup time; the candidate
             // list is the superset of "tools we know how to advertise".
-            val toolsWithIroh = if (customIrohMessagingTool != null) {
-                baseTools + customIrohMessagingTool
-            } else {
-                baseTools
+            val toolsWithIroh = buildList {
+                addAll(baseTools)
+                if (customIrohMessagingTool != null) add(customIrohMessagingTool)
+                if (agentDiscoveryTool != null) add(agentDiscoveryTool)
             }
             return ExternalToolRegistry(
                 tools = toolsWithIroh,

@@ -110,8 +110,11 @@ interface IrohCliRunner {
  * from here would leave the App Server parked on its 5-minute timeout.
  */
 sealed interface IrohCliSendResult {
-    /** The peer ACKed receipt of the message; the CLI exited 0. */
+    /** Application delivery was confirmed by the recipient. */
     data class Delivered(val msgId: String) : IrohCliSendResult
+
+    /** Transport was accepted, but application delivery is not confirmed. */
+    data class Accepted(val msgId: String, val toAgentId: String) : IrohCliSendResult
 
     /** The CLI exited non-zero because the target was unaddressable. */
     data class Unaddressable(val toAgentId: String, val reason: String) : IrohCliSendResult
