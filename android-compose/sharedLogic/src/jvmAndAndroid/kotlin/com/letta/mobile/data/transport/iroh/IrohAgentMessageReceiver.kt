@@ -5,7 +5,9 @@ import com.letta.mobile.util.Telemetry
 import computer.iroh.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * letta-mobile-bn008.3: the receive side of direct agent-to-agent messaging.
@@ -69,13 +71,20 @@ class IrohAgentMessageReceiver(
                         candidates,
                         targetConversationId = message.conversationId,
                     )
-                    val outcome = onDeliver(message, decision)
+                    val outcome = runCatching {
+                        withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) {
+                            onDeliver(message, decision)
+                        }
+                    }.getOrElse { error ->
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        DeliveryOutcome(false, "delivery_timeout")
+                    }
                     val applicationAck = stream.send()
                     IrohFrameCodec.write(
                         applicationAck,
                         IrohAgentMessageAck(
                             msgId = message.msgId,
-                            accepted = outcome.delivered,
+                            accepted = true,
                             applicationDelivered = outcome.delivered,
                             reason = outcome.reason,
                         ).encode(),
@@ -90,5 +99,9 @@ class IrohAgentMessageReceiver(
                 "error" to (e.message ?: e::class.simpleName ?: "unknown"),
             )
         }
+    }
+
+    private companion object {
+        const val DELIVERY_TIMEOUT_MS = 10_000L
     }
 }

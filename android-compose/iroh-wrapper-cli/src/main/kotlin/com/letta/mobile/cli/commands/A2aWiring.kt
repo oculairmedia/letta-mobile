@@ -28,6 +28,7 @@ import computer.iroh.RelayMode
 import computer.iroh.SecretKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -555,6 +556,7 @@ internal suspend fun handleCreateAndDeliver(
             "A2aHost", "a2a.create_and_deliver",
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
+            "msgId" to message.msgId,
             "conversationId" to createdId,
         )
         return inputOnConversation(client, message, createdId)
@@ -625,6 +627,7 @@ private suspend fun inputOnConversation(
         )
         DeliveryOutcome(true)
     }.getOrElse { t ->
+        if (t is CancellationException) throw t
         Telemetry.event(
             "A2aHost", "a2a.application_failed",
             "msgId" to message.msgId,
