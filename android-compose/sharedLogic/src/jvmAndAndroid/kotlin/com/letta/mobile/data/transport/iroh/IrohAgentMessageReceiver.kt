@@ -5,7 +5,9 @@ import com.letta.mobile.util.Telemetry
 import computer.iroh.Endpoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * letta-mobile-bn008.3: the receive side of direct agent-to-agent messaging.
@@ -20,11 +22,16 @@ import kotlinx.coroutines.launch
  * [conversationsFor]/[isBusy] are injected so the routing decision is testable
  * without live state; [onDeliver] performs the actual conversation land + turn.
  */
+data class DeliveryOutcome(
+    val delivered: Boolean,
+    val reason: String? = null,
+)
+
 class IrohAgentMessageReceiver(
     private val endpoint: Endpoint,
     private val router: IrohAgentMessageRouter,
     private val conversationsFor: suspend (agentId: String) -> List<IrohAgentMessageRouter.ConversationState>,
-    private val onDeliver: suspend (message: IrohAgentMessage, decision: IrohAgentMessageRouter.RoutingDecision) -> Unit,
+    private val onDeliver: suspend (message: IrohAgentMessage, decision: IrohAgentMessageRouter.RoutingDecision) -> DeliveryOutcome,
 ) {
     /** Start the accept loop on [scope]; returns the loop Job (cancel to stop). */
     fun start(scope: CoroutineScope): Job = scope.launch {
@@ -54,11 +61,9 @@ class IrohAgentMessageReceiver(
                         "toAgentId" to message.toAgentId,
                         "msgId" to message.msgId,
                     )
-                    // Ack first (QUIC is lossless; the receiver owns at-most-once).
-                    val send = stream.send()
-                    IrohFrameCodec.write(send, IrohAgentMessageAck(message.msgId, accepted = true).encode())
-                    send.finish()
-                    // Route + deliver.
+                    Telemetry.event("A2aHost", "a2a.transport_accepted", "msgId" to message.msgId)
+                    // Route + deliver and return the application outcome through the
+                    // correlated ack only after durable app-server acceptance.
                     val candidates = conversationsFor(message.toAgentId)
                     val decision = router.route(
                         message.fromAgentId,
@@ -66,7 +71,25 @@ class IrohAgentMessageReceiver(
                         candidates,
                         targetConversationId = message.conversationId,
                     )
-                    onDeliver(message, decision)
+                    val outcome = runCatching {
+                        withTimeout(DELIVERY_TIMEOUT_MS.milliseconds) {
+                            onDeliver(message, decision)
+                        }
+                    }.getOrElse { error ->
+                        if (error is kotlinx.coroutines.CancellationException) throw error
+                        DeliveryOutcome(false, "delivery_timeout")
+                    }
+                    val applicationAck = stream.send()
+                    IrohFrameCodec.write(
+                        applicationAck,
+                        IrohAgentMessageAck(
+                            msgId = message.msgId,
+                            accepted = true,
+                            applicationDelivered = outcome.delivered,
+                            reason = outcome.reason,
+                        ).encode(),
+                    )
+                    applicationAck.finish()
                 }
             }
         }.onFailure { e ->
@@ -76,5 +99,9 @@ class IrohAgentMessageReceiver(
                 "error" to (e.message ?: e::class.simpleName ?: "unknown"),
             )
         }
+    }
+
+    private companion object {
+        const val DELIVERY_TIMEOUT_MS = 10_000L
     }
 }

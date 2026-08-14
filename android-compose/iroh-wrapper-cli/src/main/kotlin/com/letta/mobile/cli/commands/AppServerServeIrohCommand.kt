@@ -8,6 +8,9 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.capability.RemoteCapabilities
 import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
+import com.letta.mobile.data.controller.extras.AgentDiscoveryTool
+import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
+import com.letta.mobile.data.controller.node.iroh.LocalBackendAgentDiscoverySource
 import com.letta.mobile.data.controller.extras.ExternalToolRegistry
 import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.ReconnectCoordinator
@@ -638,6 +641,7 @@ class AppServerServeIrohCommand : CliktCommand(
             binary = meridianBinary,
             identityDir = a2aIdentityDir,
             addressStore = a2aAddressBook,
+            localBackendDir = localBackendDir,
         )
 
     /**
@@ -855,6 +859,7 @@ internal fun buildProductionExternalToolRegistryForTesting(
     binary: String,
     identityDir: String?,
     addressStore: String?,
+    localBackendDir: String? = null,
 ): ExternalToolRegistry {
     if (binary.isBlank()) {
         return ExternalToolRegistry.factoryDefault()
@@ -865,9 +870,13 @@ internal fun buildProductionExternalToolRegistryForTesting(
         identityDir = identityDir,
         addressStore = addressStore,
     )
+    val discovery = localBackendDir?.takeIf { it.isNotBlank() }?.let {
+        AgentDiscoveryTool(LocalBackendAgentDiscoverySource(LocalBackendAdminStore(java.io.File(it))))
+    }
     return ExternalToolRegistry.standard(
         capabilities = capabilities,
         customIrohMessagingTool = tool,
+        agentDiscoveryTool = discovery,
     )
 }
 
