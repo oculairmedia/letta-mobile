@@ -13,24 +13,33 @@ class InMemoryRuntimeEventOutbox(
     private val mutex = Mutex()
     private val events = MutableStateFlow<List<RuntimeEventEnvelope>>(emptyList())
 
-    override suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope =
-        mutex.withLock {
-            val offset = RuntimeEventOffset((events.value.lastOrNull()?.offset?.value ?: 0L) + 1L)
-            val envelope = RuntimeEventEnvelope(
-                offset = offset,
-                eventId = eventIdFactory(draft, offset),
-                backendId = draft.backendId,
-                runtimeId = draft.runtimeId,
-                agentId = draft.agentId,
-                conversationId = draft.conversationId,
-                runId = draft.runId,
-                createdAt = clock(),
-                source = draft.source,
-                payload = draft.payload,
-            )
-            events.value += envelope
-            envelope
+    override suspend fun appendAll(drafts: List<RuntimeEventDraft>): List<RuntimeEventEnvelope> {
+        if (drafts.isEmpty()) return emptyList()
+
+        return mutex.withLock {
+            val firstOffset = (events.value.lastOrNull()?.offset?.value ?: 0L) + 1L
+            val envelopes = drafts.mapIndexed { index, draft ->
+                val offset = RuntimeEventOffset(firstOffset + index)
+                RuntimeEventEnvelope(
+                    offset = offset,
+                    eventId = eventIdFactory(draft, offset),
+                    backendId = draft.backendId,
+                    runtimeId = draft.runtimeId,
+                    agentId = draft.agentId,
+                    conversationId = draft.conversationId,
+                    runId = draft.runId,
+                    createdAt = clock(),
+                    source = draft.source,
+                    payload = draft.payload,
+                )
+            }
+            events.value += envelopes
+            envelopes
         }
+    }
+
+    override suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope =
+        appendAll(listOf(draft)).single()
 
     override fun events(afterOffset: RuntimeEventOffset): Flow<RuntimeEventEnvelope> = flow {
         var cursor = afterOffset

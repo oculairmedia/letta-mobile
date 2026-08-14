@@ -24,23 +24,32 @@ class RoomRuntimeEventOutbox(
     }
 
     override suspend fun append(draft: RuntimeEventDraft): RuntimeEventEnvelope =
-        database.withTransaction {
-            val offset = RuntimeEventOffset(database.runtimeEventDao().maxOffset() + 1L)
-            val envelope = RuntimeEventEnvelope(
-                offset = offset,
-                eventId = eventIdFactory(draft, offset),
-                backendId = draft.backendId,
-                runtimeId = draft.runtimeId,
-                agentId = draft.agentId,
-                conversationId = draft.conversationId,
-                runId = draft.runId,
-                createdAt = clock(),
-                source = draft.source,
-                payload = draft.payload,
-            )
-            database.runtimeEventDao().insert(RuntimeEventEntity.fromEnvelope(envelope, json))
-            envelope
+        appendAll(listOf(draft)).single()
+
+    override suspend fun appendAll(drafts: List<RuntimeEventDraft>): List<RuntimeEventEnvelope> {
+        if (drafts.isEmpty()) return emptyList()
+
+        return database.withTransaction {
+            val firstOffset = database.runtimeEventDao().maxOffset() + 1L
+            val envelopes = drafts.mapIndexed { index, draft ->
+                val offset = RuntimeEventOffset(firstOffset + index)
+                RuntimeEventEnvelope(
+                    offset = offset,
+                    eventId = eventIdFactory(draft, offset),
+                    backendId = draft.backendId,
+                    runtimeId = draft.runtimeId,
+                    agentId = draft.agentId,
+                    conversationId = draft.conversationId,
+                    runId = draft.runId,
+                    createdAt = clock(),
+                    source = draft.source,
+                    payload = draft.payload,
+                )
+            }
+            database.runtimeEventDao().insert(envelopes.map { RuntimeEventEntity.fromEnvelope(it, json) })
+            envelopes
         }
+    }
 
     override fun events(afterOffset: RuntimeEventOffset): Flow<RuntimeEventEnvelope> = flow {
         var cursor = afterOffset
