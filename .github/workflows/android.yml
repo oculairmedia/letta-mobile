@@ -31,7 +31,7 @@ on:
       - "scripts/deploy/**"
       - "scripts/mcp/**"
       - "scripts/scip/**"
-      - "tools/architecture_query/**"
+      - "tools/**"
   workflow_dispatch:
 
 concurrency:
