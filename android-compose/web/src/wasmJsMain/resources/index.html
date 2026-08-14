@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Letta Web</title>
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #0B0D11;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #ComposeTarget {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+    <script type="module">
+        import init, { IrohWasmClient } from './iroh/letta_iroh_wasm.js';
+        window.initIroh = async function() {
+            try {
+                await init('./iroh/letta_iroh_wasm_bg.wasm');
+                window.IrohWasmClient = IrohWasmClient;
+                window.irohReady = true;
+                console.log("🟢 Iroh 1.0.3 Wasm P2P Engine Ready!");
+            } catch (err) {
+                console.error("🔴 Failed to initialize Iroh Wasm:", err);
+            }
+        };
+        window.irohDialAndSend = async function(target, alpn, payload) {
+            if (!window.IrohWasmClient) {
+                await window.initIroh();
+            }
+            const client = new window.IrohWasmClient(target);
+            return await client.dial_and_send(target, alpn, payload);
+        };
+        window.initIroh();
+    </script>
+</head>
+<body>
+    <canvas id="ComposeTarget"></canvas>
+    <script src="letta-web.js"></script>
+</body>
+</html>

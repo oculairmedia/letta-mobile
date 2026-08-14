@@ -134,6 +134,7 @@ tasks.named("processResources") {
 
 dependencies {
     implementation(project(":sharedLogic"))
+    implementation(project(":shared-ui"))
     // letta-mobile-cq2ju: Iroh QUIC transport for desktop. sharedLogic declares
     // computer.iroh:iroh as `implementation` (not `api`), so it is NOT exposed
     // transitively for desktop compilation — declare it directly here. The JAR

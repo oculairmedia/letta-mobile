@@ -16,8 +16,6 @@ import com.letta.mobile.runtime.ConversationId
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.yield
 import kotlinx.serialization.json.JsonObject
@@ -96,7 +94,7 @@ class CustomIrohMessagingToolIntegrationTest {
      * success with the wire msgId.
      */
     @Test
-    fun dispatcherWiresAgentIdAndBodyToTheRunner() = runBlocking {
+    fun dispatcherWiresAgentIdAndBodyToTheRunner() = runTest {
         val captured = CapturingRunner()
         val tool = CustomIrohMessagingTool(
             binary = "/usr/local/bin/meridian",
@@ -178,7 +176,7 @@ class CustomIrohMessagingToolIntegrationTest {
      * doesn't hang.
      */
     @Test
-    fun unaddressableSurfacesAsMatchedIsErrorResponse() = runBlocking {
+    fun unaddressableSurfacesAsMatchedIsErrorResponse() = runTest {
         val tool = CustomIrohMessagingTool(
             binary = "/usr/local/bin/meridian",
             runner = FixedRunner(IrohCliSendResult.Unaddressable("agent-meridian", "no_kv_row")),
