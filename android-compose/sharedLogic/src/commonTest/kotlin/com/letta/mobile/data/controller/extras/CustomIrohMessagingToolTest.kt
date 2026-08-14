@@ -105,6 +105,24 @@ class CustomIrohMessagingToolTest {
     }
 
     @Test
+    fun transportAcceptedNeverClaimsDelivered() = runTest {
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Accepted("msg-accepted", "tgt")))
+        val success = assertIs<ExternalToolResult.Success>(tool.invoke(inputWithBody(), "src"))
+        assertTrue(success.content.contains("\"accepted\":true"))
+        assertTrue(success.content.contains("\"delivered\":false"))
+        assertFalse(success.content.contains("\"delivered\":true"))
+    }
+
+    @Test
+    fun unknownAgentFailureNeverClaimsDelivered() = runTest {
+        val target = "agent-a5fd4ced-6d0f-49cf-b8cb-57e9ccac37b3"
+        val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Failed(target, "agent_not_found")))
+        val error = assertIs<ExternalToolResult.Error>(tool.invoke(inputWithBody(to = target), "src"))
+        assertTrue(error.error.contains("agent_not_found"))
+        assertFalse(error.error.contains("delivered:true"))
+    }
+
+    @Test
     fun runnerUnaddressableMapsToDescriptiveError() = runTest {
         val tool = toolWithRunner(FixedRunner(IrohCliSendResult.Unaddressable("tgt", "no_kv_row")))
         val result = tool.invoke(

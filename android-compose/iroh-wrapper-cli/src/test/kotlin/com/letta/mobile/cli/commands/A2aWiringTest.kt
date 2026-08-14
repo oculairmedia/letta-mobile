@@ -10,6 +10,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInputPayload
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.iroh.HostEndpointAddressStore
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
+import com.letta.mobile.data.transport.iroh.DeliveryOutcome
 import java.io.File
 import java.nio.file.Files
 import java.util.Base64
@@ -366,7 +367,8 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.Deliver("conv-deliver")
 
-        runBlocking { handleDecision(client, message, decision) }
+        val outcome = runBlocking { handleDecision(client, message, decision) }
+        assertTrue(outcome.delivered)
 
         assertEquals(1, client.captured.size, "expected exactly one client.input call")
         val cmd = client.captured.single()
@@ -441,7 +443,9 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        runBlocking { handleDecision(client = null, message, decision) }
+        val outcome = runBlocking { handleDecision(client = null, message, decision) }
+        assertFalse(outcome.delivered)
+        assertEquals("application_enqueue_failure", outcome.reason)
 
         val events = com.letta.mobile.util.Telemetry.snapshot()
         val dropEvent = events.single { it.name == "a2a.drop" }
@@ -462,7 +466,9 @@ class A2aWiringTest {
             ts = 1_700_000_000_000L,
         )
 
-        runBlocking { handleCreateAndDeliver(client, message) }
+        val outcome = runBlocking { handleCreateAndDeliver(client, message) }
+        assertFalse(outcome.delivered)
+        assertEquals("conversation_create_failure", outcome.reason)
 
         val events = com.letta.mobile.util.Telemetry.snapshot()
         val dropEvent = events.single { it.name == "a2a.drop" }
@@ -501,7 +507,8 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        runBlocking { handleDecision(client, message, decision) }
+        val outcome = runBlocking { handleDecision(client, message, decision) }
+        assertTrue(outcome.delivered)
 
         assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
         val createCmd = client.capturedCreate.single()
@@ -544,7 +551,9 @@ class A2aWiringTest {
         )
         val decision = IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver
 
-        runBlocking { handleDecision(client, message, decision) }
+        val outcome = runBlocking { handleDecision(client, message, decision) }
+        assertFalse(outcome.delivered)
+        assertEquals("conversation_create_failure", outcome.reason)
 
         assertEquals(1, client.capturedCreate.size, "expected one conversationCreate call")
         assertTrue(client.captured.isEmpty(), "expected input not to be called when create fails")
