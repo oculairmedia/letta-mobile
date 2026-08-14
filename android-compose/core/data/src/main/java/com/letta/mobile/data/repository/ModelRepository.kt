@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,7 +36,15 @@ open class ModelRepository(
 
     private suspend fun filterCredentialed(models: List<LlmModel>): List<LlmModel> {
         val loader = credentialedProviderTypes ?: return models
-        val credentialedTypes = loader()
+        val credentialedTypes = try {
+            loader()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Fail open: a provider-lookup failure must not abort the catalog
+            // refresh and empty the picker.
+            return models
+        }
         if (credentialedTypes.isEmpty()) return models
         return ModelCatalogNormalizer.filterByCredentialedProviders(models, credentialedTypes)
     }

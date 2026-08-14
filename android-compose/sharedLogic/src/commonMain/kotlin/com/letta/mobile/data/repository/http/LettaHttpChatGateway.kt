@@ -42,6 +42,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.buildJsonObject
@@ -255,35 +256,44 @@ open class LettaHttpChatGateway(
      * cursor shape (`limit` + `after` = last provider id), bounded to a small page
      * count; a server that ignores `after` and re-serves a page cannot spin.
      */
-    private suspend fun fetchCredentialedProviderTypes(): Set<String> = runCatching {
-        val credentialedTypes = mutableSetOf<String>()
-        val seenIds = HashSet<String>()
-        var after: String? = null
-        var page = 0
-        while (page < PROVIDER_PAGE_MAX) {
-            page++
-            val response = httpClient.get("$baseUrl/v1/providers") {
-                applyAuth()
-                parameter("limit", PROVIDER_PAGE_SIZE)
-                parameter("after", after)
+    private suspend fun fetchCredentialedProviderTypes(): Set<String> {
+        return try {
+            val credentialedTypes = mutableSetOf<String>()
+            val seenIds = HashSet<String>()
+            var after: String? = null
+            var page = 0
+            while (page < PROVIDER_PAGE_MAX) {
+                page++
+                val response = httpClient.get("$baseUrl/v1/providers") {
+                    applyAuth()
+                    parameter("limit", PROVIDER_PAGE_SIZE)
+                    parameter("after", after)
+                }
+                response.requireSuccess()
+                val providers = response.body<List<Provider>>()
+                if (providers.isEmpty()) break
+                val fresh = providers.filter { provider ->
+                    provider.id?.value?.let { seenIds.add(it) } ?: true
+                }
+                if (fresh.isEmpty()) break
+                for (provider in fresh) {
+                    provider.providerType.trim().lowercase()
+                        .takeIf { it.isNotBlank() }
+                        ?.let { credentialedTypes += it }
+                }
+                if (providers.size < PROVIDER_PAGE_SIZE) break
+                after = providers.last().id?.value ?: break
             }
-            response.requireSuccess()
-            val providers = response.body<List<Provider>>()
-            if (providers.isEmpty()) break
-            val fresh = providers.filter { provider ->
-                provider.id?.value?.let { seenIds.add(it) } ?: true
-            }
-            if (fresh.isEmpty()) break
-            for (provider in fresh) {
-                provider.providerType.trim().lowercase()
-                    .takeIf { it.isNotBlank() }
-                    ?.let { credentialedTypes += it }
-            }
-            if (providers.size < PROVIDER_PAGE_SIZE) break
-            after = providers.last().id?.value ?: break
+            credentialedTypes
+        } catch (cancelled: CancellationException) {
+            // Never swallow a coroutine cancellation — the caller must observe
+            // it so the refresh can abort instead of publishing a filtered view.
+            throw cancelled
+        } catch (_: Exception) {
+            // Fail open: a provider-lookup failure must not empty the picker.
+            emptySet()
         }
-        credentialedTypes
-    }.getOrDefault(emptySet())
+    }
 
     private fun HttpRequestBuilder.applyAuth() {
         config.accessToken

@@ -10,9 +10,11 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 
 class LettaHttpChatGatewayCredentialFilterTest {
     @Test
@@ -42,7 +44,16 @@ class LettaHttpChatGatewayCredentialFilterTest {
         assertEquals(ALL_MODEL_IDS, models.map { it.id })
     }
 
-    private fun gateway(providersJson: String?): DesktopLettaHttpChatGateway {
+    @Test
+    fun providerFetchCancellationPropagates() = runTest {
+        val gateway = gateway(providersJson = null, providersCancellation = true)
+
+        assertFailsWith<CancellationException> {
+            gateway.listLlmModels()
+        }
+    }
+
+    private fun gateway(providersJson: String?, providersCancellation: Boolean = false): DesktopLettaHttpChatGateway {
         val client = HttpClient(MockEngine { request ->
             when (request.url.encodedPath) {
                 "/v1/models" -> respond(
@@ -51,7 +62,9 @@ class LettaHttpChatGatewayCredentialFilterTest {
                     headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )
                 "/v1/providers" -> {
-                    if (providersJson == null) {
+                    if (providersCancellation) {
+                        throw CancellationException("provider lookup cancelled")
+                    } else if (providersJson == null) {
                         respond(
                             content = "server error",
                             status = HttpStatusCode.InternalServerError,
