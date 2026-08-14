@@ -5,8 +5,8 @@ import android.app.Application
 import android.os.Bundle
 import androidx.metrics.performance.JankStats
 import androidx.metrics.performance.PerformanceMetricsState
-import com.letta.mobile.BuildConfig
-import com.letta.mobile.R
+import ca.oculair.meridian.BuildConfig
+import ca.oculair.meridian.R
 import com.letta.mobile.util.Telemetry
 import io.sentry.ISpan
 import io.sentry.Sentry

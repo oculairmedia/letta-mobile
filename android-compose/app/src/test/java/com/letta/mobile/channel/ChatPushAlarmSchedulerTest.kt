@@ -37,8 +37,8 @@ class ChatPushAlarmSchedulerTest {
 
         every { context.applicationContext } returns appContext
         every { appContext.getSystemService(Context.ALARM_SERVICE) } returns alarmManager
-        every { context.packageName } returns "com.letta.mobile"
-        every { appContext.packageName } returns "com.letta.mobile"
+        every { context.packageName } returns "ca.oculair.meridian"
+        every { appContext.packageName } returns "ca.oculair.meridian"
 
         mockkStatic(PendingIntent::class)
         every {

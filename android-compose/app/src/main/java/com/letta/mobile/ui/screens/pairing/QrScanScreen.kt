@@ -48,7 +48,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.controller.node.iroh.PairQrEnvelope
 import com.letta.mobile.ui.icons.LettaIcons
 import java.util.concurrent.Executors

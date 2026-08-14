@@ -6,7 +6,7 @@ trace_dir="$repo_root/scripts/perf/traces"
 mkdir -p "$trace_dir"
 
 duration_secs="${1:-10}"
-app_id="${2:-com.letta.mobile}"
+app_id="${2:-ca.oculair.meridian}"
 timestamp="$(date +%Y%m%d-%H%M%S)"
 trace_name="trace-${timestamp}.perfetto-trace"
 local_trace_path="$trace_dir/$trace_name"

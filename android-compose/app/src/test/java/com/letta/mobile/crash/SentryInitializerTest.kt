@@ -3,7 +3,7 @@ package com.letta.mobile.crash
 import android.content.Context
 import android.content.res.Resources
 import android.util.Log
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -30,7 +30,7 @@ class SentryInitializerTest {
         context = mockk()
         resources = mockk()
         every { context.resources } returns resources
-        every { context.packageName } returns "com.letta.mobile"
+        every { context.packageName } returns "ca.oculair.meridian"
 
         mockkStatic(Log::class)
         every { Log.i(any(), any()) } returns 0

@@ -2,6 +2,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Baseline profile generator needs access to the target app. -->
     <queries>
-        <package android:name="com.letta.mobile.benchmark" />
+        <package android:name="ca.oculair.meridian.benchmark" />
     </queries>
 </manifest>

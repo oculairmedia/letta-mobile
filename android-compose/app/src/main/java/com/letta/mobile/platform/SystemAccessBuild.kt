@@ -1,6 +1,6 @@
 package com.letta.mobile.platform
 
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 
 /** Compile-time distribution flavor gates for Android system-access features. */
 enum class SystemAccessFlavor {
