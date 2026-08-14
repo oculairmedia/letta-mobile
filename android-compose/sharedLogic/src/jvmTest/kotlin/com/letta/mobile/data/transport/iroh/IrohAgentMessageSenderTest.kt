@@ -39,7 +39,7 @@ class IrohAgentMessageSenderTest {
 
     @Test
     fun ackRoundTripsThroughWire() {
-        val ack = IrohAgentMessageAck("m-1", accepted = true)
+        val ack = IrohAgentMessageAck("m-1", accepted = true, applicationDelivered = true)
         assertEquals(ack, IrohAgentMessageAck.decode(ack.encode()))
     }
 
