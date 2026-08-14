@@ -69,6 +69,28 @@ class IrohWrapperCliWiringTest {
     }
 
     @Test
+    fun agentMessageSendSubcommandIsRegisteredAndAcceptsBodyFile() {
+        // letta-mobile-e12nf: this is the same regression class as
+        // rootCommandRegistersTheDeployedSubcommandName above, but for the
+        // agent-message send subcommand tree — the installed
+        // meridian-iroh-wrapper binary must expose `agent-message send`
+        // literally, and it must accept `--body-file` (not just `--body`),
+        // because DefaultIrohCliRunner always invokes it with
+        // `--body-file -`. A refactor that renames/drops either would
+        // silently break the agent_message_send tool with no compile error.
+        val root = buildIrohWrapperCli()
+        val agentMessage = root.registeredSubcommands()
+            .single { it.commandName == "agent-message" }
+        val send = agentMessage.registeredSubcommands()
+            .single { it.commandName == "send" }
+
+        val options = send.registeredOptions().flatMap { it.names }
+        listOf("--from", "--to", "--body", "--body-file", "--msg-id").forEach { option ->
+            assertTrue(option in options, "expected $option in $options")
+        }
+    }
+
+    @Test
     fun rootCommandNameMatchesTheInstalledLauncherName() {
         // `application { applicationName }` generates bin/meridian-iroh-wrapper;
         // keep the help text's program name in sync with it.
