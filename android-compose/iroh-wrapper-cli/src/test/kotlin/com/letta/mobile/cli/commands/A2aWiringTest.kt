@@ -23,6 +23,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -375,7 +376,14 @@ class A2aWiringTest {
         assertEquals(1, payload.messages.size)
         val m = payload.messages.single()
         assertEquals("user", m.role, "decision lands the message as a USER message")
-        assertEquals(JsonPrimitive(wrapA2aEnvelope(message)), m.content, "decision lands wrapped a2a envelope in content")
+        // letta-mobile-8kbqd: human-visible content is the plain body, NOT the
+        // wrapA2aEnvelope JSON blob. Envelope metadata stays on the wire +
+        // telemetry; only msgId is forwarded as clientMessageId for dedup.
+        assertEquals(JsonPrimitive("ping"), m.content, "decision lands plain body text, not envelope JSON")
+        assertFalse(
+            m.content.toString().contains("\"envelope\""),
+            "persisted/rendered content must not contain the literal envelope JSON key",
+        )
         assertEquals("msg-1", m.clientMessageId, "decision forwards the wire msgId for at-most-once on the receiver")
     }
 
@@ -507,7 +515,12 @@ class A2aWiringTest {
         val payload = inputCmd.payload as AppServerInputPayload.CreateMessage
         val m = payload.messages.single()
         assertEquals("user", m.role)
-        assertEquals(JsonPrimitive(wrapA2aEnvelope(message)), m.content)
+        // letta-mobile-8kbqd: CreateAndDeliver path also lands plain body text.
+        assertEquals(JsonPrimitive("ping create"), m.content)
+        assertFalse(
+            m.content.toString().contains("\"envelope\""),
+            "persisted/rendered content must not contain the literal envelope JSON key",
+        )
         assertEquals("msg-2", m.clientMessageId)
     }
 
