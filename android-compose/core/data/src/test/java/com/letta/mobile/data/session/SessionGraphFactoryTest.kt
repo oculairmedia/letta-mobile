@@ -21,6 +21,9 @@ import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -32,11 +35,14 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.TurnEngine
+import com.letta.mobile.testutil.FakeModelApi
+import com.letta.mobile.testutil.FakeProviderApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -353,5 +359,65 @@ class SessionGraphFactoryTest {
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertEquals("remote-letta:test-local-unsupported", graph.backendDescriptor.backendId.value)
         assertNull(graph.localRuntimeBackend)
+    }
+
+    @Test
+    fun `create wires credentialed provider filter into model repository`() = runTest {
+        val modelApi = FakeModelApi().apply {
+            llmModels += model("openai/gpt-4o")
+            llmModels += model("anthropic/claude-sonnet")
+        }
+        val providerApi = FakeProviderApi().apply {
+            providers += Provider(
+                id = ProviderId("p1"),
+                name = "OpenAI",
+                providerType = "openai",
+            )
+        }
+        val factory = SessionGraphFactory(
+            agentApi = agentApi,
+            agentDao = agentDao,
+            conversationApi = conversationApi,
+            conversationDao = conversationDao,
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
+        )
+
+        val graph = factory.create()
+
+        graph.modelRepository.refreshLlmModels()
+        assertTrue(providerApi.calls.contains("listProviders"))
+        assertEquals(listOf("openai/gpt-4o"), graph.modelRepository.llmModels.value.map { it.handle })
+
+        val listProviderCalls = providerApi.calls.count { it == "listProviders" }
+        graph.modelRepository.refreshLlmModels()
+        assertEquals(listProviderCalls, providerApi.calls.count { it == "listProviders" })
+        assertEquals(listOf("openai/gpt-4o"), graph.modelRepository.llmModels.value.map { it.handle })
+        graph.close()
+    }
+
+    private fun model(handle: String): LlmModel {
+        val provider = handle.substringBefore('/')
+        return LlmModel(
+            id = handle,
+            name = handle.substringAfter('/'),
+            handle = handle,
+            providerType = provider,
+        )
     }
 }

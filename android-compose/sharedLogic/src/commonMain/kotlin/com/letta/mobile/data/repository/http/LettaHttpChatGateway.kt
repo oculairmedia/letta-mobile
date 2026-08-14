@@ -15,6 +15,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ModelCatalogNormalizer
+import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
@@ -200,7 +201,9 @@ open class LettaHttpChatGateway(
             applyAuth()
         }
         response.requireSuccess()
-        return ModelCatalogNormalizer.normalize(response.body())
+        val normalized = ModelCatalogNormalizer.normalize(response.body())
+        val credentialedTypes = fetchCredentialedProviderTypes()
+        return ModelCatalogNormalizer.filterByCredentialedProviders(normalized, credentialedTypes)
     }
 
     /** Set the model override for an existing conversation. */
@@ -240,11 +243,58 @@ open class LettaHttpChatGateway(
         httpClient.close()
     }
 
+    /**
+     * Fetch the lowercased `provider_type` values that have a credentialed provider
+     * record on the backend (`GET /v1/providers`), driving
+     * [ModelCatalogNormalizer.filterByCredentialedProviders] so the model picker only
+     * offers models whose provider has credentials configured.
+     *
+     * FAIL-OPEN: every failure (HTTP error, parse error, empty response) maps to an
+     * empty set, which leaves the caller's model list unchanged — the picker must
+     * never empty because the providers fetch failed. Pagination mirrors the shared
+     * cursor shape (`limit` + `after` = last provider id), bounded to a small page
+     * count; a server that ignores `after` and re-serves a page cannot spin.
+     */
+    private suspend fun fetchCredentialedProviderTypes(): Set<String> = runCatching {
+        val credentialedTypes = mutableSetOf<String>()
+        val seenIds = HashSet<String>()
+        var after: String? = null
+        var page = 0
+        while (page < PROVIDER_PAGE_MAX) {
+            page++
+            val response = httpClient.get("$baseUrl/v1/providers") {
+                applyAuth()
+                parameter("limit", PROVIDER_PAGE_SIZE)
+                parameter("after", after)
+            }
+            response.requireSuccess()
+            val providers = response.body<List<Provider>>()
+            if (providers.isEmpty()) break
+            val fresh = providers.filter { provider ->
+                provider.id?.value?.let { seenIds.add(it) } ?: true
+            }
+            if (fresh.isEmpty()) break
+            for (provider in fresh) {
+                provider.providerType.trim().lowercase()
+                    .takeIf { it.isNotBlank() }
+                    ?.let { credentialedTypes += it }
+            }
+            if (providers.size < PROVIDER_PAGE_SIZE) break
+            after = providers.last().id?.value ?: break
+        }
+        credentialedTypes
+    }.getOrDefault(emptySet())
+
     private fun HttpRequestBuilder.applyAuth() {
         config.accessToken
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?.let(::bearerAuth)
+    }
+
+    private companion object {
+        const val PROVIDER_PAGE_SIZE = 100
+        const val PROVIDER_PAGE_MAX = 10
     }
 }
 

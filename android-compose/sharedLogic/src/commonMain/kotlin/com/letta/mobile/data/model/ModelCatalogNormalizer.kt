@@ -294,4 +294,37 @@ object ModelCatalogNormalizer {
         val rank = PROVIDER_RANK.indexOf(prefix)
         return if (rank < 0) 0 else (PROVIDER_RANK.size - rank)
     }
+
+    /**
+     * Keep only models whose provider routing identity matches a provider record
+     * that has credentials configured (bead letta-mobile-so999).
+     *
+     * A model is kept when ANY of the following lowercased identities is present
+     * in [credentialedTypes]:
+     *  - `LlmModel.providerType`
+     *  - the provider prefix of `LlmModel.handle` (e.g. "openai" from "openai/gpt-4o")
+     *  - the provider prefix of any `selectionAliases` entry (an LLMux-collapsed
+     *    alias like "lmstudio/..." keeps the model selectable when the alias's
+     *    provider is credentialed even if the winning handle's provider is not)
+     *
+     * Fail-open: an EMPTY [credentialedTypes] set returns [models] unchanged —
+     * the model picker must never empty when provider data is absent or a
+     * refresh failed. Blank identities never match.
+     */
+    fun filterByCredentialedProviders(
+        models: List<LlmModel>,
+        credentialedTypes: Set<String>,
+    ): List<LlmModel> {
+        if (credentialedTypes.isEmpty()) return models
+        val credentialed = credentialedTypes.mapTo(mutableSetOf()) { it.trim().lowercase() }
+        return models.filter { model ->
+            model.providerType.trim().lowercase()
+                .let { it.isNotEmpty() && it in credentialed } ||
+                providerPrefix(model.handle?.takeIf { it.isNotBlank() } ?: model.id)
+                    .let { it.isNotEmpty() && it in credentialed } ||
+                model.selectionAliases.orEmpty().any { alias ->
+                    providerPrefix(alias).let { it.isNotEmpty() && it in credentialed }
+                }
+        }
+    }
 }

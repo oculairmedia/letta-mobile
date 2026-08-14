@@ -271,6 +271,35 @@ class SessionGraphFactory internal constructor(
                 settingsRepository = it,
             )
         }
+        val providerRepository = ProviderRepository(
+            providerApi = providerApi,
+            irohProviderSource = settingsRepository?.let { settings ->
+                IrohAdminRpcProviderSource(
+                    channelTransport = channelTransport,
+                    settingsRepository = settings,
+                )
+            },
+        )
+        val modelRepository = ModelRepository(
+            modelApi = modelApi,
+            localModelSource = localModelSource,
+            settingsRepository = settingsRepository,
+            irohModelSource = settingsRepository?.let { settings ->
+                IrohAdminRpcModelSource(
+                    channelTransport = channelTransport,
+                    settingsRepository = settings,
+                )
+            },
+            credentialedProviderTypes = {
+                if (providerRepository.providers.value.isEmpty()) {
+                    providerRepository.refreshProviders()
+                }
+                providerRepository.providers.value
+                    .map { it.providerType }
+                    .filter { it.isNotBlank() }
+                    .toSet()
+            },
+        )
         return SessionGraph(
             id = graphId,
             backendDescriptor = localRuntimeBackend?.descriptor ?: remoteLettaDescriptor(activeConfig),
@@ -345,17 +374,7 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            modelRepository = ModelRepository(
-                modelApi = modelApi,
-                localModelSource = localModelSource,
-                settingsRepository = settingsRepository,
-                irohModelSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcModelSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
+            modelRepository = modelRepository,
             passageRepository = PassageRepository(
                 passageApi = passageApi,
                 irohPassageSource = settingsRepository?.let { settings ->
@@ -393,15 +412,7 @@ class SessionGraphFactory internal constructor(
                     )
                 },
             ),
-            providerRepository = ProviderRepository(
-                providerApi = providerApi,
-                irohProviderSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcProviderSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
+            providerRepository = providerRepository,
             scheduleRepository = if (useIroh) {
                 val directory = IrohAdminRpcAgentDirectory(channelTransport)
                 IrohScheduleRepository { directory }
