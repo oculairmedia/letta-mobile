@@ -19,6 +19,7 @@ import com.letta.mobile.data.transport.iroh.IrohAgentAddress
 import com.letta.mobile.data.transport.iroh.IrohAgentAddressResolver
 import com.letta.mobile.data.transport.iroh.IrohAgentIdentity
 import com.letta.mobile.data.transport.iroh.IrohAgentMessage
+import com.letta.mobile.data.transport.iroh.DeliveryOutcome
 import com.letta.mobile.data.transport.iroh.IrohAgentMessageReceiver
 import com.letta.mobile.util.Telemetry
 import computer.iroh.Endpoint
@@ -205,7 +206,7 @@ suspend fun buildA2aWiring(
             else listConversationsForAgent(backendStore, AgentIdNamespace.normalizeToBareId(agentId))
         }
 
-        val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> Unit = { message, decision ->
+        val onDeliver: suspend (IrohAgentMessage, IrohAgentMessageRouter.RoutingDecision) -> DeliveryOutcome = { message, decision ->
             handleDecision(client, message, decision)
         }
 
@@ -468,7 +469,7 @@ internal suspend fun handleDecision(
     client: AppServerClient?,
     message: IrohAgentMessage,
     decision: IrohAgentMessageRouter.RoutingDecision,
-) {
+): DeliveryOutcome {
     val normMessage = message.copy(
         fromAgentId = AgentIdNamespace.normalizeToBareId(message.fromAgentId),
         toAgentId = AgentIdNamespace.normalizeToBareId(message.toAgentId),
@@ -479,9 +480,10 @@ internal suspend fun handleDecision(
                 "A2aHost", "a2a.deliver",
                 "fromAgentId" to normMessage.fromAgentId,
                 "toAgentId" to normMessage.toAgentId,
+                "msgId" to normMessage.msgId,
                 "conversationId" to decision.conversationId,
             )
-            inputOnConversation(client, normMessage, decision.conversationId)
+            return inputOnConversation(client, normMessage, decision.conversationId)
         }
         is IrohAgentMessageRouter.RoutingDecision.Queue -> {
             // Same as Deliver but no second turn: the app-server already serializes
@@ -493,21 +495,24 @@ internal suspend fun handleDecision(
                 "A2aHost", "a2a.route",
                 "fromAgentId" to normMessage.fromAgentId,
                 "toAgentId" to normMessage.toAgentId,
+                "msgId" to normMessage.msgId,
                 "decision" to "queue",
                 "conversationId" to decision.conversationId,
             )
-            inputOnConversation(client, normMessage, decision.conversationId)
+            return inputOnConversation(client, normMessage, decision.conversationId)
         }
         is IrohAgentMessageRouter.RoutingDecision.CreateAndDeliver -> {
-            handleCreateAndDeliver(client, normMessage)
+            return handleCreateAndDeliver(client, normMessage)
         }
         is IrohAgentMessageRouter.RoutingDecision.Dropped -> {
             Telemetry.event(
                 "A2aHost", "a2a.drop",
                 "fromAgentId" to normMessage.fromAgentId,
                 "toAgentId" to normMessage.toAgentId,
+                "msgId" to normMessage.msgId,
                 "reason" to decision.reason,
             )
+            return DeliveryOutcome(false, decision.reason)
         }
     }
 }
@@ -515,16 +520,17 @@ internal suspend fun handleDecision(
 internal suspend fun handleCreateAndDeliver(
     client: AppServerClient?,
     message: IrohAgentMessage,
-) {
+): DeliveryOutcome {
     if (client == null) {
         Telemetry.event(
             "A2aHost", "a2a.drop",
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
+            "msgId" to message.msgId,
             "reason" to "no_app_server_client",
             level = Telemetry.Level.WARN,
         )
-        return
+        return DeliveryOutcome(false, "application_enqueue_failure")
     }
     var appServerError: String? = null
     val createdId = runCatching {
@@ -551,11 +557,12 @@ internal suspend fun handleCreateAndDeliver(
             "toAgentId" to message.toAgentId,
             "conversationId" to createdId,
         )
-        inputOnConversation(client, message, createdId)
+        return inputOnConversation(client, message, createdId)
     } else {
         val dropAttrs = mutableListOf<Pair<String, Any?>>(
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
+            "msgId" to message.msgId,
             "reason" to "no_conversation_create_path",
         )
         if (!appServerError.isNullOrBlank()) {
@@ -567,24 +574,26 @@ internal suspend fun handleCreateAndDeliver(
             level = Telemetry.Level.WARN,
         )
     }
+    return DeliveryOutcome(false, "conversation_create_failure")
 }
 
 private suspend fun inputOnConversation(
     client: AppServerClient?,
     message: IrohAgentMessage,
     conversationId: String,
-) {
+): DeliveryOutcome {
     if (client == null) {
         Telemetry.event(
             "A2aHost", "a2a.drop",
             "fromAgentId" to message.fromAgentId,
             "toAgentId" to message.toAgentId,
+            "msgId" to message.msgId,
             "reason" to "no_app_server_client",
             level = Telemetry.Level.WARN,
         )
-        return
+        return DeliveryOutcome(false, "application_enqueue_failure")
     }
-    runCatching {
+    return runCatching {
         client.input(
             AppServerCommand.Input(
                 runtime = AppServerRuntimeScope(
@@ -607,14 +616,24 @@ private suspend fun inputOnConversation(
                 ),
             ),
         )
-    }.onFailure { t ->
+    }.map {
         Telemetry.event(
-            "A2aHost", "a2a.drop",
-            "fromAgentId" to message.fromAgentId,
+            "A2aHost", "a2a.application_delivered",
+            "msgId" to message.msgId,
             "toAgentId" to message.toAgentId,
-            "reason" to "input_failed:${t::class.simpleName ?: "error"}",
+            "conversationId" to conversationId,
+        )
+        DeliveryOutcome(true)
+    }.getOrElse { t ->
+        Telemetry.event(
+            "A2aHost", "a2a.application_failed",
+            "msgId" to message.msgId,
+            "toAgentId" to message.toAgentId,
+            "conversationId" to conversationId,
+            "reason" to "application_input_failure",
             level = Telemetry.Level.WARN,
         )
+        DeliveryOutcome(false, "application_input_failure")
     }
 }
 

@@ -74,7 +74,14 @@ class IrohAgentMessageSendE2ETest {
                     received.incrementAndGet()
                     lastMsgId = msg.msgId
                     val send = stream.send()
-                    IrohFrameCodec.write(send, IrohAgentMessageAck(msg.msgId, accepted = true).encode())
+                    IrohFrameCodec.write(
+                        send,
+                        IrohAgentMessageAck(
+                            msgId = msg.msgId,
+                            accepted = true,
+                            applicationDelivered = true,
+                        ).encode(),
+                    )
                     send.finish()
                 }
             }

@@ -94,6 +94,7 @@ class IrohAgentMessageReceiveE2ETest {
                     turns.incrementAndGet()          // triggers exactly one turn
                     landed.complete(decision.conversationId)
                 }
+                DeliveryOutcome(delivered = decision is IrohAgentMessageRouter.RoutingDecision.Deliver)
             },
         )
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -166,6 +167,7 @@ class IrohAgentMessageReceiveE2ETest {
                     turns.incrementAndGet()
                     landed.complete(decision.conversationId)
                 }
+                DeliveryOutcome(delivered = decision is IrohAgentMessageRouter.RoutingDecision.Deliver)
             },
         )
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)

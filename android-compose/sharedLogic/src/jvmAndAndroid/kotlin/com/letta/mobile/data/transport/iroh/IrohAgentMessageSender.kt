@@ -56,10 +56,15 @@ class IrohAgentMessageSender(
                         IrohFrameCodec.readOne(stream.recv())
                     } ?: return@runCatching AgentSendResult.Failed(message.toAgentId, "no_ack")
                     val ack = IrohAgentMessageAck.decode(ackWire)
-                    if (ack.accepted && ack.msgId == message.msgId) {
+                    if (ack.accepted && ack.msgId == message.msgId && ack.applicationDelivered) {
                         AgentSendResult.Delivered(message.msgId)
+                    } else if (ack.accepted && ack.msgId == message.msgId) {
+                        AgentSendResult.Failed(
+                            message.toAgentId,
+                            ack.reason ?: "application_delivery_pending",
+                        )
                     } else {
-                        AgentSendResult.Failed(message.toAgentId, "ack_rejected_or_mismatched")
+                        AgentSendResult.Failed(message.toAgentId, ack.reason ?: "ack_rejected_or_mismatched")
                     }
                 }
             }
