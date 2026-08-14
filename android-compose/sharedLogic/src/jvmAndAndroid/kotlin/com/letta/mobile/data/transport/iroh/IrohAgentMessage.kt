@@ -33,7 +33,13 @@ data class IrohAgentMessage(
 
 /** Result of an ack read from the peer. */
 @Serializable
-data class IrohAgentMessageAck(val msgId: String, val accepted: Boolean) {
+data class IrohAgentMessageAck(
+    val msgId: String,
+    val accepted: Boolean,
+    /** Transport acceptance is not application delivery. */
+    val applicationDelivered: Boolean = false,
+    val reason: String? = null,
+) {
     fun encode(): String = Json.encodeToString(serializer(), this)
     companion object {
         fun decode(wire: String): IrohAgentMessageAck = Json.decodeFromString(serializer(), wire)

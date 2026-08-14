@@ -242,8 +242,10 @@ class DefaultIrohCliRunner(
                 reason = "empty_stdout_exit_0",
             )
         }
-        return if (trimmed.contains("\"ok\":true")) {
+        return if (trimmed.contains("\"delivered\":true")) {
             IrohCliSendResult.Delivered(msgId = msgId)
+        } else if (trimmed.contains("\"accepted\":true")) {
+            IrohCliSendResult.Accepted(msgId = msgId, toAgentId = toAgentId)
         } else {
             // CLI exited 0 but reported ok=false — treat as Failed. The
             // shape implies a contract break (the CLI only exits 0 on

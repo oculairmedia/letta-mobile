@@ -88,9 +88,10 @@ class CustomIrohMessagingTool(
     override val name: String = TOOL_NAME
 
     override val description: String =
-        "Send a direct message to another agent over Iroh (agent-to-agent transport). " +
-            "Use this for inter-agent coordination — distinct from matrix_agent_message, " +
-            "which is the agent↔human (social-platform) surface."
+        "Send a direct message to another agent over Iroh. delivered=true is returned " +
+            "only after recipient application acceptance; accepted=true, delivered=false " +
+            "means transport receipt without application confirmation. Distinct from " +
+            "matrix_agent_message, which is the agent↔human surface."
 
     override val capability: Capability = Capability.AgentMessaging
 
@@ -199,6 +200,9 @@ class CustomIrohMessagingTool(
         return when (result) {
             is IrohCliSendResult.Delivered -> ExternalToolResult.Success(
                 """{"ok":true,"delivered":true,"msgId":"${result.msgId}","to":"$toAgentId"}""",
+            )
+            is IrohCliSendResult.Accepted -> ExternalToolResult.Success(
+                """{"ok":true,"accepted":true,"delivered":false,"msgId":"${result.msgId}","to":"${result.toAgentId}"}""",
             )
             is IrohCliSendResult.Unaddressable -> ExternalToolResult.Error(
                 "agent_message_send: target '$toAgentId' is unaddressable: ${result.reason}",
