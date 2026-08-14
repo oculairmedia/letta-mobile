@@ -85,6 +85,19 @@ class ProductionIrohToolRegistryWiringTest {
     }
 
     @Test
+    fun localBackendAdvertisesDiscoveryAlongsideMessaging() {
+        val registry = buildProductionExternalToolRegistryForTesting(
+            binary = "/usr/local/bin/meridian",
+            identityDir = null,
+            addressStore = null,
+            localBackendDir = "/tmp/local-backend",
+        )
+        val names = registry.listAdvertisedTools().map { it.name }.toSet()
+        assertTrue("agent_discover" in names)
+        assertTrue(CustomIrohMessagingTool.TOOL_NAME in names)
+    }
+
+    @Test
     fun registryAdvertisesTheSameToolForEveryRuntimeScope() {
         // Per-agent injection: the same registry instance is passed to every
         // runtime_start, so the Iroh tool lights up for every agent on the
