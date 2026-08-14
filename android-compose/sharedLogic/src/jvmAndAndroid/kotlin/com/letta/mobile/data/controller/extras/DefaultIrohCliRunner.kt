@@ -2,6 +2,11 @@ package com.letta.mobile.data.controller.extras
 
 import java.io.File
 import java.util.UUID
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -242,18 +247,45 @@ class DefaultIrohCliRunner(
                 reason = "empty_stdout_exit_0",
             )
         }
-        return if (trimmed.contains("\"delivered\":true")) {
-            IrohCliSendResult.Delivered(msgId = msgId)
-        } else if (trimmed.contains("\"accepted\":true")) {
-            IrohCliSendResult.Accepted(msgId = msgId, toAgentId = toAgentId)
-        } else {
-            // CLI exited 0 but reported ok=false — treat as Failed. The
-            // shape implies a contract break (the CLI only exits 0 on
-            // Delivered), but we degrade safely rather than crash.
+        return runCatching {
+            val payload = Json.parseToJsonElement(trimmed).jsonObject
+            val parsed = CliSendResultPayload.decode(payload)
+            when {
+                parsed.accepted && parsed.applicationDelivered ->
+                    IrohCliSendResult.Delivered(msgId = parsed.msgId)
+                parsed.accepted && !parsed.applicationDelivered ->
+                    IrohCliSendResult.Accepted(msgId = parsed.msgId, toAgentId = toAgentId)
+                else -> IrohCliSendResult.Failed(
+                    toAgentId = toAgentId,
+                    reason = parsed.reason ?: "ok_false_exit_0",
+                )
+            }
+        }.getOrElse { error ->
             IrohCliSendResult.Failed(
                 toAgentId = toAgentId,
-                reason = "ok_false_exit_0: ${trimmed.take(200)}",
+                reason = "invalid_cli_result: ${error.message ?: error::class.simpleName}",
             )
+        }
+    }
+
+    private data class CliSendResultPayload(
+        val msgId: String,
+        val accepted: Boolean,
+        val applicationDelivered: Boolean,
+        val reason: String?,
+    ) {
+        companion object {
+            fun decode(json: JsonObject): CliSendResultPayload {
+                fun requiredString(name: String): String = json[name]?.jsonPrimitive?.contentOrNull
+                    ?: error("missing or invalid $name")
+                fun requiredBoolean(name: String): Boolean = json[name]?.jsonPrimitive?.booleanOrNull
+                    ?: error("missing or invalid $name")
+                val msgId = requiredString("msgId")
+                val accepted = requiredBoolean("accepted")
+                val delivered = requiredBoolean("applicationDelivered")
+                if (!accepted && delivered) error("contradictory accepted/applicationDelivered")
+                return CliSendResultPayload(msgId, accepted, delivered, json["reason"]?.jsonPrimitive?.contentOrNull)
+            }
         }
     }
 

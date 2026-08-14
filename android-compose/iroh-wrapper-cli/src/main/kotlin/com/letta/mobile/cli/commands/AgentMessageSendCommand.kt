@@ -151,10 +151,10 @@ internal fun agentSendResultJson(result: AgentSendResult, id: String): String {
     fun q(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
     return when (result) {
         is AgentSendResult.Delivered ->
-            """{"ok":true,"delivered":true,"msgId":${q(result.msgId)}}"""
+            """{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":${q(result.msgId)}}"""
         is AgentSendResult.Unaddressable ->
-            """{"ok":false,"delivered":false,"msgId":${q(id)},"error":"unaddressable","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
+            """{"ok":false,"accepted":false,"applicationDelivered":false,"msgId":${q(id)},"error":"unaddressable","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
         is AgentSendResult.Failed ->
-            """{"ok":false,"delivered":false,"msgId":${q(id)},"error":"failed","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
+            """{"ok":false,"accepted":false,"applicationDelivered":false,"msgId":${q(id)},"error":"failed","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
     }
 }
