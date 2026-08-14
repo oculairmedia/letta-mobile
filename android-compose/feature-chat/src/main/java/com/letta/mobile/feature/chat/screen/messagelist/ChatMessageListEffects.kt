@@ -166,7 +166,9 @@ private fun ChatMessageListLoadOlderEffect(params: ChatMessageListEffectsParams)
             .distinctUntilChanged()
             .collect { _ ->
                 if (!shouldLoadOlderMessages(params)) return@collect
-                val lastVisible = params.listState.layoutInfo.visibleItemsInfo.maxOfOrNull { it.index } ?: 0
+                // ⚡ Bolt Optimization: visibleItemsInfo is inherently sorted by index.
+                // Using lastOrNull() avoids allocating an iterator on every frame, reducing GC jank.
+                val lastVisible = params.listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 val totalItems = params.listState.layoutInfo.totalItemsCount
                 if (totalItems > 0 && lastVisible >= totalItems - 3) {
                     params.onLoadOlderMessages()
