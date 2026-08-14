@@ -4,6 +4,7 @@ import java.io.File
 import java.util.UUID
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -191,11 +192,7 @@ class DefaultIrohCliRunner(
             return@withContext parsed
         } else {
             processObserver?.invoke(process, "exit_nonzero")
-            return@withContext parseFailureFromStderr(
-                stderr = stderr,
-                stdout = stdout,
-                toAgentId = toAgentId,
-            )
+            return@withContext parseFailureFromStderr(stderr, stdout, toAgentId)
         }
     }
 
@@ -249,16 +246,23 @@ class DefaultIrohCliRunner(
         }
         return runCatching {
             val payload = Json.parseToJsonElement(trimmed).jsonObject
-            val parsed = CliSendResultPayload.decode(payload)
+            val parsed = CliSendResultPayload.decode(payload, fallbackToAgentId = toAgentId)
             when {
                 parsed.accepted && parsed.applicationDelivered ->
                     IrohCliSendResult.Delivered(msgId = parsed.msgId)
                 parsed.accepted && !parsed.applicationDelivered ->
                     IrohCliSendResult.Accepted(msgId = parsed.msgId, toAgentId = toAgentId)
-                else -> IrohCliSendResult.Failed(
-                    toAgentId = toAgentId,
-                    reason = parsed.reason ?: "ok_false_exit_0",
-                )
+                else -> if (parsed.error == "unaddressable") {
+                    IrohCliSendResult.Unaddressable(
+                        toAgentId = parsed.toAgentId,
+                        reason = parsed.reason ?: "unaddressable",
+                    )
+                } else {
+                    IrohCliSendResult.Failed(
+                        toAgentId = parsed.toAgentId,
+                        reason = parsed.reason ?: parsed.error ?: "ok_false_exit_0",
+                    )
+                }
             }
         }.getOrElse { error ->
             IrohCliSendResult.Failed(
@@ -272,10 +276,12 @@ class DefaultIrohCliRunner(
         val msgId: String,
         val accepted: Boolean,
         val applicationDelivered: Boolean,
+        val toAgentId: String,
+        val error: String?,
         val reason: String?,
     ) {
         companion object {
-            fun decode(json: JsonObject): CliSendResultPayload {
+            fun decode(json: JsonObject, fallbackToAgentId: String): CliSendResultPayload {
                 fun requiredString(name: String): String = json[name]?.jsonPrimitive?.contentOrNull
                     ?: error("missing or invalid $name")
                 fun requiredBoolean(name: String): Boolean = json[name]?.jsonPrimitive?.booleanOrNull
@@ -284,7 +290,14 @@ class DefaultIrohCliRunner(
                 val accepted = requiredBoolean("accepted")
                 val delivered = requiredBoolean("applicationDelivered")
                 if (!accepted && delivered) error("contradictory accepted/applicationDelivered")
-                return CliSendResultPayload(msgId, accepted, delivered, json["reason"]?.jsonPrimitive?.contentOrNull)
+                return CliSendResultPayload(
+                    msgId = msgId,
+                    accepted = accepted,
+                    applicationDelivered = delivered,
+                    toAgentId = json["toAgentId"]?.jsonPrimitive?.contentOrNull ?: fallbackToAgentId,
+                    error = json["error"]?.jsonPrimitive?.contentOrNull,
+                    reason = json["reason"]?.jsonPrimitive?.contentOrNull,
+                )
             }
         }
     }
@@ -300,6 +313,12 @@ class DefaultIrohCliRunner(
         toAgentId: String,
     ): IrohCliSendResult {
         val trimmedStdout = stdout.trim()
+        if (trimmedStdout.isNotEmpty()) {
+            val parsed = parseCliResultJson(trimmedStdout, msgId = "", toAgentId = toAgentId)
+            if (parsed is IrohCliSendResult.Unaddressable || parsed is IrohCliSendResult.Failed || parsed is IrohCliSendResult.Accepted) {
+                return parsed
+            }
+        }
         if (trimmedStdout.contains("\"error\":\"unaddressable\"")) {
             return IrohCliSendResult.Unaddressable(
                 toAgentId = toAgentId,

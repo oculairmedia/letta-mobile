@@ -19,7 +19,7 @@ class AgentMessageSendCommandTest {
     @Test
     fun deliveredResultJsonContract() {
         val json = agentSendResultJson(AgentSendResult.Delivered("m-1"), "m-1")
-        assertEquals("""{"ok":true,"delivered":true,"msgId":"m-1"}""", json)
+        assertEquals("""{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":"m-1"}""", json)
     }
 
     @Test
