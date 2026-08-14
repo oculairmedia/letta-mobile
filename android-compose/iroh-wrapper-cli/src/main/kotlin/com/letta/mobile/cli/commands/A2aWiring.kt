@@ -414,8 +414,14 @@ internal suspend fun listConversationsForAgent(
 internal fun JsonElement?.stringOrNullSafe(): String? = (this as? JsonPrimitive)?.let { if (it.isString) it.content else null }
 
 /**
- * Wrap an inbound [IrohAgentMessage] in an a2a envelope JSON string helper.
+ * Build the a2a envelope JSON for diagnostic / metadata use.
+ *
  * Shape: {"envelope":"a2a","from_agent_id":...,"to_agent_id":...,"ts":...,"msg_id":...,"content":...}
+ *
+ * letta-mobile-8kbqd: this is NOT what gets written into the recipient's
+ * conversation. Delivery uses [message.body] plain text so humans / chat UIs
+ * see the sender's words, not a nested JSON blob. Wire identity for
+ * at-most-once dedup stays on [IrohAgentMessage.msgId] → clientMessageId.
  */
 internal fun wrapA2aEnvelope(message: IrohAgentMessage): String = buildJsonObject {
     put("envelope", "a2a")
@@ -587,9 +593,14 @@ private suspend fun inputOnConversation(
                 ),
                 payload = AppServerInputPayload.CreateMessage(
                     messages = listOf(
+                        // letta-mobile-8kbqd: persist/render the plain body.
+                        // Envelope metadata (from/to/ts/msg_id) stays on the
+                        // wire + telemetry; only msgId is forwarded as
+                        // clientMessageId for at-most-once dedup. Never land
+                        // wrapA2aEnvelope(...) as human-visible chat text.
                         AppServerInputMessage(
                             role = "user",
-                            content = JsonPrimitive(wrapA2aEnvelope(message)),
+                            content = JsonPrimitive(message.body),
                             clientMessageId = message.msgId,
                         ),
                     ),

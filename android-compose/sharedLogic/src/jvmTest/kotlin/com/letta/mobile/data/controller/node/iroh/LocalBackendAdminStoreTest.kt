@@ -6,8 +6,10 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.io.File
 import java.nio.file.Files
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -435,5 +437,32 @@ class LocalBackendAdminStoreTest {
         val base = tempStore()
         val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
         assertEquals(emptySet<String>(), store.activeConversationIds(LocalBackendFixtureStore.AGENT_ID))
+    }
+
+    @Test
+    fun `agentExists finds bare dir bare json and base64url json agent records`() {
+        // Live lc-local-backend stores some agents as agents/{b64url(id)}.json
+        // (e.g. PM-letta-mobile). agentExists must match all three shapes so
+        // listConversationsForAgent does not emit a2a.agent_missing and force
+        // CreateAndDeliver for every inbound a2a message.
+        val base = tempStore()
+        val agents = File(base, "agents").apply { mkdirs() }
+
+        val bareDirId = "agent-bare-dir"
+        File(agents, bareDirId).mkdirs()
+
+        val bareJsonId = "agent-bare-json"
+        File(agents, "$bareJsonId.json").writeText("""{"id":"$bareJsonId","name":"Bare"}""")
+
+        val b64Id = "agent-c356b54a-8b37-4d53-b9d0-b43164749b6f"
+        val b64Name = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(b64Id.toByteArray(Charsets.UTF_8)) + ".json"
+        File(agents, b64Name).writeText("""{"id":"$b64Id","name":"PM"}""")
+
+        val store = LocalBackendAdminStore(base, lmstudioBaseUrl = "http://e/v1")
+        assertTrue(store.agentExists(bareDirId), "bare agents/{id}/ dir must count as present")
+        assertTrue(store.agentExists(bareJsonId), "bare agents/{id}.json must count as present")
+        assertTrue(store.agentExists(b64Id), "base64url agents/{b64(id)}.json must count as present")
+        assertFalse(store.agentExists("agent-missing-zzz"), "unknown id must not exist")
     }
 }
