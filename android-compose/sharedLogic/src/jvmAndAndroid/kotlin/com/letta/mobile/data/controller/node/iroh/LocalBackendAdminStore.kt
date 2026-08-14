@@ -61,13 +61,28 @@ open class LocalBackendAdminStore(
     /**
      * Checks whether an agent JSON record or directory exists under baseDir/agents.
      *
+     * Live local-backend layouts store agents in two shapes:
+     *  - bare dir / bare file: `agents/{id}/` or `agents/{id}.json`
+     *  - base64url file: `agents/{b64url(id)}.json` (lc-local-backend default
+     *    for agents that only have a JSON record, e.g. PM-letta-mobile)
+     *
+     * Returning false for a real agent forces [listConversationsForAgent] to
+     * emit `a2a.agent_missing` and empty candidates, so every inbound a2a
+     * message falls through to CreateAndDeliver. Check all three shapes.
+     *
      * `open` so the host-endpoint address-book membership tests can supply an
      * in-memory subclass that answers membership without a real on-disk backend.
      */
     open fun agentExists(agentId: String): Boolean {
         val agentsDir = File(baseDir, "agents")
         if (!agentsDir.exists()) return true
-        return File(agentsDir, agentId).exists() || File(agentsDir, "$agentId.json").exists()
+        if (File(agentsDir, agentId).exists()) return true
+        if (File(agentsDir, "$agentId.json").exists()) return true
+        // lc-local-backend writes some agents as base64url(id).json (no bare
+        // dir). LocalBackendAgentReader already discovers them by scanning
+        // *.json and reading the embedded id — membership must match that.
+        val b64Name = support.b64UrlEncode(agentId) + ".json"
+        return File(agentsDir, b64Name).exists()
     }
 
     /** See [LocalBackendConversationReader.listConversationsProjected]. */
