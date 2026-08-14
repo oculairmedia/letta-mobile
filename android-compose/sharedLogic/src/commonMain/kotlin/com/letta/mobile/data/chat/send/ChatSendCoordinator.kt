@@ -29,7 +29,10 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -79,8 +82,7 @@ class ChatSendCoordinator(
     private val startTimelineObserver: (String) -> Unit,
     private val clientVersion: () -> String,
     private val otidGenerator: () -> String,
-    private val recordRuntimeEvent: suspend (event: WsTimelineEvent, conversationIdOverride: String?) -> Unit =
-        { _, _ -> },
+    private val recordRuntimeEvents: suspend (List<ScopedRuntimeEvent>) -> Unit = {},
 ) {
     // Send acceptance, transport events, and cleanup all mutate one ownership graph. Serializing
     // their suspend paths makes the lifecycle decision and the matching UI/OTID mutation atomic.
@@ -113,8 +115,16 @@ class ChatSendCoordinator(
     private val seenBridgeEventKeySet = mutableSetOf<String>()
     private val liveIngestLock = SynchronizedObject()
     private val lastLiveIngestByConversation = mutableMapOf<String, Long>()
+    private val runtimeEventRecords = Channel<ScopedRuntimeEvent>(Channel.UNLIMITED)
 
     init {
+        scope.launch {
+            try {
+                drainRuntimeEventRecords()
+            } finally {
+                runtimeEventRecords.cancel()
+            }
+        }
         scope.launch {
             wsChatBridge.events.collect { event -> handleEvent(event) }
         }
@@ -812,7 +822,7 @@ class ChatSendCoordinator(
                     preConversationMessageDeltas.addLast(event)
                     return
                 }
-                recordRuntimeEvent(event, conversationId)
+                enqueueRuntimeEvent(event, conversationId)
                 rememberActiveAssistantMessageRunId(
                     state = peekState(conversationId),
                     message = event.message,
@@ -838,7 +848,7 @@ class ChatSendCoordinator(
                     reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
-                recordRuntimeEvent(event, state.conversationId)
+                enqueueRuntimeEvent(event, state.conversationId)
                 if (ignoreForeignTurnStop(state, event)) return
                 recordStopReasonForTurn(state, event)
                 markTurnVisuallyComplete(state, reason = "stopReason")
@@ -849,7 +859,7 @@ class ChatSendCoordinator(
                     reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
-                recordRuntimeEvent(event, state.conversationId)
+                enqueueRuntimeEvent(event, state.conversationId)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
                 // on the shim. Multi-step turns may produce per-step usage; the
                 // run-level record reflects the first. Drop subsequent ones.
@@ -909,7 +919,7 @@ class ChatSendCoordinator(
             is WsTimelineEvent.GoalsUpdated -> Unit
             is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome ->
-                recordRuntimeEvent(event, event.conversationId ?: lastActiveConversationId)
+                enqueueRuntimeEvent(event, event.conversationId ?: lastActiveConversationId)
         }
     }
 
@@ -979,7 +989,7 @@ class ChatSendCoordinator(
         // Still ignore a frame for a different TURN inside the same conversation
         // so a superseded turn cannot poison the live one.
         if (event.turnId != null && state.turnId != null && event.turnId != state.turnId) return
-        recordRuntimeEvent(event, state.conversationId)
+        enqueueRuntimeEvent(event, state.conversationId)
         // lcp-axv: stash the error and wait for the immediately-following TurnDone
         // to flip the UI. Surfacing the error here would race with TurnDone and
         // could leave isStreaming / isAgentTyping stuck if TurnDone is delayed.
@@ -1130,7 +1140,7 @@ class ChatSendCoordinator(
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
         runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
-        recordRuntimeEvent(event, event.conversationId)
+        enqueueRuntimeEvent(event, event.conversationId)
         setActiveConversationId(event.conversationId)
         startTimelineObserver(event.conversationId)
         if (ownsForegroundUi(event.conversationId)) {
@@ -1485,7 +1495,7 @@ class ChatSendCoordinator(
             )
         }
         if (recordEvent != null) {
-            recordRuntimeEvent(recordEvent, conversationId)
+            enqueueRuntimeEvent(recordEvent, conversationId)
         }
         if (lossy) {
             Telemetry.event(
@@ -1785,7 +1795,7 @@ class ChatSendCoordinator(
         val state = peekState(conversationId)
         while (true) {
             val delta = preConversationMessageDeltas.removeFirstOrNull() ?: return
-            recordRuntimeEvent(delta, conversationId)
+            enqueueRuntimeEvent(delta, conversationId)
             rememberActiveAssistantMessageRunId(
                 state = state,
                 message = delta.message,
@@ -1793,6 +1803,45 @@ class ChatSendCoordinator(
                 isReplay = delta.isReplay,
             )
             timelineRepository.ingestExternalTransportMessage(agentId, conversationId, delta.message, source = "coordinator.preConversationDrain")
+        }
+    }
+
+    private fun enqueueRuntimeEvent(event: WsTimelineEvent, conversationId: String?) {
+        val result = runtimeEventRecords.trySend(ScopedRuntimeEvent(event, conversationId))
+        if (result.isFailure) {
+            Telemetry.event(
+                "AdminChatVM", "runtimeEvent.enqueueRejected",
+                "eventType" to (event::class.simpleName ?: ""),
+                "conversationId" to (conversationId ?: ""),
+            )
+        }
+    }
+
+    private suspend fun drainRuntimeEventRecords() {
+        for (first in runtimeEventRecords) {
+            val batch = mutableListOf(first)
+            while (true) {
+                val next = runtimeEventRecords.tryReceive().getOrNull() ?: break
+                batch += next
+            }
+            persistRuntimeEventBatch(batch)
+        }
+    }
+
+    private suspend fun persistRuntimeEventBatch(records: List<ScopedRuntimeEvent>) {
+        currentCoroutineContext().ensureActive()
+        try {
+            recordRuntimeEvents(records)
+            currentCoroutineContext().ensureActive()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error(
+                "AdminChatVM", "runtimeEvent.recordFailed", error,
+                "eventType" to (records.firstOrNull()?.event?.let { it::class.simpleName } ?: ""),
+                "conversationId" to (records.firstOrNull()?.conversationId ?: ""),
+                "batchSize" to records.size,
+            )
         }
     }
 
@@ -1825,4 +1874,10 @@ class ChatSendCoordinator(
         val otid: String,
         val startNewConversation: Boolean = false,
     )
+
 }
+
+data class ScopedRuntimeEvent(
+    val event: WsTimelineEvent,
+    val conversationId: String?,
+)
