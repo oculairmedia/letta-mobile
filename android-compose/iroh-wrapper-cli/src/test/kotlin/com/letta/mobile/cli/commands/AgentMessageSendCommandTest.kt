@@ -23,6 +23,15 @@ class AgentMessageSendCommandTest {
     }
 
     @Test
+    fun acceptedButUndeliveredResultJsonContract() {
+        val json = agentSendResultJson(AgentSendResult.Accepted("m-accepted", "agent-x"), "m-accepted")
+        assertEquals(
+            """{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":"m-accepted","toAgentId":"agent-x"}""",
+            json,
+        )
+    }
+
+    @Test
     fun unaddressableResultJsonContract() {
         val json = agentSendResultJson(AgentSendResult.Unaddressable("agent-x", "not_registered"), "m-2")
         assertTrue(json.contains("\"ok\":false"))

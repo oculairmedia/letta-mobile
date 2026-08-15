@@ -111,6 +111,7 @@ class CustomIrohMessagingToolTest {
         assertTrue(success.content.contains("\"accepted\":true"))
         assertTrue(success.content.contains("\"delivered\":false"))
         assertFalse(success.content.contains("\"delivered\":true"))
+        assertTrue(success.content.contains("\"msgId\":\"msg-accepted\""))
     }
 
     @Test
