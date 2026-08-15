@@ -127,10 +127,16 @@ internal object ChatHydrationTrace {
     }
 
     private fun settleIfReady(state: State) {
-        if (state.settled || !state.sourceReady || state.published == 0 || state.layouts == 0 || state.scrolls == 0 || state.activity) return
+        if (!state.canSettle()) return
         state.settled = true
         emit(state, "settled", "commitReason" to "initial_frame_settled")
     }
+
+    private fun State.canSettle(): Boolean =
+        !settled && hasInitialFrame() && !activity
+
+    private fun State.hasInitialFrame(): Boolean =
+        sourceReady && published > 0 && layouts > 0 && scrolls > 0
 
     private fun emit(state: State, name: String, vararg attrs: Pair<String, Any?>) {
         if (!Telemetry.isChatHydrationTraceEnabled()) return
