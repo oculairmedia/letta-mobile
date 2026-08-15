@@ -53,7 +53,14 @@ class SubagentRepositoryTest {
     private fun repository(
         scope: kotlinx.coroutines.CoroutineScope,
         clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
-    ): SubagentRepository = SubagentRepository(transport, scope, clock = clock).also(repositories::add)
+    ): SubagentRepository = SubagentRepository(
+        transport = transport,
+        scope = scope,
+        clock = clock,
+        // A production watchdog is intentionally long-lived. Do not let its
+        // virtual-time loop drive a unit test past its assertions.
+        streamTimeoutSweepIntervalMs = Long.MAX_VALUE,
+    ).also(repositories::add)
 
     @Test
     fun `activeSubagentsFlow triggers exactly one subagent_list regardless of subscribers`() = runTest {

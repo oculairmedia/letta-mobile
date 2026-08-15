@@ -74,6 +74,7 @@ open class SubagentRepository(
     // include recently-terminal entries in the initial snapshot.
     private val includeAll: Boolean = false,
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    private val streamTimeoutSweepIntervalMs: Long = STREAM_TIMEOUT_SWEEP_INTERVAL_MS,
 ) : ISubagentRepository {
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
     private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
@@ -102,7 +103,7 @@ open class SubagentRepository(
     /** Stops the periodic stream-timeout sweep. */
     private suspend fun observeStreamTimeout() {
         while (true) {
-            kotlinx.coroutines.delay(STREAM_TIMEOUT_SWEEP_INTERVAL_MS)
+            kotlinx.coroutines.delay(streamTimeoutSweepIntervalMs)
             sweepStreamTimeouts()
         }
     }
