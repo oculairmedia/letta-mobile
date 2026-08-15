@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -166,6 +167,17 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             toolCallId = callId,
                             approvalDecision = chip,
                             subagentDispatch = tc.toSubagentDispatch(result),
+                            // letta-mobile-slqfp: Local (streaming/optimistic)
+                            // events don't carry an owning agentId, so the
+                            // outbound a2a projection returns null here until
+                            // the event is Confirmed by the server.
+                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
+                                toolName = tc.name,
+                                argumentsJson = tc.arguments,
+                                resultJson = result,
+                                isError = isError,
+                                fromAgentId = null,
+                            ),
                         )
                     }
                 } else null
@@ -219,6 +231,18 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     ev.attachments.map {
                         UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
                     }
+                },
+                // letta-mobile-slqfp: Local events have no owning agentId yet,
+                // so inbound provenance projects against a null recipient —
+                // still correct because the decoded envelope carries its own
+                // toAgentId as a fallback (see projectInbound).
+                agentMessageProvenance = if (role == "user") {
+                    AgentMessageProvenanceProjection.projectInbound(
+                        clientMessageId = ev.otid,
+                        ownAgentId = null,
+                    )
+                } else {
+                    null
                 },
             )
         }
@@ -296,6 +320,13 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             resultTruncation = truncation?.let {
                                 UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
                             },
+                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
+                                toolName = tc.name,
+                                argumentsJson = tc.arguments,
+                                resultJson = result,
+                                isError = isError,
+                                fromAgentId = ev.agentId,
+                            ),
                         )
                     }
                 } else null
@@ -370,6 +401,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     ev.attachments.map {
                         UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
                     }
+                },
+                agentMessageProvenance = if (role == "user") {
+                    AgentMessageProvenanceProjection.projectInbound(
+                        clientMessageId = ev.otid,
+                        ownAgentId = ev.agentId,
+                    )
+                } else {
+                    null
                 },
             )
         }

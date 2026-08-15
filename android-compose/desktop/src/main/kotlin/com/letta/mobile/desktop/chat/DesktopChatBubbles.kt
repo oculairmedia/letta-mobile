@@ -77,9 +77,11 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun DesktopMessageBubble(
     message: UiMessage,
     streamingMessageId: StreamingMessageId? = null,
+    resolveAgentName: (agentId: String) -> String? = { null },
+    onAgentClick: (agentId: String) -> Unit = {},
 ) {
     if (MessageRoleToken(message.role).isUser()) {
-        UserPrompt(message)
+        UserPrompt(message, resolveAgentName = resolveAgentName, onAgentClick = onAgentClick)
         return
     }
     AssistantMessageColumn(message = message, streamingMessageId = streamingMessageId)
@@ -222,20 +224,37 @@ private data class CopyButtonInteraction(
  * behind it.
  */
 @Composable
-internal fun UserPrompt(message: UiMessage) {
+internal fun UserPrompt(
+    message: UiMessage,
+    resolveAgentName: (agentId: String) -> String? = { null },
+    onAgentClick: (agentId: String) -> Unit = {},
+) {
     // Clamped by default: this card stays pinned as a sticky header, so a
     // massive prompt must not swallow the viewport. A chevron (shown only when
     // the text actually overflows) expands the card in place for a closer look
     // and collapses it back.
     var expanded by remember(message.id) { mutableStateOf(false) }
     var overflowed by remember(message.id) { mutableStateOf(false) }
+    // letta-mobile-slqfp: separate disclosure state for the inter-agent
+    // provenance metadata block — independent of the prompt-text expansion
+    // above, since a user may want the technical detail without expanding a
+    // long body (or vice versa).
+    var provenanceExpanded by remember(message.id) { mutableStateOf(false) }
     // The whole card toggles expansion (enabled only when there is hidden
     // text), so a huge expanded prompt can always be collapsed by clicking
     // anywhere on it — not just a chevron that may sit outside the fold.
     // Hand-drawn outline instead of Surface border: sides + bottom only, no
     // top line — a full box read too heavy, and the pinned card's top edge
     // doubles up against the pane's own boundary.
-    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+    val provenance = message.agentMessageProvenance
+    val edgeColor = if (provenance != null) {
+        // Restrained identity tint on the card edge for an inbound agent
+        // message — distinct from the ordinary human-prompt outline without
+        // becoming a loud banner.
+        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
+    } else {
+        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+    }
     Surface(
         onClick = { expanded = !expanded },
         enabled = overflowed || expanded,
@@ -268,6 +287,15 @@ internal fun UserPrompt(message: UiMessage) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (provenance != null) {
+                    AgentMessageProvenanceLabel(
+                        provenance = provenance,
+                        resolveName = resolveAgentName,
+                        expanded = provenanceExpanded,
+                        onToggleExpand = { provenanceExpanded = !provenanceExpanded },
+                        onAgentClick = onAgentClick,
+                    )
+                }
                 if (message.content.isNotBlank()) {
                     // Expanded height is capped with internal scrolling so the
                     // card (and its collapse affordances) never outgrows the
