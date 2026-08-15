@@ -294,7 +294,7 @@ private fun DrawScope.drawAmbientFallback(
 private const val AMBIENT_TELEMETRY_TAG = "AmbientShader"
 private const val HiddenAlpha = 0.001f
 private const val MaxFrameDeltaSeconds = 0.1f
-private const val StreamImpulse = 0.22f
-private const val StreamEnergyDecaySeconds = 0.72f
+private const val StreamImpulse = 0.35f
+private const val StreamEnergyDecaySeconds = 0.9f
 private const val BaseRadiansPerSecond =
     (2 * PI).toFloat() * 1000f / AmbientMotion.BASE_PERIOD_MILLIS

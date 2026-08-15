@@ -60,7 +60,7 @@ half4 ambientColor(float2 fragCoord) {
     float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
     float aspect = uSize.x / max(uSize.y, 1.0);
     float2 p = float2((uv.x - 0.5) * aspect, uv.y);
-    float t = uTime * (0.09 + 0.009 * uStreamEnergy);
+    float t = uTime * (0.09 + 0.0162 * uStreamEnergy);
 
     float3 acc = float3(0.0);
     float wsum = 0.0;
@@ -85,24 +85,24 @@ half4 ambientColor(float2 fragCoord) {
     // Broad left-to-right scan integrated by the host. It gently lifts the
     // existing field rather than drawing a stripe. Stream energy adds only a
     // small vividness/height response, preserving the calm baseline.
-    float scanPhase = fract(uTime * 0.075 * (1.0 + 0.10 * uStreamEnergy));
+    float scanPhase = fract(uTime * 0.075 * (1.0 + 0.18 * uStreamEnergy));
     float scanCenter = mix(-0.22, 1.22, scanPhase);
     float scan = 1.0 - smoothstep(0.16, 0.48, abs(uv.x - scanCenter));
-    float scanWeight = scan * (0.025 + 0.020 * uStreamEnergy);
+    float scanWeight = scan * (0.025 + 0.050 * uStreamEnergy);
     acc += palB(uv.x * 0.25 + t * 0.05) * scanWeight;
     wsum += scanWeight;
     // Mix ratio lifted 0.22 -> 0.40 (letta-mobile-shader-saturation), then
     // 0.40 -> 0.58 (letta-mobile-shader-tint-2026-08-06) so the green/teal
     // tint dominates the palette at low-energy pixels in the narrow band.
     float3 fieldColor = acc / max(wsum, 0.001);
-    float3 rgb = mix(fieldColor, uColor.rgb, 0.58 - scan * (0.02 + 0.02 * uStreamEnergy));
+    float3 rgb = mix(fieldColor, uColor.rgb, 0.58 - scan * (0.02 + 0.06 * uStreamEnergy));
 
     float energy = clamp(wsum * (0.8 + 0.2 * uAgitation), 0.0, 1.4);
     // Alpha curve narrowed to bottom band (0.72..0.98) so the visible glow
     // occupies less vertical real estate — a thin glow under the composer
     // instead of a broad mid-screen band. Amplitude reduced 0.55 -> 0.34
     // for a more subtle, less dominant presence. Alpha cap 0.98 -> 0.78.
-    float aRaw = energy * smoothstep(0.72, 0.98, uv.y) * (0.34 + scan * 0.008 * uStreamEnergy);
+    float aRaw = energy * smoothstep(0.72, 0.98, uv.y) * (0.34 + scan * 0.020 * uStreamEnergy);
     float alpha = clamp(aRaw * uEnvelope * uColor.a, 0.0, 0.78);
     alpha = max(alpha + dither(fragCoord), 0.0);
     return half4(rgb, alpha);
