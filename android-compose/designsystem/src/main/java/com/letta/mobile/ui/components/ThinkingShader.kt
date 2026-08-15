@@ -17,9 +17,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -59,9 +58,6 @@ uniform vec4 tint;
 uniform vec4 tint2;
 uniform vec4 tint3;
 uniform vec4 bgColor;
-uniform float uScanPhase;
-uniform float uStreamEnergy;
-uniform float uMotionScale;
 
 // letta-mobile-9dx2y: ported wholesale from the working TTS shader
 // (audio/AudioAnimation.kt). The previous p2auf approach painted
@@ -121,35 +117,22 @@ float perlin_noise_1d(float d) {
 half4 main(float2 fragCoord) {
   float2 uv = fragCoord / iResolution.xy;
 
-  // The existing wave remains dominant. Two quieter relatives share its
-  // direction while varying phase/frequency/width just enough to avoid a
-  // mechanically repeated edge. Their combined displacement is kept within
-  // the original visual envelope instead of stacking more motion on top.
-  float waveTime = iTime * uMotionScale;
-  float primary = sin(uv.x * 3.2 + waveTime * 0.9) * 0.048;
-  float secondary = sin(uv.x * 3.42 + waveTime * 0.84 + 1.35) * 0.014;
-  float tertiary = sin(uv.x * 2.92 + waveTime * 0.76 + 3.70) * 0.008;
-  float wave = primary + secondary + tertiary;
+  // Slow horizontal sine — the macro motion the user called the
+  // "slightly moving" effect. Kept gentle. (geometry unchanged)
+  float wave_speed = 0.9;
+  float wave_frequency = 3.2;
+  float wave = sin(uv.x * wave_frequency + iTime * wave_speed) * 0.06;
 
   // Two-octave perlin with a slow 2D crawl so the grain churns
   // organically rather than sliding in one direction. (geometry unchanged)
-  float nA = perlin_noise_1d(uv.x * 2.8 + waveTime * 0.45 + uv.y * 1.5);
-  float nB = perlin_noise_1d(uv.x * 5.3 - waveTime * 0.21 + 11.0);
+  float nA = perlin_noise_1d(uv.x * 2.8 + iTime * 0.45 + uv.y * 1.5);
+  float nB = perlin_noise_1d(uv.x * 5.3 - iTime * 0.21 + 11.0);
   float noise = nA * 0.7 + nB * 0.3;
   float noise_offset = (noise - 0.5) * 0.025;
 
-  // A broad constant-rate scan passes THROUGH the established field. It is
-  // deliberately not a bright stripe: it only lifts the local baseline and
-  // vividness slightly. Streaming energy can make the field more awake, but
-  // never controls position directly, so bursty token cadence cannot jitter.
-  float scanCenter = mix(-0.22, 1.22, uScanPhase);
-  float scanDistance = abs(uv.x - scanCenter);
-  float scan = 1.0 - smoothstep(0.16, 0.48, scanDistance);
-  float scanLift = scan * (0.010 + uStreamEnergy * 0.006) * uMotionScale;
-
   // Glow body hugs the bottom of the strip; the composer covers the
   // brightest part and a soft halo rises above. (geometry unchanged)
-  float baseline = 0.90 + wave + noise_offset + scanLift;
+  float baseline = 0.90 + wave + noise_offset;
   float dist = clamp(baseline - uv.y, 0.0, 1.0);
   // Band hugging the bottom; dissolves upward. Divisor controls height
   // (too large = the colour washes up over the messages); pow keeps the
@@ -163,7 +146,7 @@ half4 main(float2 fragCoord) {
   // than a bright wash — keeps the full band height and the drift, just
   // less saturated. Color-space (toward the real bg), so never grey.
   // Base softness, ~20% more vivid than before (0.55 -> 0.44).
-  float BG_MIX_BASE = 0.35 - scan * (0.020 + uStreamEnergy * 0.020); // 0=fully vivid, 1=invisible (== bg)
+  float BG_MIX_BASE = 0.35; // 0=fully vivid, 1=invisible (== bg)
   // Vertical opacity graduation: MORE vivid toward the TOP of the band,
   // MORE muted toward the bottom. uv.y rises upward; map the band's
   // vertical position (where glow is non-zero) to an extra mix amount so
@@ -206,23 +189,59 @@ fun ThinkingShader(
     // unchanged; pass distinct theme colors for the multi-color drift.
     tint2: Color = tint,
     tint3: Color = tint,
-    /** Normalized streaming activity. Callers may update this per chunk. */
-    streamingEnergy: Float = 0f,
 ) {
     // letta-mobile-vcky.b: API ≥ 33 gets the AGSL path; older devices fall
     // back to the Compose-native gradient so we don't ship a dead rectangle.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ThinkingShaderCanvas(
-            tint = tint,
-            bgColor = bgColor,
-            tint2 = tint2,
-            tint3 = tint3,
-            animate = animate,
-            streamingEnergy = streamingEnergy,
+        val shader = remember { RuntimeShader(SHADER) }
+        val shaderBrush = remember { ShaderBrush(shader) }
+        var iTime by remember { mutableFloatStateOf(0f) }
+
+        LaunchedEffect(animate) {
+            if (animate) {
+                while (true) {
+                    withFrameMillis { frameTimeMs -> iTime = frameTimeMs / 1000f }
+                }
+            }
+        }
+
+        Canvas(
             modifier = modifier
                 .fillMaxWidth()
                 .height(heightDp.dp),
-        )
+        ) {
+            shader.setFloatUniform("iTime", iTime)
+            shader.setFloatUniform("iResolution", size.width, size.height)
+            shader.setFloatUniform(
+                "tint",
+                tint.red,
+                tint.green,
+                tint.blue,
+                tint.alpha,
+            )
+            shader.setFloatUniform(
+                "tint2",
+                tint2.red,
+                tint2.green,
+                tint2.blue,
+                tint2.alpha,
+            )
+            shader.setFloatUniform(
+                "tint3",
+                tint3.red,
+                tint3.green,
+                tint3.blue,
+                tint3.alpha,
+            )
+            shader.setFloatUniform(
+                "bgColor",
+                bgColor.red,
+                bgColor.green,
+                bgColor.blue,
+                bgColor.alpha,
+            )
+            drawRect(brush = shaderBrush)
+        }
     } else {
         ThinkingShaderFallback(
             tint = tint,
@@ -232,60 +251,7 @@ fun ThinkingShader(
             animate = animate,
             tint2 = tint2,
             tint3 = tint3,
-            streamingEnergy = streamingEnergy,
         )
-    }
-}
-
-@Composable
-private fun ThinkingShaderCanvas(
-    tint: Color,
-    bgColor: Color,
-    tint2: Color,
-    tint3: Color,
-    animate: Boolean,
-    streamingEnergy: Float,
-    modifier: Modifier,
-) {
-    val shader = remember { RuntimeShader(SHADER) }
-    val shaderBrush = remember { ShaderBrush(shader) }
-    var iTime by remember { mutableFloatStateOf(0f) }
-    var scanPhase by remember { mutableFloatStateOf(0f) }
-    var smoothedEnergy by remember { mutableFloatStateOf(0f) }
-    val targetEnergy by rememberUpdatedState(
-        streamingEnergy.coerceIn(ThinkingShaderMotion.MinEnergy, ThinkingShaderMotion.MaxEnergy),
-    )
-
-    LaunchedEffect(animate) {
-        if (!animate) return@LaunchedEffect
-        var lastFrameNanos = 0L
-        while (true) {
-            withFrameNanos { now ->
-                if (lastFrameNanos != 0L) {
-                    val dt = (now - lastFrameNanos) / 1_000_000_000f
-                    smoothedEnergy = ThinkingShaderMotion.smoothEnergy(smoothedEnergy, targetEnergy, dt)
-                    scanPhase = ThinkingShaderMotion.advancePhase(scanPhase, smoothedEnergy, dt, motionScale = 1f)
-                    iTime += dt.coerceIn(0f, 0.1f)
-                }
-                lastFrameNanos = now
-            }
-        }
-    }
-    LaunchedEffect(animate, targetEnergy) {
-        if (!animate) smoothedEnergy = targetEnergy
-    }
-
-    Canvas(modifier = modifier) {
-        shader.setFloatUniform("iTime", iTime)
-        shader.setFloatUniform("iResolution", size.width, size.height)
-        shader.setFloatUniform("uScanPhase", scanPhase)
-        shader.setFloatUniform("uStreamEnergy", smoothedEnergy)
-        shader.setFloatUniform("uMotionScale", if (animate) 1f else 0f)
-        shader.setFloatUniform("tint", tint.red, tint.green, tint.blue, tint.alpha)
-        shader.setFloatUniform("tint2", tint2.red, tint2.green, tint2.blue, tint2.alpha)
-        shader.setFloatUniform("tint3", tint3.red, tint3.green, tint3.blue, tint3.alpha)
-        shader.setFloatUniform("bgColor", bgColor.red, bgColor.green, bgColor.blue, bgColor.alpha)
-        drawRect(brush = shaderBrush)
     }
 }
 
@@ -298,7 +264,6 @@ private fun ThinkingShaderFallback(
     animate: Boolean = true,
     tint2: Color = tint,
     tint3: Color = tint,
-    streamingEnergy: Float = 0f,
 ) {
     val phase = if (animate) {
         val transition = rememberInfiniteTransition(label = "thinkingShaderFallback")
@@ -348,11 +313,10 @@ private fun ThinkingShaderFallback(
     // the AGSL path's intent — the composer covers this and the visible
     // tail fades upward into the chat list). Horizontal phase shift gives
     // the "slightly moving" sensation without a runtime shader.
-    val energy = streamingEnergy.coerceIn(0f, 1f)
     val center = 0.5f + 0.30f * sin(phase)
     // Render at high opacity so the vivid color reads on the dark
     // surface (the surrounding gradient still dissolves into bgColor).
-    val mixed = lerp(drifted, Color.White, energy * 0.04f).copy(alpha = 0.85f)
+    val mixed = drifted.copy(alpha = 0.85f)
 
     Canvas(
         modifier = modifier

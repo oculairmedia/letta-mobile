@@ -176,6 +176,7 @@ internal fun DesktopAmbientChatBackground(
                     shaderBuilder.uniform("uTime", phase)
                     shaderBuilder.uniform("uAgitation", agitation)
                     shaderBuilder.uniform("uEnvelope", intensity)
+                    shaderBuilder.uniform("uStreamEnergy", 0f)
                     shaderBuilder.uniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
                     // One native Shader per frame is unavoidable (uniforms bake
                     // in at makeShader time), but leaving it to the cleaner is

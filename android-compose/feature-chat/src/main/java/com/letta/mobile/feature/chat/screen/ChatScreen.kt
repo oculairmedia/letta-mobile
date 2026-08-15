@@ -75,6 +75,7 @@ internal fun ChatScreen(
         // opaque, so the gesture bar is still visually distinct).
         val bottomInsetDp = 0.dp
         val ambient = rememberChatScreenAmbientState()
+        val streamActivityPulse = rememberVisibleAssistantStreamPulse(state)
         val streamingRevealPulse = rememberStreamingRevealHapticPulse(hapticsEnabled)
 
         ChatScreenEffects(
@@ -95,6 +96,7 @@ internal fun ChatScreen(
         // receives `bottomInsetDp` for navbar-clearance.
         AmbientShaderAgentBackground(
             agentStatus = ambient.status,
+            streamActivityPulse = streamActivityPulse,
             modifier = modifier
                 .fillMaxSize()
                 .imePadding()
@@ -121,6 +123,21 @@ internal fun ChatScreen(
             )
         }
     }
+}
+
+@Composable
+private fun rememberVisibleAssistantStreamPulse(state: com.letta.mobile.ui.chat.render.ChatUiState): Long {
+    var pulseState by remember { mutableStateOf(VisibleAssistantStreamPulseState()) }
+    val tail = state.messages.lastOrNull { it.role == "assistant" && !it.isReasoning }
+    LaunchedEffect(state.isStreaming, tail?.id, tail?.content?.length) {
+        pulseState = reduceVisibleAssistantStreamPulse(
+            previous = pulseState,
+            isStreaming = state.isStreaming,
+            tailId = tail?.id,
+            contentLength = tail?.content?.length ?: 0,
+        )
+    }
+    return pulseState.pulse
 }
 
 // NoConversationContent (the prior placeholder for ConversationState.
