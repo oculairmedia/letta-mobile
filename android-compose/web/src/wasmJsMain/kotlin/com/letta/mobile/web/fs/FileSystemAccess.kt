@@ -1,3 +1,5 @@
+@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+
 package com.letta.mobile.web.fs
 
 import kotlinx.coroutines.await
