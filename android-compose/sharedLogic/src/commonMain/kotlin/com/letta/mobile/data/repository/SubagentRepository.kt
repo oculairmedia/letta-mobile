@@ -59,8 +59,10 @@ internal fun defaultSubagentScope(): CoroutineScope =
  * letta-mobile-sqdqe: INCREMENTAL push snapshots can be transiently
  * incomplete, so replacement is conservative: running entries survive omission
  * until the shim sends an explicit terminal state or absence exceeds a bound.
- * AUTHORITATIVE (refresh) snapshots are ground truth — a running entry omitted
- * from a full subagent_list response is EVICTED immediately.
+ * AUTHORITATIVE refresh snapshots are still bounded: the mobile request is
+ * active-scoped (`all=false`), so an omission can be a filtered/temporarily
+ * incomplete view. Running entries therefore use the same absence linger as
+ * incremental pushes. Explicit terminal events remain immediate and durable.
  */
 open class SubagentRepository(
     private val transport: IChannelTransport,
@@ -199,8 +201,7 @@ open class SubagentRepository(
         val retained = when (kind) {
             SnapshotKind.AUTHORITATIVE -> {
                 emitDeltaRunningCount(incoming)
-                evictAbsentRunning(absentRunning, absence, kind)
-                emptyList()
+                retainWithinLinger(absentRunning, absence, now, kind)
             }
             SnapshotKind.INCREMENTAL -> retainWithinLinger(absentRunning, absence, now, kind)
         }
@@ -239,29 +240,6 @@ open class SubagentRepository(
             "incomingRunning" to incomingRunning,
             "delta" to (localRunning - incomingRunning),
         )
-    }
-
-    /**
-     * Ground truth: running entries omitted from a full subagent_list
-     * response are EVICTED immediately.
-     */
-    private fun evictAbsentRunning(
-        absentRunning: List<SubagentEntry>,
-        absence: MutableMap<String, Long>,
-        kind: SnapshotKind,
-    ) {
-        absentRunning.forEach { entry ->
-            val key = entry.cacheKey()
-            absence.remove(key)
-            Telemetry.event(
-                "SubagentRepo",
-                "merge.evictRunning",
-                "cacheKey" to key,
-                "status" to entry.status,
-                "kind" to kind.name,
-                "reason" to "absent-from-authoritative-snapshot",
-            )
-        }
     }
 
     /**

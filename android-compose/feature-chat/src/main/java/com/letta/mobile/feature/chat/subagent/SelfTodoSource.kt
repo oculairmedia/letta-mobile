@@ -1,5 +1,6 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import kotlinx.coroutines.flow.Flow
@@ -41,6 +42,11 @@ interface SelfTodoSource {
  * as the agent's own running plan at a glance.
  */
 internal fun List<SubagentTodo>.toSelfEntry(
+    // A terminal worker may leave its last TodoWrite snapshot at 4/5. The
+    // lifecycle signal must win over that independently retained checklist;
+    // callers use this overload when the parent run has reached a terminal
+    // state, while the plain form preserves normal live-plan behavior.
+    lifecycleStatus: String? = null,
     // letta-mobile-dvobc: injected so the self chip's stuck heuristic is
     // testable. Wall-clock epoch-ms stamped as the last-update time whenever
     // the plan changes (each new snapshot is a fresh observation).
@@ -49,7 +55,10 @@ internal fun List<SubagentTodo>.toSelfEntry(
     if (isEmpty()) return null
     val completed = count { it.status.trim().lowercase() == "completed" }
     val total = size
-    if (completed >= total) return null
+    val terminal = lifecycleStatus == SubagentStatus.COMPLETED ||
+        lifecycleStatus == SubagentStatus.FAILED ||
+        lifecycleStatus == SubagentStatus.CANCELLED
+    if (completed >= total || terminal) return null
     return ActiveSubagent(
         id = ActiveSubagent.SELF_ID,
         description = "Your plan · $completed/$total done",

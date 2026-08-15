@@ -143,14 +143,39 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun `refresh authoritative snapshot evicts omitted running entries`() = runTest {
+    fun `refresh authoritative omission retains running entry within bounded linger`() = runTest {
+        var now = 1_000L
         transport.enqueueSubagentList(
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_2"))),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
+        repo.refresh().getOrThrow()
+
+        assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+        now += 61_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_3"))))
+        repo.refresh().getOrThrow()
+        assertEquals(setOf("toolu_2", "toolu_3"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `refresh authoritative snapshot evicts omitted running entries after linger`() = runTest {
+        var now = 1_000L
+        transport.enqueueSubagentList(
+            successList(listOf(running("toolu_1"))),
+            successList(listOf(running("toolu_2"))),
+        )
+        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+
+        repo.refresh().getOrThrow()
+        assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+
+        now += 61_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_2"))))
         repo.refresh().getOrThrow()
 
         val after = repo.currentActiveSubagents(parentScope)
@@ -334,7 +359,7 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun `authoritative empty snapshot evicts seeded running entry`() = runTest {
+    fun `authoritative empty snapshot retains seeded running entry within linger`() = runTest {
         transport.enqueueSubagentList(
             successList(listOf(running("toolu_1"))),
             successList(emptyList()),
@@ -345,7 +370,7 @@ class SubagentRepositoryTest {
         repo.refresh().getOrThrow()
 
         val after = repo.currentActiveSubagents(parentScope)
-        assertEquals(emptyList<SubagentEntry>(), after)
+        assertEquals(listOf("toolu_1"), after.map { it.toolCallId })
     }
 
     @Test
