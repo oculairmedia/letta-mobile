@@ -27,7 +27,7 @@ fun BackendSettingsCard(
     config: LettaConfig,
     onConfigSaved: (LettaConfig) -> Unit,
     onTokenCleared: () -> Unit = {},
-    onIrohIdentityReset: () -> Unit = {},
+    onIrohIdentityReset: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var serverUrl by remember(config.serverUrl) { mutableStateOf(config.serverUrl) }
@@ -68,7 +68,7 @@ fun BackendSettingsCard(
                         Text(
                             text = when (mode) {
                                 LettaConfig.Mode.SELF_HOSTED -> "iroh://<node_id>@<ip>:<port> or https://..."
-                                LettaConfig.Mode.CLOUD -> "https://app.letta.com"
+                                LettaConfig.Mode.CLOUD -> "https://api.letta.com"
                                 LettaConfig.Mode.LOCAL -> "http://127.0.0.1:8283"
                             },
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -174,11 +174,13 @@ fun BackendSettingsCard(
                     }
                 }
 
-                OutlinedButton(
-                    onClick = onIrohIdentityReset,
-                    shape = RoundedCornerShape(8.dp),
-                ) {
-                    Text("Reset Iroh identity")
+                if (onIrohIdentityReset != null) {
+                    OutlinedButton(
+                        onClick = onIrohIdentityReset,
+                        shape = RoundedCornerShape(8.dp),
+                    ) {
+                        Text("Reset Iroh identity")
+                    }
                 }
             }
         }
