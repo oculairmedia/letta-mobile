@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -53,11 +51,11 @@ internal data class NowActiveBarState(
 
 @Immutable
 internal data class NowActiveBarActions(
-    /** Bring the active conversation on screen (bar body click). */
+    /** Bring the active conversation on screen (identity block click). */
     val onOpenConversation: () -> Unit,
     /** Jump to the conversation doing background work (chip click). */
     val onJumpToBackgroundWork: () -> Unit,
-    /** Toggle the desktop avatar companion (bar trailing control). */
+    /** Toggle the desktop avatar companion (trailing control). */
     val onAvatarCompanion: () -> Unit = {},
     /** Interrupt the pinned conversation's in-flight run (stop button). */
     val onStopRun: () -> Unit = {},
@@ -83,38 +81,46 @@ internal data class NowActiveBarHostState(
 
 @Immutable
 internal data class NowActiveBarHostActions(
-    /** Select + reveal the given conversation (bar body and work chip). */
+    /** Select + reveal the given conversation (identity block and work chip). */
     val onOpenConversation: (String) -> Unit,
     val onAvatarCompanion: () -> Unit,
     /** Interrupt the given conversation's in-flight run. */
     val onStopRun: (String) -> Unit,
 )
 
+/** Result of pinning a conversation for the header identity block: which
+ * conversation it is (so callers can scope actions to it) plus the state to
+ * render. */
+@Immutable
+internal data class NowActiveBarPin(
+    val conversationId: String,
+    val state: NowActiveBarState,
+)
+
 /**
- * Derives the bar's pinned conversation and live status from controller
- * state: pinned to the conversation the user LAST PROMPTED (sticky across
- * browsing, like now-playing), falling back to the selection until the first
- * send. Renders nothing when there is no conversation at all.
+ * Derives the header identity block's pinned conversation and live status
+ * from controller state: pinned to the conversation the user LAST PROMPTED
+ * (sticky across browsing, like now-playing), falling back to the selection
+ * until the first send. Returns null when there is no conversation at all —
+ * callers should degrade to a generic title in that case.
+ *
+ * Pure by design (no Compose state reads) so the mapping is unit-testable
+ * without a Compose UI test harness.
  */
-@Composable
-internal fun DesktopNowActiveBarHost(
-    chatController: DesktopChatController,
+internal fun deriveNowActiveBarPin(
+    lastPromptedId: String?,
+    streamingId: String?,
+    cancellingId: String?,
     chatState: DesktopChatSurfaceState,
     host: NowActiveBarHostState,
-    actions: NowActiveBarHostActions,
-) {
-    val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
-    val streamingId by chatController.streamingConversationId.collectAsState()
-    // letta-mobile-lgns8.19: an abort was sent but the terminal frame hasn't
-    // landed — the run is still live, so the bar says "stopping…" and the stop
-    // button stays available as the local force-clear escape hatch.
-    val cancellingId by chatController.cancellingConversationId.collectAsState()
+): NowActiveBarPin? {
     val barConversation = lastPromptedId
         ?.let { id -> chatState.conversations.firstOrNull { it.id == id } }
         ?: chatState.selectedConversation
-        ?: return
+        ?: return null
     val barIsSelected = barConversation.id == chatState.selectedConversationId
-    DesktopNowActiveBar(
+    return NowActiveBarPin(
+        conversationId = barConversation.id,
         state = NowActiveBarState(
             conversationTitle = barConversation.title,
             agentName = barConversation.agentName,
@@ -135,97 +141,147 @@ internal fun DesktopNowActiveBarHost(
                 ?.let { tid -> chatState.conversations.firstOrNull { it.id == tid }?.agentName },
             avatarCompanionActive = host.avatarCompanionActive,
         ),
+    )
+}
+
+/** Identity block state + click handlers ready for the header chrome to render. */
+@Immutable
+internal data class DesktopHeaderIdentity(
+    val state: NowActiveBarState?,
+    val actions: NowActiveBarActions,
+)
+
+private val NoopNowActiveBarActions = NowActiveBarActions(
+    onOpenConversation = {},
+    onJumpToBackgroundWork = {},
+)
+
+/**
+ * State provider (no UI of its own): derives the pinned conversation and
+ * live status from controller state, same as before, but now returns a
+ * value instead of rendering the footer bar — the header chrome (see
+ * [DesktopJewelWindow]) is the one place that renders it, letta-mobile-3arhe.1.
+ */
+@Composable
+internal fun DesktopNowActiveBarHost(
+    chatController: DesktopChatController,
+    chatState: DesktopChatSurfaceState,
+    host: NowActiveBarHostState,
+    actions: NowActiveBarHostActions,
+): DesktopHeaderIdentity {
+    val lastPromptedId by chatController.lastPromptedConversationId.collectAsState()
+    val streamingId by chatController.streamingConversationId.collectAsState()
+    // letta-mobile-lgns8.19: an abort was sent but the terminal frame hasn't
+    // landed — the run is still live, so the header says "stopping…" and the
+    // stop button stays available as the local force-clear escape hatch.
+    val cancellingId by chatController.cancellingConversationId.collectAsState()
+    val pin = deriveNowActiveBarPin(lastPromptedId, streamingId, cancellingId, chatState, host)
+        ?: return DesktopHeaderIdentity(state = null, actions = NoopNowActiveBarActions)
+    return DesktopHeaderIdentity(
+        state = pin.state,
         actions = NowActiveBarActions(
-            onOpenConversation = { actions.onOpenConversation(barConversation.id) },
+            onOpenConversation = { actions.onOpenConversation(pin.conversationId) },
             onJumpToBackgroundWork = {
                 host.thinkingConversationId?.let(actions.onOpenConversation)
             },
             onAvatarCompanion = actions.onAvatarCompanion,
-            // Scoped to the bar's pinned conversation so an unrelated
-            // in-flight send can never be cancelled by mistake.
-            onStopRun = { actions.onStopRun(barConversation.id) },
+            // Scoped to the pinned conversation so an unrelated in-flight
+            // send can never be cancelled by mistake.
+            onStopRun = { actions.onStopRun(pin.conversationId) },
         ),
     )
 }
 
 /**
- * Spotify-style persistent bottom bar: always shows the ACTIVE conversation
- * (updated whenever the user clicks a conversation, not just an agent) with
- * its live status, visible across every destination so leaving the chat
- * never loses track of what is running. A secondary chip surfaces background
- * work happening in a different conversation.
+ * Leading identity block for the desktop window chrome: agent orb, then
+ * conversation title stacked over agent name (+ live status), matching the
+ * layout previously used by the footer now-playing bar. Clicking anywhere on
+ * the block brings the pinned conversation on screen.
  */
 @Composable
-internal fun DesktopNowActiveBar(
+internal fun DesktopHeaderIdentityBlock(
     state: NowActiveBarState,
     actions: NowActiveBarActions,
+    modifier: Modifier = Modifier,
 ) {
-    Column(modifier = Modifier.fillMaxWidth()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant),
-        )
-        Surface(color = MaterialTheme.colorScheme.surfaceContainerLow) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = actions.onOpenConversation)
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        AgentOrb(index = state.orbIndex, size = 28.dp, cornerRadius = 7.dp)
+        Column {
+            Text(
+                text = state.conversationTitle,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = actions.onOpenConversation)
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                AgentOrb(index = state.orbIndex, size = 36.dp, cornerRadius = 9.dp)
-                Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = state.agentName,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (state.status != NowActiveStatus.Idle) {
+                    StatusDot(state.status)
                     Text(
-                        text = state.conversationTitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        text = state.status.label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (state.status == NowActiveStatus.Error) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        },
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    ) {
-                        Text(
-                            text = state.agentName,
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        if (state.status != NowActiveStatus.Idle) {
-                            StatusDot(state.status)
-                            Text(
-                                text = state.status.label,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = if (state.status == NowActiveStatus.Error) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.primary
-                                },
-                            )
-                        }
-                    }
                 }
-                state.backgroundWorkAgentName?.let { name ->
-                    BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
-                }
-                if (state.status == NowActiveStatus.Thinking ||
-                    state.status == NowActiveStatus.Streaming ||
-                    state.status == NowActiveStatus.Stopping
-                ) {
-                    StopRunButton(stopping = state.status == NowActiveStatus.Stopping, onClick = actions.onStopRun)
-                }
-                AvatarCompanionButton(
-                    active = state.avatarCompanionActive,
-                    onClick = actions.onAvatarCompanion,
-                )
             }
         }
+    }
+}
+
+/**
+ * Trailing controls that used to sit at the end of the footer bar: the
+ * background-work chip, the stop-run button (only while a run is live), and
+ * the avatar-companion toggle. Rendered to the left of the native window
+ * controls so they never collide with minimize/maximize/close.
+ */
+@Composable
+internal fun DesktopHeaderTrailingControls(
+    state: NowActiveBarState,
+    actions: NowActiveBarActions,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        state.backgroundWorkAgentName?.let { name ->
+            BackgroundWorkChip(agentName = name, onClick = actions.onJumpToBackgroundWork)
+        }
+        if (state.status == NowActiveStatus.Thinking ||
+            state.status == NowActiveStatus.Streaming ||
+            state.status == NowActiveStatus.Stopping
+        ) {
+            StopRunButton(stopping = state.status == NowActiveStatus.Stopping, onClick = actions.onStopRun)
+        }
+        AvatarCompanionButton(
+            active = state.avatarCompanionActive,
+            onClick = actions.onAvatarCompanion,
+        )
     }
 }
 

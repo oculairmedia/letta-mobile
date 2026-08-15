@@ -36,6 +36,8 @@ import com.composables.icons.lucide.Menu
 import com.composables.icons.lucide.MessageCircle
 import com.composables.icons.lucide.MessageSquare
 import com.composables.icons.lucide.Package
+import com.composables.icons.lucide.PanelLeftClose
+import com.composables.icons.lucide.PanelLeftOpen
 import com.composables.icons.lucide.Pencil
 import com.composables.icons.lucide.Pin
 import com.composables.icons.lucide.PinOff
@@ -79,6 +81,11 @@ object LettaIcons {
     val ArrowDropUp: ImageVector get() = Lucide.ChevronUp
     val KeyboardArrowDown: ImageVector get() = Lucide.ChevronDown
     val ListIcon: ImageVector get() = Lucide.List
+
+    // letta-mobile-3arhe.1: sidebar collapse/expand toggle glyph (a rounded
+    // panel outline with a vertical divider), not a hamburger.
+    val PanelLeftClose: ImageVector get() = Lucide.PanelLeftClose
+    val PanelLeftOpen: ImageVector get() = Lucide.PanelLeftOpen
 
     // Actions
     val Add: ImageVector get() = Lucide.Plus

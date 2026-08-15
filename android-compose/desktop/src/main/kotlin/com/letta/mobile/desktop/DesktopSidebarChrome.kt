@@ -18,8 +18,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.ChevronLeft
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Psychology
@@ -51,6 +49,7 @@ import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.ui.icons.LettaIcons
 import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
@@ -178,8 +177,14 @@ internal fun DesktopSidebarToggleButton(
                 .semantics { contentDescription = label },
         ) {
             Icon(
-                imageVector = if (collapsed) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
+                // Panel glyph (rounded rectangle + vertical divider), not a
+                // hamburger — mirrors the reference desktop chrome.
+                imageVector = if (collapsed) LettaIcons.PanelLeftOpen else LettaIcons.PanelLeftClose,
                 contentDescription = null,
+                // Explicit theme-aware tint — never rely on the ambient
+                // content color for chrome icons: it flips light/dark with
+                // the theme (onSurfaceVariant), unlike a hardcoded color.
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -208,7 +213,12 @@ internal fun DesktopSidebarOverflowMenu(
             onClick = { expanded = true },
             modifier = Modifier.semantics { contentDescription = label },
         ) {
-            Icon(imageVector = Icons.Outlined.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(
+                imageVector = Icons.Outlined.MoreVert,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
