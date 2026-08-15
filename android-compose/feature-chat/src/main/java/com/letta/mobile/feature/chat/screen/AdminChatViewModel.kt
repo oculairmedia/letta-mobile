@@ -75,6 +75,7 @@ import com.letta.mobile.feature.chat.coordination.ChatComposerEffect
 import com.letta.mobile.feature.chat.coordination.ChatComposerState
 import com.letta.mobile.feature.chat.coordination.ChatConversationCoordinator
 import com.letta.mobile.feature.chat.coordination.ChatHistoryPager
+import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.feature.chat.coordination.ChatProjectBindings
 import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatSearchCoordinator
@@ -488,6 +489,16 @@ internal class AdminChatViewModel @Inject constructor(
         agentId = agentId.value,
         conversationId = { conversationId?.value },
     )
+    private fun hydrationIdentity(scopedAgentId: String?, convId: String): ChatHydrationTrace.Identity {
+        val descriptor = sessionManager.current.backendDescriptor
+        return ChatHydrationTrace.Identity(
+            agentId = scopedAgentId,
+            conversationId = convId,
+            backendId = descriptor.backendId.value,
+            runtimeId = descriptor.runtimeId.value,
+        )
+    }
+
     private val chatTimelineObserver: ChatTimelineObserver = ChatTimelineObserver(
         scope = viewModelScope,
         timelineRepository = timelineRepository,
@@ -512,6 +523,7 @@ internal class AdminChatViewModel @Inject constructor(
         clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
         collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
         syncA2uiHistorySnapshot = { convId, msgs -> adminChatA2uiCoordinator.syncA2uiHistorySnapshot(convId, msgs) },
+        hydrationIdentity = ::hydrationIdentity,
     )
     private val chatConversationCoordinator: ChatConversationCoordinator = ChatConversationCoordinator(
         scope = viewModelScope,
@@ -552,6 +564,7 @@ internal class AdminChatViewModel @Inject constructor(
         },
         markFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = true },
         localRuntimeRouting = ::localRuntimeRouting,
+        hydrationIdentity = { convId -> hydrationIdentity(agentId.value, convId) },
     )
 
     private fun localRuntimeRouting(): LocalRuntimeRouting = resolveLocalRuntimeRouting(

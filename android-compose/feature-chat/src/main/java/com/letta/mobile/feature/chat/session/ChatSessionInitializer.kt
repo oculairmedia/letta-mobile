@@ -49,6 +49,7 @@ internal class ChatSessionInitializer(
         observeAgentNameCache()
         runExpansionState.hydrateUiState()
         bootstrapProjectContext()
+        conversationCoordinator.recordOpenRequested()
         resolveConversationAndLoad(false)
     }
 
