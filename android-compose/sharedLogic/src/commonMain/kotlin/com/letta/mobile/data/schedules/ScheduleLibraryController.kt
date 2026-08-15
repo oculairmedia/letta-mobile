@@ -83,9 +83,12 @@ fun ScheduledMessage.toScheduleLibraryItem(): ScheduleLibraryItem =
         timing = if (schedule.type == "recurring") {
             ScheduleTiming.Recurring(schedule.cronExpression.orEmpty())
         } else {
-            ScheduleTiming.OneTime(nextScheduledTime ?: schedule.scheduledAt?.toString().orEmpty())
+            ScheduleTiming.OneTime(nextScheduledTime ?: schedule.scheduledAt?.toPortableScheduleTime().orEmpty())
         },
     )
+
+private fun Double.toPortableScheduleTime(): String =
+    if (isFinite() && this % 1.0 == 0.0) toLong().toString() else toString()
 
 class ScheduleLibraryController(
     private val agentRepository: IAgentRepository,

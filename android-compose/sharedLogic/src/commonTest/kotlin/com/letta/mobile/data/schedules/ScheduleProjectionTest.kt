@@ -72,7 +72,7 @@ class ScheduleProjectionTest {
 
         assertEquals("one time msg", item.messagePreview)
         assertTrue(item.timing is ScheduleTiming.OneTime)
-        assertEquals("1.7040672E9", (item.timing as ScheduleTiming.OneTime).displayTime)
+        assertEquals("1704067200", (item.timing as ScheduleTiming.OneTime).displayTime)
     }
 
     @Test
