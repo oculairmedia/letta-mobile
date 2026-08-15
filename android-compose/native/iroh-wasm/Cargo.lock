@@ -1616,8 +1616,11 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
  "wasm-bindgen",
  "wasm-bindgen-futures",
+ "wasm-streams",
  "web-sys",
 ]
 

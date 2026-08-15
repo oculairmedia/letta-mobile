@@ -8,7 +8,7 @@ description = "Iroh Wasm P2P client bridge for Letta Web"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = "0.2"
+wasm-bindgen = "=0.2.127"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
 web-sys = { version = "0.3", features = ["console"] }
@@ -21,3 +21,6 @@ n0-future = "0.3"
 anyhow = "1.0"
 async-channel = "2.3"
 console_error_panic_hook = "0.1"
+thiserror = "2.0"
+tokio = { version = "1", features = ["sync"] }
+wasm-streams = "0.5"
