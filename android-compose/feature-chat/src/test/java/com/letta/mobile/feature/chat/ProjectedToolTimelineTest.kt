@@ -60,6 +60,8 @@ class ProjectedToolTimelineTest {
                                 id = "tc-b",
                                 command = "ls",
                             ),
+                            toolMessage(id = "tc-c", command = "git status"),
+                            toolMessage(id = "tc-d", command = "git diff"),
                         ),
                         collapsed = false,
                         onToggleCollapsed = {},
@@ -73,6 +75,33 @@ class ProjectedToolTimelineTest {
         // Verify rows render in projected mode
         composeRule.onNodeWithText("Bash(pwd)").assertIsDisplayed()
         composeRule.onNodeWithText("Bash(ls)").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(git status)").assertIsDisplayed()
+        composeRule.onNodeWithText("Bash(git diff)").assertIsDisplayed()
+        composeRule.onNodeWithText("Worked").assertIsDisplayed()
+        composeRule.onNodeWithText("4 tools").assertIsDisplayed()
+        composeRule.onNodeWithText("Done").assertDoesNotExist()
+    }
+
+    @Test
+    fun projectedToolTimeline_showsTerminalMetadataOnlyWhenExpanded() {
+        composeRule.setContent {
+            LettaTheme(AppTheme.LIGHT, ThemePreset.DEFAULT, false) {
+                LettaChatTheme {
+                    RunBlock(
+                        messages = listOf(
+                            toolMessage(id = "tc-a", command = "pwd", completed = true),
+                            toolMessage(id = "tc-b", command = "ls", completed = true),
+                        ),
+                        collapsed = false,
+                        onToggleCollapsed = {},
+                    ) { message, _, rowModifier -> Text(message.id, modifier = rowModifier) }
+                }
+            }
+        }
+
+        composeRule.onNodeWithText("Done").assertDoesNotExist()
+        composeRule.onNodeWithText("Bash(pwd)").performClick()
+        composeRule.onNodeWithText("Done").assertIsDisplayed()
     }
 
     @Test
@@ -527,6 +556,7 @@ class ProjectedToolTimelineTest {
         id: String,
         command: String,
         approvalRequest: UiApprovalRequest? = null,
+        completed: Boolean = false,
     ) = UiMessage(
         id = id,
         role = "assistant",
@@ -538,7 +568,8 @@ class ProjectedToolTimelineTest {
             UiToolCall(
                 name = "Bash",
                 arguments = """{"command":"$command"}""",
-                result = null,
+                result = if (completed) "ok" else null,
+                status = if (completed) "success" else null,
                 toolCallId = if (id == "tc-a") "call-a" else "call-b",
             )
         ),
