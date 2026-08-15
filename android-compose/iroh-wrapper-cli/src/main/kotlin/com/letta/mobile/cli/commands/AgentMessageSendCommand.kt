@@ -100,7 +100,7 @@ class AgentMessageSendCommand : CliktCommand(name = "send") {
             println(resultJson(result, id))
             when (result) {
                 is AgentSendResult.Delivered -> exitProcess(0)
-                is AgentSendResult.Unaddressable, is AgentSendResult.Failed -> exitProcess(1)
+                is AgentSendResult.Accepted, is AgentSendResult.Unaddressable, is AgentSendResult.Failed -> exitProcess(1)
             }
         } finally {
             runCatching { endpoint.shutdown() }
@@ -151,10 +151,12 @@ internal fun agentSendResultJson(result: AgentSendResult, id: String): String {
     fun q(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
     return when (result) {
         is AgentSendResult.Delivered ->
-            """{"ok":true,"delivered":true,"msgId":${q(result.msgId)}}"""
+            """{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":${q(result.msgId)}}"""
+        is AgentSendResult.Accepted ->
+            """{"ok":true,"accepted":true,"applicationDelivered":false,"msgId":${q(result.msgId)},"toAgentId":${q(result.toAgentId)}}"""
         is AgentSendResult.Unaddressable ->
-            """{"ok":false,"delivered":false,"msgId":${q(id)},"error":"unaddressable","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
+            """{"ok":false,"accepted":false,"applicationDelivered":false,"msgId":${q(id)},"error":"unaddressable","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
         is AgentSendResult.Failed ->
-            """{"ok":false,"delivered":false,"msgId":${q(id)},"error":"failed","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
+            """{"ok":false,"accepted":false,"applicationDelivered":false,"msgId":${q(id)},"error":"failed","toAgentId":${q(result.toAgentId)},"reason":${q(result.reason)}}"""
     }
 }

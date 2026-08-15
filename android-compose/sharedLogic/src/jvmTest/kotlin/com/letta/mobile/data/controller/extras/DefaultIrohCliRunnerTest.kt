@@ -41,7 +41,7 @@ class DefaultIrohCliRunnerTest {
             body = """
                 #!/bin/sh
                 cat > "@STDOUT_PATH@"
-                printf '{"ok":true,"delivered":true,"msgId":"echo-id"}'
+                printf '{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":"echo-id"}'
                 exit 0
             """.trimIndent(),
         )
@@ -74,7 +74,7 @@ class DefaultIrohCliRunnerTest {
             body = """
                 #!/bin/sh
                 cat > /dev/null
-                printf '{"ok":true,"delivered":true,"msgId":"ignored"}'
+                printf '{"ok":true,"accepted":true,"applicationDelivered":true,"msgId":"live-msg-6f2963bb-4936-4fff-97b2-0604128e2f42","futureField":"ignored"}'
                 exit 0
             """.trimIndent(),
         )
@@ -90,6 +90,42 @@ class DefaultIrohCliRunnerTest {
             result is IrohCliSendResult.Delivered,
             "exit 0 + ok:true must yield Delivered, got: $result",
         )
+        assertEquals("live-msg-6f2963bb-4936-4fff-97b2-0604128e2f42", (result as IrohCliSendResult.Delivered).msgId)
+    }
+
+    @Test
+    fun acceptedButNotDeliveredIsNotReportedAsDelivered() = runBlocking {
+        val tmp = kotlin.io.path.createTempDirectory("iroh-runner-test").toFile()
+        val script = writeCaptureScript(tmp, "accepted.sh", File(tmp, "stdout.txt"), """
+            #!/bin/sh
+            cat >/dev/null
+            printf '{"ok":false,"accepted":true,"applicationDelivered":false,"msgId":"m-accepted","reason":"delivery_timeout","future":123}'
+            exit 1
+        """.trimIndent())
+        val result = DefaultIrohCliRunner().send(script.absolutePath, "from", "to", "hi", IrohCliPaths())
+        assertTrue(result is IrohCliSendResult.Accepted)
+        assertEquals("m-accepted", (result as IrohCliSendResult.Accepted).msgId)
+    }
+
+    @Test
+    fun malformedAndContradictoryPayloadsFailClosed() = runBlocking {
+        fun script(payload: String): File {
+            val tmp = kotlin.io.path.createTempDirectory("iroh-runner-test").toFile()
+            return writeCaptureScript(tmp, "bad.sh", File(tmp, "stdout.txt"), """
+                #!/bin/sh
+                cat >/dev/null
+                printf '$payload'
+                exit 0
+            """.trimIndent())
+        }
+        for (payload in listOf(
+            "{}",
+            "{\"msgId\":\"m\",\"accepted\":false,\"applicationDelivered\":true}",
+            "{\"msgId\":\"m\",\"accepted\":\"yes\",\"applicationDelivered\":true}",
+        )) {
+            val result = DefaultIrohCliRunner().send(script(payload).absolutePath, "from", "to", "hi", IrohCliPaths())
+            assertTrue(result is IrohCliSendResult.Failed, "payload must fail closed: $payload")
+        }
     }
 
     @Test
@@ -102,7 +138,7 @@ class DefaultIrohCliRunnerTest {
             body = """
                 #!/bin/sh
                 cat > /dev/null
-                printf '{"ok":false,"delivered":false,"error":"unaddressable","toAgentId":"to","reason":"no_kv_row"}'
+                printf '{"ok":false,"accepted":false,"applicationDelivered":false,"error":"unaddressable","toAgentId":"to","reason":"no_kv_row","msgId":"m-unaddr"}'
                 exit 1
             """.trimIndent(),
         )
@@ -133,7 +169,7 @@ class DefaultIrohCliRunnerTest {
             body = """
                 #!/bin/sh
                 cat > /dev/null
-                echo "boom: dial timed out" 1>&2
+                printf '{"ok":false,"accepted":false,"applicationDelivered":false,"error":"failed","msgId":"m-fail","reason":"dial_timed_out"}'
                 exit 1
             """.trimIndent(),
         )
@@ -151,7 +187,7 @@ class DefaultIrohCliRunnerTest {
         )
         val failed = result as IrohCliSendResult.Failed
         assertTrue(
-            failed.reason.contains("dial timed out"),
+            failed.reason.contains("dial_timed_out"),
             "stderr should be surfaced as the failure reason, got: ${failed.reason}",
         )
         assertEquals("to", failed.toAgentId)
@@ -169,7 +205,7 @@ class DefaultIrohCliRunnerTest {
             body = """
                 #!/bin/sh
                 cat > /dev/null
-                printf '{"ok":false,"delivered":false}'
+                printf '{"ok":false,"accepted":false,"applicationDelivered":false,"error":"failed","msgId":"m-weird","reason":"bad_state"}'
                 exit 0
             """.trimIndent(),
         )

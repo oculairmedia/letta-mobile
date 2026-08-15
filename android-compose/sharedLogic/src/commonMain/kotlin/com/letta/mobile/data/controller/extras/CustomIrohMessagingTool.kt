@@ -205,7 +205,7 @@ class CustomIrohMessagingTool(
                 """{"ok":true,"accepted":true,"delivered":false,"msgId":"${result.msgId}","to":"${result.toAgentId}"}""",
             )
             is IrohCliSendResult.Unaddressable -> ExternalToolResult.Error(
-                "agent_message_send: target '$toAgentId' is unaddressable: ${result.reason}",
+                "agent_message_send: target '$toAgentId' is unaddressable (msgId unavailable at resolution): ${result.reason}",
             )
             is IrohCliSendResult.Failed -> ExternalToolResult.Error(
                 "agent_message_send: send to '$toAgentId' failed: ${result.reason}",
