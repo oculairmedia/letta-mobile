@@ -1,88 +1,65 @@
+@file:OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+
 package com.letta.mobile.web.iroh
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-
-@Serializable
-data class ParsedIrohTicket(
-    val nodeId: String,
-    val publicKeyValid: Boolean,
-    val directAddr: String? = null,
-    val relayUrl: String? = null,
-)
-
-/**
- * Pure Kotlin / Wasm ticket parser & validator mirroring the Rust native/iroh-wasm crate.
- */
-object IrohWasmBridge {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
+internal class IrohWasmBridge private constructor(
+    private val sessionId: Int,
+) {
+    suspend fun sendControl(payload: String) {
+        callSendControl(sessionId, payload).awaitPromise()
     }
 
-    /**
-     * Parse an Iroh ticket or URL into its cryptographic Node ID and direct endpoint.
-     */
-    fun parseTicket(ticketOrUrl: String): ParsedIrohTicket {
-        val trimmed = ticketOrUrl.trim()
-        val body = if (trimmed.startsWith("iroh://")) {
-            trimmed.removePrefix("iroh://")
-        } else {
-            trimmed
-        }
+    fun pollControl(): String? = callPollControl(sessionId)?.toString()
 
-        val nodePart: String
-        val addrPart: String?
+    fun pollStream(): String? = callPollStream(sessionId)?.toString()
 
-        if (body.contains("@")) {
-            nodePart = body.substringBefore("@")
-            addrPart = body.substringAfter("@").takeIf { it.isNotBlank() }
-        } else {
-            nodePart = body
-            addrPart = null
-        }
+    fun state(): String = callSessionState(sessionId).toString()
 
-        // Validate Iroh Ed25519 public key hex format (64 hex characters) or base32
-        val isValidHex = nodePart.length == 64 && nodePart.all { it in "0123456789abcdefABCDEF" }
-        val isValidBase32 = nodePart.length == 52 || nodePart.length == 59
+    fun error(): String? = callSessionError(sessionId)?.toString()
 
-        return ParsedIrohTicket(
-            nodeId = nodePart,
-            publicKeyValid = isValidHex || isValidBase32,
-            directAddr = addrPart,
-            relayUrl = null,
-        )
+    suspend fun close() {
+        callClose(sessionId).awaitPromise()
     }
 
-    /**
-     * Send an RPC command over Iroh 1.0 P2P (via Relays) to a target Node ID.
-     */
-    suspend fun dialAndSend(targetNodeId: String, alpn: String, payload: String): String {
-        return try {
-            val promise = callIrohDialAndSend(targetNodeId, alpn, payload)
-            val res = promise.awaitPromise()
-            res.toString()
-        } catch (e: Throwable) {
-            println("Iroh dialAndSend error: ${e.message}")
-            throw e
+    companion object {
+        suspend fun connect(ticket: String): IrohWasmBridge {
+            val id = callConnect(ticket).awaitPromise().toInt()
+            return IrohWasmBridge(id)
         }
     }
 }
 
-private fun callIrohDialAndSend(target: String, alpn: String, payload: String): kotlin.js.Promise<JsString> =
-    js("window.irohDialAndSend(target, alpn, payload)")
+private fun callConnect(ticket: String): kotlin.js.Promise<JsNumber> =
+    js("window.irohConnect(ticket)")
+
+private fun callSendControl(sessionId: Int, payload: String): kotlin.js.Promise<JsAny?> =
+    js("window.irohSendControl(sessionId, payload)")
+
+private fun callPollControl(sessionId: Int): JsString? =
+    js("window.irohPollControl(sessionId)")
+
+private fun callPollStream(sessionId: Int): JsString? =
+    js("window.irohPollStream(sessionId)")
+
+private fun callSessionState(sessionId: Int): JsString =
+    js("window.irohSessionState(sessionId)")
+
+private fun callSessionError(sessionId: Int): JsString? =
+    js("window.irohSessionError(sessionId)")
+
+private fun callClose(sessionId: Int): kotlin.js.Promise<JsAny?> =
+    js("window.irohClose(sessionId)")
 
 private suspend fun <T : JsAny?> kotlin.js.Promise<T>.awaitPromise(): T =
-    kotlinx.coroutines.suspendCancellableCoroutine { cont ->
-        this.then(
+    kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
+        then(
             onFulfilled = { value ->
-                cont.resumeWith(Result.success(value))
+                continuation.resumeWith(Result.success(value))
                 null
             },
             onRejected = { reason ->
-                cont.resumeWith(Result.failure(RuntimeException(reason.toString())))
+                continuation.resumeWith(Result.failure(RuntimeException(reason.toString())))
                 null
-            }
+            },
         )
     }
-
