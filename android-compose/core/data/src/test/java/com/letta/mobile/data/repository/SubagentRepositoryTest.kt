@@ -17,6 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -36,16 +37,27 @@ class SubagentRepositoryTest {
     private val parentScope = SubagentParentScope("agent-parent", "default")
 
     private lateinit var transport: FakeChannelTransport
+    private val repositories = mutableListOf<SubagentRepository>()
 
     @Before
     fun setUp() {
         transport = FakeChannelTransport(initialState = connectedState())
     }
 
+    @After
+    fun tearDown() {
+        repositories.forEach(SubagentRepository::close)
+    }
+
+    private fun repository(
+        scope: kotlinx.coroutines.CoroutineScope,
+        clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    ): SubagentRepository = SubagentRepository(transport, scope, clock = clock).also(repositories::add)
+
     @Test
     fun `activeSubagentsFlow triggers exactly one subagent_list regardless of subscribers`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val s1 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         val s2 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -62,7 +74,7 @@ class SubagentRepositoryTest {
     @Test
     fun `activeSubagentsFlow returns current snapshot within one WS round-trip`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"), running("toolu_2"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val subagents = withTimeout(5.seconds) {
             repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -74,7 +86,7 @@ class SubagentRepositoryTest {
     @Test
     fun `subagents_updated push folds fresh active snapshot in by replacement`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         assertEquals(1, transport.subagentListCalls.size)
@@ -100,7 +112,7 @@ class SubagentRepositoryTest {
     @Test
     fun `subagents_updated with explicit terminal replaces running entry with durable terminal`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
@@ -124,7 +136,7 @@ class SubagentRepositoryTest {
     @Test
     fun `subagents_updated partial snapshot retains omitted running entries`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
@@ -149,7 +161,7 @@ class SubagentRepositoryTest {
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_2"))),
         )
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         repo.refresh().getOrThrow()
@@ -173,7 +185,7 @@ class SubagentRepositoryTest {
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_2"))),
         )
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         repo.refresh().getOrThrow()
@@ -192,7 +204,7 @@ class SubagentRepositoryTest {
         val agentOne = running("toolu-agent-1")
         val agentTwo = running("toolu-agent-2").copy(parentAgentId = "agent-other")
         transport.enqueueSubagentList(successList(listOf(agentOne, agentTwo)))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val first = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         val second = repo.activeSubagentsFlow(SubagentParentScope("agent-other", "default"))
@@ -207,7 +219,7 @@ class SubagentRepositoryTest {
         val firstConversation = running("toolu-conv-a").copy(parentConversationId = "conv-a")
         val secondConversation = running("toolu-conv-b").copy(parentConversationId = "conv-b")
         transport.enqueueSubagentList(successList(listOf(firstConversation, secondConversation)))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val first = repo.activeSubagentsFlow(SubagentParentScope("agent-parent", "conv-a"))
             .first { it.isNotEmpty() }
@@ -222,7 +234,7 @@ class SubagentRepositoryTest {
     fun `terminal lifecycle remains cached after resubscribe beyond sharing timeout`() = runTest {
         var now = 1_000L
         transport.enqueueSubagentList(successList(listOf(running("toolu-terminal"))))
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
@@ -261,7 +273,7 @@ class SubagentRepositoryTest {
                 ),
             ),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val result = repo.todos("toolu_1")
         assertTrue("todos returned $result", result.isSuccess)
@@ -281,7 +293,7 @@ class SubagentRepositoryTest {
                 error = "unknown subagent",
             ),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val result = repo.todos("toolu_x")
         assertTrue("todos should fail", result.isFailure)
@@ -294,7 +306,7 @@ class SubagentRepositoryTest {
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_1"), running("toolu_2"))),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         assertEquals(1, transport.subagentListCalls.size)
@@ -313,7 +325,7 @@ class SubagentRepositoryTest {
     fun `refresh dedups parallel callers to a single in-flight WS round-trip`() = runTest {
         transport.subagentListDelayMs = 50
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val initial = async(start = CoroutineStart.UNDISPATCHED) {
             repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -338,7 +350,7 @@ class SubagentRepositoryTest {
                 error = "registry unavailable",
             )
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val result = repo.refresh()
         assertTrue("refresh should fail", result.isFailure)
@@ -350,7 +362,7 @@ class SubagentRepositoryTest {
     fun `refresh concurrent callers share one deferred and do not cancel each other`() = runTest {
         transport.subagentListDelayMs = 50
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val r1 = async { repo.refresh() }
         val r2 = async { repo.refresh() }
@@ -369,7 +381,7 @@ class SubagentRepositoryTest {
             successList(listOf(running("toolu_1"))),
             successList(emptyList()),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         repo.refresh().getOrThrow()
@@ -381,7 +393,7 @@ class SubagentRepositoryTest {
     @Test
     fun `incremental push omitting running entry retains it`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         // INCREMENTAL push omits toolu_1 — it must be RETAINED (sqdqe guard).
@@ -406,7 +418,7 @@ class SubagentRepositoryTest {
     fun `incremental absence bound evicts running entry after linger`() = runTest {
         var now = 1_000L
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         // First INCREMENTAL push omits toolu_1 — retained with absence timestamp.
@@ -462,7 +474,7 @@ class SubagentRepositoryTest {
     fun `absence sweep evicts without a later snapshot`() = runTest {
         var now = 1_000L
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         transport.events.emit(ServerFrame.SubagentsUpdated(
             id = "u-absent", ts = "t", reason = "gap",
