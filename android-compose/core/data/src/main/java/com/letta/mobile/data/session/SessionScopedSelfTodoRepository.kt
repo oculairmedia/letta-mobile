@@ -26,4 +26,12 @@ class SessionScopedSelfTodoRepository @Inject constructor(
 
     override fun latestFor(conversationId: String): List<SubagentTodo> =
         sessionManager.currentGraph.value.selfTodoRepository.latestFor(conversationId)
+
+    override fun lifecycleStatusForFlow(conversationId: String): Flow<String?> =
+        sessionManager.currentGraph.flatMapLatest {
+            it.selfTodoRepository.lifecycleStatusForFlow(conversationId)
+        }
+
+    override fun lifecycleStatusFor(conversationId: String): String? =
+        sessionManager.currentGraph.value.selfTodoRepository.lifecycleStatusFor(conversationId)
 }

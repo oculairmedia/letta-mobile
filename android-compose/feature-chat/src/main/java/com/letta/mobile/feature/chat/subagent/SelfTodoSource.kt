@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -80,7 +81,10 @@ class WsSelfTodoSource(
     private val repository: ISelfTodoRepository,
 ) : SelfTodoSource {
     override fun selfEntry(conversationId: String): Flow<ActiveSubagent?> =
-        repository.latestForFlow(conversationId).map { it.toSelfEntry() }
+        combine(
+            repository.latestForFlow(conversationId),
+            repository.lifecycleStatusForFlow(conversationId),
+        ) { todos, lifecycleStatus -> todos.toSelfEntry(lifecycleStatus) }
 
     override fun todos(conversationId: String): List<SubagentTodo> =
         repository.latestFor(conversationId)

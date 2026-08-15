@@ -64,6 +64,7 @@ open class SelfTodoRepository(
 
     // conversationId -> latest TodoWrite snapshot for that conversation.
     private val byConversation = MutableStateFlow<Map<String, List<SubagentTodo>>>(emptyMap())
+    private val lifecycleByConversation = MutableStateFlow<Map<String, String?>>(emptyMap())
 
     init {
         scope.launch { observeToolCalls() }
@@ -74,6 +75,12 @@ open class SelfTodoRepository(
 
     override fun latestFor(conversationId: String): List<SubagentTodo> =
         byConversation.value[conversationId].orEmpty()
+
+    override fun lifecycleStatusForFlow(conversationId: String): Flow<String?> =
+        lifecycleByConversation.map { it[conversationId] }
+
+    override fun lifecycleStatusFor(conversationId: String): String? =
+        lifecycleByConversation.value[conversationId]
 
     /** Test/preview hook: directly stage a snapshot for a conversation. */
     internal fun stage(conversationId: String, todos: List<SubagentTodo>) {

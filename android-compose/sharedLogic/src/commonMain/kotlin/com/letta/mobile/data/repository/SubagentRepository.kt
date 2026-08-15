@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Long-lived coroutine scope SubagentRepository uses for its push observer and
@@ -87,6 +89,7 @@ open class SubagentRepository(
     // mutated from two threads at once. Each merge reads one consistent
     // snapshot, mutates a private local copy, and publishes it once.
     private val runningAbsentSince = atomic<Map<String, Long>>(emptyMap())
+    private val stateMutex = Mutex()
 
     private val pushJob = scope.launch { observePushEvents() }
     private val reconnectJob = scope.launch { observeReconnects() }
@@ -130,7 +133,7 @@ open class SubagentRepository(
     }
 
     override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
-        state.value.inParentScope(scope)
+        state.value.inParentScope(scope).filterNotExpired(clock())
 
     /**
      * Force a fresh `subagent_list` round-trip. Parallel callers (e.g. the
@@ -150,8 +153,9 @@ open class SubagentRepository(
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "subagent_list failed")
             }
-            val subagents = mergeSnapshot(response.subagents, kind = SnapshotKind.AUTHORITATIVE)
-            state.value = subagents
+            val subagents = stateMutex.withLock {
+                mergeSnapshot(response.subagents, kind = SnapshotKind.AUTHORITATIVE)
+            }
             subagents
         }
                 deferred.complete(result)
@@ -176,7 +180,7 @@ open class SubagentRepository(
 
     enum class SnapshotKind { AUTHORITATIVE, INCREMENTAL }
 
-    private fun mergeSnapshot(
+    private suspend fun mergeSnapshot(
         incoming: List<SubagentEntry>,
         terminal: SubagentEntry? = null,
         kind: SnapshotKind,
@@ -312,7 +316,9 @@ open class SubagentRepository(
                     entry.copy(lastSeenAtMs = now)
                 } else entry
             }
-            state.value = mergeSnapshot(stamped, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
+            stateMutex.withLock {
+                state.value = mergeSnapshot(stamped, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
+            }
         }
     }
 
@@ -322,7 +328,7 @@ open class SubagentRepository(
      * `now - lastSeenAtMs > STREAM_TIMEOUT_MS`. Mutates state once per call (single
      * publication via atomic StateFlow).
      */
-    private fun sweepStreamTimeouts() {
+    private suspend fun sweepStreamTimeouts() = stateMutex.withLock {
         val now = clock()
         val current = state.value
         if (current.isEmpty()) return
@@ -347,6 +353,12 @@ open class SubagentRepository(
         }
         state.value = updated.distinctBy { it.cacheKey() }
     }
+
+    private fun List<SubagentEntry>.filterNotExpired(now: Long): List<SubagentEntry> =
+        filter { entry ->
+            entry.status != SubagentStatus.RUNNING ||
+                runningAbsentSince.value[entry.cacheKey()]?.let { now - it < RUNNING_ABSENCE_LINGER_MS } != false
+        }
 
     private suspend fun observeReconnects() {
         var wasConnected: Boolean? = null

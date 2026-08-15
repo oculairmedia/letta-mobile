@@ -155,7 +155,12 @@ class SubagentRepositoryTest {
         repo.refresh().getOrThrow()
 
         assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
-        now += 61_000L
+        now += 59_999L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_2"))))
+        repo.refresh().getOrThrow()
+        assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+
+        now += 1L
         transport.enqueueSubagentList(successList(listOf(running("toolu_3"))))
         repo.refresh().getOrThrow()
         assertEquals(setOf("toolu_2", "toolu_3"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
@@ -422,7 +427,17 @@ class SubagentRepositoryTest {
         assertEquals(setOf("toolu_1", "toolu_2"), afterFirst.map { it.toolCallId }.toSet())
 
         // Advance clock past the 60s absence linger bound.
-        now += 61_000L
+        now += 59_999L
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "u-boundary-retain", ts = "t", reason = "registry-gap",
+                subagent = running("toolu_2"),
+                subagentsActive = listOf(running("toolu_2")), at = "t",
+            )
+        )
+        assertTrue(repo.currentActiveSubagents(parentScope).any { it.toolCallId == "toolu_1" })
+
+        now += 1L
 
         // Second INCREMENTAL push still omits toolu_1 — should be EVICTED now.
         transport.events.emit(
@@ -441,6 +456,21 @@ class SubagentRepositoryTest {
             repo.activeSubagentsFlow(parentScope).first { it.any { e -> e.toolCallId == "toolu_3" } }
         }
         assertEquals(setOf("toolu_2", "toolu_3"), afterSecond.map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `absence sweep evicts without a later snapshot`() = runTest {
+        var now = 1_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
+        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+        transport.events.emit(ServerFrame.SubagentsUpdated(
+            id = "u-absent", ts = "t", reason = "gap",
+            subagent = running("toolu_2"), subagentsActive = listOf(running("toolu_2")), at = "t",
+        ))
+        withTimeout(2.seconds) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
+        now += 60_001L
+        assertTrue(repo.currentActiveSubagents(parentScope).none { it.toolCallId == "toolu_1" })
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────

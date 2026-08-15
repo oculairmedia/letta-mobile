@@ -30,10 +30,16 @@ interface ISelfTodoRepository {
      */
     fun latestForFlow(conversationId: String): Flow<List<SubagentTodo>>
 
+    /** Correlated lifecycle status for the foreground run, when known. */
+    fun lifecycleStatusForFlow(conversationId: String): Flow<String?> = kotlinx.coroutines.flow.flowOf(null)
+
     /**
      * Point-in-time read of the latest TodoWrite snapshot for
      * [conversationId] (used by the tap-to-todolist sheet). Returns an empty
      * list when no plan has been observed yet.
      */
     fun latestFor(conversationId: String): List<SubagentTodo>
+
+    /** Point-in-time correlated lifecycle status for the foreground run. */
+    fun lifecycleStatusFor(conversationId: String): String? = null
 }
