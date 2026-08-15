@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material3.Icon
@@ -44,9 +46,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.formatRelativeTimestamp
+import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 
 /** Read-only inputs for [DesktopHomeSurface]. */
 @Immutable
@@ -91,24 +95,39 @@ data class DesktopHomeActions(
  * `/reload` rather than an app release. (Mod-owned terminal panels cannot paint
  * Compose directly, so an A2UI document is the only viable hand-off.)
  *
- * [document] is that seam. It is currently **accepted and ignored**: the
- * desktop module has no A2UI renderer wired up at all — `GeneratedUiCard` in
- * `chat/DesktopChatToolCards.kt` prints `propsJson` as text rather than calling
- * `A2uiSurfaceRenderer`, which today lives in the Android-only `designsystem`
- * module and only composes inside the chat surface stack. Rendering a
- * mod-authored homepage needs three things this repo does not have yet:
- * a KMP/desktop A2UI renderer, a standalone (non-chat) A2UI surface host, and
- * a transport for "home document" envelopes outside a chat message. Until then
- * the native page below is always what draws, and nothing above this function
- * knows the difference.
+ * [document] is that seam. letta-mobile-2don7 wired it up: the A2UI renderer
+ * moved from the Android-only `designsystem` module into sharedLogic's
+ * jvmAndAndroid source set, so desktop can call the same
+ * [A2uiSurfaceRenderer] Android's chat surface stack uses. When [document]
+ * adapts to a real, recognized A2UI widget (see [toA2uiSurfaceStateOrNull]),
+ * this standalone (non-chat) host renders it full-page in place of the native
+ * dashboard below — unlike the chat-anchored `GeneratedUiCard`, this host is
+ * NOT height-bounded, since it *is* the page rather than one card inside a
+ * scrolling transcript. What's still missing before a live mod can drive this
+ * seam is a transport for "home document" envelopes outside a chat message —
+ * [document] has no production caller yet, only this rendering path.
  */
 @Composable
 fun DesktopHomeSurface(
     state: DesktopHomeState,
     actions: DesktopHomeActions,
     modifier: Modifier = Modifier,
-    @Suppress("UNUSED_PARAMETER") document: UiGeneratedComponent? = null,
+    document: UiGeneratedComponent? = null,
 ) {
+    val documentSurface = remember(document) { document?.toA2uiSurfaceStateOrNull() }
+    if (documentSurface != null) {
+        Box(
+            modifier = modifier
+                .fillMaxHeight()
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.background)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 28.dp, vertical = 20.dp),
+        ) {
+            A2uiSurfaceRenderer(surface = documentSurface, modifier = Modifier.fillMaxWidth())
+        }
+        return
+    }
     LazyColumn(
         modifier = modifier
             .fillMaxHeight()

@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CallMade
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -51,6 +54,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -59,6 +63,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
+import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 
 /**
  * Collapsible single-tool disclosure. Deliberately chrome-less when it succeeds:
@@ -266,8 +271,41 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
     }
 }
 
+/**
+ * A generated-UI tool result rendered inline in the transcript.
+ *
+ * letta-mobile-2don7: this now renders through the real A2UI Basic-catalog
+ * renderer ([A2uiSurfaceRenderer], moved into sharedLogic so desktop can
+ * reach it) whenever [UiGeneratedComponent] adapts to a real, recognized
+ * widget (see [toA2uiSurfaceStateOrNull]). Chat-anchored A2UI stays
+ * BOUNDED — a generated document must not be able to take over the whole
+ * transcript column, so the rendered surface is capped at
+ * [ChatAnchoredA2uiMaxHeight] and scrolls internally past that. Payloads
+ * that don't adapt to a known widget (unparseable JSON, or a name that
+ * isn't a catalog widget id — e.g. demo/preview cards) fall back to the
+ * previous fallback-text + raw-JSON card so nothing renders as a silent
+ * blank.
+ */
 @Composable
 internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
+    val surface = remember(generatedUi) { generatedUi.toA2uiSurfaceStateOrNull() }
+    if (surface != null) {
+        ArtifactCard(
+            icon = Icons.Outlined.Widgets,
+            title = generatedUi.name,
+            status = ToolStatusToken("A2UI"),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = ChatAnchoredA2uiMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                A2uiSurfaceRenderer(surface = surface, modifier = Modifier.fillMaxWidth())
+            }
+        }
+        return
+    }
     ArtifactCard(
         icon = Icons.Outlined.Widgets,
         title = generatedUi.name,
@@ -286,6 +324,9 @@ internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
         )
     }
 }
+
+/** Chat-anchored A2UI must stay bounded — see [GeneratedUiCard]. */
+private val ChatAnchoredA2uiMaxHeight = 360.dp
 
 /**
  * Threads the approval-decision callback (and the set of in-flight request ids)

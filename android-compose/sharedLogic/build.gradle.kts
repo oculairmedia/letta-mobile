@@ -40,12 +40,21 @@ kotlin {
         withHostTestBuilder {}
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            // letta-mobile-2don7: the A2UI renderer (moved here from designsystem)
+            // uses ExperimentalMaterial3Api surfaces (TimeInput, ExposedDropdownMenuBox,
+            // PrimaryTabRow, ...) the same way designsystem opted in.
+            freeCompilerArgs.addAll(
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            )
         }
     }
 
     jvm {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            freeCompilerArgs.addAll(
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            )
         }
     }
 
@@ -105,6 +114,16 @@ kotlin {
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")
+                // letta-mobile-2don7: A2UI renderer + LettaIcons moved here from the
+                // Android-only designsystem module so desktop can render A2UI
+                // surfaces with the same widget set. animation-core backs
+                // AnimatedVisibility/Crossfade used by the Accordion/Tabs widgets;
+                // icons-lucide backs LettaIcons; coil3 backs the A2UI Image widget
+                // (coil3.compose.LocalPlatformContext is multiplatform, unlike
+                // androidx.compose.ui.platform.LocalContext).
+                api("org.jetbrains.compose.animation:animation:1.10.0")
+                api("com.composables:icons-lucide:1.1.0")
+                api("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
                 // Shared Android/Desktop Markdown paint layer. Semantic streaming
                 // structure lives alongside it in this source set; platform
                 // modules provide only optional image/clipboard adapters.

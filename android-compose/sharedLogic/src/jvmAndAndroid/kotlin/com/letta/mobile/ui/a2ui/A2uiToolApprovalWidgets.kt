@@ -1,4 +1,4 @@
-package com.letta.mobile.ui.a2ui
+﻿package com.letta.mobile.ui.a2ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -27,7 +27,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -36,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
-import com.letta.mobile.ui.haptics.HapticEffects
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -61,7 +59,6 @@ internal fun A2uiToolApprovalCard(
 
     val riskStyle = props.risk.style()
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
     var result by remember(component.id, props.callId) { mutableStateOf<ToolApprovalResult?>(null) }
     var remainingSeconds by remember(component.id, props.callId, props.timeoutSeconds) {
         mutableStateOf(props.timeoutSeconds)
@@ -77,9 +74,9 @@ internal fun A2uiToolApprovalCard(
         )
         result = next
         if (affordance == ToolApprovalAffordance.Deny) {
-            HapticEffects.reject(haptic, view)
+            A2uiHaptics.reject(haptic)
         } else if (props.risk == ToolApprovalRisk.Destructive) {
-            HapticEffects.longPress(haptic)
+            A2uiHaptics.longPress(haptic)
         }
                 onAction(toolApprovalAction(surface, props.callId, next))
     }
