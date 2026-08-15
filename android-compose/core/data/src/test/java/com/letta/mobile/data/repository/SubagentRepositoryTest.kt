@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.After
@@ -483,6 +484,21 @@ class SubagentRepositoryTest {
         withTimeout(2.seconds) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
         now += 60_001L
         assertTrue(repo.currentActiveSubagents(parentScope).none { it.toolCallId == "toolu_1" })
+    }
+
+    @Test
+    fun `test fixture forbids untracked repository construction`() {
+        val source = File("src/test/java/com/letta/mobile/data/repository/SubagentRepositoryTest.kt").readText()
+        val directConstructions = Regex("SubagentRepository\\(transport,")
+            .findAll(source)
+            .count()
+
+        assertEquals(
+            "Only repository(...) may construct SubagentRepository so @After always closes collectors.",
+            1,
+            directConstructions,
+        )
+        assertTrue(source.contains("repositories.forEach(SubagentRepository::close)"))
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────
