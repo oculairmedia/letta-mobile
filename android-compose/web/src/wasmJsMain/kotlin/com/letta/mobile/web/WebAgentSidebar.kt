@@ -1,8 +1,6 @@
 package com.letta.mobile.web
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -61,28 +61,51 @@ internal fun WebAgentSidebar(
     }
     Column(
         modifier = Modifier
-            .width(260.dp)
+            .width(231.dp)
             .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .border(BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant))
+            .background(MaterialTheme.colorScheme.surfaceContainerLowest)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        val selectedAgent = agents.firstOrNull { it.id == selectedAgentId }
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Agents (${agents.size})", style = MaterialTheme.typography.titleMedium)
+            WebAgentAvatar(agents.indexOf(selectedAgent).coerceAtLeast(0), 30.dp)
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(selectedAgent?.name ?: "Letta", style = MaterialTheme.typography.titleSmall, maxLines = 1)
+                Text(
+                    selectedAgent?.model ?: "Agent workspace",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             } else {
-                IconButton(onClick = onRefresh, enabled = connectionState !is WebConnectionState.Connecting) {
-                    Icon(Icons.Default.Refresh, contentDescription = "Refresh agents")
+                WebTooltip("Refresh agents") {
+                    IconButton(onClick = onRefresh, enabled = connectionState !is WebConnectionState.Connecting) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh agents", modifier = Modifier.size(17.dp))
+                    }
                 }
             }
         }
         WebConnectionStatus(connectionState)
+        Surface(
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            shape = RoundedCornerShape(6.dp),
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) {
+            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = null, modifier = Modifier.size(17.dp))
+                Spacer(Modifier.width(10.dp))
+                Text("Conversation", style = MaterialTheme.typography.labelLarge)
+            }
+        }
         if (error != null) {
             Surface(
                 color = MaterialTheme.colorScheme.errorContainer,
@@ -108,6 +131,12 @@ internal fun WebAgentSidebar(
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
+        Text(
+            "Agents",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp, top = 4.dp),
+        )
         if (!isLoading && agents.isEmpty()) {
             Text(
                 text = if (connectionState is WebConnectionState.Connected) "No agents returned by the server"
@@ -119,23 +148,25 @@ internal fun WebAgentSidebar(
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(filtered, key = AgentItemState::id) { agent ->
                 val selected = agent.id == selectedAgentId
-                Surface(
-                    color = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onAgentSelected(agent) },
-                ) {
-                    Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(agent.name.take(2).uppercase(), style = MaterialTheme.typography.labelLarge)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(
-                                agent.model,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                WebTooltip(agent.name, Modifier.fillMaxWidth()) {
+                    Surface(
+                        color = if (selected) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onAgentSelected(agent) },
+                    ) {
+                        Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            WebAgentAvatar(agents.indexOf(agent), 28.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(agent.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    agent.model,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
                         }
                     }
                 }
