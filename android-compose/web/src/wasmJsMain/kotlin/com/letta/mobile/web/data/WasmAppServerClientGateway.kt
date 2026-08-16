@@ -175,7 +175,7 @@ class WasmAppServerClientGateway(
             session.transport.isConnected.first { connected -> !connected }
             if (activeSession === session) {
                 activeSession = null
-                session.conversationByAgent.clear()
+                session.onTransportDisconnected()
                 mutableState.value = WebConnectionState.Failed("Connection closed")
             }
         }

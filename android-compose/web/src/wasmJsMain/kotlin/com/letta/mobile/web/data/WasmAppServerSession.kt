@@ -78,6 +78,11 @@ internal class WasmAppServerSession(
         conversationByAgent.clear()
         closeTransport()
     }
+
+    internal fun onTransportDisconnected() {
+        router.detach()
+        conversationByAgent.clear()
+    }
 }
 
 internal suspend fun connectWasmAppServerSession(
