@@ -1,8 +1,6 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,16 +23,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
+import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
@@ -101,6 +103,32 @@ internal fun LettaDesktopApp(
     val activeConfig = bootstrap.activeConfig
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
+    // Collapsible capability/history sidebar (Memory/Schedules/Channels/
+    // Skills/New chat/conversation history) — letta-mobile-o5m90. Distinct
+    // from railExpanded above: that toggles the far-left agent rail between
+    // icon and expanded modes, this hides the middle sidebar entirely.
+    // Fenced by backend config id so switching backends never restores
+    // another backend's layout (rememberSaveable does not survive a desktop
+    // process restart, so this goes through a real persisted store).
+    val shellLayoutStore = remember { DesktopShellLayoutStore() }
+    val shellLayoutController = rememberDesktopShellLayoutController(
+        backendConfigId = activeConfig.id,
+        store = shellLayoutStore,
+    )
+    val shellLayoutState = shellLayoutController.state
+    val reducedMotion = remember { desktopPrefersReducedMotion() }
+    SidebarToggleKeyDispatcherEffect(
+        onToggle = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
+    )
+    val sidebarToggleFocusRequester = remember { FocusRequester() }
+    // Move focus onto the surviving toggle button whenever the sidebar
+    // leaves composition, so a keyboard user never loses focus into a
+    // removed subtree (AC #7 focus restoration).
+    LaunchedEffect(shellLayoutState.isSidebarVisible) {
+        if (!shellLayoutState.isSidebarVisible) {
+            runCatching { sidebarToggleFocusRequester.requestFocus() }
+        }
+    }
     val chatScope = rememberCoroutineScope()
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
@@ -543,12 +571,29 @@ internal fun LettaDesktopApp(
                   },
           ) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-            // Responsive shell: below the breakpoint the conversation sidebar
-            // collapses away and the chat takes the full width — a narrow
-            // window shows a single column (rail + chat) instead of squeezing
-            // three panes into unusable slivers. The 56dp rail stays as the
-            // navigation affordance.
-            val compactShell = maxWidth < CompactShellWidthBreakpoint
+            // Responsive shell: below the breakpoint (or when the user
+            // explicitly collapses it) the capability/history sidebar is
+            // fully removed — not shrunk to an icon rail — and the chat pane
+            // takes the full width. The breakpoint/collapse decision itself
+            // lives in sharedLogic's ShellLayoutReducer; this just reports
+            // the measured width into it. The 56dp agent rail always stays as
+            // the navigation affordance.
+            val measuredWidthDp = maxWidth.value
+            val isSidebarVisible = shellLayoutState.isSidebarVisible &&
+                !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
+            LaunchedEffect(measuredWidthDp) {
+                shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
+            }
+            fun openNewChatForFocusedAgent() {
+                editAgentId = null
+                selectedDestination = DesktopDestination.Conversations
+                // Target the focused agent explicitly — for a roster-only
+                // agent, createConversation()'s conversation-derived agent
+                // id would miss it.
+                selectedAgentId
+                    ?.let(chatController::createConversationForAgent)
+                    ?: chatController.createConversation()
+            }
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -575,14 +620,13 @@ internal fun LettaDesktopApp(
                     ),
                 )
                 RailDivider()
-                // Agent sidebar: agent header + nav + conversations. Collapses
-                // horizontally in the compact shell.
-                AnimatedVisibility(
-                    visible = !compactShell,
-                    enter = expandHorizontally(),
-                    exit = shrinkHorizontally(),
+                // Agent sidebar: agent header + nav + conversations. Fully
+                // removed (not shrunk to an icon rail — AC #3) below the
+                // breakpoint or when the user explicitly collapses it.
+                DesktopCollapsibleSidebar(
+                    visible = isSidebarVisible,
+                    reducedMotion = reducedMotion,
                 ) {
-                Row(Modifier.fillMaxHeight()) {
                 DesktopAgentSidebar(
                     state = DesktopAgentSidebarState(
                         agentName = selectedAgentName,
@@ -606,21 +650,11 @@ internal fun LettaDesktopApp(
                             selectedDestination = DesktopDestination.Conversations
                         },
                         onDeleteConversation = chatController::deleteConversation,
-                        onNewChat = {
-                            editAgentId = null
-                            selectedDestination = DesktopDestination.Conversations
-                            // Target the focused agent explicitly — for a roster-only
-                            // agent, createConversation()'s conversation-derived agent
-                            // id would miss it.
-                            selectedAgentId
-                                ?.let(chatController::createConversationForAgent)
-                                ?: chatController.createConversation()
-                        },
+                        onNewChat = ::openNewChatForFocusedAgent,
                         onEditAgent = { editAgentId = selectedAgentId },
                     ),
                 )
                 RailDivider()
-                }
                 }
                 // Main content pane.
                 Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -789,6 +823,41 @@ internal fun LettaDesktopApp(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
+                    // Sidebar toggle: the one control that survives collapse
+                    // (AC #1 chrome + #7 focus anchor). The overflow menu only
+                    // appears while collapsed — when the sidebar is visible its
+                    // own nav already covers Memory/Schedules/Channels/Skills/
+                    // New chat (AC #6); conversation history stays reachable
+                    // either way through the command palette (Ctrl+K).
+                    if (editing == null) {
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(top = 12.dp, start = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            DesktopSidebarToggleButton(
+                                collapsed = !isSidebarVisible,
+                                onToggle = {
+                                    if (!ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)) {
+                                        shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar)
+                                    }
+                                },
+                                focusRequester = sidebarToggleFocusRequester,
+                            )
+                            if (!isSidebarVisible) {
+                                DesktopSidebarOverflowMenu(
+                                    mode = workPlayMode,
+                                    onNewChat = ::openNewChatForFocusedAgent,
+                                    onDestination = { lensDestination ->
+                                        editAgentId = null
+                                        selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
                 if (showBackgroundTasks && subagentRepository != null) {
                     RailDivider()
@@ -941,8 +1010,3 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
  * tools and default memory blocks (model/embedding default to the active
  * agent's config so the new agent is valid for this backend).
  */
-
-// Below this window width the conversation sidebar collapses and the chat
-// takes the full width (single-column shell). Chosen so the 231dp sidebar
-// only survives when the chat pane still gets a comfortable ~550dp+.
-private val CompactShellWidthBreakpoint = 840.dp
