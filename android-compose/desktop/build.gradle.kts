@@ -336,3 +336,13 @@ nucleus.application {
         }
     }
 }
+
+// Jewel ships Java-25 bytecode (class-file v69), while this module targets
+// JVM 21 for the Iroh binding. Gradle otherwise selects the compile toolchain
+// for `run`, which fails before the window is created. Keep development runs
+// on the installed JDK 26 runtime instead.
+tasks.named<JavaExec>("run") {
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(26))
+    })
+}
