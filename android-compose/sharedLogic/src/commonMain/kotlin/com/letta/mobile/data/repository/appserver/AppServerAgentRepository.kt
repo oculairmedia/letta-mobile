@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 
 class AppServerAgentRepository(
@@ -25,6 +27,7 @@ class AppServerAgentRepository(
     private val agentsFlow = MutableStateFlow<List<Agent>>(emptyList())
     private val refreshingFlow = MutableStateFlow(false)
     private val refreshErrorFlow = MutableStateFlow<Throwable?>(null)
+    private val refreshMutex = Mutex()
     private var lastRefreshMs = 0L
 
     override val agents: StateFlow<List<Agent>> = agentsFlow
@@ -36,7 +39,11 @@ class AppServerAgentRepository(
         return agentsFlow.value.size
     }
 
-    override suspend fun refreshAgents() {
+    override suspend fun refreshAgents() = refreshMutex.withLock {
+        refreshAgentsLocked()
+    }
+
+    private suspend fun refreshAgentsLocked() {
         refreshingFlow.value = true
         try {
             agentsFlow.value = AppServerProtocol.json.decodeFromJsonElement(
@@ -56,10 +63,12 @@ class AppServerAgentRepository(
     }
 
     override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean {
-        val now = Clock.System.now().toEpochMilliseconds()
-        if (agentsFlow.value.isNotEmpty() && now - lastRefreshMs <= maxAgeMs) return false
-        refreshAgents()
-        return true
+        return refreshMutex.withLock {
+            val now = Clock.System.now().toEpochMilliseconds()
+            if (agentsFlow.value.isNotEmpty() && now - lastRefreshMs <= maxAgeMs) return@withLock false
+            refreshAgentsLocked()
+            true
+        }
     }
 
     override suspend fun listAgentSummaries(): List<AgentSummary> {

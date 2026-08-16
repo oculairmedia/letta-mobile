@@ -9,11 +9,16 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AppServerLocalRepositoriesTest {
     @Test
     fun `agent repository caches typed App Server rows`() = runTest {
@@ -45,6 +50,29 @@ class AppServerLocalRepositoriesTest {
     }
 
     @Test
+    fun `concurrent stale refreshes share one App Server request`() = runTest {
+        val agent = Agent(id = AgentId("agent-1"), name = "Ada")
+        val release = CompletableDeferred<Unit>()
+        val transport = FakeTransport(
+            agents = JsonArray(listOf(AppServerProtocol.json.encodeToJsonElement(Agent.serializer(), agent))),
+            agentRelease = release,
+        )
+        val repository = AppServerAgentRepository(transport)
+
+        val refreshes = listOf(
+            async { repository.refreshAgentsIfStale(30_000L) },
+            async { repository.refreshAgentsIfStale(30_000L) },
+        )
+        runCurrent()
+
+        assertEquals(1, transport.agentListCalls)
+        assertEquals(true, repository.isRefreshing.value)
+        release.complete(Unit)
+        assertEquals(listOf(true, false), refreshes.awaitAll())
+        assertEquals(false, repository.isRefreshing.value)
+    }
+
+    @Test
     fun `block repository decodes authoritative App Server rows`() = runTest {
         val block = Block(id = BlockId("block-1"), label = "human", value = "Prefers concise replies")
         val transport = FakeTransport(
@@ -64,12 +92,14 @@ class AppServerLocalRepositoriesTest {
         private val blocks: JsonArray = JsonArray(emptyList()),
         private val context: JsonObject? = null,
         private val agentFailure: Throwable? = null,
+        private val agentRelease: CompletableDeferred<Unit>? = null,
     ) : AppServerLocalRepositoryTransport {
         var agentListCalls = 0
         var lastBlockAgentId: String? = null
 
         override suspend fun listAgents(): JsonArray {
             agentListCalls += 1
+            agentRelease?.await()
             agentFailure?.let { throw it }
             return agents
         }
