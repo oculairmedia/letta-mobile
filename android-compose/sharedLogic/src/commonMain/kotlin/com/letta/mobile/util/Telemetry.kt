@@ -71,6 +71,8 @@ object Telemetry {
     // rebuild). Left in the tree for future render-layer diagnosis.
     @Suppress("MemberVisibilityCanBePrivate")
     val renderDiagEnabled = TelemetryFlag(false)
+    // Bounded chat-open ordering trace. Off by default; enable per device when reproducing startup jitter.
+    val chatHydrationTraceEnabled = TelemetryFlag(false)
     // Per-gate Iroh frame-flow content-length diagnostic (see IrohFrameFlowDiagnostics).
     val frameFlowDiagEnabled = TelemetryFlag(false)
 
@@ -85,6 +87,7 @@ object Telemetry {
     private const val CHAT_HOT_PATH_DEBUG_TAG = "LettaChatHotPath"
     private const val TIMELINE_SYNC_GATE_DEBUG_TAG = "LettaTimelineSyncGate"
     private const val RENDER_DIAG_TAG = "LettaRenderDiag"
+    private const val CHAT_HYDRATION_TRACE_TAG = "LettaChatHydrationTrace"
     private const val FRAME_FLOW_DIAG_TAG = "LettaFrameFlowDiag"
     private const val TAG_PREFIX = "Telemetry"
     private const val MAX_RING_SIZE = 1000
@@ -106,6 +109,9 @@ object Telemetry {
 
     fun isRenderDiagEnabled(): Boolean =
         renderDiagEnabled.get() || (delegate?.isLoggable(RENDER_DIAG_TAG, 2) ?: false)
+
+    fun isChatHydrationTraceEnabled(): Boolean =
+        chatHydrationTraceEnabled.get() || (delegate?.isLoggable(CHAT_HYDRATION_TRACE_TAG, 2) ?: false)
 
     fun isFrameFlowDiagEnabled(): Boolean =
         frameFlowDiagEnabled.get() || (delegate?.isLoggable(FRAME_FLOW_DIAG_TAG, 2) ?: false)

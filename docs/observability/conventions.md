@@ -85,6 +85,7 @@ in-app inspector.
 | `ChatPushService`    | app/channel/ChatPushService.kt            | foreground service lifecycle |
 | `ChatComposerAttach` | app/ui/screens/chat/ChatComposerAttach.kt | attachment decoding |
 | `AdminChatVM`        | app/ui/screens/chat/AdminChatViewModel.kt | chat screen actions |
+| `ChatHydration`      | feature-chat/coordination/ChatHydrationTrace.kt | debug-only initial chat-open ordering |
 | `Sentry`             | app/crash/SentryInitializer.kt            | upload lifecycle and transport outcomes |
 | `Perf`               | app/performance/DebugPerformanceMonitor.kt | debug instrumentation enabled state |
 | `Jank`               | app/performance/DebugPerformanceMonitor.kt | frame jank warnings |

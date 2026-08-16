@@ -9,6 +9,7 @@ import com.letta.mobile.feature.chat.screen.StreamingAutoScrollSnapThrottleMs
 import com.letta.mobile.feature.chat.screen.newestMessageAutoScrollSignature
 import com.letta.mobile.feature.chat.screen.shouldForceScrollOnUserSend
 import com.letta.mobile.feature.chat.screen.toChatViewportSnapshot
+import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.ui.chat.render.ConversationState
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyListState
@@ -77,6 +78,9 @@ private fun ChatMessageListConversationResetEffect(params: ChatMessageListConver
         if (params.renderItems.isNotEmpty()) {
             params.listState.scrollToItem(0)
         }
+        ChatHydrationTrace.current(params.conversationId)?.let { generation ->
+            ChatHydrationTrace.scrollInitialized(generation, correction = "conversation_reset")
+        }
     }
 }
 
@@ -95,6 +99,9 @@ private fun ChatMessageListAutoScrollEffect(params: ChatMessageListEffectsParams
         followLatest = true
         if (params.renderItems.isNotEmpty()) {
             params.listState.scrollToItem(0)
+        }
+        ChatHydrationTrace.current(conversationId)?.let { generation ->
+            ChatHydrationTrace.scrollInitialized(generation, correction = "follow_latest_reset")
         }
     }
 
