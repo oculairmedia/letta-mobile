@@ -37,8 +37,6 @@ concurrency:
 jobs:
   windows-installer:
     runs-on: windows-latest
-    env:
-      LETTA_DESKTOP_BUILD_DIR: ${{ runner.temp }}/letta-desktop-build
     defaults:
       run:
         working-directory: android-compose
@@ -71,6 +69,8 @@ jobs:
             ${{ runner.os }}-konan-
 
       - name: Build Windows EXE + MSI installers
+        env:
+          LETTA_DESKTOP_BUILD_DIR: ${{ runner.temp }}/letta-desktop-build
         # Non-minified distributable: builds EXE/MSI without the ProGuard pass.
         # The *Release* variant runs proguardReleaseJars, which fails on JDK 26
         # ("can't find superclass java.lang.Object") because ProGuard can't see
