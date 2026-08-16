@@ -481,7 +481,7 @@ class IrohAdminRpcChatGatewayTest {
         }
 
         assertTrue(failure.message.orEmpty().contains("exceeded"))
-        assertEquals(IrohAdminRpcAgentDirectory.BLOCK_LIST_MAX_PAGES, transport.rpcCalls.size)
+        assertEquals(IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_MAX_PAGES, transport.rpcCalls.size)
     }
 
     @Test

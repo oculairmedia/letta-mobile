@@ -152,7 +152,7 @@ class MemoryParityMapperTest {
             schedules = emptyList(),
             backendDescriptor = sampleBackend(),
             channelTransportState = ChannelTransportState.Idle,
-            loaded = MemoryParityLoaded.All.copy(skills = false),
+            availability = MemoryParityAvailability(skillsLoaded = false),
         )
 
         assertEquals(1, state.summary.skillCount)
