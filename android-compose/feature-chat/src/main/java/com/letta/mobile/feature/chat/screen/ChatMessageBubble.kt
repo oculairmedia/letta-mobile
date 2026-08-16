@@ -205,6 +205,7 @@ internal fun MessageBubbleSurface(
     onGeneratedUiMessage: ((String) -> Unit)? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
+    showTimestamp: Boolean = true,
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String = "",
     // letta-mobile-1k3ge restore: tap an attached image to open the fullscreen
@@ -359,7 +360,7 @@ internal fun MessageBubbleSurface(
                     onDecision = onApprovalDecision,
                 )
             }
-            if (!isLastAssistant && message.role == "assistant" && !message.isReasoning) {
+            if (showTimestamp && !isLastAssistant && message.role == "assistant" && !message.isReasoning) {
                 DeliveryTimeText(
                     timestamp = message.timestamp,
                     modifier = Modifier.padding(top = LettaSpacing.XXXS),

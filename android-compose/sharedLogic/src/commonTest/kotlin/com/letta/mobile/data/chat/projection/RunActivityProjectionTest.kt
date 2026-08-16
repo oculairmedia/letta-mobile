@@ -133,6 +133,22 @@ class RunActivityProjectionTest {
     }
 
     @Test
+    fun fourToolMessagesProduceOneAccurateTurnSummary() {
+        val activity = projectRunActivity(
+            messages = (1..4).map { index ->
+                message("tool-$index") {
+                    copy(toolCalls = listOf(successfulToolCall("call-$index", executionTimeMs = 250L)))
+                }
+            },
+            isActiveRunStreaming = false,
+        )!!
+
+        assertEquals(RunActivityState.Worked, activity.state)
+        assertEquals(4, activity.toolCount)
+        assertEquals(1_000L, activity.durationMs)
+    }
+
+    @Test
     fun completedWorkUsesPositiveTimelineSpanWhenLatencyIsUnavailable() {
         val activity = projectRunActivity(
             messages = listOf(

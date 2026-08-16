@@ -552,7 +552,7 @@ class MessageGroupingTest {
     }
 
     @Test
-    fun `run tool-call compaction preserves non-empty content as its own step`() {
+    fun `run tool-call compaction keeps one canonical group across assistant prose`() {
         val steps = compactRunToolCallSteps(
             listOf(
                 assistantToolCall("tc1", command = "pwd"),
@@ -561,18 +561,13 @@ class MessageGroupingTest {
             ),
         )
 
-        assertEquals(3, steps.size)
-        // letta-mobile: a lone tool-call message now groups the same as a multi-call
-        // run (letta-mobile-8kdjm.7) so it renders through the same projected timeline
-        // component family, instead of staying a plain Message step.
-        val firstTool = steps[0] as RunTimelineStep.ToolCallGroup
+        assertEquals(2, steps.size)
+        val group = steps[0] as RunTimelineStep.ToolCallGroup
         val text = steps[1] as RunTimelineStep.Message
-        val group = steps[2] as RunTimelineStep.ToolCallGroup
-        assertEquals(listOf("tc1"), firstTool.messages.map { it.id })
+        assertEquals(listOf("tc1", "tc2", "tc3"), group.messages.map { it.id })
+        assertEquals(listOf("call-tc1", "call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
         assertEquals("about to run ls", text.message.content)
         assertTrue(text.message.toolCalls.isNullOrEmpty())
-        assertEquals(listOf("tc2", "tc3"), group.messages.map { it.id })
-        assertEquals(listOf("call-tc2", "call-tc3"), group.toolCalls.map { it.toolCallId })
     }
 
     @Test
@@ -587,8 +582,8 @@ class MessageGroupingTest {
         )
 
         assertEquals(3, steps.size)
-        val preamble = steps[0] as RunTimelineStep.Message
-        val group = steps[1] as RunTimelineStep.ToolCallGroup
+        val group = steps[0] as RunTimelineStep.ToolCallGroup
+        val preamble = steps[1] as RunTimelineStep.Message
         assertEquals("I'll inspect the environment.", preamble.message.content)
         assertTrue(preamble.message.toolCalls.isNullOrEmpty())
         assertEquals(listOf("tc1", "tc2", "tc3"), group.messages.map { it.id })
