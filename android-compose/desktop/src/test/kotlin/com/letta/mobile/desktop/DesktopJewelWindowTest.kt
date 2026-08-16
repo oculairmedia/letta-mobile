@@ -26,6 +26,10 @@ class DesktopJewelWindowTest {
 
 internal fun desktopProjectDirectory(): File {
     val workingDirectory = File(System.getProperty("user.dir"))
-    return listOf(workingDirectory, workingDirectory.resolve("desktop"))
-        .first { candidate -> candidate.resolve("build.gradle.kts").isFile }
+    return generateSequence(workingDirectory) { it.parentFile }
+        .flatMap { root ->
+            sequenceOf(root.resolve("desktop"), root.resolve("android-compose/desktop"))
+        }
+        .firstOrNull { candidate -> candidate.resolve("build.gradle.kts").isFile }
+        ?: error("Could not locate the desktop Gradle project from $workingDirectory")
 }
