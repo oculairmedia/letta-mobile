@@ -358,7 +358,7 @@ class IrohAdminRpcChatGatewayTest {
 
     @Test
     fun directoryListAgentBlocksUsesCanonicalRpcContractAndDecodesResult() = runTest(UnconfinedTestDispatcher()) {
-        val pageSize = IrohAdminRpcAgentDirectory.BLOCK_LIST_PAGE_SIZE
+        val pageSize = IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_PAGE_SIZE
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->
             assertEquals("block.list_agent", call.method)
@@ -452,6 +452,36 @@ class IrohAdminRpcChatGatewayTest {
 
         assertTrue(blocks.isEmpty(), "explicit [] must decode as a measured empty list")
         assertEquals(1, transport.rpcCalls.size)
+    }
+
+    @Test
+    fun directoryListAgentBlocksRejectsWindowWithoutValidHasMore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport().apply {
+            rpcResponder = { ok("""{"blocks":[]}""") }
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("has_more"))
+    }
+
+    @Test
+    fun directoryListAgentBlocksFailsWhenPageCapStillHasMore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport().apply {
+            rpcResponder = {
+                val index = rpcCalls.size
+                ok("""{"blocks":[{"id":"block-$index","label":"persona","value":"v"}],"has_more":true}""")
+            }
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("exceeded"))
+        assertEquals(IrohAdminRpcAgentDirectory.BLOCK_LIST_MAX_PAGES, transport.rpcCalls.size)
     }
 
     @Test

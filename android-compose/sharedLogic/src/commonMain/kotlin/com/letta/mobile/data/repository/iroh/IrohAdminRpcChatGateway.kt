@@ -638,39 +638,6 @@ class IrohAdminRpcAgentDirectory(
             ?: error("agent.count returned unparseable result: $result")
     }
 
-    /** Authoritative per-agent memory blocks, paged below the admin_rpc frame cap. */
-    suspend fun listAgentBlocks(agentId: String): List<Block> {
-        val merged = mutableListOf<Block>()
-        val seenIds = mutableSetOf<String>()
-        var offset = 0
-        repeat(BLOCK_LIST_MAX_PAGES) {
-            val body = buildJsonObject {
-                put("agent_id", agentId)
-                put("limit", BLOCK_LIST_PAGE_SIZE.toString())
-                put("offset", offset.toString())
-            }.toString()
-            val result = adminRpcResult(
-                "block.list_agent",
-                "/v1/agents/$agentId/core-memory/blocks?limit=$BLOCK_LIST_PAGE_SIZE&offset=$offset",
-                body,
-            ) ?: return merged
-            val (blocks, hasMore) = when (result) {
-                is JsonArray -> json.decodeFromJsonElement(ListSerializer(Block.serializer()), result) to false
-                is JsonObject -> {
-                    val rows = result["blocks"] as? JsonArray ?: JsonArray(emptyList())
-                    json.decodeFromJsonElement(ListSerializer(Block.serializer()), rows) to
-                        ((result["has_more"] as? JsonPrimitive)?.booleanOrNull ?: false)
-                }
-                else -> error("block.list_agent returned an unsupported result: $result")
-            }
-            val fresh = blocks.filter { seenIds.add(it.id.value) }
-            merged += fresh
-            if (!hasMore || blocks.isEmpty() || fresh.isEmpty()) return merged
-            offset += blocks.size
-        }
-        return merged
-    }
-
     /**
      * True when the last [listAgents] stopped because the backend returned a
      * REPEATED page (it ignores limit/offset), i.e. the roster is known to be
@@ -871,11 +838,13 @@ class IrohAdminRpcAgentDirectory(
             val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
             merged += fresh
             if (page.blocks.isEmpty() || fresh.isEmpty()) return merged
-            val hasMore = page.hasMore ?: (page.blocks.size >= AGENT_BLOCK_LIST_PAGE_SIZE)
-            if (!hasMore) return merged
+            if (!page.hasMore) return merged
             offset += page.blocks.size
         }
-        return merged
+        throw TimelineTransportHttpException(
+            502,
+            "block.list_agent exceeded $AGENT_BLOCK_LIST_MAX_PAGES pages while has_more remained true",
+        )
     }
 
     private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage = when (result) {
@@ -886,15 +855,19 @@ class IrohAdminRpcAgentDirectory(
         is JsonObject -> AgentBlockPage(
             blocks = result["blocks"]
                 ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
-                .orEmpty(),
-            hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull(),
+                ?: throw TimelineTransportHttpException(502, "block.list_agent returned an object without blocks"),
+            hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+                ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more"),
         )
-        else -> AgentBlockPage(emptyList(), hasMore = false)
+        else -> throw TimelineTransportHttpException(
+            502,
+            "block.list_agent returned an unsupported result: $result",
+        )
     }
 
     private data class AgentBlockPage(
         val blocks: List<Block>,
-        val hasMore: Boolean?,
+        val hasMore: Boolean,
     )
 
     suspend fun createBlock(params: BlockCreateParams): Block {
@@ -988,8 +961,6 @@ class IrohAdminRpcAgentDirectory(
         // agents past the first 200 never appeared in the rail, palette, or
         // New Conversation directory.
         const val AGENT_LIST_LIMIT = 2500
-        const val BLOCK_LIST_PAGE_SIZE = 50
-        const val BLOCK_LIST_MAX_PAGES = 100
         // Per-page size for the paged agent.list read. Kept small because each
         // agent object is heavy (full system prompt + core memory): ~10 agents
         // is a few hundred KB, well under the admin_rpc timeout on a slow link,
