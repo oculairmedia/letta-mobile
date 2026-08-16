@@ -1058,25 +1058,13 @@ internal fun DrawerContent(
 
         val drawerItemColors = contrastDrawerItemColors()
         Spacer(modifier = Modifier.height(16.dp))
-        ContextWindowCard(
-            state = contextWindow,
-            onRefresh = onRefreshContextWindow,
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        ModelInfoCard(
+        DrawerAgentActions(
+            contextWindow = contextWindow,
+            onRefreshContextWindow = onRefreshContextWindow,
             currentModel = currentModel,
-            onTap = onModelTap,
-        )
-        NavigationDrawerItem(
-            icon = { Icon(LettaIcons.Search, contentDescription = null) },
-            label = { Text(stringResource(R.string.action_search)) },
-            selected = false,
-            onClick = {
-                HapticEffects.segmentTick(haptic, view)
-                onSearchMessages()
-            },
+            onModelTap = onModelTap,
+            onSearchMessages = onSearchMessages,
             colors = drawerItemColors,
-            modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_SEARCH_MESSAGES),
         )
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider()
@@ -1224,6 +1212,33 @@ internal fun DrawerContent(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+@Composable
+private fun DrawerAgentActions(
+    contextWindow: ContextWindowUiState,
+    onRefreshContextWindow: () -> Unit,
+    currentModel: String?,
+    onModelTap: () -> Unit,
+    onSearchMessages: () -> Unit,
+    colors: androidx.compose.material3.NavigationDrawerItemColors,
+) {
+    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+    ContextWindowCard(state = contextWindow, onRefresh = onRefreshContextWindow)
+    Spacer(modifier = Modifier.height(8.dp))
+    ModelInfoCard(currentModel = currentModel, onTap = onModelTap)
+    NavigationDrawerItem(
+        icon = { Icon(LettaIcons.Search, contentDescription = null) },
+        label = { Text(stringResource(R.string.action_search)) },
+        selected = false,
+        onClick = {
+            HapticEffects.segmentTick(haptic, view)
+            onSearchMessages()
+        },
+        colors = colors,
+        modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_SEARCH_MESSAGES),
+    )
 }
 
 @Composable
