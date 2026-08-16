@@ -180,6 +180,7 @@ class WasmAppServerClientGateway(
                 val reason = (session.transport as? IrohWasmAppServerTransport)
                     ?.failureReason
                     ?.value
+                    ?.takeIf { it.isNotBlank() }
                     ?: "Connection closed"
                 mutableState.value = WebConnectionState.Failed(reason)
             }

@@ -10,5 +10,6 @@ class TimelineRuntimeWasmTest {
         assertTrue(isTimelineNetworkFailure(IllegalStateException("Connection closed")))
         assertTrue(isTimelineNetworkFailure(IllegalStateException("Request timed out")))
         assertFalse(isTimelineNetworkFailure(IllegalArgumentException("Invalid payload")))
+        assertFalse(isTimelineNetworkFailure(IllegalArgumentException("Invalid transport payload")))
     }
 }

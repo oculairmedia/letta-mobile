@@ -14,11 +14,15 @@ actual fun isTimelineNetworkFailure(t: Throwable): Boolean {
 }
 
 private val NETWORK_FAILURE_MARKERS = listOf(
-    "connection",
+    "connection closed",
+    "connection failed",
+    "connection refused",
+    "connection reset",
     "disconnected",
-    "network",
+    "network error",
+    "network request failed",
     "timed out",
     "timeout",
-    "transport",
-    "websocket",
+    "websocket closed",
+    "websocket connection",
 )
