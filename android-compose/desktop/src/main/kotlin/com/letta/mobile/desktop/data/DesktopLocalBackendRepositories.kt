@@ -1,6 +1,5 @@
 package com.letta.mobile.desktop.data
 
-import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
@@ -14,7 +13,11 @@ import com.letta.mobile.data.model.ImportedAgentsResponse
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.desktop.chat.desktopChatJson
-import java.io.File
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
+import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientBinding
+import java.util.UUID
 import kotlin.time.Clock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,9 +26,12 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 internal class DesktopLocalBackendAgentRepository(
-    private val store: LocalBackendAdminStore,
+    private val clientBinding: DesktopLocalAppServerClientBinding,
 ) : IAgentRepository {
     private val agentsFlow = MutableStateFlow<List<Agent>>(emptyList())
     private val refreshingFlow = MutableStateFlow(false)
@@ -36,13 +42,26 @@ internal class DesktopLocalBackendAgentRepository(
     override val isRefreshing: StateFlow<Boolean> = refreshingFlow
     override val refreshError: StateFlow<Throwable?> = refreshErrorFlow
 
-    override suspend fun countAgents(): Int = store.countAgents() ?: 0
+    override suspend fun countAgents(): Int {
+        refreshAgentsIfStale(30_000L)
+        return agentsFlow.value.size
+    }
 
     override suspend fun refreshAgents() {
         refreshingFlow.value = true
         try {
-            agentsFlow.value = store.listAgentsProjected(limit = 10_000, offset = 0)
-                .decodeList(Agent.serializer())
+            val response = clientBinding.client().agentList(
+                AppServerCommand.AgentList(
+                    requestId = requestId("agent-list"),
+                    query = buildJsonObject {
+                        put("limit", "10000")
+                        put("offset", "0")
+                    },
+                ),
+            )
+            check(response.success) { response.error ?: "Bundled App Server agent listing failed" }
+            val rows = response.agents ?: error("Bundled App Server agent listing returned no agents")
+            agentsFlow.value = rows.decodeList(Agent.serializer())
             lastRefreshMs = Clock.System.now().toEpochMilliseconds()
             refreshErrorFlow.value = null
         } catch (failure: Throwable) {
@@ -73,7 +92,18 @@ internal class DesktopLocalBackendAgentRepository(
     }
 
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
-        val projected = store.agentContextProjected(agentId.value, conversationId?.value)
+        val response = clientBinding.client().adminRpc(
+            AppServerCommand.AdminRpc(
+                requestId = requestId("agent-context"),
+                method = "agent.context",
+                params = buildJsonObject {
+                    put("agent_id", agentId.value)
+                    conversationId?.value?.let { put("conversation_id", it) }
+                },
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server agent context failed" }
+        val projected = response.result as? JsonObject
             ?: throw NoSuchElementException("Local context for agent ${agentId.value} was not found")
         return desktopChatJson.decodeFromJsonElement(ContextWindowOverview.serializer(), projected)
     }
@@ -89,13 +119,35 @@ internal class DesktopLocalBackendAgentRepository(
 
     private fun unsupported(operation: String): Nothing =
         throw UnsupportedOperationException("Bundled local backend does not support $operation yet")
+
+    private fun requestId(operation: String): String = "desktop-local-$operation-${UUID.randomUUID()}"
 }
 
 internal class DesktopLocalBackendBlockRepository(
-    private val store: LocalBackendAdminStore,
+    private val clientBinding: DesktopLocalAppServerClientBinding,
 ) : IAgentBlockRepository {
-    override suspend fun getBlocks(agentId: String): List<Block> =
-        store.blocksForAgentProjected(agentId).decodeList(Block.serializer())
+    override suspend fun getBlocks(agentId: String): List<Block> {
+        val response = clientBinding.client().adminRpc(
+            AppServerCommand.AdminRpc(
+                requestId = "desktop-local-block-list-${UUID.randomUUID()}",
+                method = "block.list_agent",
+                params = buildJsonObject {
+                    put("agent_id", agentId)
+                    put("limit", "10000")
+                    put("offset", "0")
+                },
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server block listing failed" }
+        val rows = when (val result = response.result) {
+            is JsonArray -> result
+            is JsonObject -> result["blocks"] as? JsonArray
+                ?: error("Bundled App Server block listing returned no blocks")
+            null -> error("Bundled App Server block listing returned no result")
+            else -> error("Bundled App Server block listing returned an unsupported result")
+        }
+        return rows.decodeList(Block.serializer())
+    }
 }
 
 internal data class DesktopLocalRepositoryBundle(
@@ -103,11 +155,16 @@ internal data class DesktopLocalRepositoryBundle(
     val blockRepository: IAgentBlockRepository,
 )
 
-internal fun buildDesktopLocalRepositories(backendDirectory: File): DesktopLocalRepositoryBundle {
-    val store = LocalBackendAdminStore(backendDirectory)
+internal fun buildDesktopLocalRepositories(
+    clientProvider: (suspend () -> AppServerClient)? = null,
+): DesktopLocalRepositoryBundle {
+    val baselineGeneration = DesktopLocalAppServerClientRegistry.generation()
+    val binding = DesktopLocalAppServerClientBinding(
+        clientProvider ?: { DesktopLocalAppServerClientRegistry.awaitClientAfter(baselineGeneration) },
+    )
     return DesktopLocalRepositoryBundle(
-        agentRepository = DesktopLocalBackendAgentRepository(store),
-        blockRepository = DesktopLocalBackendBlockRepository(store),
+        agentRepository = DesktopLocalBackendAgentRepository(binding),
+        blockRepository = DesktopLocalBackendBlockRepository(binding),
     )
 }
 

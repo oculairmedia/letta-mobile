@@ -1,51 +1,59 @@
 package com.letta.mobile.desktop.chat
 
-import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
-import com.letta.mobile.data.controller.node.iroh.MessagePage
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
-import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.timeline.TimelineStreamFrame
-import java.io.File
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
- * Read side of the bundled local backend. The Letta Code child remains the
- * only writer; this gateway projects its on-disk store for desktop admin reads.
+ * Authoritative admin surface for the bundled local backend. Reads and writes
+ * use the same child-owned App Server session as turns, never its backing files.
  */
 internal class DesktopLocalBackendAdminGateway(
-    backendDirectory: File,
+    private val appServerClient: AppServerClient,
 ) : DesktopAdminChatGateway {
-    private val store = LocalBackendAdminStore(backendDirectory)
-    private val pendingConversations = ConcurrentHashMap<String, Conversation>()
-
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> {
-        val stored = store.listConversationsProjected(
-            agentId = null,
-            archiveStatus = archiveStatus,
-            limit = limit,
-            offset = 0,
-        ).decodeList(Conversation.serializer())
-        val storedIds = stored.mapTo(mutableSetOf()) { it.id.value }
-        return (pendingConversations.values.filter { it.id.value !in storedIds } + stored)
-            .take(limit)
+        val response = appServerClient.conversationList(
+            AppServerCommand.ConversationList(
+                requestId = requestId("conversation-list"),
+                query = buildJsonObject {
+                    put("limit", limit.toString())
+                    archiveStatus?.let { put("archive_status", it) }
+                    put("order", "desc")
+                    put("order_by", "last_message_at")
+                },
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server conversation listing failed" }
+        val rows = response.conversations
+            ?: error("Bundled App Server conversation listing returned no conversations")
+        return rows.decodeList(Conversation.serializer())
     }
 
-    override suspend fun getConversation(conversationId: String): Conversation =
-        pendingConversations[conversationId]
-            ?: listConversations(limit = 10_000, archiveStatus = null)
-                .firstOrNull { it.id.value == conversationId }
-            ?: throw NoSuchElementException("Local conversation $conversationId was not found")
+    override suspend fun getConversation(conversationId: String): Conversation {
+        val response = appServerClient.conversationRetrieve(
+            AppServerCommand.ConversationRetrieve(
+                requestId = requestId("conversation-get"),
+                conversationId = conversationId,
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server conversation retrieval failed" }
+        return response.conversation?.let {
+            desktopChatJson.decodeFromJsonElement(Conversation.serializer(), it)
+        } ?: error("Bundled App Server conversation retrieval returned no conversation")
+    }
 
     override suspend fun listConversationMessages(
         conversationId: String,
@@ -53,12 +61,20 @@ internal class DesktopLocalBackendAdminGateway(
         after: String?,
         order: String?,
     ): List<LettaMessage> {
-        val agentId = runCatching { getConversation(conversationId).agentId.value }.getOrNull()
-        return store.listMessagesProjected(
-            conversationId = conversationId,
-            agentId = agentId,
-            page = MessagePage(limit = limit, before = null, after = after, order = order),
-        ).decodeList(LettaMessage.serializer())
+        val response = appServerClient.conversationMessagesList(
+            AppServerCommand.ConversationMessagesList(
+                requestId = requestId("message-list"),
+                conversationId = conversationId,
+                query = buildJsonObject {
+                    limit?.let { put("limit", it.toString()) }
+                    after?.let { put("after", it) }
+                    order?.let { put("order", it) }
+                },
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server message listing failed" }
+        val rows = response.messages ?: error("Bundled App Server message listing returned no messages")
+        return rows.decodeList(LettaMessage.serializer())
     }
 
     override suspend fun listAgentMessages(
@@ -85,29 +101,30 @@ internal class DesktopLocalBackendAdminGateway(
     }
 
     override suspend fun createConversation(agentId: String, summary: String?): Conversation {
-        val conversationId = "local-conv-${UUID.randomUUID()}"
-        val agentName = listAgents().firstOrNull { it.id.value == agentId }?.name
-        return Conversation(
-            id = ConversationId(conversationId),
-            agentId = AgentId(agentId),
-            agentName = agentName,
-            summary = summary,
-        ).also { pendingConversations[conversationId] = it }
+        val response = appServerClient.conversationCreate(
+            AppServerCommand.ConversationCreate(
+                requestId = requestId("conversation-create"),
+                body = buildJsonObject {
+                    put("agent_id", agentId)
+                    summary?.let { put("summary", it) }
+                },
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server conversation creation failed" }
+        val conversation = response.conversation?.let {
+            desktopChatJson.decodeFromJsonElement(Conversation.serializer(), it)
+        } ?: error("Bundled App Server conversation creation returned no conversation")
+        return conversation
     }
 
     override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
-        getConversation(conversationId)
+        updateConversation(conversationId, buildJsonObject { put("model", model) })
 
-    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation {
-        val updated = getConversation(conversationId).copy(archived = archived)
-        if (pendingConversations.containsKey(conversationId)) pendingConversations[conversationId] = updated
-        return updated
-    }
+    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
+        updateConversation(conversationId, buildJsonObject { put("archived", archived) })
 
     override suspend fun deleteConversation(conversationId: String) {
-        if (pendingConversations.remove(conversationId) == null) {
-            throw UnsupportedOperationException("Persisted local conversation deletion is not supported yet")
-        }
+        setConversationArchived(conversationId, archived = true)
     }
 
     override suspend fun createAgent(params: AgentCreateParams): Agent =
@@ -125,9 +142,25 @@ internal class DesktopLocalBackendAdminGateway(
 
     override fun close() = Unit
 
-    private fun listAgents(): List<Agent> =
-        store.listAgentsProjected(limit = 10_000, offset = 0).decodeList(Agent.serializer())
+    private suspend fun updateConversation(
+        conversationId: String,
+        body: kotlinx.serialization.json.JsonObject,
+    ): Conversation {
+        val response = appServerClient.conversationUpdate(
+            AppServerCommand.ConversationUpdate(
+                requestId = requestId("conversation-update"),
+                conversationId = conversationId,
+                body = body,
+            ),
+        )
+        check(response.success) { response.error ?: "Bundled App Server conversation update failed" }
+        return response.conversation?.let {
+            desktopChatJson.decodeFromJsonElement(Conversation.serializer(), it)
+        } ?: error("Bundled App Server conversation update returned no conversation")
+    }
 
-    private fun <T> JsonArray?.decodeList(serializer: kotlinx.serialization.KSerializer<T>): List<T> =
-        this?.let { desktopChatJson.decodeFromJsonElement(ListSerializer(serializer), it) }.orEmpty()
+    private fun requestId(operation: String): String = "desktop-local-$operation-${UUID.randomUUID()}"
+
+    private fun <T> JsonArray.decodeList(serializer: kotlinx.serialization.KSerializer<T>): List<T> =
+        desktopChatJson.decodeFromJsonElement(ListSerializer(serializer), this)
 }

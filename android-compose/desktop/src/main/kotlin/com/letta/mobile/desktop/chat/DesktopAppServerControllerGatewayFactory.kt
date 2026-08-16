@@ -17,6 +17,7 @@ import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
 import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
+import com.letta.mobile.desktop.runtime.DesktopLocalAppServerClientRegistry
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import computer.iroh.Endpoint
@@ -34,7 +35,8 @@ import kotlinx.coroutines.withContext
  * Wires the controller stack (transport -> client -> controller) for either an
  * iroh:// backend (QUIC, peer to the Android path) or a WebSocket App Server,
  * authenticates the iroh session, and returns a hybrid gateway that routes
- * send/stream through the controller and listing/CRUD through HTTP.
+ * send/stream through the controller. LOCAL admin reads/writes share that same
+ * child-owned protocol session; remote backends retain their HTTP admin path.
  */
 class DesktopAppServerControllerGatewayFactory(
     /** Coroutine scope for the controller and transport. */
@@ -65,36 +67,50 @@ class DesktopAppServerControllerGatewayFactory(
         }
 
         val client = DefaultAppServerClient(transport)
-        // Iroh turns run on the wrapper; client-local preflight would be a
-        // duplicate typed-command path (Android dial already uses None).
-        val eventRouter = AppServerRuntimeEventRouter()
-        val turnEngine = buildDesktopAppServerTurnEngine(
-            client = client,
-            scope = controllerScope,
-            eventRouter = eventRouter,
-            turnContextPreflight = if (isIroh) {
-                TurnContextPreflight.None
-            } else {
-                AppServerContextWindowPreflight(client)
-            },
-        )
-        // The App Server doesn't expose conversation listing, message history,
-        // agent CRUD, or the model catalog; those stay on HTTP.
-        val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-            DesktopLocalBackendAdminGateway(DesktopLocalRuntimeHost.backendDirectory())
+        val localClientLease = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+            DesktopLocalAppServerClientRegistry.install(client)
         } else {
-            DesktopLettaHttpChatGateway(
-                config = lettaConfig,
-                httpClient = createDesktopLettaHttpClient(),
-            )
+            null
         }
-        DesktopHybridAppServerChatGateway(
-            turnEngine = turnEngine,
-            client = client,
-            adminGateway = adminGateway,
-            transportResources = transportResources,
-            onClose = { eventRouter.detach() },
-        )
+        var eventRouter: AppServerRuntimeEventRouter? = null
+        try {
+            // Iroh turns run on the wrapper; client-local preflight would be a
+            // duplicate typed-command path (Android dial already uses None).
+            eventRouter = AppServerRuntimeEventRouter()
+            val turnEngine = buildDesktopAppServerTurnEngine(
+                client = client,
+                scope = controllerScope,
+                eventRouter = eventRouter,
+                turnContextPreflight = if (isIroh) {
+                    TurnContextPreflight.None
+                } else {
+                    AppServerContextWindowPreflight(client)
+                },
+            )
+            val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                DesktopLocalBackendAdminGateway(appServerClient = client)
+            } else {
+                DesktopLettaHttpChatGateway(
+                    config = lettaConfig,
+                    httpClient = createDesktopLettaHttpClient(),
+                )
+            }
+            DesktopHybridAppServerChatGateway(
+                turnEngine = turnEngine,
+                client = client,
+                adminGateway = adminGateway,
+                transportResources = transportResources,
+                onClose = {
+                    eventRouter.detach()
+                    localClientLease?.close()
+                },
+            )
+        } catch (error: Throwable) {
+            eventRouter?.detach()
+            localClientLease?.close()
+            transportResources.close()
+            throw error
+        }
     }
 
     /**

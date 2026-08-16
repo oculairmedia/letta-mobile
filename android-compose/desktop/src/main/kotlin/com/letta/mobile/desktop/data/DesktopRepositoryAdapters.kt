@@ -39,7 +39,6 @@ import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
-import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
@@ -215,7 +214,7 @@ class DesktopRepositoryAdapters(
     private val irohMode = IrohChannelTransport.isIrohUrl(config?.serverUrl)
     private val localMode = config?.mode == LettaConfig.Mode.LOCAL
     private val localRepositories = if (localMode) {
-        buildDesktopLocalRepositories(DesktopLocalRuntimeHost.backendDirectory())
+        buildDesktopLocalRepositories()
     } else {
         null
     }
