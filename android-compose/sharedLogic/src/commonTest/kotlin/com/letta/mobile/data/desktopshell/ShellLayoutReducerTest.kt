@@ -105,6 +105,18 @@ class ShellLayoutReducerTest {
     }
 
     @Test
+    fun toggleIsNoOpWhileSidebarIsWidthForcedHidden() {
+        val narrow = ShellLayoutState(
+            windowWidthDp = ShellLayoutReducer.SIDEBAR_COLLAPSE_BREAKPOINT_DP - 1f,
+        )
+
+        val toggled = ShellLayoutReducer.reduce(narrow, ShellLayoutEvent.ToggleSidebar)
+
+        assertEquals(narrow, toggled)
+        assertFalse(toggled.hasExplicitPreference)
+    }
+
+    @Test
     fun defaultCollapsedForWidthMatchesBreakpoint() {
         assertTrue(ShellLayoutReducer.defaultCollapsedForWidth(839f))
         assertFalse(ShellLayoutReducer.defaultCollapsedForWidth(840f))

@@ -30,6 +30,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
@@ -578,6 +579,8 @@ internal fun LettaDesktopApp(
             // the measured width into it. The 56dp agent rail always stays as
             // the navigation affordance.
             val measuredWidthDp = maxWidth.value
+            val isSidebarVisible = shellLayoutState.isSidebarVisible &&
+                !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
             LaunchedEffect(measuredWidthDp) {
                 shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
             }
@@ -621,7 +624,7 @@ internal fun LettaDesktopApp(
                 // removed (not shrunk to an icon rail — AC #3) below the
                 // breakpoint or when the user explicitly collapses it.
                 DesktopCollapsibleSidebar(
-                    visible = shellLayoutState.isSidebarVisible,
+                    visible = isSidebarVisible,
                     reducedMotion = reducedMotion,
                 ) {
                 DesktopAgentSidebar(
@@ -835,11 +838,15 @@ internal fun LettaDesktopApp(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             DesktopSidebarToggleButton(
-                                collapsed = !shellLayoutState.isSidebarVisible,
-                                onToggle = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
+                                collapsed = !isSidebarVisible,
+                                onToggle = {
+                                    if (!ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)) {
+                                        shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar)
+                                    }
+                                },
                                 focusRequester = sidebarToggleFocusRequester,
                             )
-                            if (!shellLayoutState.isSidebarVisible) {
+                            if (!isSidebarVisible) {
                                 DesktopSidebarOverflowMenu(
                                     mode = workPlayMode,
                                     onNewChat = ::openNewChatForFocusedAgent,

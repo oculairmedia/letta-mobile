@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.desktopshell.ShellLayoutState
 import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import java.nio.file.Files
 import kotlin.test.Test
@@ -62,5 +63,17 @@ class DesktopShellLayoutControllerTest {
         val laterWideLaunch = DesktopShellLayoutController(backendConfigId = "backend-a", store = store)
         laterWideLaunch.dispatch(ShellLayoutEvent.WindowWidthChanged(1400f))
         assertFalse(laterWideLaunch.state.collapsedPreference)
+    }
+
+    @Test
+    fun widthOnlyChangesDoNotPersistAfterAnExplicitChoice() {
+        val explicit = ShellLayoutState(
+            collapsedPreference = true,
+            hasExplicitPreference = true,
+            windowWidthDp = 1_000f,
+        )
+
+        assertFalse(shouldPersistShellLayout(explicit, explicit.copy(windowWidthDp = 1_001f)))
+        assertTrue(shouldPersistShellLayout(explicit, explicit.copy(sidebarWidthDp = 280f)))
     }
 }

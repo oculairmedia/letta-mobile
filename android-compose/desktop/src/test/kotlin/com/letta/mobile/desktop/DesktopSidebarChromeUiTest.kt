@@ -56,15 +56,21 @@ private fun ShellLayoutHarness(windowWidthDp: Dp, reducedMotion: Boolean = false
     var state by remember { mutableStateOf(ShellLayoutState()) }
     BoxWithConstraints(Modifier.width(windowWidthDp).fillMaxSize()) {
         val measuredWidthDp = maxWidth.value
+        val isSidebarVisible = state.isSidebarVisible &&
+            !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
         LaunchedEffect(measuredWidthDp) {
             state = ShellLayoutReducer.reduce(state, ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
         }
         Row {
             DesktopSidebarToggleButton(
-                collapsed = !state.isSidebarVisible,
-                onToggle = { state = ShellLayoutReducer.reduce(state, ShellLayoutEvent.ToggleSidebar) },
+                collapsed = !isSidebarVisible,
+                onToggle = {
+                    if (!ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)) {
+                        state = ShellLayoutReducer.reduce(state, ShellLayoutEvent.ToggleSidebar)
+                    }
+                },
             )
-            DesktopCollapsibleSidebar(visible = state.isSidebarVisible, reducedMotion = reducedMotion) {
+            DesktopCollapsibleSidebar(visible = isSidebarVisible, reducedMotion = reducedMotion) {
                 Text("Memory", modifier = Modifier.testTag(SidebarContentTag))
             }
             Column {

@@ -27,9 +27,10 @@ internal class DesktopShellLayoutController(
         private set
 
     fun dispatch(event: ShellLayoutEvent) {
+        val previous = state
         val next = ShellLayoutReducer.reduce(state, event)
         state = next
-        persistIfExplicit(next)
+        if (shouldPersistShellLayout(previous, next)) persist(next)
     }
 
     private fun loadInitial(): ShellLayoutState {
@@ -44,11 +45,7 @@ internal class DesktopShellLayoutController(
         )
     }
 
-    private fun persistIfExplicit(state: ShellLayoutState) {
-        // Narrow-width auto-collapse is derived, not a user decision — never
-        // persist it, or reopening the app on a wide window would wrongly
-        // start collapsed from a transient narrow session.
-        if (!state.hasExplicitPreference) return
+    private fun persist(state: ShellLayoutState) {
         store.save(
             backendConfigId,
             PersistedShellLayout(
@@ -58,6 +55,13 @@ internal class DesktopShellLayoutController(
         )
     }
 }
+
+internal fun shouldPersistShellLayout(previous: ShellLayoutState, next: ShellLayoutState): Boolean =
+    next.hasExplicitPreference && (
+        !previous.hasExplicitPreference ||
+            previous.collapsedPreference != next.collapsedPreference ||
+            previous.sidebarWidthDp != next.sidebarWidthDp
+        )
 
 @Composable
 internal fun rememberDesktopShellLayoutController(

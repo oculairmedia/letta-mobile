@@ -65,10 +65,14 @@ object ShellLayoutReducer {
     const val SIDEBAR_COLLAPSE_BREAKPOINT_DP = 840f
 
     fun reduce(state: ShellLayoutState, event: ShellLayoutEvent): ShellLayoutState = when (event) {
-        ShellLayoutEvent.ToggleSidebar -> state.copy(
-            collapsedPreference = !state.collapsedPreference,
-            hasExplicitPreference = true,
-        )
+        ShellLayoutEvent.ToggleSidebar -> if (state.isNarrowWindow) {
+            state
+        } else {
+            state.copy(
+                collapsedPreference = !state.collapsedPreference,
+                hasExplicitPreference = true,
+            )
+        }
         is ShellLayoutEvent.SetSidebarCollapsed -> state.copy(
             collapsedPreference = event.collapsed,
             hasExplicitPreference = true,
