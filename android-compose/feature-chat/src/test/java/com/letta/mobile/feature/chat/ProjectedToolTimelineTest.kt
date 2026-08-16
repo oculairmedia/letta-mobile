@@ -570,7 +570,7 @@ class ProjectedToolTimelineTest {
                 arguments = """{"command":"$command"}""",
                 result = if (completed) "ok" else null,
                 status = if (completed) "success" else null,
-                toolCallId = if (id == "tc-a") "call-a" else "call-b",
+                toolCallId = "call-${id.removePrefix("tc-")}",
             )
         ),
     )
