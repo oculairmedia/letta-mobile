@@ -89,7 +89,7 @@ private fun AgentScaffoldDrawerSheet(state: AgentScaffoldRuntimeState) {
             onChatModeSelected = params.onChatModeChange,
             onModelTap = { params.sheetVisibility.onShowModelPickerChange(true) },
             onSearchMessages = {
-                closeDrawerAndRun(state) {
+                closeDrawerThenRun(state) {
                     params.searchUi.onChatSearchExpandedChange(true)
                 }
             },
