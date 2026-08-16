@@ -43,6 +43,7 @@ import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
@@ -154,6 +155,7 @@ internal fun LettaDesktopApp(
         ),
     )
     val chatState by chatController.state.collectAsState()
+    var openConversationIds by remember(chatState.sessionGraphId) { mutableStateOf(emptyList<String>()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val submittingApprovals by chatController.submittingApprovals.collectAsState()
@@ -234,6 +236,52 @@ internal fun LettaDesktopApp(
 
     val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
+
+    LaunchedEffect(selectedDestination, chatState.selectedConversationId) {
+        val selectedId = chatState.selectedConversationId
+        if (
+            selectedDestination == DesktopDestination.Conversations &&
+            selectedId != null &&
+            selectedId !in openConversationIds
+        ) {
+            openConversationIds = openConversationIds + selectedId
+        }
+    }
+    LaunchedEffect(chatState.connectionState, chatState.conversations) {
+        if (
+            chatState.connectionState == DesktopChatConnectionState.Live ||
+            chatState.connectionState == DesktopChatConnectionState.NoConversations
+        ) {
+            val availableIds = chatState.conversations.mapTo(mutableSetOf()) { it.id }
+            openConversationIds = openConversationIds.filter { it in availableIds }
+        }
+    }
+    val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
+    val conversationTabs = remember(openConversationIds, conversationById) {
+        openConversationIds.mapNotNull { conversationId ->
+            conversationById[conversationId]?.let { conversation ->
+                DesktopConversationTab(
+                    conversationId = conversation.id,
+                    title = conversation.displayTitle(),
+                    agentName = conversation.agentName,
+                )
+            }
+        }
+    }
+
+    fun closeConversationTab(conversationId: String) {
+        val fallbackId = fallbackConversationTabAfterClose(openConversationIds, conversationId)
+        val closingActiveTab = conversationId == chatState.selectedConversationId
+        openConversationIds = openConversationIds.filterNot { it == conversationId }
+        if (!closingActiveTab) return
+        if (fallbackId != null) {
+            editAgentId = null
+            chatController.selectConversation(fallbackId)
+            selectedDestination = DesktopDestination.Conversations
+        } else {
+            selectedDestination = DesktopDestination.Home
+        }
+    }
 
     // Same-named agents are stacked in the rail, and the sidebar lists the
     // whole stack's conversations together (see [buildRailAgents]).
@@ -938,6 +986,14 @@ internal fun LettaDesktopApp(
                     selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
                 },
             ),
+            conversationTabs = conversationTabs,
+            activeConversationId = chatState.selectedConversationId,
+            onSelectConversationTab = { conversationId ->
+                editAgentId = null
+                chatController.selectConversation(conversationId)
+                selectedDestination = DesktopDestination.Conversations
+            },
+            onCloseConversationTab = ::closeConversationTab,
         )
         SideEffect { onHeaderChromeChange(headerChrome) }
     }

@@ -67,6 +67,10 @@ internal data class DesktopHeaderChromeState(
     val onToggleSidebar: () -> Unit,
     val sidebarToggleFocusRequester: FocusRequester? = null,
     val sidebarOverflow: DesktopHeaderSidebarOverflow? = null,
+    val conversationTabs: List<DesktopConversationTab> = emptyList(),
+    val activeConversationId: String? = null,
+    val onSelectConversationTab: (String) -> Unit = {},
+    val onCloseConversationTab: (String) -> Unit = {},
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -187,7 +191,15 @@ internal fun DesktopJewelWindow(
                             // Agent-first identity: leading avatar, conversation
                             // title over agent name (letta-mobile-3arhe.1).
                             val identity = header.identity
-                            if (identity != null) {
+                            if (header.conversationTabs.isNotEmpty()) {
+                                DesktopConversationTabRow(
+                                    tabs = header.conversationTabs,
+                                    activeConversationId = header.activeConversationId,
+                                    onSelect = header.onSelectConversationTab,
+                                    onClose = header.onCloseConversationTab,
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                )
+                            } else if (identity != null) {
                                 DesktopHeaderIdentityBlock(
                                     state = identity,
                                     actions = header.identityActions,
@@ -223,7 +235,9 @@ internal fun DesktopJewelWindow(
                             // buttons land flush against the window's right
                             // edge regardless of how wide the identity block
                             // actually rendered.
-                            Box(modifier = Modifier.weight(1f).fillMaxHeight())
+                            if (header.conversationTabs.isEmpty()) {
+                                Box(modifier = Modifier.weight(1f).fillMaxHeight())
+                            }
                             if (identity != null) {
                                 DesktopHeaderTrailingControls(state = identity, actions = header.identityActions)
                             }
