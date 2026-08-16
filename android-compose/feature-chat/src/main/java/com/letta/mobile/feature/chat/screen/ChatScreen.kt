@@ -17,6 +17,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
+import com.letta.mobile.ui.ambient.VisibleAssistantStreamPulseState
+import com.letta.mobile.ui.ambient.reduceVisibleAssistantStreamPulse
 import com.letta.mobile.ui.components.AmbientShaderAgentBackground
 import com.letta.mobile.ui.theme.ChatBackground
 import com.letta.mobile.ui.theme.LettaChatTheme

@@ -1,12 +1,12 @@
-package com.letta.mobile.feature.chat.screen
+package com.letta.mobile.ui.ambient
 
-internal data class VisibleAssistantStreamPulseState(
+data class VisibleAssistantStreamPulseState(
     val pulse: Long = 0L,
     val tailId: String? = null,
     val contentLength: Int = 0,
 )
 
-internal fun reduceVisibleAssistantStreamPulse(
+fun reduceVisibleAssistantStreamPulse(
     previous: VisibleAssistantStreamPulseState,
     isStreaming: Boolean,
     tailId: String?,

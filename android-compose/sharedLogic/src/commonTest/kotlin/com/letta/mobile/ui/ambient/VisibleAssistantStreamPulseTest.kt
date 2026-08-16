@@ -1,7 +1,7 @@
-package com.letta.mobile.feature.chat.screen
+package com.letta.mobile.ui.ambient
 
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 class VisibleAssistantStreamPulseTest {
     @Test
