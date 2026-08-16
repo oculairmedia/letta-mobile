@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -38,17 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
+import com.letta.mobile.desktop.fadingEdges
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -114,20 +108,25 @@ internal fun MessageList(
         ),
     )
 
-    val fadeAlphas = rememberChatListFadeAlphas(listState)
+    val fadeAlphas = rememberChatListFadeAlphas(listState, rememberPromptPinned(listState, rows))
 
     Box(modifier = modifier.fillMaxWidth()) {
         // The fade wraps ONLY the list (not the scroll-to-latest button, which is
         // a sibling below) so the button is never dimmed by the bottom fade.
-        // No top fade: the user prompt pins to the top as a sticky header, and a
-        // fade there dissolved the pinned card itself instead of loose text.
+        // Both ramps sit at the container's own edges, where an edge treatment
+        // belongs. The top ramp is taller than the bottom so it reads clearly
+        // under the tab strip, and it yields entirely while a prompt card is
+        // pinned: that card is opaque and full-width, so it already terminates
+        // the content at the top edge, and fading it (or starting the ramp
+        // below it) only ever looked broken.
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .chatFadingEdges(
-                    topFadeAlpha = 0f,
+                .fadingEdges(
+                    topFadeAlpha = fadeAlphas.top,
                     bottomFadeAlpha = fadeAlphas.bottom,
-                    fadeLength = 44.dp,
+                    topFadeLength = 72.dp,
+                    bottomFadeLength = 44.dp,
                 ),
         ) {
             MessageListColumn(
@@ -154,24 +153,61 @@ internal fun MessageList(
     }
 }
 
-private data class ChatListFadeAlphas(val bottom: Float)
+/**
+ * Whether a user-prompt card is currently pinned as the list's sticky header:
+ * it is the topmost visible row AND stuck to the viewport edge (offset <= 0).
+ * "A prompt happens to be first" is not enough — that also matches a prompt
+ * scrolled to the top mid-list, which is not the card the top fade must yield
+ * to.
+ */
+@Composable
+private fun rememberPromptPinned(listState: LazyListState, rows: List<DesktopChatRow>): Boolean {
+    val userPromptKeys = remember(rows) {
+        rows.mapNotNull { row -> (row as? DesktopChatRow.Item)?.takeIf { it.item.isUserPrompt() }?.key }.toSet()
+    }
+    val pinned by remember(userPromptKeys) {
+        derivedStateOf {
+            val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+            topItem != null && topItem.offset <= 0 && userPromptKeys.contains(topItem.key)
+        }
+    }
+    return pinned
+}
+
+private data class ChatListFadeAlphas(val top: Float, val bottom: Float)
 
 @Composable
-private fun rememberChatListFadeAlphas(listState: LazyListState): ChatListFadeAlphas {
-    // Soft gradient fade at the bottom of the list so content dissolves into
-    // the composer instead of hard-clipping (mirrors the mobile chat fading
-    // edges). Top has no fade — the pinned prompt card owns that edge.
+private fun rememberChatListFadeAlphas(
+    listState: LazyListState,
+    promptPinned: Boolean,
+): ChatListFadeAlphas {
+    // Soft gradient fade at both edges of the list so content dissolves into
+    // the surrounding chrome instead of hard-clipping (mirrors the mobile
+    // chat fading edges): the bottom fades into the composer, the top fades
+    // under the tab strip/header. Each only shows once there's actually
+    // content scrolled past that edge, so a short, unscrolled conversation
+    // isn't faded on either side. The top fade also stands down while a
+    // prompt card is pinned — the opaque card already owns that edge, and the
+    // tween below cross-fades the ramp out as the card pins rather than
+    // snapping it.
 
-    // ⚡ Bolt Optimization: `listState.canScrollForward` is already backed by Compose State.
-    // Wrapping it in `derivedStateOf` is redundant and wastes memory and observation overhead.
+    // ⚡ Bolt Optimization: `listState.canScrollForward`/`canScrollBackward` are
+    // already backed by Compose State. Wrapping them in `derivedStateOf` is
+    // redundant and wastes memory and observation overhead.
+    val showTopFade = listState.canScrollBackward && !promptPinned
     val showBottomFade = listState.canScrollForward
 
+    val topFadeAlpha by animateFloatAsState(
+        targetValue = if (showTopFade) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "topFadeAlpha",
+    )
     val bottomFadeAlpha by animateFloatAsState(
         targetValue = if (showBottomFade) 1f else 0f,
         animationSpec = tween(durationMillis = 250),
         label = "bottomFadeAlpha",
     )
-    return ChatListFadeAlphas(bottom = bottomFadeAlpha)
+    return ChatListFadeAlphas(top = topFadeAlpha, bottom = bottomFadeAlpha)
 }
 
 private data class MessageListFollowParams(
@@ -409,52 +445,6 @@ private fun List<ChatRenderItem>.tailContentLength(): Int =
             is ChatRenderItem.SkillEnvelopeChip -> item.rawContent.length
         }
     } ?: 0
-
-/**
- * Softly dissolves the top/bottom [fadeLength] of the wrapped content to
- * transparent, so the message list grades into the background instead of
- * hard-clipping at the title bar / composer — the desktop port of the mobile
- * chat fading edges. A [BlendMode.DstIn] vertical-gradient mask over an
- * offscreen layer (DstIn keeps the already-drawn content only where the mask is
- * opaque, so a transparent→opaque ramp makes each edge fade out). The mask
- * colour is irrelevant; only its alpha drives the fade. No-ops (and skips the
- * offscreen layer) when both alphas are 0, i.e. the list isn't scrollable.
- */
-internal fun Modifier.chatFadingEdges(
-    topFadeAlpha: Float,
-    bottomFadeAlpha: Float,
-    fadeLength: Dp,
-): Modifier {
-    if (topFadeAlpha <= 0f && bottomFadeAlpha <= 0f) return this
-    return this
-        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            val fadePx = fadeLength.toPx()
-            if (fadePx <= 0f) return@drawWithContent
-            if (topFadeAlpha > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Black.copy(alpha = 1f - topFadeAlpha), Color.Black),
-                        startY = 0f,
-                        endY = fadePx.coerceAtMost(size.height),
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            }
-            if (bottomFadeAlpha > 0f) {
-                val len = fadePx.coerceAtMost(size.height / 2f)
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomFadeAlpha)),
-                        startY = size.height - len,
-                        endY = size.height,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            }
-        }
-}
 
 internal fun LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): ChatViewportSnapshot =
     ChatViewportSnapshot(

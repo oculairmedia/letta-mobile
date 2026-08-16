@@ -2,6 +2,9 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -165,11 +168,17 @@ private fun ToolCardHeader(
     val collapsedSummary = toolCall.stepLabel()
         .takeUnless { it == toolCall.name }
         ?: toolCall.stepSummary()
+    // Hover-only source (separate from the row's click interaction, which
+    // `clickable` owns internally) purely so the copy affordance below can
+    // reveal on hover of this activity-log row.
+    val rowHoverSource = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverSource.collectIsHoveredAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("tool-card-toggle")
             .clickable(onClick = onToggle)
+            .hoverable(rowHoverSource)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -204,6 +213,7 @@ private fun ToolCardHeader(
             CopyIconButton(
                 text = toolCall.copyPayload(),
                 config = CopyActionConfig(contentDescription = "Copy tool call"),
+                visible = rowHovered,
             )
         }
         Icon(
@@ -241,8 +251,12 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
             }
         }
         toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
+            val outputRowHoverSource = remember { MutableInteractionSource() }
+            val outputRowHovered by outputRowHoverSource.collectIsHoveredAsState()
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hoverable(outputRowHoverSource),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -254,6 +268,7 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
                 CopyIconButton(
                     text = result,
                     config = CopyActionConfig(contentDescription = "Copy output"),
+                    visible = outputRowHovered,
                 )
             }
             ToolOutputBlock(result, isError = isError)

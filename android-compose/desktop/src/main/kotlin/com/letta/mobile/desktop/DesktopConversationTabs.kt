@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,20 +72,23 @@ private fun DesktopConversationTabItem(
 ) {
     val interactionSource = remember(tab.conversationId) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    // Browser-style tab strip: the active tab is painted in the page background
+    // so it reads as the front edge of the content below it, while inactive tabs
+    // recede into the title bar (surfaceContainerLow) and only lift on hover.
     Surface(
         onClick = onSelect,
         modifier = Modifier
             .fillMaxHeight()
             .widthIn(min = 132.dp, max = 220.dp)
-            .padding(vertical = 4.dp),
-        shape = RoundedCornerShape(7.dp),
-        color = if (active) {
-            MaterialTheme.colorScheme.surfaceContainerHighest
-        } else {
-            MaterialTheme.colorScheme.surfaceContainerLow
+            .padding(top = 5.dp),
+        shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
+        color = when {
+            active -> MaterialTheme.colorScheme.background
+            hovered -> MaterialTheme.colorScheme.surfaceContainer
+            else -> Color.Transparent
         },
         contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = if (active) 2.dp else 0.dp,
+        tonalElevation = 0.dp,
         interactionSource = interactionSource,
     ) {
         Box {
@@ -118,6 +122,11 @@ private fun DesktopConversationTabLabel(
             text = tab.title,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
+            color = if (active) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,

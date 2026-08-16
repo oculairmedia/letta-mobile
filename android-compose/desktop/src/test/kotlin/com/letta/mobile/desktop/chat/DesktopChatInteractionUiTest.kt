@@ -87,6 +87,36 @@ class DesktopChatInteractionUiTest {
     }
 
     @Test
+    fun userPromptCopyActionStaysDiscoverableWhenHiddenByHoverGating() = runComposeUiTest {
+        // The copy button on the user-prompt card is hover-gated (invisible
+        // until the card is hovered), but it must never be removed from
+        // composition/semantics — it should still be found, focused, and
+        // clicked exactly as before even without simulating pointer hover.
+        setContent {
+            MaterialTheme {
+                DesktopMessageBubble(
+                    UiMessage(
+                        id = "user-1",
+                        role = "user",
+                        content = "Deploy finished cleanly.",
+                        timestamp = "2026-07-19T12:00:00Z",
+                    ),
+                )
+            }
+        }
+
+        val copy = onNodeWithContentDescription("Copy message")
+        copy.assertExists().assertHasClickAction()
+        copy.performSemanticsAction(SemanticsActions.RequestFocus)
+        copy.assertIsFocused()
+        val bounds = copy.fetchSemanticsNode().boundsInRoot
+        assertTrue(bounds.width >= with(density) { 36.dp.toPx() })
+        assertTrue(bounds.height >= with(density) { 36.dp.toPx() })
+        copy.performClick()
+        onNodeWithContentDescription("Copied").assertExists()
+    }
+
+    @Test
     fun manualToolDisclosureSurvivesRunningToCompletedRefresh() = runComposeUiTest {
         var tool by mutableStateOf(toolCall(status = "running", result = null))
         setContent {

@@ -136,6 +136,15 @@ private fun AssistantMessageColumn(
  * Small, functional copy affordance: click copies [text] to the clipboard and
  * the glyph briefly flips to a green check. Replaces the former decorative copy
  * glyphs that did nothing on click.
+ *
+ * [visible] gates the icon on the *surrounding* row/bubble/card's hover state
+ * (the caller owns that interaction source) rather than this button's own —
+ * the button still reserves its full hit-target size and stays in the
+ * semantics tree when hidden, it's just faded to fully transparent, so
+ * layout never shifts and accessibility/UI tests can still find it. Once the
+ * button itself is hovered, focused, or mid-"copied" animation it stays
+ * visible regardless of [visible], so a pointer already over the control
+ * never has it vanish out from under it.
  */
 @Composable
 internal fun CopyIconButton(
@@ -143,6 +152,7 @@ internal fun CopyIconButton(
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     config: CopyActionConfig = CopyActionConfig(),
+    visible: Boolean = true,
 ) {
     val clipboard = LocalClipboardManager.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -155,8 +165,13 @@ internal fun CopyIconButton(
             copied = false
         }
     }
+    val revealed = visible or focused or hovered or copied
     val visualAlpha by animateFloatAsState(
-        targetValue = if (config.emphasized or focused or hovered or copied) 1f else 0.58f,
+        targetValue = when {
+            !revealed -> 0f
+            config.emphasized or focused or hovered or copied -> 1f
+            else -> 0.58f
+        },
         animationSpec = tween(durationMillis = 120),
         label = "copyActionAlpha",
     )
@@ -256,22 +271,25 @@ internal fun UserPrompt(
     // anywhere on it — not just a chevron that may sit outside the fold.
     // Hand-drawn outline instead of Surface border: sides + bottom only, no
     // top line — a full box read too heavy, and the pinned card's top edge
-    // doubles up against the pane's own boundary.
+    // doubles up against the pane's own boundary. Same ordinary outline for
+    // every prompt card, inter-agent or not — the identity tint lives on the
+    // provenance label inside the card, not on the outer edge.
     val provenance = message.agentMessageProvenance
-    val edgeColor = if (provenance != null) {
-        // Restrained identity tint on the card edge for an inbound agent
-        // message — distinct from the ordinary human-prompt outline without
-        // becoming a loud banner.
-        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
-    }
+    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+    // A dedicated hover-only interaction source, independent of the card's
+    // own click interaction source (which Surface disables along with click
+    // handling whenever the card can't currently expand/collapse) — the copy
+    // affordance's reveal-on-hover must keep working even when the card
+    // itself isn't clickable.
+    val cardHoverSource = remember(message.id) { MutableInteractionSource() }
+    val cardHovered by cardHoverSource.collectIsHoveredAsState()
     Surface(
         onClick = { expanded = !expanded },
         enabled = overflowed || expanded,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp)
+            .hoverable(cardHoverSource)
             .drawBehind {
                 val stroke = 1.dp.toPx()
                 val radius = 10.dp.toPx()
@@ -352,6 +370,7 @@ internal fun UserPrompt(
                     text = message.content,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     config = CopyActionConfig(contentDescription = "Copy message", emphasized = false),
+                    visible = cardHovered,
                 )
             }
         }
@@ -554,12 +573,17 @@ internal fun AgentText(params: AgentTextParams) {
         Surface(
             modifier = Modifier.align(Alignment.TopEnd),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (isHovered) 0.94f else 0.35f),
+            color = if (isHovered) {
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+            } else {
+                Color.Transparent
+            },
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
             CopyIconButton(
                 text = params.text,
                 config = CopyActionConfig(contentDescription = "Copy response", emphasized = isHovered),
+                visible = isHovered,
             )
         }
     }

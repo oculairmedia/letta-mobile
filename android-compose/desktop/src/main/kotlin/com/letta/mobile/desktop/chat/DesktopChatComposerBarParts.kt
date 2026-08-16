@@ -339,6 +339,7 @@ internal fun ComposerControlRow(
                 ) {
                     ComposerSafetyChip()
                     ComposerEffortControls()
+                    ComposerContextChip(state.contextUsage)
                 }
             }
         } else {
@@ -351,6 +352,7 @@ internal fun ComposerControlRow(
                 ComposerModelControls(state = state, actions = actions)
                 ComposerSafetyChip()
                 ComposerEffortControls()
+                ComposerContextChip(state.contextUsage)
                 Spacer(Modifier.weight(1f))
                 ComposerSendButton(canSend = canSend, onSend = actions.onSend)
             }
