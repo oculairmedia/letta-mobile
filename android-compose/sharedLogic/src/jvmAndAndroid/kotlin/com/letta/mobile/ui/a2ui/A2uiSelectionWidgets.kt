@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.a2ui
+package com.letta.mobile.ui.a2ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
@@ -255,7 +255,7 @@ internal fun A2uiAccordion(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = if (expandedState.value) "Ã¢Ë†â€™" else "+",
+                            text = if (expandedState.value) "-" else "+",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -501,7 +501,7 @@ internal fun A2uiStepper(
             enabled = !surfaceSubmitting && value > range.min,
             modifier = Modifier.testTag(A2uiTestTags.STEPPER_DECREMENT),
         ) {
-            Text("Ã¢Ë†â€™")
+            Text("-")
         }
         Text(
             text = value.numericDisplay(range.integralStep),

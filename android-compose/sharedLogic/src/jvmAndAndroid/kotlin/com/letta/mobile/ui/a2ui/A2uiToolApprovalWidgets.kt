@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.a2ui
+package com.letta.mobile.ui.a2ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable

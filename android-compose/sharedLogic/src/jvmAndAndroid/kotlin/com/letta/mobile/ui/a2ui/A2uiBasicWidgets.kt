@@ -1,4 +1,4 @@
-﻿package com.letta.mobile.ui.a2ui
+package com.letta.mobile.ui.a2ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -129,7 +129,7 @@ internal fun A2uiTextField(
     val validation = component.raw.stringValue("validationRegexp")
 
     val value = if (explicitPath != null) {
-        // Bound surfaces: existing behavior Ã¢â‚¬â€ read from the observed binding.
+    // Bound surfaces: existing behavior - read from the observed binding.
         literalDefault
     } else {
         // Unbound surfaces: synthetic data-model slot drives display; literal
@@ -1190,7 +1190,7 @@ internal fun A2uiButton(
                 return@Button
             }
             // letta-mobile-ykkl diagnostic: log the dispatch hop so the
-            // chain "Compose onClick Ã¢â€ â€™ onAction Ã¢â€ â€™ WsChatBridge Ã¢â€ â€™ wire"
+                // chain "Compose onClick -> onAction -> WsChatBridge -> wire"
             // is traceable in adb logcat without a debugger attached.
             val resolved = component.action(surface, renderScope)
             if (resolved == null) {

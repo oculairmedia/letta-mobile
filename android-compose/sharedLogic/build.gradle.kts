@@ -159,6 +159,10 @@ kotlin {
             }
         }
 
+        val jvmAndAndroidTest by creating {
+            dependsOn(commonTest.get())
+        }
+
         // Wire android and jvm source sets to jvmAndAndroid
         getByName("androidMain") {
             dependsOn(jvmAndAndroid)
@@ -169,6 +173,10 @@ kotlin {
                 // IrohAndroidInit.kt). See letta-mobile-eakk8.
                 implementation("computer.iroh:iroh-android:1.1.0")
             }
+        }
+
+        getByName("androidHostTest") {
+            dependsOn(jvmAndAndroidTest)
         }
 
         getByName("jvmMain") {
@@ -195,6 +203,7 @@ kotlin {
         }
 
         getByName("jvmTest") {
+            dependsOn(jvmAndAndroidTest)
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("io.ktor:ktor-client-cio:3.5.0")

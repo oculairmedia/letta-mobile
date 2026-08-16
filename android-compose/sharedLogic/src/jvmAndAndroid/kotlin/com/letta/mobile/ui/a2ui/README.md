@@ -1,17 +1,18 @@
 # A2UI Catalog Authoring Guide
 
-This package contains the Android Compose renderer for A2UI surfaces. Use this
+This package contains the shared Android/Desktop Compose renderer for A2UI surfaces. Use this
 guide when adding a Basic widget, adding a Letta domain catalog, or writing
 agent-authored payloads that should render in the mobile chat surface.
 
 Authoritative implementation files:
 
-- Renderer: `android-compose/designsystem/src/main/java/com/letta/mobile/ui/a2ui/A2uiRenderer.kt`
+- Renderer: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderer.kt`
 - Protocol models and catalog negotiation: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiProtocol.kt`
 - Surface state and binding resolver: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiSurfaceManager.kt`
 - JSON Pointer data model: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiDataModel.kt`
 - Action context resolution: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiActions.kt`
-- Renderer tests and examples: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererTest.kt`
+- Shared renderer support tests: `android-compose/sharedLogic/src/jvmAndAndroidTest/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupportTest.kt`
+- Android renderer tests and examples: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererTest.kt`
 - WS round-trip tests: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiToolApprovalRoundTripTest.kt`
 - Screenshot tests: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererScreenshotTest.kt`
 

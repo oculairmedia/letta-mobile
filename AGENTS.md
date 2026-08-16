@@ -56,7 +56,7 @@ git push --force-with-lease                 # safe force-push to your branch
 | --- | --- | --- | --- |
 | Shared domain / transport / timeline | `android-compose/sharedLogic/` | repositories, reducers, mappers, RPC, caching | — |
 | Android UI / navigation | `android-compose/app/`, `feature-*` | Compose screens, ViewModels that call shared APIs | Activity, Hilt, permissions |
-| Design system / A2UI | `android-compose/designsystem/` | reusable components, theme, A2UI renderer | — |
+| Design system / A2UI | `android-compose/designsystem/`, `android-compose/sharedLogic/src/jvmAndAndroid/.../a2ui/` | reusable components/theme; shared Android/Desktop A2UI renderer | — |
 | Desktop shell | `android-compose/desktop/` | — | windowing, installer, Ktor engine, OS lock |
 | CLI / probes | `android-compose/cli/`, `appserver-cli/` | JVM tooling | — |
 
@@ -318,7 +318,7 @@ The `.github/workflows/release.yml` workflow picks up the tag, builds the signed
 Use these rules for all new UI work and UI refactors in this repo. The app already uses Material 3 broadly; the goal is to use it **systematically**.
 
 For A2UI renderer or catalog-authoring work, read
-[`android-compose/designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md`](android-compose/designsystem/src/main/java/com/letta/mobile/ui/a2ui/README.md)
+[`android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/a2ui/README.md`](android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/a2ui/README.md)
 before changing widget payloads, catalog IDs, bindings, or renderer dispatch.
 
 ### 1. Stable chrome, expressive content
