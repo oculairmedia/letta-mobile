@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.model.MessageCreate
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnEngine
@@ -113,16 +114,63 @@ class DesktopLocalBackendAdminGatewayTest {
     }
 
     @Test
-    fun `delete archives through authoritative conversation update`() = runTest {
+    fun `delete fails closed instead of silently archiving`() = runTest {
         val client = FakeAppServerClient(failedCreateResponse()).apply {
             retrieveConversation = conversation("conversation-1", archived = false)
         }
         val gateway = DesktopLocalBackendAdminGateway(client)
 
-        gateway.deleteConversation("conversation-1")
+        val failure = assertFailsWith<UnsupportedOperationException> {
+            gateway.deleteConversation("conversation-1")
+        }
+
+        assertEquals(true, failure.message.orEmpty().contains("archive explicitly"))
+        assertEquals(null, client.updateCommand)
+    }
+
+    @Test
+    fun `explicit archive uses authoritative conversation update`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            retrieveConversation = conversation("conversation-1", archived = false)
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        gateway.setConversationArchived("conversation-1", archived = true)
 
         assertEquals("conversation-1", client.updateCommand?.conversationId)
         assertEquals(true, client.updateCommand?.body?.get("archived")?.jsonPrimitive?.boolean)
+    }
+
+    @Test
+    fun `agent message reads require a conversation instead of fanning out`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse())
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        assertFailsWith<IllegalArgumentException> {
+            gateway.listAgentMessages("agent-1", limit = 5, order = "desc", conversationId = null)
+        }
+
+        assertEquals(null, client.messagesCommand)
+    }
+
+    @Test
+    fun `agent message reads preserve conversation limit and order`() = runTest {
+        val client = FakeAppServerClient(failedCreateResponse()).apply {
+            listedMessages = listOf(UserMessage(id = "message-1", contentRaw = JsonPrimitive("hello")))
+        }
+        val gateway = DesktopLocalBackendAdminGateway(client)
+
+        val messages = gateway.listAgentMessages(
+            agentId = "agent-1",
+            limit = 5,
+            order = "desc",
+            conversationId = "conversation-1",
+        )
+
+        assertEquals(listOf("message-1"), messages.map { it.id })
+        assertEquals("conversation-1", client.messagesCommand?.conversationId)
+        assertEquals("5", client.messagesCommand?.query?.get("limit")?.jsonPrimitive?.content)
+        assertEquals("desc", client.messagesCommand?.query?.get("order")?.jsonPrimitive?.content)
     }
 
     private fun failedCreateResponse() = AppServerInboundFrame.ConversationCreateResponse(
@@ -164,6 +212,8 @@ class DesktopLocalBackendAdminGatewayTest {
         var retrieveConversation: com.letta.mobile.data.model.Conversation? = null
         var omitConversationList = false
         var updateCommand: AppServerCommand.ConversationUpdate? = null
+        var messagesCommand: AppServerCommand.ConversationMessagesList? = null
+        var listedMessages: List<com.letta.mobile.data.model.LettaMessage> = emptyList()
 
         override suspend fun conversationCreate(
             command: AppServerCommand.ConversationCreate,
@@ -224,6 +274,21 @@ class DesktopLocalBackendAdminGatewayTest {
                     com.letta.mobile.data.model.Conversation.serializer(),
                     updated,
                 ).jsonObject,
+            )
+        }
+
+        override suspend fun conversationMessagesList(
+            command: AppServerCommand.ConversationMessagesList,
+        ): AppServerInboundFrame.ConversationMessagesListResponse {
+            messagesCommand = command
+            return AppServerInboundFrame.ConversationMessagesListResponse(
+                requestId = command.requestId,
+                success = true,
+                messages = kotlinx.serialization.json.JsonArray(
+                    listedMessages.map {
+                        desktopChatJson.encodeToJsonElement(com.letta.mobile.data.model.LettaMessageSerializer, it)
+                    },
+                ),
             )
         }
 
