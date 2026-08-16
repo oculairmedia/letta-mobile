@@ -72,6 +72,7 @@ internal data class ChatDetailPaneState(
     /** Approval request ids whose answer/dismiss is currently in flight. */
     val submittingApprovalRequestIds: Set<String> = emptySet(),
     val agentNamesById: Map<String, String> = emptyMap(),
+    val contextUsage: ComposerContextUsageState = ComposerContextUsageState(),
 )
 
 /** Interaction callbacks for [ChatDetailPane]. */
@@ -188,6 +189,7 @@ internal fun ChatDetailPane(
                     commands = state.commands,
                     mentionables = state.mentionables,
                     placeholder = state.composerPlaceholder,
+                    contextUsage = state.contextUsage,
                 ),
                 actions = ComposerBarActions(
                     onModelSelected = actions.onModelSelected,

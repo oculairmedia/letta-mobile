@@ -22,6 +22,7 @@ internal data class ComposerBarState(
     val commands: List<ComposerCommand>,
     val mentionables: List<Mentionable>,
     val placeholder: String,
+    val contextUsage: ComposerContextUsageState = ComposerContextUsageState(),
 )
 
 /** Callbacks for [ComposerBar] interactions. */
