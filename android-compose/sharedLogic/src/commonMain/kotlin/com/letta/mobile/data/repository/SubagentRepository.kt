@@ -150,15 +150,17 @@ open class SubagentRepository(
             val deferred = CompletableDeferred<Result<List<SubagentEntry>>>()
             if (inFlightRefresh.compareAndSet(current, deferred)) {
                 val result = runCatching {
-            val response = transport.sendSubagentList(all = includeAll)
-            if (!response.success) {
-                throw IllegalStateException(response.error ?: "subagent_list failed")
-            }
-            val subagents = stateMutex.withLock {
-                mergeSnapshot(response.subagents, kind = SnapshotKind.AUTHORITATIVE)
-            }
-            subagents
-        }
+                    val response = transport.sendSubagentList(all = includeAll)
+                    if (!response.success) {
+                        throw IllegalStateException(response.error ?: "subagent_list failed")
+                    }
+                    stateMutex.withLock {
+                        mergeSnapshot(
+                            incoming = response.subagents,
+                            kind = SnapshotKind.AUTHORITATIVE,
+                        ).also { merged -> state.value = merged }
+                    }
+                }
                 deferred.complete(result)
                 inFlightRefresh.compareAndSet(deferred, null)
                 return result

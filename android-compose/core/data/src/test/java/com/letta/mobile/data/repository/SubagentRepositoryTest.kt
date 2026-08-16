@@ -496,7 +496,7 @@ class SubagentRepositoryTest {
     @Test
     fun `test fixture forbids untracked repository construction`() {
         val source = File("src/test/java/com/letta/mobile/data/repository/SubagentRepositoryTest.kt").readText()
-        val directConstructions = Regex("SubagentRepository\\(transport,")
+        val directConstructions = Regex("""(?m)SubagentRepository\(\s*$""")
             .findAll(source)
             .count()
 
