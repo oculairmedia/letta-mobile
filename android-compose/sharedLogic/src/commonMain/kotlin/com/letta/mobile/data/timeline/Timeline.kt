@@ -191,6 +191,9 @@ data class Timeline(
      * accurate "load older" affordance.
      */
     val releasedOlderCount: Int = 0,
+    internal val residentOtids: kotlinx.collections.immutable.PersistentSet<String> =
+        events.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+    internal val invariantsKnown: Boolean = false,
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashMap<String, Int>(events.size).also { map ->
@@ -213,8 +216,8 @@ data class Timeline(
     }
 
     init {
-        val positionViolation = events.zipWithNext().any { (a, b) -> a.position >= b.position }
-        val otidDupes = events.size != events.distinctBy { it.otid }.size
+        val positionViolation = !invariantsKnown && events.zipWithNext().any { (a, b) -> a.position >= b.position }
+        val otidDupes = !invariantsKnown && events.size != residentOtids.size
 
         if (positionViolation) {
             Telemetry.error(
@@ -284,7 +287,7 @@ data class Timeline(
      * the chat screen.
      */
     fun append(event: TimelineEvent): Timeline {
-        if (findByOtid(event.otid) != null) {
+        if (event.otid in residentOtids) {
             Telemetry.event(
                 "Timeline", "append.duplicateOtid",
                 "conversationId" to conversationId,
@@ -310,7 +313,12 @@ data class Timeline(
         } else {
             event
         }
-        return copy(events = events.adding(safeEvent), stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(
+            events = events.adding(safeEvent),
+            stablePrefixVersion = stablePrefixVersion + 1,
+            residentOtids = residentOtids.adding(safeEvent.otid),
+            invariantsKnown = true,
+        )
             .slideResidentWindow()
     }
 
@@ -333,7 +341,7 @@ data class Timeline(
             attachments = if (confirmed.attachments.isEmpty()) local.attachments else confirmed.attachments,
         )
         val newEvents = events.replacingAt(idx, stabilized)
-        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1, invariantsKnown = true)
     }
 
     /**
@@ -345,11 +353,16 @@ data class Timeline(
      * returns this timeline unchanged (keeps the existing, possibly Local, event).
      */
     fun insertOrdered(event: TimelineEvent): Timeline {
-        if (findByOtid(event.otid) != null) return this
+        if (event.otid in residentOtids) return this
         val insertIdx = events.indexOfFirst { it.position > event.position }
         val newEvents = if (insertIdx == -1) events.adding(event)
                        else events.addingAt(insertIdx, event)
-        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(
+            events = newEvents,
+            stablePrefixVersion = stablePrefixVersion + 1,
+            residentOtids = residentOtids.adding(event.otid),
+            invariantsKnown = true,
+        )
             .slideResidentWindow()
     }
 
@@ -403,6 +416,8 @@ data class Timeline(
             events = remaining,
             backfillCursor = newOldestServerId ?: backfillCursor,
             releasedOlderCount = releasedOlderCount + evictedCount,
+            residentOtids = remaining.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+            invariantsKnown = true,
         )
     }
 
@@ -525,6 +540,9 @@ data class Timeline(
         if (removedEvents.isEmpty()) return AbandonedAssistantFragmentCleanupResult(this, emptySet())
         val removeServerIds = removedEvents.map { it.serverId }.toSet()
         val suppressions = removedEvents.map { it.toAbandonedAssistantFragmentSuppression() }.toSet()
+        val retainedEvents = events.filterNot { event ->
+            event is TimelineEvent.Confirmed && event.serverId in removeServerIds
+        }.toPersistentList()
         Telemetry.event(
             "TimelineSync", "orphanAssistantFragments.cleaned",
             "conversationId" to conversationId,
@@ -535,14 +553,14 @@ data class Timeline(
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(
-                events = events.filterNot { event ->
-                    event is TimelineEvent.Confirmed && event.serverId in removeServerIds
-                }.toPersistentList(),
+                events = retainedEvents,
                 abandonedAssistantFragmentSuppressions = buildList {
                     addAll(abandonedAssistantFragmentSuppressions)
                     addAll(suppressions)
                 }.takeLast(MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS).toPersistentSet(),
                 stablePrefixVersion = stablePrefixVersion + 1,
+                residentOtids = retainedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+                invariantsKnown = true,
             ),
             suppressions = suppressions,
         )

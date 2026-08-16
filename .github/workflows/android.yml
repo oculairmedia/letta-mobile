@@ -239,6 +239,50 @@ jobs:
         # extra configuration phases and exposes the full graph to Gradle.
         run: ./gradlew :sharedLogic:allTests :desktop:test :appserver-cli:test :appserver-cli:distZip :iroh-wrapper-cli:test :iroh-wrapper-cli:installDist
 
+  web-wasm:
+    name: web-wasm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: android-compose
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Java 26
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 26
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Setup Rust with WASM target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install pinned wasm-bindgen CLI
+        run: cargo install wasm-bindgen-cli --version 0.2.127 --locked
+
+      - name: Verify Iroh WASM transport
+        working-directory: android-compose/native/iroh-wasm
+        run: |
+          cargo fmt --check
+          cargo test --locked
+          cargo clippy --locked --target wasm32-unknown-unknown -- -D warnings
+
+      - name: Build and test Compose web client
+        run: ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
+
   build-apk:
     runs-on: ubuntu-latest
     # Deliberately independent of `test`: GitHub can fan out test, shared KMP

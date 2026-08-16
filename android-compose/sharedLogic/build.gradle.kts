@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
@@ -54,6 +56,11 @@ kotlin {
         hostOs == "Mac OS X" -> macosX64("hostNative")
         hostOs.startsWith("Windows") -> mingwX64("hostNative")
         hostOs == "Linux" -> linuxX64("hostNative")
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
     }
 
     sourceSets {
@@ -199,6 +206,16 @@ kotlin {
                 implementation("io.ktor:ktor-client-mock:3.5.0")
                 implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
+            }
+        }
+
+        // Wasm/Browser source set — inherits from commonMain (NOT jvmAndAndroid,
+        // which carries JVM-only deps: ZXing, CIO engine, Iroh JNI). The JS
+        // Ktor engine provides browser-native fetch/WebSocket transport.
+        val wasmJsMain by getting {
+            dependsOn(commonMain.get())
+            dependencies {
+                implementation("io.ktor:ktor-client-js:3.5.0")
             }
         }
     }
