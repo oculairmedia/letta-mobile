@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -137,13 +138,18 @@ internal fun DesktopJewelWindow(
         ) {
             DesktopMaterialTheme {
                 val colorScheme = MaterialTheme.colorScheme
-                val titleBarStyle = remember(colorScheme) {
+                // With a tab strip the active tab is painted in the page
+                // background and must run straight into the content beneath it,
+                // so the title bar's hairline is dropped — the tab-vs-strip
+                // contrast carries the separation instead (browser behaviour).
+                val tabbed = header.conversationTabs.isNotEmpty()
+                val titleBarStyle = remember(colorScheme, tabbed) {
                     TitleBarStyle(
                         colors = TitleBarColors(
                             background = colorScheme.surfaceContainerLow,
                             inactiveBackground = colorScheme.surfaceContainerLow,
                             content = colorScheme.onSurface,
-                            border = colorScheme.outlineVariant,
+                            border = if (tabbed) Color.Transparent else colorScheme.outlineVariant,
                         ),
                         metrics = TitleBarMetrics(height = TitleBarHeight),
                     )
