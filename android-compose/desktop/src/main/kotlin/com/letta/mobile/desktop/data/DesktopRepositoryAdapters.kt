@@ -218,7 +218,7 @@ class DesktopRepositoryAdapters(
     } else {
         null
     }
-    private val adminRepositories = buildHttpAdminRepositories(config, irohMode || localMode)
+    private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
     private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
@@ -274,4 +274,3 @@ fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
         ),
     )
 }
-
