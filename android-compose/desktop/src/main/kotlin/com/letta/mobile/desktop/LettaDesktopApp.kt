@@ -29,6 +29,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
+import com.letta.mobile.data.desktopshell.ConversationTabsReducer
+import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
@@ -155,7 +157,7 @@ internal fun LettaDesktopApp(
         ),
     )
     val chatState by chatController.state.collectAsState()
-    var openConversationIds by remember(chatState.sessionGraphId) { mutableStateOf(emptyList<String>()) }
+    var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val submittingApprovals by chatController.submittingApprovals.collectAsState()
@@ -242,9 +244,9 @@ internal fun LettaDesktopApp(
         if (
             selectedDestination == DesktopDestination.Conversations &&
             selectedId != null &&
-            selectedId !in openConversationIds
+            selectedId !in conversationTabsState.openConversationIds
         ) {
-            openConversationIds = openConversationIds + selectedId
+            conversationTabsState = ConversationTabsReducer.select(conversationTabsState, selectedId)
         }
     }
     LaunchedEffect(chatState.connectionState, chatState.conversations) {
@@ -253,12 +255,16 @@ internal fun LettaDesktopApp(
             chatState.connectionState == DesktopChatConnectionState.NoConversations
         ) {
             val availableIds = chatState.conversations.mapTo(mutableSetOf()) { it.id }
-            openConversationIds = openConversationIds.filter { it in availableIds }
+            conversationTabsState = ConversationTabsReducer.retainAvailable(
+                state = conversationTabsState,
+                availableConversationIds = availableIds,
+                selectedConversationId = chatState.selectedConversationId,
+            )
         }
     }
     val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
-    val conversationTabs = remember(openConversationIds, conversationById) {
-        openConversationIds.mapNotNull { conversationId ->
+    val conversationTabs = remember(conversationTabsState, conversationById) {
+        conversationTabsState.openConversationIds.mapNotNull { conversationId ->
             conversationById[conversationId]?.let { conversation ->
                 DesktopConversationTab(
                     conversationId = conversation.id,
@@ -270,9 +276,10 @@ internal fun LettaDesktopApp(
     }
 
     fun closeConversationTab(conversationId: String) {
-        val fallbackId = fallbackConversationTabAfterClose(openConversationIds, conversationId)
+        val result = ConversationTabsReducer.close(conversationTabsState, conversationId)
+        val fallbackId = result.fallbackConversationId
         val closingActiveTab = conversationId == chatState.selectedConversationId
-        openConversationIds = openConversationIds.filterNot { it == conversationId }
+        conversationTabsState = result.state
         if (!closingActiveTab) return
         if (fallbackId != null) {
             editAgentId = null
