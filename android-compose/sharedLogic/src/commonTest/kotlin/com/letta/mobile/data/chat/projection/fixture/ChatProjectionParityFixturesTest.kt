@@ -1,109 +1,84 @@
 package com.letta.mobile.data.chat.projection.fixture
 
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
+import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.IncrementalChatRenderItemsCache
 import com.letta.mobile.data.chat.projection.buildChatRenderModel
-import com.letta.mobile.data.model.UiMessage
-import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.chat.projection.projectToolTimelineGroups
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class ChatProjectionParityFixturesTest {
 
-    private fun user(id: String, content: String) = UiMessage(
-        id = id,
-        role = "user",
-        content = content,
-        timestamp = "2024-01-01T00:00:00Z"
-    )
-
-    private fun reasoning(id: String, content: String, runId: String) = UiMessage(
-        id = id,
-        role = "assistant",
-        content = content,
-        timestamp = "2024-01-01T00:00:01Z",
-        isReasoning = true,
-        runId = runId
-    )
-
-    private fun assistant(id: String, content: String, runId: String) = UiMessage(
-        id = id,
-        role = "assistant",
-        content = content,
-        timestamp = "2024-01-01T00:00:02Z",
-        runId = runId
-    )
-
-    private fun assistantToolCall(id: String, runId: String, toolCalls: List<UiToolCall>) = UiMessage(
-        id = id,
-        role = "assistant",
-        content = "",
-        timestamp = "2024-01-01T00:00:02Z",
-        runId = runId,
-        toolCalls = toolCalls
-    )
-
     @Test
-    fun `fixture - simple interactive stream correctly aggregates assistant run`() {
-        val messages = listOf(
-            user("u1", "hello"),
-            reasoning("r1", "thinking...", "run-1"),
-            assistant("a1", "hi there", "run-1")
-        )
+    fun `canonical fixtures project to the shared semantic contract`() {
+        ChatProjectionParityFixtures.projectionCases.forEach { fixture ->
+            val actual = buildChatRenderModel(
+                messages = fixture.messages,
+                mode = ChatDisplayMode.Interactive,
+            ).renderItems.toFixtureExpectation()
 
-        val model = buildChatRenderModel(messages, ChatDisplayMode.Interactive)
-
-        // The list is in reverse order (newest first)
-        assertEquals(2, model.renderItems.size)
-
-        val item1 = model.renderItems[0] // run-1 block (reasoning + assistant)
-        assertTrue(item1 is ChatRenderItem.RunBlock)
-        assertEquals("run-1", item1.runId)
-        assertEquals(2, item1.messages.size)
-
-        val item2 = model.renderItems[1] // user message
-        assertTrue(item2 is ChatRenderItem.Single)
-        assertEquals("u1", item2.message.id)
+            assertEquals(fixture.expectedItems, actual, fixture.id)
+            assertEquals(actual.map { it.key }.distinct(), actual.map { it.key }, "${fixture.id}: duplicate keys")
+            assertEquals(
+                fixture.expectedToolStates,
+                projectToolTimelineGroups(fixture.messages).flatMap { group -> group.calls.map { it.state } },
+                "${fixture.id}: tool timeline classification",
+            )
+        }
     }
 
     @Test
-    fun `fixture - identical reasoning and assistant content dedupes reasoning`() {
-        val messages = listOf(
-            user("u1", "hello"),
-            reasoning("r1", "same text", "run-1"),
-            assistant("a1", "same text", "run-1")
+    fun `a2ui fixture shares authoritative conversation and run identity with chat projection`() {
+        val fixture = ChatProjectionParityFixtures.projectionCases.single { it.expectedA2uiLink != null }
+        val expected = assertNotNull(fixture.expectedA2uiLink)
+        val surface = assertNotNull(fixture.a2uiSurface)
+        val rendered = buildChatRenderModel(fixture.messages, ChatDisplayMode.Interactive).renderItems
+
+        assertEquals(expected.surfaceId, surface.surfaceId)
+        assertEquals(expected.conversationId, surface.conversationId)
+        assertEquals(expected.runId, surface.runId)
+        assertEquals(expected.approvalRequestId, surface.approvalRequestId)
+        assertTrue(
+            rendered.any { it is ChatRenderItem.RunBlock && it.runId == surface.runId },
+            "${fixture.id}: A2UI surface must link to a rendered run",
         )
-
-        val model = buildChatRenderModel(messages, ChatDisplayMode.Interactive)
-
-        assertEquals(2, model.renderItems.size)
-
-        val item1 = model.renderItems[0] // assistant run block
-        assertTrue(item1 is ChatRenderItem.Single, "Should be single because assistant message was deduped")
-        assertEquals("r1", item1.message.id)
+        assertTrue(
+            fixture.messages.any { it.approvalRequest?.requestId == surface.approvalRequestId },
+            "${fixture.id}: A2UI surface must link to the rendered approval request",
+        )
     }
 
     @Test
-    fun `fixture - tool calls are grouped correctly within the same run`() {
-        val messages = listOf(
-            user("u1", "fetch data"),
-            reasoning("r1", "running tools", "run-2"),
-            assistantToolCall(
-                "t1",
-                "run-2",
-                listOf(UiToolCall(name = "Fetch", arguments = "{}", result = "OK"))
-            ),
-            assistant("a1", "done", "run-2")
-        )
+    fun `incremental fixture changes match production classification and full projection`() {
+        val sequence = ChatProjectionParityFixtures.transitionSequence
+        val cache = IncrementalChatRenderItemsCache()
+        var previous = emptyList<com.letta.mobile.data.model.UiMessage>()
 
-        val model = buildChatRenderModel(messages, ChatDisplayMode.Interactive)
+        sequence.frames.forEach { frame ->
+            val actualChange = if (previous.isEmpty()) {
+                ChatMessageListChange.Full
+            } else {
+                ChatMessageListChange.compute(previous, frame.messages)
+            }
+            assertEquals(frame.expectedChange, actualChange, sequence.id)
 
-        assertEquals(2, model.renderItems.size)
+            val incremental = cache.renderItems(
+                messages = frame.messages,
+                mode = ChatDisplayMode.Interactive,
+                change = actualChange,
+            )
+            val full = buildChatRenderModel(
+                messages = frame.messages,
+                mode = ChatDisplayMode.Interactive,
+            ).renderItems
+            assertEquals(full, incremental, "${sequence.id}: incremental projection drift")
+            previous = frame.messages
+        }
 
-        val item1 = model.renderItems[0]
-        assertTrue(item1 is ChatRenderItem.RunBlock)
-        assertEquals("run-2", item1.runId)
-        assertEquals(3, item1.messages.size) // r1, t1, a1
+        assertTrue(cache.incrementalBuildCount > 0, "${sequence.id}: fixture never exercised incremental path")
     }
 }
