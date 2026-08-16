@@ -973,6 +973,7 @@ internal fun DrawerContent(
     chatMode: String,
     onChatModeSelected: (String) -> Unit,
     onModelTap: () -> Unit,
+    onSearchMessages: () -> Unit = {},
     conversations: List<Conversation>,
     currentConversationId: String?,
     onNewConversation: () -> Unit,
@@ -1065,6 +1066,17 @@ internal fun DrawerContent(
         ModelInfoCard(
             currentModel = currentModel,
             onTap = onModelTap,
+        )
+        NavigationDrawerItem(
+            icon = { Icon(LettaIcons.Search, contentDescription = null) },
+            label = { Text(stringResource(R.string.action_search)) },
+            selected = false,
+            onClick = {
+                HapticEffects.segmentTick(haptic, view)
+                onSearchMessages()
+            },
+            colors = drawerItemColors,
+            modifier = Modifier.testTag(AgentScaffoldTestTags.DRAWER_SEARCH_MESSAGES),
         )
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider()
