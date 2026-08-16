@@ -396,6 +396,9 @@ private fun PreviewPane(
             active.uniform("uTime", phase())
             active.uniform("uAgitation", state.agitation)
             active.uniform("uEnvelope", state.envelope)
+            if (state.source.contains("uniform float uStreamEnergy")) {
+                active.uniform("uStreamEnergy", 0f)
+            }
             active.uniform("uColor", state.tint.red, state.tint.green, state.tint.blue, state.alpha)
             if (state.source.contains("uniform float uInvert")) {
                 active.uniform("uInvert", state.invert)
