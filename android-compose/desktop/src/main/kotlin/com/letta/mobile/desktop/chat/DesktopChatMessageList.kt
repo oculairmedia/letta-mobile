@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -38,17 +37,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
 import com.letta.mobile.data.chat.runtime.ChatViewportSnapshot
+import com.letta.mobile.desktop.fadingEdges
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
@@ -137,7 +131,7 @@ internal fun MessageList(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .chatFadingEdges(
+                .fadingEdges(
                     topFadeAlpha = fadeAlphas.top,
                     bottomFadeAlpha = fadeAlphas.bottom,
                     topFadeLength = 72.dp,
@@ -441,66 +435,6 @@ private fun List<ChatRenderItem>.tailContentLength(): Int =
             is ChatRenderItem.SkillEnvelopeChip -> item.rawContent.length
         }
     } ?: 0
-
-/**
- * Softly dissolves the top [topFadeLength] and bottom [bottomFadeLength] of
- * the wrapped content to transparent, so the message list grades into the
- * background instead of hard-clipping at the title bar / composer — the
- * desktop port of the mobile chat fading edges. A [BlendMode.DstIn]
- * vertical-gradient mask over an offscreen layer (DstIn keeps the
- * already-drawn content only where the mask is opaque, so a
- * transparent→opaque ramp makes each edge fade out). The mask colour is
- * irrelevant; only its alpha drives the fade. No-ops (and skips the
- * offscreen layer) when both alphas are 0, i.e. the list isn't scrollable.
- *
- * [pinnedHeaderHeightPx] — read fresh on every draw — is the height in px of
- * content at the very top that must stay untouched by the top fade (e.g. a
- * pinned sticky header card); the top gradient starts below it instead of at
- * y=0. Defaults to always 0 (fade starts at the top edge), which is also
- * what callers that don't have any such pinned content get for free.
- */
-internal fun Modifier.chatFadingEdges(
-    topFadeAlpha: Float,
-    bottomFadeAlpha: Float,
-    topFadeLength: Dp,
-    bottomFadeLength: Dp,
-    pinnedHeaderHeightPx: () -> Float = { 0f },
-): Modifier {
-    if (topFadeAlpha <= 0f && bottomFadeAlpha <= 0f) return this
-    return this
-        .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-        .drawWithContent {
-            drawContent()
-            if (topFadeAlpha > 0f) {
-                val topFadePx = topFadeLength.toPx()
-                val topStartY = pinnedHeaderHeightPx().coerceIn(0f, size.height)
-                if (topFadePx > 0f && topStartY < size.height) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Black.copy(alpha = 1f - topFadeAlpha), Color.Black),
-                            startY = topStartY,
-                            endY = (topStartY + topFadePx).coerceAtMost(size.height),
-                        ),
-                        blendMode = BlendMode.DstIn,
-                    )
-                }
-            }
-            if (bottomFadeAlpha > 0f) {
-                val bottomFadePx = bottomFadeLength.toPx()
-                if (bottomFadePx > 0f) {
-                    val len = bottomFadePx.coerceAtMost(size.height / 2f)
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomFadeAlpha)),
-                            startY = size.height - len,
-                            endY = size.height,
-                        ),
-                        blendMode = BlendMode.DstIn,
-                    )
-                }
-            }
-        }
-}
 
 internal fun LazyListState.toChatViewportSnapshot(isUserScrolling: Boolean): ChatViewportSnapshot =
     ChatViewportSnapshot(

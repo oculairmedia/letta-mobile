@@ -4,6 +4,7 @@ import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -62,6 +64,15 @@ import com.letta.mobile.data.agents.deriveAgentSpaces
 import com.letta.mobile.data.model.DisplayNames
 import com.letta.mobile.data.search.TextMatch
 import com.letta.mobile.desktop.chat.AgentOrb
+
+/**
+ * Fade length for the rail's scroll edges — proportionate to the rail's own
+ * ~34dp orb slots (roughly one orb's worth of fade at each edge), distinct
+ * from the chat message list's taller 44/72dp fades which suit a much wider
+ * reading column. Shared by both rail modes (collapsed orb list, expanded
+ * library roster) so they match.
+ */
+private val RailFadeLength = 32.dp
 
 /**
  * Format an ISO-8601 instant (e.g. lastMessageAt) as a compact relative label
@@ -297,7 +308,29 @@ private fun ColumnScope.ExpandedAgentLibrary(
     }
     LibrarySearchField(query = query, onQueryChange = { query = it })
     // Lazy: a large roster (hundreds of agents) must not compose every row.
-    LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+    val listState = rememberLazyListState()
+    val topFadeAlpha by animateFloatAsState(
+        targetValue = if (listState.canScrollBackward) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "railLibraryTopFadeAlpha",
+    )
+    val bottomFadeAlpha by animateFloatAsState(
+        targetValue = if (listState.canScrollForward) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "railLibraryBottomFadeAlpha",
+    )
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .fadingEdges(
+                topFadeAlpha = topFadeAlpha,
+                bottomFadeAlpha = bottomFadeAlpha,
+                topFadeLength = RailFadeLength,
+                bottomFadeLength = RailFadeLength,
+            ),
+    ) {
         if (filtered.isEmpty()) {
             item(key = "library-empty") {
                 Text(
@@ -448,8 +481,28 @@ private fun ColumnScope.AgentRailOrbList(
     // actions off-screen, and is lazy so hundreds of agents don't all
     // compose. Keyed by group name so each row's thinking-ring animation
     // follows its agent across recency reordering.
+    val listState = rememberLazyListState()
+    val topFadeAlpha by animateFloatAsState(
+        targetValue = if (listState.canScrollBackward) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "railOrbTopFadeAlpha",
+    )
+    val bottomFadeAlpha by animateFloatAsState(
+        targetValue = if (listState.canScrollForward) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "railOrbBottomFadeAlpha",
+    )
     LazyColumn(
-        modifier = Modifier.weight(1f).fillMaxWidth(),
+        state = listState,
+        modifier = Modifier
+            .weight(1f)
+            .fillMaxWidth()
+            .fadingEdges(
+                topFadeAlpha = topFadeAlpha,
+                bottomFadeAlpha = bottomFadeAlpha,
+                topFadeLength = RailFadeLength,
+                bottomFadeLength = RailFadeLength,
+            ),
         horizontalAlignment = Alignment.CenterHorizontally,
         // Each 30dp orb already sits in a 34dp slot (2dp slack top and bottom),
         // so this spacing is ON TOP of that: 4dp here is an 8dp gap between
