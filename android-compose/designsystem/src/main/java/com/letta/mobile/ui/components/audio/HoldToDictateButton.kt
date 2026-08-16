@@ -131,31 +131,30 @@ fun HoldToDictateButton(
                 },
             contentAlignment = Alignment.Center,
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
-                    .background(
-                        if (isRecognizing) {
-                            MaterialTheme.colorScheme.primary
-                        } else {
-                            MaterialTheme.colorScheme.primaryContainer
-                        },
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    imageVector = Icons.Rounded.Mic,
-                    contentDescription = "Hold to talk",
-                    tint = if (isRecognizing) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    },
-                )
-            }
+            HoldToDictateVisual(isRecognizing = isRecognizing, enabled = enabled)
         }
+    }
+}
+
+@Composable
+private fun HoldToDictateVisual(isRecognizing: Boolean, enabled: Boolean) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
+            .background(
+                if (isRecognizing) MaterialTheme.colorScheme.primary
+                else MaterialTheme.colorScheme.primaryContainer,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.Mic,
+            contentDescription = "Hold to talk",
+            tint = if (isRecognizing) MaterialTheme.colorScheme.onPrimary
+            else MaterialTheme.colorScheme.onPrimaryContainer,
+        )
     }
 }
 
