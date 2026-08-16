@@ -3,9 +3,9 @@ package com.letta.mobile.data.messaging
 import com.letta.mobile.data.controller.extras.CustomIrohMessagingTool
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * letta-mobile-slqfp: pure projection from transport-structural signals to
@@ -69,13 +69,13 @@ object AgentMessageProvenanceProjection {
         if (toolName != CustomIrohMessagingTool.TOOL_NAME) return null
         val from = fromAgentId?.takeIf { it.isNotBlank() } ?: return null
         val args = argumentsJson?.let { runCatching { json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
-        val to = args?.get("to")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() } ?: return null
+        val to = args?.string("to")?.takeIf { it.isNotBlank() } ?: return null
 
         val result = resultJson?.let { runCatching { json.parseToJsonElement(it) as? JsonObject }.getOrNull() }
-        val ok = result?.get("ok")?.jsonPrimitive?.booleanOrNull == true
-        val delivered = result?.get("delivered")?.jsonPrimitive?.booleanOrNull == true
-        val accepted = result?.get("accepted")?.jsonPrimitive?.booleanOrNull == true
-        val msgIdFromResult = result?.get("msgId")?.jsonPrimitive?.contentOrNull
+        val ok = result?.boolean("ok") == true
+        val delivered = result?.boolean("delivered") == true
+        val accepted = result?.boolean("accepted") == true
+        val msgIdFromResult = result?.string("msgId")
 
         val deliveryState = when {
             isError -> AgentMessageDeliveryState.FAILED
@@ -99,4 +99,10 @@ object AgentMessageProvenanceProjection {
             failureReason = failureReason,
         )
     }
+
+    private fun JsonObject.string(key: String): String? =
+        (get(key) as? JsonPrimitive)?.contentOrNull
+
+    private fun JsonObject.boolean(key: String): Boolean? =
+        (get(key) as? JsonPrimitive)?.booleanOrNull
 }

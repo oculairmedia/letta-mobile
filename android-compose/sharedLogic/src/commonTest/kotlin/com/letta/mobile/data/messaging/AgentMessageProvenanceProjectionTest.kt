@@ -62,25 +62,32 @@ class AgentMessageProvenanceProjectionTest {
     private fun acceptedResult(msgId: String, to: String) =
         """{"ok":true,"accepted":true,"delivered":false,"msgId":"$msgId","to":"$to"}"""
 
+    private fun projectOutbound(
+        toolName: String? = "agent_message_send",
+        argumentsJson: String? = """{"to":"agent-b","body":"hi"}""",
+        resultJson: String? = null,
+        isError: Boolean = false,
+        fromAgentId: String? = "agent-a",
+    ) = AgentMessageProvenanceProjection.projectOutbound(
+        toolName = toolName,
+        argumentsJson = argumentsJson,
+        resultJson = resultJson,
+        isError = isError,
+        fromAgentId = fromAgentId,
+    )
+
     @Test
     fun `projectOutbound returns null for a tool call that is not agent_message_send`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
+        val provenance = projectOutbound(
             toolName = "some_other_tool",
-            argumentsJson = """{"to":"agent-b","body":"hi"}""",
             resultJson = deliveredResult("msg-1", "agent-b"),
-            isError = false,
-            fromAgentId = "agent-a",
         )
         assertNull(provenance)
     }
 
     @Test
     fun `projectOutbound returns null when fromAgentId is unknown`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = "agent_message_send",
-            argumentsJson = """{"to":"agent-b","body":"hi"}""",
-            resultJson = null,
-            isError = false,
+        val provenance = projectOutbound(
             fromAgentId = null,
         )
         assertNull(provenance)
@@ -88,25 +95,15 @@ class AgentMessageProvenanceProjectionTest {
 
     @Test
     fun `projectOutbound returns null when the 'to' argument is missing`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = "agent_message_send",
+        val provenance = projectOutbound(
             argumentsJson = """{"body":"hi"}""",
-            resultJson = null,
-            isError = false,
-            fromAgentId = "agent-a",
         )
         assertNull(provenance)
     }
 
     @Test
     fun `projectOutbound is PENDING while the tool call has no result yet`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = "agent_message_send",
-            argumentsJson = """{"to":"agent-b","body":"hi"}""",
-            resultJson = null,
-            isError = false,
-            fromAgentId = "agent-a",
-        )
+        val provenance = projectOutbound()
         requireNotNull(provenance)
         assertEquals(AgentMessageDirection.OUTBOUND, provenance.direction)
         assertEquals("agent-a", provenance.fromAgentId)
@@ -116,12 +113,8 @@ class AgentMessageProvenanceProjectionTest {
 
     @Test
     fun `projectOutbound is SENT when transport accepted but application delivery unconfirmed`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = "agent_message_send",
-            argumentsJson = """{"to":"agent-b","body":"hi"}""",
+        val provenance = projectOutbound(
             resultJson = acceptedResult("msg-1", "agent-b"),
-            isError = false,
-            fromAgentId = "agent-a",
         )
         assertEquals(AgentMessageDeliveryState.SENT, provenance?.deliveryState)
         assertEquals("msg-1", provenance?.msgId)
@@ -129,24 +122,17 @@ class AgentMessageProvenanceProjectionTest {
 
     @Test
     fun `projectOutbound is RECEIVER_CONFIRMED when delivered=true`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = "agent_message_send",
-            argumentsJson = """{"to":"agent-b","body":"hi"}""",
+        val provenance = projectOutbound(
             resultJson = deliveredResult("msg-1", "agent-b"),
-            isError = false,
-            fromAgentId = "agent-a",
         )
         assertEquals(AgentMessageDeliveryState.RECEIVER_CONFIRMED, provenance?.deliveryState)
     }
 
     @Test
     fun `projectOutbound is FAILED with the tool's typed error text on isError`() {
-        val provenance = AgentMessageProvenanceProjection.projectOutbound(
-            toolName = "agent_message_send",
-            argumentsJson = """{"to":"agent-b","body":"hi"}""",
+        val provenance = projectOutbound(
             resultJson = "agent_message_send: target 'agent-b' is unaddressable: no_address",
             isError = true,
-            fromAgentId = "agent-a",
         )
         requireNotNull(provenance)
         assertEquals(AgentMessageDeliveryState.FAILED, provenance.deliveryState)
@@ -154,5 +140,16 @@ class AgentMessageProvenanceProjectionTest {
             "agent_message_send: target 'agent-b' is unaddressable: no_address",
             provenance.failureReason,
         )
+    }
+
+    @Test
+    fun `projectOutbound ignores non-primitive structural fields`() {
+        assertNull(projectOutbound(argumentsJson = """{"to":{"id":"agent-b"}}"""))
+
+        val provenance = projectOutbound(
+            resultJson = """{"ok":{},"delivered":[true],"msgId":{"value":"msg-1"}}""",
+        )
+        assertEquals(AgentMessageDeliveryState.FAILED, provenance?.deliveryState)
+        assertEquals("", provenance?.msgId)
     }
 }

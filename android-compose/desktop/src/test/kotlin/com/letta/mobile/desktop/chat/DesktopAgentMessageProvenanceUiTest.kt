@@ -3,6 +3,7 @@
 package com.letta.mobile.desktop.chat
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
@@ -42,22 +43,27 @@ class DesktopAgentMessageProvenanceUiTest {
     fun inboundAgentMessageShowsCompactSenderToRecipientLabel() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                DesktopMessageBubble(
-                    UiMessage(
-                        id = "inbound-1",
-                        role = "user",
-                        content = "Deploy finished cleanly.",
-                        timestamp = "2026-08-15T12:00:00Z",
-                        agentMessageProvenance = inboundProvenance(),
-                    ),
-                    resolveAgentName = { agentId ->
+                CompositionLocalProvider(
+                    LocalDesktopAgentMessageContext provides DesktopAgentMessageContext(
+                        resolveName = { agentId ->
                         when (agentId) {
                             "agent-meridian" -> "Meridian"
                             "agent-pm-letta-mobile" -> "PM-letta-mobile"
                             else -> null
                         }
-                    },
-                )
+                        },
+                    ),
+                ) {
+                    DesktopMessageBubble(
+                        UiMessage(
+                            id = "inbound-1",
+                            role = "user",
+                            content = "Deploy finished cleanly.",
+                            timestamp = "2026-08-15T12:00:00Z",
+                            agentMessageProvenance = inboundProvenance(),
+                        ),
+                    )
+                }
             }
         }
 
@@ -218,11 +224,14 @@ class DesktopAgentMessageProvenanceUiTest {
                             ),
                         ),
                     ),
+                    resolveAgentName = { id ->
+                        if (id == "agent-pm-letta-mobile") "PM-letta-mobile" else "Meridian"
+                    },
                 )
             }
         }
 
-        onNodeWithText("Agent message", substring = true).assertExists()
+        onNodeWithText("PM-letta-mobile → Meridian · Agent message").assertExists()
         onNodeWithTag("tool-card-toggle").assertExists()
     }
 }

@@ -100,7 +100,7 @@ fun scrubUserEnvelope(content: String): String {
  *   tooling) should observe the timeline directly without going through this
  *   projection.
  */
-fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
+fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiMessage? {
     return when (ev) {
         is TimelineEvent.Local -> {
             // letta-mobile-5s1n: Locals can now represent in-flight assistant
@@ -167,16 +167,12 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             toolCallId = callId,
                             approvalDecision = chip,
                             subagentDispatch = tc.toSubagentDispatch(result),
-                            // letta-mobile-slqfp: Local (streaming/optimistic)
-                            // events don't carry an owning agentId, so the
-                            // outbound a2a projection returns null here until
-                            // the event is Confirmed by the server.
                             agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
                                 toolName = tc.name,
                                 argumentsJson = tc.arguments,
                                 resultJson = result,
                                 isError = isError,
-                                fromAgentId = null,
+                                fromAgentId = ownAgentId,
                             ),
                         )
                     }
@@ -239,7 +235,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                 agentMessageProvenance = if (role == "user") {
                     AgentMessageProvenanceProjection.projectInbound(
                         clientMessageId = ev.otid,
-                        ownAgentId = null,
+                        ownAgentId = ownAgentId,
                     )
                 } else {
                     null

@@ -736,6 +736,38 @@ class TimelineEventToUiMessageTest {
     }
 
     @Test
+    fun `local outbound agent message carries pending provenance before confirmation`() {
+        val event = TimelineEvent.Local(
+            position = 1.0,
+            otid = "otid-a2a-local",
+            content = "",
+            sentAt = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+            messageType = TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(
+                ToolCall(
+                    id = "call-a2a-local",
+                    name = "agent_message_send",
+                    arguments = """{"to":"agent-meridian","body":"status update"}""",
+                ),
+            ).toPersistentList(),
+        )
+
+        val provenance = timelineEventToUiMessage(event, ownAgentId = "agent-pm")
+            ?.toolCalls
+            ?.single()
+            ?.agentMessageProvenance
+
+        assertNotNull(provenance)
+        assertEquals("agent-pm", provenance.fromAgentId)
+        assertEquals("agent-meridian", provenance.toAgentId)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDeliveryState.PENDING,
+            provenance.deliveryState,
+        )
+    }
+
+    @Test
     fun `hydration and live-reconciled paths render identical provenance for the same logical message`() {
         // letta-mobile-slqfp AC6: the SAME logical inbound a2a message must
         // render identically whether it is observed as freshly-arrived LIVE

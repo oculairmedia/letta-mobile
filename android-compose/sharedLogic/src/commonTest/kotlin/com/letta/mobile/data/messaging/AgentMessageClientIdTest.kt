@@ -48,4 +48,10 @@ class AgentMessageClientIdTest {
         assertEquals("msg-1", encoded)
         assertNull(AgentMessageClientId.decode(encoded))
     }
+
+    @Test
+    fun `encode rejects delimiters in message and recipient ids`() {
+        assertEquals("msg:1", AgentMessageClientId.encode("msg:1", "agent-a", "agent-b"))
+        assertEquals("msg-1", AgentMessageClientId.encode("msg-1", "agent-a", "agent:b"))
+    }
 }

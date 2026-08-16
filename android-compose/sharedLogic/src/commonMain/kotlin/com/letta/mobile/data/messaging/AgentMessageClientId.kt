@@ -26,9 +26,11 @@ object AgentMessageClientId {
     private const val PART_COUNT = 3
 
     fun encode(msgId: String, fromAgentId: String, toAgentId: String): String {
-        if (msgId.contains(':') || fromAgentId.contains(':') || toAgentId.contains(':')) return msgId
+        if (containsDelimiter(msgId, fromAgentId, toAgentId)) return msgId
         return "$PREFIX$msgId:$fromAgentId:$toAgentId"
     }
+
+    private fun containsDelimiter(vararg values: String): Boolean = values.any { ':' in it }
 
     data class Decoded(val msgId: String, val fromAgentId: String, val toAgentId: String)
 

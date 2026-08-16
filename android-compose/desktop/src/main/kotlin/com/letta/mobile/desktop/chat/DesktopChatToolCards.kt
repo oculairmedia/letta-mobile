@@ -57,6 +57,8 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.messaging.compactLabel
+import com.letta.mobile.data.messaging.displayLabel
 
 /**
  * Collapsible single-tool disclosure. Deliberately chrome-less when it succeeds:
@@ -109,6 +111,7 @@ private fun ToolCardHeader(
     // message, not an anonymous tool invocation.
     val provenance = toolCall.agentMessageProvenance
     if (provenance != null) {
+        val presentation = LocalDesktopAgentMessageContext.current
         val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
         val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
         Row(
@@ -118,9 +121,8 @@ private fun ToolCardHeader(
                 .clickable(onClick = onToggle)
                 .padding(horizontal = 10.dp, vertical = 5.dp)
                 .semantics {
-                    contentDescription = "Agent message, outbound, to " +
-                        agentDisplayLabel(provenance.toAgentId, provenance.toAgentName) +
-                        ", " + provenance.deliveryState.label().lowercase()
+                    contentDescription = provenance.compactLabel(presentation.resolveName) +
+                        ", ${provenance.deliveryState.displayLabel().lowercase()}"
                 },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -132,7 +134,7 @@ private fun ToolCardHeader(
                 tint = tint.copy(alpha = 0.85f),
             )
             Text(
-                text = "You → ${agentDisplayLabel(provenance.toAgentId, provenance.toAgentName)} · Agent message",
+                text = provenance.compactLabel(presentation.resolveName),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
                 color = tint,
@@ -141,7 +143,7 @@ private fun ToolCardHeader(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = provenance.deliveryState.label(),
+                text = provenance.deliveryState.displayLabel(),
                 style = MaterialTheme.typography.labelSmall,
                 color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
             )

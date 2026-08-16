@@ -78,7 +78,8 @@ class ChatTimelinePresenter {
         prefix: List<UiMessage>,
         previousState: ChatUiState,
         isActiveRunStreaming: Boolean,
-    ): TimelineProjection = projector.project(timeline, prefix, previousState, isActiveRunStreaming)
+        ownAgentId: String? = null,
+    ): TimelineProjection = projector.project(timeline, prefix, previousState, isActiveRunStreaming, ownAgentId)
 
     /** Assemble the neutral presentation from a (changed) projection + signals. */
     fun present(

@@ -203,6 +203,7 @@ internal class ChatTimelineObserver(
                             // between tools (regression introduced by PR
                             // #1119 — see bead letta-mobile-dir4k.1).
                             isActiveRunStreaming = hasActiveChatTurn(),
+                            ownAgentId = observerBinding?.agentId,
                         )
                     }
 

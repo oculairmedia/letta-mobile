@@ -42,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -77,14 +78,24 @@ import kotlin.time.Duration.Companion.milliseconds
 internal fun DesktopMessageBubble(
     message: UiMessage,
     streamingMessageId: StreamingMessageId? = null,
-    resolveAgentName: (agentId: String) -> String? = { null },
-    onAgentClick: (agentId: String) -> Unit = {},
+    resolveAgentName: ((agentId: String) -> String?)? = null,
+    onAgentClick: ((agentId: String) -> Unit)? = null,
 ) {
+    val context = LocalDesktopAgentMessageContext.current
+    val effectiveResolveName = resolveAgentName ?: context.resolveName
+    val effectiveAgentClick = onAgentClick ?: context.onAgentClick
     if (MessageRoleToken(message.role).isUser()) {
-        UserPrompt(message, resolveAgentName = resolveAgentName, onAgentClick = onAgentClick)
+        UserPrompt(message, resolveAgentName = effectiveResolveName, onAgentClick = effectiveAgentClick)
         return
     }
-    AssistantMessageColumn(message = message, streamingMessageId = streamingMessageId)
+    CompositionLocalProvider(
+        LocalDesktopAgentMessageContext provides DesktopAgentMessageContext(
+            resolveName = effectiveResolveName,
+            onAgentClick = effectiveAgentClick,
+        ),
+    ) {
+        AssistantMessageColumn(message = message, streamingMessageId = streamingMessageId)
+    }
 }
 
 @Composable

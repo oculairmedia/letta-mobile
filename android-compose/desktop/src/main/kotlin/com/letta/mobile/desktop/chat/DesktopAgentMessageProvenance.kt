@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,8 +21,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -31,6 +35,15 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.messaging.AgentMessageDeliveryState
 import com.letta.mobile.data.messaging.AgentMessageDirection
 import com.letta.mobile.data.messaging.AgentMessageProvenance
+import com.letta.mobile.data.messaging.agentMessageDisplayLabel
+import com.letta.mobile.data.messaging.displayLabel
+
+internal data class DesktopAgentMessageContext(
+    val resolveName: (String) -> String? = { null },
+    val onAgentClick: (String) -> Unit = {},
+)
+
+internal val LocalDesktopAgentMessageContext = staticCompositionLocalOf { DesktopAgentMessageContext() }
 
 /**
  * letta-mobile-slqfp: desktop-only VISUAL render for structured inter-agent
@@ -47,35 +60,6 @@ import com.letta.mobile.data.messaging.AgentMessageProvenance
  * body's own readability.
  */
 
-/** Short, human-scannable fallback for an unresolved agent id. */
-internal fun agentDisplayLabel(agentId: String, resolvedName: String?): String {
-    val trimmed = resolvedName?.trim()
-    if (!trimmed.isNullOrEmpty()) return trimmed
-    if (agentId.isBlank()) return "Unknown agent"
-    val bare = agentId.removePrefix("agent-")
-    return "Agent " + bare.take(8)
-}
-
-/**
- * The default compact transcript label, e.g.
- * "Meridian → PM-letta-mobile · Agent message" — matches the
- * letta-mobile-slqfp spec format exactly (proper arrow glyph, em middle dot).
- */
-internal fun AgentMessageProvenance.compactLabel(
-    resolveName: (agentId: String) -> String?,
-): String {
-    val from = agentDisplayLabel(fromAgentId, fromAgentName ?: resolveName(fromAgentId))
-    val to = agentDisplayLabel(toAgentId, toAgentName ?: resolveName(toAgentId))
-    return "$from → $to · Agent message"
-}
-
-internal fun AgentMessageDeliveryState.label(): String = when (this) {
-    AgentMessageDeliveryState.PENDING -> "Pending"
-    AgentMessageDeliveryState.SENT -> "Sent"
-    AgentMessageDeliveryState.RECEIVER_CONFIRMED -> "Delivered"
-    AgentMessageDeliveryState.FAILED -> "Failed"
-}
-
 /**
  * Compact label + icon + restrained identity tint for an inbound or
  * outbound inter-agent message. Click toggles the technical-metadata
@@ -90,108 +74,154 @@ internal fun AgentMessageDeliveryState.label(): String = when (this) {
 @Composable
 internal fun AgentMessageProvenanceLabel(
     provenance: AgentMessageProvenance,
-    resolveName: (agentId: String) -> String? = { null },
+    resolveName: ((agentId: String) -> String?)? = null,
     expanded: Boolean,
     onToggleExpand: () -> Unit,
-    onAgentClick: (agentId: String) -> Unit = {},
+    onAgentClick: ((agentId: String) -> Unit)? = null,
 ) {
-    val isInbound = provenance.direction == AgentMessageDirection.INBOUND
-    val isFailed = provenance.deliveryState == AgentMessageDeliveryState.FAILED
+    val context = LocalDesktopAgentMessageContext.current
+    val spec = provenance.toLabelSpec(resolveName ?: context.resolveName)
+    val effectiveAgentClick = onAgentClick ?: context.onAgentClick
     // Semantic identity tint — restrained (tertiary is the M3 "accent
     // distinct from primary" role), not a loud banner color. Failures use
     // the standard destructive (error) role regardless of direction, since a
     // failed send/receipt needs to be noticed.
-    val tint = when {
-        isFailed -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.tertiary
-    }
-    val fromLabel = agentDisplayLabel(provenance.fromAgentId, provenance.fromAgentName ?: resolveName(provenance.fromAgentId))
-    val toLabel = agentDisplayLabel(provenance.toAgentId, provenance.toAgentName ?: resolveName(provenance.toAgentId))
-    val a11yDescription = "Agent message, ${provenance.direction.name.lowercase()}, " +
-        "from $fromLabel to $toLabel, ${provenance.deliveryState.label().lowercase()}" +
-        (provenance.failureReason?.let { ": $it" } ?: "")
+    val tint = if (spec.isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
 
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .semantics { contentDescription = a11yDescription },
+            .semantics { contentDescription = spec.contentDescription },
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onToggleExpand)
-                .padding(bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Icon(
-                imageVector = when {
-                    isFailed -> Icons.Outlined.ErrorOutline
-                    isInbound -> Icons.Outlined.CallReceived
-                    else -> Icons.Outlined.CallMade
-                },
-                contentDescription = null,
-                modifier = Modifier.padding(0.dp),
-                tint = tint.copy(alpha = 0.85f),
-            )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f, fill = false),
-            ) {
-                Text(
-                    text = fromLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = tint,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .clickable(role = Role.Button) { onAgentClick(provenance.fromAgentId) },
-                )
-                Text(
-                    text = "→",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Text(
-                    text = toLabel,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = tint,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .clickable(role = Role.Button) { onAgentClick(provenance.toAgentId) },
-                )
-                Text(
-                    text = " · Agent message",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (provenance.deliveryState != AgentMessageDeliveryState.RECEIVER_CONFIRMED) {
-                Text(
-                    text = provenance.deliveryState.label(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Icon(
-                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
-                contentDescription = if (expanded) "Collapse agent message details" else "Expand agent message details",
-                modifier = Modifier.padding(0.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        AgentMessageProvenanceHeader(
+            provenance = provenance,
+            spec = spec,
+            tint = tint,
+            expanded = expanded,
+            onToggleExpand = onToggleExpand,
+            onAgentClick = effectiveAgentClick,
+        )
+        if (expanded) AgentMessageProvenanceMetadata(provenance, tint)
+    }
+}
+
+private data class ProvenanceLabelSpec(
+    val fromLabel: String,
+    val toLabel: String,
+    val isInbound: Boolean,
+    val isFailed: Boolean,
+    val contentDescription: String,
+) {
+    val directionIcon: ImageVector
+        get() = when {
+            isFailed -> Icons.Outlined.ErrorOutline
+            isInbound -> Icons.Outlined.CallReceived
+            else -> Icons.Outlined.CallMade
         }
-        if (expanded) {
-            AgentMessageProvenanceMetadata(provenance, tint)
-        }
+}
+
+private fun AgentMessageProvenance.toLabelSpec(resolveName: (String) -> String?): ProvenanceLabelSpec {
+    val fromLabel = agentMessageDisplayLabel(fromAgentId, fromAgentName ?: resolveName(fromAgentId))
+    val toLabel = agentMessageDisplayLabel(toAgentId, toAgentName ?: resolveName(toAgentId))
+    val failureDetail = failureReason?.let { ": $it" }.orEmpty()
+    return ProvenanceLabelSpec(
+        fromLabel = fromLabel,
+        toLabel = toLabel,
+        isInbound = direction == AgentMessageDirection.INBOUND,
+        isFailed = deliveryState == AgentMessageDeliveryState.FAILED,
+        contentDescription = "Agent message, ${direction.name.lowercase()}, " +
+            "from $fromLabel to $toLabel, ${deliveryState.displayLabel().lowercase()}$failureDetail",
+    )
+}
+
+@Composable
+private fun AgentMessageProvenanceHeader(
+    provenance: AgentMessageProvenance,
+    spec: ProvenanceLabelSpec,
+    tint: Color,
+    expanded: Boolean,
+    onToggleExpand: () -> Unit,
+    onAgentClick: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onToggleExpand)
+            .padding(bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(
+            imageVector = spec.directionIcon,
+            contentDescription = null,
+            modifier = Modifier.padding(0.dp),
+            tint = tint.copy(alpha = 0.85f),
+        )
+        AgentRoute(provenance, spec, tint, onAgentClick)
+        DeliveryState(provenance.deliveryState, spec.isFailed)
+        ExpansionIcon(expanded)
     }
 }
 
 @Composable
-internal fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: androidx.compose.ui.graphics.Color) {
+private fun RowScope.AgentRoute(
+    provenance: AgentMessageProvenance,
+    spec: ProvenanceLabelSpec,
+    tint: Color,
+    onAgentClick: (String) -> Unit,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.weight(1f, fill = false),
+    ) {
+        AgentLink(spec.fromLabel, provenance.fromAgentId, tint, onAgentClick)
+        Text("→", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AgentLink(spec.toLabel, provenance.toAgentId, tint, onAgentClick)
+        Text(
+            text = " · Agent message",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun AgentLink(label: String, agentId: String, tint: Color, onAgentClick: (String) -> Unit) {
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelMedium,
+        color = tint,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.clickable(role = Role.Button) { onAgentClick(agentId) },
+    )
+}
+
+@Composable
+private fun DeliveryState(state: AgentMessageDeliveryState, isFailed: Boolean) {
+    if (state == AgentMessageDeliveryState.RECEIVER_CONFIRMED) return
+    Text(
+        text = state.displayLabel(),
+        style = MaterialTheme.typography.labelSmall,
+        color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+private fun ExpansionIcon(expanded: Boolean) {
+    Icon(
+        imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+        contentDescription = if (expanded) "Collapse agent message details" else "Expand agent message details",
+        modifier = Modifier.padding(0.dp),
+        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+@Composable
+internal fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, tint: Color) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -211,7 +241,7 @@ internal fun AgentMessageProvenanceMetadata(provenance: AgentMessageProvenance, 
                 MetadataRow("Message id", provenance.msgId.ifBlank { "(unknown — transport did not confirm)" })
                 MetadataRow("Transport", provenance.transport)
                 provenance.routingConversationId?.let { MetadataRow("Routing conversation", it) }
-                MetadataRow("Delivery state", provenance.deliveryState.label())
+                MetadataRow("Delivery state", provenance.deliveryState.displayLabel())
                 provenance.failureReason?.let { MetadataRow("Failure detail", it) }
                 provenance.ackLatencyMs?.let { MetadataRow("Ack latency", "$it ms") }
             }
