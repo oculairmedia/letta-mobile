@@ -15,7 +15,8 @@ class DesktopJewelWindowTest {
         val build = project.resolve("build.gradle.kts").readText()
 
         assertContains(source, "DecoratedWindow(")
-        assertContains(source, "TitleBar(style = titleBarStyle)")
+        assertContains(source, "BasicTitleBar(")
+        assertContains(source, "style = titleBarStyle")
         assertFalse(source.lineSequence().any { it.trim().startsWith("undecorated = true") })
         assertContains(build, "implementation(\"dev.nucleusframework:nucleus.decorated-window-core:")
         assertContains(build, "implementation(\"dev.nucleusframework:nucleus.decorated-window-awt:")
