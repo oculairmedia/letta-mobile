@@ -2,8 +2,11 @@ package com.letta.mobile.web.data
 
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
@@ -21,7 +24,13 @@ data class WebChatEntry(
     val sender: String,
     val text: String,
     val isUser: Boolean,
+    val attachments: List<MessageContentPart.Image> = emptyList(),
 )
+
+sealed interface WebConversationUpdate {
+    data class Snapshot(val entries: List<WebChatEntry>) : WebConversationUpdate
+    data class Upsert(val entry: WebChatEntry) : WebConversationUpdate
+}
 
 internal fun resolveWebSocketUrl(serverUrl: String): String {
     val trimmed = serverUrl.trim().removeSuffix("/")
@@ -62,8 +71,16 @@ internal fun mergeAssistantText(existing: String, incoming: String): String = wh
     else -> existing + incoming
 }
 
+internal fun decodeWebConversationUpdate(received: AppServerReceivedFrame): WebConversationUpdate? {
+    val stream = received.frame as? AppServerInboundFrame.StreamDelta ?: return null
+    val message = runCatching {
+        AppServerProtocol.json.decodeFromJsonElement(LettaMessage.serializer(), stream.delta)
+    }.getOrNull() ?: return null
+    return message.toWebEntry()?.let(WebConversationUpdate::Upsert)
+}
+
 internal fun LettaMessage.toWebEntry(): WebChatEntry? = when (this) {
-    is UserMessage -> WebChatEntry(id, "You", content, true)
-    is AssistantMessage -> WebChatEntry(id, "Agent", content, false)
+    is UserMessage -> WebChatEntry(id, "You", content, true, attachments)
+    is AssistantMessage -> WebChatEntry(id, "Agent", content, false, attachments)
     else -> null
 }
