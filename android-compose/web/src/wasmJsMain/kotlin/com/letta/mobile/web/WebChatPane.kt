@@ -49,6 +49,7 @@ internal fun WebChatPane(
     isSending: Boolean,
     error: String?,
     workspaceName: String?,
+    attachments: WebImageAttachments,
     onInputChanged: (String) -> Unit,
     onAgentSelected: (AgentItemState) -> Unit,
     onSend: () -> Unit,
@@ -63,15 +64,18 @@ internal fun WebChatPane(
             agents = agents,
             selectedAgent = selectedAgent,
             connectionState = connectionState,
-            workspaceName = workspaceName,
             onAgentSelected = onAgentSelected,
-            onOpenWorkspace = onOpenWorkspace,
             onSettings = onSettings,
         )
         Box(modifier = Modifier.weight(1f).fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
             when {
                 isLoadingConversation -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                selectedAgent == null -> EmptyChatState(connectionState, onSettings, Modifier.align(Alignment.Center))
+                selectedAgent == null -> EmptyChatState(
+                    connectionState,
+                    compact,
+                    onSettings,
+                    Modifier.align(Alignment.Center),
+                )
                 else -> WebChatMessages(messages, selectedAgent, isSending, compact)
             }
         }
@@ -89,6 +93,7 @@ internal fun WebChatPane(
             enabled = canSend,
             compact = compact,
             workspaceName = workspaceName,
+            attachments = attachments,
             onInputChanged = onInputChanged,
             onOpenWorkspace = onOpenWorkspace,
             onSend = onSend,
@@ -102,9 +107,7 @@ private fun ChatHeader(
     agents: List<AgentItemState>,
     selectedAgent: AgentItemState?,
     connectionState: WebConnectionState,
-    workspaceName: String?,
     onAgentSelected: (AgentItemState) -> Unit,
-    onOpenWorkspace: () -> Unit,
     onSettings: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
@@ -143,9 +146,11 @@ private fun ChatHeader(
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (!compact) WebConnectionStatus(connectionState)
-                WebTooltip("Backend settings") {
-                    IconButton(onClick = onSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Backend settings")
+                if (compact) {
+                    WebTooltip("Backend settings") {
+                        IconButton(onClick = onSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "Backend settings")
+                        }
                     }
                 }
             }
@@ -154,7 +159,12 @@ private fun ChatHeader(
 }
 
 @Composable
-private fun EmptyChatState(state: WebConnectionState, onSettings: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyChatState(
+    state: WebConnectionState,
+    compact: Boolean,
+    onSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Column(modifier = modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         WebConnectionStatus(state)
         Spacer(Modifier.height(12.dp))
@@ -163,7 +173,7 @@ private fun EmptyChatState(state: WebConnectionState, onSettings: () -> Unit, mo
             else "Configure a backend before starting a conversation.",
             style = MaterialTheme.typography.bodyMedium,
         )
-        if (state !is WebConnectionState.Connected) {
+        if (compact && state !is WebConnectionState.Connected) {
             Spacer(Modifier.height(8.dp))
             AssistChip(onClick = onSettings, label = { Text("Open settings") })
         }

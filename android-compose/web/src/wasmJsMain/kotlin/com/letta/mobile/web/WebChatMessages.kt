@@ -22,6 +22,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -30,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.web.data.AgentItemState
 import com.letta.mobile.web.data.WebChatEntry
+import com.letta.mobile.data.model.MessageContentPart
 
 private val WebChatColumnMaxWidth = 760.dp
 
@@ -104,8 +108,13 @@ private fun WebUserPrompt(message: WebChatEntry) {
         contentColor = MaterialTheme.colorScheme.onSurface,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
     ) {
-        SelectionContainer {
-            Text(message.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(14.dp))
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AttachmentSummary(message.attachments)
+            if (message.text.isNotBlank()) {
+                SelectionContainer {
+                    Text(message.text, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
         }
     }
 }
@@ -115,12 +124,37 @@ private fun WebAssistantMessage(message: WebChatEntry) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
         WebAgentSphere(28.dp)
         Spacer(Modifier.width(12.dp))
-        SelectionContainer {
+        Column(modifier = Modifier.weight(1f).padding(top = 3.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            AttachmentSummary(message.attachments)
+            if (message.text.isNotBlank()) {
+                SelectionContainer {
+                    Text(
+                        message.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AttachmentSummary(attachments: List<MessageContentPart.Image>) {
+    if (attachments.isEmpty()) return
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(Icons.Outlined.Image, contentDescription = null, modifier = Modifier.size(16.dp))
             Text(
-                message.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.weight(1f).padding(top = 3.dp),
+                if (attachments.size == 1) "1 image" else "${attachments.size} images",
+                style = MaterialTheme.typography.labelMedium,
             )
         }
     }

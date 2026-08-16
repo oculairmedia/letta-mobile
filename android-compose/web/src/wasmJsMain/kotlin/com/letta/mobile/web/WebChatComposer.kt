@@ -16,6 +16,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -29,6 +31,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.web.data.AgentItemState
+import com.letta.mobile.data.model.MessageContentPart
+
+internal data class WebImageAttachments(
+    val images: List<MessageContentPart.Image>,
+    val onAttach: () -> Unit,
+    val onRemove: (Int) -> Unit,
+)
 
 @Composable
 internal fun WebChatComposer(
@@ -37,6 +46,7 @@ internal fun WebChatComposer(
     enabled: Boolean,
     compact: Boolean,
     workspaceName: String?,
+    attachments: WebImageAttachments,
     onInputChanged: (String) -> Unit,
     onOpenWorkspace: () -> Unit,
     onSend: () -> Unit,
@@ -66,6 +76,28 @@ internal fun WebChatComposer(
                 val textStyle = MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                if (attachments.images.isNotEmpty()) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        attachments.images.forEachIndexed { index, _ ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(start = 8.dp, end = 2.dp, top = 4.dp, bottom = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Image ${index + 1}", style = MaterialTheme.typography.labelMedium)
+                                    IconButton(onClick = { attachments.onRemove(index) }, modifier = Modifier.size(26.dp)) {
+                                        Icon(Icons.Outlined.Close, contentDescription = "Remove image ${index + 1}", modifier = Modifier.size(14.dp))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
                 BasicTextField(
                     value = input,
                     onValueChange = onInputChanged,
@@ -88,6 +120,12 @@ internal fun WebChatComposer(
                     },
                 )
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                    WebTooltip("Attach images") {
+                        IconButton(onClick = attachments.onAttach, enabled = enabled, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Outlined.AddPhotoAlternate, contentDescription = "Attach images", modifier = Modifier.size(17.dp))
+                        }
+                    }
+                    Spacer(Modifier.width(4.dp))
                     WebTooltip(if (workspaceName == null) "Open local workspace" else "Change workspace") {
                         IconButton(onClick = onOpenWorkspace, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Outlined.FolderOpen, contentDescription = "Open local workspace", modifier = Modifier.size(17.dp))
@@ -106,7 +144,7 @@ internal fun WebChatComposer(
                     WebTooltip("Send message") {
                         FilledIconButton(
                             onClick = onSend,
-                            enabled = enabled && input.isNotBlank(),
+                            enabled = enabled && (input.isNotBlank() || attachments.images.isNotEmpty()),
                             shape = CircleShape,
                             modifier = Modifier.size(36.dp),
                         ) {
@@ -120,7 +158,7 @@ internal fun WebChatComposer(
         if (!compact) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Text(
-                    "@ add files   ·   / commands   ·   Enter to send   ·   Shift+Enter newline",
+                    "Attach images   ·   Enter to send   ·   Shift+Enter newline",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.92f),
                     modifier = Modifier.width(minOf(maxWidth, 760.dp)).padding(start = 8.dp),
