@@ -26,21 +26,33 @@ object AgentMessageClientId {
     private const val PART_COUNT = 3
 
     fun encode(msgId: String, fromAgentId: String, toAgentId: String): String {
-        if (containsDelimiter(msgId, fromAgentId, toAgentId)) return msgId
-        return "$PREFIX$msgId:$fromAgentId:$toAgentId"
+        val parts = Parts(msgId, fromAgentId, toAgentId)
+        return parts.encodedOrNull() ?: msgId
     }
-
-    private fun containsDelimiter(vararg values: String): Boolean = values.any { ':' in it }
 
     data class Decoded(val msgId: String, val fromAgentId: String, val toAgentId: String)
 
-    fun decode(clientMessageId: String?): Decoded? {
-        if (clientMessageId == null || !clientMessageId.startsWith(PREFIX)) return null
-        val rest = clientMessageId.removePrefix(PREFIX)
-        val parts = rest.split(':')
-        if (parts.size != PART_COUNT) return null
-        val (msgId, from, to) = parts
-        if (msgId.isBlank() || from.isBlank() || to.isBlank()) return null
-        return Decoded(msgId, from, to)
+    fun decode(clientMessageId: String?): Decoded? = clientMessageId
+        ?.takeIf { it.startsWith(PREFIX) }
+        ?.removePrefix(PREFIX)
+        ?.split(':')
+        ?.toDecoded()
+
+    fun dedupIdentity(clientMessageId: String): String = decode(clientMessageId)?.msgId ?: clientMessageId
+
+    private data class Parts(
+        val msgId: String,
+        val fromAgentId: String,
+        val toAgentId: String,
+    ) {
+        private val values = listOf(msgId, fromAgentId, toAgentId)
+
+        fun encodedOrNull(): String? = values
+            .takeUnless { parts -> parts.any { it.contains(':') } }
+            ?.joinToString(separator = ":", prefix = PREFIX)
     }
+
+    private fun List<String>.toDecoded(): Decoded? = takeIf { it.size == PART_COUNT }
+        ?.takeUnless { parts -> parts.any(String::isBlank) }
+        ?.let { (msgId, fromAgentId, toAgentId) -> Decoded(msgId, fromAgentId, toAgentId) }
 }

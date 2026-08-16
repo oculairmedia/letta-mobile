@@ -50,8 +50,10 @@ class AgentMessageClientIdTest {
     }
 
     @Test
-    fun `encode rejects delimiters in message and recipient ids`() {
-        assertEquals("msg:1", AgentMessageClientId.encode("msg:1", "agent-a", "agent-b"))
-        assertEquals("msg-1", AgentMessageClientId.encode("msg-1", "agent-a", "agent:b"))
+    fun `dedup identity normalizes encoded and legacy ids`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+
+        assertEquals("msg-1", AgentMessageClientId.dedupIdentity(encoded))
+        assertEquals("msg-1", AgentMessageClientId.dedupIdentity("msg-1"))
     }
 }

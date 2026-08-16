@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.messaging.AgentMessageClientId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
@@ -66,6 +67,16 @@ class TimelineTest {
         assertEquals(2, t.events.size)
         assertEquals("a", t.events[0].otid)
         assertEquals("b", t.events[1].otid)
+    }
+
+    @Test
+    fun `legacy and encoded agent message ids share one lookup identity`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+        val legacyEvent = local("msg-1", 1.0)
+        val encodedEvent = confirmed(encoded, 1.0, TimelineMessageType.USER)
+
+        assertEquals(legacyEvent, Timeline("legacy").append(legacyEvent).findByOtid(encoded))
+        assertEquals(encodedEvent, Timeline("encoded").append(encodedEvent).findByOtid("msg-1"))
     }
 
     // NOTE: Previous tests asserted that append() throws IllegalArgumentException

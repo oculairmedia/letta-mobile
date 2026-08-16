@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.messaging.AgentMessageClientId
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
@@ -197,7 +198,10 @@ data class Timeline(
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashMap<String, Int>(events.size).also { map ->
-            events.forEachIndexed { i, e -> map[e.otid] = i }
+            events.forEachIndexed { i, event ->
+                map[event.otid] = i
+                map[AgentMessageClientId.dedupIdentity(event.otid)] = i
+            }
         }
     }
 
@@ -246,7 +250,8 @@ data class Timeline(
         return last + 1.0
     }
 
-    fun findByOtid(otid: String): TimelineEvent? = otidToIndex[otid]?.let { events[it] }
+    fun findByOtid(otid: String): TimelineEvent? =
+        otidToIndex[AgentMessageClientId.dedupIdentity(otid)]?.let { events[it] }
 
     fun containsIdentityFor(event: TimelineEvent): Boolean {
         val tail = events.lastOrNull()
