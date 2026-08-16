@@ -80,6 +80,7 @@ private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // the space — the bar's previous compact state, restored live.
 private val ChatComposerInputVerticalPadding = 24.dp
 private val ChatComposerInputCompactVerticalPadding = 12.dp
+private const val ChatComposerImeInsetForCompactPaddingPx = 96
 private val ChatComposerInputItemSpacing = LettaSpacing.XS
 
 internal object ChatComposerTestTags {
@@ -342,13 +343,17 @@ private fun ChatComposerInput(
     // tracks the keyboard even when the field loses focus while the IME is
     // still up (e.g. user taps the attach menu).
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    // The parent follows platform IME insets directly. Do the same here so
-    // composer padding cannot lag behind the keyboard with a separate tween.
-    val verticalPadding = if (keyboardOpen) {
-        ChatComposerInputCompactVerticalPadding
-    } else {
-        ChatComposerInputVerticalPadding
-    }
+    // Drive the height transition from the same continuously changing IME
+    // inset that moves the parent. A fixed tween starts after the keyboard
+    // transition and produces a visible pop on close.
+    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val compactFraction = (imeBottomPx.toFloat() / ChatComposerImeInsetForCompactPaddingPx)
+        .coerceIn(0f, 1f)
+    val verticalPadding = androidx.compose.ui.unit.lerp(
+        start = ChatComposerInputVerticalPadding,
+        stop = ChatComposerInputCompactVerticalPadding,
+        fraction = compactFraction,
+    )
     LettaInputBar(
         text = model.inputText,
         onTextChange = callbacks.onTextChange,
