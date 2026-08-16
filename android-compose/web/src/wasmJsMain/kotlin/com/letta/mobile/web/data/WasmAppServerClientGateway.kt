@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlin.random.Random
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -43,6 +44,7 @@ class WasmAppServerClientGateway(
     private val mutableState = MutableStateFlow<WebConnectionState>(WebConnectionState.Unconfigured)
     private var activeSession: WasmAppServerSession? = null
     private var connectionMonitor: Job? = null
+    private val requestSessionId = Random.nextLong().toString()
     private var requestSequence = 0
 
     val state: StateFlow<WebConnectionState> = mutableState.asStateFlow()
@@ -183,7 +185,7 @@ class WasmAppServerClientGateway(
 
     private fun nextRequestId(prefix: String): String {
         requestSequence += 1
-        return "web-$prefix-$requestSequence"
+        return webRequestId(requestSessionId, prefix, requestSequence)
     }
 
     private suspend fun <T> bounded(
@@ -201,3 +203,6 @@ class WasmAppServerClientGateway(
         const val REQUEST_TIMEOUT_MS = 20_000L
     }
 }
+
+internal fun webRequestId(sessionId: String, prefix: String, sequence: Int): String =
+    "web-$sessionId-$prefix-$sequence"

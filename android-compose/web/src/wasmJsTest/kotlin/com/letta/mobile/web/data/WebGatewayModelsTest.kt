@@ -9,6 +9,7 @@ import com.letta.mobile.web.encodeWebImage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNotEquals
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -44,6 +45,15 @@ class WebGatewayModelsTest {
         assertEquals("hello", mergeAssistantText("hel", "hello"))
         assertEquals("hello world", mergeAssistantText("hello", " world"))
         assertEquals("hello", mergeAssistantText("hello", "hello"))
+    }
+
+    @Test
+    fun `request ids do not collide after a page reload`() {
+        val firstPage = webRequestId("page-a", "message", 9)
+        val reloadedPage = webRequestId("page-b", "message", 9)
+
+        assertNotEquals(firstPage, reloadedPage)
+        assertEquals("web-page-b-message-9", reloadedPage)
     }
 
     @Test
