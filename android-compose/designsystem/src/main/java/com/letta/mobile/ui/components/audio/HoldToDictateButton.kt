@@ -9,7 +9,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
@@ -31,6 +30,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -98,7 +98,8 @@ fun HoldToDictateButton(
     if (recordAudioPermissionGranted) {
         Box(
             modifier = modifier
-                .wrapContentSize(Alignment.Center)
+                .size(48.dp)
+                .testTag(HOLD_TO_DICTATE_BUTTON_TEST_TAG)
                 .pointerInput(Unit) {
                     val cancelThresholdPx = cancelThresholdDp.dp.toPx()
                     awaitEachGesture {
@@ -127,18 +128,35 @@ fun HoldToDictateButton(
                             onStopUpdated()
                         }
                     }
-                }
-                .clip(CircleShape)
-                .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
-                .background(if (isRecognizing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer)
-                .size(44.dp),
+                },
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Rounded.Mic,
-                contentDescription = "Hold to talk",
-                tint = if (isRecognizing) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
-            )
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
+                    .background(
+                        if (isRecognizing) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.primaryContainer
+                        },
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Mic,
+                    contentDescription = "Hold to talk",
+                    tint = if (isRecognizing) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    },
+                )
+            }
         }
     }
 }
+
+internal const val HOLD_TO_DICTATE_BUTTON_TEST_TAG = "hold_to_dictate_button"
