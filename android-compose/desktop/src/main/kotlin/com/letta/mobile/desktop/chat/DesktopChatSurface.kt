@@ -70,6 +70,7 @@ internal data class ChatDetailPaneState(
     val composerPlaceholder: String = "Message…",
     /** Approval request ids whose answer/dismiss is currently in flight. */
     val submittingApprovalRequestIds: Set<String> = emptySet(),
+    val agentNamesById: Map<String, String> = emptyMap(),
 )
 
 /** Interaction callbacks for [ChatDetailPane]. */
@@ -84,6 +85,7 @@ internal data class ChatDetailPaneActions(
     val onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
     /** Answer / dismiss a parked approval: (requestId, toolCallIds, approve, reason). */
     val onSubmitApproval: ((String, List<String>, Boolean, String?) -> Unit)? = null,
+    val onOpenAgent: (String) -> Unit = {},
 )
 
 @Composable
@@ -127,7 +129,13 @@ internal fun ChatDetailPane(
     // A hairline edge separates the chat pane from the sidebar without insetting
     // it: the pane stays flush to the window, so this reads as one boundary line
     // rather than a second frame floating inside the app's own window border.
-    CompositionLocalProvider(LocalDesktopApprovalDecision provides approvalHandler) {
+    CompositionLocalProvider(
+        LocalDesktopApprovalDecision provides approvalHandler,
+        LocalDesktopAgentMessageContext provides DesktopAgentMessageContext(
+            resolveName = state.agentNamesById::get,
+            onAgentClick = actions.onOpenAgent,
+        ),
+    ) {
     DesktopAmbientChatBackground(
         status = ambientStatus,
         modifier = modifier

@@ -612,4 +612,207 @@ class TimelineEventToUiMessageTest {
         assertNotNull(ui.toolCalls!![0].resultTruncation)
         assertEquals(120000L, ui.toolCalls!![0].resultTruncation!!.byteLen)
     }
+
+    // ---- letta-mobile-slqfp: inter-agent provenance projection ----------
+
+    @Test
+    fun `inbound a2a USER message projects structured provenance - Confirmed hydration path`() {
+        val clientMessageId = com.letta.mobile.data.messaging.AgentMessageClientId.encode(
+            msgId = "msg-hydrated-1",
+            fromAgentId = "agent-meridian",
+            toAgentId = "agent-pm",
+        )
+        val ev = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = clientMessageId,
+            content = "Ping from Meridian",
+            serverId = "server-msg-1",
+            messageType = TimelineMessageType.USER,
+            runId = null,
+            stepId = null,
+            date = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            agentId = "agent-pm",
+        )
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertEquals("user", ui.role)
+        val provenance = ui.agentMessageProvenance
+        assertNotNull(provenance)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDirection.INBOUND,
+            provenance.direction,
+        )
+        assertEquals("agent-meridian", provenance.fromAgentId)
+        assertEquals("agent-pm", provenance.toAgentId)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDeliveryState.RECEIVER_CONFIRMED,
+            provenance.deliveryState,
+        )
+    }
+
+    @Test
+    fun `ordinary human-sent USER message has no agent provenance - no content heuristics`() {
+        val ev = confirmed(
+            TimelineMessageType.USER,
+            content = "Meridian just told me the deploy is done",
+            serverId = "human-1",
+        )
+        val ui = timelineEventToUiMessage(ev)!!
+        // The body TEXT mentions another agent's name, but the clientMessageId
+        // carries no a2a envelope encoding — must NOT be treated as inbound
+        // agent provenance. This pins the "no content heuristics" AC.
+        assertNull(ui.agentMessageProvenance)
+    }
+
+    @Test
+    fun `outbound agent_message_send tool call projects structured provenance on the tool call`() {
+        val tc = ToolCall(
+            id = "call-a2a-1",
+            name = "agent_message_send",
+            arguments = """{"to":"agent-meridian","body":"status update"}""",
+        )
+        val ev = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "otid-a2a-send-1",
+            content = "",
+            serverId = "server-tc-1",
+            messageType = TimelineMessageType.TOOL_CALL,
+            runId = null,
+            stepId = null,
+            date = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            agentId = "agent-pm",
+            toolCalls = listOf(tc).toPersistentList(),
+            toolReturnContentByCallId = mapOf(
+                "call-a2a-1" to """{"ok":true,"delivered":true,"msgId":"msg-out-1","to":"agent-meridian"}""",
+            ).toPersistentMap(),
+        )
+        val ui = timelineEventToUiMessage(ev)!!
+        val provenance = ui.toolCalls!!.single().agentMessageProvenance
+        assertNotNull(provenance)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDirection.OUTBOUND,
+            provenance.direction,
+        )
+        assertEquals("agent-pm", provenance.fromAgentId)
+        assertEquals("agent-meridian", provenance.toAgentId)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDeliveryState.RECEIVER_CONFIRMED,
+            provenance.deliveryState,
+        )
+        assertEquals("msg-out-1", provenance.msgId)
+    }
+
+    @Test
+    fun `outbound agent_message_send tool call projects FAILED delivery state on error`() {
+        val tc = ToolCall(
+            id = "call-a2a-2",
+            name = "agent_message_send",
+            arguments = """{"to":"agent-unreachable","body":"hello"}""",
+        )
+        val ev = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "otid-a2a-send-2",
+            content = "",
+            serverId = "server-tc-2",
+            messageType = TimelineMessageType.TOOL_CALL,
+            runId = null,
+            stepId = null,
+            date = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            agentId = "agent-pm",
+            toolCalls = listOf(tc).toPersistentList(),
+            toolReturnContentByCallId = mapOf(
+                "call-a2a-2" to "agent_message_send: target 'agent-unreachable' is unaddressable: no_address",
+            ).toPersistentMap(),
+            toolReturnIsErrorByCallId = mapOf("call-a2a-2" to true).toPersistentMap(),
+        )
+        val ui = timelineEventToUiMessage(ev)!!
+        val provenance = ui.toolCalls!!.single().agentMessageProvenance
+        assertNotNull(provenance)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED,
+            provenance.deliveryState,
+        )
+        assertNotNull(provenance.failureReason)
+    }
+
+    @Test
+    fun `local outbound agent message carries pending provenance before confirmation`() {
+        val event = TimelineEvent.Local(
+            position = 1.0,
+            otid = "otid-a2a-local",
+            content = "",
+            sentAt = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            deliveryState = DeliveryState.SENDING,
+            messageType = TimelineMessageType.TOOL_CALL,
+            toolCalls = listOf(
+                ToolCall(
+                    id = "call-a2a-local",
+                    name = "agent_message_send",
+                    arguments = """{"to":"agent-meridian","body":"status update"}""",
+                ),
+            ).toPersistentList(),
+        )
+
+        val provenance = timelineEventToUiMessage(event, ownAgentId = "agent-pm")
+            ?.toolCalls
+            ?.single()
+            ?.agentMessageProvenance
+
+        assertNotNull(provenance)
+        assertEquals("agent-pm", provenance.fromAgentId)
+        assertEquals("agent-meridian", provenance.toAgentId)
+        assertEquals(
+            com.letta.mobile.data.messaging.AgentMessageDeliveryState.PENDING,
+            provenance.deliveryState,
+        )
+    }
+
+    @Test
+    fun `hydration and live-reconciled paths render identical provenance for the same logical message`() {
+        // letta-mobile-slqfp AC6: the SAME logical inbound a2a message must
+        // render identically whether it is observed as freshly-arrived LIVE
+        // (a Local optimistic row created by the fanout path) or as
+        // server-HYDRATED history (a Confirmed event fetched later, e.g.
+        // after a reconnect) — same otid, same projected provenance, so a
+        // reconciliation swap never changes what the user sees mid-flight.
+        val clientMessageId = com.letta.mobile.data.messaging.AgentMessageClientId.encode(
+            msgId = "msg-reconcile-1",
+            fromAgentId = "agent-meridian",
+            toAgentId = "agent-pm",
+        )
+
+        val live = TimelineEvent.Local(
+            position = 1.0,
+            otid = clientMessageId,
+            content = "Ping from Meridian",
+            role = Role.USER,
+            sentAt = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            deliveryState = DeliveryState.SENT,
+            messageType = TimelineMessageType.USER,
+        )
+        val hydrated = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = clientMessageId,
+            content = "Ping from Meridian",
+            serverId = "server-msg-reconcile-1",
+            messageType = TimelineMessageType.USER,
+            runId = null,
+            stepId = null,
+            date = parseTimelineInstant("2026-08-15T06:00:00Z"),
+            agentId = "agent-pm",
+        )
+
+        val liveUi = timelineEventToUiMessage(live)!!
+        val hydratedUi = timelineEventToUiMessage(hydrated)!!
+
+        assertEquals(liveUi.agentMessageProvenance, hydratedUi.agentMessageProvenance)
+        assertNotNull(liveUi.agentMessageProvenance)
+        assertEquals("agent-meridian", liveUi.agentMessageProvenance!!.fromAgentId)
+        assertEquals(liveUi.content, hydratedUi.content)
+        assertEquals(liveUi.role, hydratedUi.role)
+        // Both events share one otid — the dedup key TimelineHydrationReducer
+        // and TimelineSyncReconcile key off of — so they collapse to a single
+        // timeline row rather than appearing twice.
+        assertEquals(live.otid, hydrated.otid)
+    }
 }

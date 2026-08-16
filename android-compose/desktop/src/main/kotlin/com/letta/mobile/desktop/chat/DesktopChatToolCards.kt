@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CallMade
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -43,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -54,6 +57,8 @@ import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.messaging.compactLabel
+import com.letta.mobile.data.messaging.displayLabel
 
 /**
  * Collapsible single-tool disclosure. Deliberately chrome-less when it succeeds:
@@ -100,6 +105,57 @@ private fun ToolCardHeader(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
+    // letta-mobile-slqfp: `agent_message_send` gets a distinct compact
+    // sender -> recipient label instead of the generic tool-name row — the
+    // whole point of structured provenance is that this reads as an agent
+    // message, not an anonymous tool invocation.
+    val provenance = toolCall.agentMessageProvenance
+    if (provenance != null) {
+        val presentation = LocalDesktopAgentMessageContext.current
+        val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
+        val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tool-card-toggle")
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+                .semantics {
+                    contentDescription = provenance.compactLabel(presentation.resolveName) +
+                        ", ${provenance.deliveryState.displayLabel().lowercase()}"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CallMade,
+                contentDescription = null,
+                modifier = Modifier.size(13.dp),
+                tint = tint.copy(alpha = 0.85f),
+            )
+            Text(
+                text = provenance.compactLabel(presentation.resolveName),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = provenance.deliveryState.displayLabel(),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
     val collapsedSummary = toolCall.stepLabel()
         .takeUnless { it == toolCall.name }
         ?: toolCall.stepSummary()
@@ -161,6 +217,14 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
             .padding(start = 31.dp, end = 10.dp, top = 2.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        toolCall.agentMessageProvenance?.let { provenance ->
+            val tint = if (provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.tertiary
+            }
+            AgentMessageProvenanceMetadata(provenance, tint)
+        }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
             SelectionContainer {
                 Text(

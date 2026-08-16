@@ -142,9 +142,15 @@ class ChatTimelineProjector {
         prefix: List<UiMessage>,
         previousState: ChatUiState,
         isActiveRunStreaming: Boolean,
+        ownAgentId: String? = null,
     ): TimelineProjection {
         val startedAtMs = System.currentTimeMillis()
-        tailProjectionFastPath(timeline = timeline, prefix = prefix, isActiveRunStreaming = isActiveRunStreaming)?.let { fastProjection ->
+        tailProjectionFastPath(
+            timeline = timeline,
+            prefix = prefix,
+            isActiveRunStreaming = isActiveRunStreaming,
+            ownAgentId = ownAgentId,
+        )?.let { fastProjection ->
             emitProjectionTelemetry(
                 timeline = timeline,
                 projection = fastProjection,
@@ -170,7 +176,7 @@ class ChatTimelineProjector {
                 cached
             } else {
                 eventsProjected++
-                event.projectForCacheRecord(key)
+                event.projectForCacheRecord(key, ownAgentId)
             }
             nextCache[key] = projected
             nextRecords += projected
@@ -294,6 +300,7 @@ class ChatTimelineProjector {
         timeline: Timeline,
         prefix: List<UiMessage>,
         isActiveRunStreaming: Boolean,
+        ownAgentId: String?,
     ): TimelineProjection? {
         val previous = lastProjectionSnapshot ?: return null
         if (previous.conversationId != timeline.conversationId || timeline.events.isEmpty()) return null
@@ -313,7 +320,7 @@ class ChatTimelineProjector {
         val tailEvent = timeline.events.last()
         val tailKey = tailEvent.projectionKey()
         val tailCached = projectionCache[tailKey]?.takeIf { it.event == tailEvent }
-        val tailRecord = tailCached ?: tailEvent.projectForCacheRecord(tailKey)
+        val tailRecord = tailCached ?: tailEvent.projectForCacheRecord(tailKey, ownAgentId)
 
         // letta-mobile-yflpp DEDUPE: during streaming the authoritative Timeline
         // StateFlow can re-emit ~20x/sec for the SAME visible content. The
@@ -562,9 +569,12 @@ class ChatTimelineProjector {
         return combined
     }
 
-    private fun TimelineEvent.projectForCacheRecord(key: TimelineProjectionKey): CachedTimelineProjectionEvent {
+    private fun TimelineEvent.projectForCacheRecord(
+        key: TimelineProjectionKey,
+        ownAgentId: String?,
+    ): CachedTimelineProjectionEvent {
         val extractedA2uiMessages = mutableListOf<A2uiMessage>()
-        val uiMessage = timelineEventToUiMessage(this)
+        val uiMessage = timelineEventToUiMessage(this, ownAgentId)
             ?.extractA2uiHistoryInto(extractedA2uiMessages)
             ?.takeUnless { it.isEmptyAfterA2uiExtraction() }
         return CachedTimelineProjectionEvent(

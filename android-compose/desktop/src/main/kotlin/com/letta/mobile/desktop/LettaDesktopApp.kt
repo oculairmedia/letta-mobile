@@ -700,6 +700,7 @@ internal fun LettaDesktopApp(
                                     selectedAgentName,
                                 ),
                                 submittingApprovalRequestIds = submittingApprovals,
+                                agentNamesById = rosterAgents.associate { it.id.value to it.name },
                             ),
                             actions = ChatDetailPaneActions(
                                 onComposerTextChanged = chatController::updateComposerText,
@@ -724,6 +725,7 @@ internal fun LettaDesktopApp(
                                             selectedDestination = DesktopDestination.Agents
                                     }
                                 },
+                                onOpenAgent = ::openAgent,
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )

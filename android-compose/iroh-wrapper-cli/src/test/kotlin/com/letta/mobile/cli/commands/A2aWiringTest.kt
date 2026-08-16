@@ -386,7 +386,15 @@ class A2aWiringTest {
             m.content.toString().contains("\"envelope\""),
             "persisted/rendered content must not contain the literal envelope JSON key",
         )
-        assertEquals("msg-1", m.clientMessageId, "decision forwards the wire msgId for at-most-once on the receiver")
+        // letta-mobile-slqfp: clientMessageId now carries the structured a2a
+        // envelope encoding (msgId + from/to agentId) so the receiving
+        // client's chat render can project inbound provenance without ever
+        // parsing message body text. Decode it back out rather than
+        // asserting the raw msgId.
+        val decoded = com.letta.mobile.data.messaging.AgentMessageClientId.decode(m.clientMessageId)
+        assertEquals("msg-1", decoded?.msgId, "decision forwards the wire msgId for at-most-once on the receiver")
+        assertEquals("Meridian", decoded?.fromAgentId)
+        assertEquals("PM-letta-mobile", decoded?.toAgentId)
     }
 
     @Test
@@ -528,7 +536,10 @@ class A2aWiringTest {
             m.content.toString().contains("\"envelope\""),
             "persisted/rendered content must not contain the literal envelope JSON key",
         )
-        assertEquals("msg-2", m.clientMessageId)
+        val decodedCreate = com.letta.mobile.data.messaging.AgentMessageClientId.decode(m.clientMessageId)
+        assertEquals("msg-2", decodedCreate?.msgId)
+        assertEquals("Meridian", decodedCreate?.fromAgentId)
+        assertEquals("PM-letta-mobile", decodedCreate?.toAgentId)
     }
 
     @Test
