@@ -31,8 +31,8 @@ Everything under [`android-compose/`](android-compose/).
 | `core/domain/` | Domain models, repository interfaces, business rules |
 | `core/runtime/` | Turn engine, runtime event fanout |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire schemas |
-| `designsystem/` | Reusable Compose UI, theming, A2UI renderer |
-| `sharedLogic/` | **Platform-neutral KMP module.** Domain logic, transport, timeline, IPC — consumed by every host |
+| `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
+| `sharedLogic/` | **KMP shared module.** Platform-neutral domain/transport plus shared Android/Desktop A2UI UI |
 | `desktop/` | Compose Desktop entry point, OS lock, installer |
 | `cli/` `appserver-cli/` | JVM command-line tooling, contract probes |
 | `architecture-tests/` | Module-boundary and parity gates |

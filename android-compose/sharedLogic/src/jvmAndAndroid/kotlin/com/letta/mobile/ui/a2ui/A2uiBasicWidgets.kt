@@ -1,7 +1,5 @@
 package com.letta.mobile.ui.a2ui
 
-import android.content.Intent
-import androidx.core.net.toUri
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,9 +55,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.painter.ColorPainter
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.testTag
@@ -70,11 +67,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
-import com.letta.mobile.ui.haptics.HapticEffects
+import com.letta.mobile.data.timeline.timelineLogger
 import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
@@ -82,6 +80,9 @@ import kotlinx.serialization.json.JsonPrimitive
 import java.time.LocalTime
 
 import kotlin.time.Duration.Companion.milliseconds
+
+private val a2uiLog by lazy { timelineLogger("A2UI") }
+
 @Composable
 internal fun A2uiText(
     component: A2uiComponent,
@@ -128,7 +129,7 @@ internal fun A2uiTextField(
     val validation = component.raw.stringValue("validationRegexp")
 
     val value = if (explicitPath != null) {
-        // Bound surfaces: existing behavior â€” read from the observed binding.
+    // Bound surfaces: existing behavior - read from the observed binding.
         literalDefault
     } else {
         // Unbound surfaces: synthetic data-model slot drives display; literal
@@ -196,11 +197,10 @@ internal fun A2uiBooleanInput(
     val checked = observedAtPath?.let(A2uiBindingResolver::displayText)?.toBooleanStrictOrNull() ?: defaultChecked
     val label = component.resolveControlLabel(surface, renderScope)
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     fun update(next: Boolean) {
         if (next != checked) {
-            if (next) HapticEffects.toggleOn(haptic, view) else HapticEffects.toggleOff(haptic, view)
+            if (next) A2uiHaptics.toggleOn(haptic) else A2uiHaptics.toggleOff(haptic)
         }
         surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
     }
@@ -256,7 +256,6 @@ internal fun A2uiRadio(
     val label = component.resolveControlLabel(surface, renderScope)
     val options = component.resolveRadioOptions(surface, renderScope)
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     if (options.isEmpty()) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
@@ -264,7 +263,7 @@ internal fun A2uiRadio(
     }
 
     fun update(next: String) {
-        if (next != value) HapticEffects.segmentTick(haptic, view)
+        if (next != value) A2uiHaptics.segmentTick(haptic)
         surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
     }
 
@@ -337,7 +336,6 @@ internal fun A2uiChoicePicker(
         else -> options.size <= ChoicePickerSegmentedOptionLimit
     }
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     if (options.isEmpty()) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_COMPONENT))
@@ -350,7 +348,7 @@ internal fun A2uiChoicePicker(
         } else {
             linkedSetOf(next)
         }
-        if (nextSelection != selected) HapticEffects.segmentTick(haptic, view)
+        if (nextSelection != selected) A2uiHaptics.segmentTick(haptic)
         val nextValue = if (multiSelect) {
             JsonArray(nextSelection.map(::JsonPrimitive))
         } else {
@@ -457,7 +455,6 @@ internal fun A2uiDateTimeInput(
     var showTimePicker by remember { mutableStateOf(false) }
     var pendingDateMillis by remember { mutableStateOf(value.toDateMillis()) }
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value.toDateMillis())
     val initialTime = value.toLocalTime() ?: LocalTime.NOON
     val timePickerState = rememberTimePickerState(
@@ -484,7 +481,7 @@ internal fun A2uiDateTimeInput(
                 .matchParentSize()
                 .zIndex(1f)
                 .clickable {
-                    HapticEffects.contextClick(haptic, view)
+                    A2uiHaptics.contextClick(haptic)
                     if (enableDate) {
                         showDatePicker = true
                     } else {
@@ -508,14 +505,14 @@ internal fun A2uiDateTimeInput(
                         pendingDateMillis = datePickerState.selectedDateMillis ?: pendingDateMillis
                         showDatePicker = false
                         if (enableTime) {
-                            HapticEffects.contextClick(haptic, view)
+                            A2uiHaptics.contextClick(haptic)
                             showTimePicker = true
                         } else {
                             surface.dataModel.applyPatch(
                                 path = effectivePath,
                                 value = JsonPrimitive(formatDateTime(pendingDateMillis, null, enableDate, false)),
                             )
-                            HapticEffects.confirm(haptic, view)
+                            A2uiHaptics.confirm(haptic)
                         }
                     },
                 ) {
@@ -550,7 +547,7 @@ internal fun A2uiDateTimeInput(
                                 ),
                             ),
                         )
-                        HapticEffects.confirm(haptic, view)
+                        A2uiHaptics.confirm(haptic)
                     },
                 ) {
                     Text("OK")
@@ -578,7 +575,7 @@ internal fun A2uiImage(
         return
     }
 
-    val context = LocalContext.current
+    val context = LocalPlatformContext.current
     val request = remember(context, imageUrl) {
         ImageRequest.Builder(context)
             .data(imageUrl)
@@ -686,8 +683,7 @@ internal fun A2uiIcon(
 
     if (name == null || imageVector == null) {
         LaunchedEffect(component.id, name) {
-            android.util.Log.w(
-                "A2UI",
+            timelineLogger("A2UI").warn(
                 "Unsupported A2UI Icon name=${name.orEmpty()} componentId=${component.id}",
             )
         }
@@ -1159,9 +1155,8 @@ internal fun A2uiButton(
     val label = component.resolveButtonLabel(surface, renderScope)
     val action = component.action(surface, renderScope)
     val localOpenUrl = component.localOpenUrl(surface, renderScope)
-    val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
     var inFlight by remember(surface.surfaceId, component.id) { mutableStateOf(false) }
 
     LaunchedEffect(inFlight) {
@@ -1182,39 +1177,33 @@ internal fun A2uiButton(
         onClick = {
             if (inFlight) return@Button
             if (localOpenUrl != null) {
-                android.util.Log.i(
-                    "A2UI",
+                a2uiLog.debug(
                     "Button onClick: opening URL surfaceId=${surface.surfaceId} " +
                         "componentId=${component.id} url=$localOpenUrl",
                 )
-                HapticEffects.confirm(haptic, view)
+                A2uiHaptics.confirm(haptic)
                 runCatching {
-                    context.startActivity(
-                        Intent(Intent.ACTION_VIEW, localOpenUrl.toUri())
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
+                    uriHandler.openUri(localOpenUrl)
                 }.onFailure { error ->
-                    android.util.Log.w("A2UI", "Failed to open URL for A2UI Button", error)
+                    a2uiLog.warn("Failed to open URL for A2UI Button", error)
                 }
                 return@Button
             }
             // letta-mobile-ykkl diagnostic: log the dispatch hop so the
-            // chain "Compose onClick â†’ onAction â†’ WsChatBridge â†’ wire"
+                // chain "Compose onClick -> onAction -> WsChatBridge -> wire"
             // is traceable in adb logcat without a debugger attached.
             val resolved = component.action(surface, renderScope)
             if (resolved == null) {
-                android.util.Log.w(
-                    "A2UI",
+                a2uiLog.warn(
                     "Button onClick: action unresolved surfaceId=${surface.surfaceId} " +
                         "componentId=${component.id} raw=${component.raw["action"] ?: component.raw["onClick"]}",
                 )
             } else {
-                android.util.Log.i(
-                    "A2UI",
+                a2uiLog.debug(
                     "Button onClick: dispatching surfaceId=${surface.surfaceId} " +
                         "componentId=${component.id} event=${resolved.name}",
                 )
-                HapticEffects.confirm(haptic, view)
+                A2uiHaptics.confirm(haptic)
                 inFlight = true
                 onPendingActionDelta(1)
                 onAction(resolved)

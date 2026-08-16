@@ -41,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -51,7 +50,6 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.A2uiBindingResolver
 import com.letta.mobile.data.a2ui.A2uiComponent
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
-import com.letta.mobile.ui.haptics.HapticEffects
 import kotlinx.serialization.json.JsonPrimitive
 
 
@@ -71,12 +69,11 @@ internal fun A2uiChip(
         return
     }
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     AssistChip(
         onClick = {
             action?.let {
-                HapticEffects.contextClick(haptic, view)
+                A2uiHaptics.contextClick(haptic)
                 onAction(it)
             }
         },
@@ -101,7 +98,6 @@ internal fun A2uiFilterChip(
     val selected = observedAtPath?.let(A2uiBindingResolver::displayText)?.toBooleanStrictOrNull() ?: defaultSelected
     val label = component.resolveControlLabel(surface, renderScope)
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
     if (label == null) {
         A2uiSkeletonLine(modifier = modifier.testTag(A2uiTestTags.MISSING_TEXT))
         return
@@ -109,7 +105,7 @@ internal fun A2uiFilterChip(
 
     fun update(next: Boolean) {
         if (next != selected) {
-            if (next) HapticEffects.toggleOn(haptic, view) else HapticEffects.toggleOff(haptic, view)
+            if (next) A2uiHaptics.toggleOn(haptic) else A2uiHaptics.toggleOff(haptic)
         }
         surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
     }
@@ -167,7 +163,6 @@ internal fun A2uiTabs(
     val selectedIndexState = rememberA2uiLocalIntState("selectedTabIndex", defaultIndex)
     val selectedIndex = selectedIndexState.value.coerceIn(0, items.lastIndex)
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     Column(
         modifier = modifier
@@ -180,7 +175,7 @@ internal fun A2uiTabs(
                 Tab(
                     selected = selectedIndex == index,
                     onClick = {
-                        if (selectedIndex != index) HapticEffects.segmentTick(haptic, view)
+                        if (selectedIndex != index) A2uiHaptics.segmentTick(haptic)
                         selectedIndexState.value = index
                     },
                     text = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -260,7 +255,7 @@ internal fun A2uiAccordion(
                             color = MaterialTheme.colorScheme.onSurface,
                         )
                         Text(
-                            text = if (expandedState.value) "âˆ’" else "+",
+                            text = if (expandedState.value) "-" else "+",
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -312,10 +307,9 @@ internal fun A2uiDropdown(
     val isError = validation != null && value.isNotBlank() && !value.matchesValidation(validation)
     var expanded by remember(component.id) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
 
     fun update(next: String) {
-        if (next != value) HapticEffects.segmentTick(haptic, view)
+        if (next != value) A2uiHaptics.segmentTick(haptic)
         surface.dataModel.applyPatch(path = effectivePath, value = JsonPrimitive(next))
         expanded = false
     }
@@ -324,7 +318,7 @@ internal fun A2uiDropdown(
         expanded = expanded,
         onExpandedChange = {
             if (!surfaceSubmitting) {
-                if (it && !expanded) HapticEffects.contextClick(haptic, view)
+                if (it && !expanded) A2uiHaptics.contextClick(haptic)
                 expanded = it
             }
         },
@@ -392,14 +386,13 @@ internal fun A2uiSlider(
         ?: defaultValue
     val label = component.resolveControlLabel(surface, renderScope)
     val haptic = LocalHapticFeedback.current
-    val view = LocalView.current
     var dragStartValue by remember(component.id) { mutableStateOf<Double?>(null) }
     var lastTickValue by remember(component.id) { mutableStateOf(range.coerce(value)) }
 
     fun update(next: Double) {
         val stepped = range.coerce(next)
         if (stepped != lastTickValue) {
-            HapticEffects.segmentTick(haptic, view)
+            A2uiHaptics.segmentTick(haptic)
             lastTickValue = stepped
         }
         surface.dataModel.applyPatch(path = effectivePath, value = stepped.numericJsonPrimitive(range.integralStep))
@@ -441,7 +434,7 @@ internal fun A2uiSlider(
             onValueChangeFinished = {
                 val startedAt = dragStartValue
                 if (startedAt != null && lastTickValue != startedAt) {
-                    HapticEffects.confirm(haptic, view)
+                    A2uiHaptics.confirm(haptic)
                 }
                 dragStartValue = null
             },
@@ -508,7 +501,7 @@ internal fun A2uiStepper(
             enabled = !surfaceSubmitting && value > range.min,
             modifier = Modifier.testTag(A2uiTestTags.STEPPER_DECREMENT),
         ) {
-            Text("âˆ’")
+            Text("-")
         }
         Text(
             text = value.numericDisplay(range.integralStep),

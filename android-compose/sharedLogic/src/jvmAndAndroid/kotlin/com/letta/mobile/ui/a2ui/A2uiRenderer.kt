@@ -15,8 +15,10 @@ import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.a2ui.A2uiSurfaceState
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_CARD_WIDGET_ID
 import com.letta.mobile.data.a2ui.LETTA_SCHEDULE_SELECTOR_WIDGET_ID
+import com.letta.mobile.data.timeline.timelineLogger
 
 private const val A2UI_LOG_TAG = "A2UI"
+private val a2uiLog by lazy { timelineLogger(A2UI_LOG_TAG) }
 
 @Composable
 fun A2uiRenderer(
@@ -411,12 +413,7 @@ private fun A2uiComponentNodeContent(
     }
 }
 
-@android.annotation.SuppressLint("LogTagMismatch")
 private fun logA2uiRender(surfaceId: String, componentId: String, componentType: String) {
-    if (android.util.Log.isLoggable(A2UI_LOG_TAG, android.util.Log.DEBUG)) {
-        android.util.Log.d(
-            A2UI_LOG_TAG,
-            "Render component surfaceId=$surfaceId componentId=$componentId type=$componentType",
-        )
-    }
+    if (!a2uiLog.isDebugEnabled) return
+    a2uiLog.debug("Render component surfaceId=$surfaceId componentId=$componentId type=$componentType")
 }
