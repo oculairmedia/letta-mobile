@@ -5,15 +5,10 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.TooltipArea
-import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
@@ -26,7 +21,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -42,7 +36,6 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
@@ -97,49 +90,6 @@ internal fun DesktopCollapsibleSidebar(
     }
 }
 
-private const val TooltipShowDelayMs = 150
-
-/**
- * Minimal hover tooltip built only on plain Compose + Material3 primitives —
- * deliberately NOT [DesktopTooltip] (which renders through Jewel's
- * `TooltipChip`/`JewelLocalContentColor`): that path pulls in a Jewel class
- * file built for a newer JDK than this module's JVM 21 test toolchain can
- * load (`JewelThemeKt`, class file version 69 vs. the toolchain's 65),
- * so any test that renders it fails with `UnsupportedClassVersionError`
- * regardless of what the test asserts. Runtime is unaffected — the
- * application launches on JDK 26 — but new sidebar-chrome tests need to run
- * under the JVM 21 test toolchain, so this avoids the Jewel dependency.
- */
-@Composable
-@OptIn(ExperimentalFoundationApi::class)
-private fun DesktopChromeTooltip(
-    text: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    TooltipArea(
-        tooltip = {
-            Surface(
-                shape = RoundedCornerShape(6.dp),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                shadowElevation = 6.dp,
-            ) {
-                Text(
-                    text = text,
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                    style = MaterialTheme.typography.labelMedium,
-                )
-            }
-        },
-        delayMillis = TooltipShowDelayMs,
-        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(12.dp, 12.dp)),
-    ) {
-        Row(modifier = modifier) { content() }
-    }
-}
-
 /**
  * Sidebar collapse/expand toggle, always present in the desktop chrome (AC
  * #1) regardless of sidebar state — this is the one control that survives
@@ -155,7 +105,7 @@ internal fun DesktopSidebarToggleButton(
     focusRequester: FocusRequester? = null,
 ) {
     val label = if (collapsed) "Show sidebar (Ctrl+B)" else "Hide sidebar (Ctrl+B)"
-    DesktopChromeTooltip(text = label, modifier = modifier) {
+    DesktopTooltip(text = label, modifier = modifier) {
         IconButton(
             onClick = onToggle,
             modifier = Modifier
@@ -195,7 +145,7 @@ internal fun DesktopSidebarOverflowMenu(
     var expanded by remember { mutableStateOf(false) }
     val label = "More (${WorkPlayLens.destinationLabel(mode, LensDestination.Memory)}, " +
         "${WorkPlayLens.destinationLabel(mode, LensDestination.Schedules)}, and more)"
-    DesktopChromeTooltip(text = "More", modifier = modifier) {
+    DesktopTooltip(text = "More", modifier = modifier) {
         IconButton(
             onClick = { expanded = true },
             modifier = Modifier.semantics { contentDescription = label },
