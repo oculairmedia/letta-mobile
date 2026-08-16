@@ -116,18 +116,40 @@ internal fun MessageList(
 
     val fadeAlphas = rememberChatListFadeAlphas(listState)
 
+    // Keys of rows rendered as the pinned user-prompt sticky header (see
+    // MessageListColumn) — used below to keep the top fade off the pinned
+    // card itself: it must stay fully opaque while only the loose content
+    // scrolling behind/beneath it dissolves.
+    val userPromptKeys = remember(rows) {
+        rows.mapNotNull { row -> (row as? DesktopChatRow.Item)?.takeIf { it.item.isUserPrompt() }?.key }.toSet()
+    }
+
     Box(modifier = modifier.fillMaxWidth()) {
         // The fade wraps ONLY the list (not the scroll-to-latest button, which is
         // a sibling below) so the button is never dimmed by the bottom fade.
-        // No top fade: the user prompt pins to the top as a sticky header, and a
-        // fade there dissolved the pinned card itself instead of loose text.
+        // Top fade only appears once there's content scrolled above the
+        // viewport (canScrollBackward), and is taller than the bottom fade so
+        // it reads clearly under the tab strip/header. It must not touch the
+        // pinned user-prompt sticky header, so [pinnedHeaderHeightPx] reads the
+        // header's measured height off the list's own layout info each frame
+        // and the fade starts below it — when nothing is pinned that's 0 and
+        // the fade starts at the very top, same as before.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .chatFadingEdges(
-                    topFadeAlpha = 0f,
+                    topFadeAlpha = fadeAlphas.top,
                     bottomFadeAlpha = fadeAlphas.bottom,
-                    fadeLength = 44.dp,
+                    topFadeLength = 72.dp,
+                    bottomFadeLength = 44.dp,
+                    pinnedHeaderHeightPx = {
+                        val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+                        if (topItem != null && userPromptKeys.contains(topItem.key)) {
+                            topItem.size.toFloat()
+                        } else {
+                            0f
+                        }
+                    },
                 ),
         ) {
             MessageListColumn(
@@ -154,24 +176,34 @@ internal fun MessageList(
     }
 }
 
-private data class ChatListFadeAlphas(val bottom: Float)
+private data class ChatListFadeAlphas(val top: Float, val bottom: Float)
 
 @Composable
 private fun rememberChatListFadeAlphas(listState: LazyListState): ChatListFadeAlphas {
-    // Soft gradient fade at the bottom of the list so content dissolves into
-    // the composer instead of hard-clipping (mirrors the mobile chat fading
-    // edges). Top has no fade — the pinned prompt card owns that edge.
+    // Soft gradient fade at both edges of the list so content dissolves into
+    // the surrounding chrome instead of hard-clipping (mirrors the mobile
+    // chat fading edges): the bottom fades into the composer, the top fades
+    // under the tab strip/header. Each only shows once there's actually
+    // content scrolled past that edge, so a short, unscrolled conversation
+    // isn't faded on either side.
 
-    // ⚡ Bolt Optimization: `listState.canScrollForward` is already backed by Compose State.
-    // Wrapping it in `derivedStateOf` is redundant and wastes memory and observation overhead.
+    // ⚡ Bolt Optimization: `listState.canScrollForward`/`canScrollBackward` are
+    // already backed by Compose State. Wrapping them in `derivedStateOf` is
+    // redundant and wastes memory and observation overhead.
+    val showTopFade = listState.canScrollBackward
     val showBottomFade = listState.canScrollForward
 
+    val topFadeAlpha by animateFloatAsState(
+        targetValue = if (showTopFade) 1f else 0f,
+        animationSpec = tween(durationMillis = 250),
+        label = "topFadeAlpha",
+    )
     val bottomFadeAlpha by animateFloatAsState(
         targetValue = if (showBottomFade) 1f else 0f,
         animationSpec = tween(durationMillis = 250),
         label = "bottomFadeAlpha",
     )
-    return ChatListFadeAlphas(bottom = bottomFadeAlpha)
+    return ChatListFadeAlphas(top = topFadeAlpha, bottom = bottomFadeAlpha)
 }
 
 private data class MessageListFollowParams(
@@ -411,47 +443,61 @@ private fun List<ChatRenderItem>.tailContentLength(): Int =
     } ?: 0
 
 /**
- * Softly dissolves the top/bottom [fadeLength] of the wrapped content to
- * transparent, so the message list grades into the background instead of
- * hard-clipping at the title bar / composer — the desktop port of the mobile
- * chat fading edges. A [BlendMode.DstIn] vertical-gradient mask over an
- * offscreen layer (DstIn keeps the already-drawn content only where the mask is
- * opaque, so a transparent→opaque ramp makes each edge fade out). The mask
- * colour is irrelevant; only its alpha drives the fade. No-ops (and skips the
+ * Softly dissolves the top [topFadeLength] and bottom [bottomFadeLength] of
+ * the wrapped content to transparent, so the message list grades into the
+ * background instead of hard-clipping at the title bar / composer — the
+ * desktop port of the mobile chat fading edges. A [BlendMode.DstIn]
+ * vertical-gradient mask over an offscreen layer (DstIn keeps the
+ * already-drawn content only where the mask is opaque, so a
+ * transparent→opaque ramp makes each edge fade out). The mask colour is
+ * irrelevant; only its alpha drives the fade. No-ops (and skips the
  * offscreen layer) when both alphas are 0, i.e. the list isn't scrollable.
+ *
+ * [pinnedHeaderHeightPx] — read fresh on every draw — is the height in px of
+ * content at the very top that must stay untouched by the top fade (e.g. a
+ * pinned sticky header card); the top gradient starts below it instead of at
+ * y=0. Defaults to always 0 (fade starts at the top edge), which is also
+ * what callers that don't have any such pinned content get for free.
  */
 internal fun Modifier.chatFadingEdges(
     topFadeAlpha: Float,
     bottomFadeAlpha: Float,
-    fadeLength: Dp,
+    topFadeLength: Dp,
+    bottomFadeLength: Dp,
+    pinnedHeaderHeightPx: () -> Float = { 0f },
 ): Modifier {
     if (topFadeAlpha <= 0f && bottomFadeAlpha <= 0f) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
-            val fadePx = fadeLength.toPx()
-            if (fadePx <= 0f) return@drawWithContent
             if (topFadeAlpha > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Black.copy(alpha = 1f - topFadeAlpha), Color.Black),
-                        startY = 0f,
-                        endY = fadePx.coerceAtMost(size.height),
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+                val topFadePx = topFadeLength.toPx()
+                val topStartY = pinnedHeaderHeightPx().coerceIn(0f, size.height)
+                if (topFadePx > 0f && topStartY < size.height) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Black.copy(alpha = 1f - topFadeAlpha), Color.Black),
+                            startY = topStartY,
+                            endY = (topStartY + topFadePx).coerceAtMost(size.height),
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             }
             if (bottomFadeAlpha > 0f) {
-                val len = fadePx.coerceAtMost(size.height / 2f)
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomFadeAlpha)),
-                        startY = size.height - len,
-                        endY = size.height,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
+                val bottomFadePx = bottomFadeLength.toPx()
+                if (bottomFadePx > 0f) {
+                    val len = bottomFadePx.coerceAtMost(size.height / 2f)
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomFadeAlpha)),
+                            startY = size.height - len,
+                            endY = size.height,
+                        ),
+                        blendMode = BlendMode.DstIn,
+                    )
+                }
             }
         }
 }
