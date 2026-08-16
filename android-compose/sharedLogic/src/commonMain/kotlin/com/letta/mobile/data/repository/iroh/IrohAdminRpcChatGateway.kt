@@ -856,7 +856,9 @@ class IrohAdminRpcAgentDirectory(
             blocks = result["blocks"]
                 ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
                 ?: throw TimelineTransportHttpException(502, "block.list_agent returned an object without blocks"),
-            hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull()
+            hasMore = (result["has_more"] as? JsonPrimitive)
+                ?.takeUnless { it.isString }
+                ?.booleanOrNull
                 ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more"),
         )
         else -> throw TimelineTransportHttpException(

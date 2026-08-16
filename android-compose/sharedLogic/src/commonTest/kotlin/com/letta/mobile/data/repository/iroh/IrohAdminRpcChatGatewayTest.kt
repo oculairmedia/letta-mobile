@@ -468,6 +468,19 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun directoryListAgentBlocksRejectsQuotedHasMore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport().apply {
+            rpcResponder = { ok("""{"blocks":[],"has_more":"false"}""") }
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("has_more"))
+    }
+
+    @Test
     fun directoryListAgentBlocksFailsWhenPageCapStillHasMore() = runTest(UnconfinedTestDispatcher()) {
         val transport = FakeIrohTransport().apply {
             rpcResponder = {
