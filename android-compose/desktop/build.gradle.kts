@@ -343,9 +343,10 @@ nucleus.application {
 // on the installed JDK 26 runtime instead.
 afterEvaluate {
     tasks.named<JavaExec>("run") {
-        javaLauncher.set(javaToolchains.launcherFor {
+        val runtimeLauncher = javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(26))
-        })
-        setExecutable("C:/Program Files/Eclipse Adoptium/jdk-26.0.1.8-hotspot/bin/java.exe")
+        }
+        javaLauncher.set(runtimeLauncher)
+        setExecutable(runtimeLauncher.get().executablePath.asFile)
     }
 }
