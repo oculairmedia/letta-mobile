@@ -73,6 +73,8 @@ kotlin {
                 implementation("io.ktor:ktor-client-websockets:$ktorVersion")
                 implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+                implementation("io.github.vinceglb:filekit-core:0.15.0")
+                implementation("io.github.vinceglb:filekit-dialogs:0.15.0")
             }
         }
         val wasmJsTest by getting {
