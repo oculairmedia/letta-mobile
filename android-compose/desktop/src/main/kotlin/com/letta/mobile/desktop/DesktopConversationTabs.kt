@@ -1,14 +1,17 @@
 package com.letta.mobile.desktop
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
@@ -19,9 +22,12 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
@@ -50,13 +56,15 @@ internal fun DesktopConversationTabRow(
     onClose: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
-        modifier = modifier,
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(tabs, key = { it.conversationId }) { tab ->
+        tabs.forEach { tab ->
             val active = tab.conversationId == activeConversationId
+            val interactionSource = remember(tab.conversationId) { MutableInteractionSource() }
+            val hovered by interactionSource.collectIsHoveredAsState()
             Surface(
                 onClick = { onSelect(tab.conversationId) },
                 modifier = Modifier
@@ -71,18 +79,22 @@ internal fun DesktopConversationTabRow(
                 },
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 tonalElevation = if (active) 2.dp else 0.dp,
+                interactionSource = interactionSource,
             ) {
-                Row(
-                    modifier = Modifier.padding(start = 10.dp, end = 2.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                Box {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(horizontal = 34.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
                         Text(
                             text = tab.title,
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
                         )
                         Text(
                             text = tab.agentName,
@@ -90,17 +102,22 @@ internal fun DesktopConversationTabRow(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center,
                         )
                     }
-                    IconButton(
-                        onClick = { onClose(tab.conversationId) },
-                        modifier = Modifier.size(28.dp),
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Close,
-                            contentDescription = "Close ${tab.title} tab",
-                            modifier = Modifier.size(14.dp),
-                        )
+                    if (hovered) {
+                        IconButton(
+                            onClick = { onClose(tab.conversationId) },
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .size(28.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "Close ${tab.title} tab",
+                                modifier = Modifier.size(14.dp),
+                            )
+                        }
                     }
                 }
             }

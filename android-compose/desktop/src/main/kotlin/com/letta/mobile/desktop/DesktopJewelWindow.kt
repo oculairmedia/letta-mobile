@@ -2,6 +2,7 @@ package com.letta.mobile.desktop
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -100,6 +101,9 @@ private val TitleBarHeight = 48.dp
  */
 private val IdentityBlockMaxWidth = 320.dp
 
+/** Always leaves an unobstructed title-bar lane for native window dragging. */
+private val MinimumTitleBarDragWidth = 96.dp
+
 /**
  * Main desktop window chrome.
  *
@@ -192,13 +196,28 @@ internal fun DesktopJewelWindow(
                             // title over agent name (letta-mobile-3arhe.1).
                             val identity = header.identity
                             if (header.conversationTabs.isNotEmpty()) {
-                                DesktopConversationTabRow(
-                                    tabs = header.conversationTabs,
-                                    activeConversationId = header.activeConversationId,
-                                    onSelect = header.onSelectConversationTab,
-                                    onClose = header.onCloseConversationTab,
-                                    modifier = Modifier.weight(1f).fillMaxHeight(),
-                                )
+                                // Keep the weighted container itself non-interactive: the tab strip
+                                // wraps its content until it reaches the available width minus the
+                                // reserved drag lane, then scrolls horizontally. Blank space inside
+                                // this box remains draggable and trailing controls stay fixed.
+                                BoxWithConstraints(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight(),
+                                ) {
+                                    DesktopConversationTabRow(
+                                        tabs = header.conversationTabs,
+                                        activeConversationId = header.activeConversationId,
+                                        onSelect = header.onSelectConversationTab,
+                                        onClose = header.onCloseConversationTab,
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .widthIn(
+                                                max = (maxWidth - MinimumTitleBarDragWidth)
+                                                    .coerceAtLeast(0.dp),
+                                            ),
+                                    )
+                                }
                             } else if (identity != null) {
                                 DesktopHeaderIdentityBlock(
                                     state = identity,
@@ -229,12 +248,9 @@ internal fun DesktopJewelWindow(
                                     )
                                 }
                             }
-                            // Flexible drag region: the ONLY weighted element
-                            // in this row, so it always absorbs exactly the
-                            // leftover width — guaranteeing Nucleus's caption
-                            // buttons land flush against the window's right
-                            // edge regardless of how wide the identity block
-                            // actually rendered.
+                            // Without tabs, this is the only weighted element. With tabs, the
+                            // weighted BoxWithConstraints above doubles as the drag region around
+                            // its wrap-content tab strip. Either way, caption controls remain fixed.
                             if (header.conversationTabs.isEmpty()) {
                                 Box(modifier = Modifier.weight(1f).fillMaxHeight())
                             }
