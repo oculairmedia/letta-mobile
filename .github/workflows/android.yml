@@ -283,6 +283,48 @@ jobs:
       - name: Build and test Compose web client
         run: ./gradlew :web:wasmJsBrowserDistribution :web:wasmJsBrowserTest
 
+      - name: Locate WASM distribution
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        id: wasm-dist
+        run: |
+          set -euo pipefail
+          for candidate in \
+            web/build/dist/wasmJs/productionExecutable \
+            web/build/kotlin-webpack/wasmJs/productionExecutable \
+            web/build/dist/wasmJs/developmentExecutable
+          do
+            if [ -f "$candidate/index.html" ]; then
+              echo "path=$candidate" >> "$GITHUB_OUTPUT"
+              ls -la "$candidate"
+              exit 0
+            fi
+          done
+          echo "WASM dist with index.html not found" >&2
+          find web/build -name index.html -print | head
+          exit 1
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: android-compose/${{ steps.wasm-dist.outputs.path }}
+
+  deploy-web-pages:
+    name: deploy-web-pages
+    needs: web-wasm
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - name: Deploy WASM client to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
+
   build-apk:
     runs-on: ubuntu-latest
     # Deliberately independent of `test`: GitHub can fan out test, shared KMP

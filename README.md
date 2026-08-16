@@ -6,6 +6,9 @@ project. One shared domain module powers both apps; platform layers are thin bin
 
 <a href="https://apps.obtainium.imranr.dev/redirect.html?r=obtainium://add/https://github.com/oculairmedia/letta-mobile/releases" target="_blank"><img src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png" alt="Get it on Obtainium" height="48"></a>
 
+Browser client (Iroh WASM, shipped in #1205): https://oculairmedia.github.io/letta-mobile/
+
+
 ## Features
 
 - **Agent management** — create, edit, clone, import, delete, and organize agents (Android + desktop)
