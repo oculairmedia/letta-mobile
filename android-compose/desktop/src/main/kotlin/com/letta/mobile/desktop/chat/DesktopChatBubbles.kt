@@ -271,16 +271,11 @@ internal fun UserPrompt(
     // anywhere on it — not just a chevron that may sit outside the fold.
     // Hand-drawn outline instead of Surface border: sides + bottom only, no
     // top line — a full box read too heavy, and the pinned card's top edge
-    // doubles up against the pane's own boundary.
+    // doubles up against the pane's own boundary. Same ordinary outline for
+    // every prompt card, inter-agent or not — the identity tint lives on the
+    // provenance label inside the card, not on the outer edge.
     val provenance = message.agentMessageProvenance
-    val edgeColor = if (provenance != null) {
-        // Restrained identity tint on the card edge for an inbound agent
-        // message — distinct from the ordinary human-prompt outline without
-        // becoming a loud banner.
-        MaterialTheme.colorScheme.tertiary.copy(alpha = 0.45f)
-    } else {
-        MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
-    }
+    val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
     // A dedicated hover-only interaction source, independent of the card's
     // own click interaction source (which Surface disables along with click
     // handling whenever the card can't currently expand/collapse) — the copy
@@ -578,7 +573,11 @@ internal fun AgentText(params: AgentTextParams) {
         Surface(
             modifier = Modifier.align(Alignment.TopEnd),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (isHovered) 0.94f else 0.35f),
+            color = if (isHovered) {
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+            } else {
+                Color.Transparent
+            },
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
             CopyIconButton(
