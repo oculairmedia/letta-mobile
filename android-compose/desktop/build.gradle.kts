@@ -357,11 +357,19 @@ val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntim
     val temporary = File(target.parentFile, "${target.name}.part")
     val downloadScript = """
         ${'$'}ErrorActionPreference = 'Stop'
+        function Get-Sha256([string]${'$'}Path) {
+            ${'$'}stream = [System.IO.File]::OpenRead(${'$'}Path)
+            try {
+                ${'$'}hasher = [System.Security.Cryptography.SHA256]::Create()
+                try { return [System.BitConverter]::ToString(${'$'}hasher.ComputeHash(${'$'}stream)).Replace('-', '').ToLowerInvariant() }
+                finally { ${'$'}hasher.Dispose() }
+            } finally { ${'$'}stream.Dispose() }
+        }
         New-Item -ItemType Directory -Force -Path '${target.parentFile.absolutePath}' | Out-Null
-        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-FileHash -Algorithm SHA256 -LiteralPath '${target.absolutePath}').Hash.ToLowerInvariant() -eq '$desktopNodeArchiveSha256')) { exit 0 }
+        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-Sha256 '${target.absolutePath}') -eq '$desktopNodeArchiveSha256')) { exit 0 }
         Remove-Item -LiteralPath '${temporary.absolutePath}' -Force -ErrorAction SilentlyContinue
         Invoke-WebRequest -UseBasicParsing 'https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName' -OutFile '${temporary.absolutePath}'
-        if ((Get-FileHash -Algorithm SHA256 -LiteralPath '${temporary.absolutePath}').Hash.ToLowerInvariant() -ne '$desktopNodeArchiveSha256') { throw 'SHA-256 mismatch for $desktopNodeArchiveName' }
+        if ((Get-Sha256 '${temporary.absolutePath}') -ne '$desktopNodeArchiveSha256') { throw 'SHA-256 mismatch for $desktopNodeArchiveName' }
         Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
     """.trimIndent()
     commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)

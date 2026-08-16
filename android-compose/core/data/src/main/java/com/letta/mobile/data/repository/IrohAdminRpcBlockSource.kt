@@ -23,8 +23,8 @@ import kotlinx.serialization.json.put
  * handlers already exist (ToolAdminHandlers registers block.get, block.create,
  * block.update, block.delete, block.list); this is the missing CLIENT wiring.
  */
-class IrohAdminRpcBlockSource(
-    private val channelTransport: IChannelTransport,
+class IrohAdminRpcBlockSource private constructor(
+    private val channelTransportProvider: () -> IChannelTransport,
     private val settingsRepository: ISettingsRepository,
     private val json: Json = Json {
         ignoreUnknownKeys = true
@@ -32,14 +32,37 @@ class IrohAdminRpcBlockSource(
         explicitNulls = false
         coerceInputValues = true
     },
-    private val agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
+    private val agentDirectoryProvider: (() -> IrohAdminRpcAgentDirectory)? = null,
 ) {
+    constructor(
+        channelTransport: IChannelTransport,
+        settingsRepository: ISettingsRepository,
+        json: Json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            explicitNulls = false
+            coerceInputValues = true
+        },
+        agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
+    ) : this({ channelTransport }, settingsRepository, json, { agentDirectory })
+
+    constructor(
+        channelTransportProvider: () -> IChannelTransport,
+        settingsRepository: ISettingsRepository,
+    ) : this(channelTransportProvider, settingsRepository, agentDirectoryProvider = null)
+
+    private val agentDirectory: IrohAdminRpcAgentDirectory by lazy {
+        agentDirectoryProvider?.invoke() ?: IrohAdminRpcAgentDirectory(channelTransportProvider())
+    }
+
+    private fun channelTransport(): IChannelTransport = channelTransportProvider()
+
     fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
     suspend fun retrieveBlock(blockId: String): Block {
         val params = buildJsonObject { put("block_id", blockId) }
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.get",
             path = "/v1/blocks/$blockId",
             body = params.toString(),
@@ -67,7 +90,7 @@ class IrohAdminRpcBlockSource(
                 clearLimit -> put("limit", JsonNull)
             }
         }
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.update",
             path = "/v1/blocks/$blockId",
             body = requestBody.toString(),
@@ -78,7 +101,7 @@ class IrohAdminRpcBlockSource(
     }
 
     suspend fun createBlock(params: BlockCreateParams): Block {
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.create",
             path = "/v1/blocks",
             body = json.encodeToString(BlockCreateParams.serializer(), params),
@@ -90,7 +113,7 @@ class IrohAdminRpcBlockSource(
 
     suspend fun deleteBlock(blockId: String) {
         val params = buildJsonObject { put("block_id", blockId) }
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.delete",
             path = "/v1/blocks/$blockId",
             body = params.toString(),
@@ -169,7 +192,7 @@ class IrohAdminRpcBlockSource(
             put("limit", limit.toString())
             put("offset", offset.toString())
         }
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.list",
             path = "/v1/blocks?limit=$limit&offset=$offset",
             body = params.toString(),
@@ -203,7 +226,7 @@ class IrohAdminRpcBlockSource(
         val hasMore: Boolean?,
     )
     suspend fun attachBlock(agentId: String, blockId: String) {
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.attach",
             path = "/v1/agents/$agentId/core-memory/blocks/attach/$blockId",
             body = buildJsonObject {
@@ -215,7 +238,7 @@ class IrohAdminRpcBlockSource(
     }
 
     suspend fun detachBlock(agentId: String, blockId: String) {
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.detach",
             path = "/v1/agents/$agentId/core-memory/blocks/detach/$blockId",
             body = buildJsonObject {
@@ -244,7 +267,7 @@ class IrohAdminRpcBlockSource(
             params.limit?.let { put("limit", it) }
             params.description?.let { put("description", it) }
         }
-        val response = channelTransport.adminRpc(
+        val response = channelTransport().adminRpc(
             method = "block.update_agent",
             path = "/v1/agents/$agentId/core-memory/blocks/$blockLabel",
             body = body.toString(),
