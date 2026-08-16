@@ -25,8 +25,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -344,15 +342,13 @@ private fun ChatComposerInput(
     // tracks the keyboard even when the field loses focus while the IME is
     // still up (e.g. user taps the attach menu).
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val animatedVerticalPadding by animateDpAsState(
-        targetValue = if (keyboardOpen) {
-            ChatComposerInputCompactVerticalPadding
-        } else {
-            ChatComposerInputVerticalPadding
-        },
-        animationSpec = tween(durationMillis = 220),
-        label = "chatComposerVerticalPadding",
-    )
+    // The parent follows platform IME insets directly. Do the same here so
+    // composer padding cannot lag behind the keyboard with a separate tween.
+    val verticalPadding = if (keyboardOpen) {
+        ChatComposerInputCompactVerticalPadding
+    } else {
+        ChatComposerInputVerticalPadding
+    }
     LettaInputBar(
         text = model.inputText,
         onTextChange = callbacks.onTextChange,
@@ -377,7 +373,7 @@ private fun ChatComposerInput(
         customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
         contentPadding = PaddingValues(
             horizontal = ChatComposerInputHorizontalPadding,
-            vertical = animatedVerticalPadding,
+            vertical = verticalPadding,
         ),
         itemSpacing = ChatComposerInputItemSpacing,
         leadingContent = {
