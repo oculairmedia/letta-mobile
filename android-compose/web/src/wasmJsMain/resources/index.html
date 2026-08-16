@@ -27,7 +27,8 @@
         import init, { IrohAppServerSession } from './iroh/letta_iroh_wasm.js';
 
         const sessions = new Map();
-        const maxQueuedFrames = 256;
+        const maxQueuedControlFrames = 256;
+        const maxQueuedStreamFrames = 2048;
         let nextSessionId = 1;
         let initialization;
 
@@ -36,7 +37,7 @@
             return initialization;
         };
 
-        const drain = async (session, stream, queue) => {
+        const drain = async (session, stream, queue, maxQueuedFrames) => {
             try {
                 for await (const frame of stream) {
                     if (queue.length >= maxQueuedFrames) throw new Error('Iroh frame queue overflow');
@@ -44,8 +45,10 @@
                 }
                 if (session.state === 'connected') session.state = 'disconnected';
             } catch (error) {
-                session.error = String(error);
-                session.state = 'error';
+                if (session.state !== 'closed') {
+                    session.error = String(error);
+                    session.state = 'error';
+                }
             }
         };
 
@@ -59,10 +62,13 @@
                 error: null,
                 control: [],
                 stream: [],
+                drains: [],
             };
             sessions.set(id, session);
-            void drain(session, native.take_control_events(), session.control);
-            void drain(session, native.take_stream_events(), session.stream);
+            session.drains = [
+                drain(session, native.take_control_events(), session.control, maxQueuedControlFrames),
+                drain(session, native.take_stream_events(), session.stream, maxQueuedStreamFrames),
+            ];
             return id;
         };
 
@@ -81,6 +87,7 @@
             session.state = 'closed';
             sessions.delete(id);
             await session.native.close();
+            await Promise.allSettled(session.drains);
             session.native.free();
         };
     </script>

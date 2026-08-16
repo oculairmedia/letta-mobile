@@ -5,15 +5,20 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -28,12 +33,27 @@ internal class WasmAppServerSession(
     val router: AppServerRuntimeEventRouter,
     val transport: AppServerTransport,
     val label: String,
+    private val scope: CoroutineScope,
     private val closeTransport: suspend () -> Unit,
 ) {
     val conversationByAgent = mutableMapOf<String, String>()
+    private val conversationInFlight = mutableMapOf<String, Deferred<String>>()
 
     suspend fun ensureConversation(agentId: String, nextRequestId: (String) -> String): String {
         conversationByAgent[agentId]?.let { return it }
+        val pending = conversationInFlight[agentId] ?: scope.async {
+            resolveConversation(agentId, nextRequestId)
+        }.also { conversationInFlight[agentId] = it }
+        return try {
+            pending.await().also { conversationByAgent[agentId] = it }
+        } finally {
+            if (pending.isCompleted && conversationInFlight[agentId] === pending) {
+                conversationInFlight.remove(agentId)
+            }
+        }
+    }
+
+    private suspend fun resolveConversation(agentId: String, nextRequestId: (String) -> String): String {
         val listed = admin(
             method = "conversation.list",
             params = buildJsonObject {
@@ -54,16 +74,16 @@ internal class WasmAppServerSession(
                 nextRequestId = nextRequestId,
             ) ?: error("Conversation create returned no result"),
         )
-        return conversation.id.value.also { conversationByAgent[agentId] = it }
+        return conversation.id.value
     }
 
     suspend fun admin(
         method: String,
         params: JsonObject,
         nextRequestId: (String) -> String,
-    ): JsonElement? = bounded(RequestTimeoutMs, "$method timed out") {
+    ): JsonElement? = bounded(REQUEST_TIMEOUT_MS, "$method timed out") {
         val response = client.adminRpc(
-            com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc(
+            AppServerCommand.AdminRpc(
                 requestId = nextRequestId(method.substringAfterLast('.')),
                 method = method,
                 params = params,
@@ -74,14 +94,22 @@ internal class WasmAppServerSession(
     }
 
     suspend fun close() {
-        router.detach()
-        conversationByAgent.clear()
-        closeTransport()
+        withContext(NonCancellable) {
+            router.detach()
+            conversationInFlight.values.forEach { it.cancel() }
+            conversationInFlight.clear()
+            conversationByAgent.clear()
+            closeTransport()
+        }
     }
 
-    internal fun onTransportDisconnected() {
-        router.detach()
-        conversationByAgent.clear()
+    internal suspend fun onTransportDisconnected() {
+        withContext(NonCancellable) {
+            router.detach()
+            conversationInFlight.values.forEach { it.cancel() }
+            conversationInFlight.clear()
+            conversationByAgent.clear()
+        }
     }
 }
 
@@ -110,34 +138,40 @@ internal suspend fun connectWasmAppServerSession(
         label = "WebSocket"
         closeTransport = websocket::close
     }
+    var router: AppServerRuntimeEventRouter? = null
     try {
-        bounded(ConnectTimeoutMs, "Connection timed out") { transport.isConnected.first { it } }
+        bounded(CONNECT_TIMEOUT_MS, "Connection timed out") { transport.isConnected.first { it } }
         val client = DefaultAppServerClient(transport, parentScope = scope)
-        val router = AppServerRuntimeEventRouter()
-        router.attach(scope, client.events)
+        val eventRouter = AppServerRuntimeEventRouter()
+        router = eventRouter
+        eventRouter.attach(scope, client.events)
         return WasmAppServerSession(
             client = client,
             engine = AppServerTurnEngine(
                 client = client,
                 requestIdFactory = { nextRequestId("turn") },
-                eventRouter = router,
+                eventRouter = eventRouter,
             ),
-            router = router,
+            router = eventRouter,
             transport = transport,
             label = label,
+            scope = scope,
             closeTransport = closeTransport,
         )
     } catch (error: Throwable) {
-        closeTransport()
+        withContext(NonCancellable) {
+            router?.detach()
+            closeTransport()
+        }
         throw error
     }
 }
 
-private suspend fun <T> bounded(timeoutMs: Long, message: String, block: suspend () -> T): T = try {
+internal suspend fun <T> bounded(timeoutMs: Long, message: String, block: suspend () -> T): T = try {
     withTimeout(timeoutMs) { block() }
 } catch (timeout: TimeoutCancellationException) {
     throw IllegalStateException(message, timeout)
 }
 
-private const val ConnectTimeoutMs = 15_000L
-private const val RequestTimeoutMs = 20_000L
+private const val CONNECT_TIMEOUT_MS = 15_000L
+internal const val REQUEST_TIMEOUT_MS = 20_000L

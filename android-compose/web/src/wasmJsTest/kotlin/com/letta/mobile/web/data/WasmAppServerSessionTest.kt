@@ -9,17 +9,22 @@ import com.letta.mobile.data.transport.appserver.AppServerTransport
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
 import com.letta.mobile.runtime.ConversationId
 import kotlin.test.Test
+import kotlin.test.assertIs
+import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 
 class WasmAppServerSessionTest {
     @Test
-    fun `transport disconnect closes router subscribers`() = runTest {
+    fun `transport disconnect unblocks router subscribers`() = runTest {
         val transport = FakeTransport()
         val client = DefaultAppServerClient(transport)
         val router = AppServerRuntimeEventRouter()
@@ -29,14 +34,25 @@ class WasmAppServerSessionTest {
             router = router,
             transport = transport,
             label = "test",
+            scope = this,
             closeTransport = {},
         )
         val (_, events) = router.subscribe(AgentId("agent-1"), ConversationId("conv-1"))
-        val completion = async { events.toList() }
+        val started = CompletableDeferred<Unit>()
+        val completion = async {
+            try {
+                events.onStart { started.complete(Unit) }.toList()
+                null
+            } catch (cancelled: CancellationException) {
+                cancelled
+            }
+        }
+        started.await()
 
         session.onTransportDisconnected()
 
-        withTimeout(100) { runCatching { completion.await() } }
+        assertIs<CancellationException>(withTimeout(100) { completion.await() })
+        assertTrue(completion.isCompleted)
     }
 
     private class FakeTransport : AppServerTransport {

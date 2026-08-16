@@ -6,6 +6,7 @@ import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerTransport
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
@@ -15,8 +16,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.onSubscription
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -30,15 +32,26 @@ internal class IrohWasmAppServerTransport private constructor(
     private val control = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER)
     private val stream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = FRAME_BUFFER)
     private val connected = MutableStateFlow(true)
+    private val failure = MutableStateFlow<String?>(null)
+    private var controlPump: Job? = null
+    private var streamPump: Job? = null
     private var closed = false
 
-    override val controlFrames: Flow<AppServerReceivedFrame> = control.asSharedFlow()
-    override val streamFrames: Flow<AppServerReceivedFrame> = stream.asSharedFlow()
+    override val controlFrames: Flow<AppServerReceivedFrame> = control.onSubscription { startControlPump() }
+    override val streamFrames: Flow<AppServerReceivedFrame> = stream.onSubscription { startStreamPump() }
     override val isConnected: Flow<Boolean> = connected.asStateFlow()
+    internal val failureReason: StateFlow<String?> = failure.asStateFlow()
 
-    init {
-        scope.launch { pump(AppServerChannel.Control, bridge::pollControl, control) }
-        scope.launch { pump(AppServerChannel.Stream, bridge::pollStream, stream) }
+    private fun startControlPump() {
+        if (controlPump == null) {
+            controlPump = scope.launch { pump(AppServerChannel.Control, bridge::pollControl, control) }
+        }
+    }
+
+    private fun startStreamPump() {
+        if (streamPump == null) {
+            streamPump = scope.launch { pump(AppServerChannel.Stream, bridge::pollStream, stream) }
+        }
     }
 
     override suspend fun sendControl(command: AppServerCommand) {
@@ -61,19 +74,28 @@ internal class IrohWasmAppServerTransport private constructor(
         poll: () -> String?,
         destination: MutableSharedFlow<AppServerReceivedFrame>,
     ) {
+        var pollIntervalMs = MIN_POLL_INTERVAL_MS
         try {
             while (currentCoroutineContext().isActive && connected.value) {
                 val raw = poll()
                 if (raw != null) {
                     destination.emit(AppServerProtocol.decodeFrame(raw, channel))
+                    pollIntervalMs = MIN_POLL_INTERVAL_MS
                     continue
                 }
                 when (bridge.state()) {
-                    "connected" -> delay(POLL_INTERVAL_MS)
+                    "connected" -> {
+                        delay(pollIntervalMs)
+                        pollIntervalMs = (pollIntervalMs * 2).coerceAtMost(MAX_POLL_INTERVAL_MS)
+                    }
                     "error" -> error(bridge.error() ?: "Iroh App Server stream failed")
                     else -> return
                 }
             }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            failure.value = error.message ?: "Iroh App Server stream failed"
         } finally {
             connected.value = false
         }
@@ -81,7 +103,8 @@ internal class IrohWasmAppServerTransport private constructor(
 
     companion object {
         private const val FRAME_BUFFER = 64
-        private const val POLL_INTERVAL_MS = 10L
+        private const val MIN_POLL_INTERVAL_MS = 10L
+        private const val MAX_POLL_INTERVAL_MS = 100L
 
         suspend fun connect(ticket: String, scope: CoroutineScope): IrohWasmAppServerTransport =
             IrohWasmAppServerTransport(IrohWasmBridge.connect(ticket), scope)

@@ -2,11 +2,13 @@
 
 package com.letta.mobile.web.iroh
 
+import kotlinx.coroutines.await
+
 internal class IrohWasmBridge private constructor(
     private val sessionId: Int,
 ) {
     suspend fun sendControl(payload: String) {
-        callSendControl(sessionId, payload).awaitPromise()
+        callSendControl(sessionId, payload).await()
     }
 
     fun pollControl(): String? = callPollControl(sessionId)?.toString()
@@ -18,12 +20,12 @@ internal class IrohWasmBridge private constructor(
     fun error(): String? = callSessionError(sessionId)?.toString()
 
     suspend fun close() {
-        callClose(sessionId).awaitPromise()
+        callClose(sessionId).await()
     }
 
     companion object {
         suspend fun connect(ticket: String): IrohWasmBridge {
-            val id = callConnect(ticket).awaitPromise().toInt()
+            val id = callConnect(ticket).await().toInt()
             return IrohWasmBridge(id)
         }
     }
@@ -49,17 +51,3 @@ private fun callSessionError(sessionId: Int): JsString? =
 
 private fun callClose(sessionId: Int): kotlin.js.Promise<JsAny?> =
     js("window.irohClose(sessionId)")
-
-private suspend fun <T : JsAny?> kotlin.js.Promise<T>.awaitPromise(): T =
-    kotlinx.coroutines.suspendCancellableCoroutine { continuation ->
-        then(
-            onFulfilled = { value ->
-                continuation.resumeWith(Result.success(value))
-                null
-            },
-            onRejected = { reason ->
-                continuation.resumeWith(Result.failure(RuntimeException(reason.toString())))
-                null
-            },
-        )
-    }

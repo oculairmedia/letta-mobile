@@ -8,13 +8,13 @@ import com.letta.mobile.data.model.buildContentParts
 import com.letta.mobile.data.model.toJsonArray
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.web.iroh.IrohWasmAppServerTransport
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.js.Js
 import io.ktor.client.plugins.websocket.WebSockets
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import kotlin.random.Random
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
@@ -178,7 +177,11 @@ class WasmAppServerClientGateway(
             if (activeSession === session) {
                 activeSession = null
                 session.onTransportDisconnected()
-                mutableState.value = WebConnectionState.Failed("Connection closed")
+                val reason = (session.transport as? IrohWasmAppServerTransport)
+                    ?.failureReason
+                    ?.value
+                    ?: "Connection closed"
+                mutableState.value = WebConnectionState.Failed(reason)
             }
         }
     }
@@ -188,19 +191,8 @@ class WasmAppServerClientGateway(
         return webRequestId(requestSessionId, prefix, requestSequence)
     }
 
-    private suspend fun <T> bounded(
-        timeoutMs: Long,
-        message: String,
-        block: suspend () -> T,
-    ): T = try {
-        withTimeout(timeoutMs) { block() }
-    } catch (timeout: TimeoutCancellationException) {
-        throw IllegalStateException(message, timeout)
-    }
-
     private companion object {
         const val AGENT_LIMIT = 100
-        const val REQUEST_TIMEOUT_MS = 20_000L
     }
 }
 

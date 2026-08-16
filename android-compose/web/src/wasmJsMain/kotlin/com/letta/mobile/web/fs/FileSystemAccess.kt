@@ -2,6 +2,8 @@
 
 package com.letta.mobile.web.fs
 
+import com.letta.mobile.data.timeline.timelineLogger
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.await
 import kotlin.js.Promise
 
@@ -46,6 +48,7 @@ external interface WindowWithFileSystem : JsAny {
  * Controller managing browser local workspace directory via File System Access API.
  */
 class WebWorkspaceController {
+    private val logger = timelineLogger("WebWorkspace")
     var rootHandle: FileSystemDirectoryHandle? = null
         private set
 
@@ -61,7 +64,8 @@ class WebWorkspaceController {
             rootHandle = handle
             true
         } catch (t: Throwable) {
-            println("Directory picker cancelled or unsupported: ${t.message}")
+            if (t is CancellationException) throw t
+            logger.warn("Directory picker cancelled or unsupported", t)
             false
         }
     }
@@ -73,7 +77,8 @@ class WebWorkspaceController {
             val file = fileHandle.getFile().await()
             file.text().await().toString()
         } catch (t: Throwable) {
-            println("Failed to read file $fileName: ${t.message}")
+            if (t is CancellationException) throw t
+            logger.error("Failed to read workspace file", t)
             null
         }
     }
@@ -81,13 +86,14 @@ class WebWorkspaceController {
     suspend fun writeFile(fileName: String, content: String): Boolean {
         val handle = rootHandle ?: return false
         return try {
-            val fileHandle = handle.getFileHandle(fileName).await()
+            val fileHandle = handle.getFileHandle(fileName, createFileOptions()).await()
             val writable = fileHandle.createWritable().await()
             writable.write(content).await()
             writable.close().await()
             true
         } catch (t: Throwable) {
-            println("Failed to write file $fileName: ${t.message}")
+            if (t is CancellationException) throw t
+            logger.error("Failed to write workspace file", t)
             false
         }
     }
@@ -95,3 +101,5 @@ class WebWorkspaceController {
 
 private fun promptDirectoryPicker(): Promise<FileSystemDirectoryHandle> =
     js("window.showDirectoryPicker()")
+
+private fun createFileOptions(): JsAny = js("({ create: true })")
