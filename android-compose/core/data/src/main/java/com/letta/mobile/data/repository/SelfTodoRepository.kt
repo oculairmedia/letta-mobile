@@ -2,6 +2,8 @@ package com.letta.mobile.data.repository
 
 import android.util.Log
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.SelfTodoSnapshot
+import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
@@ -62,35 +64,64 @@ open class SelfTodoRepository(
 
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    // conversationId -> latest TodoWrite snapshot for that conversation.
-    private val byConversation = MutableStateFlow<Map<String, List<SubagentTodo>>>(emptyMap())
+    private val snapshots = MutableStateFlow<Map<String, SelfTodoSnapshot>>(emptyMap())
+    private val activeRuns = mutableMapOf<String, ActiveRun>()
 
     init {
-        scope.launch { observeToolCalls() }
+        scope.launch { observeFrames() }
     }
 
-    override fun latestForFlow(conversationId: String): Flow<List<SubagentTodo>> =
-        byConversation.map { it[conversationId].orEmpty() }
+    override fun snapshotForFlow(conversationId: String): Flow<SelfTodoSnapshot> =
+        snapshots.map { it[conversationId] ?: SelfTodoSnapshot() }
 
-    override fun latestFor(conversationId: String): List<SubagentTodo> =
-        byConversation.value[conversationId].orEmpty()
+    override fun snapshotFor(conversationId: String): SelfTodoSnapshot =
+        snapshots.value[conversationId] ?: SelfTodoSnapshot()
 
     /** Test/preview hook: directly stage a snapshot for a conversation. */
     internal fun stage(conversationId: String, todos: List<SubagentTodo>) {
-        byConversation.value = byConversation.value.toMutableMap().apply {
-            this[conversationId] = todos
+        updateSnapshot(conversationId) { it.copy(todos = todos) }
+    }
+
+    private suspend fun observeFrames() {
+        transport.events.collect { frame ->
+            when (frame) {
+                is ServerFrame.TurnStarted -> recordStarted(frame)
+                is ServerFrame.TurnDone -> recordDone(frame)
+                is ServerFrame.ToolCallMessage -> {
+                    val conversationId = frame.conversationId.takeIf { it.isNotBlank() } ?: return@collect
+                    val todoCall = frame.allToolCalls().firstOrNull { it.name == TODO_WRITE_TOOL } ?: return@collect
+                    val todos = parseTodos(todoCall.arguments) ?: return@collect
+                    updateSnapshot(conversationId) { it.copy(todos = todos) }
+                }
+                else -> Unit
+            }
         }
     }
 
-    private suspend fun observeToolCalls() {
-        transport.events.collect { frame ->
-            if (frame !is ServerFrame.ToolCallMessage) return@collect
-            val conversationId = frame.conversationId.takeIf { it.isNotBlank() } ?: return@collect
-            val todoCall = frame.allToolCalls().firstOrNull { it.name == TODO_WRITE_TOOL } ?: return@collect
-            val todos = parseTodos(todoCall.arguments) ?: return@collect
-            byConversation.value = byConversation.value.toMutableMap().apply {
-                this[conversationId] = todos
-            }
+    private fun recordStarted(frame: ServerFrame.TurnStarted) {
+        activeRuns.entries.removeAll { it.value.conversationId == frame.conversationId }
+        activeRuns[frame.runId] = ActiveRun(frame.conversationId, frame.turnId)
+        updateSnapshot(frame.conversationId) { it.copy(lifecycleStatus = SubagentStatus.RUNNING) }
+    }
+
+    private fun recordDone(frame: ServerFrame.TurnDone) {
+        val activeRun = activeRuns[frame.runId]?.takeIf { it.turnId == frame.turnId } ?: return
+        activeRuns.remove(frame.runId)
+        val status = when (frame.status.trim().lowercase()) {
+            "completed", "complete", "success", "succeeded" -> SubagentStatus.COMPLETED
+            "cancelled", "canceled" -> SubagentStatus.CANCELLED
+            "failed", "error" -> SubagentStatus.FAILED
+            else -> return
+        }
+        updateSnapshot(activeRun.conversationId) { it.copy(lifecycleStatus = status) }
+    }
+
+    private fun updateSnapshot(
+        conversationId: String,
+        transform: (SelfTodoSnapshot) -> SelfTodoSnapshot,
+    ) {
+        snapshots.value = snapshots.value.toMutableMap().apply {
+            this[conversationId] = transform(get(conversationId) ?: SelfTodoSnapshot())
         }
     }
 
@@ -122,6 +153,11 @@ open class SelfTodoRepository(
         const val TAG = "SelfTodoRepository"
         const val TODO_WRITE_TOOL = "TodoWrite"
     }
+
+    private data class ActiveRun(
+        val conversationId: String,
+        val turnId: String,
+    )
 }
 
 /**
