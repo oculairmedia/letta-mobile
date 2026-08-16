@@ -4,6 +4,7 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeout
 
 /** Shares the single child-owned App Server session with LOCAL repository adapters. */
 internal object DesktopLocalAppServerClientRegistry {
@@ -28,6 +29,10 @@ internal object DesktopLocalAppServerClientRegistry {
     @Synchronized
     fun generation(): Long = entry.value.generation
 
-    suspend fun awaitClientAfter(generation: Long): AppServerClient =
+    suspend fun awaitClientAfter(
+        generation: Long,
+        timeoutMs: Long = 10_000L,
+    ): AppServerClient = withTimeout(timeoutMs) {
         entry.first { it.generation > generation && it.client != null }.client!!
+    }
 }

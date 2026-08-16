@@ -5,12 +5,14 @@ import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlin.test.Test
+import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.TimeoutCancellationException
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class DesktopLocalAppServerClientRegistryTest {
@@ -32,6 +34,15 @@ class DesktopLocalAppServerClientRegistryTest {
 
         assertSame(second, waitingForSecond.await())
         secondLease.close()
+    }
+
+    @Test
+    fun `repository wait is bounded while a gateway is unavailable`() = runTest {
+        val baseline = DesktopLocalAppServerClientRegistry.generation()
+
+        assertFailsWith<TimeoutCancellationException> {
+            DesktopLocalAppServerClientRegistry.awaitClientAfter(baseline, timeoutMs = 1)
+        }
     }
 
     private class FakeClient : AppServerClient {
