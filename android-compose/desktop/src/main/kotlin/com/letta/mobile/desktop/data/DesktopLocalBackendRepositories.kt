@@ -14,9 +14,8 @@ internal data class DesktopLocalRepositoryBundle(
 )
 
 internal fun buildDesktopLocalRepositories(): DesktopLocalRepositoryBundle {
-    val baselineGeneration = DesktopLocalAppServerClientRegistry.generation()
     val transport = DefaultAppServerLocalRepositoryTransport(
-        clientProvider = { DesktopLocalAppServerClientRegistry.awaitClientAfter(baselineGeneration) },
+        clientProvider = DesktopLocalAppServerClientRegistry::currentClient,
         requestId = { operation -> "desktop-local-$operation-${UUID.randomUUID()}" },
     )
     return DesktopLocalRepositoryBundle(

@@ -2,11 +2,11 @@ package com.letta.mobile.data.repository.appserver
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -20,11 +20,8 @@ class DefaultAppServerLocalRepositoryTransport(
     private val clientProvider: suspend () -> AppServerClient,
     private val requestId: (String) -> String,
 ) : AppServerLocalRepositoryTransport {
-    private val clientMutex = Mutex()
-    private var pinnedClient: AppServerClient? = null
-
     override suspend fun listAgents(): JsonArray {
-        val response = client().agentList(
+        val response = clientProvider().agentList(
             AppServerCommand.AgentList(
                 requestId = requestId("agent-list"),
                 query = buildJsonObject {
@@ -48,22 +45,33 @@ class DefaultAppServerLocalRepositoryTransport(
         ) as? JsonObject
 
     override suspend fun listAgentBlocks(agentId: String): JsonArray {
-        val result = adminRpc(
-            operation = "block-list",
-            method = "block.list_agent",
-            params = buildJsonObject {
-                put("agent_id", agentId)
-                put("limit", "10000")
-                put("offset", "0")
-            },
-        )
-        return when (result) {
-            is JsonArray -> result
-            is JsonObject -> result["blocks"] as? JsonArray
+        val merged = mutableListOf<JsonElement>()
+        var offset = 0
+        repeat(BLOCK_LIST_MAX_PAGES) {
+            val result = adminRpc(
+                operation = "block-list",
+                method = "block.list_agent",
+                params = buildJsonObject {
+                    put("agent_id", agentId)
+                    put("limit", BLOCK_LIST_PAGE_SIZE.toString())
+                    put("offset", offset.toString())
+                },
+            ) ?: error("Bundled App Server block listing returned no result")
+            if (result is JsonArray) return JsonArray(merged + result)
+            val page = result as? JsonObject
+                ?: error("Bundled App Server block listing returned an unsupported result")
+            val blocks = page["blocks"] as? JsonArray
                 ?: error("Bundled App Server block listing returned no blocks")
-            null -> error("Bundled App Server block listing returned no result")
-            else -> error("Bundled App Server block listing returned an unsupported result")
+            val hasMore = (page["has_more"] as? JsonPrimitive)
+                ?.takeUnless { it.isString }
+                ?.booleanOrNull
+                ?: error("Bundled App Server block listing returned invalid has_more")
+            merged.addAll(blocks)
+            if (!hasMore) return JsonArray(merged)
+            check(blocks.isNotEmpty()) { "Bundled App Server block listing returned an empty continuing page" }
+            offset += blocks.size
         }
+        error("Bundled App Server block listing exceeded $BLOCK_LIST_MAX_PAGES pages")
     }
 
     private suspend fun adminRpc(
@@ -71,7 +79,7 @@ class DefaultAppServerLocalRepositoryTransport(
         method: String,
         params: JsonObject,
     ): JsonElement? {
-        val response = client().adminRpc(
+        val response = clientProvider().adminRpc(
             AppServerCommand.AdminRpc(
                 requestId = requestId(operation),
                 method = method,
@@ -82,7 +90,8 @@ class DefaultAppServerLocalRepositoryTransport(
         return response.result
     }
 
-    private suspend fun client(): AppServerClient = pinnedClient ?: clientMutex.withLock {
-        pinnedClient ?: clientProvider().also { pinnedClient = it }
+    private companion object {
+        const val BLOCK_LIST_PAGE_SIZE = 50
+        const val BLOCK_LIST_MAX_PAGES = 100
     }
 }

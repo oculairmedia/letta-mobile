@@ -45,6 +45,20 @@ class DesktopLocalAppServerClientRegistryTest {
         }
     }
 
+    @Test
+    fun `current client follows the latest installed generation`() = runTest {
+        val first = FakeClient()
+        val second = FakeClient()
+        val firstLease = DesktopLocalAppServerClientRegistry.install(first)
+
+        assertSame(first, DesktopLocalAppServerClientRegistry.currentClient())
+        val secondLease = DesktopLocalAppServerClientRegistry.install(second)
+        firstLease.close()
+        assertSame(second, DesktopLocalAppServerClientRegistry.currentClient())
+
+        secondLease.close()
+    }
+
     private class FakeClient : AppServerClient {
         override val events: Flow<AppServerReceivedFrame> = emptyFlow()
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = unsupported()

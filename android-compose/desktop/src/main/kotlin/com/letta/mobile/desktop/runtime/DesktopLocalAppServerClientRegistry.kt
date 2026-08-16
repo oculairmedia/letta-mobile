@@ -29,6 +29,10 @@ internal object DesktopLocalAppServerClientRegistry {
     @Synchronized
     fun generation(): Long = entry.value.generation
 
+    suspend fun currentClient(timeoutMs: Long = 10_000L): AppServerClient = withTimeout(timeoutMs) {
+        entry.first { it.client != null }.client!!
+    }
+
     suspend fun awaitClientAfter(
         generation: Long,
         timeoutMs: Long = 10_000L,

@@ -5,18 +5,27 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
+import com.letta.mobile.data.transport.appserver.AppServerClient
+import com.letta.mobile.data.transport.appserver.AppServerCommand
+import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
+import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertSame
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class AppServerLocalRepositoriesTest {
@@ -87,6 +96,52 @@ class AppServerLocalRepositoriesTest {
         assertEquals("agent-1", transport.lastBlockAgentId)
     }
 
+    @Test
+    fun `default transport follows active client rotation`() = runTest {
+        val first = FakeClient { okBlocks("[]") }
+        val second = FakeClient { okBlocks("[]") }
+        var active: AppServerClient = first
+        val transport = DefaultAppServerLocalRepositoryTransport(
+            clientProvider = { active },
+            requestId = { it },
+        )
+
+        transport.listAgentBlocks("agent-1")
+        active = second
+        transport.listAgentBlocks("agent-1")
+
+        assertEquals(1, first.adminRpcCalls.size)
+        assertEquals(1, second.adminRpcCalls.size)
+    }
+
+    @Test
+    fun `default transport merges paged block envelopes`() = runTest {
+        val offsets = mutableListOf<String>()
+        val client = FakeClient { command ->
+            val offset = command.params?.get("offset")?.jsonPrimitive?.content.orEmpty()
+            offsets += offset
+            if (offset == "0") {
+                okBlocks("""{"blocks":[{"id":"block-1","label":"human","value":"one"}],"has_more":true}""")
+            } else {
+                okBlocks("""{"blocks":[{"id":"block-2","label":"persona","value":"two"}],"has_more":false}""")
+            }
+        }
+        val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
+
+        val blocks = transport.listAgentBlocks("agent-1")
+
+        assertEquals(listOf("0", "1"), offsets)
+        assertEquals(listOf("block-1", "block-2"), blocks.map { it.jsonObject["id"]?.jsonPrimitive?.content })
+    }
+
+    @Test
+    fun `default transport rejects quoted pagination flag`() = runTest {
+        val client = FakeClient { okBlocks("""{"blocks":[],"has_more":"false"}""") }
+        val transport = DefaultAppServerLocalRepositoryTransport({ client }) { it }
+
+        assertFailsWith<IllegalStateException> { transport.listAgentBlocks("agent-1") }
+    }
+
     private class FakeTransport(
         private val agents: JsonArray = JsonArray(emptyList()),
         private val blocks: JsonArray = JsonArray(emptyList()),
@@ -111,4 +166,29 @@ class AppServerLocalRepositoriesTest {
             return blocks
         }
     }
+
+    private class FakeClient(
+        private val responder: (AppServerCommand.AdminRpc) -> AppServerInboundFrame.AdminRpcResponse,
+    ) : AppServerClient {
+        override val events: Flow<AppServerReceivedFrame> = emptyFlow()
+        val adminRpcCalls = mutableListOf<AppServerCommand.AdminRpc>()
+
+        override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart) = unsupported()
+        override suspend fun input(command: AppServerCommand.Input): Unit = unsupported()
+        override suspend fun sync(command: AppServerCommand.Sync) = unsupported()
+        override suspend fun abort(command: AppServerCommand.AbortMessage) = unsupported()
+        override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse): Unit = unsupported()
+        override suspend fun adminRpc(command: AppServerCommand.AdminRpc): AppServerInboundFrame.AdminRpcResponse {
+            adminRpcCalls += command
+            return responder(command)
+        }
+
+        private fun unsupported(): Nothing = error("Unexpected App Server operation")
+    }
+
+    private fun okBlocks(json: String) = AppServerInboundFrame.AdminRpcResponse(
+        requestId = "request",
+        success = true,
+        result = AppServerProtocol.json.parseToJsonElement(json),
+    )
 }
