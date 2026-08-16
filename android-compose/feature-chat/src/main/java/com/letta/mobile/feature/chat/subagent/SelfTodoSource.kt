@@ -1,11 +1,11 @@
 package com.letta.mobile.feature.chat.subagent
 
-import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SelfTodoSnapshot
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.toActivePlanState
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
@@ -42,32 +42,21 @@ interface SelfTodoSource {
  * The description is a compact progress label ("N/M done") so the chip reads
  * as the agent's own running plan at a glance.
  */
-internal fun List<SubagentTodo>.toSelfEntry(
-    // A terminal worker may leave its last TodoWrite snapshot at 4/5. The
-    // lifecycle signal must win over that independently retained checklist;
-    // callers use this overload when the parent run has reached a terminal
-    // state, while the plain form preserves normal live-plan behavior.
-    lifecycleStatus: String? = null,
+internal fun SelfTodoSnapshot.toSelfEntry(
     // letta-mobile-dvobc: injected so the self chip's stuck heuristic is
     // testable. Wall-clock epoch-ms stamped as the last-update time whenever
     // the plan changes (each new snapshot is a fresh observation).
     now: Long = System.currentTimeMillis(),
 ): ActiveSubagent? {
-    if (isEmpty()) return null
-    val completed = count { it.status.trim().lowercase() == "completed" }
-    val total = size
-    val terminal = lifecycleStatus == SubagentStatus.COMPLETED ||
-        lifecycleStatus == SubagentStatus.FAILED ||
-        lifecycleStatus == SubagentStatus.CANCELLED
-    if (completed >= total || terminal) return null
+    val plan = toActivePlanState() ?: return null
     return ActiveSubagent(
         id = ActiveSubagent.SELF_ID,
-        description = "Your plan · $completed/$total done",
+        description = "Your plan · ${plan.completed}/${plan.total} done",
         subagentType = "self",
         status = ActiveSubagent.Status.RUNNING,
         isSelf = true,
         // letta-mobile-dvobc: real determinate ring fill from the plan.
-        progress = SubagentTodoProgress(completed = completed, total = total),
+        progress = SubagentTodoProgress(completed = plan.completed, total = plan.total),
         lastUpdateAt = now,
     )
 }
@@ -81,10 +70,7 @@ class WsSelfTodoSource(
     private val repository: ISelfTodoRepository,
 ) : SelfTodoSource {
     override fun selfEntry(conversationId: String): Flow<ActiveSubagent?> =
-        combine(
-            repository.latestForFlow(conversationId),
-            repository.lifecycleStatusForFlow(conversationId),
-        ) { todos, lifecycleStatus -> todos.toSelfEntry(lifecycleStatus) }
+        repository.snapshotForFlow(conversationId).map { it.toSelfEntry() }
 
     override fun todos(conversationId: String): List<SubagentTodo> =
         repository.latestFor(conversationId)
@@ -104,7 +90,7 @@ class FakeSelfTodoSource(
     }
 
     override fun selfEntry(conversationId: String): Flow<ActiveSubagent?> =
-        _todos.map { it.toSelfEntry() }
+        _todos.map { SelfTodoSnapshot(todos = it).toSelfEntry() }
 
     override fun todos(conversationId: String): List<SubagentTodo> = _todos.value
 }
