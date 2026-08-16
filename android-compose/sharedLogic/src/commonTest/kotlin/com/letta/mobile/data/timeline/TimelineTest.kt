@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.messaging.AgentMessageClientId
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
@@ -68,6 +69,27 @@ class TimelineTest {
         assertEquals("b", t.events[1].otid)
     }
 
+    @Test
+    fun `legacy and encoded agent message ids share one lookup identity`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+        val legacyEvent = local("msg-1", 1.0)
+        val encodedEvent = confirmed(encoded, 1.0, TimelineMessageType.USER)
+
+        assertEquals(legacyEvent, Timeline("legacy").append(legacyEvent).findByOtid(encoded))
+        assertEquals(encodedEvent, Timeline("encoded").append(encodedEvent).findByOtid("msg-1"))
+    }
+
+    @Test
+    fun `legacy and encoded agent message ids cannot both enter the timeline`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+
+        val legacyFirst = Timeline("legacy").append(local("msg-1", 1.0)).append(local(encoded, 2.0))
+        val encodedFirst = Timeline("encoded").append(local(encoded, 1.0)).insertOrdered(local("msg-1", 2.0))
+
+        assertEquals(listOf("msg-1"), legacyFirst.events.map { it.otid })
+        assertEquals(listOf(encoded), encodedFirst.events.map { it.otid })
+    }
+
     // NOTE: Previous tests asserted that append() throws IllegalArgumentException
     // on out-of-order position or duplicate otid. As of letta-mobile-4jmg we tolerate
     // both cases (log telemetry, bump position, drop duplicate) to avoid crashing the
@@ -88,6 +110,27 @@ class TimelineTest {
         assertEquals(1.0, first.position, 0.0)
         assertEquals("user-1", first.otid)
         assertEquals(2.0, updated.events[1].position, 0.0)
+    }
+
+    @Test
+    fun `replaceLocal accepts encoded alias for legacy local id`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+        val updated = Timeline("c1")
+            .append(local("msg-1", 1.0))
+            .replaceLocal(encoded, confirmed(encoded, 9.0, TimelineMessageType.USER))
+
+        assertTrue(updated.events.single() is TimelineEvent.Confirmed)
+        assertEquals("msg-1", updated.events.single().otid)
+        assertEquals(1.0, updated.events.single().position)
+    }
+
+    @Test
+    fun `delivery updates accept encoded alias for legacy local id`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+        val timeline = Timeline("c1").append(local("msg-1", 1.0))
+
+        assertEquals(DeliveryState.SENT, (timeline.markSent(encoded).events.single() as TimelineEvent.Local).deliveryState)
+        assertEquals(DeliveryState.FAILED, (timeline.markFailed(encoded).events.single() as TimelineEvent.Local).deliveryState)
     }
 
     @Test

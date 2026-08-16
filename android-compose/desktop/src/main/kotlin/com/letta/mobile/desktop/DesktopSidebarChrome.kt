@@ -5,21 +5,13 @@ import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Build
-import androidx.compose.material.icons.outlined.ChevronLeft
-import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Psychology
@@ -29,7 +21,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,17 +37,14 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.ui.icons.LettaIcons
 import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.event.KeyEvent
-import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.delay
 
 /** Sidebar toggle test/automation tag, referenced by desktop UI tests. */
 internal const val SidebarToggleTestTag = "desktop-sidebar-toggle"
@@ -102,58 +90,6 @@ internal fun DesktopCollapsibleSidebar(
     }
 }
 
-private const val TooltipShowDelayMs = 150L
-
-/**
- * Minimal hover tooltip built only on plain Compose + Material3 primitives —
- * deliberately NOT [DesktopTooltip] (which renders through Jewel's
- * `TooltipChip`/`JewelLocalContentColor`): that path pulls in a Jewel class
- * file built for a newer JDK than this module's JVM 21 test toolchain can
- * load (`JewelThemeKt`, class file version 69 vs. the toolchain's 65),
- * so any test that renders it fails with `UnsupportedClassVersionError`
- * regardless of what the test asserts. Runtime is unaffected — the
- * application launches on JDK 26 — but new sidebar-chrome tests need to run
- * under the JVM 21 test toolchain, so this avoids the Jewel dependency.
- */
-@Composable
-private fun DesktopChromeTooltip(
-    text: String,
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit,
-) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    var show by remember { mutableStateOf(false) }
-    LaunchedEffect(hovered) {
-        if (hovered) {
-            delay(TooltipShowDelayMs.milliseconds)
-            show = true
-        } else {
-            show = false
-        }
-    }
-    Box(modifier = modifier.hoverable(interaction)) {
-        content()
-        if (show) {
-            Popup(alignment = Alignment.BottomStart, properties = PopupProperties(focusable = false)) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    shadowElevation = 6.dp,
-                ) {
-                    Text(
-                        text = text,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
-            }
-        }
-    }
-}
-
 /**
  * Sidebar collapse/expand toggle, always present in the desktop chrome (AC
  * #1) regardless of sidebar state — this is the one control that survives
@@ -169,7 +105,7 @@ internal fun DesktopSidebarToggleButton(
     focusRequester: FocusRequester? = null,
 ) {
     val label = if (collapsed) "Show sidebar (Ctrl+B)" else "Hide sidebar (Ctrl+B)"
-    DesktopChromeTooltip(text = label, modifier = modifier) {
+    DesktopTooltip(text = label, modifier = modifier) {
         IconButton(
             onClick = onToggle,
             modifier = Modifier
@@ -178,8 +114,14 @@ internal fun DesktopSidebarToggleButton(
                 .semantics { contentDescription = label },
         ) {
             Icon(
-                imageVector = if (collapsed) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
+                // Panel glyph (rounded rectangle + vertical divider), not a
+                // hamburger — mirrors the reference desktop chrome.
+                imageVector = if (collapsed) LettaIcons.PanelLeftOpen else LettaIcons.PanelLeftClose,
                 contentDescription = null,
+                // Explicit theme-aware tint — never rely on the ambient
+                // content color for chrome icons: it flips light/dark with
+                // the theme (onSurfaceVariant), unlike a hardcoded color.
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp),
             )
         }
@@ -203,12 +145,17 @@ internal fun DesktopSidebarOverflowMenu(
     var expanded by remember { mutableStateOf(false) }
     val label = "More (${WorkPlayLens.destinationLabel(mode, LensDestination.Memory)}, " +
         "${WorkPlayLens.destinationLabel(mode, LensDestination.Schedules)}, and more)"
-    DesktopChromeTooltip(text = "More", modifier = modifier) {
+    DesktopTooltip(text = "More", modifier = modifier) {
         IconButton(
             onClick = { expanded = true },
             modifier = Modifier.semantics { contentDescription = label },
         ) {
-            Icon(imageVector = Icons.Outlined.MoreVert, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(
+                imageVector = Icons.Outlined.MoreVert,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {

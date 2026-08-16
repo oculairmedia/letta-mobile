@@ -29,6 +29,8 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
+import com.letta.mobile.data.desktopshell.ConversationTabsReducer
+import com.letta.mobile.data.desktopshell.ConversationTabsState
 import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
@@ -43,6 +45,7 @@ import com.letta.mobile.desktop.chat.ChatDetailPaneState
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
@@ -82,6 +85,7 @@ internal data class DesktopAppShellBindings(
 internal fun LettaDesktopApp(
     shell: DesktopAppShellBindings,
     onActiveTitleChange: (String) -> Unit = {},
+    onHeaderChromeChange: (DesktopHeaderChromeState) -> Unit = {},
 ) {
     val nucleusApplicationScope = shell.nucleusApplicationScope
     val window = shell.window
@@ -153,6 +157,7 @@ internal fun LettaDesktopApp(
         ),
     )
     val chatState by chatController.state.collectAsState()
+    var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val submittingApprovals by chatController.submittingApprovals.collectAsState()
@@ -234,6 +239,57 @@ internal fun LettaDesktopApp(
     val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
+    LaunchedEffect(selectedDestination, chatState.selectedConversationId) {
+        val selectedId = chatState.selectedConversationId
+        if (
+            selectedDestination == DesktopDestination.Conversations &&
+            selectedId != null &&
+            selectedId !in conversationTabsState.openConversationIds
+        ) {
+            conversationTabsState = ConversationTabsReducer.select(conversationTabsState, selectedId)
+        }
+    }
+    LaunchedEffect(chatState.connectionState, chatState.conversations) {
+        if (
+            chatState.connectionState == DesktopChatConnectionState.Live ||
+            chatState.connectionState == DesktopChatConnectionState.NoConversations
+        ) {
+            val availableIds = chatState.conversations.mapTo(mutableSetOf()) { it.id }
+            conversationTabsState = ConversationTabsReducer.retainAvailable(
+                state = conversationTabsState,
+                availableConversationIds = availableIds,
+                selectedConversationId = chatState.selectedConversationId,
+            )
+        }
+    }
+    val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
+    val conversationTabs = remember(conversationTabsState, conversationById) {
+        conversationTabsState.openConversationIds.mapNotNull { conversationId ->
+            conversationById[conversationId]?.let { conversation ->
+                DesktopConversationTab(
+                    conversationId = conversation.id,
+                    title = conversation.displayTitle(),
+                    agentName = conversation.agentName,
+                )
+            }
+        }
+    }
+
+    fun closeConversationTab(conversationId: String) {
+        val result = ConversationTabsReducer.close(conversationTabsState, conversationId)
+        val fallbackId = result.fallbackConversationId
+        val closingActiveTab = conversationId == chatState.selectedConversationId
+        conversationTabsState = result.state
+        if (!closingActiveTab) return
+        if (fallbackId != null) {
+            editAgentId = null
+            chatController.selectConversation(fallbackId)
+            selectedDestination = DesktopDestination.Conversations
+        } else {
+            selectedDestination = DesktopDestination.Home
+        }
+    }
+
     // Same-named agents are stacked in the rail, and the sidebar lists the
     // whole stack's conversations together (see [buildRailAgents]).
     val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
@@ -293,6 +349,20 @@ internal fun LettaDesktopApp(
     )
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
+
+    // Also used by the header chrome's collapsed-sidebar overflow menu
+    // (letta-mobile-3arhe.1), hence declared at the top level rather than
+    // nested inside the BoxWithConstraints below.
+    fun openNewChatForFocusedAgent() {
+        editAgentId = null
+        selectedDestination = DesktopDestination.Conversations
+        // Target the focused agent explicitly — for a roster-only agent,
+        // createConversation()'s conversation-derived agent id would miss it.
+        selectedAgentId
+            ?.let(chatController::createConversationForAgent)
+            ?: chatController.createConversation()
+    }
+
     // Per-agent avatar-style override chosen in the editor (stored in agent
     // metadata). Re-derived whenever the roster changes — which includes the
     // post-save reload — so a freshly-saved icon is reflected on the orbs.
@@ -592,16 +662,6 @@ internal fun LettaDesktopApp(
             LaunchedEffect(measuredWidthDp) {
                 shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
             }
-            fun openNewChatForFocusedAgent() {
-                editAgentId = null
-                selectedDestination = DesktopDestination.Conversations
-                // Target the focused agent explicitly — for a roster-only
-                // agent, createConversation()'s conversation-derived agent
-                // id would miss it.
-                selectedAgentId
-                    ?.let(chatController::createConversationForAgent)
-                    ?: chatController.createConversation()
-            }
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -835,41 +895,10 @@ internal fun LettaDesktopApp(
                             modifier = Modifier.fillMaxSize(),
                         )
                     }
-                    // Sidebar toggle: the one control that survives collapse
-                    // (AC #1 chrome + #7 focus anchor). The overflow menu only
-                    // appears while collapsed — when the sidebar is visible its
-                    // own nav already covers Memory/Schedules/Channels/Skills/
-                    // New chat (AC #6); conversation history stays reachable
-                    // either way through the command palette (Ctrl+K).
-                    if (editing == null) {
-                        Row(
-                            modifier = Modifier
-                                .align(Alignment.TopStart)
-                                .padding(top = 12.dp, start = 12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            DesktopSidebarToggleButton(
-                                collapsed = !isSidebarVisible,
-                                onToggle = {
-                                    if (!ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)) {
-                                        shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar)
-                                    }
-                                },
-                                focusRequester = sidebarToggleFocusRequester,
-                            )
-                            if (!isSidebarVisible) {
-                                DesktopSidebarOverflowMenu(
-                                    mode = workPlayMode,
-                                    onNewChat = ::openNewChatForFocusedAgent,
-                                    onDestination = { lensDestination ->
-                                        editAgentId = null
-                                        selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
-                                    },
-                                )
-                            }
-                        }
-                    }
+                    // Sidebar toggle + overflow menu moved into the window
+                    // chrome header (letta-mobile-3arhe.1): floating it over
+                    // content made it easy to miss once the sidebar was
+                    // hidden. See the DesktopHeaderChromeState wiring below.
                 }
                 if (showBackgroundTasks && subagentRepository != null) {
                     RailDivider()
@@ -921,28 +950,59 @@ internal fun LettaDesktopApp(
                 ),
             )
           }
-          DesktopNowActiveBarHost(
-              chatController = chatController,
-              chatState = chatState,
-              host = NowActiveBarHostState(
-                  thinkingConversationId = thinkingConversationId,
-                  isStreamingReplySelected = isStreamingReplySelected,
-                  avatarStyleByAgentId = avatarStyleByAgentId,
-                  fallbackOrbIndex = selectedAgentOrbIndex,
-                  avatarCompanionActive = avatar.isActive,
-              ),
-              actions = NowActiveBarHostActions(
-                  onOpenConversation = { conversationId ->
-                      editAgentId = null
-                      chatController.selectConversation(conversationId)
-                      selectedDestination = DesktopDestination.Conversations
-                  },
-                  onAvatarCompanion = avatar.toggle,
-                  onStopRun = chatController::stopActiveRun,
-              ),
-          )
           }
         }
+
+        // Header chrome (letta-mobile-3arhe.1): the agent-first identity
+        // block (was a footer bar) plus the sidebar toggle (letta-mobile-
+        // o5m90), lifted up to Main.kt/DesktopJewelWindow's custom title bar
+        // the same way onActiveTitleChange already lifts the window title —
+        // that title bar is a composition sibling of this Column, not a
+        // descendant, so it cannot read this state directly.
+        val headerIdentity = DesktopNowActiveBarHost(
+            chatController = chatController,
+            chatState = chatState,
+            host = NowActiveBarHostState(
+                thinkingConversationId = thinkingConversationId,
+                isStreamingReplySelected = isStreamingReplySelected,
+                avatarStyleByAgentId = avatarStyleByAgentId,
+                fallbackOrbIndex = selectedAgentOrbIndex,
+                avatarCompanionActive = avatar.isActive,
+            ),
+            actions = NowActiveBarHostActions(
+                onOpenConversation = { conversationId ->
+                    editAgentId = null
+                    chatController.selectConversation(conversationId)
+                    selectedDestination = DesktopDestination.Conversations
+                },
+                onAvatarCompanion = avatar.toggle,
+                onStopRun = chatController::stopActiveRun,
+            ),
+        )
+        val headerChrome = DesktopHeaderChromeState(
+            identity = headerIdentity.state,
+            identityActions = headerIdentity.actions,
+            sidebarCollapsed = !shellLayoutState.isSidebarVisible,
+            onToggleSidebar = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
+            sidebarToggleFocusRequester = sidebarToggleFocusRequester,
+            sidebarOverflow = DesktopHeaderSidebarOverflow(
+                mode = workPlayMode,
+                onNewChat = ::openNewChatForFocusedAgent,
+                onDestination = { lensDestination ->
+                    editAgentId = null
+                    selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
+                },
+            ),
+            conversationTabs = conversationTabs,
+            activeConversationId = chatState.selectedConversationId,
+            onSelectConversationTab = { conversationId ->
+                editAgentId = null
+                chatController.selectConversation(conversationId)
+                selectedDestination = DesktopDestination.Conversations
+            },
+            onCloseConversationTab = ::closeConversationTab,
+        )
+        SideEffect { onHeaderChromeChange(headerChrome) }
     }
 }
 

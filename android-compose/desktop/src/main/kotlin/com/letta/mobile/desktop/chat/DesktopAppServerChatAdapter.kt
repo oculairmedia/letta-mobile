@@ -1,6 +1,11 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLifecycle
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLease
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Desktop insertion contract for a future App Server-backed chat path.
@@ -56,17 +61,56 @@ class DesktopAppServerClientUnavailableException :
             "DesktopAppServerChatGatewayFactory backed by the shared App Server client.",
     )
 
-suspend fun createDefaultDesktopChatGateway(
+internal suspend fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
     appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(),
-): DesktopChatGateway =
-    if (appServerConfig.enabled) {
-        appServerGatewayFactory?.create(config, appServerConfig)
-            ?: throw DesktopAppServerClientUnavailableException()
-    } else {
-        DesktopLettaHttpChatGateway(config)
+    localRuntime: DesktopLocalRuntimeLifecycle = DesktopLocalRuntimeHost,
+): DesktopChatGateway {
+    var runtimeLease: DesktopLocalRuntimeLease? = null
+    val resolvedAppServerConfig = when {
+        config.mode == LettaConfig.Mode.LOCAL && appServerConfig.serverUrl == null -> {
+            val lease = withContext(Dispatchers.IO) { localRuntime.acquire() }
+            runtimeLease = lease
+            DesktopAppServerRuntimeConfig(enabled = true, serverUrl = lease.serverUrl)
+        }
+        appServerConfig.enabled -> appServerConfig
+        else -> appServerConfig
     }
+    try {
+        val gateway = if (resolvedAppServerConfig.enabled) {
+            appServerGatewayFactory?.create(config, resolvedAppServerConfig)
+                ?: throw DesktopAppServerClientUnavailableException()
+        } else {
+            DesktopLettaHttpChatGateway(config)
+        }
+        return runtimeLease?.let { DesktopRuntimeOwnedChatGateway(gateway, it) } ?: gateway
+    } catch (error: Throwable) {
+        runtimeLease?.close()
+        throw error
+    }
+}
+
+private class DesktopRuntimeOwnedChatGateway(
+    private val delegate: DesktopChatGateway,
+    private val runtimeLease: DesktopLocalRuntimeLease,
+) : DesktopChatGateway by delegate, DesktopApprovalSubmitter, DesktopTurnAborter, AutoCloseable {
+    override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
+        (delegate as? DesktopApprovalSubmitter)?.submitApproval(submission)
+            ?: error("The local App Server gateway cannot submit approvals")
+    }
+
+    override suspend fun abortConversationTurn(conversationId: String): Boolean =
+        (delegate as? DesktopTurnAborter)?.abortConversationTurn(conversationId) ?: false
+
+    override fun close() {
+        try {
+            (delegate as? AutoCloseable)?.close()
+        } finally {
+            runtimeLease.close()
+        }
+    }
+}
 
 /**
  * Creates the default App Server gateway factory for desktop chat.

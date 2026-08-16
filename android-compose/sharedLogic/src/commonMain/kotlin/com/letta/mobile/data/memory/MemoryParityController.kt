@@ -94,9 +94,17 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
         }
 
-        // Agent tools and blocks come from the same cached Agent snapshot.
         val agentSnapshotLoaded = roster.loaded || selectedAgentDetail != null
         val skillsLoaded = if (selectedAgent == null) globalTools.loaded else agentSnapshotLoaded
+        val blocks = selectedAgent?.let { agent ->
+            graph.blockRepository?.let { repository ->
+                sectionReader.read("blocks") { repository.getBlocks(agent.id.value) }
+            } ?: MemoryParitySectionRead.Loaded(agent.coreBlocks)
+        } ?: if (roster.loaded) {
+            MemoryParitySectionRead.Loaded(emptyList())
+        } else {
+            MemoryParitySectionRead.Unavailable(DependencyUnavailable("roster"))
+        }
         val schedules = selectedAgent?.id?.value?.let { agentId ->
             sectionReader.read("schedules") {
                 graph.scheduleRepository.refreshSchedules(agentId)
@@ -119,13 +127,14 @@ class MemoryParityController<Graph : SessionRepositoryGraph>(
             agents = agents,
             selectedAgentId = selectedAgent?.id?.value,
             allTools = globalTools.value.orEmpty(),
+            blocks = blocks.value,
             schedules = schedules.value.orEmpty(),
             backendDescriptor = graph.backendDescriptor,
             channelTransportState = channelState,
             contextWindowOverview = context.value,
             availability = MemoryParityAvailability(
                 skillsLoaded = skillsLoaded,
-                memoryBlocksLoaded = agentSnapshotLoaded,
+                memoryBlocksLoaded = blocks.loaded,
                 schedulesLoaded = schedules.loaded,
                 contextLoaded = context.loaded,
             ),

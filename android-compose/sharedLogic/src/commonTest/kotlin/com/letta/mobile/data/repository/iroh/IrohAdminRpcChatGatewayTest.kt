@@ -455,6 +455,49 @@ class IrohAdminRpcChatGatewayTest {
     }
 
     @Test
+    fun directoryListAgentBlocksRejectsWindowWithoutValidHasMore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport().apply {
+            rpcResponder = { ok("""{"blocks":[]}""") }
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("has_more"))
+    }
+
+    @Test
+    fun directoryListAgentBlocksRejectsQuotedHasMore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport().apply {
+            rpcResponder = { ok("""{"blocks":[],"has_more":"false"}""") }
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("has_more"))
+    }
+
+    @Test
+    fun directoryListAgentBlocksFailsWhenPageCapStillHasMore() = runTest(UnconfinedTestDispatcher()) {
+        val transport = FakeIrohTransport().apply {
+            rpcResponder = {
+                val index = rpcCalls.size
+                ok("""{"blocks":[{"id":"block-$index","label":"persona","value":"v"}],"has_more":true}""")
+            }
+        }
+
+        val failure = assertFailsWith<TimelineTransportHttpException> {
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        }
+
+        assertTrue(failure.message.orEmpty().contains("exceeded"))
+        assertEquals(IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_MAX_PAGES, transport.rpcCalls.size)
+    }
+
+    @Test
     fun listAgentsStopsWhenBackendIgnoresPagination() = runTest(UnconfinedTestDispatcher()) {
         // Regression (observed in production): the backend ignores BOTH limit and
         // offset, returning its first page on every call. The short-page test

@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.data
 
+import java.io.IOException
 import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
@@ -61,28 +62,33 @@ class DesktopShellLayoutStore(
 
     private fun readProperties(): Properties? {
         if (!Files.exists(path)) return null
-        val properties = Properties()
-        Files.newInputStream(path).use { input -> properties.load(input) }
-        return properties
+        return try {
+            Properties().also { properties ->
+                Files.newInputStream(path).use(properties::load)
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: IllegalArgumentException) {
+            null
+        }
     }
 
     private fun writeAtomically(properties: Properties) {
-        val parent = path.parent
-        if (parent != null) {
-            Files.createDirectories(parent)
-        }
+        val target = path.toAbsolutePath()
+        val parent = requireNotNull(target.parent)
+        Files.createDirectories(parent)
         val tmp = Files.createTempFile(parent, "shell-layout", ".tmp")
         try {
             Files.newOutputStream(tmp).use<OutputStream, Unit> { output ->
                 properties.store(output, "Letta Desktop shell layout")
             }
             try {
-                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: java.nio.file.AtomicMoveNotSupportedException) {
                 // Some filesystems (notably certain network/cross-volume
                 // setups) don't support ATOMIC_MOVE; fall back to a plain
                 // replace rather than failing the write outright.
-                Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING)
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING)
             }
         } finally {
             Files.deleteIfExists(tmp)

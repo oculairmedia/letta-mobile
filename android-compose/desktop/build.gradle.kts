@@ -4,6 +4,13 @@ import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// WiX 4 still resolves installer sources through Win32 paths. Keep CI's
+// packaging workspace short so deeply nested production dependencies remain
+// below MAX_PATH; ordinary local builds retain the standard module build dir.
+providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
+    ?.takeIf(String::isNotBlank)
+    ?.let { layout.buildDirectory.set(file(it)) }
+
 // This repo does not yet use a Gradle version catalog. Keep desktop-only
 // versions named here until dependency versions are centralized project-wide.
 //
@@ -39,6 +46,10 @@ val jcefMavenVersion = "146.0.10"
 val jnaVersion = "5.17.0"
 val nucleusVersion = "2.1.5"
 val nativeTrayVersion = "2.0.1"
+val desktopNodeVersion = "24.13.1"
+val desktopLettaCodeVersion = "0.29.12"
+val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
+val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -173,7 +184,22 @@ dependencies {
     implementation("dev.nucleusframework:composenativetray-jvm:$nativeTrayVersion")
     // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
     // use its portable JNI-backed AWT window backend rather than Tao.
-    runtimeOnly("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
+    //
+    // letta-mobile-scedm: `DecoratedWindow`/`TitleBar` (core+awt, compile-time
+    // API) plus the JNI native backend (runtime-only — installs a real Win32
+    // WndProc subclass on Windows) replace the hand-rolled
+    // `undecorated = true` Window + DwmSetWindowAttribute-only chrome. That
+    // combination lost Aero Snap, Snap Layouts, DWM min/max/restore
+    // animations, and the standard drop shadow because the OS never saw a
+    // real WS_CAPTION/WS_THICKFRAME frame. Nucleus's JNI backend keeps a real
+    // native frame under custom-drawn chrome instead — the maintained
+    // alternative to subclassing GWLP_WNDPROC ourselves via JNA.
+    implementation("dev.nucleusframework:nucleus.decorated-window-core:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.decorated-window-awt:$nucleusVersion")
+    // `DecoratedWindow`/`TitleBar` themselves (the public entry points we call
+    // from DesktopJewelWindow.kt) are published from this module, not -core —
+    // it must be a compile-time dependency, not runtimeOnly.
+    implementation("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
     implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
@@ -247,6 +273,7 @@ nucleus.application {
     }
 
     nativeDistributions {
+        appResourcesRootDir.set(project.layout.buildDirectory.dir("generated/desktop-app-resources"))
         if (providers.gradleProperty("nucleusAllFormats").orNull.toBoolean()) {
             targetFormats(*TargetFormat.entries.toTypedArray())
         } else {
@@ -319,5 +346,112 @@ nucleus.application {
             appCategory = "Utility"
             startupWMClass = "Letta Desktop"
         }
+    }
+}
+
+val desktopRuntimeSourceDir = layout.projectDirectory.dir("runtime")
+val desktopNodeArchive = layout.buildDirectory.file("downloads/$desktopNodeArchiveName")
+val desktopNodeExtractDir = layout.buildDirectory.dir("desktop-node-runtime")
+val desktopRuntimeInstallDir = layout.buildDirectory.dir("desktop-letta-code-runtime")
+val desktopAppResourcesDir = layout.buildDirectory.dir("generated/desktop-app-resources")
+val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("windows/letta-code-runtime") }
+val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+
+val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntime") {
+    onlyIf { isWindowsHost }
+    inputs.property("nodeVersion", desktopNodeVersion)
+    inputs.property("sha256", desktopNodeArchiveSha256)
+    outputs.file(desktopNodeArchive)
+    val target = desktopNodeArchive.get().asFile
+    val temporary = File(target.parentFile, "${target.name}.part")
+    val downloadScript = """
+        ${'$'}ErrorActionPreference = 'Stop'
+        function Get-Sha256([string]${'$'}Path) {
+            ${'$'}stream = [System.IO.File]::OpenRead(${'$'}Path)
+            try {
+                ${'$'}hasher = [System.Security.Cryptography.SHA256]::Create()
+                try { return [System.BitConverter]::ToString(${'$'}hasher.ComputeHash(${'$'}stream)).Replace('-', '').ToLowerInvariant() }
+                finally { ${'$'}hasher.Dispose() }
+            } finally { ${'$'}stream.Dispose() }
+        }
+        New-Item -ItemType Directory -Force -Path '${target.parentFile.absolutePath}' | Out-Null
+        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-Sha256 '${target.absolutePath}') -eq '$desktopNodeArchiveSha256')) { exit 0 }
+        Remove-Item -LiteralPath '${temporary.absolutePath}' -Force -ErrorAction SilentlyContinue
+        Invoke-WebRequest -UseBasicParsing 'https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName' -OutFile '${temporary.absolutePath}'
+        if ((Get-Sha256 '${temporary.absolutePath}') -ne '$desktopNodeArchiveSha256') { throw 'SHA-256 mismatch for $desktopNodeArchiveName' }
+        Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
+    """.trimIndent()
+    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)
+}
+
+val extractDesktopNodeRuntime = tasks.register<Sync>("extractDesktopNodeRuntime") {
+    onlyIf { isWindowsHost }
+    dependsOn(downloadDesktopNodeRuntime)
+    from(desktopNodeArchive.map { archive -> zipTree(archive) }) {
+        eachFile { path = path.substringAfter('/') }
+        includeEmptyDirs = false
+    }
+    into(desktopNodeExtractDir)
+}
+
+val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntimeInstallDir") {
+    from(desktopRuntimeSourceDir)
+    include("package.json", "package-lock.json", "runtime-manifest.json")
+    into(desktopRuntimeInstallDir)
+}
+
+val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCodeRuntime") {
+    onlyIf { isWindowsHost }
+    dependsOn(extractDesktopNodeRuntime)
+    dependsOn(prepareDesktopRuntimeInstallDir)
+    inputs.files(
+        desktopRuntimeSourceDir.file("package.json"),
+        desktopRuntimeSourceDir.file("package-lock.json"),
+    )
+    inputs.property("lettaCodeVersion", desktopLettaCodeVersion)
+    outputs.dir(desktopRuntimeInstallDir.map { it.dir("node_modules") })
+    workingDir(desktopRuntimeInstallDir)
+    commandLine(
+        desktopNodeExtractDir.get().file("npm.cmd").asFile.absolutePath,
+        "ci",
+        "--omit=dev",
+        "--no-audit",
+        "--no-fund",
+    )
+}
+
+val prepareDesktopLettaCodeRuntime = tasks.register<Sync>("prepareDesktopLettaCodeRuntime") {
+    onlyIf { isWindowsHost }
+    dependsOn(installDesktopLettaCodeRuntime)
+    from(desktopNodeExtractDir.map { it.file("node.exe") })
+    from(desktopRuntimeInstallDir) {
+        include("package.json", "package-lock.json", "runtime-manifest.json", "node_modules/**")
+        // TypeScript declarations are never loaded at runtime. Some SDK packages
+        // nest them deeply enough to exceed WiX's effective source-path limit,
+        // leaving the MSI manifest pointing at files Windows could not stage.
+        exclude(
+            "node_modules/**/*.d.ts",
+            "node_modules/**/*.map",
+            "node_modules/**/dist-types/**",
+        )
+    }
+    into(desktopBundledRuntimeDir)
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(prepareDesktopLettaCodeRuntime)
+}
+
+// Jewel ships Java-25 bytecode (class-file v69), while this module targets
+// JVM 21 for the Iroh binding. Gradle otherwise selects the compile toolchain
+// for `run`, which fails before the window is created. Keep development runs
+// on the installed JDK 26 runtime instead.
+afterEvaluate {
+    tasks.named<JavaExec>("run") {
+        val runtimeLauncher = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(26))
+        }
+        javaLauncher.set(runtimeLauncher)
+        setExecutable(runtimeLauncher.get().executablePath.asFile)
     }
 }

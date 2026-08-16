@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.http.LettaHttpChatGateway
 import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
@@ -14,6 +15,8 @@ import kotlinx.serialization.json.Json
 import dev.nucleusframework.nativessl.NativeTrustManager
 
 typealias DesktopChatGateway = ChatGateway
+
+internal interface DesktopAdminChatGateway : ChatGateway, ChatGatewayExtras, AutoCloseable
 
 /**
  * Optional capability a [DesktopChatGateway] may implement to answer / dismiss a
@@ -64,7 +67,7 @@ data class DesktopApprovalSubmission(
 class DesktopLettaHttpChatGateway(
     config: LettaConfig,
     httpClient: HttpClient = createDesktopLettaHttpClient(),
-) : LettaHttpChatGateway(config = config, httpClient = httpClient)
+) : LettaHttpChatGateway(config = config, httpClient = httpClient), DesktopAdminChatGateway
 
 fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
     engine {

@@ -47,6 +47,20 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     @Test
+    fun localModeKeepsHttpScheduleAndToolRepositories() {
+        val adapters = DesktopRepositoryAdapters(
+            LettaConfig(
+                id = "desktop-local",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "http://127.0.0.1:8283",
+            ),
+        )
+
+        assertIs<DesktopLettaHttpAdminRepositories>(adapters.scheduleRepository)
+        assertIs<DesktopLettaHttpAdminRepositories>(adapters.toolRepository)
+    }
+
+    @Test
     fun unavailableRepositoriesFailWhenInvokedBeforeJvmBindingExists() = runTest {
         val graph = DesktopSessionGraphFactory().create()
 

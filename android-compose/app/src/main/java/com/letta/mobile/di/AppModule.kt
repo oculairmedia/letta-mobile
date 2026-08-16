@@ -125,10 +125,10 @@ abstract class AppModule {
         @Provides
         @Singleton
         fun provideIrohAdminRpcBlockSource(
-            transport: IChannelTransport,
+            transport: javax.inject.Provider<IChannelTransport>,
             settingsRepository: ISettingsRepository,
         ): IrohAdminRpcBlockSource = IrohAdminRpcBlockSource(
-            channelTransport = transport,
+            channelTransportProvider = transport::get,
             settingsRepository = settingsRepository,
         )
 

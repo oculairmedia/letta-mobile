@@ -139,7 +139,7 @@ class MemoryParityMapperTest {
 
         assertEquals(0, state.summary.skillCount)
         assertEquals(emptyList(), state.section(MemoryParitySectionKind.Skills).items)
-        assertEquals(MemoryParitySectionStatus.Loaded, state.section(MemoryParitySectionKind.Skills).status)
+        assertEquals("0", state.summary.metrics.first { it.kind == MemorySummaryMetricKind.Skills }.value)
         assertEquals(MemoryChannelStatus.Idle, (state.section(MemoryParitySectionKind.Channels).items.single() as MemoryParityItem.Channel).status)
     }
 
@@ -157,7 +157,7 @@ class MemoryParityMapperTest {
 
         assertEquals(null, state.summary.skillCount)
         assertEquals(1, state.section(MemoryParitySectionKind.Skills).items.size)
-        assertEquals(MemoryParitySectionStatus.Unavailable, state.section(MemoryParitySectionKind.Skills).status)
+        assertEquals("—", state.summary.metrics.first { it.kind == MemorySummaryMetricKind.Skills }.value)
     }
 
     @Test

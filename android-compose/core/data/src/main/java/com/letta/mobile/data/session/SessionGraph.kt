@@ -3,6 +3,7 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ArchiveRepository
+import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
@@ -56,6 +57,7 @@ class SessionGraph internal constructor(
     override val subagentRepository: SubagentRepository,
     override val toolRepository: ToolRepository,
     override val vibesyncEventStreamRepository: VibesyncEventStreamRepository,
+    override val blockRepository: BlockRepository? = null,
 ) : SessionRepositoryGraph {
     override fun close() {
         scope.cancel()

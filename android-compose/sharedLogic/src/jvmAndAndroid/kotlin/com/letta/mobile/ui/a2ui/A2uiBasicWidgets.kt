@@ -1179,13 +1179,16 @@ internal fun A2uiButton(
             if (localOpenUrl != null) {
                 a2uiLog.debug(
                     "Button onClick: opening URL surfaceId=${surface.surfaceId} " +
-                        "componentId=${component.id} url=$localOpenUrl",
+                        "componentId=${component.id} action=open_url",
                 )
                 A2uiHaptics.confirm(haptic)
                 runCatching {
                     uriHandler.openUri(localOpenUrl)
-                }.onFailure { error ->
-                    a2uiLog.warn("Failed to open URL for A2UI Button", error)
+                }.onFailure {
+                    a2uiLog.warn(
+                        "Button onClick: URL open failed surfaceId=${surface.surfaceId} " +
+                            "componentId=${component.id} action=open_url",
+                    )
                 }
                 return@Button
             }
@@ -1196,7 +1199,7 @@ internal fun A2uiButton(
             if (resolved == null) {
                 a2uiLog.warn(
                     "Button onClick: action unresolved surfaceId=${surface.surfaceId} " +
-                        "componentId=${component.id} raw=${component.raw["action"] ?: component.raw["onClick"]}",
+                        "componentId=${component.id}",
                 )
             } else {
                 a2uiLog.debug(

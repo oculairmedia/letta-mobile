@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop.data
 
 import java.nio.file.Files
+import java.nio.file.Path
+import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -70,5 +72,30 @@ class DesktopShellLayoutStoreTest {
         assertEquals(false, store.load("backend-a")?.collapsedPreference)
         assertEquals(300f, store.load("backend-a")?.sidebarWidthDp)
         assertEquals(true, store.load("backend-b")?.collapsedPreference)
+    }
+
+    @Test
+    fun corruptPropertiesAreIgnoredAndReplacedOnSave() {
+        val path = Files.createTempDirectory("shell-layout-test").resolve("shell-layout.properties")
+        Files.writeString(path, "broken=\\u00ZZ")
+        val store = DesktopShellLayoutStore(path)
+
+        assertNull(store.load("backend-a"))
+        store.save("backend-a", PersistedShellLayout(collapsedPreference = true, sidebarWidthDp = 280f))
+
+        assertEquals(true, store.load("backend-a")?.collapsedPreference)
+    }
+
+    @Test
+    fun relativePathCanBeSaved() {
+        val path = Path.of("shell-layout-${UUID.randomUUID()}.properties")
+        try {
+            val store = DesktopShellLayoutStore(path)
+            store.save("backend-a", PersistedShellLayout(collapsedPreference = true, sidebarWidthDp = null))
+
+            assertEquals(true, store.load("backend-a")?.collapsedPreference)
+        } finally {
+            Files.deleteIfExists(path)
+        }
     }
 }

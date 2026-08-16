@@ -75,15 +75,15 @@ import kotlin.time.Duration.Companion.milliseconds
 class DesktopHybridAppServerChatGateway internal constructor(
     private val turnEngine: TurnEngine,
     private val client: AppServerClient,
-    private val httpGateway: DesktopLettaHttpChatGateway,
+    private val adminGateway: DesktopAdminChatGateway,
     private val transportResources: DesktopTransportResources? = null,
     private val onClose: (() -> Unit)? = null,
     private val heartbeatIntervalMs: Long = IrohAdminRpcChatGateway.STREAM_HEARTBEAT_INTERVAL_MS,
     private val agentIdResolver: suspend (conversationId: String) -> String = { conversationId ->
-        httpGateway.getConversation(conversationId).agentId.value
+        adminGateway.getConversation(conversationId).agentId.value
     },
 ) : DesktopChatGateway,
-    ChatGatewayExtras by httpGateway,
+    ChatGatewayExtras by adminGateway,
     DesktopApprovalSubmitter,
     DesktopTurnAborter,
     AutoCloseable {
@@ -338,35 +338,35 @@ class DesktopHybridAppServerChatGateway internal constructor(
         limit: Int?,
         after: String?,
         order: String?,
-    ): List<LettaMessage> = httpGateway.listConversationMessages(conversationId, limit, after, order)
+    ): List<LettaMessage> = adminGateway.listConversationMessages(conversationId, limit, after, order)
 
     override suspend fun listAgentMessages(
         agentId: String,
         limit: Int?,
         order: String?,
         conversationId: String?,
-    ): List<LettaMessage> = httpGateway.listAgentMessages(agentId, limit, order, conversationId)
+    ): List<LettaMessage> = adminGateway.listAgentMessages(agentId, limit, order, conversationId)
 
     override suspend fun listConversations(
         limit: Int,
         archiveStatus: String?,
-    ): List<Conversation> = httpGateway.listConversations(limit, archiveStatus)
+    ): List<Conversation> = adminGateway.listConversations(limit, archiveStatus)
         .also { conversations ->
             conversations.forEach { agentIdByConversation[it.id.value] = it.agentId.value }
         }
 
     override suspend fun getConversation(conversationId: String): Conversation =
-        httpGateway.getConversation(conversationId)
+        adminGateway.getConversation(conversationId)
             .also { agentIdByConversation[it.id.value] = it.agentId.value }
 
     override suspend fun deleteConversation(conversationId: String) {
-        httpGateway.deleteConversation(conversationId)
+        adminGateway.deleteConversation(conversationId)
         agentIdByConversation.remove(conversationId)
     }
 
     override fun close() {
         onClose?.invoke()
-        httpGateway.close()
+        adminGateway.close()
         transportResources?.close()
     }
 

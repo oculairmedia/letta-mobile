@@ -152,18 +152,24 @@ jobs:
             ${{ runner.os }}-konan-
 
       - name: Build Windows EXE + MSI installers
+        env:
+          # Match desktop CI's drive-root workspace so WiX source paths stay
+          # below the Win32 MAX_PATH boundary in release packaging too.
+          LETTA_DESKTOP_BUILD_DIR: D:\l
         # Output:
-        #   desktop/build/compose/binaries/main/exe/*.exe
-        #   desktop/build/compose/binaries/main/msi/*.msi
-        run: ./gradlew --no-daemon :desktop:packageDistributionForCurrentOS
+        #   D:\l\compose\binaries\main\exe\*.exe
+        #   D:\l\compose\binaries\main\msi\*.msi
+        # Keep release packaging aligned with desktop CI: the bundled-runtime
+        # Exec tasks are deliberately outside Gradle's configuration cache.
+        run: ./gradlew --no-daemon --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload desktop installers
         uses: actions/upload-artifact@v4
         with:
           name: desktop-installers
           path: |
-            android-compose/desktop/build/compose/binaries/main/exe/*.exe
-            android-compose/desktop/build/compose/binaries/main/msi/*.msi
+            D:\l\compose\binaries\main\exe\*.exe
+            D:\l\compose\binaries\main\msi\*.msi
           if-no-files-found: error
 
   # ── Publish: gather APK + EXE + MSI and create the release ──────────────

@@ -24,6 +24,7 @@ import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.AgentRepository
 import com.letta.mobile.data.repository.AllConversationsRepository
 import com.letta.mobile.data.repository.ArchiveRepository
+import com.letta.mobile.data.repository.BlockRepository
 import com.letta.mobile.data.repository.ConversationRepository
 import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
@@ -106,6 +107,7 @@ class SessionGraphFactory internal constructor(
     private val scheduleApi: ScheduleApi,
     private val stepApi: StepApi,
     private val toolApi: ToolApi,
+    private val blockRepository: BlockRepository? = null,
     private val runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
     private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
     private val settingsRepository: ISettingsRepository? = null,
@@ -138,6 +140,7 @@ class SessionGraphFactory internal constructor(
         scheduleApi: ScheduleApi,
         stepApi: StepApi,
         toolApi: ToolApi,
+        blockRepository: BlockRepository,
         runtimeEventOutbox: RuntimeEventOutbox,
         memFsStore: MemFsStore,
         localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
@@ -168,6 +171,7 @@ class SessionGraphFactory internal constructor(
         scheduleApi = scheduleApi,
         stepApi = stepApi,
         toolApi = toolApi,
+        blockRepository = blockRepository,
         runCursorStore = runCursorStore,
         conversationCursorStore = conversationCursorStore,
         settingsRepository = settingsRepository,
@@ -273,6 +277,7 @@ class SessionGraphFactory internal constructor(
             localRuntimeBackend = localRuntimeBackend,
             scope = scope,
             agentRepository = agentRepository,
+            blockRepository = blockRepository,
             allConversationsRepository = AllConversationsRepository(
                 conversationApi = conversationApi,
                 conversationDao = conversationDao,
