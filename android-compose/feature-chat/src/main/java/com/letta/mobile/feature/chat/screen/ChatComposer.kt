@@ -434,6 +434,7 @@ private fun ChatComposerAddButton(
     Box(
         modifier = Modifier
             .size(ChatComposerActionTargetSize)
+            .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,

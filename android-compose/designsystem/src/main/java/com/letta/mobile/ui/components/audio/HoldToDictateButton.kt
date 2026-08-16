@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
@@ -97,6 +98,7 @@ fun HoldToDictateButton(
     if (recordAudioPermissionGranted) {
         Box(
             modifier = modifier
+                .wrapContentSize(Alignment.Center)
                 .pointerInput(Unit) {
                     val cancelThresholdPx = cancelThresholdDp.dp.toPx()
                     awaitEachGesture {
@@ -129,7 +131,7 @@ fun HoldToDictateButton(
                 .clip(CircleShape)
                 .graphicsLayer { alpha = if (enabled) 1f else 0.5f }
                 .background(if (isRecognizing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer)
-                .size(48.dp),
+                .size(44.dp),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
