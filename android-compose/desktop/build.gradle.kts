@@ -173,7 +173,22 @@ dependencies {
     implementation("dev.nucleusframework:composenativetray-jvm:$nativeTrayVersion")
     // Letta Desktop embeds JCEF and uses Swing/AWT integration, so Nucleus must
     // use its portable JNI-backed AWT window backend rather than Tao.
-    runtimeOnly("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
+    //
+    // letta-mobile-scedm: `DecoratedWindow`/`TitleBar` (core+awt, compile-time
+    // API) plus the JNI native backend (runtime-only — installs a real Win32
+    // WndProc subclass on Windows) replace the hand-rolled
+    // `undecorated = true` Window + DwmSetWindowAttribute-only chrome. That
+    // combination lost Aero Snap, Snap Layouts, DWM min/max/restore
+    // animations, and the standard drop shadow because the OS never saw a
+    // real WS_CAPTION/WS_THICKFRAME frame. Nucleus's JNI backend keeps a real
+    // native frame under custom-drawn chrome instead — the maintained
+    // alternative to subclassing GWLP_WNDPROC ourselves via JNA.
+    implementation("dev.nucleusframework:nucleus.decorated-window-core:$nucleusVersion")
+    implementation("dev.nucleusframework:nucleus.decorated-window-awt:$nucleusVersion")
+    // `DecoratedWindow`/`TitleBar` themselves (the public entry points we call
+    // from DesktopJewelWindow.kt) are published from this module, not -core —
+    // it must be a compile-time dependency, not runtimeOnly.
+    implementation("dev.nucleusframework:nucleus.decorated-window-jni:$nucleusVersion")
     implementation("org.jetbrains.jewel:jewel-decorated-window:$jewelVersion")
     implementation("org.jetbrains.compose.material3:material3:$composeDesktopMaterial3Version")
     implementation("org.jetbrains.compose.material:material-icons-extended:$composeDesktopMaterialIconsVersion")
