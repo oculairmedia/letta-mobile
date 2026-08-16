@@ -68,7 +68,7 @@ class MemoryParityMapperTest {
         assertEquals(185, state.summary.totalMemoryTokens)
         assertEquals(512, state.summary.contextWindowUsed)
         assertEquals(
-            listOf("Skills" to "1", "Blocks" to "1", "Schedules" to "1", "Channels" to "1", "Context" to "512 / 8000"),
+            listOf("Skills" to "1", "Blocks" to "1", "Schedules" to "1", "Channels" to "1", "Context" to "512 / 16000"),
             state.summary.metrics.map { it.label to it.value },
         )
         assertEquals("5 nodes / 4 links", state.graph.summaryLabel)
@@ -155,7 +155,7 @@ class MemoryParityMapperTest {
             availability = MemoryParityAvailability(skillsLoaded = false),
         )
 
-        assertEquals(1, state.summary.skillCount)
+        assertEquals(null, state.summary.skillCount)
         assertEquals(1, state.section(MemoryParitySectionKind.Skills).items.size)
         assertEquals("—", state.summary.metrics.first { it.kind == MemorySummaryMetricKind.Skills }.value)
     }
@@ -266,9 +266,9 @@ class MemoryParityMapperTest {
         assertEquals(0, state.summary.skillCount)
         assertEquals(0, state.summary.memoryBlockCount)
         assertEquals(0, state.summary.scheduleCount)
-        assertEquals(0, state.summary.totalMemoryTokens)
+        assertEquals(null, state.summary.totalMemoryTokens)
         assertEquals(null, state.summary.contextWindowUsed)
-        assertEquals("Not loaded", state.summary.contextUsageLabel)
+        assertEquals("—", state.summary.contextUsageLabel)
         // The memory-data sections are empty when there is nothing to show.
         assertEquals(true, state.section(MemoryParitySectionKind.Skills).items.isEmpty())
         assertEquals(true, state.section(MemoryParitySectionKind.Memory).items.isEmpty())
