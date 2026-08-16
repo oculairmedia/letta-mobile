@@ -39,6 +39,7 @@ import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
@@ -212,19 +213,21 @@ class DesktopRepositoryAdapters(
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
 ) {
     private val irohMode = IrohChannelTransport.isIrohUrl(config?.serverUrl)
-    private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
+    private val localMode = config?.mode == LettaConfig.Mode.LOCAL
+    private val localRepositories = if (localMode) {
+        buildDesktopLocalRepositories(DesktopLocalRuntimeHost.backendDirectory())
+    } else {
+        null
+    }
+    private val adminRepositories = buildHttpAdminRepositories(config, irohMode || localMode)
     private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 
-    val agentRepository: IAgentRepository = selectIrohOrHttp(
-        irohRepositories?.agentRepository,
-        adminRepositories,
-    )
-    val blockRepository: IAgentBlockRepository = selectIrohOrHttp(
-        irohRepositories?.blockRepository,
-        adminRepositories,
-    )
+    val agentRepository: IAgentRepository = localRepositories?.agentRepository
+        ?: selectIrohOrHttp(irohRepositories?.agentRepository, adminRepositories)
+    val blockRepository: IAgentBlockRepository = localRepositories?.blockRepository
+        ?: selectIrohOrHttp(irohRepositories?.blockRepository, adminRepositories)
     val archiveRepository: IArchiveRepository = unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = unavailableRepository()

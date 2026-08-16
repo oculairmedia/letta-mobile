@@ -1,0 +1,9 @@
+{
+  "name": "letta-desktop-local-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Pinned Letta Code runtime bundled with the Windows desktop client.",
+  "dependencies": {
+    "@letta-ai/letta-code": "0.29.12"
+  }
+}

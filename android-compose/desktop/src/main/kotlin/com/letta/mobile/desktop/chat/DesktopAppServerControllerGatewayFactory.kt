@@ -16,6 +16,7 @@ import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransport
 import com.letta.mobile.data.transport.iroh.IrohAppServerTransportAdapter
 import com.letta.mobile.desktop.security.DesktopIrohIdentity
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohFrameCodec
 import computer.iroh.Endpoint
@@ -79,14 +80,18 @@ class DesktopAppServerControllerGatewayFactory(
         )
         // The App Server doesn't expose conversation listing, message history,
         // agent CRUD, or the model catalog; those stay on HTTP.
-        val httpGateway = DesktopLettaHttpChatGateway(
-            config = lettaConfig,
-            httpClient = createDesktopLettaHttpClient(),
-        )
+        val adminGateway: DesktopAdminChatGateway = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+            DesktopLocalBackendAdminGateway(DesktopLocalRuntimeHost.backendDirectory())
+        } else {
+            DesktopLettaHttpChatGateway(
+                config = lettaConfig,
+                httpClient = createDesktopLettaHttpClient(),
+            )
+        }
         DesktopHybridAppServerChatGateway(
             turnEngine = turnEngine,
             client = client,
-            httpGateway = httpGateway,
+            adminGateway = adminGateway,
             transportResources = transportResources,
             onClose = { eventRouter.detach() },
         )

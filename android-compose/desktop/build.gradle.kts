@@ -39,6 +39,10 @@ val jcefMavenVersion = "146.0.10"
 val jnaVersion = "5.17.0"
 val nucleusVersion = "2.1.5"
 val nativeTrayVersion = "2.0.1"
+val desktopNodeVersion = "24.13.1"
+val desktopLettaCodeVersion = "0.29.12"
+val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
+val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -262,6 +266,7 @@ nucleus.application {
     }
 
     nativeDistributions {
+        appResourcesRootDir.set(project.layout.buildDirectory.dir("generated/desktop-app-resources"))
         if (providers.gradleProperty("nucleusAllFormats").orNull.toBoolean()) {
             targetFormats(*TargetFormat.entries.toTypedArray())
         } else {
@@ -335,6 +340,78 @@ nucleus.application {
             startupWMClass = "Letta Desktop"
         }
     }
+}
+
+val desktopRuntimeSourceDir = layout.projectDirectory.dir("runtime")
+val desktopNodeArchive = layout.buildDirectory.file("downloads/$desktopNodeArchiveName")
+val desktopNodeExtractDir = layout.buildDirectory.dir("desktop-node-runtime")
+val desktopRuntimeInstallDir = layout.buildDirectory.dir("desktop-letta-code-runtime")
+val desktopAppResourcesDir = layout.buildDirectory.dir("generated/desktop-app-resources")
+val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("windows/letta-code-runtime") }
+
+val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntime") {
+    inputs.property("nodeVersion", desktopNodeVersion)
+    inputs.property("sha256", desktopNodeArchiveSha256)
+    outputs.file(desktopNodeArchive)
+    val target = desktopNodeArchive.get().asFile
+    val temporary = File(target.parentFile, "${target.name}.part")
+    val downloadScript = """
+        ${'$'}ErrorActionPreference = 'Stop'
+        New-Item -ItemType Directory -Force -Path '${target.parentFile.absolutePath}' | Out-Null
+        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-FileHash -Algorithm SHA256 -LiteralPath '${target.absolutePath}').Hash.ToLowerInvariant() -eq '$desktopNodeArchiveSha256')) { exit 0 }
+        Remove-Item -LiteralPath '${temporary.absolutePath}' -Force -ErrorAction SilentlyContinue
+        Invoke-WebRequest -UseBasicParsing 'https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName' -OutFile '${temporary.absolutePath}'
+        if ((Get-FileHash -Algorithm SHA256 -LiteralPath '${temporary.absolutePath}').Hash.ToLowerInvariant() -ne '$desktopNodeArchiveSha256') { throw 'SHA-256 mismatch for $desktopNodeArchiveName' }
+        Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
+    """.trimIndent()
+    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)
+}
+
+val extractDesktopNodeRuntime = tasks.register<Sync>("extractDesktopNodeRuntime") {
+    dependsOn(downloadDesktopNodeRuntime)
+    from(desktopNodeArchive.map { archive -> zipTree(archive) }) {
+        eachFile { path = path.substringAfter('/') }
+        includeEmptyDirs = false
+    }
+    into(desktopNodeExtractDir)
+}
+
+val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntimeInstallDir") {
+    from(desktopRuntimeSourceDir)
+    include("package.json", "package-lock.json", "runtime-manifest.json")
+    into(desktopRuntimeInstallDir)
+}
+
+val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCodeRuntime") {
+    dependsOn(extractDesktopNodeRuntime)
+    dependsOn(prepareDesktopRuntimeInstallDir)
+    inputs.files(
+        desktopRuntimeSourceDir.file("package.json"),
+        desktopRuntimeSourceDir.file("package-lock.json"),
+    )
+    inputs.property("lettaCodeVersion", desktopLettaCodeVersion)
+    outputs.dir(desktopRuntimeInstallDir.map { it.dir("node_modules") })
+    workingDir(desktopRuntimeInstallDir)
+    commandLine(
+        desktopNodeExtractDir.get().file("npm.cmd").asFile.absolutePath,
+        "ci",
+        "--omit=dev",
+        "--no-audit",
+        "--no-fund",
+    )
+}
+
+val prepareDesktopLettaCodeRuntime = tasks.register<Sync>("prepareDesktopLettaCodeRuntime") {
+    dependsOn(installDesktopLettaCodeRuntime)
+    from(desktopNodeExtractDir.map { it.file("node.exe") })
+    from(desktopRuntimeInstallDir) {
+        include("package.json", "package-lock.json", "runtime-manifest.json", "node_modules/**")
+    }
+    into(desktopBundledRuntimeDir)
+}
+
+tasks.matching { it.name == "prepareAppResources" }.configureEach {
+    dependsOn(prepareDesktopLettaCodeRuntime)
 }
 
 // Jewel ships Java-25 bytecode (class-file v69), while this module targets

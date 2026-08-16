@@ -1,6 +1,9 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeHost
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Desktop insertion contract for a future App Server-backed chat path.
@@ -60,13 +63,25 @@ suspend fun createDefaultDesktopChatGateway(
     config: LettaConfig,
     appServerConfig: DesktopAppServerRuntimeConfig = DesktopAppServerRuntimeConfig.fromProcess(),
     appServerGatewayFactory: DesktopAppServerChatGatewayFactory? = defaultDesktopAppServerGatewayFactory(),
-): DesktopChatGateway =
-    if (appServerConfig.enabled) {
-        appServerGatewayFactory?.create(config, appServerConfig)
+): DesktopChatGateway {
+    val resolvedAppServerConfig = when {
+        appServerConfig.enabled -> appServerConfig
+        config.mode == LettaConfig.Mode.LOCAL -> DesktopAppServerRuntimeConfig(
+            enabled = true,
+            serverUrl = withContext(Dispatchers.IO) { DesktopLocalRuntimeHost.ensureStarted() },
+        )
+        else -> {
+            withContext(Dispatchers.IO) { DesktopLocalRuntimeHost.close() }
+            appServerConfig
+        }
+    }
+    return if (resolvedAppServerConfig.enabled) {
+        appServerGatewayFactory?.create(config, resolvedAppServerConfig)
             ?: throw DesktopAppServerClientUnavailableException()
     } else {
         DesktopLettaHttpChatGateway(config)
     }
+}
 
 /**
  * Creates the default App Server gateway factory for desktop chat.
