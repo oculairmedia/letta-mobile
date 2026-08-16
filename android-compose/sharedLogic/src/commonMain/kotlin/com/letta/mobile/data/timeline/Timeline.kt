@@ -336,7 +336,9 @@ data class Timeline(
      * the Confirmed event at its natural position instead.
      */
     fun replaceLocal(otid: String, confirmed: TimelineEvent.Confirmed): Timeline {
-        val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return insertOrdered(confirmed)
+        val lookupOtid = AgentMessageClientId.dedupIdentity(otid)
+        val idx = otidToIndex[lookupOtid]?.takeIf { events[it] is TimelineEvent.Local }
+            ?: return insertOrdered(confirmed)
         val local = events[idx]
         val stabilized = confirmed.copy(
             position = local.position,
@@ -590,7 +592,8 @@ data class Timeline(
     fun markFailed(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.FAILED) }
 
     private inline fun updateLocal(otid: String, transform: (TimelineEvent.Local) -> TimelineEvent.Local): Timeline {
-        val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
+        val lookupOtid = AgentMessageClientId.dedupIdentity(otid)
+        val idx = otidToIndex[lookupOtid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
         val local = events[idx] as TimelineEvent.Local
         return copy(events = events.replacingAt(idx, transform(local)), stablePrefixVersion = stablePrefixVersion + 1)
     }

@@ -113,6 +113,27 @@ class TimelineTest {
     }
 
     @Test
+    fun `replaceLocal accepts encoded alias for legacy local id`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+        val updated = Timeline("c1")
+            .append(local("msg-1", 1.0))
+            .replaceLocal(encoded, confirmed(encoded, 9.0, TimelineMessageType.USER))
+
+        assertTrue(updated.events.single() is TimelineEvent.Confirmed)
+        assertEquals("msg-1", updated.events.single().otid)
+        assertEquals(1.0, updated.events.single().position)
+    }
+
+    @Test
+    fun `delivery updates accept encoded alias for legacy local id`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+        val timeline = Timeline("c1").append(local("msg-1", 1.0))
+
+        assertEquals(DeliveryState.SENT, (timeline.markSent(encoded).events.single() as TimelineEvent.Local).deliveryState)
+        assertEquals(DeliveryState.FAILED, (timeline.markFailed(encoded).events.single() as TimelineEvent.Local).deliveryState)
+    }
+
+    @Test
     fun `replaceLocal carries local image attachments into the text-only confirmed event`() {
         val image = MessageContentPart.Image(base64 = "AAAA", mediaType = "image/jpeg")
         val localWithImage = TimelineEvent.Local(
