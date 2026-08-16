@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection.fixture
 
+import com.letta.mobile.data.a2ui.A2uiSurfaceManager
 import com.letta.mobile.data.chat.projection.ChatDisplayMode
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 import com.letta.mobile.data.chat.projection.ChatRenderItem
@@ -16,32 +17,45 @@ class ChatProjectionParityFixturesTest {
     @Test
     fun `canonical fixtures project to the shared semantic contract`() {
         ChatProjectionParityFixtures.projectionCases.forEach { fixture ->
-            val actual = buildChatRenderModel(
-                messages = fixture.messages,
-                mode = ChatDisplayMode.Interactive,
-            ).renderItems.toFixtureExpectation()
+            ChatDisplayMode.entries.forEach { mode ->
+                val actual = buildChatRenderModel(
+                    messages = fixture.messages,
+                    mode = mode,
+                ).renderItems.toFixtureExpectation()
 
-            assertEquals(fixture.expectedItems, actual, fixture.id)
-            assertEquals(actual.map { it.key }.distinct(), actual.map { it.key }, "${fixture.id}: duplicate keys")
-            assertEquals(
-                fixture.expectedToolStates,
-                projectToolTimelineGroups(fixture.messages).flatMap { group -> group.calls.map { it.state } },
-                "${fixture.id}: tool timeline classification",
-            )
+                assertEquals(fixture.expectedItems, actual, "${fixture.id}: $mode")
+                assertEquals(
+                    actual.map { it.key }.distinct(),
+                    actual.map { it.key },
+                    "${fixture.id}: $mode duplicate keys",
+                )
+            }
         }
     }
 
     @Test
-    fun `a2ui fixture shares authoritative conversation and run identity with chat projection`() {
-        val fixture = ChatProjectionParityFixtures.projectionCases.single { it.expectedA2uiLink != null }
-        val expected = assertNotNull(fixture.expectedA2uiLink)
-        val surface = assertNotNull(fixture.a2uiSurface)
+    fun `tool fixture pins production timeline classification`() {
+        val fixture = ToolApprovalFixture.fixture
+
+        assertEquals(
+            fixture.expectedToolStates,
+            projectToolTimelineGroups(fixture.messages).flatMap { group -> group.calls.map { it.state } },
+        )
+    }
+
+    @Test
+    fun `a2ui envelope metadata links production surface to projected run and approval`() {
+        val fixture = ToolApprovalFixture.fixture
+        val event = assertNotNull(fixture.a2uiEvent)
+        val manager = A2uiSurfaceManager()
+        manager.apply(event)
+        val surfaceId = event.messages.single().surfaceId
+        val surface = assertNotNull(manager.surface(surfaceId))
         val rendered = buildChatRenderModel(fixture.messages, ChatDisplayMode.Interactive).renderItems
 
-        assertEquals(expected.surfaceId, surface.surfaceId)
-        assertEquals(expected.conversationId, surface.conversationId)
-        assertEquals(expected.runId, surface.runId)
-        assertEquals(expected.approvalRequestId, surface.approvalRequestId)
+        assertEquals(event.conversationId, surface.conversationId)
+        assertEquals(event.runId, surface.runId)
+        assertEquals(event.requestId, surface.approvalRequestId)
         assertTrue(
             rendered.any { it is ChatRenderItem.RunBlock && it.runId == surface.runId },
             "${fixture.id}: A2UI surface must link to a rendered run",
