@@ -69,12 +69,12 @@ internal suspend fun createDefaultDesktopChatGateway(
 ): DesktopChatGateway {
     var runtimeLease: DesktopLocalRuntimeLease? = null
     val resolvedAppServerConfig = when {
-        appServerConfig.enabled -> appServerConfig
-        config.mode == LettaConfig.Mode.LOCAL -> {
+        config.mode == LettaConfig.Mode.LOCAL && appServerConfig.serverUrl == null -> {
             val lease = withContext(Dispatchers.IO) { localRuntime.acquire() }
             runtimeLease = lease
             DesktopAppServerRuntimeConfig(enabled = true, serverUrl = lease.serverUrl)
         }
+        appServerConfig.enabled -> appServerConfig
         else -> appServerConfig
     }
     try {

@@ -101,6 +101,27 @@ class DesktopAppServerChatAdapterTest {
     }
 
     @Test
+    fun localModeStartsBundledRuntimeWhenAppServerIsEnabledWithoutUrl() = runBlocking {
+        val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43124")
+        var received: DesktopAppServerRuntimeConfig? = null
+
+        val gateway = createDefaultDesktopChatGateway(
+            config = LettaConfig("local", LettaConfig.Mode.LOCAL, "local://bundled"),
+            appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = null),
+            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { config, appServer ->
+                received = appServer
+                DesktopLettaHttpChatGateway(config.copy(serverUrl = "http://unused.invalid"))
+            },
+            localRuntime = runtime,
+        )
+
+        assertEquals(1, runtime.acquireCount)
+        assertEquals("ws://127.0.0.1:43124", received?.serverUrl)
+        assertIs<AutoCloseable>(gateway).close()
+        assertEquals(1, runtime.closeCount)
+    }
+
+    @Test
     fun remoteModeDoesNotAcquireBundledRuntimeWhenExplicitAppServerIsEnabled() = runBlocking {
         val runtime = FakeLocalRuntime()
         val config = LettaConfig("remote", LettaConfig.Mode.SELF_HOSTED, "http://unused.invalid")
