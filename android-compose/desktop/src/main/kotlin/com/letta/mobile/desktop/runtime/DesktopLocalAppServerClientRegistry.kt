@@ -4,8 +4,6 @@ import com.letta.mobile.data.transport.appserver.AppServerClient
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 /** Shares the single child-owned App Server session with LOCAL repository adapters. */
 internal object DesktopLocalAppServerClientRegistry {
@@ -32,15 +30,4 @@ internal object DesktopLocalAppServerClientRegistry {
 
     suspend fun awaitClientAfter(generation: Long): AppServerClient =
         entry.first { it.generation > generation && it.client != null }.client!!
-}
-
-internal class DesktopLocalAppServerClientBinding(
-    private val clientProvider: suspend () -> AppServerClient,
-) {
-    private val mutex = Mutex()
-    private var pinned: AppServerClient? = null
-
-    suspend fun client(): AppServerClient = pinned ?: mutex.withLock {
-        pinned ?: clientProvider().also { pinned = it }
-    }
 }

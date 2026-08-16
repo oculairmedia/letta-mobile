@@ -15,22 +15,22 @@ import kotlinx.coroutines.test.runTest
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class DesktopLocalAppServerClientRegistryTest {
     @Test
-    fun `repository generation waits for next client and pins it`() = runTest {
+    fun `repository generation waits for each next client`() = runTest {
         val baseline = DesktopLocalAppServerClientRegistry.generation()
         val first = FakeClient()
         val second = FakeClient()
-        val binding = DesktopLocalAppServerClientBinding {
-            DesktopLocalAppServerClientRegistry.awaitClientAfter(baseline)
-        }
-        val waiting = async { binding.client() }
+        val waiting = async { DesktopLocalAppServerClientRegistry.awaitClientAfter(baseline) }
         runCurrent()
 
         val firstLease = DesktopLocalAppServerClientRegistry.install(first)
         assertSame(first, waiting.await())
+        val firstGeneration = DesktopLocalAppServerClientRegistry.generation()
+        val waitingForSecond = async { DesktopLocalAppServerClientRegistry.awaitClientAfter(firstGeneration) }
+        runCurrent()
         val secondLease = DesktopLocalAppServerClientRegistry.install(second)
         firstLease.close()
 
-        assertSame(first, binding.client())
+        assertSame(second, waitingForSecond.await())
         secondLease.close()
     }
 
