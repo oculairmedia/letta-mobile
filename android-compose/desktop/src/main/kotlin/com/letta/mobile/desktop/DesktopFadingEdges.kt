@@ -2,6 +2,8 @@ package com.letta.mobile.desktop
 
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -21,48 +23,55 @@ import androidx.compose.ui.unit.Dp
  * skips the offscreen layer) when both alphas are 0, i.e. the list isn't
  * scrollable.
  *
- * [pinnedHeaderHeightPx] — read fresh on every draw — is the height in px of
- * content at the very top that must stay untouched by the top fade (e.g. a
- * pinned sticky header card); the top gradient starts below it instead of at
- * y=0. Defaults to always 0 (fade starts at the top edge), which is also
- * what callers with no such pinned content get for free.
+ * Both ramps are anchored to the container's own edges. An earlier version let
+ * the top ramp start below a pinned sticky header so the header stayed opaque;
+ * that put a dissolved band across the MIDDLE of the viewport — content
+ * directly under the pinned card vanished while content above it stayed sharp,
+ * which reads as a rendering bug rather than an edge treatment. Content that
+ * must not fade is kept out of this modifier's subtree, or the caller drops
+ * the relevant alpha to 0 (see the chat list's pinned-prompt handling).
  */
 internal fun Modifier.fadingEdges(
     topFadeAlpha: Float,
     bottomFadeAlpha: Float,
     topFadeLength: Dp,
     bottomFadeLength: Dp,
-    pinnedHeaderHeightPx: () -> Float = { 0f },
 ): Modifier {
     if (topFadeAlpha <= 0f && bottomFadeAlpha <= 0f) return this
     return this
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
+            // Each mask is drawn as a BAND, not over the whole content: a
+            // gradient brush clamps to its end colours outside [startY, endY],
+            // so a full-size rect would carry the top ramp's transparent end
+            // across every pixel above it.
             if (topFadeAlpha > 0f) {
-                val topFadePx = topFadeLength.toPx()
-                val topStartY = pinnedHeaderHeightPx().coerceIn(0f, size.height)
-                if (topFadePx > 0f && topStartY < size.height) {
+                val topEndY = topFadeLength.toPx().coerceAtMost(size.height / 2f)
+                if (topEndY > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(Color.Black.copy(alpha = 1f - topFadeAlpha), Color.Black),
-                            startY = topStartY,
-                            endY = (topStartY + topFadePx).coerceAtMost(size.height),
+                            startY = 0f,
+                            endY = topEndY,
                         ),
+                        topLeft = Offset.Zero,
+                        size = Size(size.width, topEndY),
                         blendMode = BlendMode.DstIn,
                     )
                 }
             }
             if (bottomFadeAlpha > 0f) {
-                val bottomFadePx = bottomFadeLength.toPx()
-                if (bottomFadePx > 0f) {
-                    val len = bottomFadePx.coerceAtMost(size.height / 2f)
+                val len = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
+                if (len > 0f) {
                     drawRect(
                         brush = Brush.verticalGradient(
                             colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomFadeAlpha)),
                             startY = size.height - len,
                             endY = size.height,
                         ),
+                        topLeft = Offset(0f, size.height - len),
+                        size = Size(size.width, len),
                         blendMode = BlendMode.DstIn,
                     )
                 }

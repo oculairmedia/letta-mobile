@@ -108,26 +108,32 @@ internal fun MessageList(
         ),
     )
 
-    val fadeAlphas = rememberChatListFadeAlphas(listState)
-
-    // Keys of rows rendered as the pinned user-prompt sticky header (see
-    // MessageListColumn) — used below to keep the top fade off the pinned
-    // card itself: it must stay fully opaque while only the loose content
-    // scrolling behind/beneath it dissolves.
+    // Keys of rows rendered as the user-prompt sticky header (see
+    // MessageListColumn). A prompt card is PINNED when it is the topmost
+    // visible row and has been stuck to the viewport edge (offset <= 0) —
+    // that, not "a prompt happens to be first", is what the top fade has to
+    // react to.
     val userPromptKeys = remember(rows) {
         rows.mapNotNull { row -> (row as? DesktopChatRow.Item)?.takeIf { it.item.isUserPrompt() }?.key }.toSet()
     }
+    val promptPinned by remember(userPromptKeys) {
+        derivedStateOf {
+            val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+            topItem != null && topItem.offset <= 0 && userPromptKeys.contains(topItem.key)
+        }
+    }
+
+    val fadeAlphas = rememberChatListFadeAlphas(listState, promptPinned)
 
     Box(modifier = modifier.fillMaxWidth()) {
         // The fade wraps ONLY the list (not the scroll-to-latest button, which is
         // a sibling below) so the button is never dimmed by the bottom fade.
-        // Top fade only appears once there's content scrolled above the
-        // viewport (canScrollBackward), and is taller than the bottom fade so
-        // it reads clearly under the tab strip/header. It must not touch the
-        // pinned user-prompt sticky header, so [pinnedHeaderHeightPx] reads the
-        // header's measured height off the list's own layout info each frame
-        // and the fade starts below it — when nothing is pinned that's 0 and
-        // the fade starts at the very top, same as before.
+        // Both ramps sit at the container's own edges, where an edge treatment
+        // belongs. The top ramp is taller than the bottom so it reads clearly
+        // under the tab strip, and it yields entirely while a prompt card is
+        // pinned: that card is opaque and full-width, so it already terminates
+        // the content at the top edge, and fading it (or starting the ramp
+        // below it) only ever looked broken.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -136,14 +142,6 @@ internal fun MessageList(
                     bottomFadeAlpha = fadeAlphas.bottom,
                     topFadeLength = 72.dp,
                     bottomFadeLength = 44.dp,
-                    pinnedHeaderHeightPx = {
-                        val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
-                        if (topItem != null && userPromptKeys.contains(topItem.key)) {
-                            topItem.size.toFloat()
-                        } else {
-                            0f
-                        }
-                    },
                 ),
         ) {
             MessageListColumn(
@@ -173,18 +171,24 @@ internal fun MessageList(
 private data class ChatListFadeAlphas(val top: Float, val bottom: Float)
 
 @Composable
-private fun rememberChatListFadeAlphas(listState: LazyListState): ChatListFadeAlphas {
+private fun rememberChatListFadeAlphas(
+    listState: LazyListState,
+    promptPinned: Boolean,
+): ChatListFadeAlphas {
     // Soft gradient fade at both edges of the list so content dissolves into
     // the surrounding chrome instead of hard-clipping (mirrors the mobile
     // chat fading edges): the bottom fades into the composer, the top fades
     // under the tab strip/header. Each only shows once there's actually
     // content scrolled past that edge, so a short, unscrolled conversation
-    // isn't faded on either side.
+    // isn't faded on either side. The top fade also stands down while a
+    // prompt card is pinned — the opaque card already owns that edge, and the
+    // tween below cross-fades the ramp out as the card pins rather than
+    // snapping it.
 
     // ⚡ Bolt Optimization: `listState.canScrollForward`/`canScrollBackward` are
     // already backed by Compose State. Wrapping them in `derivedStateOf` is
     // redundant and wastes memory and observation overhead.
-    val showTopFade = listState.canScrollBackward
+    val showTopFade = listState.canScrollBackward && !promptPinned
     val showBottomFade = listState.canScrollForward
 
     val topFadeAlpha by animateFloatAsState(
