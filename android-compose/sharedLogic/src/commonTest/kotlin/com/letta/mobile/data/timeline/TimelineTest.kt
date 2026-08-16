@@ -79,6 +79,17 @@ class TimelineTest {
         assertEquals(encodedEvent, Timeline("encoded").append(encodedEvent).findByOtid("msg-1"))
     }
 
+    @Test
+    fun `legacy and encoded agent message ids cannot both enter the timeline`() {
+        val encoded = AgentMessageClientId.encode("msg-1", "agent-a", "agent-b")
+
+        val legacyFirst = Timeline("legacy").append(local("msg-1", 1.0)).append(local(encoded, 2.0))
+        val encodedFirst = Timeline("encoded").append(local(encoded, 1.0)).insertOrdered(local("msg-1", 2.0))
+
+        assertEquals(listOf("msg-1"), legacyFirst.events.map { it.otid })
+        assertEquals(listOf(encoded), encodedFirst.events.map { it.otid })
+    }
+
     // NOTE: Previous tests asserted that append() throws IllegalArgumentException
     // on out-of-order position or duplicate otid. As of letta-mobile-4jmg we tolerate
     // both cases (log telemetry, bump position, drop duplicate) to avoid crashing the

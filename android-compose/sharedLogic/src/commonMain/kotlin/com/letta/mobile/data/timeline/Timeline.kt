@@ -193,7 +193,7 @@ data class Timeline(
      */
     val releasedOlderCount: Int = 0,
     internal val residentOtids: kotlinx.collections.immutable.PersistentSet<String> =
-        events.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+        events.mapTo(mutableSetOf()) { AgentMessageClientId.dedupIdentity(it.otid) }.toPersistentSet(),
     internal val invariantsKnown: Boolean = false,
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
@@ -292,7 +292,8 @@ data class Timeline(
      * the chat screen.
      */
     fun append(event: TimelineEvent): Timeline {
-        if (event.otid in residentOtids) {
+        val eventIdentity = AgentMessageClientId.dedupIdentity(event.otid)
+        if (eventIdentity in residentOtids) {
             Telemetry.event(
                 "Timeline", "append.duplicateOtid",
                 "conversationId" to conversationId,
@@ -321,7 +322,7 @@ data class Timeline(
         return copy(
             events = events.adding(safeEvent),
             stablePrefixVersion = stablePrefixVersion + 1,
-            residentOtids = residentOtids.adding(safeEvent.otid),
+            residentOtids = residentOtids.adding(AgentMessageClientId.dedupIdentity(safeEvent.otid)),
             invariantsKnown = true,
         )
             .slideResidentWindow()
@@ -358,14 +359,15 @@ data class Timeline(
      * returns this timeline unchanged (keeps the existing, possibly Local, event).
      */
     fun insertOrdered(event: TimelineEvent): Timeline {
-        if (event.otid in residentOtids) return this
+        val eventIdentity = AgentMessageClientId.dedupIdentity(event.otid)
+        if (eventIdentity in residentOtids) return this
         val insertIdx = events.indexOfFirst { it.position > event.position }
         val newEvents = if (insertIdx == -1) events.adding(event)
                        else events.addingAt(insertIdx, event)
         return copy(
             events = newEvents,
             stablePrefixVersion = stablePrefixVersion + 1,
-            residentOtids = residentOtids.adding(event.otid),
+            residentOtids = residentOtids.adding(eventIdentity),
             invariantsKnown = true,
         )
             .slideResidentWindow()
@@ -421,7 +423,9 @@ data class Timeline(
             events = remaining,
             backfillCursor = newOldestServerId ?: backfillCursor,
             releasedOlderCount = releasedOlderCount + evictedCount,
-            residentOtids = remaining.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+            residentOtids = remaining
+                .mapTo(mutableSetOf()) { AgentMessageClientId.dedupIdentity(it.otid) }
+                .toPersistentSet(),
             invariantsKnown = true,
         )
     }
@@ -564,7 +568,9 @@ data class Timeline(
                     addAll(suppressions)
                 }.takeLast(MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS).toPersistentSet(),
                 stablePrefixVersion = stablePrefixVersion + 1,
-                residentOtids = retainedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+            residentOtids = retainedEvents
+                .mapTo(mutableSetOf()) { AgentMessageClientId.dedupIdentity(it.otid) }
+                .toPersistentSet(),
                 invariantsKnown = true,
             ),
             suppressions = suppressions,
