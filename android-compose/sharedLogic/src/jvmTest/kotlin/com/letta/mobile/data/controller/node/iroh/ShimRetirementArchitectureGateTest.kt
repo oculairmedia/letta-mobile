@@ -175,8 +175,8 @@ class ShimRetirementArchitectureGateTest {
             .flatMap { root ->
                 Files.walk(root).use { stream ->
                     stream.filter { it.isRegularFile() && it.pathString.endsWith(".kt") }
-                        .filter { !it.pathString.contains("/build/") }
-                        .filter { !SRC_TEST_DIR.containsMatchIn(it.pathString) }
+                        .filter { !it.pathString.replace('\\', '/').contains("/build/") }
+                        .filter { !SRC_TEST_DIR.containsMatchIn(it.pathString.replace('\\', '/')) }
                         .toList()
                 }
             }

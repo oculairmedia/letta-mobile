@@ -358,7 +358,7 @@ class IrohAdminRpcChatGatewayTest {
 
     @Test
     fun directoryListAgentBlocksUsesCanonicalRpcContractAndDecodesResult() = runTest(UnconfinedTestDispatcher()) {
-        val pageSize = IrohAdminRpcAgentDirectory.AGENT_BLOCK_LIST_PAGE_SIZE
+        val pageSize = IrohAdminRpcAgentDirectory.BLOCK_LIST_PAGE_SIZE
         val transport = FakeIrohTransport()
         transport.rpcResponder = { call ->
             assertEquals("block.list_agent", call.method)
