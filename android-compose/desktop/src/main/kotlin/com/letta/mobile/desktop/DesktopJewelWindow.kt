@@ -30,9 +30,10 @@ import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
+import dev.nucleusframework.window.BasicTitleBar
 import dev.nucleusframework.window.DecoratedWindow
 import dev.nucleusframework.window.NucleusDecoratedWindowTheme
-import dev.nucleusframework.window.TitleBar
+import dev.nucleusframework.window.TitleBarLayoutPolicy
 import dev.nucleusframework.window.styling.DecoratedWindowColors
 import dev.nucleusframework.window.styling.DecoratedWindowMetrics
 import dev.nucleusframework.window.styling.DecoratedWindowStyle
@@ -154,7 +155,10 @@ internal fun DesktopJewelWindow(
                     windowStyle = windowStyle,
                     titleBarStyle = titleBarStyle,
                 ) {
-                    TitleBar(style = titleBarStyle) {
+                    BasicTitleBar(
+                        style = titleBarStyle,
+                        layoutPolicy = TitleBarLayoutPolicy.FillCenter,
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
