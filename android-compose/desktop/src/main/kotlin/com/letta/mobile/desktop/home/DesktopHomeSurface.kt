@@ -47,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.desktop.chat.AgentOrb
 import com.letta.mobile.desktop.formatRelativeTimestamp
@@ -72,6 +73,7 @@ data class DesktopHomeActions(
     val onOpenConversation: (String) -> Unit,
     /** Send this text into the shell's chat pipeline (see the shell's wiring). */
     val onSubmitPrompt: (String) -> Unit,
+    val onA2uiAction: (A2uiAction) -> Unit = {},
 )
 
 /**
@@ -124,7 +126,11 @@ fun DesktopHomeSurface(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 28.dp, vertical = 20.dp),
         ) {
-            A2uiSurfaceRenderer(surface = documentSurface, modifier = Modifier.fillMaxWidth())
+            A2uiSurfaceRenderer(
+                surface = documentSurface,
+                modifier = Modifier.fillMaxWidth(),
+                onAction = actions.onA2uiAction,
+            )
         }
         return
     }

@@ -2,7 +2,7 @@
 
 This package contains the shared Android/Desktop Compose renderer for A2UI surfaces. Use this
 guide when adding a Basic widget, adding a Letta domain catalog, or writing
-agent-authored payloads that should render in the mobile chat surface.
+agent-authored payloads for mobile chat, desktop chat, or standalone desktop surfaces.
 
 Authoritative implementation files:
 

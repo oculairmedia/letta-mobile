@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.onboarding.AgentOnboarding
@@ -86,6 +87,7 @@ internal data class ChatDetailPaneActions(
     /** Answer / dismiss a parked approval: (requestId, toolCallIds, approve, reason). */
     val onSubmitApproval: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     val onOpenAgent: (String) -> Unit = {},
+    val onA2uiAction: (A2uiAction) -> Unit = {},
 )
 
 @Composable
@@ -135,6 +137,7 @@ internal fun ChatDetailPane(
             resolveName = state.agentNamesById::get,
             onAgentClick = actions.onOpenAgent,
         ),
+        LocalDesktopA2uiActionHandler provides actions.onA2uiAction,
     ) {
     DesktopAmbientChatBackground(
         status = ambientStatus,

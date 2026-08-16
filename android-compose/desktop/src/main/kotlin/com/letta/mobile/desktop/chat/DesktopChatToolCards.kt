@@ -63,6 +63,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 
 /**
@@ -287,7 +288,11 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
  * blank.
  */
 @Composable
-internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
+internal fun GeneratedUiCard(
+    generatedUi: UiGeneratedComponent,
+    onAction: ((A2uiAction) -> Unit)? = null,
+) {
+    val actionHandler = onAction ?: LocalDesktopA2uiActionHandler.current
     val surface = remember(generatedUi) { generatedUi.toA2uiSurfaceStateOrNull() }
     if (surface != null) {
         ArtifactCard(
@@ -301,7 +306,11 @@ internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
                     .heightIn(max = ChatAnchoredA2uiMaxHeight)
                     .verticalScroll(rememberScrollState()),
             ) {
-                A2uiSurfaceRenderer(surface = surface, modifier = Modifier.fillMaxWidth())
+                A2uiSurfaceRenderer(
+                    surface = surface,
+                    modifier = Modifier.fillMaxWidth(),
+                    onAction = actionHandler,
+                )
             }
         }
         return
@@ -344,6 +353,7 @@ internal data class DesktopApprovalDecisionHandler(
 )
 
 internal val LocalDesktopApprovalDecision = staticCompositionLocalOf<DesktopApprovalDecisionHandler?> { null }
+internal val LocalDesktopA2uiActionHandler = staticCompositionLocalOf<(A2uiAction) -> Unit> { {} }
 
 @Composable
 internal fun ApprovalRequestCard(approvalRequest: UiApprovalRequest) {

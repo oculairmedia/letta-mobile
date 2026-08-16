@@ -26,6 +26,6 @@ internal object A2uiHaptics {
     fun toggleOn(haptic: HapticFeedback) = haptic.performHapticFeedback(HapticFeedbackType.ToggleOn)
     fun toggleOff(haptic: HapticFeedback) = haptic.performHapticFeedback(HapticFeedbackType.ToggleOff)
     fun segmentTick(haptic: HapticFeedback) = haptic.performHapticFeedback(HapticFeedbackType.SegmentTick)
-    fun contextClick(haptic: HapticFeedback) = haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+    fun contextClick(haptic: HapticFeedback) = haptic.performHapticFeedback(HapticFeedbackType.ContextClick)
     fun longPress(haptic: HapticFeedback) = haptic.performHapticFeedback(HapticFeedbackType.LongPress)
 }

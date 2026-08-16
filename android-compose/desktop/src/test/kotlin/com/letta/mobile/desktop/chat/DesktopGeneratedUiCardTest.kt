@@ -4,9 +4,11 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.UiGeneratedComponent
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * letta-mobile-2don7: desktop's `GeneratedUiCard` used to print `fallbackText`
@@ -34,6 +36,24 @@ class DesktopGeneratedUiCardTest {
         }
 
         onNodeWithText("Hello from A2UI").assertExists()
+    }
+
+    @Test
+    fun `recognized widget action reaches the desktop chat host`() = runComposeUiTest {
+        val generatedUi = UiGeneratedComponent(
+            name = "Button",
+            propsJson = """{"label":"Continue","action":{"name":"example.continue"}}""",
+        )
+        var actionName: String? = null
+
+        setContent {
+            MaterialTheme {
+                GeneratedUiCard(generatedUi, onAction = { actionName = it.name })
+            }
+        }
+
+        onNodeWithText("Continue").performClick()
+        assertEquals("example.continue", actionName)
     }
 
     @Test

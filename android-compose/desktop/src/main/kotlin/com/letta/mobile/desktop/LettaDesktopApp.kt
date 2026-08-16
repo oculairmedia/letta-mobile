@@ -238,6 +238,14 @@ internal fun LettaDesktopApp(
     // whole stack's conversations together (see [buildRailAgents]).
     val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
     val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
+    fun dispatchA2uiAction(action: com.letta.mobile.data.a2ui.A2uiAction) {
+        val resolvedAction = if (action.conversationId.isNullOrBlank()) {
+            action.copy(conversationId = chatState.selectedConversationId)
+        } else {
+            action
+        }
+        sessionGraph.channelTransport.sendA2uiAction(resolvedAction)
+    }
     LaunchedEffect(sessionGraph, chatState.connectionState) {
         runCatching {
             sessionGraph.agentRepository.refreshAgentsIfStale(
@@ -711,6 +719,7 @@ internal fun LettaDesktopApp(
                                 // and let the card disable/hide its buttons instead.
                                 onSubmitApproval = chatController::submitApproval
                                     .takeIf { canSubmitApprovals },
+                                onA2uiAction = ::dispatchA2uiAction,
                                 onAttachImage = { pickerLauncher.launch() },
                                 onRemoveImageAttachment = chatController::removeImageAttachment,
                                 onRetryConnection = chatController::retryConnection,
@@ -787,6 +796,7 @@ internal fun LettaDesktopApp(
                                         selectedDestination = DesktopDestination.Conversations
                                     },
                                     onSubmitPrompt = ::submitHomePrompt,
+                                    onA2uiAction = ::dispatchA2uiAction,
                                 ),
                                 memory = DestinationMemoryActions(
                                     onRefresh = libraries.memory::reload,

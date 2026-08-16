@@ -4,9 +4,11 @@ package com.letta.mobile.desktop.home
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.model.UiGeneratedComponent
 import kotlin.test.Test
+import kotlin.test.assertEquals
 
 /**
  * letta-mobile-2don7: [DesktopHomeSurface]'s `document` parameter was reserved
@@ -57,6 +59,28 @@ class DesktopHomeSurfaceDocumentTest {
         // The native dashboard's own heading must not also be present — the
         // document fully replaces it, it doesn't sit alongside it.
         onNodeWithText("Home").assertDoesNotExist()
+    }
+
+    @Test
+    fun `standalone document action reaches the desktop home host`() = runComposeUiTest {
+        val document = UiGeneratedComponent(
+            name = "Button",
+            propsJson = """{"label":"Open issue","action":{"name":"issue.open"}}""",
+        )
+        var actionName: String? = null
+
+        setContent {
+            MaterialTheme {
+                DesktopHomeSurface(
+                    state = state,
+                    actions = actions.copy(onA2uiAction = { actionName = it.name }),
+                    document = document,
+                )
+            }
+        }
+
+        onNodeWithText("Open issue").performClick()
+        assertEquals("issue.open", actionName)
     }
 
     @Test
