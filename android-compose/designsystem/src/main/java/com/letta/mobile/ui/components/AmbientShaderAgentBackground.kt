@@ -222,6 +222,12 @@ private fun rememberAmbientMotion(
     var energy by remember { mutableFloatStateOf(0f) }
     val pulse by rememberUpdatedState(streamActivityPulse)
     var observed by remember { androidx.compose.runtime.mutableLongStateOf(streamActivityPulse) }
+    LaunchedEffect(animate, pulse) {
+        if (!animate) {
+            energy = 0f
+            observed = pulse
+        }
+    }
     if (animate) LaunchedEffect(Unit) {
         var last = 0L
         while (true) withFrameNanos { now ->
