@@ -128,8 +128,7 @@ private fun ContextUsageHeader(usage: ContextWindowUsage?) {
 private fun ContextUsagePlaceholder(state: ContextWindowUsageState) {
     val message = when {
         state.loading -> "Measuring…"
-        state.error != null -> state.error
-        else -> "No context reading for this conversation yet."
+        else -> state.error ?: "No context reading for this conversation yet."
     }
     Text(
         text = message,

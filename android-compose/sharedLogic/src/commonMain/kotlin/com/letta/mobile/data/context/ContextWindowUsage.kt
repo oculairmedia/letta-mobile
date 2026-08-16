@@ -70,8 +70,13 @@ data class ContextWindowUsage(
             val itemisedSum = itemised.sumOf { (_, _, tokens) -> tokens }
             val reported = overview.contextWindowSizeCurrent.coerceAtLeast(0)
             val used = maxOf(reported, itemisedSum)
-            val window = maxOf(overview.contextWindowSizeMax.coerceAtLeast(0), used)
-            val free = window - used
+            // A stated window of 0 means the server did not report one at all,
+            // which is not the same as a window that is merely too small: with
+            // no scale to draw against, every fraction stays 0 and there is no
+            // free space to claim.
+            val stated = overview.contextWindowSizeMax.coerceAtLeast(0)
+            val window = if (stated > 0) maxOf(stated, used) else 0
+            val free = (window - used).coerceAtLeast(0)
             val occupied = itemised + unitemisedRemainder(used - itemisedSum)
             val segments = occupied
                 .sortedByDescending { (_, _, tokens) -> tokens }
