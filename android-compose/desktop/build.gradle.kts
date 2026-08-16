@@ -341,8 +341,8 @@ nucleus.application {
 // JVM 21 for the Iroh binding. Gradle otherwise selects the compile toolchain
 // for `run`, which fails before the window is created. Keep development runs
 // on the installed JDK 26 runtime instead.
-tasks.withType<JavaExec>().configureEach {
-    if (name == "run") {
+afterEvaluate {
+    tasks.named<JavaExec>("run") {
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(26))
         })
