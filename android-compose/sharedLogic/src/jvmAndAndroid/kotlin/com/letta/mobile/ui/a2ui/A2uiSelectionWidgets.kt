@@ -29,7 +29,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -442,13 +441,6 @@ internal fun A2uiSlider(
             enabled = !surfaceSubmitting,
             valueRange = range.min.toFloat()..range.max.toFloat(),
             steps = range.sliderSteps,
-            track = { sliderState ->
-                SliderDefaults.Track(
-                    sliderState = sliderState,
-                    thumbTrackGapSize = 0.dp,
-                    trackInsideCornerSize = 0.dp,
-                )
-            },
         )
     }
 }
