@@ -346,6 +346,6 @@ tasks.withType<JavaExec>().configureEach {
         javaLauncher.set(javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(26))
         })
-        executable = "C:/Program Files/Eclipse Adoptium/jdk-26.0.1.8-hotspot/bin/java.exe"
+        executable.set("C:/Program Files/Eclipse Adoptium/jdk-26.0.1.8-hotspot/bin/java.exe")
     }
 }
