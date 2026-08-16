@@ -26,6 +26,7 @@ internal object AgentScaffoldTestTags {
     const val PROJECT_BRIEF_CARD = "agent_scaffold_project_brief_card"
     const val PROJECT_BUG_SUMMARY_CARD = "agent_scaffold_project_bug_summary_card"
     const val CHAT_SEARCH_FIELD = "agent_scaffold_chat_search_field"
+    const val DRAWER_SEARCH_MESSAGES = "agent_scaffold_drawer_search_messages"
     const val AGENT_PICKER_SEARCH_FIELD = "agent_scaffold_agent_picker_search_field"
     const val DRAWER_EDIT_AGENT = "agent_scaffold_drawer_edit_agent"
     const val MODEL_PICKER_SHEET = "agent_scaffold_model_picker_sheet"
