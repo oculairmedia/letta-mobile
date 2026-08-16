@@ -80,6 +80,7 @@ kotlin {
         val wasmJsTest by getting {
             dependencies {
                 implementation(kotlin("test"))
+                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
             }
         }
     }
