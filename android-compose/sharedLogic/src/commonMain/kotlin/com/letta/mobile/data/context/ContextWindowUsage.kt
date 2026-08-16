@@ -18,6 +18,9 @@ enum class ContextWindowSegmentKind {
     SummaryMemory,
     ExternalMemorySummary,
     Messages,
+
+    /** Counted in the server's used total but not broken out by section. */
+    Unitemised,
     FreeSpace,
 }
 
@@ -35,9 +38,20 @@ data class ContextWindowSegment(
  * client renders: occupied segments (largest first), then free space.
  *
  * The server reports the used total separately from the per-section token
- * counts, and the two can disagree (sections the overview does not itemise).
- * The reported total wins for [usedTokens] so the header matches the server,
- * and free space is derived from it rather than from the segment sum.
+ * counts, and the two can disagree — so the projection reconciles them rather
+ * than letting a bar drawn from segments contradict a header drawn from the
+ * total:
+ *
+ *  - reported total above the itemised sum: the difference becomes an explicit
+ *    [ContextWindowSegmentKind.Unitemised] segment, since the server is telling
+ *    us the prompt holds sections its overview does not break out;
+ *  - itemised sum above the reported total: the parts win, because a total that
+ *    contradicts its own components cannot be shown alongside them;
+ *  - parts overflowing the stated window: [maxTokens] widens to hold them — a
+ *    window smaller than its own contents is not a window to draw against.
+ *
+ * The result is exact: every segment's [ContextWindowSegment.fraction] plus
+ * [freeSegment]'s totals `1f`, and [usedTokens] equals the sum of the segments.
  */
 data class ContextWindowUsage(
     val usedTokens: Int,
@@ -52,32 +66,39 @@ data class ContextWindowUsage(
 
     companion object {
         fun from(overview: ContextWindowOverview): ContextWindowUsage {
-            val itemised = itemisedSegments(overview)
-            val max = overview.contextWindowSizeMax.coerceAtLeast(0)
-            val used = overview.contextWindowSizeCurrent
-                .takeIf { it > 0 }
-                ?: itemised.sumOf { (_, _, tokens) -> tokens }
-            val boundedUsed = if (max > 0) used.coerceIn(0, max) else used.coerceAtLeast(0)
-            val free = (max - boundedUsed).coerceAtLeast(0)
-            val segments = itemised
-                .filter { (_, _, tokens) -> tokens > 0 }
+            val itemised = itemisedSegments(overview).filter { (_, _, tokens) -> tokens > 0 }
+            val itemisedSum = itemised.sumOf { (_, _, tokens) -> tokens }
+            val reported = overview.contextWindowSizeCurrent.coerceAtLeast(0)
+            val used = maxOf(reported, itemisedSum)
+            val window = maxOf(overview.contextWindowSizeMax.coerceAtLeast(0), used)
+            val free = window - used
+            val occupied = itemised + unitemisedRemainder(used - itemisedSum)
+            val segments = occupied
                 .sortedByDescending { (_, _, tokens) -> tokens }
                 .map { (kind, label, tokens) ->
-                    ContextWindowSegment(kind, label, tokens, fractionOf(tokens, max))
+                    ContextWindowSegment(kind, label, tokens, fractionOf(tokens, window))
                 }
             return ContextWindowUsage(
-                usedTokens = boundedUsed,
-                maxTokens = max,
+                usedTokens = used,
+                maxTokens = window,
                 freeTokens = free,
                 segments = segments,
                 freeSegment = ContextWindowSegment(
                     kind = ContextWindowSegmentKind.FreeSpace,
                     label = "Free space",
                     tokens = free,
-                    fraction = fractionOf(free, max),
+                    fraction = fractionOf(free, window),
                 ),
             )
         }
+
+        /** The slice the server counts as used but never itemises. */
+        private fun unitemisedRemainder(tokens: Int): List<Itemised> =
+            if (tokens > 0) {
+                listOf(Itemised(ContextWindowSegmentKind.Unitemised, "Other", tokens))
+            } else {
+                emptyList()
+            }
 
         private data class Itemised(
             val kind: ContextWindowSegmentKind,

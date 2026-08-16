@@ -34,16 +34,10 @@ import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.context.ContextWindowSegment
 import com.letta.mobile.data.context.ContextWindowSegmentKind
 import com.letta.mobile.data.context.ContextWindowUsage
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.context.formatContextPercent
 import com.letta.mobile.data.context.formatContextShare
 import com.letta.mobile.data.context.formatContextTokens
-
-/** What the composer knows about the focused conversation's context window. */
-internal data class ComposerContextUsageState(
-    val usage: ContextWindowUsage? = null,
-    val loading: Boolean = false,
-    val error: String? = null,
-)
 
 /**
  * Composer chip + popover for the context window: how much of the focused
@@ -52,7 +46,7 @@ internal data class ComposerContextUsageState(
  * messages) with the remainder as free space.
  */
 @Composable
-internal fun ComposerContextChip(state: ComposerContextUsageState) {
+internal fun ComposerContextChip(state: ContextWindowUsageState) {
     var open by remember { mutableStateOf(false) }
     val usage = state.usage
     val label = when {
@@ -74,7 +68,7 @@ internal fun ComposerContextChip(state: ComposerContextUsageState) {
 
 @Composable
 private fun ContextUsagePopover(
-    state: ComposerContextUsageState,
+    state: ContextWindowUsageState,
     onDismiss: () -> Unit,
 ) {
     Popup(
@@ -131,7 +125,7 @@ private fun ContextUsageHeader(usage: ContextWindowUsage?) {
 }
 
 @Composable
-private fun ContextUsagePlaceholder(state: ComposerContextUsageState) {
+private fun ContextUsagePlaceholder(state: ContextWindowUsageState) {
     val message = when {
         state.loading -> "Measuring…"
         state.error != null -> state.error
@@ -239,6 +233,7 @@ private fun contextSegmentColor(kind: ContextWindowSegmentKind): Color = when (k
     ContextWindowSegmentKind.SummaryMemory -> Color(0xFFE06CB0)
     ContextWindowSegmentKind.ExternalMemorySummary -> Color(0xFFD9534F)
     ContextWindowSegmentKind.Messages -> Color(0xFFE8622F)
+    ContextWindowSegmentKind.Unitemised -> Color(0xFF8A93A6)
     ContextWindowSegmentKind.FreeSpace -> MaterialTheme.colorScheme.surfaceContainerHighest
 }
 

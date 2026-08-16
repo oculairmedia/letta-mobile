@@ -42,9 +42,7 @@ import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
-import com.letta.mobile.desktop.chat.ComposerContextUsageKey
-import com.letta.mobile.desktop.chat.rememberComposerContextUsage
-import com.letta.mobile.desktop.chat.rememberContextWindowLoader
+import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
@@ -758,17 +756,11 @@ internal fun LettaDesktopApp(
                                 onNavigate = { selectedDestination = it },
                             ),
                         )
-                        // Context reading for the composer chip: taken when the
-                        // conversation changes and again once each turn settles.
-                        val contextUsage = rememberComposerContextUsage(
-                            key = ComposerContextUsageKey(
-                                agentId = selectedAgentId,
-                                conversationId = chatState.selectedConversationId,
-                                settled = !isThinkingSelected && !isStreamingReplySelected,
-                            ),
-                            load = rememberContextWindowLoader(
-                                dataBindings.sessionGraphProvider.current.agentRepository,
-                            ),
+                        val contextUsage = rememberFocusedContextUsage(
+                            agentId = selectedAgentId,
+                            conversationId = chatState.selectedConversationId,
+                            settled = !isThinkingSelected && !isStreamingReplySelected,
+                            repository = dataBindings.sessionGraphProvider.current.agentRepository,
                         )
                         ChatDetailPane(
                             state = ChatDetailPaneState(

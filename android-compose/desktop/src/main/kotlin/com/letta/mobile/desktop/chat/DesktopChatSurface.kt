@@ -46,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.data.composer.Mentionable
@@ -72,7 +73,7 @@ internal data class ChatDetailPaneState(
     /** Approval request ids whose answer/dismiss is currently in flight. */
     val submittingApprovalRequestIds: Set<String> = emptySet(),
     val agentNamesById: Map<String, String> = emptyMap(),
-    val contextUsage: ComposerContextUsageState = ComposerContextUsageState(),
+    val contextUsage: ContextWindowUsageState = ContextWindowUsageState(),
 )
 
 /** Interaction callbacks for [ChatDetailPane]. */

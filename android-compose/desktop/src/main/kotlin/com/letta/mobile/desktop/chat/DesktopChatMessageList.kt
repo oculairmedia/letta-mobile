@@ -108,22 +108,7 @@ internal fun MessageList(
         ),
     )
 
-    // Keys of rows rendered as the user-prompt sticky header (see
-    // MessageListColumn). A prompt card is PINNED when it is the topmost
-    // visible row and has been stuck to the viewport edge (offset <= 0) —
-    // that, not "a prompt happens to be first", is what the top fade has to
-    // react to.
-    val userPromptKeys = remember(rows) {
-        rows.mapNotNull { row -> (row as? DesktopChatRow.Item)?.takeIf { it.item.isUserPrompt() }?.key }.toSet()
-    }
-    val promptPinned by remember(userPromptKeys) {
-        derivedStateOf {
-            val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
-            topItem != null && topItem.offset <= 0 && userPromptKeys.contains(topItem.key)
-        }
-    }
-
-    val fadeAlphas = rememberChatListFadeAlphas(listState, promptPinned)
+    val fadeAlphas = rememberChatListFadeAlphas(listState, rememberPromptPinned(listState, rows))
 
     Box(modifier = modifier.fillMaxWidth()) {
         // The fade wraps ONLY the list (not the scroll-to-latest button, which is
@@ -166,6 +151,27 @@ internal fun MessageList(
             )
         }
     }
+}
+
+/**
+ * Whether a user-prompt card is currently pinned as the list's sticky header:
+ * it is the topmost visible row AND stuck to the viewport edge (offset <= 0).
+ * "A prompt happens to be first" is not enough — that also matches a prompt
+ * scrolled to the top mid-list, which is not the card the top fade must yield
+ * to.
+ */
+@Composable
+private fun rememberPromptPinned(listState: LazyListState, rows: List<DesktopChatRow>): Boolean {
+    val userPromptKeys = remember(rows) {
+        rows.mapNotNull { row -> (row as? DesktopChatRow.Item)?.takeIf { it.item.isUserPrompt() }?.key }.toSet()
+    }
+    val pinned by remember(userPromptKeys) {
+        derivedStateOf {
+            val topItem = listState.layoutInfo.visibleItemsInfo.firstOrNull()
+            topItem != null && topItem.offset <= 0 && userPromptKeys.contains(topItem.key)
+        }
+    }
+    return pinned
 }
 
 private data class ChatListFadeAlphas(val top: Float, val bottom: Float)

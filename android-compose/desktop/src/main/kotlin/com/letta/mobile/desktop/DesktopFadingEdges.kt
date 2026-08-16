@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 
@@ -42,39 +43,30 @@ internal fun Modifier.fadingEdges(
         .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
         .drawWithContent {
             drawContent()
-            // Each mask is drawn as a BAND, not over the whole content: a
-            // gradient brush clamps to its end colours outside [startY, endY],
-            // so a full-size rect would carry the top ramp's transparent end
-            // across every pixel above it.
-            if (topFadeAlpha > 0f) {
-                val topEndY = topFadeLength.toPx().coerceAtMost(size.height / 2f)
-                if (topEndY > 0f) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Black.copy(alpha = 1f - topFadeAlpha), Color.Black),
-                            startY = 0f,
-                            endY = topEndY,
-                        ),
-                        topLeft = Offset.Zero,
-                        size = Size(size.width, topEndY),
-                        blendMode = BlendMode.DstIn,
-                    )
-                }
-            }
-            if (bottomFadeAlpha > 0f) {
-                val len = bottomFadeLength.toPx().coerceAtMost(size.height / 2f)
-                if (len > 0f) {
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomFadeAlpha)),
-                            startY = size.height - len,
-                            endY = size.height,
-                        ),
-                        topLeft = Offset(0f, size.height - len),
-                        size = Size(size.width, len),
-                        blendMode = BlendMode.DstIn,
-                    )
-                }
-            }
+            drawFadeBand(topFadeLength.toPx(), topFadeAlpha, fromTop = true)
+            drawFadeBand(bottomFadeLength.toPx(), bottomFadeAlpha, fromTop = false)
         }
+}
+
+/**
+ * Masks one edge over [lengthPx], ramping the content out towards it. Drawn as
+ * a BAND rather than over the whole content: a gradient brush clamps to its end
+ * colours outside `[startY, endY]`, so a full-size rect would carry the ramp's
+ * transparent end across every pixel beyond it.
+ */
+private fun DrawScope.drawFadeBand(lengthPx: Float, alpha: Float, fromTop: Boolean) {
+    val band = lengthPx.coerceAtMost(size.height / 2f)
+    if (alpha <= 0f || band <= 0f) return
+    val startY = if (fromTop) 0f else size.height - band
+    val faded = Color.Black.copy(alpha = 1f - alpha)
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = if (fromTop) listOf(faded, Color.Black) else listOf(Color.Black, faded),
+            startY = startY,
+            endY = startY + band,
+        ),
+        topLeft = Offset(0f, startY),
+        size = Size(size.width, band),
+        blendMode = BlendMode.DstIn,
+    )
 }

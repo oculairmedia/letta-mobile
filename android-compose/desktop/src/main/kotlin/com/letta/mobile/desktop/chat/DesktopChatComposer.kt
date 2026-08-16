@@ -9,6 +9,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.composer.ComposerAutocomplete
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.model.MessageContentPart
 
@@ -22,7 +23,7 @@ internal data class ComposerBarState(
     val commands: List<ComposerCommand>,
     val mentionables: List<Mentionable>,
     val placeholder: String,
-    val contextUsage: ComposerContextUsageState = ComposerContextUsageState(),
+    val contextUsage: ContextWindowUsageState = ContextWindowUsageState(),
 )
 
 /** Callbacks for [ComposerBar] interactions. */

@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.context.ContextWindowUsage
+import com.letta.mobile.data.context.ContextWindowUsageState
 import com.letta.mobile.data.model.ContextWindowOverview
 import kotlin.test.Test
 
@@ -31,7 +32,7 @@ class DesktopComposerContextUsageUiTest {
     fun chipShowsTheUsedShareAndOpensTheBreakdown() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                ComposerContextChip(ComposerContextUsageState(usage = usage))
+                ComposerContextChip(ContextWindowUsageState(usage = usage))
             }
         }
 
@@ -47,7 +48,7 @@ class DesktopComposerContextUsageUiTest {
     fun chipReportsAFailedReadingInsteadOfATotal() = runComposeUiTest {
         setContent {
             MaterialTheme {
-                ComposerContextChip(ComposerContextUsageState(error = "Backend unreachable."))
+                ComposerContextChip(ContextWindowUsageState(error = "Backend unreachable."))
             }
         }
 
