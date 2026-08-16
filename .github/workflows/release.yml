@@ -124,6 +124,8 @@ jobs:
   # ── Desktop: Windows EXE + MSI installers ───────────────────────────────
   desktop-installers:
     runs-on: windows-latest
+    env:
+      LETTA_DESKTOP_BUILD_DIR: ${{ runner.temp }}/letta-desktop-build
     defaults:
       run:
         working-directory: android-compose
@@ -153,8 +155,8 @@ jobs:
 
       - name: Build Windows EXE + MSI installers
         # Output:
-        #   desktop/build/compose/binaries/main/exe/*.exe
-        #   desktop/build/compose/binaries/main/msi/*.msi
+        #   $RUNNER_TEMP/letta-desktop-build/compose/binaries/main/exe/*.exe
+        #   $RUNNER_TEMP/letta-desktop-build/compose/binaries/main/msi/*.msi
         run: ./gradlew --no-daemon :desktop:packageDistributionForCurrentOS
 
       - name: Upload desktop installers
@@ -162,8 +164,8 @@ jobs:
         with:
           name: desktop-installers
           path: |
-            android-compose/desktop/build/compose/binaries/main/exe/*.exe
-            android-compose/desktop/build/compose/binaries/main/msi/*.msi
+            ${{ runner.temp }}/letta-desktop-build/compose/binaries/main/exe/*.exe
+            ${{ runner.temp }}/letta-desktop-build/compose/binaries/main/msi/*.msi
           if-no-files-found: error
 
   # ── Publish: gather APK + EXE + MSI and create the release ──────────────

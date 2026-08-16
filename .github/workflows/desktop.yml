@@ -37,6 +37,8 @@ concurrency:
 jobs:
   windows-installer:
     runs-on: windows-latest
+    env:
+      LETTA_DESKTOP_BUILD_DIR: ${{ runner.temp }}/letta-desktop-build
     defaults:
       run:
         working-directory: android-compose
@@ -75,8 +77,8 @@ jobs:
         # the java.base module classes. For a testable desktop installer we want
         # the non-minified build anyway; minified release packaging is a separate
         # follow-up. Output:
-        #   desktop/build/compose/binaries/main/exe/*.exe
-        #   desktop/build/compose/binaries/main/msi/*.msi
+        #   $RUNNER_TEMP/letta-desktop-build/compose/binaries/main/exe/*.exe
+        #   $RUNNER_TEMP/letta-desktop-build/compose/binaries/main/msi/*.msi
         run: ./gradlew --no-daemon :desktop:packageDistributionForCurrentOS
 
       - name: Upload Windows installers
@@ -84,8 +86,8 @@ jobs:
         with:
           name: letta-desktop-windows-installer-${{ github.run_number }}
           path: |
-            android-compose/desktop/build/compose/binaries/main/exe/*.exe
-            android-compose/desktop/build/compose/binaries/main/msi/*.msi
+            ${{ runner.temp }}/letta-desktop-build/compose/binaries/main/exe/*.exe
+            ${{ runner.temp }}/letta-desktop-build/compose/binaries/main/msi/*.msi
           if-no-files-found: error
 
   # Stable status check for branch protection.

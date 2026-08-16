@@ -4,6 +4,13 @@ import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
+// WiX 4 still resolves installer sources through Win32 paths. Keep CI's
+// packaging workspace short so deeply nested production dependencies remain
+// below MAX_PATH; ordinary local builds retain the standard module build dir.
+providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
+    ?.takeIf(String::isNotBlank)
+    ?.let { layout.buildDirectory.set(file(it)) }
+
 // This repo does not yet use a Gradle version catalog. Keep desktop-only
 // versions named here until dependency versions are centralized project-wide.
 //
@@ -414,6 +421,14 @@ val prepareDesktopLettaCodeRuntime = tasks.register<Sync>("prepareDesktopLettaCo
     from(desktopNodeExtractDir.map { it.file("node.exe") })
     from(desktopRuntimeInstallDir) {
         include("package.json", "package-lock.json", "runtime-manifest.json", "node_modules/**")
+        // TypeScript declarations are never loaded at runtime. Some SDK packages
+        // nest them deeply enough to exceed WiX's effective source-path limit,
+        // leaving the MSI manifest pointing at files Windows could not stage.
+        exclude(
+            "node_modules/**/*.d.ts",
+            "node_modules/**/*.map",
+            "node_modules/**/dist-types/**",
+        )
     }
     into(desktopBundledRuntimeDir)
 }
