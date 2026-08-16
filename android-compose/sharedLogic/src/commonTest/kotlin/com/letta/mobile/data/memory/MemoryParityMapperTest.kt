@@ -268,7 +268,7 @@ class MemoryParityMapperTest {
         assertEquals(0, state.summary.scheduleCount)
         assertEquals(null, state.summary.totalMemoryTokens)
         assertEquals(null, state.summary.contextWindowUsed)
-        assertEquals("—", state.summary.contextUsageLabel)
+        assertEquals("Unavailable", state.summary.contextUsageLabel)
         // The memory-data sections are empty when there is nothing to show.
         assertEquals(true, state.section(MemoryParitySectionKind.Skills).items.isEmpty())
         assertEquals(true, state.section(MemoryParitySectionKind.Memory).items.isEmpty())
