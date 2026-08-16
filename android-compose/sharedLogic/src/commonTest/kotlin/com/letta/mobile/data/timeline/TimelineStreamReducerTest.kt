@@ -1337,6 +1337,8 @@ class TimelineStreamReducerTest {
         ).timeline
 
         cleaned.events shouldHaveSize 0
+        cleaned.residentOtids shouldHaveSize 0
+        cleaned.invariantsKnown shouldBe true
     }
 
 

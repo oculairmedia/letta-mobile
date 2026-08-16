@@ -540,6 +540,9 @@ data class Timeline(
         if (removedEvents.isEmpty()) return AbandonedAssistantFragmentCleanupResult(this, emptySet())
         val removeServerIds = removedEvents.map { it.serverId }.toSet()
         val suppressions = removedEvents.map { it.toAbandonedAssistantFragmentSuppression() }.toSet()
+        val retainedEvents = events.filterNot { event ->
+            event is TimelineEvent.Confirmed && event.serverId in removeServerIds
+        }.toPersistentList()
         Telemetry.event(
             "TimelineSync", "orphanAssistantFragments.cleaned",
             "conversationId" to conversationId,
@@ -550,14 +553,14 @@ data class Timeline(
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(
-                events = events.filterNot { event ->
-                    event is TimelineEvent.Confirmed && event.serverId in removeServerIds
-                }.toPersistentList(),
+                events = retainedEvents,
                 abandonedAssistantFragmentSuppressions = buildList {
                     addAll(abandonedAssistantFragmentSuppressions)
                     addAll(suppressions)
                 }.takeLast(MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS).toPersistentSet(),
                 stablePrefixVersion = stablePrefixVersion + 1,
+                residentOtids = retainedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+                invariantsKnown = true,
             ),
             suppressions = suppressions,
         )
