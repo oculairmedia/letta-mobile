@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.CallMade
-import androidx.compose.material.icons.outlined.CallReceived
-import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.KeyboardArrowUp
 import androidx.compose.material3.Icon
@@ -25,7 +22,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -111,14 +107,7 @@ private data class ProvenanceLabelSpec(
     val isInbound: Boolean,
     val isFailed: Boolean,
     val contentDescription: String,
-) {
-    val directionIcon: ImageVector
-        get() = when {
-            isFailed -> Icons.Outlined.ErrorOutline
-            isInbound -> Icons.Outlined.CallReceived
-            else -> Icons.Outlined.CallMade
-        }
-}
+)
 
 private fun AgentMessageProvenance.toLabelSpec(resolveName: (String) -> String?): ProvenanceLabelSpec {
     val fromLabel = agentMessageDisplayLabel(fromAgentId, fromAgentName ?: resolveName(fromAgentId))
@@ -151,12 +140,6 @@ private fun AgentMessageProvenanceHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(
-            imageVector = spec.directionIcon,
-            contentDescription = null,
-            modifier = Modifier.padding(0.dp),
-            tint = tint.copy(alpha = 0.85f),
-        )
         AgentRoute(provenance, spec, tint, onAgentClick)
         DeliveryState(provenance.deliveryState, spec.isFailed)
         ExpansionIcon(expanded)
