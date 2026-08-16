@@ -153,10 +153,12 @@ jobs:
 
       - name: Build Windows EXE + MSI installers
         env:
-          LETTA_DESKTOP_BUILD_DIR: ${{ runner.temp }}/letta-desktop-build
+          # Match desktop CI's drive-root workspace so WiX source paths stay
+          # below the Win32 MAX_PATH boundary in release packaging too.
+          LETTA_DESKTOP_BUILD_DIR: D:\l
         # Output:
-        #   $RUNNER_TEMP/letta-desktop-build/compose/binaries/main/exe/*.exe
-        #   $RUNNER_TEMP/letta-desktop-build/compose/binaries/main/msi/*.msi
+        #   D:\l\compose\binaries\main\exe\*.exe
+        #   D:\l\compose\binaries\main\msi\*.msi
         run: ./gradlew --no-daemon :desktop:packageDistributionForCurrentOS
 
       - name: Upload desktop installers
@@ -164,8 +166,8 @@ jobs:
         with:
           name: desktop-installers
           path: |
-            ${{ runner.temp }}/letta-desktop-build/compose/binaries/main/exe/*.exe
-            ${{ runner.temp }}/letta-desktop-build/compose/binaries/main/msi/*.msi
+            D:\l\compose\binaries\main\exe\*.exe
+            D:\l\compose\binaries\main\msi\*.msi
           if-no-files-found: error
 
   # ── Publish: gather APK + EXE + MSI and create the release ──────────────
