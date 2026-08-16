@@ -12,10 +12,11 @@ fun reduceVisibleAssistantStreamPulse(
     tailId: String?,
     contentLength: Int,
 ): VisibleAssistantStreamPulseState {
-    val grew = isStreaming && tailId != null && tailId == previous.tailId && contentLength > previous.contentLength
+    val sameTail = tailId != null && tailId == previous.tailId
+    val grew = isStreaming && sameTail && contentLength > previous.contentLength
     return VisibleAssistantStreamPulseState(
         pulse = if (grew) previous.pulse + 1 else previous.pulse,
         tailId = tailId,
-        contentLength = contentLength,
+        contentLength = if (sameTail) maxOf(previous.contentLength, contentLength) else contentLength,
     )
 }

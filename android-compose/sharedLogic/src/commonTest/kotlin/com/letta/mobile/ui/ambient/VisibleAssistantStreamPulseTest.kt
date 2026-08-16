@@ -44,8 +44,12 @@ class VisibleAssistantStreamPulseTest {
     @Test
     fun `duplicates and shrinking projections do not pulse`() {
         val previous = VisibleAssistantStreamPulseState(pulse = 3, tailId = "assistant-1", contentLength = 20)
+        val shrunk = reduceVisibleAssistantStreamPulse(previous, true, "assistant-1", 12)
+        val restored = reduceVisibleAssistantStreamPulse(shrunk, true, "assistant-1", 20)
 
         assertEquals(3L, reduceVisibleAssistantStreamPulse(previous, true, "assistant-1", 20).pulse)
-        assertEquals(3L, reduceVisibleAssistantStreamPulse(previous, true, "assistant-1", 12).pulse)
+        assertEquals(3L, shrunk.pulse)
+        assertEquals(20, shrunk.contentLength)
+        assertEquals(3L, restored.pulse)
     }
 }
