@@ -60,7 +60,7 @@ half4 ambientColor(float2 fragCoord) {
     float2 uv = fragCoord / max(uSize, float2(1.0, 1.0));
     float aspect = uSize.x / max(uSize.y, 1.0);
     float2 p = float2((uv.x - 0.5) * aspect, uv.y);
-    float t = uTime * (0.09 + 0.0162 * uStreamEnergy);
+    float t = uTime * (0.09 + 0.009 * uStreamEnergy);
 
     float3 acc = float3(0.0);
     float wsum = 0.0;
@@ -85,7 +85,7 @@ half4 ambientColor(float2 fragCoord) {
     // Broad left-to-right scan integrated by the host. It gently lifts the
     // existing field rather than drawing a stripe. Stream energy adds only a
     // small vividness/height response, preserving the calm baseline.
-    float scanPhase = fract(uTime * 0.075 * (1.0 + 0.18 * uStreamEnergy));
+    float scanPhase = fract(uTime * 0.075 * (1.0 + 0.10 * uStreamEnergy));
     float scanCenter = mix(-0.22, 1.22, scanPhase);
     float scan = 1.0 - smoothstep(0.16, 0.48, abs(uv.x - scanCenter));
     float scanWeight = scan * (0.025 + 0.050 * uStreamEnergy);
