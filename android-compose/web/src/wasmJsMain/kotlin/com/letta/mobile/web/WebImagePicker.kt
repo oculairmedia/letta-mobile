@@ -10,6 +10,7 @@ import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.dialogs.openFilePicker
 import io.github.vinceglb.filekit.name
 import io.github.vinceglb.filekit.readBytes
+import io.github.vinceglb.filekit.size
 import kotlin.io.encoding.Base64
 
 internal suspend fun pickWebImages(): List<MessageContentPart.Image> {
@@ -17,7 +18,12 @@ internal suspend fun pickWebImages(): List<MessageContentPart.Image> {
         type = FileKitType.Image,
         mode = FileKitMode.Multiple(maxItems = ImageIngressPolicy.MAX_FILES),
     )
-    return files.orEmpty().map { file -> encodeWebImage(file.name, file.readBytes()) }
+    return files.orEmpty().map { file ->
+        require(file.size() <= AttachmentLimits.Default.maxRawBytesPerImage) {
+            "Image exceeds the ${AttachmentLimits.Default.maxRawBytesPerImage / (1024 * 1024)} MB browser upload limit."
+        }
+        encodeWebImage(file.name, file.readBytes())
+    }
 }
 
 internal fun encodeWebImage(

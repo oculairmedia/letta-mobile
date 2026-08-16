@@ -8,6 +8,8 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.persistentListOf
 
 @Immutable
 data class CustomColors(
@@ -47,6 +49,7 @@ data class CustomColors(
     val agentAColor: Color = Color.Unspecified,
     val agentBColor: Color = Color.Unspecified,
     val agentCColor: Color = Color.Unspecified,
+    val agentGradientColors: PersistentList<Color> = persistentListOf(),
 
     // Muted section captions (darker than onSurfaceVariant — Phase 6).
     val onSurfaceMutedColor: Color = Color.Unspecified,

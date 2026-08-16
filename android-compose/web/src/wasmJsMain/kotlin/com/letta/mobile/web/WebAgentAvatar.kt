@@ -13,23 +13,17 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-
-private val WebAgentGradients = listOf(
-    Color(0xFFF0A03C) to Color(0xFFE0457B),
-    Color(0xFFE0457B) to Color(0xFF8E5CFF),
-    Color(0xFF3FA0F0) to Color(0xFF3FE0C0),
-    Color(0xFF7AD08F) to Color(0xFF3FA0A0),
-    Color(0xFF8E7CFF) to Color(0xFF3F6EF0),
-    Color(0xFF3FC0D0) to Color(0xFF3F90A0),
-)
+import androidx.compose.material3.MaterialTheme
+import com.letta.mobile.ui.theme.customColors
 
 @Composable
 internal fun WebAgentAvatar(index: Int, size: Dp, modifier: Modifier = Modifier) {
-    val colors = WebAgentGradients[index.mod(WebAgentGradients.size)]
+    val colors = MaterialTheme.customColors.agentGradientColors
+    val colorIndex = index.mod(colors.size / 2) * 2
     Box(
         modifier = modifier
             .size(size)
-            .background(Brush.linearGradient(listOf(colors.first, colors.second)), RoundedCornerShape(7.dp)),
+            .background(Brush.linearGradient(listOf(colors[colorIndex], colors[colorIndex + 1])), RoundedCornerShape(7.dp)),
     )
 }
 

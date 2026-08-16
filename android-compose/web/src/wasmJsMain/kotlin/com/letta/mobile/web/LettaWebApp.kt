@@ -26,6 +26,8 @@ import com.letta.mobile.web.data.WasmAppServerClientGateway
 import com.letta.mobile.web.data.WebChatEntry
 import com.letta.mobile.web.data.WebConnectionState
 import com.letta.mobile.web.data.WebConversationUpdate
+import com.letta.mobile.web.data.replaceOptimisticTurn
+import com.letta.mobile.web.data.upsertWebChatEntry
 import com.letta.mobile.web.fs.WebWorkspaceController
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.collect
@@ -39,15 +41,11 @@ fun LettaWebApp() {
     val connectionState by gateway.state.collectAsState()
     val agents = remember { mutableStateListOf<AgentItemState>() }
     val messagesByAgent = remember { mutableStateMapOf<String, List<WebChatEntry>>() }
+    val pendingUpdatesByAgent = remember { mutableStateMapOf<String, List<WebChatEntry>>() }
     val pendingImages = remember { mutableStateListOf<MessageContentPart.Image>() }
     var config by remember {
         mutableStateOf(
-            LettaConfig(
-                id = "default",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = "",
-                accessToken = null,
-            ),
+            LettaConfig(id = "default", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "", accessToken = null),
         )
     }
     var destination by remember { mutableStateOf(WebNavDestination.CHAT) }
@@ -85,7 +83,7 @@ fun LettaWebApp() {
     }
     val selectedAgent = agents.firstOrNull { it.id == selectedAgentId }
     val messages = selectedAgentId?.let(messagesByAgent::get).orEmpty()
-    LaunchedEffect(config.serverUrl, config.accessToken, refreshSequence) {
+    LaunchedEffect(config.serverUrl, config.accessToken, config.mode, refreshSequence) {
         isLoadingAgents = true
         uiError = null
         try {
@@ -119,11 +117,8 @@ fun LettaWebApp() {
                         isLoadingConversation = false
                     }
                     is WebConversationUpdate.Upsert -> {
-                        if (isSending) return@collect
-                        val current = messagesByAgent[agentId].orEmpty()
-                        val index = current.indexOfFirst { it.id == update.entry.id }
-                        messagesByAgent[agentId] = if (index < 0) current + update.entry
-                        else current.toMutableList().apply { this[index] = update.entry }
+                        val target = if (isSending) pendingUpdatesByAgent else messagesByAgent
+                        target[agentId] = upsertWebChatEntry(target[agentId].orEmpty(), update.entry)
                     }
                 }
             }
@@ -167,11 +162,16 @@ fun LettaWebApp() {
             } catch (error: Throwable) {
                 uiError = error.message ?: "Agent turn failed"
             } finally {
+                val pending = pendingUpdatesByAgent.remove(agent.id).orEmpty()
+                if (pending.isNotEmpty()) {
+                    messagesByAgent[agent.id] = replaceOptimisticTurn(
+                        messagesByAgent[agent.id].orEmpty(), userId, assistantId, pending,
+                    )
+                }
                 isSending = false
             }
         }
     }
-
     SharedMaterialTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             BoxWithConstraints {

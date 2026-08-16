@@ -9,6 +9,8 @@ import com.letta.mobile.data.transport.appserver.AppServerProtocol
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -35,7 +37,10 @@ sealed interface WebConversationUpdate {
 internal fun resolveWebSocketUrl(serverUrl: String): String {
     val trimmed = serverUrl.trim().removeSuffix("/")
     return when {
-        trimmed.startsWith("ws://") || trimmed.startsWith("wss://") -> trimmed
+        trimmed.startsWith("ws://") || trimmed.startsWith("wss://") -> {
+            val pathStart = trimmed.indexOf('/', startIndex = trimmed.indexOf("://") + 3)
+            if (pathStart < 0) "$trimmed/ws" else trimmed
+        }
         trimmed.startsWith("http://") -> "ws://${trimmed.removePrefix("http://")}/ws"
         trimmed.startsWith("https://") -> "wss://${trimmed.removePrefix("https://")}/ws"
         else -> error("Server URL must use iroh, http, https, ws, or wss")
@@ -45,19 +50,19 @@ internal fun resolveWebSocketUrl(serverUrl: String): String {
 internal fun decodeWebAgents(elements: JsonArray): List<AgentItemState> = elements.map { element ->
     val agent = element.jsonObject
     AgentItemState(
-        id = agent["id"]?.jsonPrimitive?.content ?: error("Agent response is missing id"),
-        name = agent["name"]?.jsonPrimitive?.content ?: "Agent",
-        description = agent["description"]?.jsonPrimitive?.content,
-        model = agent["model"]?.jsonPrimitive?.content ?: "Unknown model",
+        id = agent["id"]?.jsonPrimitive?.contentOrNull ?: error("Agent response is missing id"),
+        name = agent["name"]?.jsonPrimitive?.contentOrNull ?: "Agent",
+        description = agent["description"]?.jsonPrimitive?.contentOrNull,
+        model = agent["model"]?.jsonPrimitive?.contentOrNull ?: "Unknown model",
         isOnline = true,
     )
 }
 
 internal fun decodeAssistantDelta(payload: RuntimeEventPayload.RemoteStreamFrame): String? {
     if (payload.messageType != "assistant_message") return null
-    val raw = AppServerProtocol.json.parseToJsonElement(payload.body).jsonObject
-    val delta = raw["delta"]?.jsonObject ?: raw
     return runCatching {
+        val raw = AppServerProtocol.json.parseToJsonElement(payload.body) as? JsonObject ?: return@runCatching null
+        val delta = raw["delta"] as? JsonObject ?: raw
         AppServerProtocol.json
             .decodeFromJsonElement(LettaMessage.serializer(), delta)
             .let { it as? AssistantMessage }

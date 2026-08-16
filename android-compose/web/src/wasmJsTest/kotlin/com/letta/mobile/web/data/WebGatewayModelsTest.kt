@@ -9,9 +9,11 @@ import com.letta.mobile.web.encodeWebImage
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonArray
 
 class WebGatewayModelsTest {
@@ -20,6 +22,7 @@ class WebGatewayModelsTest {
         assertEquals("ws://localhost:4500/ws", resolveWebSocketUrl("http://localhost:4500/"))
         assertEquals("wss://api.example.com/ws", resolveWebSocketUrl("https://api.example.com"))
         assertEquals("ws://localhost:4500/ws", resolveWebSocketUrl("ws://localhost:4500/ws"))
+        assertEquals("ws://localhost:4500/ws", resolveWebSocketUrl("ws://localhost:4500"))
     }
 
     @Test
@@ -48,12 +51,45 @@ class WebGatewayModelsTest {
     }
 
     @Test
+    fun `assistant delta accepts wrapped and direct messages`() {
+        assertEquals("wrapped", decodeAssistantDelta(assistantPayload(
+            """{"delta":{"message_type":"assistant_message","id":"a-1","content":"wrapped"}}""",
+        )))
+        assertEquals("direct", decodeAssistantDelta(assistantPayload(
+            """{"message_type":"assistant_message","id":"a-2","content":"direct"}""",
+        )))
+    }
+
+    @Test
+    fun `assistant delta ignores unrelated and malformed frames`() {
+        assertEquals(null, decodeAssistantDelta(assistantPayload("not-json")))
+        assertEquals(null, decodeAssistantDelta(assistantPayload("{}", messageType = "reasoning_message")))
+    }
+
+    @Test
     fun `request ids do not collide after a page reload`() {
         val firstPage = webRequestId("page-a", "message", 9)
         val reloadedPage = webRequestId("page-b", "message", 9)
 
         assertNotEquals(firstPage, reloadedPage)
         assertEquals("web-page-b-message-9", reloadedPage)
+    }
+
+    @Test
+    fun `passive turn updates replace optimistic rows after send`() {
+        val optimistic = listOf(
+            WebChatEntry("local-user-1", "You", "hello", true),
+            WebChatEntry("local-assistant-1", "Agent", "hel", false),
+        )
+        val committed = listOf(
+            WebChatEntry("server-user-1", "You", "hello", true),
+            WebChatEntry("server-assistant-1", "Agent", "hello", false),
+        )
+
+        assertEquals(
+            committed,
+            replaceOptimisticTurn(optimistic, "local-user-1", "local-assistant-1", committed),
+        )
     }
 
     @Test
@@ -74,7 +110,7 @@ class WebGatewayModelsTest {
         val update = decodeWebConversationUpdate(streamFrame(delta)) as WebConversationUpdate.Upsert
         assertEquals("assistant-1", update.entry.id)
         assertEquals("hello", update.entry.text)
-        assertEquals(false, update.entry.isUser)
+        assertFalse(update.entry.isUser)
     }
 
     @Test
@@ -92,7 +128,16 @@ class WebGatewayModelsTest {
         }
     }
 
-    private fun streamFrame(delta: kotlinx.serialization.json.JsonElement): AppServerReceivedFrame {
+    private fun assistantPayload(
+        body: String,
+        messageType: String = "assistant_message",
+    ) = com.letta.mobile.runtime.RuntimeEventPayload.RemoteStreamFrame(
+        frameId = "frame-1",
+        body = body,
+        messageType = messageType,
+    )
+
+    private fun streamFrame(delta: JsonElement): AppServerReceivedFrame {
         val runtime = AppServerRuntimeScope(agentId = "agent-1", conversationId = "conv-1")
         return AppServerReceivedFrame(
             channel = AppServerChannel.Stream,
