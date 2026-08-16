@@ -355,8 +355,10 @@ val desktopNodeExtractDir = layout.buildDirectory.dir("desktop-node-runtime")
 val desktopRuntimeInstallDir = layout.buildDirectory.dir("desktop-letta-code-runtime")
 val desktopAppResourcesDir = layout.buildDirectory.dir("generated/desktop-app-resources")
 val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("windows/letta-code-runtime") }
+val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 
 val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntime") {
+    onlyIf { isWindowsHost }
     inputs.property("nodeVersion", desktopNodeVersion)
     inputs.property("sha256", desktopNodeArchiveSha256)
     outputs.file(desktopNodeArchive)
@@ -383,6 +385,7 @@ val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntim
 }
 
 val extractDesktopNodeRuntime = tasks.register<Sync>("extractDesktopNodeRuntime") {
+    onlyIf { isWindowsHost }
     dependsOn(downloadDesktopNodeRuntime)
     from(desktopNodeArchive.map { archive -> zipTree(archive) }) {
         eachFile { path = path.substringAfter('/') }
@@ -398,6 +401,7 @@ val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntim
 }
 
 val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCodeRuntime") {
+    onlyIf { isWindowsHost }
     dependsOn(extractDesktopNodeRuntime)
     dependsOn(prepareDesktopRuntimeInstallDir)
     inputs.files(
@@ -417,6 +421,7 @@ val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCo
 }
 
 val prepareDesktopLettaCodeRuntime = tasks.register<Sync>("prepareDesktopLettaCodeRuntime") {
+    onlyIf { isWindowsHost }
     dependsOn(installDesktopLettaCodeRuntime)
     from(desktopNodeExtractDir.map { it.file("node.exe") })
     from(desktopRuntimeInstallDir) {

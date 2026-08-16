@@ -62,14 +62,40 @@ class DesktopLettaCodeRuntimeLocatorTest {
         assertNull(DesktopLettaCodeRuntimeLocator.locate(inputs(resourcesRoot = root)))
     }
 
+    @Test
+    fun `packaged Windows runtime is ignored on other hosts`() = withRuntimeTree { root ->
+        runtimeInstallation(File(root, "windows/letta-code-runtime"))
+
+        assertNull(DesktopLettaCodeRuntimeLocator.locate(inputs(resourcesRoot = root, isWindows = false)))
+    }
+
+    @Test
+    fun `explicit runtime remains available on other hosts`() = withRuntimeTree { root ->
+        val explicit = runtimeInstallation(File(root, "explicit"))
+
+        val located = DesktopLettaCodeRuntimeLocator.locate(
+            inputs(
+                properties = mapOf(
+                    "letta.desktop.runtime.node" to explicit.nodeExecutable.path,
+                    "letta.desktop.runtime.lettaJs" to explicit.lettaEntryPoint.path,
+                ),
+                isWindows = false,
+            ),
+        )
+
+        assertEquals(explicit, located)
+    }
+
     private fun inputs(
         properties: Map<String, String> = emptyMap(),
         environment: Map<String, String> = emptyMap(),
         resourcesRoot: File? = null,
+        isWindows: Boolean = true,
     ) = DesktopRuntimeLocationInputs(
         property = properties::get,
         environment = environment::get,
         resourcesRoot = resourcesRoot,
+        isWindows = isWindows,
     )
 
     private fun runtimeInstallation(root: File): DesktopLettaCodeInstallation {

@@ -11,6 +11,7 @@ internal data class DesktopRuntimeLocationInputs(
     val property: (String) -> String?,
     val environment: (String) -> String?,
     val resourcesRoot: File?,
+    val isWindows: Boolean,
 )
 
 internal object DesktopLettaCodeRuntimeLocator {
@@ -26,11 +27,13 @@ internal object DesktopLettaCodeRuntimeLocator {
             resourcesRoot = System.getProperty("compose.application.resources.dir")
                 ?.takeIf { it.isNotBlank() }
                 ?.let(::File),
+            isWindows = System.getProperty("os.name").startsWith("Windows", ignoreCase = true),
         ),
     )
 
     internal fun locate(inputs: DesktopRuntimeLocationInputs): DesktopLettaCodeInstallation? {
         explicitInstallation(inputs)?.let { return it.validatedOrNull() }
+        if (!inputs.isWindows) return null
         val resourcesRoot = inputs.resourcesRoot ?: return null
         return sequenceOf(
             File(resourcesRoot, "letta-code-runtime"),
@@ -70,6 +73,7 @@ internal interface DesktopLocalRuntimeLifecycle : AutoCloseable {
 
 internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
     private const val MAX_LOG_BYTES = 5L * 1024L * 1024L
+    private val logLock = Any()
     private val manager = DesktopLocalRuntimeManager(
         installationProvider = DesktopLettaCodeRuntimeLocator::locate,
         backendDirectory = ::backendDirectory,
@@ -118,15 +122,16 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
     private fun localRuntimeLogFile(): File =
         File(System.getProperty("user.home"), ".letta-mobile/logs/local-runtime.log")
 
-    @Synchronized
     private fun appendLog(file: File, line: String) {
-        file.parentFile.mkdirs()
-        if (file.length() > MAX_LOG_BYTES) {
-            val previous = File(file.parentFile, "${file.name}.previous")
-            previous.delete()
-            file.renameTo(previous)
+        synchronized(logLock) {
+            file.parentFile.mkdirs()
+            if (file.length() > MAX_LOG_BYTES) {
+                val previous = File(file.parentFile, "${file.name}.previous")
+                previous.delete()
+                file.renameTo(previous)
+            }
+            file.appendText("$line\n")
         }
-        file.appendText("$line\n")
     }
 }
 
