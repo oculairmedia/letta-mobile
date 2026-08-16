@@ -6,10 +6,9 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.TooltipArea
+import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
@@ -43,9 +42,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
@@ -54,8 +52,6 @@ import java.awt.KeyEventDispatcher
 import java.awt.KeyboardFocusManager
 import java.awt.Toolkit
 import java.awt.event.KeyEvent
-import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.delay
 
 /** Sidebar toggle test/automation tag, referenced by desktop UI tests. */
 internal const val SidebarToggleTestTag = "desktop-sidebar-toggle"
@@ -101,7 +97,7 @@ internal fun DesktopCollapsibleSidebar(
     }
 }
 
-private const val TooltipShowDelayMs = 150L
+private const val TooltipShowDelayMs = 150
 
 /**
  * Minimal hover tooltip built only on plain Compose + Material3 primitives —
@@ -115,41 +111,32 @@ private const val TooltipShowDelayMs = 150L
  * under the JVM 21 test toolchain, so this avoids the Jewel dependency.
  */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun DesktopChromeTooltip(
     text: String,
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    var show by remember { mutableStateOf(false) }
-    LaunchedEffect(hovered) {
-        if (hovered) {
-            delay(TooltipShowDelayMs.milliseconds)
-            show = true
-        } else {
-            show = false
-        }
-    }
-    Box(modifier = modifier.hoverable(interaction)) {
-        content()
-        if (show) {
-            Popup(alignment = Alignment.BottomStart, properties = PopupProperties(focusable = false)) {
-                Surface(
-                    shape = RoundedCornerShape(6.dp),
-                    color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                    shadowElevation = 6.dp,
-                ) {
-                    Text(
-                        text = text,
-                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                }
+    TooltipArea(
+        tooltip = {
+            Surface(
+                shape = RoundedCornerShape(6.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                shadowElevation = 6.dp,
+            ) {
+                Text(
+                    text = text,
+                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                    style = MaterialTheme.typography.labelMedium,
+                )
             }
-        }
+        },
+        delayMillis = TooltipShowDelayMs,
+        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(12.dp, 12.dp)),
+    ) {
+        Row(modifier = modifier) { content() }
     }
 }
 
