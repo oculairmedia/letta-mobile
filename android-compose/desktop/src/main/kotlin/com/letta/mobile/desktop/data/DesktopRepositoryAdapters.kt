@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
@@ -59,6 +60,7 @@ class DesktopSessionGraph internal constructor(
     override val backendDescriptor: BackendDescriptor,
     override val localRuntimeBackend: LettaBackend?,
     override val agentRepository: IAgentRepository,
+    override val blockRepository: IAgentBlockRepository,
     override val channelTransport: IChannelTransport,
     override val conversationRepository: IConversationRepository,
     override val cronRepository: ICronRepository,
@@ -111,6 +113,7 @@ class DesktopSessionGraphFactory(
             backendDescriptor = desktopRemoteLettaDescriptor(config),
             localRuntimeBackend = null,
             agentRepository = adapters.agentRepository,
+            blockRepository = adapters.blockRepository,
             channelTransport = channelTransportFactory(),
             conversationRepository = adapters.conversationRepository,
             cronRepository = adapters.cronRepository,
@@ -216,6 +219,10 @@ class DesktopRepositoryAdapters(
 
     val agentRepository: IAgentRepository = selectIrohOrHttp(
         irohRepositories?.agentRepository,
+        adminRepositories,
+    )
+    val blockRepository: IAgentBlockRepository = selectIrohOrHttp(
+        irohRepositories?.blockRepository,
         adminRepositories,
     )
     val archiveRepository: IArchiveRepository = unavailableRepository()

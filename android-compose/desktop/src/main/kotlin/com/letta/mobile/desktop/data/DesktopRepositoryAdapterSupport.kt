@@ -1,8 +1,10 @@
 package com.letta.mobile.desktop.data
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -15,6 +17,7 @@ import kotlinx.coroutines.flow.emptyFlow
 
 internal data class IrohRepositoryBundle(
     val agentRepository: DesktopIrohAgentRepository,
+    val blockRepository: IAgentBlockRepository,
     val scheduleRepository: DesktopIrohScheduleRepository,
     val toolRepository: IToolRepository,
 )
@@ -26,6 +29,7 @@ internal fun buildIrohRepositories(
     if (!irohMode) return null
     return IrohRepositoryBundle(
         agentRepository = DesktopIrohAgentRepository(irohAgentDirectoryProvider),
+        blockRepository = IrohAgentBlockRepository(irohAgentDirectoryProvider),
         scheduleRepository = DesktopIrohScheduleRepository(irohAgentDirectoryProvider),
         toolRepository = DesktopIrohToolRepository(irohAgentDirectoryProvider),
     )

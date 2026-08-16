@@ -1,6 +1,7 @@
 package com.letta.mobile.data.session
 
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
@@ -38,6 +39,8 @@ interface SessionRepositoryGraph {
     val backendDescriptor: BackendDescriptor
     val localRuntimeBackend: LettaBackend?
     val agentRepository: IAgentRepository
+    val blockRepository: IAgentBlockRepository?
+        get() = null
     val channelTransport: IChannelTransport
     val conversationRepository: IConversationRepository
     val cronRepository: ICronRepository
