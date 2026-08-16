@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -170,16 +169,6 @@ internal fun WebAgentSidebar(
                         }
                     }
                 }
-            }
-        }
-        Surface(
-            color = Color.Transparent,
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onSettings),
-        ) {
-            Row(modifier = Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Outlined.Settings, contentDescription = null)
-                Spacer(Modifier.width(12.dp))
-                Text("Settings", style = MaterialTheme.typography.labelLarge)
             }
         }
     }
