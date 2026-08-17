@@ -21,6 +21,9 @@ import com.letta.mobile.data.api.ToolApi
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.Provider
+import com.letta.mobile.data.model.ProviderId
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohScheduleRepository
 import com.letta.mobile.data.repository.ScheduleRepository
@@ -32,11 +35,14 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.TurnEngine
+import com.letta.mobile.testutil.FakeModelApi
+import com.letta.mobile.testutil.FakeProviderApi
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -70,29 +76,7 @@ class SessionGraphFactoryTest {
 
     @Test
     fun `create clears daos and produces remote descriptor by default`() {
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-        )
+        val factory = createFactory()
 
         val graph = factory.create()
 
@@ -116,30 +100,7 @@ class SessionGraphFactoryTest {
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
         every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository
-        )
+        val factory = createFactory(customSettingsRepository = settingsRepository)
 
         val graph = factory.create()
 
@@ -160,30 +121,7 @@ class SessionGraphFactoryTest {
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
         every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-        )
+        val factory = createFactory(customSettingsRepository = settingsRepository)
 
         val graph = factory.create()
 
@@ -203,30 +141,9 @@ class SessionGraphFactoryTest {
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Disabled
+        val factory = createFactory(
+            customSettingsRepository = settingsRepository,
+            customLocalRuntimeOptions = LocalRuntimeOptions.Disabled,
         )
 
         val graph = factory.create()
@@ -264,34 +181,13 @@ class SessionGraphFactoryTest {
         val runtimeEventOutbox: RuntimeEventOutbox = mockk()
         val memFsStore: MemFsStore = mockk()
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Enabled(
+        val factory = createFactory(
+            customSettingsRepository = settingsRepository,
+            customLocalRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
                 memFsStore = memFsStore,
-                providers = setOf(provider)
-            )
+                providers = setOf(provider),
+            ),
         )
 
         val graph = factory.create()
@@ -317,34 +213,13 @@ class SessionGraphFactoryTest {
         val runtimeEventOutbox: RuntimeEventOutbox = mockk()
         val memFsStore: MemFsStore = mockk()
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Enabled(
+        val factory = createFactory(
+            customSettingsRepository = settingsRepository,
+            customLocalRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
                 memFsStore = memFsStore,
-                providers = setOf(provider)
-            )
+                providers = setOf(provider),
+            ),
         )
 
         val graph = factory.create()
@@ -353,5 +228,77 @@ class SessionGraphFactoryTest {
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertEquals("remote-letta:test-local-unsupported", graph.backendDescriptor.backendId.value)
         assertNull(graph.localRuntimeBackend)
+    }
+
+    @Test
+    fun `create wires credentialed provider filter into model repository`() = runTest {
+        val modelApi = FakeModelApi().apply {
+            llmModels += model("openai/gpt-4o")
+            llmModels += model("anthropic/claude-sonnet")
+        }
+        val providerApi = FakeProviderApi().apply {
+            providers += Provider(
+                id = ProviderId("p1"),
+                name = "OpenAI",
+                providerType = "openai",
+            )
+        }
+        val factory = createFactory(
+            customModelApi = modelApi,
+            customProviderApi = providerApi,
+        )
+
+        val graph = factory.create()
+
+        graph.modelRepository.refreshLlmModels()
+        assertTrue(providerApi.calls.contains("listProviders"))
+        assertEquals(listOf("openai/gpt-4o"), graph.modelRepository.llmModels.value.map { it.handle })
+
+        val listProviderCalls = providerApi.calls.count { it == "listProviders" }
+        graph.modelRepository.refreshLlmModels()
+        assertEquals(listProviderCalls, providerApi.calls.count { it == "listProviders" })
+        assertEquals(listOf("openai/gpt-4o"), graph.modelRepository.llmModels.value.map { it.handle })
+        graph.close()
+    }
+
+    private fun createFactory(
+        customModelApi: ModelApi = modelApi,
+        customProviderApi: ProviderApi = providerApi,
+        customSettingsRepository: ISettingsRepository? = null,
+        customLocalRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
+    ): SessionGraphFactory = SessionGraphFactory(
+        agentApi = agentApi,
+        agentDao = agentDao,
+        conversationApi = conversationApi,
+        conversationDao = conversationDao,
+        archiveApi = archiveApi,
+        folderApi = folderApi,
+        groupApi = groupApi,
+        identityApi = identityApi,
+        lettaApiClient = lettaApiClient,
+        mcpServerApi = mcpServerApi,
+        modelApi = customModelApi,
+        passageApi = passageApi,
+        projectApi = projectApi,
+        projectWorkApi = projectWorkApi,
+        runApi = runApi,
+        jobApi = jobApi,
+        providerApi = customProviderApi,
+        scheduleApi = scheduleApi,
+        stepApi = stepApi,
+        toolApi = toolApi,
+        appContext = appContext,
+        settingsRepository = customSettingsRepository,
+        localRuntimeOptions = customLocalRuntimeOptions,
+    )
+
+    private fun model(handle: String): LlmModel {
+        val provider = handle.substringBefore('/')
+        return LlmModel(
+            id = handle,
+            name = handle.substringAfter('/'),
+            handle = handle,
+            providerType = provider,
+        )
     }
 }

@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.ModelCatalogNormalizer
 import com.letta.mobile.data.repository.api.IModelRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,6 +23,7 @@ open class ModelRepository(
     // hard-fails at the LettaApiClient choke-point, which left the model
     // picker dropdown empty.
     private val irohModelSource: IrohAdminRpcModelSource? = null,
+    private val credentialedProviderTypes: (suspend () -> Set<String>)? = null,
 ) : IModelRepository {
     private val _llmModels = MutableStateFlow<List<LlmModel>>(emptyList())
     override val llmModels: StateFlow<List<LlmModel>> = _llmModels.asStateFlow()
@@ -31,6 +33,21 @@ open class ModelRepository(
 
     private fun isLocalRuntimeActive(): Boolean =
         localModelSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
+
+    private suspend fun filterCredentialed(models: List<LlmModel>): List<LlmModel> {
+        val loader = credentialedProviderTypes ?: return models
+        val credentialedTypes = try {
+            loader()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Fail open: a provider-lookup failure must not abort the catalog
+            // refresh and empty the picker.
+            return models
+        }
+        if (credentialedTypes.isEmpty()) return models
+        return ModelCatalogNormalizer.filterByCredentialedProviders(models, credentialedTypes)
+    }
 
     override suspend fun refreshLlmModels() {
         // Local-runtime mode: pickers list downloaded embedded models; the
@@ -42,10 +59,10 @@ open class ModelRepository(
         }
         val irohSource = irohModelSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            _llmModels.update { ModelCatalogNormalizer.normalize(irohSource.listLlmModels()) }
+            _llmModels.update { filterCredentialed(ModelCatalogNormalizer.normalize(irohSource.listLlmModels())) }
             return
         }
-        _llmModels.update { ModelCatalogNormalizer.normalize(modelApi.listLlmModels()) }
+        _llmModels.update { filterCredentialed(ModelCatalogNormalizer.normalize(modelApi.listLlmModels())) }
     }
 
     override suspend fun refreshEmbeddingModels() {

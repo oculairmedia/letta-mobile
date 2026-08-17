@@ -15,6 +15,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.ModelCatalogNormalizer
+import com.letta.mobile.data.model.Provider
 import com.letta.mobile.data.stream.SseFrame
 import com.letta.mobile.data.stream.SseParser
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
@@ -41,6 +42,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.buildJsonObject
@@ -200,7 +202,9 @@ open class LettaHttpChatGateway(
             applyAuth()
         }
         response.requireSuccess()
-        return ModelCatalogNormalizer.normalize(response.body())
+        val normalized = ModelCatalogNormalizer.normalize(response.body())
+        val credentialedTypes = fetchCredentialedProviderTypes()
+        return ModelCatalogNormalizer.filterByCredentialedProviders(normalized, credentialedTypes)
     }
 
     /** Set the model override for an existing conversation. */
@@ -240,11 +244,76 @@ open class LettaHttpChatGateway(
         httpClient.close()
     }
 
+    /**
+     * Fetch the lowercased `provider_type` values that have a credentialed provider
+     * record on the backend (`GET /v1/providers`), driving
+     * [ModelCatalogNormalizer.filterByCredentialedProviders] so the model picker only
+     * offers models whose provider has credentials configured.
+     *
+     * FAIL-OPEN: every failure (HTTP error, parse error, empty response) maps to an
+     * empty set, which leaves the caller's model list unchanged — the picker must
+     * never empty because the providers fetch failed. Pagination mirrors the shared
+     * cursor shape (`limit` + `after` = last provider id), bounded to a small page
+     * count; a server that ignores `after` and re-serves a page cannot spin.
+     */
+    private suspend fun fetchCredentialedProviderTypes(): Set<String> {
+        return try {
+            collectCredentialedProviderTypes()
+        } catch (cancelled: CancellationException) {
+            // Never swallow a coroutine cancellation — the caller must observe
+            // it so the refresh can abort instead of publishing a filtered view.
+            throw cancelled
+        } catch (_: Exception) {
+            // Fail open: a provider-lookup failure must not empty the picker.
+            emptySet()
+        }
+    }
+
+    private suspend fun collectCredentialedProviderTypes(): Set<String> {
+        val credentialedTypes = mutableSetOf<String>()
+        val seenIds = HashSet<String>()
+        var after: String? = null
+        for (page in 0 until PROVIDER_PAGE_MAX) {
+            val providers = fetchProvidersPage(after)
+            after = ingestProviderPage(providers, seenIds, credentialedTypes) ?: break
+        }
+        return credentialedTypes
+    }
+
+    private fun ingestProviderPage(
+        providers: List<Provider>,
+        seenIds: MutableSet<String>,
+        target: MutableSet<String>,
+    ): String? {
+        if (providers.isEmpty()) return null
+        val fresh = providers.filter { p -> p.id?.value?.let(seenIds::add) ?: true }
+        if (fresh.isEmpty()) return null
+        fresh.mapNotNull { it.providerType.trim().lowercase().takeIf(String::isNotBlank) }
+            .forEach(target::add)
+        if (providers.size < PROVIDER_PAGE_SIZE) return null
+        return providers.last().id?.value
+    }
+
+    private suspend fun fetchProvidersPage(after: String?): List<Provider> {
+        val response = httpClient.get("$baseUrl/v1/providers") {
+            applyAuth()
+            parameter("limit", PROVIDER_PAGE_SIZE)
+            parameter("after", after)
+        }
+        response.requireSuccess()
+        return response.body<List<Provider>>()
+    }
+
     private fun HttpRequestBuilder.applyAuth() {
         config.accessToken
             ?.trim()
             ?.takeIf { it.isNotBlank() }
             ?.let(::bearerAuth)
+    }
+
+    private companion object {
+        const val PROVIDER_PAGE_SIZE = 100
+        const val PROVIDER_PAGE_MAX = 10
     }
 }
 
