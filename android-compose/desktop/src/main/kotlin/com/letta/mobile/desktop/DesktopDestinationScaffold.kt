@@ -115,6 +115,7 @@ internal data class DestinationContentInputs(
     val blockApi: DesktopBlockApi?,
     val skills: DestinationSkillsInputs,
     val nucleus: DesktopNucleusState,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderState,
 )
 
 internal data class DestinationNucleusActions(
@@ -139,6 +140,7 @@ internal data class DestinationContentActions(
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val nucleus: DestinationNucleusActions,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
 )
 
 private data class DestinationSettingsActions(
@@ -146,12 +148,14 @@ private data class DestinationSettingsActions(
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val nucleus: DestinationNucleusActions,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
 )
 
 private data class ScrollableDestinationInputs(
     val destination: DesktopDestination,
     val state: DesktopBootstrapState,
     val nucleus: DesktopNucleusState,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderState,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -228,12 +232,14 @@ internal fun DestinationContent(
                 destination = destination,
                 state = inputs.state,
                 nucleus = inputs.nucleus,
+                localRuntimeProvider = inputs.localRuntimeProvider,
             ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
                 onIrohIdentityReset = actions.onIrohIdentityReset,
                 nucleus = actions.nucleus,
+                localRuntimeProvider = actions.localRuntimeProvider,
             ),
             modifier = modifier,
         )
@@ -338,6 +344,7 @@ private fun ScrollableDestinationContent(
             destination = inputs.destination,
             state = inputs.state,
             nucleus = inputs.nucleus,
+            localRuntimeProvider = inputs.localRuntimeProvider,
             settings = settings,
         )
     }
@@ -363,6 +370,7 @@ private fun LazyListScope.scrollableDestinationItems(
     destination: DesktopDestination,
     state: DesktopBootstrapState,
     nucleus: DesktopNucleusState,
+    localRuntimeProvider: DesktopLocalRuntimeProviderState,
     settings: DestinationSettingsActions,
 ) {
     when (destination) {
@@ -377,6 +385,12 @@ private fun LazyListScope.scrollableDestinationItems(
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
                     onIrohIdentityReset = settings.onIrohIdentityReset,
+                )
+            }
+            item {
+                LocalRuntimeProviderSettingsCard(
+                    state = localRuntimeProvider,
+                    actions = settings.localRuntimeProvider,
                 )
             }
             item {

@@ -35,6 +35,7 @@ import com.letta.mobile.data.desktopshell.ShellLayoutEvent
 import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
@@ -156,6 +157,16 @@ internal fun LettaDesktopApp(
             irohAgentDirectory = irohAgentDirectory,
             secureSettingsStore = secureSettingsStore,
         ),
+    )
+    val (localRuntimeProviderState, localRuntimeProviderActions) = rememberDesktopLocalRuntimeProviderState(
+        scope = chatScope,
+        onSaved = {
+            // The saved config only affects the BUNDLED local runtime — a
+            // remote/self-hosted backend has nothing to restart.
+            if (activeConfig.mode == LettaConfig.Mode.LOCAL) {
+                chatController.retryConnection()
+            }
+        },
     )
     val chatState by chatController.state.collectAsState()
     var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
@@ -850,6 +861,7 @@ internal fun LettaDesktopApp(
                                     focusedAgentName = selectedAgentName,
                                 ),
                                 nucleus = nucleusState,
+                                localRuntimeProvider = localRuntimeProviderState,
                             ),
                             actions = DestinationContentActions(
                                 onRetryConnection = chatController::retryConnection,
@@ -899,6 +911,7 @@ internal fun LettaDesktopApp(
                                 // through the confirmation dialog first.
                                 onIrohIdentityReset = { overlays.irohResetConfirm = true },
                                 nucleus = destinationNucleusActions(nucleusController, window),
+                                localRuntimeProvider = localRuntimeProviderActions,
                             ),
                             modifier = Modifier.fillMaxSize(),
                         )
