@@ -344,13 +344,13 @@ class DesktopChatControllerTest {
     }
 
     @Test
-    fun blankServerUrlShowsConfigNeededWithoutConstructingGateway() = runTest {
+    fun blankServerUrlShowsConfigNeededWithoutConstructingGatewayForRemoteModes() = runTest {
         var gatewayConstructed = false
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(
                 config = LettaConfig(
                     id = "blank",
-                    mode = LettaConfig.Mode.LOCAL,
+                    mode = LettaConfig.Mode.SELF_HOSTED,
                     serverUrl = "",
                 ),
             ),
@@ -369,6 +369,45 @@ class DesktopChatControllerTest {
         assertFalse(state.isRemoteBacked)
         assertFalse(gatewayConstructed)
         assertTrue(state.conversations.isEmpty())
+
+        controller.close()
+    }
+
+    /**
+     * letta-mobile-9v9nu regression: `Mode.LOCAL` is self-contained — it
+     * spawns the bundled runtime itself and, per BackendConfigPolicy's
+     * stale-URL migration, deliberately has a blank `serverUrl`. Before this
+     * fix `connectAndLoad` bailed out to `ConfigNeeded` for ANY blank
+     * `serverUrl`, so `gatewayFactory()` — and therefore
+     * `DesktopLocalRuntimeHost.acquire()` — was never invoked, and the app
+     * came up permanently empty in Local mode with zero telemetry and no
+     * `local-runtime.log`, silently, with no visible error.
+     */
+    @Test
+    fun blankServerUrlInLocalModeStillConstructsGatewayAndConnects() = runTest {
+        var gatewayConstructed = false
+        val controller = DesktopChatController(
+            bootstrapState = defaultDesktopBootstrapState(
+                config = LettaConfig(
+                    id = "local-blank",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "",
+                ),
+            ),
+            scope = this,
+            gatewayFactory = {
+                gatewayConstructed = true
+                FakeDesktopChatGateway()
+            },
+        )
+
+        controller.start()
+        runCurrent()
+
+        val state = controller.state.value
+        assertTrue(gatewayConstructed)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+        assertTrue(state.isRemoteBacked)
 
         controller.close()
     }

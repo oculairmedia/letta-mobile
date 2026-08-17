@@ -19,6 +19,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
@@ -1154,7 +1155,14 @@ class DesktopChatController(
 
     private suspend fun connectAndLoad() {
         if (closed) return
-        if (bootstrapState.config.serverUrl.isBlank()) {
+        // letta-mobile-9v9nu: a blank serverUrl is only "not configured" for
+        // remote modes. Mode.LOCAL is self-contained — it spawns the bundled
+        // runtime itself and never needs a serverUrl (the stale-URL migration
+        // in BackendConfigPolicy deliberately blanks it out for LOCAL
+        // configs). Bailing out here for LOCAL too meant gatewayFactory() —
+        // and therefore DesktopLocalRuntimeHost.acquire() — was never even
+        // called, so the local runtime silently never started.
+        if (bootstrapState.config.mode != LettaConfig.Mode.LOCAL && bootstrapState.config.serverUrl.isBlank()) {
             _state.value = initialState.withRuntimeState(
                 ChatSessionReducer.configNeeded(initialState.runtimeState),
             )
