@@ -303,7 +303,7 @@ private class TestAppServerController(
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime {
-        startRuntimeCalls += StartRuntimeCall(agentId, conversationId, cwd, mode, recoverApprovals, forceDeviceStatus)
+        startRuntimeCalls += StartRuntimeCall(agentId, conversationId)
         return CanonicalRuntime(
             scope = AppServerRuntimeScope(
                 agentId = agentId.value,
@@ -351,9 +351,5 @@ private class TestAppServerController(
     data class StartRuntimeCall(
         val agentId: AgentId,
         val conversationId: ConversationId,
-        val cwd: String?,
-        val mode: AppServerPermissionMode?,
-        val recoverApprovals: Boolean,
-        val forceDeviceStatus: Boolean,
     )
 }
