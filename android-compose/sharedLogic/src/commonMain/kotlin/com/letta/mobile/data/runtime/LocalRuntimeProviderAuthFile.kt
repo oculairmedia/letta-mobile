@@ -91,11 +91,38 @@ object LocalRuntimeProviderAuth {
         val providers = (root["providers"] as? JsonObject) ?: JsonObject(emptyMap())
         val existingProvider = providers[providerName] as? JsonObject
 
+        val newProvider = buildProviderObject(
+            existingProvider = existingProvider,
+            config = config,
+            nowIso = nowIso,
+            providerName = providerName,
+        )
+
+        val newProviders = buildJsonObject {
+            providers.entries.forEach { (key, value) -> if (key != providerName) put(key, value) }
+            put(providerName, newProvider)
+        }
+
+        val newRoot = buildJsonObject {
+            put("version", root["version"] ?: JsonPrimitive(1))
+            root.entries.forEach { (key, value) -> if (key != "providers" && key != "version") put(key, value) }
+            put("providers", newProviders)
+        }
+
+        return json.encodeToString(JsonObject.serializer(), newRoot)
+    }
+
+    private fun buildProviderObject(
+        existingProvider: JsonObject?,
+        config: LocalRuntimeProviderConfig,
+        nowIso: String,
+        providerName: String,
+    ): JsonObject {
         val createdAt = (existingProvider?.get("created_at") as? JsonPrimitive)?.contentOrNull ?: nowIso
         val id = (existingProvider?.get("id") as? JsonPrimitive)?.contentOrNull ?: "local-provider-$providerName"
         val apiKey = config.apiKey?.trim()?.takeIf { it.isNotBlank() } ?: LOCAL_RUNTIME_NO_API_KEY_SENTINEL
 
-        val newProvider = buildJsonObject {
+        return buildJsonObject {
             existingProvider?.entries?.forEach { (key, value) ->
                 if (key !in managedProviderKeys) put(key, value)
             }
@@ -114,19 +141,6 @@ object LocalRuntimeProviderAuth {
             put("created_at", JsonPrimitive(createdAt))
             put("updated_at", JsonPrimitive(nowIso))
         }
-
-        val newProviders = buildJsonObject {
-            providers.entries.forEach { (key, value) -> if (key != providerName) put(key, value) }
-            put(providerName, newProvider)
-        }
-
-        val newRoot = buildJsonObject {
-            put("version", root["version"] ?: JsonPrimitive(1))
-            root.entries.forEach { (key, value) -> if (key != "providers" && key != "version") put(key, value) }
-            put("providers", newProviders)
-        }
-
-        return json.encodeToString(JsonObject.serializer(), newRoot)
     }
 
     fun readStatus(
