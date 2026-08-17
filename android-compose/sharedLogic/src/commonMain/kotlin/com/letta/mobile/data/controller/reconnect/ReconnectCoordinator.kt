@@ -4,10 +4,18 @@ import com.letta.mobile.data.controller.AppServerController
 import com.letta.mobile.data.controller.AppServerControllerState
 import com.letta.mobile.data.controller.registry.RuntimeRegistry
 import com.letta.mobile.data.controller.registry.RuntimeRecord
+import com.letta.mobile.util.Telemetry
 import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Instant
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Coordinator for App Server reconnect/replay aligned to sync.
@@ -52,8 +60,10 @@ class ReconnectCoordinator(
                     "${controller::class.simpleName}.state is not a StateFlow. " +
                     "Pass connectionState explicitly.",
             ),
+    private val clock: Clock = Clock.System,
 ) {
     private val reconnectMutex = Mutex()
+    private var lastResumeSyncAt: Instant? = null
 
     /**
      * Executes the reconnect/replay flow.
@@ -115,6 +125,168 @@ class ReconnectCoordinator(
     }
 
     /**
+     * Light-weight status refresh triggered on app resume when connection is alive.
+     *
+     * Invariants:
+     * 1. Single-flight: skips if reconnect is in-flight or reconnect is needed.
+     * 2. Debounced: skips if within [cooldown] of the last resume sync.
+     * 3. Bounded & concurrent: syncs each active runtime concurrently under [timeoutPerRuntime].
+     * 4. Loud outcomes: records telemetry on success, warning on partial/total failure.
+     */
+    suspend fun onAppResumed(
+        timeoutPerRuntime: Duration = 5.seconds,
+        cooldown: Duration = 5.seconds,
+    ): ResumeSyncResult {
+        if (isReconnectNeeded()) {
+            Telemetry.event(
+                "AppServer", "resume.sync.skipped",
+                "reason" to "reconnect_needed",
+            )
+            return ResumeSyncResult.Skipped(reason = "reconnect_needed")
+        }
+
+        if (!reconnectMutex.tryLock()) {
+            Telemetry.event(
+                "AppServer", "resume.sync.skipped",
+                "reason" to "reconnect_in_flight",
+            )
+            return ResumeSyncResult.Skipped(reason = "reconnect_in_flight")
+        }
+
+        try {
+            val now = clock.now()
+            val last = lastResumeSyncAt
+            if (last != null && (now - last) < cooldown) {
+                Telemetry.event(
+                    "AppServer", "resume.sync.skipped",
+                    "reason" to "cooldown_active",
+                    "elapsedMs" to (now - last).inWholeMilliseconds,
+                )
+                return ResumeSyncResult.Skipped(reason = "cooldown_active")
+            }
+            lastResumeSyncAt = now
+
+            val records = try {
+                registry.list()
+            } catch (e: Exception) {
+                Telemetry.event(
+                    "AppServer", "resume.sync.failed",
+                    "reason" to "load_records_failed",
+                    "error" to (e.message ?: "unknown"),
+                    level = Telemetry.Level.WARN,
+                )
+                return ResumeSyncResult.Failed(
+                    errors = listOf(
+                        ReconnectError(
+                            runtimeRecordId = null,
+                            phase = ReconnectPhase.LOAD_RECORDS,
+                            message = "Failed to load runtime records from registry on resume",
+                            cause = e,
+                        ),
+                    ),
+                )
+            }
+
+            if (records.isEmpty()) {
+                Telemetry.event(
+                    "AppServer", "resume.sync.success",
+                    "syncedCount" to 0,
+                )
+                return ResumeSyncResult.Success(syncedCount = 0)
+            }
+
+            val results: List<Result<String>> = coroutineScope {
+                records.map { record ->
+                    async {
+                        val recordId = record.id
+                        try {
+                            val timedOut = withTimeoutOrNull(timeoutPerRuntime) {
+                                val canonicalScope = record.canonicalRuntime?.scope
+                                    ?: controller.startRuntime(
+                                        agentId = record.agentId,
+                                        conversationId = record.conversationId,
+                                        cwd = record.cwd,
+                                        recoverApprovals = false,
+                                        forceDeviceStatus = false,
+                                    ).scope
+
+                                controller.sync(
+                                    runtime = canonicalScope,
+                                    recoverApprovals = false,
+                                    forceDeviceStatus = true,
+                                )
+                            }
+                            if (timedOut == null) {
+                                Result.failure(
+                                    ResumeSyncException(
+                                        ReconnectError(
+                                            runtimeRecordId = recordId,
+                                            phase = ReconnectPhase.RECONNECT_RUNTIME,
+                                            message = "Sync timed out after ${timeoutPerRuntime.inWholeMilliseconds}ms for runtime $recordId",
+                                            cause = null,
+                                        ),
+                                    ),
+                                )
+                            } else {
+                                Result.success(recordId)
+                            }
+                        } catch (t: Throwable) {
+                            Result.failure(
+                                ResumeSyncException(
+                                    ReconnectError(
+                                        runtimeRecordId = recordId,
+                                        phase = ReconnectPhase.RECONNECT_RUNTIME,
+                                        message = "Failed to sync runtime $recordId on resume: ${t.message}",
+                                        cause = t,
+                                    ),
+                                ),
+                            )
+                        }
+                    }
+                }.awaitAll()
+            }
+
+            var successCount = 0
+            val errors = mutableListOf<ReconnectError>()
+            for (res in results) {
+                res.fold(
+                    onSuccess = { successCount++ },
+                    onFailure = { err ->
+                        if (err is ResumeSyncException) {
+                            errors += err.error
+                        } else {
+                            errors += ReconnectError(
+                                runtimeRecordId = null,
+                                phase = ReconnectPhase.RECONNECT_RUNTIME,
+                                message = err.message ?: "Unknown error",
+                                cause = err,
+                            )
+                        }
+                    },
+                )
+            }
+
+            val result = when {
+                errors.isEmpty() -> ResumeSyncResult.Success(syncedCount = successCount)
+                successCount > 0 -> ResumeSyncResult.Partial(syncedCount = successCount, errors = errors)
+                else -> ResumeSyncResult.Failed(errors = errors)
+            }
+
+            Telemetry.event(
+                "AppServer", "resume.sync",
+                "successCount" to successCount,
+                "errorCount" to errors.size,
+                "status" to result::class.simpleName,
+                level = if (errors.isNotEmpty()) Telemetry.Level.WARN else Telemetry.Level.INFO,
+            )
+
+            return result
+        } finally {
+            reconnectMutex.unlock()
+        }
+    }
+
+    /**
      * Reconnects a single runtime.
      *
      * This method:
@@ -171,6 +343,33 @@ class ReconnectCoordinator(
 }
 
 /**
+ * Result of an app resume sync operation.
+ */
+sealed interface ResumeSyncResult {
+    /**
+     * Successfully synced all active runtimes.
+     */
+    data class Success(val syncedCount: Int) : ResumeSyncResult
+
+    /**
+     * Resume sync was skipped due to cooldown or an active/needed reconnect.
+     */
+    data class Skipped(val reason: String) : ResumeSyncResult
+
+    /**
+     * Some runtimes succeeded and some failed or timed out.
+     */
+    data class Partial(val syncedCount: Int, val errors: List<ReconnectError>) : ResumeSyncResult
+
+    /**
+     * All runtime syncs failed or loading records failed.
+     */
+    data class Failed(val errors: List<ReconnectError>) : ResumeSyncResult
+}
+
+private class ResumeSyncException(val error: ReconnectError) : Exception(error.message, error.cause)
+
+/**
  * Result of a reconnect operation.
  *
  * @property reconnectedCount Number of runtimes successfully reconnected
@@ -225,3 +424,4 @@ enum class ReconnectPhase {
      */
     RECONNECT_RUNTIME,
 }
+

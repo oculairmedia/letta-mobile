@@ -18,6 +18,7 @@ class AdminChatScreenLifecycleCoordinatorTest {
     ) {
         val sessionState = MutableStateFlow(initialState)
         var resolveCalls = 0
+        var resumeSyncCalls = 0
 
         val coordinator = AdminChatScreenLifecycleCoordinator(
             currentConversationTracker = CurrentConversationTracker(),
@@ -26,6 +27,7 @@ class AdminChatScreenLifecycleCoordinatorTest {
             resolveConversationAndLoad = { resolveCalls++ },
             updateSessionState = { reducer -> sessionState.value = reducer(sessionState.value) },
             isAlreadyHydrated = isAlreadyHydrated,
+            triggerResumeSync = { resumeSyncCalls++ },
         )
     }
 
@@ -79,5 +81,31 @@ class AdminChatScreenLifecycleCoordinatorTest {
         harness.coordinator.onScreenResumed()
 
         assertEquals(0, harness.sessionState.value.selectionGeneration)
+    }
+
+    @Test
+    fun `resume triggers resume sync when connection is live`() = runTest {
+        val harness = Harness(
+            isAlreadyHydrated = { false },
+            initialState = ChatSessionState(connectionState = ChatConnectionState.Live),
+        )
+
+        harness.coordinator.onScreenResumed()
+
+        assertEquals(1, harness.resumeSyncCalls)
+        assertEquals(0, harness.resolveCalls)
+    }
+
+    @Test
+    fun `resume does not trigger resume sync when connection is offline`() = runTest {
+        val harness = Harness(
+            isAlreadyHydrated = { false },
+            initialState = ChatSessionState(connectionState = ChatConnectionState.Offline),
+        )
+
+        harness.coordinator.onScreenResumed()
+
+        assertEquals(0, harness.resumeSyncCalls)
+        assertEquals(1, harness.resolveCalls)
     }
 }

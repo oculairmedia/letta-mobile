@@ -7,6 +7,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -229,6 +230,8 @@ class AppServerProtocolTest {
         assertEquals("sync", sync["type"]?.jsonPrimitive?.content)
         assertEquals("agent-1", sync["runtime"]?.jsonObject?.get("agent_id")?.jsonPrimitive?.content)
         assertEquals("sync-1", sync["request_id"]?.jsonPrimitive?.content)
+        assertEquals(false, sync["recover_approvals"]?.jsonPrimitive?.booleanOrNull)
+        assertEquals(true, sync["force_device_status"]?.jsonPrimitive?.booleanOrNull)
 
         val abort = AppServerProtocol.json.parseToJsonElement(
             AppServerProtocol.encodeCommand(
