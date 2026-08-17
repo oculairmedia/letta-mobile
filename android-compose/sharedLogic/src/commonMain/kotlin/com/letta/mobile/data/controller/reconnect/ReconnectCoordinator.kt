@@ -62,7 +62,13 @@ class ReconnectCoordinator(
             ),
     private val clock: Clock = Clock.System,
 ) {
+    companion object {
+        val DEFAULT_RESUME_SYNC_TIMEOUT: Duration = 5.seconds
+        val DEFAULT_RESUME_COOLDOWN: Duration = 5.seconds
+    }
+
     private val reconnectMutex = Mutex()
+    private val resumeSyncMutex = Mutex()
     private var lastResumeSyncAt: Instant? = null
 
     /**
@@ -83,6 +89,7 @@ class ReconnectCoordinator(
      * @return ReconnectResult with the number of runtimes reconnected and any errors
      */
     suspend fun reconnect(): ReconnectResult = reconnectMutex.withLock {
+        lastResumeSyncAt = clock.now()
         val errors = mutableListOf<ReconnectError>()
         var successCount = 0
 
@@ -125,17 +132,17 @@ class ReconnectCoordinator(
     }
 
     /**
-     * Light-weight status refresh triggered on app resume when connection is alive.
+     * Executes a lightweight resume sync across all active runtimes when the app returns
+     * to the foreground.
      *
-     * Invariants:
-     * 1. Single-flight: skips if reconnect is in-flight or reconnect is needed.
-     * 2. Debounced: skips if within [cooldown] of the last resume sync.
-     * 3. Bounded & concurrent: syncs each active runtime concurrently under [timeoutPerRuntime].
-     * 4. Loud outcomes: records telemetry on success, warning on partial/total failure.
+     * - Debounced by [cooldown] (default 5s) against rapid app-switching.
+     * - Skips if [isReconnectNeeded] is true or if a full reconnect is currently in flight.
+     * - Bounded by [timeoutPerRuntime] per active runtime concurrently without holding [reconnectMutex].
+     * - Emits outcome telemetry.
      */
     suspend fun onAppResumed(
-        timeoutPerRuntime: Duration = 5.seconds,
-        cooldown: Duration = 5.seconds,
+        timeoutPerRuntime: Duration = DEFAULT_RESUME_SYNC_TIMEOUT,
+        cooldown: Duration = DEFAULT_RESUME_COOLDOWN,
     ): ResumeSyncResult {
         if (isReconnectNeeded()) {
             Telemetry.event(
@@ -145,7 +152,7 @@ class ReconnectCoordinator(
             return ResumeSyncResult.Skipped(reason = "reconnect_needed")
         }
 
-        if (!reconnectMutex.tryLock()) {
+        if (reconnectMutex.isLocked) {
             Telemetry.event(
                 "AppServer", "resume.sync.skipped",
                 "reason" to "reconnect_in_flight",
@@ -153,7 +160,23 @@ class ReconnectCoordinator(
             return ResumeSyncResult.Skipped(reason = "reconnect_in_flight")
         }
 
+        if (!resumeSyncMutex.tryLock()) {
+            Telemetry.event(
+                "AppServer", "resume.sync.skipped",
+                "reason" to "resume_sync_in_flight",
+            )
+            return ResumeSyncResult.Skipped(reason = "resume_sync_in_flight")
+        }
+
         try {
+            if (reconnectMutex.isLocked || isReconnectNeeded()) {
+                Telemetry.event(
+                    "AppServer", "resume.sync.skipped",
+                    "reason" to "reconnect_in_flight",
+                )
+                return ResumeSyncResult.Skipped(reason = "reconnect_in_flight")
+            }
+
             val now = clock.now()
             val last = lastResumeSyncAt
             if (last != null && (now - last) < cooldown) {
@@ -187,7 +210,8 @@ class ReconnectCoordinator(
                 )
             }
 
-            if (records.isEmpty()) {
+            val eligibleRecords = records.filter { it.canonicalRuntime?.scope != null }
+            if (eligibleRecords.isEmpty()) {
                 Telemetry.event(
                     "AppServer", "resume.sync.success",
                     "syncedCount" to 0,
@@ -196,20 +220,14 @@ class ReconnectCoordinator(
             }
 
             val results: List<Result<String>> = coroutineScope {
-                records.map { record ->
+                eligibleRecords.map { record ->
                     async {
                         val recordId = record.id
+                        val canonicalScope = record.canonicalRuntime?.scope
+                            ?: return@async Result.success(recordId)
+
                         try {
                             val timedOut = withTimeoutOrNull(timeoutPerRuntime) {
-                                val canonicalScope = record.canonicalRuntime?.scope
-                                    ?: controller.startRuntime(
-                                        agentId = record.agentId,
-                                        conversationId = record.conversationId,
-                                        cwd = record.cwd,
-                                        recoverApprovals = false,
-                                        forceDeviceStatus = false,
-                                    ).scope
-
                                 controller.sync(
                                     runtime = canonicalScope,
                                     recoverApprovals = false,
@@ -282,7 +300,7 @@ class ReconnectCoordinator(
 
             return result
         } finally {
-            reconnectMutex.unlock()
+            resumeSyncMutex.unlock()
         }
     }
 

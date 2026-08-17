@@ -45,6 +45,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-1",
                 agentId = AgentId("agent-1"),
                 conversationId = ConversationId("conv-1"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
             ),
         )
         registry.save(
@@ -52,6 +53,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-2",
                 agentId = AgentId("agent-2"),
                 conversationId = ConversationId("conv-2"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-2", "conv-2")),
             ),
         )
 
@@ -72,6 +74,41 @@ class ReconnectCoordinatorResumeTest {
     }
 
     @Test
+    fun onAppResumedSkipsRecordsWithoutCanonicalRuntimeWithoutCallingStartRuntime() = runTest {
+        val registry = InMemoryRuntimeRegistry()
+        val controller = TestAppServerController()
+
+        // Record 1 has canonicalRuntime; Record 2 has none
+        registry.save(
+            RuntimeRecord(
+                id = "record-1",
+                agentId = AgentId("agent-1"),
+                conversationId = ConversationId("conv-1"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
+            ),
+        )
+        registry.save(
+            RuntimeRecord(
+                id = "record-2",
+                agentId = AgentId("agent-2"),
+                conversationId = ConversationId("conv-2"),
+                canonicalRuntime = null,
+            ),
+        )
+
+        val coordinator = ReconnectCoordinator(
+            controller = controller,
+            registry = registry,
+        )
+
+        val result = coordinator.onAppResumed()
+        assertIs<ResumeSyncResult.Success>(result)
+        assertEquals(1, result.syncedCount)
+        assertEquals(1, controller.syncCalls.size)
+        assertEquals(0, controller.startRuntimeCalls.size, "Resume sync must NEVER call startRuntime")
+    }
+
+    @Test
     fun onAppResumedIsDebouncedWithinCooldownWindow() = runTest {
         val registry = InMemoryRuntimeRegistry()
         val controller = TestAppServerController()
@@ -82,6 +119,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-1",
                 agentId = AgentId("agent-1"),
                 conversationId = ConversationId("conv-1"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
             ),
         )
 
@@ -120,6 +158,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-1",
                 agentId = AgentId("agent-1"),
                 conversationId = ConversationId("conv-1"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
             ),
         )
 
@@ -149,6 +188,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-1",
                 agentId = AgentId("agent-1"),
                 conversationId = ConversationId("conv-1"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-1", "conv-1")),
             ),
         )
 
@@ -190,6 +230,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-fast",
                 agentId = AgentId("agent-fast"),
                 conversationId = ConversationId("conv-fast"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-fast", "conv-fast")),
             ),
         )
         registry.save(
@@ -197,6 +238,7 @@ class ReconnectCoordinatorResumeTest {
                 id = "record-slow",
                 agentId = AgentId("agent-slow"),
                 conversationId = ConversationId("conv-slow"),
+                canonicalRuntime = CanonicalRuntime(scope = AppServerRuntimeScope("agent-slow", "conv-slow")),
             ),
         )
 
@@ -247,6 +289,7 @@ private class TestAppServerController(
     override val state: StateFlow<AppServerControllerState> = _state
 
     val syncCalls = mutableListOf<SyncCall>()
+    val startRuntimeCalls = mutableListOf<StartRuntimeCall>()
 
     fun setState(newState: AppServerControllerState) {
         _state.value = newState
@@ -260,6 +303,7 @@ private class TestAppServerController(
         recoverApprovals: Boolean,
         forceDeviceStatus: Boolean,
     ): CanonicalRuntime {
+        startRuntimeCalls += StartRuntimeCall(agentId, conversationId, cwd, mode, recoverApprovals, forceDeviceStatus)
         return CanonicalRuntime(
             scope = AppServerRuntimeScope(
                 agentId = agentId.value,
@@ -300,6 +344,15 @@ private class TestAppServerController(
 
     data class SyncCall(
         val runtime: AppServerRuntimeScope,
+        val recoverApprovals: Boolean,
+        val forceDeviceStatus: Boolean,
+    )
+
+    data class StartRuntimeCall(
+        val agentId: AgentId,
+        val conversationId: ConversationId,
+        val cwd: String?,
+        val mode: AppServerPermissionMode?,
         val recoverApprovals: Boolean,
         val forceDeviceStatus: Boolean,
     )

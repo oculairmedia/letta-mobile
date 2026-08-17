@@ -38,6 +38,7 @@ import com.letta.mobile.feature.chat.subagent.ActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.WsActiveSubagentSource
 import com.letta.mobile.feature.chat.subagent.LocalAwareActiveSubagentSource
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.util.Telemetry
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.persistentListOf
@@ -370,7 +371,28 @@ internal class AdminChatViewModel @Inject constructor(
             updateSessionState = ::updateSessionState,
             probeConnection = wsChatBridge::probeNow,
             isAlreadyHydrated = { _uiState.value.messages.isNotEmpty() },
+            triggerResumeSync = ::triggerResumeSync,
         )
+    }
+
+    private fun triggerResumeSync() {
+        val convId = conversationId?.value ?: chatConversationCoordinator.activeConversationId ?: return
+        viewModelScope.launch {
+            try {
+                timelineRepository.reconcileRecentMessages(
+                    agentId = agentId.value,
+                    conversationId = convId,
+                    reason = "screen_resumed",
+                    forceRefresh = false,
+                )
+            } catch (t: Throwable) {
+                Telemetry.event(
+                    "AdminChatVM", "resume.sync.error",
+                    "error" to (t.message ?: "unknown"),
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        }
     }
 
     private val chatApprovalController: ChatApprovalController = ChatApprovalController(
