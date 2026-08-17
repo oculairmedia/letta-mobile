@@ -180,26 +180,13 @@ internal fun DestinationContent(
     when (destination) {
         // The fleet dashboard. Rendered natively today; see DesktopHomeSurface's
         // KDoc for the Letta Code mod / A2UI document seam.
-        DesktopDestination.Home -> {
-            if (inputs.chat.connectionState in setOf(
-                    ChatConnectionState.Loading,
-                    ChatConnectionState.ConfigNeeded,
-                    ChatConnectionState.Offline,
-                )
-            ) {
-                ChatStatePanel(
-                    state = inputs.chat,
-                    onRetryConnection = actions.onRetryConnection,
-                    modifier = modifier,
-                )
-            } else {
-                DesktopHomeSurface(
-                    state = inputs.home,
-                    actions = actions.home,
-                    modifier = modifier,
-                )
-            }
-        }
+        DesktopDestination.Home -> HomeDestinationContent(
+            chat = inputs.chat,
+            home = inputs.home,
+            onRetryConnection = actions.onRetryConnection,
+            homeActions = actions.home,
+            modifier = modifier,
+        )
         DesktopDestination.Memory -> MemoryDestinationContent(
             memoryState = inputs.memoryState,
             blockApi = inputs.blockApi,
@@ -241,6 +228,34 @@ internal fun DestinationContent(
                 nucleus = actions.nucleus,
                 localRuntimeProvider = actions.localRuntimeProvider,
             ),
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun HomeDestinationContent(
+    chat: DesktopChatSurfaceState,
+    home: DesktopHomeState,
+    onRetryConnection: () -> Unit,
+    homeActions: DesktopHomeActions,
+    modifier: Modifier = Modifier,
+) {
+    if (chat.connectionState in setOf(
+            ChatConnectionState.Loading,
+            ChatConnectionState.ConfigNeeded,
+            ChatConnectionState.Offline,
+        )
+    ) {
+        ChatStatePanel(
+            state = chat,
+            onRetryConnection = onRetryConnection,
+            modifier = modifier,
+        )
+    } else {
+        DesktopHomeSurface(
+            state = home,
+            actions = homeActions,
             modifier = modifier,
         )
     }
@@ -341,10 +356,7 @@ private fun ScrollableDestinationContent(
     ) {
         item { DestinationHeader(inputs.destination) }
         scrollableDestinationItems(
-            destination = inputs.destination,
-            state = inputs.state,
-            nucleus = inputs.nucleus,
-            localRuntimeProvider = inputs.localRuntimeProvider,
+            inputs = inputs,
             settings = settings,
         )
     }
@@ -367,21 +379,18 @@ private fun DestinationHeader(destination: DesktopDestination) {
 }
 
 private fun LazyListScope.scrollableDestinationItems(
-    destination: DesktopDestination,
-    state: DesktopBootstrapState,
-    nucleus: DesktopNucleusState,
-    localRuntimeProvider: DesktopLocalRuntimeProviderState,
+    inputs: ScrollableDestinationInputs,
     settings: DestinationSettingsActions,
 ) {
-    when (destination) {
+    when (inputs.destination) {
         DesktopDestination.Overview -> {
-            item { BackendCard(state.config) }
-            item { StartupReadinessCard(state.featureReadiness) }
+            item { BackendCard(inputs.state.config) }
+            item { StartupReadinessCard(inputs.state.featureReadiness) }
         }
         DesktopDestination.Settings -> {
             item {
                 BackendSettingsCard(
-                    config = state.config,
+                    config = inputs.state.config,
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
                     onIrohIdentityReset = settings.onIrohIdentityReset,
@@ -389,13 +398,13 @@ private fun LazyListScope.scrollableDestinationItems(
             }
             item {
                 LocalRuntimeProviderSettingsCard(
-                    state = localRuntimeProvider,
+                    state = inputs.localRuntimeProvider,
                     actions = settings.localRuntimeProvider,
                 )
             }
             item {
                 DesktopNucleusSettingsCard(
-                    state = nucleus,
+                    state = inputs.nucleus,
                     actions = settings.nucleus,
                 )
             }
