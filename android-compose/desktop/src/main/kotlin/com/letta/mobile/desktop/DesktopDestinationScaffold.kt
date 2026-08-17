@@ -181,10 +181,8 @@ internal fun DestinationContent(
         // The fleet dashboard. Rendered natively today; see DesktopHomeSurface's
         // KDoc for the Letta Code mod / A2UI document seam.
         DesktopDestination.Home -> HomeDestinationContent(
-            chat = inputs.chat,
-            home = inputs.home,
-            onRetryConnection = actions.onRetryConnection,
-            homeActions = actions.home,
+            inputs = inputs,
+            actions = actions,
             modifier = modifier,
         )
         DesktopDestination.Memory -> MemoryDestinationContent(
@@ -235,27 +233,25 @@ internal fun DestinationContent(
 
 @Composable
 private fun HomeDestinationContent(
-    chat: DesktopChatSurfaceState,
-    home: DesktopHomeState,
-    onRetryConnection: () -> Unit,
-    homeActions: DesktopHomeActions,
+    inputs: DestinationContentInputs,
+    actions: DestinationContentActions,
     modifier: Modifier = Modifier,
 ) {
-    if (chat.connectionState in setOf(
+    if (inputs.chat.connectionState in setOf(
             ChatConnectionState.Loading,
             ChatConnectionState.ConfigNeeded,
             ChatConnectionState.Offline,
         )
     ) {
         ChatStatePanel(
-            state = chat,
-            onRetryConnection = onRetryConnection,
+            state = inputs.chat,
+            onRetryConnection = actions.onRetryConnection,
             modifier = modifier,
         )
     } else {
         DesktopHomeSurface(
-            state = home,
-            actions = homeActions,
+            state = inputs.home,
+            actions = actions.home,
             modifier = modifier,
         )
     }
