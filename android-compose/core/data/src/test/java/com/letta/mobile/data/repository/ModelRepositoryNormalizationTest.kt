@@ -32,12 +32,8 @@ class ModelRepositoryNormalizationTest {
 
     @Test
     fun httpCatalogKeepsOnlyCredentialedProvidersWhenLoaderPresent() = runTest {
-        val api = FakeModelApi().apply {
-            llmModels += model("openai/gpt-4o")
-            llmModels += model("anthropic/claude-sonnet")
-        }
         val repository = ModelRepository(
-            modelApi = api,
+            modelApi = defaultCatalogApi(),
             credentialedProviderTypes = { setOf("openai") },
         )
 
@@ -68,71 +64,63 @@ class ModelRepositoryNormalizationTest {
 
     @Test
     fun emptyCredentialedSetLeavesCatalogUnchanged() = runTest {
-        val api = FakeModelApi().apply {
-            llmModels += model("openai/gpt-4o")
-            llmModels += model("anthropic/claude-sonnet")
-        }
         val repository = ModelRepository(
-            modelApi = api,
+            modelApi = defaultCatalogApi(),
             credentialedProviderTypes = { emptySet() },
         )
 
         repository.refreshLlmModels()
 
         assertEquals(
-            setOf("openai/gpt-4o", "anthropic/claude-sonnet"),
+            defaultExpectedHandles,
             repository.llmModels.value.map { it.handle }.toSet(),
         )
     }
 
     @Test
     fun absentLoaderLeavesCatalogUnchanged() = runTest {
-        val api = FakeModelApi().apply {
-            llmModels += model("openai/gpt-4o")
-            llmModels += model("anthropic/claude-sonnet")
-        }
-        val repository = ModelRepository(modelApi = api)
+        val repository = ModelRepository(modelApi = defaultCatalogApi())
 
         repository.refreshLlmModels()
 
         assertEquals(
-            setOf("openai/gpt-4o", "anthropic/claude-sonnet"),
+            defaultExpectedHandles,
             repository.llmModels.value.map { it.handle }.toSet(),
         )
     }
 
     @Test
     fun throwingCredentialLoaderKeepsCatalogUnchanged() = runTest {
-        val api = FakeModelApi().apply {
-            llmModels += model("openai/gpt-4o")
-            llmModels += model("anthropic/claude-sonnet")
-        }
         val repository = ModelRepository(
-            modelApi = api,
+            modelApi = defaultCatalogApi(),
             credentialedProviderTypes = { throw IllegalStateException("provider lookup unavailable") },
         )
 
         repository.refreshLlmModels()
 
         assertEquals(
-            setOf("openai/gpt-4o", "anthropic/claude-sonnet"),
+            defaultExpectedHandles,
             repository.llmModels.value.map { it.handle }.toSet(),
         )
     }
 
     @Test
     fun credentialLoaderCancellationPropagates() {
-        val api = FakeModelApi().apply {
-            llmModels += model("openai/gpt-4o")
-        }
         val repository = ModelRepository(
-            modelApi = api,
+            modelApi = defaultCatalogApi(),
             credentialedProviderTypes = { throw CancellationException("provider lookup cancelled") },
         )
 
         assertThrows(CancellationException::class.java) {
             runBlocking { repository.refreshLlmModels() }
         }
+    }
+
+    private val defaultExpectedHandles = setOf("openai/gpt-4o", "anthropic/claude-sonnet")
+
+    private fun defaultCatalogApi(): FakeModelApi = FakeModelApi().apply {
+        llmModels += model("openai/gpt-4o")
+        llmModels += model("anthropic/claude-sonnet")
     }
 
     private fun model(handle: String): LlmModel {

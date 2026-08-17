@@ -258,33 +258,7 @@ open class LettaHttpChatGateway(
      */
     private suspend fun fetchCredentialedProviderTypes(): Set<String> {
         return try {
-            val credentialedTypes = mutableSetOf<String>()
-            val seenIds = HashSet<String>()
-            var after: String? = null
-            var page = 0
-            while (page < PROVIDER_PAGE_MAX) {
-                page++
-                val response = httpClient.get("$baseUrl/v1/providers") {
-                    applyAuth()
-                    parameter("limit", PROVIDER_PAGE_SIZE)
-                    parameter("after", after)
-                }
-                response.requireSuccess()
-                val providers = response.body<List<Provider>>()
-                if (providers.isEmpty()) break
-                val fresh = providers.filter { provider ->
-                    provider.id?.value?.let { seenIds.add(it) } ?: true
-                }
-                if (fresh.isEmpty()) break
-                for (provider in fresh) {
-                    provider.providerType.trim().lowercase()
-                        .takeIf { it.isNotBlank() }
-                        ?.let { credentialedTypes += it }
-                }
-                if (providers.size < PROVIDER_PAGE_SIZE) break
-                after = providers.last().id?.value ?: break
-            }
-            credentialedTypes
+            collectCredentialedProviderTypes()
         } catch (cancelled: CancellationException) {
             // Never swallow a coroutine cancellation — the caller must observe
             // it so the refresh can abort instead of publishing a filtered view.
@@ -293,6 +267,40 @@ open class LettaHttpChatGateway(
             // Fail open: a provider-lookup failure must not empty the picker.
             emptySet()
         }
+    }
+
+    private suspend fun collectCredentialedProviderTypes(): Set<String> {
+        val credentialedTypes = mutableSetOf<String>()
+        val seenIds = HashSet<String>()
+        var after: String? = null
+        var page = 0
+        while (page < PROVIDER_PAGE_MAX) {
+            page++
+            val providers = fetchProvidersPage(after)
+            if (providers.isEmpty()) break
+            val fresh = providers.filter { provider ->
+                provider.id?.value?.let { seenIds.add(it) } ?: true
+            }
+            if (fresh.isEmpty()) break
+            for (provider in fresh) {
+                provider.providerType.trim().lowercase()
+                    .takeIf { it.isNotBlank() }
+                    ?.let { credentialedTypes += it }
+            }
+            if (providers.size < PROVIDER_PAGE_SIZE) break
+            after = providers.last().id?.value ?: break
+        }
+        return credentialedTypes
+    }
+
+    private suspend fun fetchProvidersPage(after: String?): List<Provider> {
+        val response = httpClient.get("$baseUrl/v1/providers") {
+            applyAuth()
+            parameter("limit", PROVIDER_PAGE_SIZE)
+            parameter("after", after)
+        }
+        response.requireSuccess()
+        return response.body<List<Provider>>()
     }
 
     private fun HttpRequestBuilder.applyAuth() {
