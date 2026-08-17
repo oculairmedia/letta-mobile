@@ -34,6 +34,11 @@ internal class AdminChatScreenLifecycleCoordinator(
      * connection without re-entering Loading, so there is no reload flash.
      */
     private val isAlreadyHydrated: () -> Boolean = { false },
+    /**
+     * letta-mobile-mav4d.1: trigger light-weight status refresh on resume when
+     * the connection survived backgrounding (asynchronous / non-blocking).
+     */
+    private val triggerResumeSync: () -> Unit = {},
 ) {
     private var lastScreenResumedAtMs = Long.MIN_VALUE / 2
 
@@ -62,6 +67,10 @@ internal class AdminChatScreenLifecycleCoordinator(
                     }
                 }
                 resolveConversationAndLoad()
+            } else {
+                // letta-mobile-mav4d.1: when returning from background and the connection
+                // survived, trigger a non-blocking resume sync with force_device_status: true.
+                triggerResumeSync()
             }
         }
     }
