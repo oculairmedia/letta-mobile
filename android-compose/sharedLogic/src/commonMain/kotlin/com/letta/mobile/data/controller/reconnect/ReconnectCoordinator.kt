@@ -135,6 +135,12 @@ class ReconnectCoordinator(
      * Executes a lightweight resume sync across all active runtimes when the app returns
      * to the foreground.
      *
+     * Planned for wiring with bead `letta-mobile-2u1s6.2` (the desktop local node /
+     * controller-owning host with an application lifecycle). Note: has no production
+     * caller on Android — the mobile client has no [AppServerController] and routes
+     * lifecycle resume through [TimelineRepository.reconcileRecentMessages].
+     *
+     * Invariants:
      * - Debounced by [cooldown] (default 5s) against rapid app-switching.
      * - Skips if [isReconnectNeeded] is true or if a full reconnect is currently in flight.
      * - Bounded by [timeoutPerRuntime] per active runtime concurrently without holding [reconnectMutex].
