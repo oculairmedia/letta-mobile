@@ -17,19 +17,13 @@ import kotlinx.coroutines.test.runTest
 class BackendConfigPolicyTest {
     @Test
     fun normalizeTrimsUrlTokenAndGeneratesStableId() {
-        val fallback = LettaConfig(
-            id = "fallback",
-            mode = LettaConfig.Mode.SELF_HOSTED,
-            serverUrl = "http://localhost:8283",
-        )
-
         val normalized = BackendConfigPolicy.normalize(
-            config = fallback.copy(
+            config = defaultFallback.copy(
                 id = " ",
                 serverUrl = " https://api.letta.com/ ",
                 accessToken = " token ",
             ),
-            fallback = fallback,
+            fallback = defaultFallback,
             generatedIdPrefix = "desktop",
         )
 
@@ -40,15 +34,9 @@ class BackendConfigPolicyTest {
 
     @Test
     fun normalizeUsesFallbackUrlAndDropsBlankToken() {
-        val fallback = LettaConfig(
-            id = "fallback",
-            mode = LettaConfig.Mode.SELF_HOSTED,
-            serverUrl = "http://localhost:8283",
-        )
-
         val normalized = BackendConfigPolicy.normalize(
-            config = fallback.copy(id = "", serverUrl = "", accessToken = " "),
-            fallback = fallback,
+            config = defaultFallback.copy(id = "", serverUrl = "", accessToken = " "),
+            fallback = defaultFallback,
             generatedIdPrefix = "desktop",
         )
 
@@ -59,19 +47,13 @@ class BackendConfigPolicyTest {
 
     @Test
     fun normalizeMigratesStaleIrohServerUrlOnLocalModeConfig() {
-        val fallback = LettaConfig(
-            id = "fallback",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = "",
-        )
-
         val normalized = BackendConfigPolicy.normalize(
             config = LettaConfig(
                 id = "desktop-361c792e",
                 mode = LettaConfig.Mode.LOCAL,
                 serverUrl = STALE_LOCAL_IROH_URL,
             ),
-            fallback = fallback,
+            fallback = localFallback,
             generatedIdPrefix = "desktop",
         )
 
@@ -174,5 +156,17 @@ class BackendConfigPolicyTest {
     private companion object {
         const val STALE_LOCAL_IROH_URL =
             "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501"
+
+        val defaultFallback = LettaConfig(
+            id = "fallback",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8283",
+        )
+
+        val localFallback = LettaConfig(
+            id = "fallback",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "",
+        )
     }
 }

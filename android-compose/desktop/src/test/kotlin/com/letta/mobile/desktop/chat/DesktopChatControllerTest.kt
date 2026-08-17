@@ -345,32 +345,12 @@ class DesktopChatControllerTest {
 
     @Test
     fun blankServerUrlShowsConfigNeededWithoutConstructingGatewayForRemoteModes() = runTest {
-        var gatewayConstructed = false
-        val controller = DesktopChatController(
-            bootstrapState = defaultDesktopBootstrapState(
-                config = LettaConfig(
-                    id = "blank",
-                    mode = LettaConfig.Mode.SELF_HOSTED,
-                    serverUrl = "",
-                ),
-            ),
-            scope = this,
-            gatewayFactory = {
-                gatewayConstructed = true
-                FakeDesktopChatGateway()
-            },
-        )
+        val (state, gatewayConstructed) = executeBlankUrlController(LettaConfig.Mode.SELF_HOSTED)
 
-        controller.start()
-        runCurrent()
-
-        val state = controller.state.value
         assertEquals(DesktopChatConnectionState.ConfigNeeded, state.connectionState)
         assertFalse(state.isRemoteBacked)
         assertFalse(gatewayConstructed)
         assertTrue(state.conversations.isEmpty())
-
-        controller.close()
     }
 
     /**
@@ -385,12 +365,22 @@ class DesktopChatControllerTest {
      */
     @Test
     fun blankServerUrlInLocalModeStillConstructsGatewayAndConnects() = runTest {
+        val (state, gatewayConstructed) = executeBlankUrlController(LettaConfig.Mode.LOCAL)
+
+        assertTrue(gatewayConstructed)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+        assertTrue(state.isRemoteBacked)
+    }
+
+    private fun kotlinx.coroutines.test.TestScope.executeBlankUrlController(
+        mode: LettaConfig.Mode,
+    ): Pair<DesktopChatSurfaceState, Boolean> {
         var gatewayConstructed = false
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(
                 config = LettaConfig(
-                    id = "local-blank",
-                    mode = LettaConfig.Mode.LOCAL,
+                    id = "blank-$mode",
+                    mode = mode,
                     serverUrl = "",
                 ),
             ),
@@ -400,16 +390,11 @@ class DesktopChatControllerTest {
                 FakeDesktopChatGateway()
             },
         )
-
         controller.start()
         runCurrent()
-
         val state = controller.state.value
-        assertTrue(gatewayConstructed)
-        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
-        assertTrue(state.isRemoteBacked)
-
         controller.close()
+        return state to gatewayConstructed
     }
 
     @Test
