@@ -181,7 +181,7 @@ class DesktopLettaConfigStore(
 
     private fun readConfig(): LettaConfig {
         val fallback = defaultDesktopLettaConfig()
-        return LettaConfig(
+        val raw = LettaConfig(
             id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
             mode = settingsStore.getString(KEY_MODE)
                 ?.let { value -> runCatching { LettaConfig.Mode.valueOf(value) }.getOrNull() }
@@ -191,6 +191,16 @@ class DesktopLettaConfigStore(
             },
             accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
         )
+        // letta-mobile-9v9nu: self-heal configs persisted before mode became
+        // authoritative — a LOCAL config that still carries a remote (most
+        // commonly stale iroh://) serverUrl from before this fix. Persist the
+        // cleaned value back so the on-disk file stops disagreeing with the
+        // in-memory config the rest of the app reads from `activeConfig`.
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(raw)
+        if (migrated !== raw) {
+            settingsStore.putString(KEY_SERVER_URL, migrated.serverUrl)
+        }
+        return migrated
     }
 
     private fun rememberBackend(serverUrl: String) {

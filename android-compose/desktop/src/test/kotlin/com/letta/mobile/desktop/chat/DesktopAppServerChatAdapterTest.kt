@@ -121,6 +121,41 @@ class DesktopAppServerChatAdapterTest {
         assertEquals(1, runtime.closeCount)
     }
 
+    /**
+     * letta-mobile-9v9nu regression: a LOCAL config that still carries a
+     * stale `iroh://` serverUrl (leftover from a prior remote session) must
+     * still take the local-runtime path, not silently skip spawning the
+     * bundled runtime. The env-derived [DesktopAppServerRuntimeConfig] is
+     * what this gate actually keys on (`appServerConfig.serverUrl == null`),
+     * so a stale value on the *persisted* LettaConfig must not leak in and
+     * change that decision.
+     */
+    @Test
+    fun localModeStartsBundledRuntimeEvenWithStaleIrohServerUrlOnConfig() = runBlocking {
+        val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43125")
+        var received: DesktopAppServerRuntimeConfig? = null
+        val staleLocalConfig = LettaConfig(
+            id = "desktop-361c792e",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+        )
+
+        val gateway = createDefaultDesktopChatGateway(
+            config = staleLocalConfig,
+            appServerConfig = DesktopAppServerRuntimeConfig(enabled = false),
+            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { config, appServer ->
+                received = appServer
+                DesktopLettaHttpChatGateway(config.copy(serverUrl = "http://unused.invalid"))
+            },
+            localRuntime = runtime,
+        )
+
+        assertEquals(1, runtime.acquireCount)
+        assertEquals("ws://127.0.0.1:43125", received?.serverUrl)
+        assertIs<AutoCloseable>(gateway).close()
+        assertEquals(1, runtime.closeCount)
+    }
+
     @Test
     fun remoteModeDoesNotAcquireBundledRuntimeWhenExplicitAppServerIsEnabled() = runBlocking {
         val runtime = FakeLocalRuntime()
