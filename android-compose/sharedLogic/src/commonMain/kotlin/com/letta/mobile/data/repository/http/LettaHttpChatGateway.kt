@@ -273,24 +273,25 @@ open class LettaHttpChatGateway(
         val credentialedTypes = mutableSetOf<String>()
         val seenIds = HashSet<String>()
         var after: String? = null
-        var page = 0
-        while (page < PROVIDER_PAGE_MAX) {
-            page++
+        for (page in 0 until PROVIDER_PAGE_MAX) {
             val providers = fetchProvidersPage(after)
-            if (providers.isEmpty()) break
-            val fresh = providers.filter { provider ->
-                provider.id?.value?.let { seenIds.add(it) } ?: true
-            }
-            if (fresh.isEmpty()) break
-            for (provider in fresh) {
-                provider.providerType.trim().lowercase()
-                    .takeIf { it.isNotBlank() }
-                    ?.let { credentialedTypes += it }
-            }
-            if (providers.size < PROVIDER_PAGE_SIZE) break
-            after = providers.last().id?.value ?: break
+            after = ingestProviderPage(providers, seenIds, credentialedTypes) ?: break
         }
         return credentialedTypes
+    }
+
+    private fun ingestProviderPage(
+        providers: List<Provider>,
+        seenIds: MutableSet<String>,
+        target: MutableSet<String>,
+    ): String? {
+        if (providers.isEmpty()) return null
+        val fresh = providers.filter { p -> p.id?.value?.let(seenIds::add) ?: true }
+        if (fresh.isEmpty()) return null
+        fresh.mapNotNull { it.providerType.trim().lowercase().takeIf(String::isNotBlank) }
+            .forEach(target::add)
+        if (providers.size < PROVIDER_PAGE_SIZE) return null
+        return providers.last().id?.value
     }
 
     private suspend fun fetchProvidersPage(after: String?): List<Provider> {

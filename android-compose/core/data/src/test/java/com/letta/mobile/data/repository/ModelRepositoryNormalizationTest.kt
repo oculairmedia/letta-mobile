@@ -64,44 +64,17 @@ class ModelRepositoryNormalizationTest {
 
     @Test
     fun emptyCredentialedSetLeavesCatalogUnchanged() = runTest {
-        val repository = ModelRepository(
-            modelApi = defaultCatalogApi(),
-            credentialedProviderTypes = { emptySet() },
-        )
-
-        repository.refreshLlmModels()
-
-        assertEquals(
-            defaultExpectedHandles,
-            repository.llmModels.value.map { it.handle }.toSet(),
-        )
+        assertCatalogUnchanged { emptySet() }
     }
 
     @Test
     fun absentLoaderLeavesCatalogUnchanged() = runTest {
-        val repository = ModelRepository(modelApi = defaultCatalogApi())
-
-        repository.refreshLlmModels()
-
-        assertEquals(
-            defaultExpectedHandles,
-            repository.llmModels.value.map { it.handle }.toSet(),
-        )
+        assertCatalogUnchanged()
     }
 
     @Test
     fun throwingCredentialLoaderKeepsCatalogUnchanged() = runTest {
-        val repository = ModelRepository(
-            modelApi = defaultCatalogApi(),
-            credentialedProviderTypes = { throw IllegalStateException("provider lookup unavailable") },
-        )
-
-        repository.refreshLlmModels()
-
-        assertEquals(
-            defaultExpectedHandles,
-            repository.llmModels.value.map { it.handle }.toSet(),
-        )
+        assertCatalogUnchanged { throw IllegalStateException("provider lookup unavailable") }
     }
 
     @Test
@@ -117,6 +90,16 @@ class ModelRepositoryNormalizationTest {
     }
 
     private val defaultExpectedHandles = setOf("openai/gpt-4o", "anthropic/claude-sonnet")
+
+    private suspend fun assertCatalogUnchanged(loader: (suspend () -> Set<String>)? = null) {
+        val repository = if (loader != null) {
+            ModelRepository(modelApi = defaultCatalogApi(), credentialedProviderTypes = loader)
+        } else {
+            ModelRepository(modelApi = defaultCatalogApi())
+        }
+        repository.refreshLlmModels()
+        assertEquals(defaultExpectedHandles, repository.llmModels.value.map { it.handle }.toSet())
+    }
 
     private fun defaultCatalogApi(): FakeModelApi = FakeModelApi().apply {
         llmModels += model("openai/gpt-4o")

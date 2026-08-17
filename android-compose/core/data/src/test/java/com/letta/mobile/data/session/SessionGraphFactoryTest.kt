@@ -121,30 +121,7 @@ class SessionGraphFactoryTest {
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
         every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-        )
+        val factory = createFactory(customSettingsRepository = settingsRepository)
 
         val graph = factory.create()
 
@@ -164,30 +141,9 @@ class SessionGraphFactoryTest {
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Disabled
+        val factory = createFactory(
+            customSettingsRepository = settingsRepository,
+            customLocalRuntimeOptions = LocalRuntimeOptions.Disabled,
         )
 
         val graph = factory.create()
@@ -225,34 +181,13 @@ class SessionGraphFactoryTest {
         val runtimeEventOutbox: RuntimeEventOutbox = mockk()
         val memFsStore: MemFsStore = mockk()
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Enabled(
+        val factory = createFactory(
+            customSettingsRepository = settingsRepository,
+            customLocalRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
                 memFsStore = memFsStore,
-                providers = setOf(provider)
-            )
+                providers = setOf(provider),
+            ),
         )
 
         val graph = factory.create()
@@ -278,34 +213,13 @@ class SessionGraphFactoryTest {
         val runtimeEventOutbox: RuntimeEventOutbox = mockk()
         val memFsStore: MemFsStore = mockk()
 
-        val factory = SessionGraphFactory(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            conversationApi = conversationApi,
-            conversationDao = conversationDao,
-            archiveApi = archiveApi,
-            folderApi = folderApi,
-            groupApi = groupApi,
-            identityApi = identityApi,
-            lettaApiClient = lettaApiClient,
-            mcpServerApi = mcpServerApi,
-            modelApi = modelApi,
-            passageApi = passageApi,
-            projectApi = projectApi,
-            projectWorkApi = projectWorkApi,
-            runApi = runApi,
-            jobApi = jobApi,
-            providerApi = providerApi,
-            scheduleApi = scheduleApi,
-            stepApi = stepApi,
-            toolApi = toolApi,
-            appContext = appContext,
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Enabled(
+        val factory = createFactory(
+            customSettingsRepository = settingsRepository,
+            customLocalRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
                 memFsStore = memFsStore,
-                providers = setOf(provider)
-            )
+                providers = setOf(provider),
+            ),
         )
 
         val graph = factory.create()
@@ -351,6 +265,7 @@ class SessionGraphFactoryTest {
         customModelApi: ModelApi = modelApi,
         customProviderApi: ProviderApi = providerApi,
         customSettingsRepository: ISettingsRepository? = null,
+        customLocalRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     ): SessionGraphFactory = SessionGraphFactory(
         agentApi = agentApi,
         agentDao = agentDao,
@@ -374,6 +289,7 @@ class SessionGraphFactoryTest {
         toolApi = toolApi,
         appContext = appContext,
         settingsRepository = customSettingsRepository,
+        localRuntimeOptions = customLocalRuntimeOptions,
     )
 
     private fun model(handle: String): LlmModel {
