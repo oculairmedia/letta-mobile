@@ -100,10 +100,10 @@ class LocalRuntimeProviderAuthFileTest {
             }
         """.trimIndent()
 
-        val result = mergeLocalRuntimeProviderAuth(
+        val result = merge(
             existingJson = existing,
-            config = LocalRuntimeProviderConfig(baseUrl = "https://proxy.example.com/v1", apiKey = "sk-new"),
-            nowIso = "2026-08-16T00:00:00Z",
+            baseUrl = "https://proxy.example.com/v1",
+            apiKey = "sk-new",
         )
 
         assertTrue(result.contains("\"somethingLettaCodeAddsLater\": true"))
@@ -133,9 +133,10 @@ class LocalRuntimeProviderAuthFileTest {
             }
         """.trimIndent()
 
-        val result = mergeLocalRuntimeProviderAuth(
+        val result = merge(
             existingJson = existing,
-            config = LocalRuntimeProviderConfig(baseUrl = "http://new-host:8000/v1", apiKey = "sk-new"),
+            baseUrl = "http://new-host:8000/v1",
+            apiKey = "sk-new",
             nowIso = "2026-08-16T12:00:00Z",
         )
 
@@ -147,14 +148,12 @@ class LocalRuntimeProviderAuthFileTest {
 
     @Test
     fun secondUpdateKeepsOriginalCreatedAt() {
-        val first = mergeLocalRuntimeProviderAuth(
-            existingJson = null,
-            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:8000/v1"),
+        val first = merge(
             nowIso = "2026-01-01T00:00:00Z",
         )
-        val second = mergeLocalRuntimeProviderAuth(
+        val second = merge(
             existingJson = first,
-            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:9000/v1"),
+            baseUrl = "http://localhost:9000/v1",
             nowIso = "2026-02-01T00:00:00Z",
         )
         assertTrue(second.contains("\"created_at\": \"2026-01-01T00:00:00Z\""))
@@ -164,22 +163,14 @@ class LocalRuntimeProviderAuthFileTest {
     @Test
     fun corruptExistingJsonRefusesToMergeRatherThanDiscardingIt() {
         assertFailsWith<LocalRuntimeProviderAuthFileCorruptException> {
-            mergeLocalRuntimeProviderAuth(
-                existingJson = "{ not valid json",
-                config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:8000/v1"),
-                nowIso = "2026-08-16T00:00:00Z",
-            )
+            merge(existingJson = "{ not valid json")
         }
     }
 
     @Test
     fun nonObjectJsonRootRefusesToMerge() {
         assertFailsWith<LocalRuntimeProviderAuthFileCorruptException> {
-            mergeLocalRuntimeProviderAuth(
-                existingJson = "[1, 2, 3]",
-                config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:8000/v1"),
-                nowIso = "2026-08-16T00:00:00Z",
-            )
+            merge(existingJson = "[1, 2, 3]")
         }
     }
 
