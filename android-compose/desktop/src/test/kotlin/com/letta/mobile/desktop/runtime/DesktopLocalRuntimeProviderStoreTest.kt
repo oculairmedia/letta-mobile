@@ -13,7 +13,8 @@ class DesktopLocalRuntimeProviderStoreTest {
 
     @Test
     fun readStatusForFreshDirectoryIsUnconfigured() {
-        val store = DesktopLocalRuntimeProviderStore { tempBackendDir() }
+        val backendDir = tempBackendDir()
+        val store = DesktopLocalRuntimeProviderStore { backendDir }
         val status = store.readStatus()
         assertFalse(status.isConfigured)
         assertFalse(status.hasApiKey)

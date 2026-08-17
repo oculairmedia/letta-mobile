@@ -37,10 +37,9 @@ class LocalRuntimeProviderConfigTest {
 class LocalRuntimeProviderAuthFileTest {
     @Test
     fun writesFreshFileWhenNoneExists() {
-        val result = mergeLocalRuntimeProviderAuth(
-            existingJson = null,
-            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:8000/v1", apiKey = "sk-local"),
-            nowIso = "2026-08-16T00:00:00Z",
+        val result = merge(
+            baseUrl = "http://localhost:8000/v1",
+            apiKey = "sk-local",
         )
         val status = readLocalRuntimeProviderStatus(result)
         assertEquals("http://localhost:8000/v1", status.baseUrl)
@@ -54,20 +53,18 @@ class LocalRuntimeProviderAuthFileTest {
 
     @Test
     fun writesBlankExistingJsonAsFreshFile() {
-        val result = mergeLocalRuntimeProviderAuth(
+        val result = merge(
             existingJson = "   ",
-            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:8000/v1"),
-            nowIso = "2026-08-16T00:00:00Z",
+            baseUrl = "http://localhost:8000/v1",
         )
         assertEquals("http://localhost:8000/v1", readLocalRuntimeProviderStatus(result).baseUrl)
     }
 
     @Test
     fun noApiKeyWritesSentinelNotBlank() {
-        val result = mergeLocalRuntimeProviderAuth(
-            existingJson = null,
-            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:11434/v1", apiKey = null),
-            nowIso = "2026-08-16T00:00:00Z",
+        val result = merge(
+            baseUrl = "http://localhost:11434/v1",
+            apiKey = null,
         )
         assertTrue(result.contains("\"key\": \"not-needed\""))
         assertFalse(readLocalRuntimeProviderStatus(result).hasApiKey)
@@ -75,10 +72,9 @@ class LocalRuntimeProviderAuthFileTest {
 
     @Test
     fun blankApiKeyIsTreatedAsNoKey() {
-        val result = mergeLocalRuntimeProviderAuth(
-            existingJson = null,
-            config = LocalRuntimeProviderConfig(baseUrl = "http://localhost:11434/v1", apiKey = "   "),
-            nowIso = "2026-08-16T00:00:00Z",
+        val result = merge(
+            baseUrl = "http://localhost:11434/v1",
+            apiKey = "   ",
         )
         assertFalse(readLocalRuntimeProviderStatus(result).hasApiKey)
     }
@@ -201,6 +197,23 @@ class LocalRuntimeProviderAuthFileTest {
     }
 
     @Test
+    fun statusReadForUnexpectedJsonTypesReturnsUnconfiguredRatherThanThrowing() {
+        val jsonWithObjectBaseUrl = """
+            {
+              "providers": {
+                "lc-openai-compatible": {
+                  "base_url": { "nested": "invalid" },
+                  "auth": { "key": ["array", "invalid"] }
+                }
+              }
+            }
+        """.trimIndent()
+        val status = readLocalRuntimeProviderStatus(jsonWithObjectBaseUrl)
+        assertFalse(status.isConfigured)
+        assertFalse(status.hasApiKey)
+    }
+
+    @Test
     fun customProviderNameParameterIsRespected() {
         val result = mergeLocalRuntimeProviderAuth(
             existingJson = null,
@@ -214,4 +227,15 @@ class LocalRuntimeProviderAuthFileTest {
             readLocalRuntimeProviderStatus(result, providerName = "custom-name").baseUrl,
         )
     }
+
+    private fun merge(
+        existingJson: String? = null,
+        baseUrl: String = "http://localhost:8000/v1",
+        apiKey: String? = "sk-local",
+        nowIso: String = "2026-08-16T00:00:00Z",
+    ): String = mergeLocalRuntimeProviderAuth(
+        existingJson = existingJson,
+        config = LocalRuntimeProviderConfig(baseUrl = baseUrl, apiKey = apiKey),
+        nowIso = nowIso,
+    )
 }

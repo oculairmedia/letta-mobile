@@ -98,8 +98,8 @@ fun mergeLocalRuntimeProviderAuth(
     val providers = (root["providers"] as? JsonObject) ?: JsonObject(emptyMap())
     val existingProvider = providers[providerName] as? JsonObject
 
-    val createdAt = existingProvider?.get("created_at")?.jsonPrimitive?.contentOrNull ?: nowIso
-    val id = existingProvider?.get("id")?.jsonPrimitive?.contentOrNull ?: "local-provider-$providerName"
+    val createdAt = (existingProvider?.get("created_at") as? JsonPrimitive)?.contentOrNull ?: nowIso
+    val id = (existingProvider?.get("id") as? JsonPrimitive)?.contentOrNull ?: "local-provider-$providerName"
     val apiKey = config.apiKey?.trim()?.takeIf { it.isNotBlank() } ?: LOCAL_RUNTIME_NO_API_KEY_SENTINEL
 
     val newProvider = buildJsonObject {
@@ -153,8 +153,8 @@ fun readLocalRuntimeProviderStatus(
     val root = runCatching { parseAuthRoot(existingJson) }.getOrNull() ?: return LocalRuntimeProviderStatus(null, false)
     val provider = (root["providers"] as? JsonObject)?.get(providerName) as? JsonObject
         ?: return LocalRuntimeProviderStatus(null, false)
-    val baseUrl = provider["base_url"]?.jsonPrimitive?.contentOrNull
-    val key = (provider["auth"] as? JsonObject)?.get("key")?.jsonPrimitive?.contentOrNull
+    val baseUrl = (provider["base_url"] as? JsonPrimitive)?.contentOrNull
+    val key = ((provider["auth"] as? JsonObject)?.get("key") as? JsonPrimitive)?.contentOrNull
     val hasApiKey = !key.isNullOrBlank() && key != LOCAL_RUNTIME_NO_API_KEY_SENTINEL
     return LocalRuntimeProviderStatus(baseUrl = baseUrl, hasApiKey = hasApiKey)
 }
