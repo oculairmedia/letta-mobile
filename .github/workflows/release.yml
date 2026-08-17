@@ -107,13 +107,17 @@ jobs:
           echo "OK: embedded runtime (libnode.so) present in $apk"
 
       - name: Rename APK with tag
+        # The play-release build IS the prod artifact (package com.letta.mobile,
+        # release keystore, embedded runtime verified above). Name it -prod so
+        # the release page reads by audience, not by runtime packaging — the
+        # old -embedded name made the prod APK look like a side artifact.
         id: artifact
         working-directory: android-compose/app/build/outputs/apk/play/release
         run: |
           set -euo pipefail
           tag="${{ github.event.inputs.tag || github.ref_name }}"
           src=$(ls *.apk | head -n 1)
-          dest="letta-mobile-${tag}-embedded.apk"
+          dest="letta-mobile-${tag}-prod.apk"
           cp -f "$src" "$dest"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
 
@@ -121,7 +125,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: android-compose/app/build/outputs/apk/play/release/letta-mobile-*-embedded.apk
+          path: android-compose/app/build/outputs/apk/play/release/letta-mobile-*-prod.apk
           if-no-files-found: error
 
   # ── Desktop: Windows EXE + MSI installers ───────────────────────────────
