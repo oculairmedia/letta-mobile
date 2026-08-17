@@ -1153,6 +1153,9 @@ class DesktopChatController(
         }
     }
 
+    private fun isConfigNeededForUrl(): Boolean =
+        bootstrapState.config.mode != LettaConfig.Mode.LOCAL && bootstrapState.config.serverUrl.isBlank()
+
     private suspend fun connectAndLoad() {
         if (closed) return
         // letta-mobile-9v9nu: a blank serverUrl is only "not configured" for
@@ -1162,7 +1165,7 @@ class DesktopChatController(
         // configs). Bailing out here for LOCAL too meant gatewayFactory() —
         // and therefore DesktopLocalRuntimeHost.acquire() — was never even
         // called, so the local runtime silently never started.
-        if (bootstrapState.config.mode != LettaConfig.Mode.LOCAL && bootstrapState.config.serverUrl.isBlank()) {
+        if (isConfigNeededForUrl()) {
             _state.value = initialState.withRuntimeState(
                 ChatSessionReducer.configNeeded(initialState.runtimeState),
             )

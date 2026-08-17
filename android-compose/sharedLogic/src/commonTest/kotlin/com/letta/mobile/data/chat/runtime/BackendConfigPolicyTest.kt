@@ -69,7 +69,7 @@ class BackendConfigPolicyTest {
             config = LettaConfig(
                 id = "desktop-361c792e",
                 mode = LettaConfig.Mode.LOCAL,
-                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+                serverUrl = STALE_LOCAL_IROH_URL,
             ),
             fallback = fallback,
             generatedIdPrefix = "desktop",
@@ -84,7 +84,7 @@ class BackendConfigPolicyTest {
         val staleIroh = LettaConfig(
             id = "desktop-361c792e",
             mode = LettaConfig.Mode.LOCAL,
-            serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+            serverUrl = STALE_LOCAL_IROH_URL,
         )
 
         val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(staleIroh)
@@ -169,5 +169,10 @@ class BackendConfigPolicyTest {
         override suspend fun saveActiveConfig(config: LettaConfig) {
             state.value = config
         }
+    }
+
+    private companion object {
+        const val STALE_LOCAL_IROH_URL =
+            "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501"
     }
 }
