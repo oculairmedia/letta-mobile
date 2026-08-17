@@ -254,6 +254,25 @@ tasks.register<JavaExec>("runShaderLookdev") {
     systemProperty("lookdev.shaderDir", layout.projectDirectory.dir("lookdev-shaders").asFile.absolutePath)
 }
 
+/**
+ * Lowest JDK that can RUN this app: Jewel ships class-file v69. Compilation
+ * still targets JVM 21 for the Iroh binding, so this is deliberately not the
+ * compile toolchain.
+ */
+val minimumRuntimeJdk = 26
+
+/**
+ * Install path of a JDK new enough to run the app, for jpackage's runtime
+ * image. Null when the machine has no such JDK — packaging then fails loudly
+ * in [verifyBundledRuntime] rather than producing an installer that cannot
+ * start, and everything that is not packaging still builds on JDK 21.
+ */
+val packagingJavaHome: String? = runCatching {
+    javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(minimumRuntimeJdk))
+    }.get().metadata.installationPath.asFile.absolutePath
+}.getOrNull()
+
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
 // transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
 // Jewel UI dependency ships class-file version 69 (Java 25), so running the app
@@ -262,6 +281,14 @@ tasks.register<JavaExec>("runShaderLookdev") {
 // org.jetbrains.jewel.*. Compilation and unit tests run on JDK 21+.
 nucleus.application {
     mainClass = "com.letta.mobile.desktop.MainKt"
+
+    // jpackage builds its bundled runtime image from the TOOLCHAIN, not from
+    // JAVA_HOME — so a module targeting JVM 21 shipped a JVM 21 image that
+    // cannot load Jewel's Java-25 classes, and every installed build died on
+    // startup with jpackage's "Failed to launch JVM" dialog while
+    // `:desktop:run` (which overrides its launcher below) stayed fine.
+    // Release CI running on JDK 26 did not help for the same reason.
+    packagingJavaHome?.let { javaHome = it }
 
     // Native Image is intentionally opt-in: the JVM distribution remains the
     // compatibility build for JCEF and Iroh, while release engineers can run
@@ -441,6 +468,38 @@ val prepareDesktopLettaCodeRuntime = tasks.register<Sync>("prepareDesktopLettaCo
 tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(prepareDesktopLettaCodeRuntime)
 }
+
+/**
+ * Fails the build when a packaged distribution bundles a runtime too old to
+ * load the app's own classes. `:desktop:run` overrides its launcher and so
+ * never exercised the packaged runtime — the JVM-21 image shipped in v0.17.1
+ * was only discovered by installing it. jpackage writes the image's version
+ * into `runtime/release`, so the check is exact and costs nothing.
+ */
+fun verifyBundledRuntime(distributableDir: File) {
+    val release = distributableDir.walkTopDown()
+        .firstOrNull { it.name == "release" && it.parentFile?.name == "runtime" }
+        ?: error("No runtime/release under $distributableDir — cannot verify the bundled JVM.")
+    val version = release.readLines()
+        .firstNotNullOfOrNull { line ->
+            line.substringAfter("JAVA_VERSION=\"", "").substringBefore('"').takeIf { it.isNotBlank() }
+        }
+        ?: error("No JAVA_VERSION in $release — cannot verify the bundled JVM.")
+    val feature = version.substringBefore('.').toIntOrNull()
+        ?: error("Unparseable JAVA_VERSION \"$version\" in $release.")
+    check(feature >= minimumRuntimeJdk) {
+        "Bundled runtime is Java $version, but the app needs $minimumRuntimeJdk+ to load its own " +
+            "dependencies (Jewel ships class-file v69). The installer would fail at startup with " +
+            "\"Failed to launch JVM\". Install a JDK $minimumRuntimeJdk toolchain and repackage."
+    }
+}
+
+tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
+    .configureEach {
+        doLast {
+            outputs.files.files.filter { it.isDirectory }.forEach(::verifyBundledRuntime)
+        }
+    }
 
 // Jewel ships Java-25 bytecode (class-file v69), while this module targets
 // JVM 21 for the Iroh binding. Gradle otherwise selects the compile toolchain
