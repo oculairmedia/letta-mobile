@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockUpdateParams
@@ -257,7 +258,7 @@ class IrohAdminRpcBlockSource private constructor(
      * [listAllBlocks] union — the server returns only the requested agent's rows.
      */
     suspend fun listAgentBlocks(agentId: String): List<Block> =
-        agentDirectory.listAgentBlocks(agentId)
+        agentDirectory.listAgentBlocks(AgentId(agentId))
 
     suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         val body = buildJsonObject {
