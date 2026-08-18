@@ -638,12 +638,14 @@ class DesktopChatController(
     ) {
         if (closed) return
         approvalCoordinator.submitApproval(
-            gateway = gateway,
-            conversation = _state.value.selectedConversation,
-            requestId = requestId,
-            toolCallIds = toolCallIds,
-            approve = approve,
-            reason = reason,
+            ApprovalSubmissionRequest(
+                gateway = gateway,
+                conversation = _state.value.selectedConversation,
+                requestId = requestId,
+                toolCallIds = toolCallIds,
+                approve = approve,
+                reason = reason,
+            ),
         )
     }
 

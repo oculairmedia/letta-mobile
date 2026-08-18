@@ -47,30 +47,34 @@ internal class DesktopChatInterruptCoordinator(
             "transport" to "appServer",
         )
         scope.launch {
-            val dispatched = runCatching { aborter.abortConversationTurn(conversationId) }
-            val failure = dispatched.exceptionOrNull()
-            if (_cancellingConversationId.value != conversationId) return@launch
-            if (failure != null || dispatched.getOrDefault(false).not()) {
-                failure?.let {
-                    Telemetry.error(TELEMETRY_TAG, "interrupt.abortDispatchFailed", it)
-                }
-                onForcedLocalStop(conversationId, "abortNotDispatched")
-                return@launch
-            }
-            val settled = withTimeoutOrNull(CANCEL_TERMINAL_TIMEOUT_MS) {
-                _cancellingConversationId.first { it != conversationId }
-                true
-            } ?: false
-            if (settled || _cancellingConversationId.value != conversationId) return@launch
-            Telemetry.event(
-                TELEMETRY_TAG,
-                "interrupt.terminalTimeout",
-                "conversationId" to conversationId,
-                durationMs = CANCEL_TERMINAL_TIMEOUT_MS,
-                level = Telemetry.Level.WARN,
-            )
-            onForcedLocalStop(conversationId, "terminalTimeout")
+            performAbortAndWatch(aborter, conversationId)
         }
+    }
+
+    private suspend fun performAbortAndWatch(aborter: DesktopTurnAborter, conversationId: String) {
+        val dispatched = runCatching { aborter.abortConversationTurn(conversationId) }
+        val failure = dispatched.exceptionOrNull()
+        if (_cancellingConversationId.value != conversationId) return
+        if (failure != null || dispatched.getOrDefault(false).not()) {
+            failure?.let {
+                Telemetry.error(TELEMETRY_TAG, "interrupt.abortDispatchFailed", it)
+            }
+            onForcedLocalStop(conversationId, "abortNotDispatched")
+            return
+        }
+        val settled = withTimeoutOrNull(CANCEL_TERMINAL_TIMEOUT_MS) {
+            _cancellingConversationId.first { it != conversationId }
+            true
+        } ?: false
+        if (settled || _cancellingConversationId.value != conversationId) return
+        Telemetry.event(
+            TELEMETRY_TAG,
+            "interrupt.terminalTimeout",
+            "conversationId" to conversationId,
+            durationMs = CANCEL_TERMINAL_TIMEOUT_MS,
+            level = Telemetry.Level.WARN,
+        )
+        onForcedLocalStop(conversationId, "terminalTimeout")
     }
 
     fun clearCancelling() {

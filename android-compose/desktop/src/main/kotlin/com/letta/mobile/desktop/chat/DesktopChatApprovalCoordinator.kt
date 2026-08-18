@@ -10,6 +10,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+internal data class ApprovalSubmissionRequest(
+    val gateway: DesktopChatGateway?,
+    val conversation: DesktopConversationSummary?,
+    val requestId: String,
+    val toolCallIds: List<String>,
+    val approve: Boolean,
+    val reason: String?,
+)
+
 /**
  * Tracks, submits, and reconciles user approvals with the backend.
  */
@@ -29,49 +38,54 @@ internal class DesktopChatApprovalCoordinator(
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
     }
 
-    fun submitApproval(
-        gateway: DesktopChatGateway?,
-        conversation: DesktopConversationSummary?,
-        requestId: String,
-        toolCallIds: List<String>,
-        approve: Boolean,
-        reason: String?,
-    ) {
-        val gw = gateway
+    fun submitApproval(request: ApprovalSubmissionRequest) {
+        val gw = request.gateway ?: return
         if (gw !is ApprovalSubmittingGateway && gw !is DesktopApprovalSubmitter) return
-        if (conversation == null) return
+        val conversation = request.conversation ?: return
         val agentId = conversation.agentId?.takeIf { it.isNotBlank() } ?: return
-        submittedApprovalConversations[requestId] = conversation.id
-        _submittingApprovals.update { it + requestId }
+
+        submittedApprovalConversations[request.requestId] = conversation.id
+        _submittingApprovals.update { it + request.requestId }
+
         scope.launch {
             try {
-                when (gw) {
-                    is ApprovalSubmittingGateway -> gw.submitApproval(
-                        agentId = agentId,
-                        conversationId = conversation.id,
-                        approvalRequestId = requestId,
-                        toolCallId = toolCallIds.firstOrNull(),
-                        approve = approve,
-                        reason = reason,
-                    )
-                    is DesktopApprovalSubmitter -> gw.submitApproval(
-                        DesktopApprovalSubmission(
-                            agentId = agentId,
-                            conversationId = conversation.id,
-                            requestId = requestId,
-                            toolCallId = toolCallIds.firstOrNull(),
-                            approve = approve,
-                            reason = reason,
-                        ),
-                    )
-                }
+                dispatchToGateway(gw, agentId, conversation.id, request)
             } catch (cancelled: CancellationException) {
-                clearSubmittedApproval(requestId)
+                clearSubmittedApproval(request.requestId)
                 throw cancelled
             } catch (t: Throwable) {
-                clearSubmittedApproval(requestId)
+                clearSubmittedApproval(request.requestId)
                 onError(t.message ?: t::class.simpleName ?: "Could not submit answer")
             }
+        }
+    }
+
+    private suspend fun dispatchToGateway(
+        gw: Any,
+        agentId: String,
+        conversationId: String,
+        request: ApprovalSubmissionRequest,
+    ) {
+        val toolCallId = request.toolCallIds.firstOrNull()
+        when (gw) {
+            is ApprovalSubmittingGateway -> gw.submitApproval(
+                agentId = agentId,
+                conversationId = conversationId,
+                approvalRequestId = request.requestId,
+                toolCallId = toolCallId,
+                approve = request.approve,
+                reason = request.reason,
+            )
+            is DesktopApprovalSubmitter -> gw.submitApproval(
+                DesktopApprovalSubmission(
+                    agentId = agentId,
+                    conversationId = conversationId,
+                    requestId = request.requestId,
+                    toolCallId = toolCallId,
+                    approve = request.approve,
+                    reason = request.reason,
+                ),
+            )
         }
     }
 
