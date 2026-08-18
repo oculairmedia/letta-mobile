@@ -62,6 +62,9 @@ internal class ChatTimelineObserver(
     // letta-mobile-yflpp: minimum gap between projection writes (COALESCE). Set
     // to 0 in unit tests so virtual-clock emissions stay synchronous.
     private val projectionFrameIntervalMs: Long = PROJECTION_FRAME_INTERVAL_MS,
+    private val hydrationIdentity: (String?, String) -> ChatHydrationTrace.Identity = { agentId, conversationId ->
+        ChatHydrationTrace.Identity(agentId = agentId, conversationId = conversationId)
+    },
 ) {
     private var observerJob: Job? = null
     private var hydrateSignalJob: Job? = null
@@ -73,6 +76,7 @@ internal class ChatTimelineObserver(
 
     /** Agent/conversation id pair the current observer job is bound to. */
     private var observerBinding: TimelineObserverBinding? = null
+    private var hydrationGeneration: ChatHydrationTrace.Generation? = null
 
     fun stop() {
         observerJob?.cancel()
@@ -80,6 +84,7 @@ internal class ChatTimelineObserver(
         hydrateSignalJob?.cancel()
         hydrateSignalJob = null
         observerBinding = null
+        hydrationGeneration = null
         awaitingProjectionAfterHydrate = false
         presenter.reset()
     }
@@ -111,6 +116,8 @@ internal class ChatTimelineObserver(
             uiState.value = uiState.value.copy(isLoadingMessages = true)
         }
         observerBinding = binding
+        hydrationGeneration = ChatHydrationTrace.begin(hydrationIdentity(agentId, conversationId), reuseIfActive = true)
+        val generation = hydrationGeneration
         observerJob = scope.launch {
             val flow = try {
                 timelineRepository.observe(agentId, conversationId)
@@ -129,6 +136,7 @@ internal class ChatTimelineObserver(
                 loop.events.collect { ev ->
                     when (ev) {
                         is TimelineSyncEvent.Hydrated -> {
+                            generation?.let { ChatHydrationTrace.sourceReady(it, source = "timeline", count = ev.messageCount) }
                             android.util.Log.i(
                                 "AdminChatViewModel",
                                 "Timeline ready conv=$conversationId count=${ev.messageCount}",
@@ -145,6 +153,7 @@ internal class ChatTimelineObserver(
                             )
                         }
                         is TimelineSyncEvent.HydrateFailed -> {
+                            generation?.let { ChatHydrationTrace.sourceUnavailable(it, source = "timeline") }
                             awaitingProjectionAfterHydrate = false
                             uiState.value = uiState.value.copy(isLoadingMessages = false)
                         }
@@ -203,6 +212,7 @@ internal class ChatTimelineObserver(
                             // between tools (regression introduced by PR
                             // #1119 — see bead letta-mobile-dir4k.1).
                             isActiveRunStreaming = hasActiveChatTurn(),
+                            ownAgentId = observerBinding?.agentId,
                         )
                     }
 
@@ -238,6 +248,13 @@ internal class ChatTimelineObserver(
                             previousIsAgentTyping = prev.isAgentTyping,
                         )
                         if (presentation.isStreaming != prev.isStreaming || presentation.isAgentTyping != prev.isAgentTyping) {
+                            generation?.let {
+                                ChatHydrationTrace.activityChanged(
+                                    it,
+                                    active = presentation.isStreaming || presentation.isAgentTyping,
+                                    reason = "presence_only",
+                                )
+                            }
                             uiState.value = collapseCompletedRunsIfStreamingFinished(
                                 prev,
                                 prev.copy(
@@ -288,6 +305,21 @@ internal class ChatTimelineObserver(
                     val nextIsStreaming = presentation.isStreaming
                     val nextIsAgentTyping = presentation.isAgentTyping
 
+                    generation?.let {
+                        ChatHydrationTrace.presentationPublished(
+                            it,
+                            commitReason = projection.messageListChange::class.simpleName ?: "unknown",
+                            messageCount = ui.size,
+                            missingOptionalSources = if (projection.a2uiMessages.isEmpty()) "a2ui" else "none",
+                        )
+                        if (nextIsStreaming != prev.isStreaming || nextIsAgentTyping != prev.isAgentTyping) {
+                            ChatHydrationTrace.activityChanged(
+                                it,
+                                active = nextIsStreaming || nextIsAgentTyping,
+                                reason = "projection_presence",
+                            )
+                        }
+                    }
                     uiState.value = collapseCompletedRunsIfStreamingFinished(
                         prev,
                         prev.copy(

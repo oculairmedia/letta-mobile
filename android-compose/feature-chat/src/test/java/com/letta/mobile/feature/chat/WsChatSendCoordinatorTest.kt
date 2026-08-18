@@ -4,6 +4,7 @@ import com.letta.mobile.ui.chat.render.*
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCall
@@ -40,6 +41,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
@@ -877,10 +880,12 @@ class WsChatSendCoordinatorTest {
     }
 
     @Test
-    fun `websocket lifecycle and tool events are recorded into shared runtime outbox`() = runTest {
+    fun `runtime audit event families are recorded in one ordered batch`() = runTest {
         val recorded = mutableListOf<RuntimeEventDraft>()
+        val recordedBatches = mutableListOf<List<RuntimeEventDraft>>()
+        val workerJob = Job()
         val coordinator = WsChatSendCoordinator(
-            scope = backgroundScope,
+            scope = CoroutineScope(StandardTestDispatcher(testScheduler) + workerJob),
             agentId = "agent-1",
             activeConfig = settingsRepository(),
             wsChatBridge = mockBridge(sendAccepted = true),
@@ -893,7 +898,10 @@ class WsChatSendCoordinatorTest {
             startTimelineObserver = {},
             clientVersionProvider = clientVersionProvider,
             backendDescriptor = { backendDescriptor() },
-            runtimeEventSink = { drafts -> recorded += drafts },
+            runtimeEventSink = { drafts ->
+                recordedBatches += drafts
+                recorded += drafts
+            },
         )
 
         coordinator.handleEvent(
@@ -917,9 +925,57 @@ class WsChatSendCoordinatorTest {
                 )
             )
         )
-        advanceUntilIdle()
+        coordinator.handleEvent(
+            WsTimelineEvent.MessageDelta(
+                ApprovalRequestMessage(
+                    id = "approval-1",
+                    toolCall = ToolCall(
+                        toolCallId = "call-approval",
+                        name = "shell",
+                        arguments = """{"command":"rm /tmp/demo"}""",
+                    ),
+                    runId = "run-1",
+                )
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.StopReason(
+                turnId = "turn-1",
+                runId = "run-1",
+                stopReason = "end_turn",
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.UsageStatistics(
+                turnId = "turn-1",
+                runId = "run-1",
+                promptTokens = 1,
+                completionTokens = 2,
+                totalTokens = 3,
+                cachedInputTokens = 0,
+                reasoningTokens = 0,
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = "runtime_error",
+                message = "failed",
+                conversationId = "conv-1",
+                turnId = "turn-1",
+                runId = "run-1",
+            )
+        )
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone(
+                turnId = "turn-1",
+                runId = "run-1",
+                status = "failed",
+            )
+        )
+        runCurrent()
 
-        assertEquals(2, recorded.size)
+        assertEquals(1, recordedBatches.size)
+        assertEquals(8, recorded.size)
         assertTrue(recorded.all { it.backendId == BackendId("remote-letta:shim") })
         assertTrue(recorded.all { it.runtimeId == RuntimeId("remote-letta:shim") })
         assertTrue(recorded.all { it.agentId == AgentId("agent-1") })
@@ -932,6 +988,13 @@ class WsChatSendCoordinatorTest {
         assertEquals("call-1", toolCall.toolCallId.value)
         assertEquals("bash", toolCall.toolName.value)
         assertEquals("""{"command":"pwd"}""", toolCall.argumentsJson)
+        assertTrue(recorded[2].payload is RuntimeEventPayload.ToolCallObserved)
+        assertTrue(recorded[3].payload is RuntimeEventPayload.ApprovalRequested)
+        assertEquals("end_turn", (recorded[4].payload as RuntimeEventPayload.RunLifecycleChanged).reason)
+        assertEquals("usage:3", (recorded[5].payload as RuntimeEventPayload.ExternalTransportFrame).body)
+        assertEquals(RuntimeRunStatus.Failed, (recorded[6].payload as RuntimeEventPayload.RunLifecycleChanged).status)
+        assertEquals(RuntimeRunStatus.Failed, (recorded[7].payload as RuntimeEventPayload.RunLifecycleChanged).status)
+        workerJob.cancel()
     }
 
     @Test

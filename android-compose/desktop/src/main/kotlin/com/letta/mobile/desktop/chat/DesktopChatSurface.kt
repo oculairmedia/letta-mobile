@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Build
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.Icon
@@ -46,6 +47,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.letta.mobile.data.chat.runtime.ChatScreenStatus
+import com.letta.mobile.data.context.ContextWindowUsageState
+import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.isConnectionRetryable
 import com.letta.mobile.data.composer.Mentionable
 import com.letta.mobile.data.onboarding.AgentOnboarding
@@ -70,6 +73,18 @@ internal data class ChatDetailPaneState(
     val composerPlaceholder: String = "Message…",
     /** Approval request ids whose answer/dismiss is currently in flight. */
     val submittingApprovalRequestIds: Set<String> = emptySet(),
+    val agentNamesById: Map<String, String> = emptyMap(),
+    val contextUsage: ContextWindowUsageState = ContextWindowUsageState(),
+    /**
+     * letta-mobile folder-settings #2: the SELECTED conversation's working
+     * directory (the folder the agent's tools — bash, file edits — actually
+     * operate in), when the active gateway supports reading/changing it
+     * (the bundled local runtime only — see `DesktopWorkingDirectoryController`).
+     * Null while unsupported/unknown; [workingDirectorySupported] tells them apart.
+     */
+    val workingDirectory: String? = null,
+    val workingDirectorySupported: Boolean = false,
+    val workingDirectoryLoading: Boolean = false,
 )
 
 /** Interaction callbacks for [ChatDetailPane]. */
@@ -84,6 +99,10 @@ internal data class ChatDetailPaneActions(
     val onOnboardingTask: ((OnboardingTaskKind) -> Unit)? = null,
     /** Answer / dismiss a parked approval: (requestId, toolCallIds, approve, reason). */
     val onSubmitApproval: ((String, List<String>, Boolean, String?) -> Unit)? = null,
+    val onOpenAgent: (String) -> Unit = {},
+    val onA2uiAction: (A2uiAction) -> Unit = {},
+    /** Change the selected conversation's working directory (folder picker result). */
+    val onChangeWorkingDirectory: ((String) -> Unit)? = null,
 )
 
 @Composable
@@ -127,68 +146,154 @@ internal fun ChatDetailPane(
     // A hairline edge separates the chat pane from the sidebar without insetting
     // it: the pane stays flush to the window, so this reads as one boundary line
     // rather than a second frame floating inside the app's own window border.
-    CompositionLocalProvider(LocalDesktopApprovalDecision provides approvalHandler) {
-    DesktopAmbientChatBackground(
-        status = ambientStatus,
-        modifier = modifier
-            .fillMaxHeight()
-            .background(MaterialTheme.colorScheme.background)
-            .drawBehind {
-                val stroke = 1.dp.toPx()
-                drawRect(
-                    color = paneEdgeColor,
-                    topLeft = Offset.Zero,
-                    size = Size(stroke, size.height),
-                )
-            },
+    CompositionLocalProvider(
+        LocalDesktopApprovalDecision provides approvalHandler,
+        LocalDesktopAgentMessageContext provides DesktopAgentMessageContext(
+            resolveName = state.agentNamesById::get,
+            onAgentClick = actions.onOpenAgent,
+        ),
+        LocalDesktopA2uiActionHandler provides actions.onA2uiAction,
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            if (surface.shouldShowStatePanel) {
-                ChatStatePanel(
-                    state = surface,
-                    onRetryConnection = actions.onRetryConnection,
-                    modifier = Modifier.weight(1f),
-                )
-            } else if (surface.renderItems.isEmpty() && !state.isThinking) {
-                NewConversationWelcome(
-                    agentName = surface.selectedConversation?.agentName,
-                    onStarterPrompt = actions.onComposerTextChanged,
-                    onOnboardingTask = actions.onOnboardingTask,
-                    modifier = Modifier.weight(1f),
-                )
-            } else {
-                MessageList(
-                    params = MessageListParams(
-                        conversationId = surface.selectedConversationId,
-                        renderItems = surface.renderItems,
-                        isSending = state.isThinking,
-                        isStreamingReply = state.isStreamingReply,
-                    ),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-            ComposerBar(
-                state = ComposerBarState(
-                    text = surface.composerText,
-                    pendingImageAttachments = surface.pendingImageAttachments,
-                    enabled = surface.canSend,
-                    modelLabel = surface.composerModelLabel,
-                    modelOptions = state.modelOptions,
-                    commands = state.commands,
-                    mentionables = state.mentionables,
-                    placeholder = state.composerPlaceholder,
-                ),
-                actions = ComposerBarActions(
-                    onModelSelected = actions.onModelSelected,
-                    onOpenModelPicker = actions.onOpenModelPicker,
-                    onTextChanged = actions.onComposerTextChanged,
-                    onSend = actions.onSend,
-                    onAttachImage = actions.onAttachImage,
-                    onRemoveImageAttachment = actions.onRemoveImageAttachment,
-                ),
+        DesktopAmbientChatBackground(
+            status = ambientStatus,
+            modifier = modifier
+                .fillMaxHeight()
+                .background(MaterialTheme.colorScheme.background)
+                .drawBehind {
+                    val stroke = 1.dp.toPx()
+                    drawRect(
+                        color = paneEdgeColor,
+                        topLeft = Offset.Zero,
+                        size = Size(stroke, size.height),
+                    )
+                },
+        ) {
+            ChatDetailBody(
+                surface = surface,
+                state = state,
+                actions = actions,
+                modifier = Modifier.fillMaxSize(),
             )
         }
     }
+}
+
+@Composable
+private fun ChatDetailBody(
+    surface: DesktopChatSurfaceState,
+    state: ChatDetailPaneState,
+    actions: ChatDetailPaneActions,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        if (state.workingDirectorySupported && surface.selectedConversation != null) {
+            DesktopWorkingDirectoryRow(
+                path = state.workingDirectory,
+                loading = state.workingDirectoryLoading,
+                onChangeDirectory = actions.onChangeWorkingDirectory,
+            )
+        }
+        if (surface.shouldShowStatePanel) {
+            ChatStatePanel(
+                state = surface,
+                onRetryConnection = actions.onRetryConnection,
+                modifier = Modifier.weight(1f),
+            )
+        } else if (surface.renderItems.isEmpty() && !state.isThinking) {
+            NewConversationWelcome(
+                agentName = surface.selectedConversation?.agentName,
+                onStarterPrompt = actions.onComposerTextChanged,
+                onOnboardingTask = actions.onOnboardingTask,
+                modifier = Modifier.weight(1f),
+            )
+        } else {
+            MessageList(
+                params = MessageListParams(
+                    conversationId = surface.selectedConversationId,
+                    renderItems = surface.renderItems,
+                    isSending = state.isThinking,
+                    isStreamingReply = state.isStreamingReply,
+                ),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        ComposerBar(
+            state = ComposerBarState(
+                text = surface.composerText,
+                pendingImageAttachments = surface.pendingImageAttachments,
+                enabled = surface.canSend,
+                modelLabel = surface.composerModelLabel,
+                modelOptions = state.modelOptions,
+                commands = state.commands,
+                mentionables = state.mentionables,
+                placeholder = state.composerPlaceholder,
+                contextUsage = state.contextUsage,
+            ),
+            actions = ComposerBarActions(
+                onModelSelected = actions.onModelSelected,
+                onOpenModelPicker = actions.onOpenModelPicker,
+                onTextChanged = actions.onComposerTextChanged,
+                onSend = actions.onSend,
+                onAttachImage = actions.onAttachImage,
+                onRemoveImageAttachment = actions.onRemoveImageAttachment,
+            ),
+        )
+    }
+}
+
+/**
+ * letta-mobile folder-settings #2: compact row showing the SELECTED
+ * conversation's working directory — the folder the agent's tools (bash,
+ * file edits, git) actually operate in — with a folder picker to change it.
+ * Only rendered when the active gateway supports this (bundled local
+ * runtime); see [ChatDetailPaneState.workingDirectorySupported].
+ */
+@Composable
+private fun DesktopWorkingDirectoryRow(
+    path: String?,
+    loading: Boolean,
+    onChangeDirectory: ((String) -> Unit)?,
+) {
+    val pickerLauncher = io.github.vinceglb.filekit.dialogs.compose.rememberDirectoryPickerLauncher(
+        dialogSettings = io.github.vinceglb.filekit.dialogs.FileKitDialogSettings(
+            title = "Choose working directory",
+        ),
+    ) { directory ->
+        directory?.let { onChangeDirectory?.invoke(it.file.absolutePath) }
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = onChangeDirectory != null && !loading) { pickerLauncher.launch() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Folder,
+            contentDescription = "Working directory",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(16.dp),
+        )
+        Text(
+            text = when {
+                loading -> "Loading working directory…"
+                path != null -> path
+                else -> "Working directory unknown"
+            },
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (onChangeDirectory != null) {
+            Text(
+                text = "Change…",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 

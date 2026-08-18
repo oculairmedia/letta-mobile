@@ -69,23 +69,32 @@ jobs:
             ${{ runner.os }}-konan-
 
       - name: Build Windows EXE + MSI installers
+        env:
+          # WiX still resolves source files through MAX_PATH-limited Win32 APIs.
+          # Keep this at the drive root; the bundled npm graph contains paths
+          # long enough to overflow even RUNNER_TEMP/letta-desktop-build.
+          LETTA_DESKTOP_BUILD_DIR: D:\l
         # Non-minified distributable: builds EXE/MSI without the ProGuard pass.
         # The *Release* variant runs proguardReleaseJars, which fails on JDK 26
         # ("can't find superclass java.lang.Object") because ProGuard can't see
         # the java.base module classes. For a testable desktop installer we want
         # the non-minified build anyway; minified release packaging is a separate
         # follow-up. Output:
-        #   desktop/build/compose/binaries/main/exe/*.exe
-        #   desktop/build/compose/binaries/main/msi/*.msi
-        run: ./gradlew --no-daemon :desktop:packageDistributionForCurrentOS
+        #   D:\l\compose\binaries\main\exe\*.exe
+        #   D:\l\compose\binaries\main\msi\*.msi
+        # Runtime download/install Exec tasks intentionally perform external
+        # process work and are not configuration-cache serializable. Packaging
+        # already produces its own incremental outputs, so disable the cache
+        # rather than failing after EXE/MSI generation has completed.
+        run: ./gradlew --no-daemon --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4
         with:
           name: letta-desktop-windows-installer-${{ github.run_number }}
           path: |
-            android-compose/desktop/build/compose/binaries/main/exe/*.exe
-            android-compose/desktop/build/compose/binaries/main/msi/*.msi
+            D:\l\compose\binaries\main\exe\*.exe
+            D:\l\compose\binaries\main\msi\*.msi
           if-no-files-found: error
 
   # Stable status check for branch protection.

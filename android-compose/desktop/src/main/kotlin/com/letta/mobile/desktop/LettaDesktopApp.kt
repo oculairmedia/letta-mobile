@@ -1,8 +1,6 @@
 package com.letta.mobile.desktop
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -25,22 +23,31 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.attachment.ImageIngressPolicy
+import com.letta.mobile.data.desktopshell.ConversationTabsReducer
+import com.letta.mobile.data.desktopshell.ConversationTabsState
+import com.letta.mobile.data.desktopshell.ShellLayoutEvent
+import com.letta.mobile.data.desktopshell.ShellLayoutReducer
 import com.letta.mobile.data.lens.WorkPlayLens
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.onboarding.OnboardingTaskKind
 import com.letta.mobile.data.model.SubagentStatus
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.desktop.data.DesktopShellLayoutStore
 import com.letta.mobile.desktop.chat.ChatDetailPane
 import com.letta.mobile.desktop.chat.ChatDetailPaneActions
 import com.letta.mobile.desktop.chat.ChatDetailPaneState
+import com.letta.mobile.desktop.chat.rememberFocusedContextUsage
 import com.letta.mobile.desktop.chat.DesktopChatConnectionState
 import com.letta.mobile.desktop.chat.DesktopChatSurfaceState
 import com.letta.mobile.desktop.chat.DesktopConversationSummary
+import com.letta.mobile.data.chat.runtime.displayTitle
 import com.letta.mobile.data.search.PaletteItemKind
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksPanel
 import com.letta.mobile.desktop.chat.DesktopBackgroundTasksToggle
@@ -80,6 +87,7 @@ internal data class DesktopAppShellBindings(
 internal fun LettaDesktopApp(
     shell: DesktopAppShellBindings,
     onActiveTitleChange: (String) -> Unit = {},
+    onHeaderChromeChange: (DesktopHeaderChromeState) -> Unit = {},
 ) {
     val nucleusApplicationScope = shell.nucleusApplicationScope
     val window = shell.window
@@ -101,6 +109,32 @@ internal fun LettaDesktopApp(
     val activeConfig = bootstrap.activeConfig
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
+    // Collapsible capability/history sidebar (Memory/Schedules/Channels/
+    // Skills/New chat/conversation history) — letta-mobile-o5m90. Distinct
+    // from railExpanded above: that toggles the far-left agent rail between
+    // icon and expanded modes, this hides the middle sidebar entirely.
+    // Fenced by backend config id so switching backends never restores
+    // another backend's layout (rememberSaveable does not survive a desktop
+    // process restart, so this goes through a real persisted store).
+    val shellLayoutStore = remember { DesktopShellLayoutStore() }
+    val shellLayoutController = rememberDesktopShellLayoutController(
+        backendConfigId = activeConfig.id,
+        store = shellLayoutStore,
+    )
+    val shellLayoutState = shellLayoutController.state
+    val reducedMotion = remember { desktopPrefersReducedMotion() }
+    SidebarToggleKeyDispatcherEffect(
+        onToggle = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
+    )
+    val sidebarToggleFocusRequester = remember { FocusRequester() }
+    // Move focus onto the surviving toggle button whenever the sidebar
+    // leaves composition, so a keyboard user never loses focus into a
+    // removed subtree (AC #7 focus restoration).
+    LaunchedEffect(shellLayoutState.isSidebarVisible) {
+        if (!shellLayoutState.isSidebarVisible) {
+            runCatching { sidebarToggleFocusRequester.requestFocus() }
+        }
+    }
     val chatScope = rememberCoroutineScope()
     val nucleusController = rememberDesktopNucleusController(chatScope)
     val nucleusState by nucleusController.state.collectAsState()
@@ -124,11 +158,26 @@ internal fun LettaDesktopApp(
             secureSettingsStore = secureSettingsStore,
         ),
     )
+    val localConfig = rememberDesktopLocalConfigState(
+        scope = chatScope,
+        secureSettingsStore = secureSettingsStore,
+        isLocalMode = activeConfig.mode == LettaConfig.Mode.LOCAL,
+        onRestartRequested = chatController::retryConnection,
+    )
     val chatState by chatController.state.collectAsState()
+    var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
     val availableModels by chatController.availableModels.collectAsState()
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val submittingApprovals by chatController.submittingApprovals.collectAsState()
     val canSubmitApprovals by chatController.canSubmitApprovals.collectAsState()
+    // letta-mobile folder-settings #2: re-read the working directory whenever
+    // the selected conversation changes (or its identity resolves for the
+    // first time after a fresh connect).
+    val selectedConversationWorkingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
+    val workingDirectoryLoading by chatController.workingDirectoryLoading.collectAsState()
+    LaunchedEffect(chatState.selectedConversationId, chatState.selectedConversation?.agentId) {
+        chatController.refreshSelectedConversationWorkingDirectory()
+    }
     val modelOptions = remember(availableModels) { buildModelOptions(availableModels) }
     val httpApis = rememberDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
     val blockApi = httpApis.blockApi
@@ -206,10 +255,69 @@ internal fun LettaDesktopApp(
     val activeTitle = desktopActiveTitle(selectedDestination, chatState.selectedConversation?.title)
     LaunchedEffect(activeTitle) { onActiveTitleChange(activeTitle) }
 
+    LaunchedEffect(selectedDestination, chatState.selectedConversationId) {
+        val selectedId = chatState.selectedConversationId
+        if (
+            selectedDestination == DesktopDestination.Conversations &&
+            selectedId != null &&
+            selectedId !in conversationTabsState.openConversationIds
+        ) {
+            conversationTabsState = ConversationTabsReducer.select(conversationTabsState, selectedId)
+        }
+    }
+    LaunchedEffect(chatState.connectionState, chatState.conversations) {
+        if (
+            chatState.connectionState == DesktopChatConnectionState.Live ||
+            chatState.connectionState == DesktopChatConnectionState.NoConversations
+        ) {
+            val availableIds = chatState.conversations.mapTo(mutableSetOf()) { it.id }
+            conversationTabsState = ConversationTabsReducer.retainAvailable(
+                state = conversationTabsState,
+                availableConversationIds = availableIds,
+                selectedConversationId = chatState.selectedConversationId,
+            )
+        }
+    }
+    val conversationById = remember(chatState.conversations) { chatState.conversations.associateBy { it.id } }
+    val conversationTabs = remember(conversationTabsState, conversationById) {
+        conversationTabsState.openConversationIds.mapNotNull { conversationId ->
+            conversationById[conversationId]?.let { conversation ->
+                DesktopConversationTab(
+                    conversationId = conversation.id,
+                    title = conversation.displayTitle(),
+                    agentName = conversation.agentName,
+                )
+            }
+        }
+    }
+
+    fun closeConversationTab(conversationId: String) {
+        val result = ConversationTabsReducer.close(conversationTabsState, conversationId)
+        val fallbackId = result.fallbackConversationId
+        val closingActiveTab = conversationId == chatState.selectedConversationId
+        conversationTabsState = result.state
+        if (!closingActiveTab) return
+        if (fallbackId != null) {
+            editAgentId = null
+            chatController.selectConversation(fallbackId)
+            selectedDestination = DesktopDestination.Conversations
+        } else {
+            selectedDestination = DesktopDestination.Home
+        }
+    }
+
     // Same-named agents are stacked in the rail, and the sidebar lists the
     // whole stack's conversations together (see [buildRailAgents]).
     val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
     val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
+    fun dispatchA2uiAction(action: com.letta.mobile.data.a2ui.A2uiAction) {
+        val resolvedAction = if (action.conversationId.isNullOrBlank()) {
+            action.copy(conversationId = chatState.selectedConversationId)
+        } else {
+            action
+        }
+        sessionGraph.channelTransport.sendA2uiAction(resolvedAction)
+    }
     LaunchedEffect(sessionGraph, chatState.connectionState) {
         runCatching {
             sessionGraph.agentRepository.refreshAgentsIfStale(
@@ -257,6 +365,20 @@ internal fun LettaDesktopApp(
     )
     val selectedAgentId = chatState.selectedConversation?.agentId
         ?: railAgents.firstOrNull()?.first
+
+    // Also used by the header chrome's collapsed-sidebar overflow menu
+    // (letta-mobile-3arhe.1), hence declared at the top level rather than
+    // nested inside the BoxWithConstraints below.
+    fun openNewChatForFocusedAgent() {
+        editAgentId = null
+        selectedDestination = DesktopDestination.Conversations
+        // Target the focused agent explicitly — for a roster-only agent,
+        // createConversation()'s conversation-derived agent id would miss it.
+        selectedAgentId
+            ?.let(chatController::createConversationForAgent)
+            ?: chatController.createConversation()
+    }
+
     // Per-agent avatar-style override chosen in the editor (stored in agent
     // metadata). Re-derived whenever the roster changes — which includes the
     // post-save reload — so a freshly-saved icon is reflected on the orbs.
@@ -543,12 +665,19 @@ internal fun LettaDesktopApp(
                   },
           ) {
             BoxWithConstraints(Modifier.fillMaxSize()) {
-            // Responsive shell: below the breakpoint the conversation sidebar
-            // collapses away and the chat takes the full width — a narrow
-            // window shows a single column (rail + chat) instead of squeezing
-            // three panes into unusable slivers. The 56dp rail stays as the
-            // navigation affordance.
-            val compactShell = maxWidth < CompactShellWidthBreakpoint
+            // Responsive shell: below the breakpoint (or when the user
+            // explicitly collapses it) the capability/history sidebar is
+            // fully removed — not shrunk to an icon rail — and the chat pane
+            // takes the full width. The breakpoint/collapse decision itself
+            // lives in sharedLogic's ShellLayoutReducer; this just reports
+            // the measured width into it. The 56dp agent rail always stays as
+            // the navigation affordance.
+            val measuredWidthDp = maxWidth.value
+            val isSidebarVisible = shellLayoutState.isSidebarVisible &&
+                !ShellLayoutReducer.defaultCollapsedForWidth(measuredWidthDp)
+            LaunchedEffect(measuredWidthDp) {
+                shellLayoutController.dispatch(ShellLayoutEvent.WindowWidthChanged(measuredWidthDp))
+            }
             Row(Modifier.fillMaxSize()) {
                 // Far-left workspace/agent rail.
                 DesktopAgentRail(
@@ -575,14 +704,13 @@ internal fun LettaDesktopApp(
                     ),
                 )
                 RailDivider()
-                // Agent sidebar: agent header + nav + conversations. Collapses
-                // horizontally in the compact shell.
-                AnimatedVisibility(
-                    visible = !compactShell,
-                    enter = expandHorizontally(),
-                    exit = shrinkHorizontally(),
+                // Agent sidebar: agent header + nav + conversations. Fully
+                // removed (not shrunk to an icon rail — AC #3) below the
+                // breakpoint or when the user explicitly collapses it.
+                DesktopCollapsibleSidebar(
+                    visible = isSidebarVisible,
+                    reducedMotion = reducedMotion,
                 ) {
-                Row(Modifier.fillMaxHeight()) {
                 DesktopAgentSidebar(
                     state = DesktopAgentSidebarState(
                         agentName = selectedAgentName,
@@ -606,196 +734,175 @@ internal fun LettaDesktopApp(
                             selectedDestination = DesktopDestination.Conversations
                         },
                         onDeleteConversation = chatController::deleteConversation,
-                        onNewChat = {
-                            editAgentId = null
-                            selectedDestination = DesktopDestination.Conversations
-                            // Target the focused agent explicitly — for a roster-only
-                            // agent, createConversation()'s conversation-derived agent
-                            // id would miss it.
-                            selectedAgentId
-                                ?.let(chatController::createConversationForAgent)
-                                ?: chatController.createConversation()
-                        },
+                        onNewChat = ::openNewChatForFocusedAgent,
                         onEditAgent = { editAgentId = selectedAgentId },
                     ),
                 )
                 RailDivider()
                 }
+                val composerCommands = remember(
+                    chatController,
+                    agentSlashCommands,
+                    selectedAgentId,
+                ) {
+                    buildComposerCommands(
+                        BuildComposerCommandsParams(
+                            chatController = chatController,
+                            agentSlashCommands = agentSlashCommands,
+                            onCreateAgent = { overlays.newAgent = true },
+                            onEditAgent = { editAgentId = selectedAgentId },
+                            onNavigate = { selectedDestination = it },
+                        ),
+                    )
                 }
-                // Main content pane.
-                Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-                    val editing = editAgentId
-                    if (editing != null) {
-                        DesktopEditAgentSurface(
-                            agentId = editing,
+                val contextUsage = rememberFocusedContextUsage(
+                    agentId = selectedAgentId,
+                    conversationId = chatState.selectedConversationId,
+                    settled = !isThinkingSelected && !isStreamingReplySelected,
+                    repository = dataBindings.sessionGraphProvider.current.agentRepository,
+                )
+                DesktopMainContentPane(
+                    inputs = DesktopMainContentInputs(
+                        editingAgentId = editAgentId,
+                        selectedDestination = selectedDestination,
+                        modelOptions = modelOptions,
+                        agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                        blockApi = blockApi,
+                        secureSettingsStore = secureSettingsStore,
+                        chatScope = chatScope,
+                        chatDetailState = ChatDetailPaneState(
+                            surface = chatState,
+                            contextUsage = contextUsage,
+                            isThinking = isThinkingSelected,
+                            isStreamingReply = isStreamingReplySelected,
                             modelOptions = modelOptions,
-                            agentRepository = dataBindings.sessionGraphProvider.current.agentRepository,
+                            commands = composerCommands,
+                            mentionables = mentionables,
+                            composerPlaceholder = WorkPlayLens.composerPlaceholder(
+                                workPlayMode,
+                                selectedAgentName,
+                            ),
+                            submittingApprovalRequestIds = submittingApprovals,
+                            agentNamesById = rosterAgents.associate { it.id.value to it.name },
+                            workingDirectory = selectedConversationWorkingDirectory,
+                            workingDirectorySupported = chatController.supportsWorkingDirectory,
+                            workingDirectoryLoading = workingDirectoryLoading,
+                        ),
+                        destinationInputs = DestinationContentInputs(
+                            state = bootstrapState,
+                            home = homeState,
+                            chat = chatState,
+                            memoryState = memoryState,
+                            schedule = DestinationScheduleInputs(
+                                scheduleLibraryState = scheduleLibraryState,
+                                crons = cronPanel.crons,
+                                focusedAgentId = selectedAgentId,
+                                canCreateCron = (cronPanel.available || irohMode) &&
+                                    (scheduleLibraryState.selectedAgentId != null || selectedAgentId != null),
+                            ),
+                            channelLibraryState = channelLibraryState,
+                            toolLibraryState = toolLibraryState,
                             blockApi = blockApi,
-                            settings = secureSettingsStore,
-                            scope = chatScope,
-                            onClose = { editAgentId = null },
-                            onSaved = { style, nameChanged ->
-                                avatarOverrides = avatarOverrides + (editing to style)
-                                editAgentId = null
-                                // Only a name change is visible in the rail/sidebar,
-                                // so skip the heavy reconnect otherwise.
-                                if (nameChanged) chatController.retryConnection()
+                            skills = DestinationSkillsInputs(
+                                skills = skillsPanel.all,
+                                installedSkillNames = skillsPanel.installedNames,
+                                skillsLoading = skillsPanel.loading,
+                                skillsError = skillsPanel.error,
+                                canManageSkills = skillsPanel.available && selectedAgentId != null,
+                                focusedAgentName = selectedAgentName,
+                            ),
+                            nucleus = nucleusState,
+                            localRuntimeProvider = localConfig.providerState,
+                            localBackendDirectory = localConfig.directoryState,
+                        ),
+                        showBackgroundTasks = showBackgroundTasks,
+                        subagentRepository = subagentRepository,
+                        activeSubagents = activeSubagents,
+                    ),
+                    actions = DesktopMainContentActions(
+                        onEditAgentClose = { editAgentId = null },
+                        onEditAgentSaved = { style, nameChanged ->
+                            avatarOverrides = avatarOverrides + (editAgentId.orEmpty() to style)
+                            editAgentId = null
+                            if (nameChanged) chatController.retryConnection()
+                        },
+                        chatDetailActions = ChatDetailPaneActions(
+                            onComposerTextChanged = chatController::updateComposerText,
+                            onSend = chatController::send,
+                            onSubmitApproval = chatController::submitApproval.takeIf { canSubmitApprovals },
+                            onA2uiAction = ::dispatchA2uiAction,
+                            onAttachImage = { pickerLauncher.launch() },
+                            onRemoveImageAttachment = chatController::removeImageAttachment,
+                            onRetryConnection = chatController::retryConnection,
+                            onModelSelected = chatController::setConversationModel,
+                            onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
+                            onOpenModelPicker = { overlays.modelPicker = true },
+                            onOnboardingTask = { kind ->
+                                when (kind) {
+                                    OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
+                                    OnboardingTaskKind.ConnectChannel ->
+                                        selectedDestination = DesktopDestination.Channels
+                                    OnboardingTaskKind.AddSkills ->
+                                        selectedDestination = DesktopDestination.Agents
+                                }
                             },
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    } else if (selectedDestination == DesktopDestination.Conversations) {
-                        val composerCommands = buildComposerCommands(
-                            BuildComposerCommandsParams(
-                                chatController = chatController,
-                                agentSlashCommands = agentSlashCommands,
-                                onCreateAgent = { overlays.newAgent = true },
-                                onEditAgent = { editAgentId = selectedAgentId },
-                                onNavigate = { selectedDestination = it },
-                            ),
-                        )
-                        ChatDetailPane(
-                            state = ChatDetailPaneState(
-                                surface = chatState,
-                                isThinking = isThinkingSelected,
-                                isStreamingReply = isStreamingReplySelected,
-                                modelOptions = modelOptions,
-                                commands = composerCommands,
-                                mentionables = mentionables,
-                                composerPlaceholder = WorkPlayLens.composerPlaceholder(
-                                    workPlayMode,
-                                    selectedAgentName,
-                                ),
-                                submittingApprovalRequestIds = submittingApprovals,
-                            ),
-                            actions = ChatDetailPaneActions(
-                                onComposerTextChanged = chatController::updateComposerText,
-                                onSend = chatController::send,
-                                // Only wire the submit handler when the active gateway can actually
-                                // submit approvals; on demo / HTTP-only gateways the cast in
-                                // submitApproval fails and the write is a silent no-op, so pass null
-                                // and let the card disable/hide its buttons instead.
-                                onSubmitApproval = chatController::submitApproval
-                                    .takeIf { canSubmitApprovals },
-                                onAttachImage = { pickerLauncher.launch() },
-                                onRemoveImageAttachment = chatController::removeImageAttachment,
-                                onRetryConnection = chatController::retryConnection,
-                                onModelSelected = chatController::setConversationModel,
-                                onOpenModelPicker = { overlays.modelPicker = true },
-                                onOnboardingTask = { kind ->
-                                    when (kind) {
-                                        OnboardingTaskKind.SetPersona -> editAgentId = selectedAgentId
-                                        OnboardingTaskKind.ConnectChannel ->
-                                            selectedDestination = DesktopDestination.Channels
-                                        OnboardingTaskKind.AddSkills ->
-                                            selectedDestination = DesktopDestination.Agents
-                                    }
+                            onOpenAgent = ::openAgent,
+                        ),
+                        destinationActions = DestinationContentActions(
+                            onRetryConnection = chatController::retryConnection,
+                            home = DesktopHomeActions(
+                                onSortKeySelected = { homeSort = homeSort.toggled(it) },
+                                onOpenAgent = ::openAgent,
+                                onOpenConversation = { conversationId ->
+                                    editAgentId = null
+                                    chatController.selectConversation(conversationId)
+                                    selectedDestination = DesktopDestination.Conversations
                                 },
+                                onSubmitPrompt = ::submitHomePrompt,
+                                onA2uiAction = ::dispatchA2uiAction,
                             ),
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                        // Direct child of the chat-pane Box: the align is
-                        // unambiguous here (a deeper nesting level once resolved
-                        // it against an outer scope and the chip landed on the
-                        // rail's hamburger). Floats beside the pinned prompt,
-                        // which reserves end padding for it.
-                        if (!showBackgroundTasks && subagentRepository != null) {
-                            DesktopBackgroundTasksToggle(
-                                runningCount = activeSubagents.count { it.status == SubagentStatus.RUNNING },
-                                onClick = { showBackgroundTasks = true },
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(top = 12.dp, end = 16.dp),
-                            )
-                        }
-                    } else {
-                        DestinationContent(
-                            destination = selectedDestination,
-                            inputs = DestinationContentInputs(
-                                state = bootstrapState,
-                                home = homeState,
-                                chat = chatState,
-                                memoryState = memoryState,
-                                schedule = DestinationScheduleInputs(
+                            memory = DestinationMemoryActions(
+                                onRefresh = libraries.memory::reload,
+                                onAgentSelected = libraries.memory::selectAgent,
+                            ),
+                            schedules = destinationScheduleActions(
+                                ScheduleWiringDeps(
+                                    schedules = libraries.schedules,
+                                    cronPanel = cronPanel,
                                     scheduleLibraryState = scheduleLibraryState,
-                                    crons = cronPanel.crons,
-                                    focusedAgentId = selectedAgentId,
-                                    // HTTP backends create via /v1/crons; iroh:// uses native
-                                    // schedule.create over admin_rpc (CronApi has no HTTP base).
-                                    canCreateCron = (cronPanel.available || irohMode) &&
-                                        (scheduleLibraryState.selectedAgentId != null ||
-                                            selectedAgentId != null),
-                                ),
-                                channelLibraryState = channelLibraryState,
-                                toolLibraryState = toolLibraryState,
-                                blockApi = blockApi,
-                                skills = DestinationSkillsInputs(
-                                    skills = skillsPanel.all,
-                                    installedSkillNames = skillsPanel.installedNames,
-                                    skillsLoading = skillsPanel.loading,
-                                    skillsError = skillsPanel.error,
-                                    canManageSkills = skillsPanel.available && selectedAgentId != null,
-                                    focusedAgentName = selectedAgentName,
-                                ),
-                                nucleus = nucleusState,
-                            ),
-                            actions = DestinationContentActions(
-                                onRetryConnection = chatController::retryConnection,
-                                home = DesktopHomeActions(
-                                    onSortKeySelected = { homeSort = homeSort.toggled(it) },
-                                    // Reuse the shell's single "open this agent"
-                                    // pathway so Home behaves like the rail.
-                                    onOpenAgent = ::openAgent,
-                                    onOpenConversation = { conversationId ->
-                                        editAgentId = null
-                                        chatController.selectConversation(conversationId)
-                                        selectedDestination = DesktopDestination.Conversations
-                                    },
-                                    onSubmitPrompt = ::submitHomePrompt,
-                                ),
-                                memory = DestinationMemoryActions(
-                                    onRefresh = libraries.memory::reload,
-                                    onAgentSelected = libraries.memory::selectAgent,
-                                ),
-                                schedules = destinationScheduleActions(
-                                    ScheduleWiringDeps(
-                                        schedules = libraries.schedules,
-                                        cronPanel = cronPanel,
-                                        scheduleLibraryState = scheduleLibraryState,
-                                        selectedAgentId = selectedAgentId,
-                                    ),
-                                ),
-                                onChannelsRefresh = libraries.channels::refresh,
-                                tools = DestinationToolsActions(
-                                    onRefresh = libraries.tools::reload,
-                                    onSearchQueryChanged = libraries.tools::updateSearchQuery,
-                                    onTagToggled = libraries.tools::toggleTag,
-                                    onClearTags = libraries.tools::clearTags,
-                                    onLoadMore = libraries.tools::loadMore,
-                                ),
-                                skills = destinationSkillsActions(
-                                    skillsPanel = skillsPanel,
-                                    chatScope = chatScope,
                                     selectedAgentId = selectedAgentId,
                                 ),
-                                onConfigSaved = { applyConfig(it) },
-                                onTokenCleared = {
-                                    applyConfig(activeConfig.copy(accessToken = null))
-                                },
-                                // Destructive (breaks device pairings) — route
-                                // through the confirmation dialog first.
-                                onIrohIdentityReset = { overlays.irohResetConfirm = true },
-                                nucleus = destinationNucleusActions(nucleusController, window),
                             ),
-                            modifier = Modifier.fillMaxSize(),
-                        )
-                    }
-                }
+                            onChannelsRefresh = libraries.channels::refresh,
+                            tools = DestinationToolsActions(
+                                onRefresh = libraries.tools::reload,
+                                onSearchQueryChanged = libraries.tools::updateSearchQuery,
+                                onTagToggled = libraries.tools::toggleTag,
+                                onClearTags = libraries.tools::clearTags,
+                                onLoadMore = libraries.tools::loadMore,
+                            ),
+                            skills = destinationSkillsActions(
+                                skillsPanel = skillsPanel,
+                                chatScope = chatScope,
+                                selectedAgentId = selectedAgentId,
+                            ),
+                            onConfigSaved = { applyConfig(it) },
+                            onTokenCleared = { applyConfig(activeConfig.copy(accessToken = null)) },
+                            onIrohIdentityReset = { overlays.irohResetConfirm = true },
+                            nucleus = destinationNucleusActions(nucleusController, window),
+                            localRuntimeProvider = localConfig.providerActions,
+                            localBackendDirectory = localConfig.directoryActions,
+                        ),
+                        onShowBackgroundTasks = { showBackgroundTasks = true },
+                    ),
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                )
                 if (showBackgroundTasks && subagentRepository != null) {
                     RailDivider()
                     DesktopBackgroundTasksPanel(
                         subagents = activeSubagents,
                         onClose = { showBackgroundTasks = false },
-                        onFetchTodos = subagentRepository?.let { repo ->
+                        onFetchTodos = subagentRepository.let { repo ->
                             { toolCallId -> repo.todos(toolCallId).getOrDefault(emptyList()) }
                         },
                     )
@@ -840,28 +947,59 @@ internal fun LettaDesktopApp(
                 ),
             )
           }
-          DesktopNowActiveBarHost(
-              chatController = chatController,
-              chatState = chatState,
-              host = NowActiveBarHostState(
-                  thinkingConversationId = thinkingConversationId,
-                  isStreamingReplySelected = isStreamingReplySelected,
-                  avatarStyleByAgentId = avatarStyleByAgentId,
-                  fallbackOrbIndex = selectedAgentOrbIndex,
-                  avatarCompanionActive = avatar.isActive,
-              ),
-              actions = NowActiveBarHostActions(
-                  onOpenConversation = { conversationId ->
-                      editAgentId = null
-                      chatController.selectConversation(conversationId)
-                      selectedDestination = DesktopDestination.Conversations
-                  },
-                  onAvatarCompanion = avatar.toggle,
-                  onStopRun = chatController::stopActiveRun,
-              ),
-          )
           }
         }
+
+        // Header chrome (letta-mobile-3arhe.1): the agent-first identity
+        // block (was a footer bar) plus the sidebar toggle (letta-mobile-
+        // o5m90), lifted up to Main.kt/DesktopJewelWindow's custom title bar
+        // the same way onActiveTitleChange already lifts the window title —
+        // that title bar is a composition sibling of this Column, not a
+        // descendant, so it cannot read this state directly.
+        val headerIdentity = DesktopNowActiveBarHost(
+            chatController = chatController,
+            chatState = chatState,
+            host = NowActiveBarHostState(
+                thinkingConversationId = thinkingConversationId,
+                isStreamingReplySelected = isStreamingReplySelected,
+                avatarStyleByAgentId = avatarStyleByAgentId,
+                fallbackOrbIndex = selectedAgentOrbIndex,
+                avatarCompanionActive = avatar.isActive,
+            ),
+            actions = NowActiveBarHostActions(
+                onOpenConversation = { conversationId ->
+                    editAgentId = null
+                    chatController.selectConversation(conversationId)
+                    selectedDestination = DesktopDestination.Conversations
+                },
+                onAvatarCompanion = avatar.toggle,
+                onStopRun = chatController::stopActiveRun,
+            ),
+        )
+        val headerChrome = DesktopHeaderChromeState(
+            identity = headerIdentity.state,
+            identityActions = headerIdentity.actions,
+            sidebarCollapsed = !shellLayoutState.isSidebarVisible,
+            onToggleSidebar = { shellLayoutController.dispatch(ShellLayoutEvent.ToggleSidebar) },
+            sidebarToggleFocusRequester = sidebarToggleFocusRequester,
+            sidebarOverflow = DesktopHeaderSidebarOverflow(
+                mode = workPlayMode,
+                onNewChat = ::openNewChatForFocusedAgent,
+                onDestination = { lensDestination ->
+                    editAgentId = null
+                    selectedDestination = lensNavTarget(workPlayMode, lensDestination).first
+                },
+            ),
+            conversationTabs = conversationTabs,
+            activeConversationId = chatState.selectedConversationId,
+            onSelectConversationTab = { conversationId ->
+                editAgentId = null
+                chatController.selectConversation(conversationId)
+                selectedDestination = DesktopDestination.Conversations
+            },
+            onCloseConversationTab = ::closeConversationTab,
+        )
+        SideEffect { onHeaderChromeChange(headerChrome) }
     }
 }
 
@@ -941,8 +1079,3 @@ private fun desktopActiveTitle(destination: DesktopDestination, conversationTitl
  * tools and default memory blocks (model/embedding default to the active
  * agent's config so the new agent is valid for this backend).
  */
-
-// Below this window width the conversation sidebar collapses and the chat
-// takes the full width (single-column shell). Chosen so the 231dp sidebar
-// only survives when the chat pane still gets a comfortable ~550dp+.
-private val CompactShellWidthBreakpoint = 840.dp

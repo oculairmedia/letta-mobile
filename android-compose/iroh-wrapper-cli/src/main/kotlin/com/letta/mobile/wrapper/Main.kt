@@ -3,6 +3,8 @@ package com.letta.mobile.wrapper
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
+import com.letta.mobile.cli.commands.AgentMessageCommand
+import com.letta.mobile.cli.commands.AgentMessageSendCommand
 import com.letta.mobile.cli.commands.AppServerServeIrohCommand
 import com.letta.mobile.cli.commands.PairCommand
 
@@ -24,6 +26,18 @@ import com.letta.mobile.cli.commands.PairCommand
  * `reference/qr-pairing-protocol.md` §5.1 + §7.1) without bringing up the
  * full wrapper. The wire format is the protocol's contract; this command is
  * the renderer only.
+ *
+ * letta-mobile-e12nf: a third subcommand group, `agent-message`, is
+ * registered so this installable binary can BE the `meridian` binary that
+ * [com.letta.mobile.data.controller.extras.CustomIrohMessagingTool] /
+ * [com.letta.mobile.data.controller.extras.DefaultIrohCliRunner] invoke via
+ * `--meridian-binary`. Previously `agent-message send` only existed in
+ * `:cli`'s `meridian` command (an Android library module with no installable
+ * distribution) — this wrapper distribution is the only artifact that is
+ * ever actually deployed via systemd, so the tool had no real binary to
+ * point at on a production host. Fits the "deliberately narrow" rule above:
+ * this is the same Iroh a2a transport the wrapper already bridges, not new
+ * REST/probe surface.
  */
 class IrohWrapperCli : CliktCommand(name = "meridian-iroh-wrapper") {
     override fun run() = Unit
@@ -37,6 +51,7 @@ fun buildIrohWrapperCli(): CliktCommand =
     IrohWrapperCli().subcommands(
         AppServerServeIrohCommand(),
         PairCommand(),
+        AgentMessageCommand().subcommands(AgentMessageSendCommand()),
     )
 
 object Main {
@@ -55,10 +70,12 @@ object Main {
         Usage:
           meridian-iroh-wrapper app-server-serve-iroh [options]
           meridian-iroh-wrapper pair [options]
+          meridian-iroh-wrapper agent-message send [options]
 
         Commands:
           app-server-serve-iroh  Bridge Iroh QUIC <-> App Server WebSocket.
           pair                    Mint a QR-encoded pairing invite (letta-mobile-gw0h1).
+          agent-message send     Send a direct agent-to-agent message over Iroh (letta-mobile-e12nf).
 
         Run `meridian-iroh-wrapper <command> --help` for options.
     """.trimIndent()

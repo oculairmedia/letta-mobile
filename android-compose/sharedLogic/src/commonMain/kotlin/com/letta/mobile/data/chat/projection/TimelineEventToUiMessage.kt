@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.messaging.AgentMessageProvenanceProjection
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiApprovalToolCall
@@ -99,7 +100,7 @@ fun scrubUserEnvelope(content: String): String {
  *   tooling) should observe the timeline directly without going through this
  *   projection.
  */
-fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
+fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiMessage? {
     return when (ev) {
         is TimelineEvent.Local -> {
             // letta-mobile-5s1n: Locals can now represent in-flight assistant
@@ -166,6 +167,13 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             toolCallId = callId,
                             approvalDecision = chip,
                             subagentDispatch = tc.toSubagentDispatch(result),
+                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
+                                toolName = tc.name,
+                                argumentsJson = tc.arguments,
+                                resultJson = result,
+                                isError = isError,
+                                fromAgentId = ownAgentId,
+                            ),
                         )
                     }
                 } else null
@@ -219,6 +227,18 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     ev.attachments.map {
                         UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
                     }
+                },
+                // letta-mobile-slqfp: Local events have no owning agentId yet,
+                // so inbound provenance projects against a null recipient —
+                // still correct because the decoded envelope carries its own
+                // toAgentId as a fallback (see projectInbound).
+                agentMessageProvenance = if (role == "user") {
+                    AgentMessageProvenanceProjection.projectInbound(
+                        clientMessageId = ev.otid,
+                        ownAgentId = ownAgentId,
+                    )
+                } else {
+                    null
                 },
             )
         }
@@ -296,6 +316,13 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                             resultTruncation = truncation?.let {
                                 UiToolResultTruncation(messageId = it.messageId, byteLen = it.byteLen)
                             },
+                            agentMessageProvenance = AgentMessageProvenanceProjection.projectOutbound(
+                                toolName = tc.name,
+                                argumentsJson = tc.arguments,
+                                resultJson = result,
+                                isError = isError,
+                                fromAgentId = ev.agentId,
+                            ),
                         )
                     }
                 } else null
@@ -370,6 +397,14 @@ fun timelineEventToUiMessage(ev: TimelineEvent): UiMessage? {
                     ev.attachments.map {
                         UiImageAttachment(base64 = it.base64, mediaType = it.mediaType)
                     }
+                },
+                agentMessageProvenance = if (role == "user") {
+                    AgentMessageProvenanceProjection.projectInbound(
+                        clientMessageId = ev.otid,
+                        ownAgentId = ev.agentId,
+                    )
+                } else {
+                    null
                 },
             )
         }

@@ -61,6 +61,7 @@ internal fun RenderChatMessage(
     highlightedMessageId: String?,
     callbacks: ChatMessageRenderCallbacks,
     reasoningCollapsed: Boolean = false,
+    showTimestamp: Boolean = true,
     onToggleReasoning: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -97,6 +98,7 @@ internal fun RenderChatMessage(
                 callbacks.onSubmitApproval(requestId, toolCallIds, approve, reason)
             },
             approvalInFlight = approvalInFlight,
+            showTimestamp = showTimestamp,
             onAttachmentImageTap = callbacks.onAttachmentImageTap,
             modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
         )

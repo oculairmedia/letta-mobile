@@ -15,8 +15,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
@@ -36,16 +38,34 @@ class SubagentRepositoryTest {
     private val parentScope = SubagentParentScope("agent-parent", "default")
 
     private lateinit var transport: FakeChannelTransport
+    private val repositories = mutableListOf<SubagentRepository>()
 
     @Before
     fun setUp() {
         transport = FakeChannelTransport(initialState = connectedState())
     }
 
+    @After
+    fun tearDown() {
+        repositories.forEach(SubagentRepository::close)
+    }
+
+    private fun repository(
+        scope: kotlinx.coroutines.CoroutineScope,
+        clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    ): SubagentRepository = SubagentRepository(
+        transport = transport,
+        scope = scope,
+        clock = clock,
+        // A production watchdog is intentionally long-lived. Do not let its
+        // virtual-time loop drive a unit test past its assertions.
+        streamTimeoutSweepIntervalMs = Long.MAX_VALUE,
+    ).also(repositories::add)
+
     @Test
     fun `activeSubagentsFlow triggers exactly one subagent_list regardless of subscribers`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val s1 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         val s2 = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -62,7 +82,7 @@ class SubagentRepositoryTest {
     @Test
     fun `activeSubagentsFlow returns current snapshot within one WS round-trip`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"), running("toolu_2"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val subagents = withTimeout(5.seconds) {
             repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -74,7 +94,7 @@ class SubagentRepositoryTest {
     @Test
     fun `subagents_updated push folds fresh active snapshot in by replacement`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         assertEquals(1, transport.subagentListCalls.size)
@@ -100,7 +120,7 @@ class SubagentRepositoryTest {
     @Test
     fun `subagents_updated with explicit terminal replaces running entry with durable terminal`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
@@ -124,7 +144,7 @@ class SubagentRepositoryTest {
     @Test
     fun `subagents_updated partial snapshot retains omitted running entries`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
@@ -143,14 +163,44 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun `refresh authoritative snapshot evicts omitted running entries`() = runTest {
+    fun `refresh authoritative omission retains running entry within bounded linger`() = runTest {
+        var now = 1_000L
         transport.enqueueSubagentList(
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_2"))),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
+        repo.refresh().getOrThrow()
+
+        assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+        now += 59_999L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_2"))))
+        repo.refresh().getOrThrow()
+        assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+
+        now += 1L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_3"))))
+        repo.refresh().getOrThrow()
+        assertEquals(setOf("toolu_2", "toolu_3"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `refresh authoritative snapshot evicts omitted running entries after linger`() = runTest {
+        var now = 1_000L
+        transport.enqueueSubagentList(
+            successList(listOf(running("toolu_1"))),
+            successList(listOf(running("toolu_2"))),
+        )
+        val repo = repository(backgroundScope, clock = { now })
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+
+        repo.refresh().getOrThrow()
+        assertEquals(setOf("toolu_1", "toolu_2"), repo.currentActiveSubagents(parentScope).map { it.toolCallId }.toSet())
+
+        now += 61_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_2"))))
         repo.refresh().getOrThrow()
 
         val after = repo.currentActiveSubagents(parentScope)
@@ -162,7 +212,7 @@ class SubagentRepositoryTest {
         val agentOne = running("toolu-agent-1")
         val agentTwo = running("toolu-agent-2").copy(parentAgentId = "agent-other")
         transport.enqueueSubagentList(successList(listOf(agentOne, agentTwo)))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val first = repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         val second = repo.activeSubagentsFlow(SubagentParentScope("agent-other", "default"))
@@ -177,7 +227,7 @@ class SubagentRepositoryTest {
         val firstConversation = running("toolu-conv-a").copy(parentConversationId = "conv-a")
         val secondConversation = running("toolu-conv-b").copy(parentConversationId = "conv-b")
         transport.enqueueSubagentList(successList(listOf(firstConversation, secondConversation)))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val first = repo.activeSubagentsFlow(SubagentParentScope("agent-parent", "conv-a"))
             .first { it.isNotEmpty() }
@@ -192,7 +242,7 @@ class SubagentRepositoryTest {
     fun `terminal lifecycle remains cached after resubscribe beyond sharing timeout`() = runTest {
         var now = 1_000L
         transport.enqueueSubagentList(successList(listOf(running("toolu-terminal"))))
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         transport.events.emit(
@@ -231,7 +281,7 @@ class SubagentRepositoryTest {
                 ),
             ),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val result = repo.todos("toolu_1")
         assertTrue("todos returned $result", result.isSuccess)
@@ -251,7 +301,7 @@ class SubagentRepositoryTest {
                 error = "unknown subagent",
             ),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val result = repo.todos("toolu_x")
         assertTrue("todos should fail", result.isFailure)
@@ -264,7 +314,7 @@ class SubagentRepositoryTest {
             successList(listOf(running("toolu_1"))),
             successList(listOf(running("toolu_1"), running("toolu_2"))),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
         assertEquals(1, transport.subagentListCalls.size)
@@ -283,7 +333,7 @@ class SubagentRepositoryTest {
     fun `refresh dedups parallel callers to a single in-flight WS round-trip`() = runTest {
         transport.subagentListDelayMs = 50
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val initial = async(start = CoroutineStart.UNDISPATCHED) {
             repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
@@ -308,7 +358,7 @@ class SubagentRepositoryTest {
                 error = "registry unavailable",
             )
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val result = repo.refresh()
         assertTrue("refresh should fail", result.isFailure)
@@ -320,7 +370,7 @@ class SubagentRepositoryTest {
     fun `refresh concurrent callers share one deferred and do not cancel each other`() = runTest {
         transport.subagentListDelayMs = 50
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
 
         val r1 = async { repo.refresh() }
         val r2 = async { repo.refresh() }
@@ -334,24 +384,24 @@ class SubagentRepositoryTest {
     }
 
     @Test
-    fun `authoritative empty snapshot evicts seeded running entry`() = runTest {
+    fun `authoritative empty snapshot retains seeded running entry within linger`() = runTest {
         transport.enqueueSubagentList(
             successList(listOf(running("toolu_1"))),
             successList(emptyList()),
         )
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         repo.refresh().getOrThrow()
 
         val after = repo.currentActiveSubagents(parentScope)
-        assertEquals(emptyList<SubagentEntry>(), after)
+        assertEquals(listOf("toolu_1"), after.map { it.toolCallId })
     }
 
     @Test
     fun `incremental push omitting running entry retains it`() = runTest {
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope)
+        val repo = repository(backgroundScope)
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         // INCREMENTAL push omits toolu_1 — it must be RETAINED (sqdqe guard).
@@ -376,7 +426,7 @@ class SubagentRepositoryTest {
     fun `incremental absence bound evicts running entry after linger`() = runTest {
         var now = 1_000L
         transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
-        val repo = SubagentRepository(transport, backgroundScope, clock = { now })
+        val repo = repository(backgroundScope, clock = { now })
         repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
 
         // First INCREMENTAL push omits toolu_1 — retained with absence timestamp.
@@ -397,7 +447,17 @@ class SubagentRepositoryTest {
         assertEquals(setOf("toolu_1", "toolu_2"), afterFirst.map { it.toolCallId }.toSet())
 
         // Advance clock past the 60s absence linger bound.
-        now += 61_000L
+        now += 59_999L
+        transport.events.emit(
+            ServerFrame.SubagentsUpdated(
+                id = "u-boundary-retain", ts = "t", reason = "registry-gap",
+                subagent = running("toolu_2"),
+                subagentsActive = listOf(running("toolu_2")), at = "t",
+            )
+        )
+        assertTrue(repo.currentActiveSubagents(parentScope).any { it.toolCallId == "toolu_1" })
+
+        now += 1L
 
         // Second INCREMENTAL push still omits toolu_1 — should be EVICTED now.
         transport.events.emit(
@@ -416,6 +476,36 @@ class SubagentRepositoryTest {
             repo.activeSubagentsFlow(parentScope).first { it.any { e -> e.toolCallId == "toolu_3" } }
         }
         assertEquals(setOf("toolu_2", "toolu_3"), afterSecond.map { it.toolCallId }.toSet())
+    }
+
+    @Test
+    fun `absence sweep evicts without a later snapshot`() = runTest {
+        var now = 1_000L
+        transport.enqueueSubagentList(successList(listOf(running("toolu_1"))))
+        val repo = repository(backgroundScope, clock = { now })
+        repo.activeSubagentsFlow(parentScope).first { it.isNotEmpty() }
+        transport.events.emit(ServerFrame.SubagentsUpdated(
+            id = "u-absent", ts = "t", reason = "gap",
+            subagent = running("toolu_2"), subagentsActive = listOf(running("toolu_2")), at = "t",
+        ))
+        withTimeout(2.seconds) { repo.activeSubagentsFlow(parentScope).first { it.size == 2 } }
+        now += 60_001L
+        assertTrue(repo.currentActiveSubagents(parentScope).none { it.toolCallId == "toolu_1" })
+    }
+
+    @Test
+    fun `test fixture forbids untracked repository construction`() {
+        val source = File("src/test/java/com/letta/mobile/data/repository/SubagentRepositoryTest.kt").readText()
+        val directConstructions = Regex("""(?m)SubagentRepository\(\s*$""")
+            .findAll(source)
+            .count()
+
+        assertEquals(
+            "Only repository(...) may construct SubagentRepository so @After always closes collectors.",
+            1,
+            directConstructions,
+        )
+        assertTrue(source.contains("repositories.forEach(SubagentRepository::close)"))
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────

@@ -74,6 +74,10 @@ internal class ChatConversationCoordinator(
     private val sendMessageViaTimeline: (String) -> Unit,
     private val markFollowingDuplicateInitialMessageInFlight: () -> Unit,
     private val localRuntimeRouting: () -> LocalRuntimeRouting = { LocalRuntimeRouting.Remote },
+    private val hydrationIdentity: (String) -> ChatHydrationTrace.Identity = { conversationId ->
+        ChatHydrationTrace.Identity(agentId = agentId, conversationId = conversationId)
+    },
+    private val hydrationGeneration: (String) -> ChatHydrationTrace.Generation? = ChatHydrationTrace::current,
 ) {
     companion object {
         private const val CONVERSATION_CACHE_TTL_MS = 30_000L
@@ -93,6 +97,11 @@ internal class ChatConversationCoordinator(
 
     fun conversationId(useClientMode: Boolean): String? =
         activeConversationId ?: if (useClientMode) currentClientModeConversationId() else null
+
+    /** Records a route-open only when the route already supplies a stable conversation id. */
+    fun recordOpenRequested() {
+        activeConversationId?.let { ChatHydrationTrace.begin(hydrationIdentity(it)) }
+    }
 
     fun setActiveConversationId(conversationId: String?) {
         setRouteConversationId(conversationId)
@@ -463,8 +472,12 @@ internal class ChatConversationCoordinator(
             // await it here because the user can still send / scroll
             // against the cached view while the fetch is in flight.
             scope.launch {
+                val generation = hydrationGeneration(requestedConversationId)
+                generation?.let { ChatHydrationTrace.reconcileStarted(it, reason = "open") }
                 runCatching {
                     reconcileRecentMessages(requestedConversationId, "open")
+                }.onSuccess {
+                    generation?.let { trace -> ChatHydrationTrace.reconcileCompleted(trace, reason = "open") }
                 }.onFailure {
                     Telemetry.error(
                         "AdminChatVM", "loadMessages.reconcileOnOpenFailed", it,

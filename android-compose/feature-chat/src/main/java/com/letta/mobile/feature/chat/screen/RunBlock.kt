@@ -321,62 +321,43 @@ internal fun compactRunToolCallSteps(
 ): List<RunTimelineStep> {
     if (messages.isEmpty()) return emptyList()
     val steps = ArrayList<RunTimelineStep>(messages.size)
-    val pendingToolMessages = ArrayList<UiMessage>()
-
-    fun flushToolMessages() {
-        when (pendingToolMessages.size) {
-            0 -> Unit
-            1 -> {
-                val single = pendingToolMessages.single()
-                steps.add(
-                    RunTimelineStep.ToolCallGroup(
-                        messages = listOf(single),
-                        toolCalls = single.toolCalls.orEmpty(),
-                        pendingApprovalToolCallIds = single.approvalRequest?.toolCalls
-                            .orEmpty()
-                            .mapTo(mutableSetOf()) { it.toolCallId },
-                        approvalRequests = listOfNotNull(single.approvalRequest),
-                    )
-                )
-            }
-            else -> {
-                val groupedMessages = pendingToolMessages.toList()
-                steps.add(
-                    RunTimelineStep.ToolCallGroup(
-                        messages = groupedMessages,
-                        toolCalls = groupedMessages.flatMap { it.toolCalls.orEmpty() },
-                        pendingApprovalToolCallIds = groupedMessages
-                            .flatMap { message -> message.approvalRequest?.toolCalls.orEmpty() }
-                            .mapTo(mutableSetOf()) { it.toolCallId },
-                        approvalRequests = groupedMessages
-                            .mapNotNull { it.approvalRequest }
-                            .distinctBy { it.requestId },
-                    )
-                )
-            }
+    val toolMessages = messages.mapNotNull { message ->
+        when {
+            message.isRunCompactableToolCallMessage() -> message
+            message.hasStandaloneContentAndToolCalls() -> message.withoutStandaloneContentForToolGroup()
+            else -> null
         }
-        pendingToolMessages.clear()
     }
+    var emittedToolGroup = false
 
     messages.forEach { message ->
         when {
             message.isRunCompactableToolCallMessage() -> {
-                pendingToolMessages += message
+                if (!emittedToolGroup) {
+                    steps += toolMessages.toToolCallGroup()
+                    emittedToolGroup = true
+                }
             }
             message.hasStandaloneContentAndToolCalls() -> {
-                flushToolMessages()
+                if (!emittedToolGroup) {
+                    steps += toolMessages.toToolCallGroup()
+                    emittedToolGroup = true
+                }
                 steps.add(RunTimelineStep.Message(message.withoutToolCallsForStandaloneContent()))
-                pendingToolMessages += message.withoutStandaloneContentForToolGroup()
             }
-            else -> {
-                flushToolMessages()
-                steps.add(RunTimelineStep.Message(message))
-            }
+            else -> steps.add(RunTimelineStep.Message(message))
         }
     }
-    flushToolMessages()
     return steps
 }
+
+private fun List<UiMessage>.toToolCallGroup() = RunTimelineStep.ToolCallGroup(
+    messages = this,
+    toolCalls = flatMap { it.toolCalls.orEmpty() },
+    pendingApprovalToolCallIds = flatMap { it.approvalRequest?.toolCalls.orEmpty() }
+        .mapTo(mutableSetOf()) { it.toolCallId },
+    approvalRequests = mapNotNull { it.approvalRequest }.distinctBy { it.requestId },
+)
 
 private fun UiMessage.isRunCompactableToolCallMessage(): Boolean =
     role == "assistant" &&

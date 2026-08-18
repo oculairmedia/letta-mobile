@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Manage Letta agents and conversations from the browser.">
+    <title>Letta Web</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <style>
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: Canvas;
+            color-scheme: light dark;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+        #ComposeTarget {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+    <script type="module">
+        import init, { IrohAppServerSession } from './iroh/letta_iroh_wasm.js';
+
+        const sessions = new Map();
+        const maxQueuedControlFrames = 256;
+        const maxQueuedStreamFrames = 2048;
+        let nextSessionId = 1;
+        let initialization;
+
+        const initialize = () => {
+            initialization ??= init('./iroh/letta_iroh_wasm_bg.wasm');
+            return initialization;
+        };
+
+        const drain = async (session, stream, queue, maxQueuedFrames) => {
+            try {
+                for await (const frame of stream) {
+                    if (queue.length >= maxQueuedFrames) throw new Error('Iroh frame queue overflow');
+                    queue.push(frame);
+                }
+                if (session.state === 'connected') session.state = 'disconnected';
+            } catch (error) {
+                if (session.state !== 'closed') {
+                    session.error = String(error);
+                    session.state = 'error';
+                }
+            }
+        };
+
+        window.irohConnect = async (ticket) => {
+            await initialize();
+            const native = await IrohAppServerSession.connect(ticket);
+            const id = nextSessionId++;
+            const session = {
+                native,
+                state: 'connected',
+                error: null,
+                control: [],
+                stream: [],
+                drains: [],
+            };
+            sessions.set(id, session);
+            session.drains = [
+                drain(session, native.take_control_events(), session.control, maxQueuedControlFrames),
+                drain(session, native.take_stream_events(), session.stream, maxQueuedStreamFrames),
+            ];
+            return id;
+        };
+
+        window.irohSendControl = (id, payload) => {
+            const session = sessions.get(id);
+            if (!session || session.state !== 'connected') throw new Error('Iroh session is not connected');
+            return session.native.send_control(payload);
+        };
+        window.irohPollControl = (id) => sessions.get(id)?.control.shift() ?? null;
+        window.irohPollStream = (id) => sessions.get(id)?.stream.shift() ?? null;
+        window.irohSessionState = (id) => sessions.get(id)?.state ?? 'closed';
+        window.irohSessionError = (id) => sessions.get(id)?.error ?? null;
+        window.irohClose = async (id) => {
+            const session = sessions.get(id);
+            if (!session) return;
+            session.state = 'closed';
+            sessions.delete(id);
+            await session.native.close();
+            await Promise.allSettled(session.drains);
+            session.native.free();
+        };
+    </script>
+</head>
+<body>
+    <canvas id="ComposeTarget"></canvas>
+    <script src="letta-web.js"></script>
+</body>
+</html>

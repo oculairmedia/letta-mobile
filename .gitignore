@@ -54,6 +54,12 @@ reports/*.json
 # Local performance traces
 scripts/perf/traces/*
 !scripts/perf/traces/.gitignore
+
+# frame-shape-capture corpus: raw diagnostic capture data (may contain live
+# conversation content), not source. Kept off git; see
+# tools/frame-shape-capture/README.md.
+tools/frame-shape-capture/corpus/*
+!tools/frame-shape-capture/corpus/.gitkeep
 **/__pycache__/
 *.py[cod]
 models-cache/

@@ -2,6 +2,9 @@ package com.letta.mobile.desktop.chat
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,11 +14,15 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CallMade
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.HelpOutline
@@ -43,17 +50,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import com.letta.mobile.data.a2ui.toA2uiSurfaceStateOrNull
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AskUserQuestionItem
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiApprovalResponse
 import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
+import com.letta.mobile.data.messaging.compactLabel
+import com.letta.mobile.data.messaging.displayLabel
+import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
+import com.letta.mobile.data.a2ui.A2uiAction
+import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 
 /**
  * Collapsible single-tool disclosure. Deliberately chrome-less when it succeeds:
@@ -100,14 +115,71 @@ private fun ToolCardHeader(
     expanded: Boolean,
     onToggle: () -> Unit,
 ) {
+    // letta-mobile-slqfp: `agent_message_send` gets a distinct compact
+    // sender -> recipient label instead of the generic tool-name row — the
+    // whole point of structured provenance is that this reads as an agent
+    // message, not an anonymous tool invocation.
+    val provenance = toolCall.agentMessageProvenance
+    if (provenance != null) {
+        val presentation = LocalDesktopAgentMessageContext.current
+        val isFailed = provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED
+        val tint = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("tool-card-toggle")
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+                .semantics {
+                    contentDescription = provenance.compactLabel(presentation.resolveName) +
+                        ", ${provenance.deliveryState.displayLabel().lowercase()}"
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.CallMade,
+                contentDescription = null,
+                modifier = Modifier.size(13.dp),
+                tint = tint.copy(alpha = 0.85f),
+            )
+            Text(
+                text = provenance.compactLabel(presentation.resolveName),
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Medium,
+                color = tint,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = provenance.deliveryState.displayLabel(),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (isFailed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Icon(
+                imageVector = if (expanded) Icons.Outlined.KeyboardArrowUp else Icons.Outlined.KeyboardArrowDown,
+                contentDescription = if (expanded) "Collapse" else "Expand",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        return
+    }
     val collapsedSummary = toolCall.stepLabel()
         .takeUnless { it == toolCall.name }
         ?: toolCall.stepSummary()
+    // Hover-only source (separate from the row's click interaction, which
+    // `clickable` owns internally) purely so the copy affordance below can
+    // reveal on hover of this activity-log row.
+    val rowHoverSource = remember { MutableInteractionSource() }
+    val rowHovered by rowHoverSource.collectIsHoveredAsState()
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("tool-card-toggle")
             .clickable(onClick = onToggle)
+            .hoverable(rowHoverSource)
             .padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -142,6 +214,7 @@ private fun ToolCardHeader(
             CopyIconButton(
                 text = toolCall.copyPayload(),
                 config = CopyActionConfig(contentDescription = "Copy tool call"),
+                visible = rowHovered,
             )
         }
         Icon(
@@ -161,6 +234,14 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
             .padding(start = 31.dp, end = 10.dp, top = 2.dp, bottom = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        toolCall.agentMessageProvenance?.let { provenance ->
+            val tint = if (provenance.deliveryState == com.letta.mobile.data.messaging.AgentMessageDeliveryState.FAILED) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.tertiary
+            }
+            AgentMessageProvenanceMetadata(provenance, tint)
+        }
         toolCall.arguments.takeIf { it.isNotBlank() }?.let { args ->
             SelectionContainer {
                 Text(
@@ -171,8 +252,12 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
             }
         }
         toolCall.result?.takeIf { it.isNotBlank() }?.let { result ->
+            val outputRowHoverSource = remember { MutableInteractionSource() }
+            val outputRowHovered by outputRowHoverSource.collectIsHoveredAsState()
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .hoverable(outputRowHoverSource),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
@@ -184,6 +269,7 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
                 CopyIconButton(
                     text = result,
                     config = CopyActionConfig(contentDescription = "Copy output"),
+                    visible = outputRowHovered,
                 )
             }
             ToolOutputBlock(result, isError = isError)
@@ -202,8 +288,49 @@ private fun ToolCardBody(toolCall: UiToolCall, isError: Boolean) {
     }
 }
 
+/**
+ * A generated-UI tool result rendered inline in the transcript.
+ *
+ * letta-mobile-2don7: this now renders through the real A2UI Basic-catalog
+ * renderer ([A2uiSurfaceRenderer], moved into sharedLogic so desktop can
+ * reach it) whenever [UiGeneratedComponent] adapts to a real, recognized
+ * widget (see [toA2uiSurfaceStateOrNull]). Chat-anchored A2UI stays
+ * BOUNDED — a generated document must not be able to take over the whole
+ * transcript column, so the rendered surface is capped at
+ * [ChatAnchoredA2uiMaxHeight] and scrolls internally past that. Payloads
+ * that don't adapt to a known widget (unparseable JSON, or a name that
+ * isn't a catalog widget id — e.g. demo/preview cards) fall back to the
+ * previous fallback-text + raw-JSON card so nothing renders as a silent
+ * blank.
+ */
 @Composable
-internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
+internal fun GeneratedUiCard(
+    generatedUi: UiGeneratedComponent,
+    onAction: ((A2uiAction) -> Unit)? = null,
+) {
+    val actionHandler = onAction ?: LocalDesktopA2uiActionHandler.current
+    val surface = remember(generatedUi) { generatedUi.toA2uiSurfaceStateOrNull() }
+    if (surface != null) {
+        ArtifactCard(
+            icon = Icons.Outlined.Widgets,
+            title = generatedUi.name,
+            status = ToolStatusToken("A2UI"),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = ChatAnchoredA2uiMaxHeight)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                A2uiSurfaceRenderer(
+                    surface = surface,
+                    modifier = Modifier.fillMaxWidth(),
+                    onAction = actionHandler,
+                )
+            }
+        }
+        return
+    }
     ArtifactCard(
         icon = Icons.Outlined.Widgets,
         title = generatedUi.name,
@@ -223,6 +350,9 @@ internal fun GeneratedUiCard(generatedUi: UiGeneratedComponent) {
     }
 }
 
+/** Chat-anchored A2UI must stay bounded — see [GeneratedUiCard]. */
+private val ChatAnchoredA2uiMaxHeight = 360.dp
+
 /**
  * Threads the approval-decision callback (and the set of in-flight request ids)
  * from the chat controller down to the approval cards without widening every
@@ -239,6 +369,7 @@ internal data class DesktopApprovalDecisionHandler(
 )
 
 internal val LocalDesktopApprovalDecision = staticCompositionLocalOf<DesktopApprovalDecisionHandler?> { null }
+internal val LocalDesktopA2uiActionHandler = staticCompositionLocalOf<(A2uiAction) -> Unit> { {} }
 
 @Composable
 internal fun ApprovalRequestCard(approvalRequest: UiApprovalRequest) {

@@ -660,7 +660,9 @@ class ChatSendCoordinatorCleanupTest {
         startTimelineObserver = {},
         clientVersion = { "test" },
         otidGenerator = { "otid-${++otid}" },
-        recordRuntimeEvent = recordRuntimeEvent,
+        recordRuntimeEvents = { events ->
+            events.forEach { event -> recordRuntimeEvent(event.event, event.conversationId) }
+        },
     )
 
     private class RecordingUiSink(

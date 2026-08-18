@@ -18,7 +18,7 @@ interface RuntimeEventDao {
     suspend fun listAfterOffset(afterOffset: Long): List<RuntimeEventEntity>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun insert(row: RuntimeEventEntity)
+    suspend fun insert(rows: List<RuntimeEventEntity>)
 
     @Query("DELETE FROM runtime_events")
     suspend fun deleteAll()

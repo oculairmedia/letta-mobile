@@ -1,6 +1,7 @@
 package com.letta.mobile.data.model
 
 import androidx.compose.runtime.Immutable
+import com.letta.mobile.data.messaging.AgentMessageProvenance
 
 @Immutable
 data class UiMessage(
@@ -58,6 +59,16 @@ data class UiMessage(
      * JSON array containing inline image parts.
      */
     val attachments: List<UiImageAttachment> = emptyList(),
+    /**
+     * letta-mobile-slqfp: structured inter-agent (a2a) provenance for this
+     * message, when it is a message this conversation's agent RECEIVED from
+     * another agent (INBOUND). Never inferred from [content] — see
+     * [com.letta.mobile.data.messaging.AgentMessageProvenanceProjection].
+     * OUTBOUND provenance (this agent sending to another) lives on the
+     * `agent_message_send` [UiToolCall.agentMessageProvenance] instead, since
+     * the send is represented as a tool call, not a standalone message.
+     */
+    val agentMessageProvenance: AgentMessageProvenance? = null,
 )
 
 @Immutable
@@ -100,6 +111,13 @@ data class UiToolCall(
      * user expands the card.
      */
     val resultTruncation: UiToolResultTruncation? = null,
+    /**
+     * letta-mobile-slqfp: structured OUTBOUND inter-agent provenance when
+     * this tool call is `agent_message_send` — see
+     * [com.letta.mobile.data.messaging.AgentMessageProvenanceProjection.projectOutbound].
+     * Null for every other tool call.
+     */
+    val agentMessageProvenance: AgentMessageProvenance? = null,
 )
 
 /**

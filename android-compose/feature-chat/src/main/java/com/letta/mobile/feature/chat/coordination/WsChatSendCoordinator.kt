@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.chat.send.ChatSendCoordinator
 import com.letta.mobile.data.chat.send.ChatSendUiSink
+import com.letta.mobile.data.chat.send.ScopedRuntimeEvent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.MessageContentPart
@@ -13,7 +14,6 @@ import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
-import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -180,7 +180,7 @@ internal class WsChatSendCoordinator(
         startTimelineObserver = startTimelineObserver,
         clientVersion = { clientVersionProvider.clientVersion },
         otidGenerator = { "cm-android-${UUID.randomUUID()}" },
-        recordRuntimeEvent = ::recordRuntimeEvent,
+        recordRuntimeEvents = ::recordRuntimeEvents,
     )
 
     fun send(
@@ -192,26 +192,18 @@ internal class WsChatSendCoordinator(
 
     internal suspend fun handleEvent(event: WsTimelineEvent) = delegate.handleEvent(event)
 
-    private suspend fun recordRuntimeEvent(
-        event: WsTimelineEvent,
-        conversationIdOverride: String?,
-    ) {
+    private suspend fun recordRuntimeEvents(events: List<ScopedRuntimeEvent>) {
         val backend = backendDescriptor() ?: return
-        // The shared coordinator resolves its own active-conversation fallback
-        // and passes it as [conversationIdOverride]; only the screen-level
-        // active conversation id remains to be supplied here.
-        val conversationId = (conversationIdOverride ?: activeConversationId())
-            ?.let(::ConversationId)
-        val drafts = event.toRuntimeEventDrafts(
-            backend = backend,
-            fallbackAgentId = AgentId(agentId),
-            fallbackConversationId = conversationId,
-        )
-        if (drafts.isEmpty()) return
-        runCatching {
-            runtimeEventSink(drafts)
-        }.onFailure { error ->
-            Telemetry.error("AdminChatVM", "runtimeEvent.recordFailed", error)
+        val drafts = events.flatMap { scopedEvent ->
+            val conversationId = (scopedEvent.conversationId ?: activeConversationId())
+                ?.let(::ConversationId)
+            scopedEvent.event.toRuntimeEventDrafts(
+                backend = backend,
+                fallbackAgentId = AgentId(agentId),
+                fallbackConversationId = conversationId,
+            )
         }
+        if (drafts.isEmpty()) return
+        runtimeEventSink(drafts)
     }
 }

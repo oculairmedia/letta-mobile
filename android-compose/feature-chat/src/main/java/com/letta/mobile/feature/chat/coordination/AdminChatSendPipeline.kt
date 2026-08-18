@@ -82,7 +82,7 @@ internal class AdminChatSendPipeline(
             clientVersionProvider = clientVersionProvider,
             backendDescriptor = { sessionManager.current.backendDescriptor },
             runtimeEventSink = { drafts ->
-                drafts.forEach { draft -> runtimeEventOutbox.append(draft) }
+                runtimeEventOutbox.appendAll(drafts)
             },
         )
     }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.toPersistentList
+import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -263,7 +264,13 @@ fun Timeline.mergeServerMessages(
 private fun Timeline.replaceEventAt(index: Int, event: TimelineEvent.Confirmed): Timeline {
     val updated = events.toMutableList()
     updated[index] = event
-    return copy(events = updated.toPersistentList(), stablePrefixVersion = stablePrefixVersion + 1)
+        val updatedEvents = updated.toPersistentList()
+        return copy(
+            events = updatedEvents,
+            stablePrefixVersion = stablePrefixVersion + 1,
+            residentOtids = updatedEvents.mapTo(mutableSetOf()) { it.otid }.toPersistentSet(),
+            invariantsKnown = true,
+        )
 }
 
 private fun Timeline.findRecentAssistantPrefixIndex(incoming: TimelineEvent.Confirmed): Int? {
@@ -560,4 +567,3 @@ suspend fun reconcileForExternalRun(
         true
     )
 }
-

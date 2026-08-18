@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
@@ -38,12 +40,21 @@ kotlin {
         withHostTestBuilder {}
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            // letta-mobile-2don7: the A2UI renderer (moved here from designsystem)
+            // uses ExperimentalMaterial3Api surfaces (TimeInput, ExposedDropdownMenuBox,
+            // PrimaryTabRow, ...) the same way designsystem opted in.
+            freeCompilerArgs.addAll(
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            )
         }
     }
 
     jvm {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            freeCompilerArgs.addAll(
+                "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            )
         }
     }
 
@@ -54,6 +65,11 @@ kotlin {
         hostOs == "Mac OS X" -> macosX64("hostNative")
         hostOs.startsWith("Windows") -> mingwX64("hostNative")
         hostOs == "Linux" -> linuxX64("hostNative")
+    }
+
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
     }
 
     sourceSets {
@@ -84,11 +100,37 @@ kotlin {
             }
         }
 
+        // letta-mobile-bccty: a slim Compose-Multiplatform UI source set that
+        // is JVM-free / native-free — anything that needs to render on every
+        // UI target (jvmAndAndroid + wasmJs) lives here without dragging
+        // jvmAndAndroid's JVM-only deps (ZXing core, CIO, Iroh JNI) into
+        // wasm, and without forcing Compose UI into commonMain where the
+        // wasmJs native compilation unit does not yet want it.
+        //
+        // Kept minimal: foundation + material3 + ui + animation + lucide
+        // icons is enough for the inter-agent message provenance label and
+        // anything similar (small shared UI atoms).
+        //
+        // Declared BEFORE `jvmAndAndroid` because Kotlin DSL `creating { }`
+        // blocks resolve `dependsOn(...)` eagerly, so the source set being
+        // depended on must already exist.
+        val composeUi by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                api("org.jetbrains.compose.foundation:foundation:1.10.0")
+                api("org.jetbrains.compose.material3:material3:1.9.0")
+                api("org.jetbrains.compose.ui:ui:1.10.0")
+                api("org.jetbrains.compose.animation:animation:1.10.0")
+                api("com.composables:icons-lucide:1.1.0")
+            }
+        }
+
         // Intermediate source set for UI platforms (android + jvm/desktop).
         // Compose-Multiplatform UI doesn't support native targets, so we create
         // a jvmAndAndroid source set for shared chat UI (slice 1).
         val jvmAndAndroid by creating {
             dependsOn(commonMain.get())
+            dependsOn(composeUi)
             dependencies {
                 // Compose-Multiplatform UI dependencies for shared chat UI (slice 1).
                 // foundation/ui stay aligned with the shared Compose plugin so
@@ -98,6 +140,16 @@ kotlin {
                 api("org.jetbrains.compose.foundation:foundation:1.10.0")
                 api("org.jetbrains.compose.material3:material3:1.9.0")
                 api("org.jetbrains.compose.ui:ui:1.10.0")
+                // letta-mobile-2don7: A2UI renderer + LettaIcons moved here from the
+                // Android-only designsystem module so desktop can render A2UI
+                // surfaces with the same widget set. animation-core backs
+                // AnimatedVisibility/Crossfade used by the Accordion/Tabs widgets;
+                // icons-lucide backs LettaIcons; coil3 backs the A2UI Image widget
+                // (coil3.compose.LocalPlatformContext is multiplatform, unlike
+                // androidx.compose.ui.platform.LocalContext).
+                api("org.jetbrains.compose.animation:animation:1.10.0")
+                api("com.composables:icons-lucide:1.1.0")
+                api("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
                 // Shared Android/Desktop Markdown paint layer. Semantic streaming
                 // structure lives alongside it in this source set; platform
                 // modules provide only optional image/clipboard adapters.
@@ -133,6 +185,10 @@ kotlin {
             }
         }
 
+        val jvmAndAndroidTest by creating {
+            dependsOn(commonTest.get())
+        }
+
         // Wire android and jvm source sets to jvmAndAndroid
         getByName("androidMain") {
             dependsOn(jvmAndAndroid)
@@ -143,6 +199,10 @@ kotlin {
                 // IrohAndroidInit.kt). See letta-mobile-eakk8.
                 implementation("computer.iroh:iroh-android:1.1.0")
             }
+        }
+
+        getByName("androidHostTest") {
+            dependsOn(jvmAndAndroidTest)
         }
 
         getByName("jvmMain") {
@@ -169,6 +229,7 @@ kotlin {
         }
 
         getByName("jvmTest") {
+            dependsOn(jvmAndAndroidTest)
             dependencies {
                 implementation(compose.desktop.currentOs)
                 implementation("io.ktor:ktor-client-cio:3.5.0")
@@ -199,6 +260,17 @@ kotlin {
                 implementation("io.ktor:ktor-client-mock:3.5.0")
                 implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
+            }
+        }
+
+        // Wasm/Browser source set — inherits from commonMain (NOT jvmAndAndroid,
+        // which carries JVM-only deps: ZXing, CIO engine, Iroh JNI). The JS
+        // Ktor engine provides browser-native fetch/WebSocket transport.
+        val wasmJsMain by getting {
+            dependsOn(commonMain.get())
+            dependsOn(composeUi)
+            dependencies {
+                implementation("io.ktor:ktor-client-js:3.5.0")
             }
         }
     }

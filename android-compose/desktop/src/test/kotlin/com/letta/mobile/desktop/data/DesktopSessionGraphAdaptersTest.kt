@@ -47,6 +47,42 @@ class DesktopSessionGraphAdaptersTest {
     }
 
     @Test
+    fun localModeKeepsHttpScheduleAndToolRepositories() {
+        val adapters = DesktopRepositoryAdapters(
+            LettaConfig(
+                id = "desktop-local",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "http://127.0.0.1:8283",
+            ),
+        )
+
+        assertIs<DesktopLettaHttpAdminRepositories>(adapters.scheduleRepository)
+        assertIs<DesktopLettaHttpAdminRepositories>(adapters.toolRepository)
+    }
+
+    /**
+     * letta-mobile-9v9nu regression: before the fix, `irohMode` was computed
+     * purely from `IrohChannelTransport.isIrohUrl(config.serverUrl)`, so a
+     * LOCAL config with a leftover `iroh://` serverUrl still built
+     * [buildIrohRepositories] and routed `toolRepository`/`scheduleRepository`
+     * through the Iroh-backed implementations instead of falling back to the
+     * (correctly local-only) unavailable repository.
+     */
+    @Test
+    fun localModeWithStaleIrohServerUrlNeverUsesIrohRepositories() {
+        val adapters = DesktopRepositoryAdapters(
+            LettaConfig(
+                id = "desktop-local",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+            ),
+        )
+
+        assertFalse(adapters.toolRepository is DesktopIrohToolRepository)
+        assertFalse(adapters.scheduleRepository is DesktopIrohScheduleRepository)
+    }
+
+    @Test
     fun unavailableRepositoriesFailWhenInvokedBeforeJvmBindingExists() = runTest {
         val graph = DesktopSessionGraphFactory().create()
 
@@ -149,6 +185,35 @@ class DesktopSessionGraphAdaptersTest {
         tokenStore.clearToken()
 
         assertNull(backendStore.loadActiveConfig()?.accessToken)
+    }
+
+    /**
+     * letta-mobile-9v9nu regression: reproduces the real-world broken state —
+     * `letta.config.mode=LOCAL` plus a leftover `letta.config.serverUrl=
+     * iroh://...` from before mode became authoritative — by writing the raw
+     * keys directly (bypassing `save()`, which already migrates on write).
+     * Loading the store must self-heal: the in-memory config comes back with
+     * mode still LOCAL and the stale serverUrl dropped, and the on-disk value
+     * is corrected too so the file stops disagreeing with what the app uses.
+     */
+    @Test
+    fun configStoreMigratesStaleIrohServerUrlOnLoadForLocalMode() {
+        val settingsStore = DesktopInMemorySecureSettingsStore()
+        settingsStore.putString("letta.config.id", "desktop-361c792e")
+        settingsStore.putString("letta.config.mode", "LOCAL")
+        settingsStore.putString(
+            "letta.config.serverUrl",
+            "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+        )
+        val configStore = DesktopLettaConfigStore(settingsStore)
+
+        val loaded = configStore.load()
+
+        assertEquals(LettaConfig.Mode.LOCAL, loaded.mode)
+        assertEquals("", loaded.serverUrl)
+        // The fix persists too: a subsequent, independent load of the same
+        // backing store must not see the stale URL either.
+        assertEquals("", settingsStore.getString("letta.config.serverUrl"))
     }
 
     @Test

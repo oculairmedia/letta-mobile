@@ -1,6 +1,8 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLifecycle
+import com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLease
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,6 +25,7 @@ class DesktopAppServerChatAdapterTest {
             config = config,
             appServerConfig = appServerConfig,
             appServerGatewayFactory = null, // No factory needed when disabled
+            localRuntime = FakeLocalRuntime(),
         )
 
         assertIs<DesktopLettaHttpChatGateway>(gateway)
@@ -46,6 +49,7 @@ class DesktopAppServerChatAdapterTest {
                 config = config,
                 appServerConfig = appServerConfig,
                 appServerGatewayFactory = null, // No factory provided
+                localRuntime = FakeLocalRuntime(),
             )
         }
     }
@@ -61,17 +65,111 @@ class DesktopAppServerChatAdapterTest {
             enabled = true,
             serverUrl = "ws://localhost:4500",
         )
-        val factory = DesktopAppServerControllerGatewayFactory()
+        val expected = DesktopLettaHttpChatGateway(config)
+        val factory = DesktopAppServerChatGatewayFactory { _, _ -> expected }
 
         val gateway = createDefaultDesktopChatGateway(
             config = config,
             appServerConfig = appServerConfig,
             appServerGatewayFactory = factory,
+            localRuntime = FakeLocalRuntime(),
         )
 
-        // The factory returns a hybrid gateway
-        assertIs<DesktopHybridAppServerChatGateway>(gateway)
-        gateway.close()
+        assertEquals(expected, gateway)
+        assertIs<DesktopLettaHttpChatGateway>(gateway).close()
+    }
+
+    @Test
+    fun localModeStartsBundledRuntimeAndPassesItsUrlToFactory() = runBlocking {
+        val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43123")
+        var received: DesktopAppServerRuntimeConfig? = null
+        val gateway = createDefaultDesktopChatGateway(
+            config = LettaConfig("local", LettaConfig.Mode.LOCAL, "local://bundled"),
+            appServerConfig = DesktopAppServerRuntimeConfig(enabled = false),
+            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { config, appServer ->
+                received = appServer
+                DesktopLettaHttpChatGateway(config.copy(serverUrl = "http://unused.invalid"))
+            },
+            localRuntime = runtime,
+        )
+
+        assertEquals(1, runtime.acquireCount)
+        assertEquals(0, runtime.closeCount)
+        assertEquals("ws://127.0.0.1:43123", received?.serverUrl)
+        assertIs<AutoCloseable>(gateway).close()
+        assertEquals(1, runtime.closeCount)
+    }
+
+    @Test
+    fun localModeStartsBundledRuntimeWhenAppServerIsEnabledWithoutUrl() = runBlocking {
+        val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43124")
+        var received: DesktopAppServerRuntimeConfig? = null
+
+        val gateway = createDefaultDesktopChatGateway(
+            config = LettaConfig("local", LettaConfig.Mode.LOCAL, "local://bundled"),
+            appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = null),
+            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { config, appServer ->
+                received = appServer
+                DesktopLettaHttpChatGateway(config.copy(serverUrl = "http://unused.invalid"))
+            },
+            localRuntime = runtime,
+        )
+
+        assertEquals(1, runtime.acquireCount)
+        assertEquals("ws://127.0.0.1:43124", received?.serverUrl)
+        assertIs<AutoCloseable>(gateway).close()
+        assertEquals(1, runtime.closeCount)
+    }
+
+    /**
+     * letta-mobile-9v9nu regression: a LOCAL config that still carries a
+     * stale `iroh://` serverUrl (leftover from a prior remote session) must
+     * still take the local-runtime path, not silently skip spawning the
+     * bundled runtime. The env-derived [DesktopAppServerRuntimeConfig] is
+     * what this gate actually keys on (`appServerConfig.serverUrl == null`),
+     * so a stale value on the *persisted* LettaConfig must not leak in and
+     * change that decision.
+     */
+    @Test
+    fun localModeStartsBundledRuntimeEvenWithStaleIrohServerUrlOnConfig() = runBlocking {
+        val runtime = FakeLocalRuntime(url = "ws://127.0.0.1:43125")
+        var received: DesktopAppServerRuntimeConfig? = null
+        val staleLocalConfig = LettaConfig(
+            id = "desktop-361c792e",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+        )
+
+        val gateway = createDefaultDesktopChatGateway(
+            config = staleLocalConfig,
+            appServerConfig = DesktopAppServerRuntimeConfig(enabled = false),
+            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { config, appServer ->
+                received = appServer
+                DesktopLettaHttpChatGateway(config.copy(serverUrl = "http://unused.invalid"))
+            },
+            localRuntime = runtime,
+        )
+
+        assertEquals(1, runtime.acquireCount)
+        assertEquals("ws://127.0.0.1:43125", received?.serverUrl)
+        assertIs<AutoCloseable>(gateway).close()
+        assertEquals(1, runtime.closeCount)
+    }
+
+    @Test
+    fun remoteModeDoesNotAcquireBundledRuntimeWhenExplicitAppServerIsEnabled() = runBlocking {
+        val runtime = FakeLocalRuntime()
+        val config = LettaConfig("remote", LettaConfig.Mode.SELF_HOSTED, "http://unused.invalid")
+        val gateway = createDefaultDesktopChatGateway(
+            config = config,
+            appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = "ws://remote:4500"),
+            appServerGatewayFactory = DesktopAppServerChatGatewayFactory { _, _ -> DesktopLettaHttpChatGateway(config) },
+            localRuntime = runtime,
+        )
+
+        assertEquals(0, runtime.acquireCount)
+        assertEquals(0, runtime.closeCount)
+        assertIs<DesktopLettaHttpChatGateway>(gateway).close()
     }
 
     @Test
@@ -118,6 +216,31 @@ class DesktopAppServerChatAdapterTest {
 
         assertFailsWith<IllegalArgumentException> {
             factory.create(config, appServerConfig)
+        }
+    }
+
+    private class FakeLocalRuntime(
+        private val url: String = "ws://127.0.0.1:49920",
+    ) : DesktopLocalRuntimeLifecycle {
+        var acquireCount = 0
+        var closeCount = 0
+
+        override fun acquire(): DesktopLocalRuntimeLease {
+            acquireCount += 1
+            return object : DesktopLocalRuntimeLease {
+                override val serverUrl: String = url
+                private var closed = false
+                override fun close() {
+                    if (!closed) {
+                        closed = true
+                        closeCount += 1
+                    }
+                }
+            }
+        }
+
+        override fun close() {
+            closeCount += 1
         }
     }
 }

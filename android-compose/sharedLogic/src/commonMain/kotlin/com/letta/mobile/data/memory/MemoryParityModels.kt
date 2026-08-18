@@ -372,6 +372,7 @@ object MemoryParityMapper {
         agents: List<Agent>,
         selectedAgentId: String?,
         allTools: List<Tool>,
+        blocks: List<Block>? = null,
         schedules: List<ScheduledMessage>,
         backendDescriptor: BackendDescriptor,
         channelTransportState: ChannelTransportState,
@@ -386,9 +387,10 @@ object MemoryParityMapper {
         val selectedTools = selectedAgent?.tools
             ?: allTools.takeIf { selectedAgentId == null && agents.isEmpty() }
             ?: emptyList()
-        // coreBlocks, not blocks: a backend may send core memory nested under
-        // `memory.blocks` (canonical Letta) instead of at the top level.
-        val selectedBlocks = selectedAgent?.coreBlocks.orEmpty()
+        // Prefer the authoritative per-agent block repository. The fallback
+        // keeps compatibility with older graphs whose agent payload embeds
+        // canonical `memory.blocks` as [Agent.coreBlocks].
+        val selectedBlocks = blocks ?: selectedAgent?.coreBlocks.orEmpty()
         val channelSection = channelsSection(backendDescriptor, channelTransportState)
         val sections = listOf(
             skillsSection(selectedTools, availability.skillsLoaded),

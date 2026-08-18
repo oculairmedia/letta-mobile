@@ -80,11 +80,6 @@ internal fun AgentScaffoldTopBar(state: AgentScaffoldRuntimeState) {
         scrollBehavior = state.scrollBehavior,
         actions = {
             AgentScaffoldTopBarActions(
-                showSearchField = showSearchField,
-                onSearchClick = {
-                    HapticEffects.contextClick(state.haptic, state.view)
-                    searchUi.onChatSearchExpandedChange(true)
-                },
                 onMenuClick = {
                     HapticEffects.contextClick(state.haptic, state.view)
                     state.projectBindings.refreshContextWindow()
@@ -178,15 +173,8 @@ private fun AgentScaffoldAgentTopBarTitle(params: AgentScaffoldAgentTopBarTitleP
 
 @Composable
 private fun AgentScaffoldTopBarActions(
-    showSearchField: Boolean,
-    onSearchClick: () -> Unit,
     onMenuClick: () -> Unit,
 ) {
-    if (!showSearchField) {
-        IconButton(onClick = onSearchClick) {
-            Icon(LettaIcons.Search, contentDescription = "Search")
-        }
-    }
     IconButton(
         onClick = onMenuClick,
         modifier = Modifier.testTag(AgentScaffoldTestTags.MENU_BUTTON),

@@ -19,6 +19,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * Long-lived coroutine scope SubagentRepository uses for its push observer and
@@ -59,8 +61,10 @@ internal fun defaultSubagentScope(): CoroutineScope =
  * letta-mobile-sqdqe: INCREMENTAL push snapshots can be transiently
  * incomplete, so replacement is conservative: running entries survive omission
  * until the shim sends an explicit terminal state or absence exceeds a bound.
- * AUTHORITATIVE (refresh) snapshots are ground truth — a running entry omitted
- * from a full subagent_list response is EVICTED immediately.
+ * AUTHORITATIVE refresh snapshots are still bounded: the mobile request is
+ * active-scoped (`all=false`), so an omission can be a filtered/temporarily
+ * incomplete view. Running entries therefore use the same absence linger as
+ * incremental pushes. Explicit terminal events remain immediate and durable.
  */
 open class SubagentRepository(
     private val transport: IChannelTransport,
@@ -70,6 +74,7 @@ open class SubagentRepository(
     // include recently-terminal entries in the initial snapshot.
     private val includeAll: Boolean = false,
     private val clock: () -> Long = { kotlin.time.Clock.System.now().toEpochMilliseconds() },
+    private val streamTimeoutSweepIntervalMs: Long = STREAM_TIMEOUT_SWEEP_INTERVAL_MS,
 ) : ISubagentRepository {
     private val state = MutableStateFlow<List<SubagentEntry>>(emptyList())
     private val inFlightRefresh = atomic<CompletableDeferred<Result<List<SubagentEntry>>>?>(null)
@@ -85,6 +90,7 @@ open class SubagentRepository(
     // mutated from two threads at once. Each merge reads one consistent
     // snapshot, mutates a private local copy, and publishes it once.
     private val runningAbsentSince = atomic<Map<String, Long>>(emptyMap())
+    private val stateMutex = Mutex()
 
     private val pushJob = scope.launch { observePushEvents() }
     private val reconnectJob = scope.launch { observeReconnects() }
@@ -97,7 +103,7 @@ open class SubagentRepository(
     /** Stops the periodic stream-timeout sweep. */
     private suspend fun observeStreamTimeout() {
         while (true) {
-            kotlinx.coroutines.delay(STREAM_TIMEOUT_SWEEP_INTERVAL_MS)
+            kotlinx.coroutines.delay(streamTimeoutSweepIntervalMs)
             sweepStreamTimeouts()
         }
     }
@@ -128,7 +134,7 @@ open class SubagentRepository(
     }
 
     override fun currentActiveSubagents(scope: SubagentParentScope): List<SubagentEntry> =
-        state.value.inParentScope(scope)
+        state.value.inParentScope(scope).filterNotExpired(clock())
 
     /**
      * Force a fresh `subagent_list` round-trip. Parallel callers (e.g. the
@@ -144,14 +150,17 @@ open class SubagentRepository(
             val deferred = CompletableDeferred<Result<List<SubagentEntry>>>()
             if (inFlightRefresh.compareAndSet(current, deferred)) {
                 val result = runCatching {
-            val response = transport.sendSubagentList(all = includeAll)
-            if (!response.success) {
-                throw IllegalStateException(response.error ?: "subagent_list failed")
-            }
-            val subagents = mergeSnapshot(response.subagents, kind = SnapshotKind.AUTHORITATIVE)
-            state.value = subagents
-            subagents
-        }
+                    val response = transport.sendSubagentList(all = includeAll)
+                    if (!response.success) {
+                        throw IllegalStateException(response.error ?: "subagent_list failed")
+                    }
+                    stateMutex.withLock {
+                        mergeSnapshot(
+                            incoming = response.subagents,
+                            kind = SnapshotKind.AUTHORITATIVE,
+                        ).also { merged -> state.value = merged }
+                    }
+                }
                 deferred.complete(result)
                 inFlightRefresh.compareAndSet(deferred, null)
                 return result
@@ -174,7 +183,7 @@ open class SubagentRepository(
 
     enum class SnapshotKind { AUTHORITATIVE, INCREMENTAL }
 
-    private fun mergeSnapshot(
+    private suspend fun mergeSnapshot(
         incoming: List<SubagentEntry>,
         terminal: SubagentEntry? = null,
         kind: SnapshotKind,
@@ -199,8 +208,7 @@ open class SubagentRepository(
         val retained = when (kind) {
             SnapshotKind.AUTHORITATIVE -> {
                 emitDeltaRunningCount(incoming)
-                evictAbsentRunning(absentRunning, absence, kind)
-                emptyList()
+                retainWithinLinger(absentRunning, absence, now, kind)
             }
             SnapshotKind.INCREMENTAL -> retainWithinLinger(absentRunning, absence, now, kind)
         }
@@ -239,29 +247,6 @@ open class SubagentRepository(
             "incomingRunning" to incomingRunning,
             "delta" to (localRunning - incomingRunning),
         )
-    }
-
-    /**
-     * Ground truth: running entries omitted from a full subagent_list
-     * response are EVICTED immediately.
-     */
-    private fun evictAbsentRunning(
-        absentRunning: List<SubagentEntry>,
-        absence: MutableMap<String, Long>,
-        kind: SnapshotKind,
-    ) {
-        absentRunning.forEach { entry ->
-            val key = entry.cacheKey()
-            absence.remove(key)
-            Telemetry.event(
-                "SubagentRepo",
-                "merge.evictRunning",
-                "cacheKey" to key,
-                "status" to entry.status,
-                "kind" to kind.name,
-                "reason" to "absent-from-authoritative-snapshot",
-            )
-        }
     }
 
     /**
@@ -334,7 +319,9 @@ open class SubagentRepository(
                     entry.copy(lastSeenAtMs = now)
                 } else entry
             }
-            state.value = mergeSnapshot(stamped, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
+            stateMutex.withLock {
+                state.value = mergeSnapshot(stamped, terminal = frame.subagent, kind = SnapshotKind.INCREMENTAL)
+            }
         }
     }
 
@@ -344,7 +331,7 @@ open class SubagentRepository(
      * `now - lastSeenAtMs > STREAM_TIMEOUT_MS`. Mutates state once per call (single
      * publication via atomic StateFlow).
      */
-    private fun sweepStreamTimeouts() {
+    private suspend fun sweepStreamTimeouts() = stateMutex.withLock {
         val now = clock()
         val current = state.value
         if (current.isEmpty()) return
@@ -369,6 +356,12 @@ open class SubagentRepository(
         }
         state.value = updated.distinctBy { it.cacheKey() }
     }
+
+    private fun List<SubagentEntry>.filterNotExpired(now: Long): List<SubagentEntry> =
+        filter { entry ->
+            entry.status != SubagentStatus.RUNNING ||
+                runningAbsentSince.value[entry.cacheKey()]?.let { now - it < RUNNING_ABSENCE_LINGER_MS } != false
+        }
 
     private suspend fun observeReconnects() {
         var wasConnected: Boolean? = null

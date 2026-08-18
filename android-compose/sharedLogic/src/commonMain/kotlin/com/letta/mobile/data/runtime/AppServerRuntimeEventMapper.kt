@@ -52,6 +52,7 @@ class AppServerRuntimeEventMapper {
             is AppServerInboundFrame.WriteMemoryFileResponse,
             is AppServerInboundFrame.GetReflectionSettingsResponse,
             is AppServerInboundFrame.SetReflectionSettingsResponse,
+            is AppServerInboundFrame.GetCwdMapResponse,
             // Channels host (lgns8.23): controller-initiated, correlated by the
             // request registry, and credential-bearing — never a turn event and
             // never mapped into a runtime draft that could reach a viewer.

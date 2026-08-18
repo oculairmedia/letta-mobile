@@ -42,11 +42,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Canvas
@@ -69,20 +71,50 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.DesktopTooltip
+import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
+
+// letta-mobile-bccty: desktop shell-level wiring for the shared
+// AgentMessageProvenanceLabel. The shared label takes (resolveName,
+// onAgentClick) as explicit parameters, but DesktopChatSurface
+// (and the existing DesktopAgentMessageProvenanceUiTest) thread them
+// through a CompositionLocal so sub-bubbles / tool-cards / metadata
+// blocks all default to the same shell handler without each callsite
+// having to thread the closures manually. The local desktop
+// CompositionLocal is preserved for that ergonomic reason — the shared
+// label deliberately does NOT look it up.
+internal data class DesktopAgentMessageContext(
+    val resolveName: (String) -> String? = { null },
+    val onAgentClick: (String) -> Unit = {},
+)
+
+internal val LocalDesktopAgentMessageContext = staticCompositionLocalOf { DesktopAgentMessageContext() }
+
 @Composable
 internal fun DesktopMessageBubble(
     message: UiMessage,
     streamingMessageId: StreamingMessageId? = null,
+    resolveAgentName: ((agentId: String) -> String?)? = null,
+    onAgentClick: ((agentId: String) -> Unit)? = null,
 ) {
+    val context = LocalDesktopAgentMessageContext.current
+    val effectiveResolveName = resolveAgentName ?: context.resolveName
+    val effectiveAgentClick = onAgentClick ?: context.onAgentClick
     if (MessageRoleToken(message.role).isUser()) {
-        UserPrompt(message)
+        UserPrompt(message, resolveAgentName = effectiveResolveName, onAgentClick = effectiveAgentClick)
         return
     }
-    AssistantMessageColumn(message = message, streamingMessageId = streamingMessageId)
+    CompositionLocalProvider(
+        LocalDesktopAgentMessageContext provides DesktopAgentMessageContext(
+            resolveName = effectiveResolveName,
+            onAgentClick = effectiveAgentClick,
+        ),
+    ) {
+        AssistantMessageColumn(message = message, streamingMessageId = streamingMessageId)
+    }
 }
 
 @Composable
@@ -123,6 +155,15 @@ private fun AssistantMessageColumn(
  * Small, functional copy affordance: click copies [text] to the clipboard and
  * the glyph briefly flips to a green check. Replaces the former decorative copy
  * glyphs that did nothing on click.
+ *
+ * [visible] gates the icon on the *surrounding* row/bubble/card's hover state
+ * (the caller owns that interaction source) rather than this button's own —
+ * the button still reserves its full hit-target size and stays in the
+ * semantics tree when hidden, it's just faded to fully transparent, so
+ * layout never shifts and accessibility/UI tests can still find it. Once the
+ * button itself is hovered, focused, or mid-"copied" animation it stays
+ * visible regardless of [visible], so a pointer already over the control
+ * never has it vanish out from under it.
  */
 @Composable
 internal fun CopyIconButton(
@@ -130,6 +171,7 @@ internal fun CopyIconButton(
     modifier: Modifier = Modifier,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     config: CopyActionConfig = CopyActionConfig(),
+    visible: Boolean = true,
 ) {
     val clipboard = LocalClipboardManager.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -142,8 +184,13 @@ internal fun CopyIconButton(
             copied = false
         }
     }
+    val revealed = visible or focused or hovered or copied
     val visualAlpha by animateFloatAsState(
-        targetValue = if (config.emphasized or focused or hovered or copied) 1f else 0.58f,
+        targetValue = when {
+            !revealed -> 0f
+            config.emphasized or focused or hovered or copied -> 1f
+            else -> 0.58f
+        },
         animationSpec = tween(durationMillis = 120),
         label = "copyActionAlpha",
     )
@@ -222,26 +269,46 @@ private data class CopyButtonInteraction(
  * behind it.
  */
 @Composable
-internal fun UserPrompt(message: UiMessage) {
+internal fun UserPrompt(
+    message: UiMessage,
+    resolveAgentName: (agentId: String) -> String? = { null },
+    onAgentClick: (agentId: String) -> Unit = {},
+) {
     // Clamped by default: this card stays pinned as a sticky header, so a
     // massive prompt must not swallow the viewport. A chevron (shown only when
     // the text actually overflows) expands the card in place for a closer look
     // and collapses it back.
     var expanded by remember(message.id) { mutableStateOf(false) }
     var overflowed by remember(message.id) { mutableStateOf(false) }
+    // letta-mobile-slqfp: separate disclosure state for the inter-agent
+    // provenance metadata block — independent of the prompt-text expansion
+    // above, since a user may want the technical detail without expanding a
+    // long body (or vice versa).
+    var provenanceExpanded by remember(message.id) { mutableStateOf(false) }
     // The whole card toggles expansion (enabled only when there is hidden
     // text), so a huge expanded prompt can always be collapsed by clicking
     // anywhere on it — not just a chevron that may sit outside the fold.
     // Hand-drawn outline instead of Surface border: sides + bottom only, no
     // top line — a full box read too heavy, and the pinned card's top edge
-    // doubles up against the pane's own boundary.
+    // doubles up against the pane's own boundary. Same ordinary outline for
+    // every prompt card, inter-agent or not — the identity tint lives on the
+    // provenance label inside the card, not on the outer edge.
+    val provenance = message.agentMessageProvenance
     val edgeColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+    // A dedicated hover-only interaction source, independent of the card's
+    // own click interaction source (which Surface disables along with click
+    // handling whenever the card can't currently expand/collapse) — the copy
+    // affordance's reveal-on-hover must keep working even when the card
+    // itself isn't clickable.
+    val cardHoverSource = remember(message.id) { MutableInteractionSource() }
+    val cardHovered by cardHoverSource.collectIsHoveredAsState()
     Surface(
         onClick = { expanded = !expanded },
         enabled = overflowed || expanded,
         modifier = Modifier
             .fillMaxWidth()
             .padding(bottom = 8.dp)
+            .hoverable(cardHoverSource)
             .drawBehind {
                 val stroke = 1.dp.toPx()
                 val radius = 10.dp.toPx()
@@ -268,6 +335,15 @@ internal fun UserPrompt(message: UiMessage) {
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (provenance != null) {
+                    AgentMessageProvenanceLabel(
+                        provenance = provenance,
+                        expanded = provenanceExpanded,
+                        onToggleExpand = { provenanceExpanded = !provenanceExpanded },
+                        resolveName = resolveAgentName,
+                        onAgentClick = onAgentClick,
+                    )
+                }
                 if (message.content.isNotBlank()) {
                     // Expanded height is capped with internal scrolling so the
                     // card (and its collapse affordances) never outgrows the
@@ -313,6 +389,7 @@ internal fun UserPrompt(message: UiMessage) {
                     text = message.content,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     config = CopyActionConfig(contentDescription = "Copy message", emphasized = false),
+                    visible = cardHovered,
                 )
             }
         }
@@ -515,12 +592,17 @@ internal fun AgentText(params: AgentTextParams) {
         Surface(
             modifier = Modifier.align(Alignment.TopEnd),
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (isHovered) 0.94f else 0.35f),
+            color = if (isHovered) {
+                MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+            } else {
+                Color.Transparent
+            },
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ) {
             CopyIconButton(
                 text = params.text,
                 config = CopyActionConfig(contentDescription = "Copy response", emphasized = isHovered),
+                visible = isHovered,
             )
         }
     }

@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.messaging.AgentMessageClientId
 import androidx.compose.runtime.Immutable
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolCall
@@ -191,10 +192,16 @@ data class Timeline(
      * accurate "load older" affordance.
      */
     val releasedOlderCount: Int = 0,
+    internal val residentOtids: kotlinx.collections.immutable.PersistentSet<String> =
+        events.mapTo(mutableSetOf()) { AgentMessageClientId.dedupIdentity(it.otid) }.toPersistentSet(),
+    internal val invariantsKnown: Boolean = false,
 ) {
     private val otidToIndex: Map<String, Int> by lazy(LazyThreadSafetyMode.PUBLICATION) {
         HashMap<String, Int>(events.size).also { map ->
-            events.forEachIndexed { i, e -> map[e.otid] = i }
+            events.forEachIndexed { i, event ->
+                map[event.otid] = i
+                map[AgentMessageClientId.dedupIdentity(event.otid)] = i
+            }
         }
     }
 
@@ -213,8 +220,8 @@ data class Timeline(
     }
 
     init {
-        val positionViolation = events.zipWithNext().any { (a, b) -> a.position >= b.position }
-        val otidDupes = events.size != events.distinctBy { it.otid }.size
+        val positionViolation = !invariantsKnown && events.zipWithNext().any { (a, b) -> a.position >= b.position }
+        val otidDupes = !invariantsKnown && events.size != residentOtids.size
 
         if (positionViolation) {
             Telemetry.error(
@@ -243,7 +250,8 @@ data class Timeline(
         return last + 1.0
     }
 
-    fun findByOtid(otid: String): TimelineEvent? = otidToIndex[otid]?.let { events[it] }
+    fun findByOtid(otid: String): TimelineEvent? =
+        otidToIndex[AgentMessageClientId.dedupIdentity(otid)]?.let { events[it] }
 
     fun containsIdentityFor(event: TimelineEvent): Boolean {
         val tail = events.lastOrNull()
@@ -284,7 +292,8 @@ data class Timeline(
      * the chat screen.
      */
     fun append(event: TimelineEvent): Timeline {
-        if (findByOtid(event.otid) != null) {
+        val eventIdentity = AgentMessageClientId.dedupIdentity(event.otid)
+        if (eventIdentity in residentOtids) {
             Telemetry.event(
                 "Timeline", "append.duplicateOtid",
                 "conversationId" to conversationId,
@@ -310,7 +319,12 @@ data class Timeline(
         } else {
             event
         }
-        return copy(events = events.adding(safeEvent), stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(
+            events = events.adding(safeEvent),
+            stablePrefixVersion = stablePrefixVersion + 1,
+            residentOtids = residentOtids.adding(AgentMessageClientId.dedupIdentity(safeEvent.otid)),
+            invariantsKnown = true,
+        )
             .slideResidentWindow()
     }
 
@@ -322,7 +336,9 @@ data class Timeline(
      * the Confirmed event at its natural position instead.
      */
     fun replaceLocal(otid: String, confirmed: TimelineEvent.Confirmed): Timeline {
-        val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return insertOrdered(confirmed)
+        val lookupOtid = AgentMessageClientId.dedupIdentity(otid)
+        val idx = otidToIndex[lookupOtid]?.takeIf { events[it] is TimelineEvent.Local }
+            ?: return insertOrdered(confirmed)
         val local = events[idx]
         val stabilized = confirmed.copy(
             position = local.position,
@@ -333,7 +349,7 @@ data class Timeline(
             attachments = if (confirmed.attachments.isEmpty()) local.attachments else confirmed.attachments,
         )
         val newEvents = events.replacingAt(idx, stabilized)
-        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1, invariantsKnown = true)
     }
 
     /**
@@ -345,11 +361,17 @@ data class Timeline(
      * returns this timeline unchanged (keeps the existing, possibly Local, event).
      */
     fun insertOrdered(event: TimelineEvent): Timeline {
-        if (findByOtid(event.otid) != null) return this
+        val eventIdentity = AgentMessageClientId.dedupIdentity(event.otid)
+        if (eventIdentity in residentOtids) return this
         val insertIdx = events.indexOfFirst { it.position > event.position }
         val newEvents = if (insertIdx == -1) events.adding(event)
                        else events.addingAt(insertIdx, event)
-        return copy(events = newEvents, stablePrefixVersion = stablePrefixVersion + 1)
+        return copy(
+            events = newEvents,
+            stablePrefixVersion = stablePrefixVersion + 1,
+            residentOtids = residentOtids.adding(eventIdentity),
+            invariantsKnown = true,
+        )
             .slideResidentWindow()
     }
 
@@ -403,6 +425,10 @@ data class Timeline(
             events = remaining,
             backfillCursor = newOldestServerId ?: backfillCursor,
             releasedOlderCount = releasedOlderCount + evictedCount,
+            residentOtids = remaining
+                .mapTo(mutableSetOf()) { AgentMessageClientId.dedupIdentity(it.otid) }
+                .toPersistentSet(),
+            invariantsKnown = true,
         )
     }
 
@@ -525,6 +551,9 @@ data class Timeline(
         if (removedEvents.isEmpty()) return AbandonedAssistantFragmentCleanupResult(this, emptySet())
         val removeServerIds = removedEvents.map { it.serverId }.toSet()
         val suppressions = removedEvents.map { it.toAbandonedAssistantFragmentSuppression() }.toSet()
+        val retainedEvents = events.filterNot { event ->
+            event is TimelineEvent.Confirmed && event.serverId in removeServerIds
+        }.toPersistentList()
         Telemetry.event(
             "TimelineSync", "orphanAssistantFragments.cleaned",
             "conversationId" to conversationId,
@@ -535,14 +564,16 @@ data class Timeline(
         )
         return AbandonedAssistantFragmentCleanupResult(
             timeline = copy(
-                events = events.filterNot { event ->
-                    event is TimelineEvent.Confirmed && event.serverId in removeServerIds
-                }.toPersistentList(),
+                events = retainedEvents,
                 abandonedAssistantFragmentSuppressions = buildList {
                     addAll(abandonedAssistantFragmentSuppressions)
                     addAll(suppressions)
                 }.takeLast(MAX_ABANDONED_ASSISTANT_FRAGMENT_SUPPRESSIONS).toPersistentSet(),
                 stablePrefixVersion = stablePrefixVersion + 1,
+            residentOtids = retainedEvents
+                .mapTo(mutableSetOf()) { AgentMessageClientId.dedupIdentity(it.otid) }
+                .toPersistentSet(),
+                invariantsKnown = true,
             ),
             suppressions = suppressions,
         )
@@ -561,7 +592,8 @@ data class Timeline(
     fun markFailed(otid: String): Timeline = updateLocal(otid) { it.copy(deliveryState = DeliveryState.FAILED) }
 
     private inline fun updateLocal(otid: String, transform: (TimelineEvent.Local) -> TimelineEvent.Local): Timeline {
-        val idx = otidToIndex[otid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
+        val lookupOtid = AgentMessageClientId.dedupIdentity(otid)
+        val idx = otidToIndex[lookupOtid]?.takeIf { events[it] is TimelineEvent.Local } ?: return this
         val local = events[idx] as TimelineEvent.Local
         return copy(events = events.replacingAt(idx, transform(local)), stablePrefixVersion = stablePrefixVersion + 1)
     }

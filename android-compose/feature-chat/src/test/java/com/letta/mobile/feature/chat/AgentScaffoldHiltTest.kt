@@ -196,7 +196,7 @@ class AgentScaffoldHiltTest {
     }
 
     @Test
-    fun searchActionShowsGlobalSearchFieldAndForwardsQuery() {
+    fun drawerSearchActionShowsGlobalSearchFieldAndForwardsQuery() {
         composeRule.setLettaTestContent(windowSizeClass = windowSizeClass) {
             AgentScaffoldContent(
                 navigation = testNavigation(),
@@ -205,7 +205,8 @@ class AgentScaffoldHiltTest {
             )
         }
 
-        composeRule.onNodeWithContentDescription("Search").performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.MENU_BUTTON).performClick()
+        composeRule.onNodeWithTag(AgentScaffoldTestTags.DRAWER_SEARCH_MESSAGES).performClick()
         composeRule.onNodeWithText("Search conversations…").assertIsDisplayed()
         composeRule.onNodeWithTag(AgentScaffoldTestTags.CHAT_SEARCH_FIELD).performTextInput("needle")
 

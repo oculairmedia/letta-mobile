@@ -2,6 +2,7 @@ package com.letta.mobile.cli.commands
 
 import com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore
 import com.letta.mobile.data.controller.node.iroh.LocalBackendAdminStore
+import com.letta.mobile.data.messaging.AgentMessageClientId
 import com.letta.mobile.data.messaging.IrohAgentMessageRouter
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentIdNamespace
@@ -606,13 +607,25 @@ private suspend fun inputOnConversation(
                     messages = listOf(
                         // letta-mobile-8kbqd: persist/render the plain body.
                         // Envelope metadata (from/to/ts/msg_id) stays on the
-                        // wire + telemetry; only msgId is forwarded as
-                        // clientMessageId for at-most-once dedup. Never land
-                        // wrapA2aEnvelope(...) as human-visible chat text.
+                        // wire + telemetry; the body text itself NEVER carries
+                        // wrapA2aEnvelope(...) JSON — it must stay readable to
+                        // both the human and the receiving agent's own turn.
+                        //
+                        // letta-mobile-slqfp: structural (non-heuristic)
+                        // provenance instead rides the clientMessageId field,
+                        // which already survives Local -> Confirmed
+                        // reconciliation end to end as an opaque string (see
+                        // AgentMessageClientId). The receiving client's chat
+                        // render projects fromAgentId/toAgentId/msgId back out
+                        // of this id — never by parsing the body above.
                         AppServerInputMessage(
                             role = "user",
                             content = JsonPrimitive(message.body),
-                            clientMessageId = message.msgId,
+                            clientMessageId = AgentMessageClientId.encode(
+                                msgId = message.msgId,
+                                fromAgentId = message.fromAgentId,
+                                toAgentId = message.toAgentId,
+                            ),
                         ),
                     ),
                 ),

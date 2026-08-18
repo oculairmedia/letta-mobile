@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -53,9 +55,23 @@ private fun ColumnScope.AgentScaffoldChatSection(
     paddingValues: PaddingValues,
     topPadding: androidx.compose.ui.unit.Dp,
 ) {
+    val params = state.params
+    val dismissIdleSearchOnTimelineTap = params.searchUi.isChatSearchExpanded &&
+        state.uiState.searchQuery.isBlank() && !state.uiState.isSearchActive
     val chatModifier = Modifier
         .fillMaxWidth()
         .weight(1f)
+        .then(
+            if (dismissIdleSearchOnTimelineTap) {
+                Modifier.pointerInput(Unit) {
+                    detectTapGestures {
+                        params.searchUi.onChatSearchExpandedChange(false)
+                    }
+                }
+            } else {
+                Modifier
+            },
+        )
         .testTag(AgentScaffoldTestTags.CHAT_SCREEN_CONTENT)
     val contentTopPadding = if (state.projectContext == null) topPadding else 0.dp
 

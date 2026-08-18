@@ -86,6 +86,12 @@ private fun runDesktopApplication(
                 activationHandler.showUserThatAppIsRunning()
             }
             var windowTitle by remember { mutableStateOf("Letta Desktop") }
+            // Lifted the same way as windowTitle: LettaDesktopApp owns the live
+            // chat/shell state the header needs (identity block + sidebar
+            // toggle), but the header itself renders in the custom title bar,
+            // which is a composition sibling — not a descendant — of
+            // LettaDesktopApp. See letta-mobile-3arhe.1.
+            var headerChrome by remember { mutableStateOf(DesktopHeaderChromeState.Empty) }
             CompositionLocalProvider(
                 LocalWindowExceptionHandlerFactory provides CrashReportingExceptionHandlerFactory,
                 LocalMermaidDiagramRenderer provides DesktopMermaidDiagramRenderer,
@@ -96,6 +102,7 @@ private fun runDesktopApplication(
                     onCloseRequest = { activationHandler.hideWindow() },
                     title = windowTitle,
                     state = rememberWindowState(width = 1280.dp, height = 820.dp),
+                    header = headerChrome,
                 ) {
                     LaunchedEffect(Unit) {
                         activationHandler.attach(window)
@@ -113,6 +120,7 @@ private fun runDesktopApplication(
                             quickQuery = quickQuery,
                         ),
                         onActiveTitleChange = { windowTitle = it },
+                        onHeaderChromeChange = { headerChrome = it },
                     )
                 }
                 // Spotlight-style floating query bar, summoned by the global

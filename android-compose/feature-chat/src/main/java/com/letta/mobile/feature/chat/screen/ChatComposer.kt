@@ -25,8 +25,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -82,6 +80,7 @@ private val ChatComposerInputHorizontalPadding = LettaSpacing.SM
 // the space — the bar's previous compact state, restored live.
 private val ChatComposerInputVerticalPadding = 24.dp
 private val ChatComposerInputCompactVerticalPadding = 12.dp
+private const val ChatComposerImeInsetForCompactPaddingPx = 96
 private val ChatComposerInputItemSpacing = LettaSpacing.XS
 
 internal object ChatComposerTestTags {
@@ -344,14 +343,16 @@ private fun ChatComposerInput(
     // tracks the keyboard even when the field loses focus while the IME is
     // still up (e.g. user taps the attach menu).
     val keyboardOpen = WindowInsets.ime.getBottom(LocalDensity.current) > 0
-    val animatedVerticalPadding by animateDpAsState(
-        targetValue = if (keyboardOpen) {
-            ChatComposerInputCompactVerticalPadding
-        } else {
-            ChatComposerInputVerticalPadding
-        },
-        animationSpec = tween(durationMillis = 220),
-        label = "chatComposerVerticalPadding",
+    // Drive the height transition from the same continuously changing IME
+    // inset that moves the parent. A fixed tween starts after the keyboard
+    // transition and produces a visible pop on close.
+    val imeBottomPx = WindowInsets.ime.getBottom(LocalDensity.current)
+    val compactFraction = (imeBottomPx.toFloat() / ChatComposerImeInsetForCompactPaddingPx)
+        .coerceIn(0f, 1f)
+    val verticalPadding = androidx.compose.ui.unit.lerp(
+        start = ChatComposerInputVerticalPadding,
+        stop = ChatComposerInputCompactVerticalPadding,
+        fraction = compactFraction,
     )
     LettaInputBar(
         text = model.inputText,
@@ -377,7 +378,7 @@ private fun ChatComposerInput(
         customTrailingContent = voiceTrailingContent(model, callbacks, state.voice),
         contentPadding = PaddingValues(
             horizontal = ChatComposerInputHorizontalPadding,
-            vertical = animatedVerticalPadding,
+            vertical = verticalPadding,
         ),
         itemSpacing = ChatComposerInputItemSpacing,
         leadingContent = {
@@ -433,6 +434,7 @@ private fun ChatComposerAddButton(
     Box(
         modifier = Modifier
             .size(ChatComposerActionTargetSize)
+            .clip(CircleShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = LocalIndication.current,

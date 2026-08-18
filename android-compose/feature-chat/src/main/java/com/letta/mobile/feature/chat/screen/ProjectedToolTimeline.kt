@@ -200,8 +200,8 @@ internal fun ProjectedToolTimelineGroupCard(
 ) {
     // Dropped the Card's background fill + outline border — chrome enough on its own.
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (RenderDiagnostics.enabled()) {
             RenderDiagnostics.onVisibleGroups(
@@ -478,10 +478,10 @@ private fun ProjectedToolTimelineCallRow(
                     provenance = ExpansionProvenance.User
                     expanded = newExpanded
                 },
-                statusLabel = statusLabel,
+                statusLabel = statusLabel.takeIf { expanded },
                 statusColor = statusColor,
                 motionPolicy = motionPolicy,
-                badge = if (call.approvalDecision != null || call.state == ToolTimelineState.AwaitingApproval) {
+                badge = if (expanded && (call.approvalDecision != null || call.state == ToolTimelineState.AwaitingApproval)) {
                     {
                         val chipState = when {
                             call.state == ToolTimelineState.AwaitingApproval -> ToolApprovalState.RequestingInput

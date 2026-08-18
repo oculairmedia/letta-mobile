@@ -1,6 +1,8 @@
 package com.letta.mobile.feature.chat.subagent
 
+import com.letta.mobile.data.model.SelfTodoSnapshot
 import com.letta.mobile.data.model.SubagentTodo
+import com.letta.mobile.data.model.toActivePlanState
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,24 +42,21 @@ interface SelfTodoSource {
  * The description is a compact progress label ("N/M done") so the chip reads
  * as the agent's own running plan at a glance.
  */
-internal fun List<SubagentTodo>.toSelfEntry(
+internal fun SelfTodoSnapshot.toSelfEntry(
     // letta-mobile-dvobc: injected so the self chip's stuck heuristic is
     // testable. Wall-clock epoch-ms stamped as the last-update time whenever
     // the plan changes (each new snapshot is a fresh observation).
     now: Long = System.currentTimeMillis(),
 ): ActiveSubagent? {
-    if (isEmpty()) return null
-    val completed = count { it.status.trim().lowercase() == "completed" }
-    val total = size
-    if (completed >= total) return null
+    val plan = toActivePlanState() ?: return null
     return ActiveSubagent(
         id = ActiveSubagent.SELF_ID,
-        description = "Your plan · $completed/$total done",
+        description = "Your plan · ${plan.completed}/${plan.total} done",
         subagentType = "self",
         status = ActiveSubagent.Status.RUNNING,
         isSelf = true,
         // letta-mobile-dvobc: real determinate ring fill from the plan.
-        progress = SubagentTodoProgress(completed = completed, total = total),
+        progress = SubagentTodoProgress(completed = plan.completed, total = plan.total),
         lastUpdateAt = now,
     )
 }
@@ -71,7 +70,7 @@ class WsSelfTodoSource(
     private val repository: ISelfTodoRepository,
 ) : SelfTodoSource {
     override fun selfEntry(conversationId: String): Flow<ActiveSubagent?> =
-        repository.latestForFlow(conversationId).map { it.toSelfEntry() }
+        repository.snapshotForFlow(conversationId).map { it.toSelfEntry() }
 
     override fun todos(conversationId: String): List<SubagentTodo> =
         repository.latestFor(conversationId)
@@ -91,7 +90,7 @@ class FakeSelfTodoSource(
     }
 
     override fun selfEntry(conversationId: String): Flow<ActiveSubagent?> =
-        _todos.map { it.toSelfEntry() }
+        _todos.map { SelfTodoSnapshot(todos = it).toSelfEntry() }
 
     override fun todos(conversationId: String): List<SubagentTodo> = _todos.value
 }

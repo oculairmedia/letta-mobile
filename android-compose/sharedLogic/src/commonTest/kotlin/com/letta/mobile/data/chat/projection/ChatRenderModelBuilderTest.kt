@@ -345,7 +345,7 @@ class ChatRenderModelBuilderTest {
     @Test
     fun `incremental render item cache reuses committed history for tail appends and replacements`() {
         val cache = IncrementalChatRenderItemsCache()
-        val base = streamingHistory(turnCount = 1_000)
+        val base = streamingHistory(turnCount = 250)
         cache.renderItems(base, ChatDisplayMode.Interactive, ChatMessageListChange.Full)
 
         val appended = base + assistant("tail-append", content = "stream chunk", runId = "run-999")

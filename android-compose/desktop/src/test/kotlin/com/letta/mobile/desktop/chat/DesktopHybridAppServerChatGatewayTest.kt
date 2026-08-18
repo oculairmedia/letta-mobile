@@ -73,7 +73,7 @@ class DesktopHybridAppServerChatGatewayTest {
         DesktopHybridAppServerChatGateway(
             turnEngine = turnEngine,
             client = client,
-            httpGateway = DesktopLettaHttpChatGateway(
+            adminGateway = DesktopLettaHttpChatGateway(
                 config = LettaConfig(id = "t", mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = "http://unused.invalid"),
             ),
             transportResources = transportResources,

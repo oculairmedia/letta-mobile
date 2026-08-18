@@ -19,6 +19,7 @@ import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ModelCatalog
@@ -117,6 +118,23 @@ class DesktopChatController(
      */
     private val _canSubmitApprovals = MutableStateFlow(false)
     val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
+
+    /**
+     * letta-mobile folder-settings #2: the SELECTED conversation's working
+     * directory, as last read from the runtime via
+     * [DesktopWorkingDirectoryController.currentWorkingDirectory]. Null while
+     * unknown/loading, or when the active gateway doesn't support this
+     * (remote/HTTP backends) — see [supportsWorkingDirectory].
+     */
+    private val _selectedConversationWorkingDirectory = MutableStateFlow<String?>(null)
+    val selectedConversationWorkingDirectory: StateFlow<String?> =
+        _selectedConversationWorkingDirectory.asStateFlow()
+
+    private val _workingDirectoryLoading = MutableStateFlow(false)
+    val workingDirectoryLoading: StateFlow<Boolean> = _workingDirectoryLoading.asStateFlow()
+
+    /** Whether the active gateway can report/change a conversation's working directory. */
+    val supportsWorkingDirectory: Boolean get() = gateway is DesktopWorkingDirectoryController
 
     /**
      * requestId -> conversationId for approvals submitted this session and awaiting
@@ -866,6 +884,54 @@ class DesktopChatController(
      * cannot abort (demo / HTTP-only) fall straight through to that same local
      * clear rather than pretending to have stopped anything.
      */
+    /**
+     * Refreshes [selectedConversationWorkingDirectory] from the runtime for
+     * the currently selected conversation. Called by the UI on selection
+     * change; a no-op when the gateway doesn't support this or no
+     * conversation (with a resolved agent id) is selected.
+     */
+    fun refreshSelectedConversationWorkingDirectory() {
+        if (closed) return
+        val controller = gateway as? DesktopWorkingDirectoryController
+        val conversation = state.value.selectedConversation
+        if (controller == null || agentId == null) {
+            _selectedConversationWorkingDirectory.value = null
+            return
+        }
+        val conversationId = conversation.id
+        scope.launch {
+            _workingDirectoryLoading.value = true
+            _selectedConversationWorkingDirectory.value =
+                runCatching { controller.currentWorkingDirectory(agentId, conversationId) }.getOrNull()
+            _workingDirectoryLoading.value = false
+        }
+    }
+
+    /**
+     * Changes the SELECTED conversation's working directory to [path] (an
+     * absolute folder path from the desktop folder picker). Re-issues
+     * `runtime_start` with the new `cwd` — see
+     * [DesktopWorkingDirectoryController.setWorkingDirectory] — so the tools
+     * the agent uses next (bash, file edits) operate against the new folder.
+     */
+    fun changeSelectedConversationWorkingDirectory(path: String) {
+        if (closed) return
+        val controller = gateway as? DesktopWorkingDirectoryController ?: return
+        val conversation = state.value.selectedConversation ?: return
+        val agentId = conversation.agentId ?: return
+        val conversationId = conversation.id
+        scope.launch {
+            _workingDirectoryLoading.value = true
+            val succeeded = runCatching {
+                controller.setWorkingDirectory(agentId, conversationId, path)
+            }.getOrDefault(false)
+            if (succeeded) {
+                _selectedConversationWorkingDirectory.value = path
+            }
+            _workingDirectoryLoading.value = false
+        }
+    }
+
     fun stopActiveRun(conversationId: String) {
         if (closed) return
         val active = _streamingConversationId.value ?: _thinkingConversationId.value
@@ -1152,9 +1218,19 @@ class DesktopChatController(
         }
     }
 
+    private fun isConfigNeededForUrl(): Boolean =
+        bootstrapState.config.mode != LettaConfig.Mode.LOCAL && bootstrapState.config.serverUrl.isBlank()
+
     private suspend fun connectAndLoad() {
         if (closed) return
-        if (bootstrapState.config.serverUrl.isBlank()) {
+        // letta-mobile-9v9nu: a blank serverUrl is only "not configured" for
+        // remote modes. Mode.LOCAL is self-contained — it spawns the bundled
+        // runtime itself and never needs a serverUrl (the stale-URL migration
+        // in BackendConfigPolicy deliberately blanks it out for LOCAL
+        // configs). Bailing out here for LOCAL too meant gatewayFactory() —
+        // and therefore DesktopLocalRuntimeHost.acquire() — was never even
+        // called, so the local runtime silently never started.
+        if (isConfigNeededForUrl()) {
             _state.value = initialState.withRuntimeState(
                 ChatSessionReducer.configNeeded(initialState.runtimeState),
             )
@@ -1203,6 +1279,19 @@ class DesktopChatController(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
+                // letta-mobile debugging note: this catch previously swallowed every
+                // failure into an indistinguishable empty dropdown (Result.failure
+                // has no sink). A timeout, an adapter exception, and "genuinely no
+                // models" all looked identical from the UI. Surface the exception
+                // class the same way MemoryOverview's section_degraded does, so the
+                // NEXT time the model picker is empty there's a log line instead of
+                // a guess.
+                Telemetry.event(
+                    TELEMETRY_TAG,
+                    "modelCatalog.loadFailed",
+                    "exceptionClass" to (t::class.simpleName ?: "Throwable"),
+                    level = Telemetry.Level.WARN,
+                )
                 Result.failure(t)
             }
         }.also { modelCatalogLoad = it }
@@ -1353,6 +1442,7 @@ class DesktopChatController(
             // letta-mobile-dir4k.1: keep anyRunActive true across inter-tool gaps
             // while this conversation's reply stream is still in flight.
             isActiveRunStreaming = _streamingConversationId.value == conversationId,
+            ownAgentId = _state.value.conversations.firstOrNull { it.id == conversationId }?.agentId,
         )
         // A no-op tick (the tail re-emitted unchanged) projects to a UI
         // byte-identical to the current one — skip the state write so a streamed

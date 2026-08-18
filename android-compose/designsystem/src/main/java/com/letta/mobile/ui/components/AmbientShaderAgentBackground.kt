@@ -20,6 +20,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -75,6 +76,8 @@ internal fun AmbientAgentStatus.toMotionStatus(): AmbientMotionStatus = when (th
 fun AmbientShaderAgentBackground(
     agentStatus: String,
     modifier: Modifier = Modifier,
+    /** Monotonic pulse incremented when visible assistant content grows. */
+    streamActivityPulse: Long = 0L,
     /**
      * Optional per-agent identity color: when set, NON-TERMINAL states
      * (idle/running/active) harmonize toward it, so the ambient background
@@ -159,6 +162,7 @@ fun AmbientShaderAgentBackground(
                 speed = { speed },
                 agitation = agitation,
                 envelope = envelope.asState(),
+                streamActivityPulse = streamActivityPulse,
                 modifier = Modifier.matchParentSize(),
             )
         }
@@ -173,59 +177,20 @@ private fun AmbientCanvas(
     speed: () -> Float,
     agitation: Float,
     envelope: State<Float>,
+    streamActivityPulse: Long,
     modifier: Modifier = Modifier,
 ) {
-    // Continuous speed-integrated phase (dt * baseRate * speed) instead of a
-    // looping 0..2π transition: a status speed change glides instead of
-    // popping at the loop seam. Only runs while the canvas is composed, i.e.
-    // while the tint is visible. Unbounded float phase is fine for any
-    // realistic session length (precision degrades to visible jitter only
-    // after days of continuous animation).
-    var phase by remember { mutableFloatStateOf(0f) }
-    if (animate) {
-        LaunchedEffect(Unit) {
-            var last = 0L
-            while (true) {
-                withFrameNanos { now ->
-                    if (last != 0L) {
-                        phase += ((now - last) / 1_000_000_000f) * BaseRadiansPerSecond * speed()
-                    }
-                    last = now
-                }
-            }
-        }
-    }
-
-    // API 33+ is necessary but not sufficient: RuntimeShader THROWS on an SkSL
-    // compile error, and drivers disagree about what compiles. An unhandled
-    // throw here would take the whole chat screen down over decoration, so the
-    // construction is guarded and a failure falls through to the same gradient
-    // path pre-33 devices use — loudly, because a silent compile failure and
-    // "this device has no shader support" are otherwise indistinguishable.
-    val shader = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        remember {
-            runCatching { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
-                .onFailure { failure ->
-                    Telemetry.event(
-                        AMBIENT_TELEMETRY_TAG,
-                        "shader.compileFailed",
-                        "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
-                        level = Telemetry.Level.WARN,
-                    )
-                }
-                .getOrNull()
-        }
-    } else {
-        null
-    }
+    val motion = rememberAmbientMotion(animate, speed, streamActivityPulse)
+    val shader = rememberAmbientShader()
 
     if (shader != null) {
         val shaderBrush = remember(shader) { ShaderBrush(shader) }
         Canvas(modifier = modifier.fillMaxSize()) {
-            shader.setFloatUniform("uTime", phase)
+            shader.setFloatUniform("uTime", motion.phase)
             shader.setFloatUniform("uSize", size.width, size.height)
             shader.setFloatUniform("uAgitation", agitation)
             shader.setFloatUniform("uEnvelope", envelope.value)
+            shader.setFloatUniform("uStreamEnergy", motion.streamEnergy)
             shader.setFloatUniform("uColor", tint.red, tint.green, tint.blue, tint.alpha)
             drawRect(brush = shaderBrush)
         }
@@ -233,9 +198,67 @@ private fun AmbientCanvas(
         Canvas(modifier = modifier.fillMaxSize()) {
             // Same phase / agitation / envelope floats as the shader path, so
             // the two paths stay in step by construction.
-            drawAmbientFallback(tint = tint, phase = phase, agitation = agitation, envelope = envelope.value)
+            drawAmbientFallback(
+                tint = tint,
+                phase = motion.phase,
+                agitation = agitation,
+                envelope = envelope.value,
+                streamEnergy = motion.streamEnergy,
+            )
         }
     }
+}
+
+@Immutable
+private data class AmbientCanvasMotion(val phase: Float, val streamEnergy: Float)
+
+@Composable
+private fun rememberAmbientMotion(
+    animate: Boolean,
+    speed: () -> Float,
+    streamActivityPulse: Long,
+): AmbientCanvasMotion {
+    var phase by remember { mutableFloatStateOf(0f) }
+    var energy by remember { mutableFloatStateOf(0f) }
+    val pulse by rememberUpdatedState(streamActivityPulse)
+    var observed by remember { androidx.compose.runtime.mutableLongStateOf(streamActivityPulse) }
+    LaunchedEffect(animate, pulse) {
+        if (!animate) {
+            energy = 0f
+            observed = pulse
+        }
+    }
+    if (animate) LaunchedEffect(Unit) {
+        var last = 0L
+        while (true) withFrameNanos { now ->
+            if (last != 0L) {
+                val dt = ((now - last) / 1_000_000_000f).coerceIn(0f, MaxFrameDeltaSeconds)
+                if (pulse != observed) energy = (energy + StreamImpulse).coerceAtMost(1f)
+                observed = pulse
+                energy *= kotlin.math.exp(-dt / StreamEnergyDecaySeconds)
+                phase += dt * BaseRadiansPerSecond * speed()
+            }
+            last = now
+        }
+    }
+    return AmbientCanvasMotion(phase, energy)
+}
+
+@Composable
+private fun rememberAmbientShader(): RuntimeShader? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+    remember {
+        runCatching { RuntimeShader(AMBIENT_GLOW_SHADER_SOURCE + AMBIENT_GLOW_MAIN_UNPREMULTIPLIED) }
+            .onFailure { failure ->
+                Telemetry.event(
+                    AMBIENT_TELEMETRY_TAG,
+                    "shader.compileFailed",
+                    "error" to (failure.message ?: failure::class.simpleName.orEmpty()),
+                    level = Telemetry.Level.WARN,
+                )
+            }.getOrNull()
+    }
+} else {
+    null
 }
 
 private fun DrawScope.drawAmbientFallback(
@@ -243,6 +266,7 @@ private fun DrawScope.drawAmbientFallback(
     phase: Float,
     agitation: Float,
     envelope: Float,
+    streamEnergy: Float,
 ) {
     val breath = 0.5f + 0.5f * sin(phase)
     // No noise field here; a second sine at an unrelated frequency scaled by
@@ -259,7 +283,7 @@ private fun DrawScope.drawAmbientFallback(
     drawRect(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
-                0.00f to tint.copy(alpha = tint.alpha * 0.18f * envelope),
+                0.00f to tint.copy(alpha = tint.alpha * (0.18f + 0.01f * streamEnergy) * envelope),
                 0.52f to tint.copy(alpha = tint.alpha * 0.08f * envelope),
                 1.00f to tint.copy(alpha = 0f),
             ),
@@ -271,5 +295,8 @@ private fun DrawScope.drawAmbientFallback(
 
 private const val AMBIENT_TELEMETRY_TAG = "AmbientShader"
 private const val HiddenAlpha = 0.001f
+private const val MaxFrameDeltaSeconds = 0.1f
+private const val StreamImpulse = 0.35f
+private const val StreamEnergyDecaySeconds = 0.9f
 private const val BaseRadiansPerSecond =
     (2 * PI).toFloat() * 1000f / AmbientMotion.BASE_PERIOD_MILLIS

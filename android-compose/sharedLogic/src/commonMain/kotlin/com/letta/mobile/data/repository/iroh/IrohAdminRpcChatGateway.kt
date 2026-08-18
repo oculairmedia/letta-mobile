@@ -57,6 +57,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -837,11 +838,13 @@ class IrohAdminRpcAgentDirectory(
             val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
             merged += fresh
             if (page.blocks.isEmpty() || fresh.isEmpty()) return merged
-            val hasMore = page.hasMore ?: (page.blocks.size >= AGENT_BLOCK_LIST_PAGE_SIZE)
-            if (!hasMore) return merged
+            if (!page.hasMore) return merged
             offset += page.blocks.size
         }
-        return merged
+        throw TimelineTransportHttpException(
+            502,
+            "block.list_agent exceeded $AGENT_BLOCK_LIST_MAX_PAGES pages while has_more remained true",
+        )
     }
 
     private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage = when (result) {
@@ -852,15 +855,21 @@ class IrohAdminRpcAgentDirectory(
         is JsonObject -> AgentBlockPage(
             blocks = result["blocks"]
                 ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
-                .orEmpty(),
-            hasMore = (result["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull(),
+                ?: throw TimelineTransportHttpException(502, "block.list_agent returned an object without blocks"),
+            hasMore = (result["has_more"] as? JsonPrimitive)
+                ?.takeUnless { it.isString }
+                ?.booleanOrNull
+                ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more"),
         )
-        else -> AgentBlockPage(emptyList(), hasMore = false)
+        else -> throw TimelineTransportHttpException(
+            502,
+            "block.list_agent returned an unsupported result: $result",
+        )
     }
 
     private data class AgentBlockPage(
         val blocks: List<Block>,
-        val hasMore: Boolean?,
+        val hasMore: Boolean,
     )
 
     suspend fun createBlock(params: BlockCreateParams): Block {

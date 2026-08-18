@@ -9,8 +9,8 @@ This directory contains the production Letta Mobile Android app.
 | `app` | Screens, navigation, Hilt wiring, Android entrypoints | `:app:testRootDebugUnitTest` (required `test` job) |
 | `core/data` | Android data bindings, Ktor wiring, Room, mappers | `:core:data:testDebugUnitTest` (required `test` job) |
 | `core/domain` | JVM domain models | compiled in `test` job |
-| `sharedLogic` | Platform-neutral repositories, timeline, transport, admin RPC | `:sharedLogic:allTests` (required `shared-multiplatform`) |
-| `designsystem` | Shared Compose components, theme, dialogs, A2UI renderer | `:designsystem:testDebugUnitTest` (additive on path change) |
+| `sharedLogic` | Platform-neutral repositories/timeline/transport plus shared Android/Desktop A2UI renderer | `:sharedLogic:allTests` (required `shared-multiplatform`) |
+| `designsystem` | Android Compose components, theme, and dialogs | `:designsystem:testDebugUnitTest` (additive on path change) |
 | `feature-chat` | Chat UI + ViewModels (admin chat stack) | `:feature-chat:testDebugUnitTest` (additive on path change) |
 | `feature-editagent` | Agent editor feature module | `:feature-editagent:testDebugUnitTest` (additive on path change) |
 | `desktop` | Compose Desktop host (Windows) | `:desktop:test` (required `shared-multiplatform`) |

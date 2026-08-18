@@ -27,6 +27,7 @@ import com.letta.mobile.desktop.data.DesktopLettaConfigStore
 import com.letta.mobile.desktop.data.DesktopSessionGraphProvider
 import com.letta.mobile.desktop.data.createDefaultDesktopDataBindings
 import com.letta.mobile.desktop.memory.DesktopMemoryController
+import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
 import kotlinx.coroutines.CoroutineScope
@@ -55,7 +56,12 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
         EncryptingSecureSettingsStore(
             delegate = DesktopFileSecureSettingsStore(),
             vault = DesktopSecretVaults.forCurrentOs(defaultDesktopStateDirectory()),
-        )
+        ).also { store ->
+            // Must run before the first local-runtime spawn so a saved
+            // directory override is honored from the app's very first
+            // connection, not just after a later Settings visit.
+            DesktopLocalBackendDirectorySettings.applyStoredOverride(store)
+        }
     }
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }

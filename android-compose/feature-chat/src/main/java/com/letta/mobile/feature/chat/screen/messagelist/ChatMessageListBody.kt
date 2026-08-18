@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.screen.messagelist
 
 import com.letta.mobile.feature.chat.screen.LocalChatShouldDeferHeavyToolCards
 import com.letta.mobile.feature.chat.screen.ChatFadeEdgeLength
+import com.letta.mobile.feature.chat.coordination.ChatHydrationTrace
 import com.letta.mobile.feature.chat.screen.ChatFadingEdgesBox
 import com.letta.mobile.feature.chat.screen.chatFadeTargetColor
 import com.letta.mobile.feature.chat.screen.toChatViewportSnapshot
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.runtime.ChatViewportFollowPolicy
@@ -80,7 +82,16 @@ private fun ChatMessageListBodyContent(
     val chatShapes = MaterialTheme.chatShapes
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+    val conversationId = (params.state.conversationState as? com.letta.mobile.ui.chat.render.ConversationState.Ready)?.conversationId
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxSize()
+            .onGloballyPositioned {
+                ChatHydrationTrace.current(conversationId)?.let { generation ->
+                    ChatHydrationTrace.firstLayout(generation, params.renderItems.size)
+                }
+            },
+    ) {
         val contentWidthPx = with(density) {
             (maxWidth - chatDimens.contentPaddingHorizontal - chatDimens.contentPaddingHorizontal)
                 .roundToPx()

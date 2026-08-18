@@ -13,11 +13,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.TooltipArea
-import androidx.compose.foundation.TooltipPlacement
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -47,6 +44,7 @@ import com.letta.mobile.data.memory.MemoryCategories
 import com.letta.mobile.data.memory.MemoryGraphNode
 import com.letta.mobile.data.memory.MemoryGraphNodeKind
 import com.letta.mobile.data.memory.MemoryParityGraph
+import com.letta.mobile.desktop.DesktopTooltipArea
 import com.letta.mobile.ui.theme.customColors
 import com.letta.mobile.data.memory.accentRole
 
@@ -275,7 +273,6 @@ internal fun EntityTypeFilterBar(
  * by memory category / node kind, with a label shown only for hub nodes so the
  * canvas stays readable.
  */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun MemoryGraphNodeDot(
     node: MemoryGraphNode?,
@@ -296,10 +293,9 @@ internal fun MemoryGraphNodeDot(
         resolvedNode.kind == MemoryGraphNodeKind.Backend
     val diameter = (16 + degree * 4).coerceIn(14, 40).dp
 
-    TooltipArea(
+    DesktopTooltipArea(
         tooltip = { MemoryNodeTooltip(resolvedNode, degree, accentColor) },
         delayMillis = 250,
-        tooltipPlacement = TooltipPlacement.CursorPoint(offset = DpOffset(12.dp, 12.dp)),
     ) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,

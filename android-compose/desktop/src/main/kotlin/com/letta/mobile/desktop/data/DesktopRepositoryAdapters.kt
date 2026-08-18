@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.repository.api.ICronRepository
@@ -59,6 +60,7 @@ class DesktopSessionGraph internal constructor(
     override val backendDescriptor: BackendDescriptor,
     override val localRuntimeBackend: LettaBackend?,
     override val agentRepository: IAgentRepository,
+    override val blockRepository: IAgentBlockRepository,
     override val channelTransport: IChannelTransport,
     override val conversationRepository: IConversationRepository,
     override val cronRepository: ICronRepository,
@@ -111,6 +113,7 @@ class DesktopSessionGraphFactory(
             backendDescriptor = desktopRemoteLettaDescriptor(config),
             localRuntimeBackend = null,
             agentRepository = adapters.agentRepository,
+            blockRepository = adapters.blockRepository,
             channelTransport = channelTransportFactory(),
             conversationRepository = adapters.conversationRepository,
             cronRepository = adapters.cronRepository,
@@ -208,16 +211,25 @@ class DesktopRepositoryAdapters(
     config: LettaConfig? = null,
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
 ) {
-    private val irohMode = IrohChannelTransport.isIrohUrl(config?.serverUrl)
+    private val localMode = config?.mode == LettaConfig.Mode.LOCAL
+    // letta-mobile-9v9nu: mode is authoritative — a LOCAL config never binds
+    // the remote Iroh transport, even if its serverUrl still carries a
+    // leftover iroh:// ticket from a prior remote session.
+    private val irohMode = !localMode && IrohChannelTransport.isIrohUrl(config?.serverUrl)
+    private val localRepositories = if (localMode) {
+        buildDesktopLocalRepositories()
+    } else {
+        null
+    }
     private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
     private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
 
     val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
 
-    val agentRepository: IAgentRepository = selectIrohOrHttp(
-        irohRepositories?.agentRepository,
-        adminRepositories,
-    )
+    val agentRepository: IAgentRepository = localRepositories?.agentRepository
+        ?: selectIrohOrHttp(irohRepositories?.agentRepository, adminRepositories)
+    val blockRepository: IAgentBlockRepository = localRepositories?.blockRepository
+        ?: unavailableRepository()
     val archiveRepository: IArchiveRepository = unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = unavailableRepository()
@@ -265,4 +277,3 @@ fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
         ),
     )
 }
-
