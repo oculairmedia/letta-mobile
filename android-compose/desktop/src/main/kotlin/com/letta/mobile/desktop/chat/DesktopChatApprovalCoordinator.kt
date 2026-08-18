@@ -38,18 +38,31 @@ internal class DesktopChatApprovalCoordinator(
         _canSubmitApprovals.value = gateway is ApprovalSubmittingGateway || gateway is DesktopApprovalSubmitter
     }
 
+    private data class SubmissionTarget(
+        val gateway: Any,
+        val agentId: String,
+        val conversationId: String,
+    )
+
     fun submitApproval(request: ApprovalSubmissionRequest) {
-        val gw = request.gateway ?: return
-        if (gw !is ApprovalSubmittingGateway && gw !is DesktopApprovalSubmitter) return
-        val conversation = request.conversation ?: return
-        val agentId = conversation.agentId?.takeIf { it.isNotBlank() } ?: return
-
-        submittedApprovalConversations[request.requestId] = conversation.id
+        val target = validateSubmissionTarget(request) ?: return
+        submittedApprovalConversations[request.requestId] = target.conversationId
         _submittingApprovals.update { it + request.requestId }
+        launchSubmission(target, request)
+    }
 
+    private fun validateSubmissionTarget(request: ApprovalSubmissionRequest): SubmissionTarget? {
+        val gw = request.gateway ?: return null
+        if (gw !is ApprovalSubmittingGateway && gw !is DesktopApprovalSubmitter) return null
+        val conversation = request.conversation ?: return null
+        val agentId = conversation.agentId?.takeIf { it.isNotBlank() } ?: return null
+        return SubmissionTarget(gw, agentId, conversation.id)
+    }
+
+    private fun launchSubmission(target: SubmissionTarget, request: ApprovalSubmissionRequest) {
         scope.launch {
             try {
-                dispatchToGateway(gw, agentId, conversation.id, request)
+                dispatchToGateway(target.gateway, target.agentId, target.conversationId, request)
             } catch (cancelled: CancellationException) {
                 clearSubmittedApproval(request.requestId)
                 throw cancelled
