@@ -192,26 +192,21 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
         val agentNamesById = remember(state.switchableAgents) {
             state.switchableAgents.associate { it.id.value to it.name }
         }
-        // letta-mobile-i9h61.3.3: thread the conversation repository so
-        // the click handler can resolve the OTHER agent's conversation id
-        // via the picker. Null conversationRepository → fall back to null
-        // (appserver-resolved fresh conversation), which preserves the
-        // pre-i9h61.3.3 behavior in any unconfigured shell.
-        val conversationRepo = state.params.conversationRepository
+        // letta-mobile-i9h61.3.4: use drawerConversationRepo (params OR Hilt
+        // ConversationPickerViewModel fallback) so the picker always has a
+        // live IConversationRepository. Using params.conversationRepository
+        // alone silently fell through to null — ChatGraph never passes it.
+        val conversationRepo = state.drawerConversationRepo
         val scope = rememberCoroutineScope()
         CompositionLocalProvider(
             LocalAndroidAgentMessageContext provides AndroidAgentMessageContext(
                 resolveName = { id -> agentNamesById[id] },
                 onAgentClick = { id ->
                     scope.launch {
-                        val resolvedConversationId = if (conversationRepo == null) {
-                            null
-                        } else {
-                            pickOtherAgentConversation(
-                                repo = conversationRepo,
-                                agentId = com.letta.mobile.data.model.AgentId(id),
-                            )
-                        }
+                        val resolvedConversationId = pickOtherAgentConversation(
+                            repo = conversationRepo,
+                            agentId = com.letta.mobile.data.model.AgentId(id),
+                        )
                         state.params.navigation.onSwitchConversation?.invoke(
                             id,
                             resolvedConversationId,
