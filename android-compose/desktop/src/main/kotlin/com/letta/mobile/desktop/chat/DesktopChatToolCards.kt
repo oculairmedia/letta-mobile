@@ -66,6 +66,7 @@ import com.letta.mobile.data.model.UiGeneratedComponent
 import com.letta.mobile.data.model.UiToolCall
 import com.letta.mobile.data.messaging.compactLabel
 import com.letta.mobile.data.messaging.displayLabel
+import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceMetadata
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.ui.a2ui.A2uiSurfaceRenderer
 

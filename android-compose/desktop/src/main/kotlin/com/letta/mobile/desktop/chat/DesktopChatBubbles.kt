@@ -48,6 +48,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.foundation.Canvas
@@ -70,10 +71,28 @@ import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.desktop.DesktopTooltip
+import com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel
 import com.letta.mobile.ui.chat.render.rememberSmoothedStreamingText
 import kotlinx.coroutines.delay
 
 import kotlin.time.Duration.Companion.milliseconds
+
+// letta-mobile-bccty: desktop shell-level wiring for the shared
+// AgentMessageProvenanceLabel. The shared label takes (resolveName,
+// onAgentClick) as explicit parameters, but DesktopChatSurface
+// (and the existing DesktopAgentMessageProvenanceUiTest) thread them
+// through a CompositionLocal so sub-bubbles / tool-cards / metadata
+// blocks all default to the same shell handler without each callsite
+// having to thread the closures manually. The local desktop
+// CompositionLocal is preserved for that ergonomic reason — the shared
+// label deliberately does NOT look it up.
+internal data class DesktopAgentMessageContext(
+    val resolveName: (String) -> String? = { null },
+    val onAgentClick: (String) -> Unit = {},
+)
+
+internal val LocalDesktopAgentMessageContext = staticCompositionLocalOf { DesktopAgentMessageContext() }
+
 @Composable
 internal fun DesktopMessageBubble(
     message: UiMessage,
@@ -319,9 +338,9 @@ internal fun UserPrompt(
                 if (provenance != null) {
                     AgentMessageProvenanceLabel(
                         provenance = provenance,
-                        resolveName = resolveAgentName,
                         expanded = provenanceExpanded,
                         onToggleExpand = { provenanceExpanded = !provenanceExpanded },
+                        resolveName = resolveAgentName,
                         onAgentClick = onAgentClick,
                     )
                 }
