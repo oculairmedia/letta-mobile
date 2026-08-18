@@ -378,25 +378,12 @@ object ConversationAdminHandlers {
      * If the wrapper's shape diverges, both must be updated together.
      */
     private fun decodeConversationObject(obj: JsonObject, fallbackAgentId: String): JsonObject {
-        val id = obj["id"]?.jsonPrimitive?.contentOrNull
-            ?: return obj // pass-through if shape is unexpected; the picker will skip it.
-        val agentIdStr = obj["agent_id"]?.jsonPrimitive?.contentOrNull ?: fallbackAgentId
-        val conversationClass = obj["conversation_class"]?.jsonPrimitive?.contentOrNull
-        val archived = obj["archived"]?.jsonPrimitive?.booleanOrNull
-        val archivedAt = obj["archived_at"]?.jsonPrimitive?.contentOrNull
-        return JsonObject(
-            mapOf(
-                "id" to JsonPrimitive(id),
-                "agent_id" to JsonPrimitive(agentIdStr),
-                "summary" to (obj["summary"]?.jsonPrimitive?.contentOrNull?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-                "created_at" to (obj["created_at"]?.jsonPrimitive?.contentOrNull?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-                "updated_at" to (obj["updated_at"]?.jsonPrimitive?.contentOrNull?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-                "last_message_at" to (obj["last_message_at"]?.jsonPrimitive?.contentOrNull?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-                "archived" to (archived?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-                "archived_at" to (archivedAt?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-                "conversation_class" to (conversationClass?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
-            ),
-        )
+        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return obj
+        val agentId = obj["agent_id"]?.jsonPrimitive?.contentOrNull ?: fallbackAgentId
+        val updated = obj.toMutableMap()
+        updated["id"] = JsonPrimitive(id)
+        updated["agent_id"] = JsonPrimitive(agentId)
+        return JsonObject(updated)
     }
 
     /** Hard cap on per-call conversation fetch — the recipient's router reads all active
