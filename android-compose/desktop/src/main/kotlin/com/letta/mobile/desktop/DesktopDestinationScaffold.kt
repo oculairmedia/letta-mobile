@@ -115,6 +115,7 @@ internal data class DestinationContentInputs(
     val blockApi: DesktopBlockApi?,
     val skills: DestinationSkillsInputs,
     val nucleus: DesktopNucleusState,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderState,
 )
 
 internal data class DestinationNucleusActions(
@@ -139,6 +140,7 @@ internal data class DestinationContentActions(
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val nucleus: DestinationNucleusActions,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
 )
 
 private data class DestinationSettingsActions(
@@ -146,12 +148,14 @@ private data class DestinationSettingsActions(
     val onTokenCleared: () -> Unit,
     val onIrohIdentityReset: () -> Unit,
     val nucleus: DestinationNucleusActions,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderActions,
 )
 
 private data class ScrollableDestinationInputs(
     val destination: DesktopDestination,
     val state: DesktopBootstrapState,
     val nucleus: DesktopNucleusState,
+    val localRuntimeProvider: DesktopLocalRuntimeProviderState,
 )
 
 private val DesktopDestination.icon: ImageVector
@@ -176,26 +180,11 @@ internal fun DestinationContent(
     when (destination) {
         // The fleet dashboard. Rendered natively today; see DesktopHomeSurface's
         // KDoc for the Letta Code mod / A2UI document seam.
-        DesktopDestination.Home -> {
-            if (inputs.chat.connectionState in setOf(
-                    ChatConnectionState.Loading,
-                    ChatConnectionState.ConfigNeeded,
-                    ChatConnectionState.Offline,
-                )
-            ) {
-                ChatStatePanel(
-                    state = inputs.chat,
-                    onRetryConnection = actions.onRetryConnection,
-                    modifier = modifier,
-                )
-            } else {
-                DesktopHomeSurface(
-                    state = inputs.home,
-                    actions = actions.home,
-                    modifier = modifier,
-                )
-            }
-        }
+        DesktopDestination.Home -> HomeDestinationContent(
+            inputs = inputs,
+            actions = actions,
+            modifier = modifier,
+        )
         DesktopDestination.Memory -> MemoryDestinationContent(
             memoryState = inputs.memoryState,
             blockApi = inputs.blockApi,
@@ -228,13 +217,41 @@ internal fun DestinationContent(
                 destination = destination,
                 state = inputs.state,
                 nucleus = inputs.nucleus,
+                localRuntimeProvider = inputs.localRuntimeProvider,
             ),
             settings = DestinationSettingsActions(
                 onConfigSaved = actions.onConfigSaved,
                 onTokenCleared = actions.onTokenCleared,
                 onIrohIdentityReset = actions.onIrohIdentityReset,
                 nucleus = actions.nucleus,
+                localRuntimeProvider = actions.localRuntimeProvider,
             ),
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun HomeDestinationContent(
+    inputs: DestinationContentInputs,
+    actions: DestinationContentActions,
+    modifier: Modifier = Modifier,
+) {
+    if (inputs.chat.connectionState in setOf(
+            ChatConnectionState.Loading,
+            ChatConnectionState.ConfigNeeded,
+            ChatConnectionState.Offline,
+        )
+    ) {
+        ChatStatePanel(
+            state = inputs.chat,
+            onRetryConnection = actions.onRetryConnection,
+            modifier = modifier,
+        )
+    } else {
+        DesktopHomeSurface(
+            state = inputs.home,
+            actions = actions.home,
             modifier = modifier,
         )
     }
@@ -335,9 +352,7 @@ private fun ScrollableDestinationContent(
     ) {
         item { DestinationHeader(inputs.destination) }
         scrollableDestinationItems(
-            destination = inputs.destination,
-            state = inputs.state,
-            nucleus = inputs.nucleus,
+            inputs = inputs,
             settings = settings,
         )
     }
@@ -360,28 +375,32 @@ private fun DestinationHeader(destination: DesktopDestination) {
 }
 
 private fun LazyListScope.scrollableDestinationItems(
-    destination: DesktopDestination,
-    state: DesktopBootstrapState,
-    nucleus: DesktopNucleusState,
+    inputs: ScrollableDestinationInputs,
     settings: DestinationSettingsActions,
 ) {
-    when (destination) {
+    when (inputs.destination) {
         DesktopDestination.Overview -> {
-            item { BackendCard(state.config) }
-            item { StartupReadinessCard(state.featureReadiness) }
+            item { BackendCard(inputs.state.config) }
+            item { StartupReadinessCard(inputs.state.featureReadiness) }
         }
         DesktopDestination.Settings -> {
             item {
                 BackendSettingsCard(
-                    config = state.config,
+                    config = inputs.state.config,
                     onConfigSaved = settings.onConfigSaved,
                     onTokenCleared = settings.onTokenCleared,
                     onIrohIdentityReset = settings.onIrohIdentityReset,
                 )
             }
             item {
+                LocalRuntimeProviderSettingsCard(
+                    state = inputs.localRuntimeProvider,
+                    actions = settings.localRuntimeProvider,
+                )
+            }
+            item {
                 DesktopNucleusSettingsCard(
-                    state = nucleus,
+                    state = inputs.nucleus,
                     actions = settings.nucleus,
                 )
             }
