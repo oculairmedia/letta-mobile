@@ -33,11 +33,9 @@ object ConversationAdminHandlers {
     @Volatile
     internal var messageGetBudgetMsForTest: Long? = null
 
-    private val messageGetPageLimit: Int
-        get() = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
+    private fun messageGetPageLimit(): Int = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
 
-    private val messageGetBudgetMs: Long
-        get() = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
+    private fun messageGetBudgetMs(): Long = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
 
     fun register(
         router: AdminRpcRouter,
@@ -262,7 +260,7 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         return try {
-            kotlinx.coroutines.withTimeout(messageGetBudgetMs) {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs()) {
                 walkMessagePages(nativeClient, conversationId, messageId, op)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -279,7 +277,7 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         var before: String? = null
-        val pageLimit = messageGetPageLimit
+        val pageLimit = messageGetPageLimit()
         repeat(MESSAGE_GET_MAX_PAGES) {
             val messages = NativeAdmin.require(nativeClient, op) { c ->
                 val native = c.conversationMessagesList(
