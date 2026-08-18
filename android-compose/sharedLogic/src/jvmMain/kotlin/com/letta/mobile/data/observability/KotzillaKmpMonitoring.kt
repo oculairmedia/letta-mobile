@@ -1,13 +1,12 @@
 package com.letta.mobile.data.observability
 
 /**
- * Shared Kotzilla SDK bootstrap for KMP targets (Desktop, future WasmJS).
+ * JVM-side Kotzilla SDK bootstrap for the Desktop target.
  *
  * The Android target boots the SDK automatically at process start via a
  * ContentProvider injected by the Kotzilla Gradle plugin — no explicit call
- * needed in `Application.onCreate`. This wrapper is for the targets that do
- * NOT get the ContentProvider: Desktop's `main()` (and any future WasmJS
- * browser entry point).
+ * needed in `Application.onCreate`. This wrapper exists for the JVM (Desktop)
+ * target which doesn't get the ContentProvider.
  *
  * Looks up `initKotzillaConfig()` reflectively from the
  * `io.kotzilla.generated` package, which is generated at build time by the
@@ -28,6 +27,11 @@ package com.letta.mobile.data.observability
  *     // ... rest of app init
  * }
  * ```
+ *
+ * Lives in `jvmMain` (not `commonMain`) because Kotlin/Native's
+ * `compileKotlinHostNative` task fails on `Class.forName()` /
+ * `declaredMethods` — the Kotzilla SDK's hostNative target doesn't
+ * exist anyway, so the wrapper is JVM-only by design.
  */
 @Suppress("unused")
 fun startKotzillaMonitoring() {
