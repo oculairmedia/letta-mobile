@@ -150,12 +150,7 @@ class BackendConfigPolicyTest {
     @Test
     fun normalizeRoundTripsRemoteToLocalToRemoteWithNoReEntry() {
         val remote = normalizeConfig(
-            LettaConfig(
-                id = "",
-                mode = LettaConfig.Mode.SELF_HOSTED,
-                serverUrl = STALE_LOCAL_IROH_URL,
-                accessToken = "remote-token",
-            ),
+            sampleStaleIrohConfig(token = "remote-token", id = "").copy(mode = LettaConfig.Mode.SELF_HOSTED),
         )
         assertEquals(STALE_LOCAL_IROH_URL, remote.serverUrl)
         assertEquals(BackendKind.IROH, remote.backendKind())
