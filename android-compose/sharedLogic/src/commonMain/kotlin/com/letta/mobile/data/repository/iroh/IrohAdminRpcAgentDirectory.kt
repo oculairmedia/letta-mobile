@@ -114,15 +114,7 @@ class IrohAdminRpcAgentDirectory(
         var truncated = false
         while (out.size < limit) {
             val pageLimit = minOf(AGENT_LIST_PAGE_SIZE, limit - out.size)
-            val body = buildJsonObject {
-                put("limit", pageLimit.toString())
-                put("offset", offset.toString())
-            }.toString()
-            val page: List<Agent> = adminRpcDecodedList(
-                method = AdminRpcMethod("agent.list"),
-                path = AdminRpcPath("/v1/agents?limit=$pageLimit&offset=$offset"),
-                body = AdminRpcBody(body),
-            )
+            val page = fetchAgentPage(pageLimit, offset)
             if (page.isEmpty()) break
             val fresh = page.filter { seenIds.add(it.id.value) }
             val room = limit - out.size
@@ -138,6 +130,18 @@ class IrohAdminRpcAgentDirectory(
         if (out.size >= limit) truncated = true
         lastAgentListTruncated = truncated
         return out
+    }
+
+    private suspend fun fetchAgentPage(limit: Int, offset: Int): List<Agent> {
+        val body = buildJsonObject {
+            put("limit", limit.toString())
+            put("offset", offset.toString())
+        }.toString()
+        return adminRpcDecodedList(
+            method = AdminRpcMethod("agent.list"),
+            path = AdminRpcPath("/v1/agents?limit=$limit&offset=$offset"),
+            body = AdminRpcBody(body),
+        )
     }
 
     suspend fun getAgent(agentId: AgentId): Agent? {
@@ -331,20 +335,7 @@ class IrohAdminRpcAgentDirectory(
         val seenIds = HashSet<String>()
         var offset = 0
         repeat(AGENT_BLOCK_LIST_MAX_PAGES) {
-            val body = buildJsonObject {
-                put("agent_id", agentId.value)
-                put("limit", AGENT_BLOCK_LIST_PAGE_SIZE.toString())
-                put("offset", offset.toString())
-            }.toString()
-            val result = adminRpcResult(
-                method = AdminRpcMethod("block.list_agent"),
-                path = AdminRpcPath("/v1/agents/${agentId.value}/core-memory/blocks?limit=$AGENT_BLOCK_LIST_PAGE_SIZE&offset=$offset"),
-                body = AdminRpcBody(body),
-            ) ?: throw TimelineTransportHttpException(
-                502,
-                "block.list_agent returned no result over iroh admin_rpc",
-            )
-            val page = decodeAgentBlockPage(result)
+            val page = fetchAgentBlockPage(agentId, offset)
             val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
             merged += fresh
             if (page.blocks.isEmpty() || fresh.isEmpty()) return merged
@@ -355,6 +346,23 @@ class IrohAdminRpcAgentDirectory(
             502,
             "block.list_agent exceeded $AGENT_BLOCK_LIST_MAX_PAGES pages while has_more remained true",
         )
+    }
+
+    private suspend fun fetchAgentBlockPage(agentId: AgentId, offset: Int): AgentBlockPage {
+        val body = buildJsonObject {
+            put("agent_id", agentId.value)
+            put("limit", AGENT_BLOCK_LIST_PAGE_SIZE.toString())
+            put("offset", offset.toString())
+        }.toString()
+        val result = adminRpcResult(
+            method = AdminRpcMethod("block.list_agent"),
+            path = AdminRpcPath("/v1/agents/${agentId.value}/core-memory/blocks?limit=$AGENT_BLOCK_LIST_PAGE_SIZE&offset=$offset"),
+            body = AdminRpcBody(body),
+        ) ?: throw TimelineTransportHttpException(
+            502,
+            "block.list_agent returned no result over iroh admin_rpc",
+        )
+        return decodeAgentBlockPage(result)
     }
 
     suspend fun listAgentBlocks(agentId: String): List<Block> = listAgentBlocks(AgentId(agentId))
