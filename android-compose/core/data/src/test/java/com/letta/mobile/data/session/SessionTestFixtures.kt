@@ -26,11 +26,59 @@ import com.letta.mobile.testutil.FakeSettingsRepository
 import com.letta.mobile.testutil.FakeStepApi
 import com.letta.mobile.testutil.FakeToolApi
 import io.mockk.mockk
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.advanceUntilIdle
+import org.junit.Assert.assertEquals
 
 internal fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
+
+internal data class ProxySwitchScenario<T, R>(
+    val setupGraph: TestSessionGraphFactoryBuilder.() -> Unit,
+    val createProxy: (SessionManager, CoroutineScope) -> T,
+    val refresh: suspend (T) -> Unit,
+    val observeIds: (T) -> List<R>,
+    val mutateForBackendB: () -> Unit,
+    val expectedBefore: List<R>,
+    val expectedAfter: List<R>,
+)
+
+@OptIn(ExperimentalCoroutinesApi::class)
+internal fun <T, R> assertProxySwitchesCaches(
+    scheduler: TestCoroutineScheduler,
+    scenario: ProxySwitchScenario<T, R>,
+) {
+    val dispatcher = StandardTestDispatcher(scheduler)
+    val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
+    val sessionManager = SessionManager(
+        settingsRepository = settingsRepository,
+        sessionGraphFactory = createTestSessionGraphFactory(scenario.setupGraph),
+        managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+    )
+    val proxy = scenario.createProxy(sessionManager, CoroutineScope(SupervisorJob() + dispatcher))
+
+    kotlinx.coroutines.test.runTest(scheduler) {
+        scenario.refresh(proxy)
+        advanceUntilIdle()
+        assertEquals(scenario.expectedBefore, scenario.observeIds(proxy))
+
+        scenario.mutateForBackendB()
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<R>(), scenario.observeIds(proxy))
+
+        scenario.refresh(proxy)
+        advanceUntilIdle()
+        assertEquals(scenario.expectedAfter, scenario.observeIds(proxy))
+    }
+}
 
 @JvmInline
 internal value class TestServerUrl(val value: String)

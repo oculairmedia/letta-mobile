@@ -51,111 +51,88 @@ import org.junit.Test
 class SessionScopedAdminRepositoriesTest {
 
     @Test
-    fun `folder repository proxy switches caches to rebuilt graph`() {
+    fun `folder repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeFolderApi = FakeFolderApi().apply {
             folders = mutableListOf(Folder(id = FolderId("folder-a"), name = "Backend A Folder"))
         }
-        assertAdminProxySwitchesCaches(
-            setupGraph = { folderApi = fakeFolderApi },
-            createProxy = { sm, scope -> SessionScopedFolderRepository(sm, scope) },
-            refresh = { it.refreshFolders() },
-            observeIds = { it.folders.value.map { f -> f.id } },
-            mutateForBackendB = {
-                fakeFolderApi.folders = mutableListOf(Folder(id = FolderId("folder-b"), name = "Backend B Folder"))
-            },
-            expectedBefore = listOf(FolderId("folder-a")),
-            expectedAfter = listOf(FolderId("folder-b")),
+        assertProxySwitchesCaches(
+            testScheduler,
+            ProxySwitchScenario(
+                setupGraph = { folderApi = fakeFolderApi },
+                createProxy = { sm, scope -> SessionScopedFolderRepository(sm, scope) },
+                refresh = { it.refreshFolders() },
+                observeIds = { it.folders.value.map { f -> f.id } },
+                mutateForBackendB = {
+                    fakeFolderApi.folders = mutableListOf(Folder(id = FolderId("folder-b"), name = "Backend B Folder"))
+                },
+                expectedBefore = listOf(FolderId("folder-a")),
+                expectedAfter = listOf(FolderId("folder-b")),
+            ),
         )
     }
 
     @Test
-    fun `group repository proxy switches caches to rebuilt graph`() {
+    fun `group repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeGroupApi = FakeGroupApi().apply {
             groups = mutableListOf(sampleGroup("group-a", "Backend A Group"))
         }
-        assertAdminProxySwitchesCaches(
-            setupGraph = { groupApi = fakeGroupApi },
-            createProxy = { sm, scope -> SessionScopedGroupRepository(sm, scope) },
-            refresh = { it.refreshGroups() },
-            observeIds = { it.groups.value.map { g -> g.id } },
-            mutateForBackendB = {
-                fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
-            },
-            expectedBefore = listOf(GroupId("group-a")),
-            expectedAfter = listOf(GroupId("group-b")),
+        assertProxySwitchesCaches(
+            testScheduler,
+            ProxySwitchScenario(
+                setupGraph = { groupApi = fakeGroupApi },
+                createProxy = { sm, scope -> SessionScopedGroupRepository(sm, scope) },
+                refresh = { it.refreshGroups() },
+                observeIds = { it.groups.value.map { g -> g.id } },
+                mutateForBackendB = {
+                    fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
+                },
+                expectedBefore = listOf(GroupId("group-a")),
+                expectedAfter = listOf(GroupId("group-b")),
+            ),
         )
     }
 
     @Test
-    fun `identity repository proxy switches caches to rebuilt graph`() {
+    fun `identity repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeIdentityApi = FakeIdentityApi().apply {
             identities = mutableListOf(sampleIdentity("identity-a", "Backend A Identity"))
         }
-        assertAdminProxySwitchesCaches(
-            setupGraph = { identityApi = fakeIdentityApi },
-            createProxy = { sm, scope -> SessionScopedIdentityRepository(sm, scope) },
-            refresh = { it.refreshIdentities() },
-            observeIds = { it.identities.value.map { i -> i.id } },
-            mutateForBackendB = {
-                fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
-            },
-            expectedBefore = listOf(IdentityId("identity-a")),
-            expectedAfter = listOf(IdentityId("identity-b")),
+        assertProxySwitchesCaches(
+            testScheduler,
+            ProxySwitchScenario(
+                setupGraph = { identityApi = fakeIdentityApi },
+                createProxy = { sm, scope -> SessionScopedIdentityRepository(sm, scope) },
+                refresh = { it.refreshIdentities() },
+                observeIds = { it.identities.value.map { i -> i.id } },
+                mutateForBackendB = {
+                    fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
+                },
+                expectedBefore = listOf(IdentityId("identity-a")),
+                expectedAfter = listOf(IdentityId("identity-b")),
+            ),
         )
     }
 
     @Test
-    fun `provider repository proxy switches caches to rebuilt graph`() {
+    fun `provider repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeProviderApi = FakeProviderApi().apply {
             providers = mutableListOf(sampleProvider("provider-a", "Backend A Provider"))
         }
-        assertAdminProxySwitchesCaches(
-            setupGraph = { providerApi = fakeProviderApi },
-            createProxy = { sm, scope -> SessionScopedProviderRepository(sm, scope) },
-            refresh = { it.refreshProviders() },
-            observeIds = { it.providers.value.map { p -> p.id } },
-            mutateForBackendB = {
-                fakeProviderApi.providers = mutableListOf(sampleProvider("provider-b", "Backend B Provider"))
-            },
-            expectedBefore = listOf(ProviderId("provider-a")),
-            expectedAfter = listOf(ProviderId("provider-b")),
+        assertProxySwitchesCaches(
+            testScheduler,
+            ProxySwitchScenario(
+                setupGraph = { providerApi = fakeProviderApi },
+                createProxy = { sm, scope -> SessionScopedProviderRepository(sm, scope) },
+                refresh = { it.refreshProviders() },
+                observeIds = { it.providers.value.map { p -> p.id } },
+                mutateForBackendB = {
+                    fakeProviderApi.providers = mutableListOf(sampleProvider("provider-b", "Backend B Provider"))
+                },
+                expectedBefore = listOf(ProviderId("provider-a")),
+                expectedAfter = listOf(ProviderId("provider-b")),
+            ),
         )
     }
-
-    private fun <T, R> assertAdminProxySwitchesCaches(
-        setupGraph: TestSessionGraphFactoryBuilder.() -> Unit,
-        createProxy: (SessionManager, CoroutineScope) -> T,
-        refresh: suspend (T) -> Unit,
-        observeIds: (T) -> List<R>,
-        mutateForBackendB: () -> Unit,
-        expectedBefore: List<R>,
-        expectedAfter: List<R>,
-    ) = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionGraphFactory(setupGraph),
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-        val proxy = createProxy(sessionManager, CoroutineScope(SupervisorJob() + dispatcher))
-
-        refresh(proxy)
-        advanceUntilIdle()
-        assertEquals(expectedBefore, observeIds(proxy))
-
-        mutateForBackendB()
-        settingsRepository.activeConfigState.value = config("backend-b")
-        advanceUntilIdle()
-
-        assertEquals(emptyList<R>(), observeIds(proxy))
-
-        refresh(proxy)
-        advanceUntilIdle()
-        assertEquals(expectedAfter, observeIds(proxy))
-    }
-
-    private fun config(id: String): LettaConfig = sessionTestConfig(id)
 
     private fun sampleGroup(id: String, description: String) = Group(
         id = GroupId(id),
