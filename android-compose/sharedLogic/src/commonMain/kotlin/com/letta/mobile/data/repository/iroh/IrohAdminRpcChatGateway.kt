@@ -178,6 +178,45 @@ class IrohAdminRpcChatGateway(
             }
     }
 
+    // letta-mobile-i9h61.3.2: agent-scoped list (tap-to-navigate on
+    // inter-agent messages). The handler is conversation.list_agent
+    // (added in the same bead); a JsonArray returns the agent's
+    // active conversations. capability_unavailable is the only
+    // recoverable error path here — fall through to emptyList() so
+    // the picker falls back rather than crashes.
+    override suspend fun listConversationsForAgent(
+        agentId: String,
+        limit: Int,
+    ): List<Conversation> {
+        val body = buildJsonObject {
+            put("agent_id", agentId)
+            put("limit", limit.toString())
+        }.toString()
+        val result = runCatching {
+            rpc(AdminRpcCall("conversation.list_agent", "/v1/conversations/list_agent", body))
+        }.getOrNull() ?: return emptyList()
+        if (result !is kotlinx.serialization.json.JsonArray) {
+            // Either fail-closed capability_unavailable (handler returns
+            // an object envelope) or an unexpected shape. Treat as empty
+            // so the picker falls through to the appserver-resolved
+            // fresh-conversation path.
+            if (result is kotlinx.serialization.json.JsonObject) {
+                Telemetry.event(
+                    "IrohGate", "conversation_list_agent.unexpected_object_shape",
+                    "keyCount" to result.size,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+            return emptyList()
+        }
+        return runCatching {
+            json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+                .also { conversations ->
+                    conversations.forEach { agentIdByConversation[it.id] = it.agentId }
+                }
+        }.getOrElse { emptyList() }
+    }
+
     override suspend fun getConversation(conversationId: String): Conversation {
         val result = rpc(AdminRpcCall("conversation.get", "/v1/conversations/$conversationId"))
             ?: throw TimelineTransportHttpException(502, "conversation.get returned no result over iroh admin_rpc")
