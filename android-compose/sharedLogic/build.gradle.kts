@@ -8,6 +8,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover")
+    // Kotzilla observability — applied to sharedLogic unconditionally so the
+    // generated `io.kotzilla.generated.monitoring(...)` wrapper compiles in
+    // commonMain. The Android app module gates the SDK on `-Pkotzilla=true`
+    // (see app/build.gradle.kts); this library ships the SDK in all builds
+    // by design — the SDK is production-safe per Kotzilla docs.
+    //
+    // KSP consumers (core/data Hilt+Room) need `generateKotzillaConfig` to
+    // run first — the root build.gradle.kts `subprojects { ksp dependsOn
+    // generateKotzillaConfig }` block covers that.
+    id("io.kotzilla.kotzilla-plugin")
 }
 
 kover {
@@ -22,6 +32,21 @@ detekt {
     buildUponDefaultConfig = true
     config.setFrom("$rootDir/detekt.yml")
     parallel = true
+}
+
+// Kotzilla extension — applied unconditionally (see plugins block).
+// The KMP shared module uses the kotzilla.json with `isDefault: true` so
+// Android + Desktop (jvm) + WASM all instrument through one config.
+// Versioning tracks the app module's git-describe so the Kotzilla console
+// shows the same version for all sessions originating from the same build.
+//
+// `autoAddDependencies = false` because the SDK's `commonMain` artifact
+// doesn't publish a hostNative variant — auto-injection fails the host
+// (Kotlin/Native) target. We add the SDK per-platform below.
+val kotzillaExt = extensions.getByName("kotzilla")
+kotzillaExt.withGroovyBuilder {
+    setProperty("versionName", "sharedLogic-0.17.2")
+    setProperty("autoAddDependencies", false)
 }
 
 // Forward the opt-in flag for the live-QUIC Iroh E2E suite to the test JVM.
@@ -198,6 +223,13 @@ kotlin {
                 // ndk_context::initialize_android_context, called from
                 // IrohAndroidInit.kt). See letta-mobile-eakk8.
                 implementation("computer.iroh:iroh-android:1.1.0")
+                // Kotzilla SDK — Android variant. The SDK's `commonMain`
+                // artifact doesn't publish a hostNative variant, so we add
+                // per-platform (autoAddDependencies = false in the kotzilla{}
+                // block above). Android auto-boots via ContentProvider; shared
+                // wrapper (`startKotzillaMonitoring()`) is a no-op on this
+                // target.
+                implementation("io.kotzilla:kotzilla-sdk-compose-android:2.3.3")
             }
         }
 
@@ -212,6 +244,12 @@ kotlin {
                 // Android-specific AAR/manifest. The desktop and iroh-wrapper-cli
                 // modules don't need the JNI context init.
                 implementation("computer.iroh:iroh:1.1.0")
+                // Kotzilla SDK — JVM variant. The SDK's `commonMain` artifact
+                // doesn't publish a hostNative variant, so we add per-platform
+                // (autoAddDependencies = false in the kotzilla{} block above).
+                // Desktop's `main()` calls `startKotzillaMonitoring()` which
+                // routes to `initKotzillaConfig()`.
+                implementation("io.kotzilla:kotzilla-sdk-compose-jvm:2.3.3")
                 // letta-mobile-gw0h1 / letta-mobile-sixv8.1: PNG rendering
                 // (QrRenderer.kt) needs ZXing's javase (BufferedImage/ImageIO
                 // helpers). Scoped to jvmMain only — it must never be

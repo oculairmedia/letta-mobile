@@ -12,6 +12,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Kotzilla SDK artifacts (e.g. kotzilla-sdk-compose-jvm) are published
+        // to the Gradle Plugin Portal, not Maven Central. The plugin itself
+        // resolves via pluginManagement above; runtime SDK deps need this
+        // fallback to find their per-platform variants.
+        gradlePluginPortal()
         ivy("https://nodejs.org/dist/") {
             name = "Node.js distributions"
             patternLayout {

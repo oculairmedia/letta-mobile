@@ -307,3 +307,16 @@ subprojects {
         }
     }
 }
+
+// KSP task ordering for Kotzilla: when both KSP and the Kotzilla plugin are
+// applied to the same module, generateKotzillaConfig must run BEFORE the KSP
+// tasks (the SDK's runtime config lives in the same Kotlin source set KSP reads
+// from, and KSP validation rejects missing dependencies). Required for any
+// module that uses Hilt/Dagger/Room/Moshi + Kotzilla together — core/data today.
+//
+// See: https://doc.kotzilla.io/docs/getstartedCustom/setupNoKoin (1.3)
+subprojects {
+    tasks.matching { it.name.startsWith("ksp") }.configureEach {
+        dependsOn(tasks.matching { it.name.startsWith("generateKotzillaConfig") })
+    }
+}

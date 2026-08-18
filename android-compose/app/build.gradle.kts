@@ -169,8 +169,9 @@ logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$com
 // Configure the Kotzilla extension once `computedVersionName` is in scope.
 // SDK 2.3.0+ supports Hilt natively (no Koin required) — see
 // https://doc.kotzilla.io/docs/getstartedCustom/setupNoKoin.
-// SharedLogic/Desktop wiring lives in follow-up PRs to keep this diff
-// scoped to the app module first.
+// The `kotzilla.json` lives in :sharedLogic with `isDefault: true` so
+// only that module owns it; the app module applies the plugin for
+// ContentProvider auto-injection + Android-variant instrumentation.
 if (kotzillaEnabled) {
     val kotzillaExt = extensions.getByName("kotzilla")
     kotzillaExt.withGroovyBuilder {

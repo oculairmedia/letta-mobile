@@ -33,6 +33,11 @@ fun main(args: Array<String>) {
     applyLinuxHiDpiScale()
     DesktopCrashReporter.installGlobalHandler()
     initializeDesktopLifecycleMainThread()
+    // Kotzilla observability — must run before any UI composition so the SDK
+    // captures the full session including startup. Android target boots via
+    // ContentProvider; Desktop (and any future WasmJS) call this wrapper
+    // explicitly. See sharedLogic/commonMain/.../KotzillaKmpMonitoring.kt.
+    com.letta.mobile.data.observability.startKotzillaMonitoring()
     if (Platform.Current == Platform.Windows) {
         System.setProperty("nucleus.app.aumid", LETTA_WINDOWS_AUMID)
         WindowsJumpListManager.setProcessAppId(LETTA_WINDOWS_AUMID)
