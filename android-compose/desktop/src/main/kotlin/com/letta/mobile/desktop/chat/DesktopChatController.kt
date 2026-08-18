@@ -120,6 +120,23 @@ class DesktopChatController(
     val canSubmitApprovals: StateFlow<Boolean> = _canSubmitApprovals.asStateFlow()
 
     /**
+     * letta-mobile folder-settings #2: the SELECTED conversation's working
+     * directory, as last read from the runtime via
+     * [DesktopWorkingDirectoryController.currentWorkingDirectory]. Null while
+     * unknown/loading, or when the active gateway doesn't support this
+     * (remote/HTTP backends) — see [supportsWorkingDirectory].
+     */
+    private val _selectedConversationWorkingDirectory = MutableStateFlow<String?>(null)
+    val selectedConversationWorkingDirectory: StateFlow<String?> =
+        _selectedConversationWorkingDirectory.asStateFlow()
+
+    private val _workingDirectoryLoading = MutableStateFlow(false)
+    val workingDirectoryLoading: StateFlow<Boolean> = _workingDirectoryLoading.asStateFlow()
+
+    /** Whether the active gateway can report/change a conversation's working directory. */
+    val supportsWorkingDirectory: Boolean get() = gateway is DesktopWorkingDirectoryController
+
+    /**
      * requestId -> conversationId for approvals submitted this session and awaiting
      * reconciliation. The submit socket write returning is not proof the approval
      * is closed, so the request stays marked submitting until it disappears from
@@ -867,6 +884,55 @@ class DesktopChatController(
      * cannot abort (demo / HTTP-only) fall straight through to that same local
      * clear rather than pretending to have stopped anything.
      */
+    /**
+     * Refreshes [selectedConversationWorkingDirectory] from the runtime for
+     * the currently selected conversation. Called by the UI on selection
+     * change; a no-op when the gateway doesn't support this or no
+     * conversation (with a resolved agent id) is selected.
+     */
+    fun refreshSelectedConversationWorkingDirectory() {
+        if (closed) return
+        val controller = gateway as? DesktopWorkingDirectoryController
+        val conversation = state.value.selectedConversation
+        val agentId = conversation?.agentId
+        if (controller == null || agentId == null) {
+            _selectedConversationWorkingDirectory.value = null
+            return
+        }
+        val conversationId = conversation.id
+        scope.launch {
+            _workingDirectoryLoading.value = true
+            _selectedConversationWorkingDirectory.value =
+                runCatching { controller.currentWorkingDirectory(agentId, conversationId) }.getOrNull()
+            _workingDirectoryLoading.value = false
+        }
+    }
+
+    /**
+     * Changes the SELECTED conversation's working directory to [path] (an
+     * absolute folder path from the desktop folder picker). Re-issues
+     * `runtime_start` with the new `cwd` — see
+     * [DesktopWorkingDirectoryController.setWorkingDirectory] — so the tools
+     * the agent uses next (bash, file edits) operate against the new folder.
+     */
+    fun changeSelectedConversationWorkingDirectory(path: String) {
+        if (closed) return
+        val controller = gateway as? DesktopWorkingDirectoryController ?: return
+        val conversation = state.value.selectedConversation ?: return
+        val agentId = conversation.agentId ?: return
+        val conversationId = conversation.id
+        scope.launch {
+            _workingDirectoryLoading.value = true
+            val succeeded = runCatching {
+                controller.setWorkingDirectory(agentId, conversationId, path)
+            }.getOrDefault(false)
+            if (succeeded) {
+                _selectedConversationWorkingDirectory.value = path
+            }
+            _workingDirectoryLoading.value = false
+        }
+    }
+
     fun stopActiveRun(conversationId: String) {
         if (closed) return
         val active = _streamingConversationId.value ?: _thinkingConversationId.value

@@ -145,6 +145,10 @@ interface AppServerClient {
     suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
         throw UnsupportedOperationException("SetReflectionSettings is not supported by this client")
 
+    /** Reads the runtime's full per-conversation working-directory map (`get_cwd_map`). */
+    suspend fun getCwdMap(command: AppServerCommand.GetCwdMap): AppServerInboundFrame.GetCwdMapResponse =
+        throw UnsupportedOperationException("GetCwdMap is not supported by this client")
+
     // Channels host ownership (lgns8.23). CONTROLLER-INTERNAL: only
     // ChannelRestoreCoordinator calls these; the responses carry cleartext
     // plugin credentials and are never surfaced to viewers or diagnostics.
@@ -353,6 +357,9 @@ class DefaultAppServerClient(
 
     override suspend fun setReflectionSettings(command: AppServerCommand.SetReflectionSettings): AppServerInboundFrame.SetReflectionSettingsResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.SetReflectionSettingsResponse }) { transport.sendControl(command) }
+
+    override suspend fun getCwdMap(command: AppServerCommand.GetCwdMap): AppServerInboundFrame.GetCwdMapResponse =
+        registry.request(command.requestId, { it as? AppServerInboundFrame.GetCwdMapResponse }) { transport.sendControl(command) }
 
     override suspend fun channelsList(command: AppServerCommand.ChannelsList): AppServerInboundFrame.ChannelsListResponse =
         registry.request(command.requestId, { it as? AppServerInboundFrame.ChannelsListResponse }) { transport.sendControl(command) }

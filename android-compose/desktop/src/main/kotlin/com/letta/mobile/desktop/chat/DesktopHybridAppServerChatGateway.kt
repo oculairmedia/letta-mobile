@@ -86,7 +86,21 @@ class DesktopHybridAppServerChatGateway internal constructor(
     ChatGatewayExtras by adminGateway,
     DesktopApprovalSubmitter,
     DesktopTurnAborter,
+    DesktopWorkingDirectoryController,
     AutoCloseable {
+
+    /**
+     * letta-mobile folder-settings #2: delegates to [AppServerTurnEngine],
+     * which owns the `client` request plumbing and the `externalToolRegistry`
+     * needed to re-advertise tools on a cwd-changing `runtime_start`. Returns
+     * null/false (never fabricates) when the active engine isn't an
+     * [AppServerTurnEngine] (e.g. under test doubles).
+     */
+    override suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String? =
+        (turnEngine as? AppServerTurnEngine)?.currentWorkingDirectory(agentId, conversationId)
+
+    override suspend fun setWorkingDirectory(agentId: String, conversationId: String, path: String): Boolean =
+        (turnEngine as? AppServerTurnEngine)?.setWorkingDirectory(agentId, conversationId, path) ?: false
 
     /**
      * conversationId -> the canonical run id most recently seen on that

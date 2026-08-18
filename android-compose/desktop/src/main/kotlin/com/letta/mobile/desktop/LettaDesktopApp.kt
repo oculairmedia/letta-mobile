@@ -158,15 +158,11 @@ internal fun LettaDesktopApp(
             secureSettingsStore = secureSettingsStore,
         ),
     )
-    val (localRuntimeProviderState, localRuntimeProviderActions) = rememberDesktopLocalRuntimeProviderState(
+    val localConfig = rememberDesktopLocalConfigState(
         scope = chatScope,
-        onSaved = {
-            // The saved config only affects the BUNDLED local runtime — a
-            // remote/self-hosted backend has nothing to restart.
-            if (activeConfig.mode == LettaConfig.Mode.LOCAL) {
-                chatController.retryConnection()
-            }
-        },
+        secureSettingsStore = secureSettingsStore,
+        isLocalMode = activeConfig.mode == LettaConfig.Mode.LOCAL,
+        onRestartRequested = chatController::retryConnection,
     )
     val chatState by chatController.state.collectAsState()
     var conversationTabsState by remember(chatState.sessionGraphId) { mutableStateOf(ConversationTabsState()) }
@@ -174,6 +170,14 @@ internal fun LettaDesktopApp(
     val deletingConversationIds by chatController.deletingConversationIds.collectAsState()
     val submittingApprovals by chatController.submittingApprovals.collectAsState()
     val canSubmitApprovals by chatController.canSubmitApprovals.collectAsState()
+    // letta-mobile folder-settings #2: re-read the working directory whenever
+    // the selected conversation changes (or its identity resolves for the
+    // first time after a fresh connect).
+    val selectedConversationWorkingDirectory by chatController.selectedConversationWorkingDirectory.collectAsState()
+    val workingDirectoryLoading by chatController.workingDirectoryLoading.collectAsState()
+    LaunchedEffect(chatState.selectedConversationId, chatState.selectedConversation?.agentId) {
+        chatController.refreshSelectedConversationWorkingDirectory()
+    }
     val modelOptions = remember(availableModels) { buildModelOptions(availableModels) }
     val httpApis = rememberDesktopHttpApis(activeConfig, irohMode, irohAgentDirectory)
     val blockApi = httpApis.blockApi
@@ -780,6 +784,9 @@ internal fun LettaDesktopApp(
                             ),
                             submittingApprovalRequestIds = submittingApprovals,
                             agentNamesById = rosterAgents.associate { it.id.value to it.name },
+                            workingDirectory = selectedConversationWorkingDirectory,
+                            workingDirectorySupported = chatController.supportsWorkingDirectory,
+                            workingDirectoryLoading = workingDirectoryLoading,
                         ),
                         destinationInputs = DestinationContentInputs(
                             state = bootstrapState,
@@ -805,7 +812,8 @@ internal fun LettaDesktopApp(
                                 focusedAgentName = selectedAgentName,
                             ),
                             nucleus = nucleusState,
-                            localRuntimeProvider = localRuntimeProviderState,
+                            localRuntimeProvider = localConfig.providerState,
+                            localBackendDirectory = localConfig.directoryState,
                         ),
                         showBackgroundTasks = showBackgroundTasks,
                         subagentRepository = subagentRepository,
@@ -827,6 +835,7 @@ internal fun LettaDesktopApp(
                             onRemoveImageAttachment = chatController::removeImageAttachment,
                             onRetryConnection = chatController::retryConnection,
                             onModelSelected = chatController::setConversationModel,
+                            onChangeWorkingDirectory = chatController::changeSelectedConversationWorkingDirectory,
                             onOpenModelPicker = { overlays.modelPicker = true },
                             onOnboardingTask = { kind ->
                                 when (kind) {
@@ -881,7 +890,8 @@ internal fun LettaDesktopApp(
                             onTokenCleared = { applyConfig(activeConfig.copy(accessToken = null)) },
                             onIrohIdentityReset = { overlays.irohResetConfirm = true },
                             nucleus = destinationNucleusActions(nucleusController, window),
-                            localRuntimeProvider = localRuntimeProviderActions,
+                            localRuntimeProvider = localConfig.providerActions,
+                            localBackendDirectory = localConfig.directoryActions,
                         ),
                         onShowBackgroundTasks = { showBackgroundTasks = true },
                     ),

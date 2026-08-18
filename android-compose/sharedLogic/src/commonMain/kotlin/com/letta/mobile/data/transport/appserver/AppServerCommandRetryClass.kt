@@ -97,6 +97,7 @@ sealed interface AppServerCommandRetryClass {
 
             is AppServerCommand.GetReflectionSettings -> SafeRead
             is AppServerCommand.SetReflectionSettings -> AmbiguousMutation(dedupKey = null)
+            is AppServerCommand.GetCwdMap -> SafeRead
 
             // Channels host (lgns8.23). Listings are pure reads. channel_start is
             // deliberately NOT SafeRead for blind replay: a repeat is a full

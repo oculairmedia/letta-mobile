@@ -46,6 +46,34 @@ interface DesktopTurnAborter {
 }
 
 /**
+ * letta-mobile folder-settings #2: optional capability a [DesktopChatGateway]
+ * may implement to read/change a conversation's working directory — the
+ * folder the bundled local runtime's tools (bash, file edits, git) actually
+ * operate in. Only the App Server-backed gateway supports it (the runtime
+ * genuinely tracks this per agent+conversation, see `get_cwd_map` /
+ * `runtime_start.cwd`); HTTP-only / demo gateways don't, so callers detect it
+ * via `gateway as? DesktopWorkingDirectoryController`.
+ */
+interface DesktopWorkingDirectoryController {
+    /**
+     * The working directory currently in effect for [agentId]/[conversationId],
+     * or null if it couldn't be determined (e.g. the request failed). Falls
+     * back to the runtime's boot working directory when the conversation
+     * hasn't been individually customized.
+     */
+    suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String?
+
+    /**
+     * Changes the working directory for [agentId]/[conversationId] to [path]
+     * by re-issuing `runtime_start` with `cwd` set — the same mechanism the
+     * runtime uses to persist a directory change, so it survives reconnects
+     * and is visible to a `get_cwd_map` from any other client. Returns true
+     * on success.
+     */
+    suspend fun setWorkingDirectory(agentId: String, conversationId: String, path: String): Boolean
+}
+
+/**
  * A decision for a parked approval. [reason] carries an AskUserQuestion answer
  * when encoded via [com.letta.mobile.data.model.AskUserQuestion.encodeAnswerReason];
  * otherwise it's a plain allow/deny message.
