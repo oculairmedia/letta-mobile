@@ -27,6 +27,7 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -89,15 +90,18 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(ListSerializer(serializer<T>()), result)
     }
 
+    private fun jsonBody(builderAction: JsonObjectBuilder.() -> Unit): AdminRpcBody =
+        AdminRpcBody(buildJsonObject(builderAction).toString())
+
+    private fun entityIdBody(key: String, id: String): AdminRpcBody =
+        jsonBody { put(key, id) }
+
     suspend fun countAgents(): Int {
         val result = adminRpcResult(
             method = AdminRpcMethod("agent.count"),
             path = AdminRpcPath("/v1/agents/count"),
             body = AdminRpcBody("{}"),
-        ) ?: throw TimelineTransportHttpException(
-            502,
-            "agent.count returned no result over iroh admin_rpc",
-        )
+        ) ?: throw TimelineTransportHttpException(502, "agent.count returned no result over iroh admin_rpc")
         return (result as? JsonPrimitive)?.intOrNull
             ?: (result as? JsonObject)?.get("count")?.jsonPrimitive?.intOrNull
             ?: error("agent.count returned unparseable result: $result")
@@ -132,24 +136,20 @@ class IrohAdminRpcAgentDirectory(
         return out
     }
 
-    private suspend fun fetchAgentPage(limit: Int, offset: Int): List<Agent> {
-        val body = buildJsonObject {
+    private suspend fun fetchAgentPage(limit: Int, offset: Int): List<Agent> = adminRpcDecodedList(
+        method = AdminRpcMethod("agent.list"),
+        path = AdminRpcPath("/v1/agents?limit=$limit&offset=$offset"),
+        body = jsonBody {
             put("limit", limit.toString())
             put("offset", offset.toString())
-        }.toString()
-        return adminRpcDecodedList(
-            method = AdminRpcMethod("agent.list"),
-            path = AdminRpcPath("/v1/agents?limit=$limit&offset=$offset"),
-            body = AdminRpcBody(body),
-        )
-    }
+        },
+    )
 
     suspend fun getAgent(agentId: AgentId): Agent? {
-        val body = buildJsonObject { put("agent_id", agentId.value) }.toString()
         val result = adminRpcResultOrNull(
             method = AdminRpcMethod("agent.get"),
             path = AdminRpcPath("/v1/agents/${agentId.value}"),
-            body = AdminRpcBody(body),
+            body = entityIdBody("agent_id", agentId.value),
         ) ?: return null
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
@@ -158,98 +158,84 @@ class IrohAdminRpcAgentDirectory(
 
     suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
         val paramsJson = json.encodeToJsonElement(AgentUpdateParams.serializer(), params).jsonObject
-        val body = buildJsonObject {
+        val body = jsonBody {
             put("agent_id", agentId.value)
             paramsJson.forEach { (key, value) -> put(key, value) }
-        }.toString()
+        }
         return adminRpcDecoded(
             method = AdminRpcMethod("agent.update"),
             path = AdminRpcPath("/v1/agents/${agentId.value}"),
-            body = AdminRpcBody(body),
+            body = body,
         )
     }
 
     suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
 
     suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview {
-        val body = buildJsonObject {
+        val body = jsonBody {
             put("agent_id", agentId.value)
             conversationId?.let { put("conversation_id", it.value) }
-        }.toString()
-        val path = buildString {
-            append("/v1/agents/")
-            append(agentId.value)
-            append("/context")
-            if (conversationId != null) append("?conversation_id=").append(conversationId.value)
         }
+        val query = conversationId?.let { "?conversation_id=${it.value}" } ?: ""
         return adminRpcDecoded(
             method = AdminRpcMethod("agent.context"),
-            path = AdminRpcPath(path),
-            body = AdminRpcBody(body),
+            path = AdminRpcPath("/v1/agents/${agentId.value}/context$query"),
+            body = body,
         )
     }
 
     suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
         getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
 
-    suspend fun listTools(limit: Int, offset: Int): List<Tool> {
-        val body = buildJsonObject {
+    suspend fun listTools(limit: Int, offset: Int): List<Tool> = adminRpcDecodedList(
+        method = AdminRpcMethod("tool.list"),
+        path = AdminRpcPath("/v1/tools?limit=$limit&offset=$offset"),
+        body = jsonBody {
             put("limit", limit)
             put("offset", offset)
-        }.toString()
-        return adminRpcDecodedList(
-            method = AdminRpcMethod("tool.list"),
-            path = AdminRpcPath("/v1/tools?limit=$limit&offset=$offset"),
-            body = AdminRpcBody(body),
-        )
-    }
+        },
+    )
 
-    suspend fun createTool(params: ToolCreateParams): Tool {
-        val body = json.encodeToString(ToolCreateParams.serializer(), params)
-        return adminRpcDecoded(
-            method = AdminRpcMethod("tool.create"),
-            path = AdminRpcPath("/v1/tools"),
-            body = AdminRpcBody(body),
-        )
-    }
+    suspend fun createTool(params: ToolCreateParams): Tool = adminRpcDecoded(
+        method = AdminRpcMethod("tool.create"),
+        path = AdminRpcPath("/v1/tools"),
+        body = AdminRpcBody(json.encodeToString(ToolCreateParams.serializer(), params)),
+    )
 
     suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
         val paramsJson = json.encodeToJsonElement(ToolUpdateParams.serializer(), params).jsonObject
-        val body = buildJsonObject {
+        val body = jsonBody {
             put("tool_id", toolId.value)
             paramsJson.forEach { (key, value) -> put(key, value) }
-        }.toString()
+        }
         return adminRpcDecoded(
             method = AdminRpcMethod("tool.update"),
             path = AdminRpcPath("/v1/tools/${toolId.value}"),
-            body = AdminRpcBody(body),
+            body = body,
         )
     }
 
     suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = updateTool(ToolId(toolId), params)
 
     suspend fun deleteTool(toolId: ToolId) {
-        val body = buildJsonObject { put("tool_id", toolId.value) }.toString()
         adminRpcResult(
             method = AdminRpcMethod("tool.delete"),
             path = AdminRpcPath("/v1/tools/${toolId.value}"),
-            body = AdminRpcBody(body),
+            body = entityIdBody("tool_id", toolId.value),
         )
     }
 
     suspend fun deleteTool(toolId: String) = deleteTool(ToolId(toolId))
 
     suspend fun setToolAttached(agentId: AgentId, toolId: ToolId, attached: Boolean) {
-        val body = buildJsonObject {
-            put("agent_id", agentId.value)
-            put("tool_id", toolId.value)
-        }.toString()
-        val method = if (attached) AdminRpcMethod("tool.attach") else AdminRpcMethod("tool.detach")
         val action = if (attached) "attach" else "detach"
         adminRpcResult(
-            method = method,
+            method = AdminRpcMethod(if (attached) "tool.attach" else "tool.detach"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/tools/$action/${toolId.value}"),
-            body = AdminRpcBody(body),
+            body = jsonBody {
+                put("agent_id", agentId.value)
+                put("tool_id", toolId.value)
+            },
         )
     }
 
@@ -257,16 +243,10 @@ class IrohAdminRpcAgentDirectory(
         setToolAttached(AgentId(agentId), ToolId(toolId), attached)
 
     suspend fun listSkills(agentId: AgentId? = null): List<Skill> {
-        val body = buildJsonObject {
-            agentId?.let { put("agent_id", it.value) }
-        }.toString()
+        val body = jsonBody { agentId?.let { put("agent_id", it.value) } }
         val method = if (agentId == null) AdminRpcMethod("skill.list") else AdminRpcMethod("skill.list_agent")
         val path = agentId?.let { "/v1/agents/${it.value}/skills" } ?: "/v1/skills"
-        val result = adminRpcResult(
-            method = method,
-            path = AdminRpcPath(path),
-            body = AdminRpcBody(body),
-        ) ?: return emptyList()
+        val result = adminRpcResult(method, AdminRpcPath(path), body) ?: return emptyList()
         val skillsElement = (result as? JsonObject)?.get("skills") ?: result
         return json.decodeFromJsonElement(ListSerializer(Skill.serializer()), skillsElement)
     }
@@ -274,11 +254,10 @@ class IrohAdminRpcAgentDirectory(
     suspend fun listSkills(agentId: String?): List<Skill> = listSkills(agentId?.let(::AgentId))
 
     suspend fun listAgentSlashCommands(agentId: AgentId): List<AgentSlashCommand> {
-        val body = buildJsonObject { put("agent_id", agentId.value) }.toString()
         val result = adminRpcResult(
             method = AdminRpcMethod("slash_command.list_agent"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/slash-commands"),
-            body = AdminRpcBody(body),
+            body = entityIdBody("agent_id", agentId.value),
         ) ?: return emptyList()
         return json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
     }
@@ -287,15 +266,14 @@ class IrohAdminRpcAgentDirectory(
         listAgentSlashCommands(AgentId(agentId))
 
     suspend fun installSkill(agentId: AgentId, skillName: SkillName) {
-        val body = buildJsonObject {
-            put("agent_id", agentId.value)
-            put("name", skillName.value)
-            put("skill_path", skillName.value)
-        }.toString()
         adminRpcResult(
             method = AdminRpcMethod("skill.install"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/skills"),
-            body = AdminRpcBody(body),
+            body = jsonBody {
+                put("agent_id", agentId.value)
+                put("name", skillName.value)
+                put("skill_path", skillName.value)
+            },
         )
     }
 
@@ -303,14 +281,13 @@ class IrohAdminRpcAgentDirectory(
         installSkill(AgentId(agentId), SkillName(skillName))
 
     suspend fun uninstallSkill(agentId: AgentId, skillName: SkillName) {
-        val body = buildJsonObject {
-            put("agent_id", agentId.value)
-            put("name", skillName.value)
-        }.toString()
         adminRpcResult(
             method = AdminRpcMethod("skill.uninstall"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/skills/${skillName.value}"),
-            body = AdminRpcBody(body),
+            body = jsonBody {
+                put("agent_id", agentId.value)
+                put("name", skillName.value)
+            },
         )
     }
 
@@ -318,11 +295,10 @@ class IrohAdminRpcAgentDirectory(
         uninstallSkill(AgentId(agentId), SkillName(skillName))
 
     suspend fun getBlock(blockId: BlockId): Block? {
-        val body = buildJsonObject { put("block_id", blockId.value) }.toString()
         val result = adminRpcResultOrNull(
             method = AdminRpcMethod("block.get"),
             path = AdminRpcPath("/v1/blocks/${blockId.value}"),
-            body = AdminRpcBody(body),
+            body = entityIdBody("block_id", blockId.value),
         ) ?: return null
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
@@ -349,19 +325,15 @@ class IrohAdminRpcAgentDirectory(
     }
 
     private suspend fun fetchAgentBlockPage(agentId: AgentId, offset: Int): AgentBlockPage {
-        val body = buildJsonObject {
-            put("agent_id", agentId.value)
-            put("limit", AGENT_BLOCK_LIST_PAGE_SIZE.toString())
-            put("offset", offset.toString())
-        }.toString()
         val result = adminRpcResult(
             method = AdminRpcMethod("block.list_agent"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/core-memory/blocks?limit=$AGENT_BLOCK_LIST_PAGE_SIZE&offset=$offset"),
-            body = AdminRpcBody(body),
-        ) ?: throw TimelineTransportHttpException(
-            502,
-            "block.list_agent returned no result over iroh admin_rpc",
-        )
+            body = jsonBody {
+                put("agent_id", agentId.value)
+                put("limit", AGENT_BLOCK_LIST_PAGE_SIZE.toString())
+                put("offset", offset.toString())
+            },
+        ) ?: throw TimelineTransportHttpException(502, "block.list_agent returned no result over iroh admin_rpc")
         return decodeAgentBlockPage(result)
     }
 
@@ -392,65 +364,55 @@ class IrohAdminRpcAgentDirectory(
         val hasMore: Boolean,
     )
 
-    suspend fun createBlock(params: BlockCreateParams): Block {
-        val body = json.encodeToString(BlockCreateParams.serializer(), params)
-        return adminRpcDecoded(
-            method = AdminRpcMethod("block.create"),
-            path = AdminRpcPath("/v1/blocks"),
-            body = AdminRpcBody(body),
-        )
-    }
+    suspend fun createBlock(params: BlockCreateParams): Block = adminRpcDecoded(
+        method = AdminRpcMethod("block.create"),
+        path = AdminRpcPath("/v1/blocks"),
+        body = AdminRpcBody(json.encodeToString(BlockCreateParams.serializer(), params)),
+    )
 
-    suspend fun updateBlock(blockId: BlockId, params: BlockUpdateParams): Block {
-        val body = buildJsonObject {
+    suspend fun updateBlock(blockId: BlockId, params: BlockUpdateParams): Block = adminRpcDecoded(
+        method = AdminRpcMethod("block.update"),
+        path = AdminRpcPath("/v1/blocks/${blockId.value}"),
+        body = jsonBody {
             put("block_id", blockId.value)
             params.value?.let { put("value", it) }
             params.limit?.let { put("limit", it) }
             params.description?.let { put("description", it) }
-        }.toString()
-        return adminRpcDecoded(
-            method = AdminRpcMethod("block.update"),
-            path = AdminRpcPath("/v1/blocks/${blockId.value}"),
-            body = AdminRpcBody(body),
-        )
-    }
+        },
+    )
 
     suspend fun updateBlock(blockId: String, params: BlockUpdateParams): Block = updateBlock(BlockId(blockId), params)
 
     suspend fun deleteBlock(blockId: BlockId) {
-        val body = buildJsonObject { put("block_id", blockId.value) }.toString()
         adminRpcResult(
             method = AdminRpcMethod("block.delete"),
             path = AdminRpcPath("/v1/blocks/${blockId.value}"),
-            body = AdminRpcBody(body),
+            body = entityIdBody("block_id", blockId.value),
         )
     }
 
     suspend fun deleteBlock(blockId: String) = deleteBlock(BlockId(blockId))
 
     suspend fun attachBlock(agentId: AgentId, blockId: BlockId) {
-        val body = buildJsonObject {
-            put("agent_id", agentId.value)
-            put("block_id", blockId.value)
-        }.toString()
         adminRpcResult(
             method = AdminRpcMethod("block.attach"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/core-memory/blocks/attach/${blockId.value}"),
-            body = AdminRpcBody(body),
+            body = jsonBody {
+                put("agent_id", agentId.value)
+                put("block_id", blockId.value)
+            },
         )
     }
 
     suspend fun attachBlock(agentId: String, blockId: String) = attachBlock(AgentId(agentId), BlockId(blockId))
 
     suspend fun listSchedules(agentId: AgentId? = null): List<ScheduledMessage> {
-        val body = buildJsonObject {
-            agentId?.let { put("agent_id", it.value) }
-        }.toString()
+        val body = jsonBody { agentId?.let { put("agent_id", it.value) } }
         val path = agentId?.let { "/v1/agents/${it.value}/schedule" } ?: "/v1/schedules"
         val result = adminRpcResult(
             method = AdminRpcMethod("schedule.list"),
             path = AdminRpcPath(path),
-            body = AdminRpcBody(body),
+            body = body,
         ) ?: throw TimelineTransportHttpException(502, "schedule.list returned no result over iroh admin_rpc")
         if (result is JsonObject && "scheduled_messages" !in result) {
             throw TimelineTransportHttpException(502, "schedule.list returned a malformed result over iroh admin_rpc")
@@ -475,13 +437,13 @@ class IrohAdminRpcAgentDirectory(
     suspend fun listSchedules(agentId: String?): List<ScheduledMessage> = listSchedules(agentId?.let(::AgentId))
 
     suspend fun getSchedule(scheduleId: ScheduleId, agentId: AgentId? = null): ScheduledMessage? {
-        val body = buildJsonObject {
+        val body = jsonBody {
             put("schedule_id", scheduleId.value)
             agentId?.let { put("agent_id", it.value) }
-        }.toString()
+        }
         val path = agentId?.let { "/v1/agents/${it.value}/schedule/${scheduleId.value}" }
             ?: "/v1/schedules/${scheduleId.value}"
-        val result = scheduleGetResultOrNull(AdminRpcPath(path), AdminRpcBody(body)) ?: return null
+        val result = scheduleGetResultOrNull(AdminRpcPath(path), body) ?: return null
         return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
     }
 
@@ -490,14 +452,14 @@ class IrohAdminRpcAgentDirectory(
 
     suspend fun createSchedule(agentId: AgentId, params: ScheduleCreateParams): ScheduledMessage {
         val paramsJson = json.encodeToJsonElement(ScheduleCreateParams.serializer(), params).jsonObject
-        val body = buildJsonObject {
+        val body = jsonBody {
             put("agent_id", agentId.value)
             paramsJson.forEach { (key, value) -> put(key, value) }
-        }.toString()
+        }
         return adminRpcDecoded(
             method = AdminRpcMethod("schedule.create"),
             path = AdminRpcPath("/v1/agents/${agentId.value}/schedule"),
-            body = AdminRpcBody(body),
+            body = body,
         )
     }
 
@@ -505,16 +467,16 @@ class IrohAdminRpcAgentDirectory(
         createSchedule(AgentId(agentId), params)
 
     suspend fun deleteSchedule(scheduleId: ScheduleId, agentId: AgentId? = null) {
-        val body = buildJsonObject {
+        val body = jsonBody {
             put("schedule_id", scheduleId.value)
             agentId?.let { put("agent_id", it.value) }
-        }.toString()
+        }
         val path = agentId?.let { "/v1/agents/${it.value}/schedule/${scheduleId.value}" }
             ?: "/v1/schedules/${scheduleId.value}"
         adminRpcResult(
             method = AdminRpcMethod("schedule.delete"),
             path = AdminRpcPath(path),
-            body = AdminRpcBody(body),
+            body = body,
         )
     }
 
