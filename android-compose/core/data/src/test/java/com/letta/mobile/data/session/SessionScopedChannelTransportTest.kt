@@ -84,6 +84,7 @@ class SessionScopedChannelTransportTest {
         advanceUntilIdle()
 
         assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransportState.Idle)
+        proxy.close()
     }
 
     private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)

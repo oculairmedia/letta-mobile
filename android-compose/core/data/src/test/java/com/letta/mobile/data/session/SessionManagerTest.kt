@@ -88,6 +88,7 @@ class SessionManagerTest {
                 FakeStepApi(),
                 FakeToolApi(),
                 appContext = mockk(relaxed = true),
+                settingsRepository = settingsRepository,
             ),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
@@ -100,7 +101,7 @@ class SessionManagerTest {
         val secondGraph = sessionManager.current
         assertNotEquals(firstGraph.id, secondGraph.id)
         assertTrue(firstGraph.scope.coroutineContext.job.isCancelled)
-        assertTrue(!secondGraph.scope.coroutineContext.job.isCancelled)
+        org.junit.Assert.assertFalse(secondGraph.scope.coroutineContext.job.isCancelled)
     }
 
     @Test
