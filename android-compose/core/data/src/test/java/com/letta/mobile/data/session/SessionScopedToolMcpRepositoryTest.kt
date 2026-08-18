@@ -47,11 +47,50 @@ import org.junit.Test
 class SessionScopedToolMcpRepositoryTest {
 
     @Test
-    fun `tool and mcp repository proxies switch caches to rebuilt graph`() = runTest {
+    fun `tool repository proxy switches caches to rebuilt graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeToolApi = FakeToolApi().apply {
             tools = mutableListOf(sampleTool("tool-a"))
         }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.toolApi = fakeToolApi
+            },
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val toolProxy = SessionScopedToolRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val agentTools = toolProxy.getAgentTools("agent-1")
+
+        toolProxy.refreshTools()
+        toolProxy.attachTool("agent-1", "tool-a")
+        advanceUntilIdle()
+        assertEquals(listOf("tool-a"), toolProxy.getTools().value.map { it.id.value })
+        assertEquals(listOf("tool-a"), agentTools.first().map { it.id.value })
+
+        fakeToolApi.tools = mutableListOf(sampleTool("tool-b"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), toolProxy.getTools().value.map { it.id.value })
+        assertEquals(emptyList<String>(), agentTools.first().map { it.id.value })
+
+        val rebuiltAgentTools = toolProxy.getAgentTools("agent-1")
+        toolProxy.refreshTools()
+        toolProxy.attachTool("agent-1", "tool-b")
+        advanceUntilIdle()
+
+        assertEquals(listOf("tool-b"), toolProxy.getTools().value.map { it.id.value })
+        assertEquals(listOf("tool-b"), rebuiltAgentTools.first().map { it.id.value })
+    }
+
+    @Test
+    fun `mcp server repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeMcpServerApi = FakeMcpServerApi().apply {
             servers = mutableListOf(sampleMcpServer("server-a"))
             serverTools["server-a"] = listOf(sampleTool("mcp-tool-a"))
@@ -59,73 +98,36 @@ class SessionScopedToolMcpRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
-                FakeAgentApi(),
-                FakeAgentDao(),
-                FakeConversationApi(),
-                FakeConversationDao(),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                fakeMcpServerApi,
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                fakeToolApi,
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.mcpServerApi = fakeMcpServerApi
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-        val toolProxy = SessionScopedToolRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val mcpProxy = SessionScopedMcpServerRepository(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val agentTools = toolProxy.getAgentTools("agent-1")
         val serverTools = mcpProxy.getServerTools(McpServerId("server-a"))
 
-        toolProxy.refreshTools()
-        toolProxy.attachTool("agent-1", "tool-a")
         mcpProxy.refreshServers()
         mcpProxy.refreshServerTools(McpServerId("server-a"))
         advanceUntilIdle()
-        assertEquals(listOf("tool-a"), toolProxy.getTools().value.map { it.id.value })
-        assertEquals(listOf("tool-a"), agentTools.first().map { it.id.value })
         assertEquals(listOf(McpServerId("server-a")), mcpProxy.servers.value.map { it.id })
         assertEquals(listOf("mcp-tool-a"), serverTools.first().map { it.id.value })
 
-        fakeToolApi.tools = mutableListOf(sampleTool("tool-b"))
         fakeMcpServerApi.servers = mutableListOf(sampleMcpServer("server-b"))
         fakeMcpServerApi.serverTools = mutableMapOf("server-a" to listOf(sampleTool("mcp-tool-b")))
         settingsRepository.activeConfigState.value = config("backend-b")
         advanceUntilIdle()
 
-        assertEquals(emptyList<String>(), toolProxy.getTools().value.map { it.id.value })
-        assertEquals(emptyList<String>(), agentTools.first().map { it.id.value })
         assertEquals(emptyList<McpServerId>(), mcpProxy.servers.value.map { it.id })
         assertEquals(emptyList<String>(), serverTools.first().map { it.id.value })
 
-        val rebuiltAgentTools = toolProxy.getAgentTools("agent-1")
         val rebuiltServerTools = mcpProxy.getServerTools(McpServerId("server-a"))
-        toolProxy.refreshTools()
-        toolProxy.attachTool("agent-1", "tool-b")
         mcpProxy.refreshServers()
         mcpProxy.refreshServerTools(McpServerId("server-a"))
         advanceUntilIdle()
 
-        assertEquals(listOf("tool-b"), toolProxy.getTools().value.map { it.id.value })
-        assertEquals(listOf("tool-b"), rebuiltAgentTools.first().map { it.id.value })
         assertEquals(listOf(McpServerId("server-b")), mcpProxy.servers.value.map { it.id })
         assertEquals(listOf("mcp-tool-b"), rebuiltServerTools.first().map { it.id.value })
     }

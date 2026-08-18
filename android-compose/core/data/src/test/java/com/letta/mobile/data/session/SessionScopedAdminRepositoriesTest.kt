@@ -51,96 +51,138 @@ import org.junit.Test
 class SessionScopedAdminRepositoriesTest {
 
     @Test
-    fun `admin repository proxies switch caches to rebuilt graph`() = runTest {
+    fun `folder repository proxy switches caches to rebuilt graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeFolderApi = FakeFolderApi().apply {
             folders = mutableListOf(Folder(id = FolderId("folder-a"), name = "Backend A Folder"))
         }
-        val fakeGroupApi = FakeGroupApi().apply {
-            groups = mutableListOf(sampleGroup("group-a", "Backend A Group"))
-        }
-        val fakeIdentityApi = FakeIdentityApi().apply {
-            identities = mutableListOf(sampleIdentity("identity-a", "Backend A Identity"))
-        }
-        val fakeProviderApi = FakeProviderApi().apply {
-            providers = mutableListOf(sampleProvider("provider-a", "Backend A Provider"))
-        }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
-                FakeAgentApi(),
-                FakeAgentDao(),
-                FakeConversationApi(),
-                FakeConversationDao(),
-                FakeArchiveApi(),
-                fakeFolderApi,
-                fakeGroupApi,
-                fakeIdentityApi,
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                fakeProviderApi,
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.folderApi = fakeFolderApi
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val folderProxy = SessionScopedFolderRepository(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
+
+        folderProxy.refreshFolders()
+        advanceUntilIdle()
+        assertEquals(listOf(FolderId("folder-a")), folderProxy.folders.value.map { it.id })
+
+        fakeFolderApi.folders = mutableListOf(Folder(id = FolderId("folder-b"), name = "Backend B Folder"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<FolderId>(), folderProxy.folders.value.map { it.id })
+
+        folderProxy.refreshFolders()
+        advanceUntilIdle()
+        assertEquals(listOf(FolderId("folder-b")), folderProxy.folders.value.map { it.id })
+    }
+
+    @Test
+    fun `group repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeGroupApi = FakeGroupApi().apply {
+            groups = mutableListOf(sampleGroup("group-a", "Backend A Group"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.groupApi = fakeGroupApi
+            },
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
         val groupProxy = SessionScopedGroupRepository(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
+
+        groupProxy.refreshGroups()
+        advanceUntilIdle()
+        assertEquals(listOf(GroupId("group-a")), groupProxy.groups.value.map { it.id })
+
+        fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<GroupId>(), groupProxy.groups.value.map { it.id })
+
+        groupProxy.refreshGroups()
+        advanceUntilIdle()
+        assertEquals(listOf(GroupId("group-b")), groupProxy.groups.value.map { it.id })
+    }
+
+    @Test
+    fun `identity repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeIdentityApi = FakeIdentityApi().apply {
+            identities = mutableListOf(sampleIdentity("identity-a", "Backend A Identity"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.identityApi = fakeIdentityApi
+            },
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
         val identityProxy = SessionScopedIdentityRepository(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+
+        identityProxy.refreshIdentities()
+        advanceUntilIdle()
+        assertEquals(listOf(IdentityId("identity-a")), identityProxy.identities.value.map { it.id })
+
+        fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<IdentityId>(), identityProxy.identities.value.map { it.id })
+
+        identityProxy.refreshIdentities()
+        advanceUntilIdle()
+        assertEquals(listOf(IdentityId("identity-b")), identityProxy.identities.value.map { it.id })
+    }
+
+    @Test
+    fun `provider repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeProviderApi = FakeProviderApi().apply {
+            providers = mutableListOf(sampleProvider("provider-a", "Backend A Provider"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.providerApi = fakeProviderApi
+            },
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val providerProxy = SessionScopedProviderRepository(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
 
-        folderProxy.refreshFolders()
-        groupProxy.refreshGroups()
-        identityProxy.refreshIdentities()
         providerProxy.refreshProviders()
         advanceUntilIdle()
-        assertEquals(listOf(FolderId("folder-a")), folderProxy.folders.value.map { it.id })
-        assertEquals(listOf(GroupId("group-a")), groupProxy.groups.value.map { it.id })
-        assertEquals(listOf(IdentityId("identity-a")), identityProxy.identities.value.map { it.id })
         assertEquals(listOf(ProviderId("provider-a")), providerProxy.providers.value.map { it.id })
 
-        fakeFolderApi.folders = mutableListOf(Folder(id = FolderId("folder-b"), name = "Backend B Folder"))
-        fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
-        fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
         fakeProviderApi.providers = mutableListOf(sampleProvider("provider-b", "Backend B Provider"))
         settingsRepository.activeConfigState.value = config("backend-b")
         advanceUntilIdle()
 
-        assertEquals(emptyList<FolderId>(), folderProxy.folders.value.map { it.id })
-        assertEquals(emptyList<GroupId>(), groupProxy.groups.value.map { it.id })
-        assertEquals(emptyList<IdentityId>(), identityProxy.identities.value.map { it.id })
         assertEquals(emptyList<ProviderId>(), providerProxy.providers.value.map { it.id })
 
-        folderProxy.refreshFolders()
-        groupProxy.refreshGroups()
-        identityProxy.refreshIdentities()
         providerProxy.refreshProviders()
         advanceUntilIdle()
-
-        assertEquals(listOf(FolderId("folder-b")), folderProxy.folders.value.map { it.id })
-        assertEquals(listOf(GroupId("group-b")), groupProxy.groups.value.map { it.id })
-        assertEquals(listOf(IdentityId("identity-b")), identityProxy.identities.value.map { it.id })
         assertEquals(listOf(ProviderId("provider-b")), providerProxy.providers.value.map { it.id })
     }
 

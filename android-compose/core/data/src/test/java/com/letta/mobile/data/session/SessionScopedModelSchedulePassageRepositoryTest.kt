@@ -50,95 +50,119 @@ import org.junit.Test
 class SessionScopedModelSchedulePassageRepositoryTest {
 
     @Test
-    fun `model schedule and passage repository proxies switch caches to rebuilt graph`() = runTest {
+    fun `model repository proxy switches caches to rebuilt graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeModelApi = FakeModelApi().apply {
             llmModels = mutableListOf(sampleLlmModel("llm-a"))
             embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-a"))
         }
-        val fakePassageApi = FakePassageApi().apply {
-            setPassages("agent-1", listOf(Passage(id = "passage-a", text = "Backend A", agentId = "agent-1")))
-        }
-        val fakeScheduleApi = FakeScheduleApi().apply {
-            schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-a"))
-        }
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
-                FakeAgentApi(),
-                FakeAgentDao(),
-                FakeConversationApi(),
-                FakeConversationDao(),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                fakeModelApi,
-                fakePassageApi,
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                fakeScheduleApi,
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.modelApi = fakeModelApi
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val modelProxy = SessionScopedModelRepository(
             sessionManager = sessionManager,
             proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val passageProxy = SessionScopedPassageRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-        val scheduleProxy = SessionScopedScheduleRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-        val passages = passageProxy.getPassages("agent-1")
 
         modelProxy.refreshLlmModels()
         modelProxy.refreshEmbeddingModels()
-        passageProxy.refreshPassages("agent-1")
-        scheduleProxy.refreshSchedules("agent-1")
         advanceUntilIdle()
         assertEquals(listOf("llm-a"), modelProxy.llmModels.value.map { it.id })
         assertEquals(listOf("embedding-a"), modelProxy.embeddingModels.value.map { it.id })
-        assertEquals(listOf("passage-a"), passages.value.map { it.id })
-        assertEquals(listOf("schedule-a"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
 
         fakeModelApi.llmModels = mutableListOf(sampleLlmModel("llm-b"))
         fakeModelApi.embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-b"))
-        fakePassageApi.setPassages(
-            "agent-1",
-            listOf(Passage(id = "passage-b", text = "Backend B", agentId = "agent-1")),
-        )
-        fakeScheduleApi.schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-b"))
         settingsRepository.activeConfigState.value = config("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), modelProxy.llmModels.value.map { it.id })
         assertEquals(emptyList<String>(), modelProxy.embeddingModels.value.map { it.id })
-        assertEquals(emptyList<String>(), passages.value.map { it.id })
-        assertEquals(emptyList<String>(), scheduleProxy.getSchedules("agent-1").first().map { it.id })
 
-        val rebuiltPassages = passageProxy.getPassages("agent-1")
         modelProxy.refreshLlmModels()
         modelProxy.refreshEmbeddingModels()
-        passageProxy.refreshPassages("agent-1")
-        scheduleProxy.refreshSchedules("agent-1")
         advanceUntilIdle()
 
         assertEquals(listOf("llm-b"), modelProxy.llmModels.value.map { it.id })
         assertEquals(listOf("embedding-b"), modelProxy.embeddingModels.value.map { it.id })
+    }
+
+    @Test
+    fun `passage repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakePassageApi = FakePassageApi().apply {
+            setPassages("agent-1", listOf(Passage(id = "passage-a", text = "Backend A", agentId = "agent-1")))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.passageApi = fakePassageApi
+            },
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val passageProxy = SessionScopedPassageRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val passages = passageProxy.getPassages("agent-1")
+
+        passageProxy.refreshPassages("agent-1")
+        advanceUntilIdle()
+        assertEquals(listOf("passage-a"), passages.value.map { it.id })
+
+        fakePassageApi.setPassages(
+            "agent-1",
+            listOf(Passage(id = "passage-b", text = "Backend B", agentId = "agent-1")),
+        )
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), passages.value.map { it.id })
+
+        val rebuiltPassages = passageProxy.getPassages("agent-1")
+        passageProxy.refreshPassages("agent-1")
+        advanceUntilIdle()
+
         assertEquals(listOf("passage-b"), rebuiltPassages.value.map { it.id })
+    }
+
+    @Test
+    fun `schedule repository proxy switches caches to rebuilt graph`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeScheduleApi = FakeScheduleApi().apply {
+            schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-a"))
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = createTestSessionGraphFactory {
+                this.scheduleApi = fakeScheduleApi
+            },
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val scheduleProxy = SessionScopedScheduleRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+
+        scheduleProxy.refreshSchedules("agent-1")
+        advanceUntilIdle()
+        assertEquals(listOf("schedule-a"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
+
+        fakeScheduleApi.schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-b"))
+        settingsRepository.activeConfigState.value = config("backend-b")
+        advanceUntilIdle()
+
+        assertEquals(emptyList<String>(), scheduleProxy.getSchedules("agent-1").first().map { it.id })
+
+        scheduleProxy.refreshSchedules("agent-1")
+        advanceUntilIdle()
+
         assertEquals(listOf("schedule-b"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
     }
 

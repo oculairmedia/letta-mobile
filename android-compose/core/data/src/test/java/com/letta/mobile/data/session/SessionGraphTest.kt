@@ -66,30 +66,9 @@ class SessionGraphTest {
     @Test
     fun `session graph exposes shared backend descriptor from active config`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
-        val graph = SessionGraphFactory(
-            FakeAgentApi(),
-            FakeAgentDao(),
-            FakeConversationApi(),
-            FakeConversationDao(),
-            FakeArchiveApi(),
-            FakeFolderApi(),
-            FakeGroupApi(),
-            FakeIdentityApi(),
-            fakeLettaApiClient(),
-            FakeMcpServerApi(),
-            FakeModelApi(),
-            FakePassageApi(),
-            FakeProjectApi(),
-            FakeProjectWorkApi(),
-            FakeRunApi(),
-            FakeJobApi(),
-            FakeProviderApi(),
-            FakeScheduleApi(),
-            FakeStepApi(),
-            FakeToolApi(),
-            appContext = mockk(relaxed = true),
-            settingsRepository = settingsRepository,
-        ).create()
+        val graph = createTestSessionGraphFactory {
+            this.settingsRepository = settingsRepository
+        }.create()
 
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertEquals("remote-letta:backend-a", graph.backendDescriptor.backendId.value)
@@ -102,29 +81,7 @@ class SessionGraphTest {
 
     @Test
     fun `session graph satisfies shared repository graph contract`() = runTest {
-        val graph = SessionGraphFactory(
-            FakeAgentApi(),
-            FakeAgentDao(),
-            FakeConversationApi(),
-            FakeConversationDao(),
-            FakeArchiveApi(),
-            FakeFolderApi(),
-            FakeGroupApi(),
-            FakeIdentityApi(),
-            fakeLettaApiClient(),
-            FakeMcpServerApi(),
-            FakeModelApi(),
-            FakePassageApi(),
-            FakeProjectApi(),
-            FakeProjectWorkApi(),
-            FakeRunApi(),
-            FakeJobApi(),
-            FakeProviderApi(),
-            FakeScheduleApi(),
-            FakeStepApi(),
-            FakeToolApi(),
-            appContext = mockk(relaxed = true),
-        ).create()
+        val graph = createTestSessionGraphFactory().create()
 
         val sharedGraph: SessionRepositoryGraph = graph
 
@@ -138,31 +95,10 @@ class SessionGraphTest {
     @Test
     fun `session graph can select local runtime backend behind internal option`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = localConfig("backend-a"))
-        val graph = SessionGraphFactory(
-            FakeAgentApi(),
-            FakeAgentDao(),
-            FakeConversationApi(),
-            FakeConversationDao(),
-            FakeArchiveApi(),
-            FakeFolderApi(),
-            FakeGroupApi(),
-            FakeIdentityApi(),
-            fakeLettaApiClient(),
-            FakeMcpServerApi(),
-            FakeModelApi(),
-            FakePassageApi(),
-            FakeProjectApi(),
-            FakeProjectWorkApi(),
-            FakeRunApi(),
-            FakeJobApi(),
-            FakeProviderApi(),
-            FakeScheduleApi(),
-            FakeStepApi(),
-            FakeToolApi(),
-            appContext = mockk(relaxed = true),
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = localRuntimeOptions(),
-        ).create()
+        val graph = createTestSessionGraphFactory {
+            this.settingsRepository = settingsRepository
+            this.localRuntimeOptions = createLocalRuntimeOptions()
+        }.create()
 
         assertEquals(BackendKind.LocalLettaCode, graph.backendDescriptor.kind)
         assertEquals("local-lettacode:backend-a", graph.backendDescriptor.backendId.value)
@@ -196,42 +132,23 @@ class SessionGraphTest {
         val settingsRepository = FakeSettingsRepository(
             initialActiveConfig = localConfig("backend-a", serverUrl = "local-koog://device"),
         )
-        val graph = SessionGraphFactory(
-            FakeAgentApi(),
-            FakeAgentDao(),
-            FakeConversationApi(),
-            FakeConversationDao(),
-            FakeArchiveApi(),
-            FakeFolderApi(),
-            FakeGroupApi(),
-            FakeIdentityApi(),
-            fakeLettaApiClient(),
-            FakeMcpServerApi(),
-            FakeModelApi(),
-            FakePassageApi(),
-            FakeProjectApi(),
-            FakeProjectWorkApi(),
-            FakeRunApi(),
-            FakeJobApi(),
-            FakeProviderApi(),
-            FakeScheduleApi(),
-            FakeStepApi(),
-            FakeToolApi(),
-            appContext = mockk(relaxed = true),
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = localRuntimeOptions(
-                localRuntimeProvider(),
-                localRuntimeProvider(
-                    providerId = "local-koog",
-                    scheme = "local-koog",
-                    kind = BackendKind.LocalKoog,
-                    label = "Local Koog runtime",
-                    supportsTools = false,
-                    supportsApprovals = false,
-                    priority = 10,
+        val graph = createTestSessionGraphFactory {
+            this.settingsRepository = settingsRepository
+            this.localRuntimeOptions = createLocalRuntimeOptions(
+                createLocalRuntimeProvider(),
+                createLocalRuntimeProvider(
+                    LocalProviderSpec(
+                        providerId = "local-koog",
+                        scheme = "local-koog",
+                        kind = BackendKind.LocalKoog,
+                        label = "Local Koog runtime",
+                        supportsTools = false,
+                        supportsApprovals = false,
+                        priority = 10,
+                    ),
                 ),
-            ),
-        ).create()
+            )
+        }.create()
 
         assertEquals(BackendKind.LocalKoog, graph.backendDescriptor.kind)
         assertEquals("local-koog:backend-a", graph.backendDescriptor.backendId.value)
@@ -242,41 +159,18 @@ class SessionGraphTest {
     @Test
     fun `session graph keeps remote backend for non-local config when local runtime is available`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
-        val graph = SessionGraphFactory(
-            FakeAgentApi(),
-            FakeAgentDao(),
-            FakeConversationApi(),
-            FakeConversationDao(),
-            FakeArchiveApi(),
-            FakeFolderApi(),
-            FakeGroupApi(),
-            FakeIdentityApi(),
-            fakeLettaApiClient(),
-            FakeMcpServerApi(),
-            FakeModelApi(),
-            FakePassageApi(),
-            FakeProjectApi(),
-            FakeProjectWorkApi(),
-            FakeRunApi(),
-            FakeJobApi(),
-            FakeProviderApi(),
-            FakeScheduleApi(),
-            FakeStepApi(),
-            FakeToolApi(),
-            appContext = mockk(relaxed = true),
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = localRuntimeOptions(),
-        ).create()
+        val graph = createTestSessionGraphFactory {
+            this.settingsRepository = settingsRepository
+            this.localRuntimeOptions = createLocalRuntimeOptions()
+        }.create()
 
         assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
         assertEquals("remote-letta:backend-a", graph.backendDescriptor.backendId.value)
         assertNull(graph.localRuntimeBackend)
     }
 
-    private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
-
-    private fun localRuntimeOptions(
-        vararg providers: LocalRuntimeProvider = arrayOf(localRuntimeProvider()),
+    private fun createLocalRuntimeOptions(
+        vararg providers: LocalRuntimeProvider = arrayOf(createLocalRuntimeProvider()),
     ): LocalRuntimeOptions = LocalRuntimeOptions.Enabled(
         runtimeEventOutbox = InMemoryRuntimeEventOutbox(
             eventIdFactory = { _, offset -> RuntimeEventId("local-event-${offset.value}") },
@@ -291,34 +185,28 @@ class SessionGraphTest {
         providers = providers.toSet(),
     )
 
-    private fun localRuntimeProvider(
-        providerId: String = "local-lettacode",
-        scheme: String = "local",
-        kind: BackendKind = BackendKind.LocalLettaCode,
-        label: String = "Local LettaCode",
-        supportsTools: Boolean = true,
-        supportsApprovals: Boolean = supportsTools,
-        priority: Int = 100,
+    private fun createLocalRuntimeProvider(
+        spec: LocalProviderSpec = LocalProviderSpec(),
     ): LocalRuntimeProvider = object : LocalRuntimeProvider {
-        override val providerId: String = providerId
-        override val priority: Int = priority
+        override val providerId: String = spec.providerId
+        override val priority: Int = spec.priority
 
         override fun supports(config: LettaConfig): Boolean =
-            config.serverUrl.startsWith("$scheme://")
+            config.serverUrl.startsWith("${spec.scheme}://")
 
         override fun descriptor(config: LettaConfig): BackendDescriptor {
             val backendKey = config.id.takeIf { it.isNotBlank() } ?: "device"
             return BackendDescriptor(
-                backendId = BackendId("$providerId:$backendKey"),
-                runtimeId = RuntimeId("$providerId:$backendKey"),
-                kind = kind,
-                label = label,
+                backendId = BackendId("${spec.providerId}:$backendKey"),
+                runtimeId = RuntimeId("${spec.providerId}:$backendKey"),
+                kind = spec.kind,
+                label = spec.label,
                 capabilities = BackendCapabilities(
                     supportsStreaming = true,
                     supportsMemFs = true,
-                    supportsToolEvents = supportsTools,
-                    supportsToolExecution = supportsTools,
-                    supportsApprovals = supportsApprovals,
+                    supportsToolEvents = spec.supportsTools,
+                    supportsToolExecution = spec.supportsTools,
+                    supportsApprovals = spec.supportsApprovals,
                     supportsAgentFileImport = false,
                     supportsAgentFileExport = false,
                 ),
@@ -338,6 +226,16 @@ class SessionGraphTest {
             )
         }
     }
+
+    private data class LocalProviderSpec(
+        val providerId: String = "local-lettacode",
+        val scheme: String = "local",
+        val kind: BackendKind = BackendKind.LocalLettaCode,
+        val label: String = "Local LettaCode",
+        val supportsTools: Boolean = true,
+        val supportsApprovals: Boolean = supportsTools,
+        val priority: Int = 100,
+    )
 
     private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 
