@@ -70,6 +70,13 @@ class InterAgentConversationPickerTest {
     private val convByUpdatedId = ConversationId("conv-by-updated")
     private val convByCreatedId = ConversationId("conv-by-created")
 
+    private const val TIME_OLD = "2026-08-10T12:00:00.000Z"
+    private const val TIME_RECENT = "2026-08-17T18:00:00.000Z"
+    private const val TIME_MID = "2026-08-15T12:00:00.000Z"
+    private const val TIME_AUTONOMOUS = "2026-08-18T00:00:00.000Z"
+    private const val TIME_UPDATED = "2026-08-15T00:00:00.000Z"
+    private const val TIME_CREATED = "2026-08-17T00:00:00.000Z"
+
     private fun conv(
         id: ConversationId,
         lastMessageAt: String,
@@ -95,13 +102,13 @@ class InterAgentConversationPickerTest {
     @Test
     fun returnsMostRecentInteractiveConversationId() = runBlocking {
         val conversations = listOf(
-            conv(convOldId, "2026-08-10T12:00:00.000Z"),
-            conv(convRecentId, "2026-08-17T18:00:00.000Z"),
-            conv(convMidId, "2026-08-15T12:00:00.000Z"),
+            conv(convOldId, TIME_OLD),
+            conv(convRecentId, TIME_RECENT),
+            conv(convMidId, TIME_MID),
         )
         val repo = FakeRepo(agentScopedConversations = conversations)
         assertEquals(
-            "conv-recent",
+            convRecentId.value,
             pickOtherAgentConversation(repo, testAgentId),
         )
         assertEquals(1, repo.listCount)
@@ -110,13 +117,13 @@ class InterAgentConversationPickerTest {
     @Test
     fun skipsAutonomousConversationsEvenIfMostRecent() = runBlocking {
         val conversations = listOf(
-            conv(convInteractiveId, "2026-08-17T18:00:00.000Z"),
+            conv(convInteractiveId, TIME_RECENT),
             // AUTONOMOUS with a NEWER timestamp must NOT win — the router
             // never routes to heartbeat/goal conversations.
-            conv(convAutonomousNewestId, "2026-08-18T00:00:00.000Z", klass = ConversationClass.AUTONOMOUS),
+            conv(convAutonomousNewestId, TIME_AUTONOMOUS, klass = ConversationClass.AUTONOMOUS),
         )
         assertEquals(
-            "conv-interactive",
+            convInteractiveId.value,
             pickOtherAgentConversation(FakeRepo(agentScopedConversations = conversations), testAgentId),
         )
     }
@@ -125,14 +132,14 @@ class InterAgentConversationPickerTest {
     fun fallsBackToUpdatedAtThenCreatedAtWhenLastMessageAtMissing() = runBlocking {
         val conversations = listOf(
             // No lastMessageAt; updatedAt is older.
-            convWithFallbackTimes(convByUpdatedId, updatedAt = "2026-08-15T00:00:00.000Z"),
+            convWithFallbackTimes(convByUpdatedId, updatedAt = TIME_UPDATED),
             // No lastMessageAt/updatedAt; createdAt is newest of the fallbacks.
-            convWithFallbackTimes(convByCreatedId, createdAt = "2026-08-17T00:00:00.000Z"),
+            convWithFallbackTimes(convByCreatedId, createdAt = TIME_CREATED),
         )
         // updatedAt (08-15) vs createdAt (08-17): the created-only one is
         // lex-newer, so it wins under lastMessageAt?:updatedAt?:createdAt.
         assertEquals(
-            "conv-by-created",
+            convByCreatedId.value,
             pickOtherAgentConversation(FakeRepo(agentScopedConversations = conversations), testAgentId),
         )
     }
@@ -150,7 +157,7 @@ class InterAgentConversationPickerTest {
     @Test
     fun returnsNullWhenAllConversationsAreAutonomous() = runBlocking {
         val only = listOf(
-            conv(convAutonomousId, "2026-08-18T00:00:00.000Z", klass = ConversationClass.AUTONOMOUS),
+            conv(convAutonomousId, TIME_AUTONOMOUS, klass = ConversationClass.AUTONOMOUS),
         )
         assertNull(
             pickOtherAgentConversation(
@@ -167,7 +174,7 @@ class InterAgentConversationPickerTest {
         // handling opens a fresh conversation on the target agent.
         val repo = FakeRepo(
             agentScopedConversations = emptyList(),
-            throwOnList = RuntimeException("network down"),
+            throwOnList = IllegalStateException("network unreachable"),
         )
         assertNull(pickOtherAgentConversation(repo, testAgentId))
     }
