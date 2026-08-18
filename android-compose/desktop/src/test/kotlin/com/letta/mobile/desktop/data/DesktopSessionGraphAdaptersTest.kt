@@ -216,6 +216,56 @@ class DesktopSessionGraphAdaptersTest {
         assertEquals("", settingsStore.getString("letta.config.serverUrl"))
     }
 
+    /**
+     * letta-mobile-hhp6r: switching to Local (and back) through the store's
+     * own save()/load() must not force the user to re-enter their remote
+     * backend's URL and token. The blank-on-LOCAL behaviour from 9v9nu is
+     * preserved — `migrateStaleLocalServerUrl` still empties `serverUrl` — but
+     * the details it would otherwise discard land in dedicated parked fields
+     * and come back out on the next switch to a remote mode.
+     */
+    @Test
+    fun configStoreRoundTripsRemoteDetailsAcrossASwitchToLocalAndBack() {
+        val settingsStore = DesktopInMemorySecureSettingsStore()
+        val configStore = DesktopLettaConfigStore(settingsStore)
+
+        configStore.save(
+            LettaConfig(
+                id = "desktop-remote",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://abc123@192.168.50.90:4501",
+                accessToken = "remote-token",
+            ),
+        )
+
+        // User flips the mode chip to Local without touching the URL/token
+        // fields, so the save carries the stale remote serverUrl along.
+        configStore.save(
+            configStore.load().copy(mode = LettaConfig.Mode.LOCAL),
+        )
+        val local = configStore.load()
+        assertEquals(LettaConfig.Mode.LOCAL, local.mode)
+        assertEquals("", local.serverUrl)
+
+        // Flip back to a remote mode with a blank serverUrl field (mirrors the
+        // desktop settings card immediately after switching mode) — the parked
+        // remote backend should come back with no re-entry required.
+        configStore.save(
+            configStore.load().copy(mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = ""),
+        )
+        val restored = configStore.load()
+        assertEquals("iroh://abc123@192.168.50.90:4501", restored.serverUrl)
+        assertEquals("remote-token", restored.accessToken)
+
+        // And once more: Local, then back to remote — still round-trips.
+        configStore.save(configStore.load().copy(mode = LettaConfig.Mode.LOCAL))
+        assertEquals("", configStore.load().serverUrl)
+        configStore.save(configStore.load().copy(mode = LettaConfig.Mode.SELF_HOSTED, serverUrl = ""))
+        val restoredAgain = configStore.load()
+        assertEquals("iroh://abc123@192.168.50.90:4501", restoredAgain.serverUrl)
+        assertEquals("remote-token", restoredAgain.accessToken)
+    }
+
     @Test
     fun fileSettingsStorePersistsAcrossInstances() {
         val file = Files.createTempFile("letta-desktop-settings", ".properties")

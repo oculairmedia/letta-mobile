@@ -149,6 +149,17 @@ class DesktopLettaConfigStore(
             ?.takeIf { it.isNotBlank() }
             ?.let { settingsStore.putString(KEY_ACCESS_TOKEN, it) }
             ?: settingsStore.remove(KEY_ACCESS_TOKEN)
+        // letta-mobile-hhp6r: persist the parked remote backend (if any) so a
+        // switch to Local, followed by an app restart, still has something to
+        // restore from when the user switches back to a remote mode.
+        normalized.parkedServerUrl
+            ?.takeIf { it.isNotBlank() }
+            ?.let { settingsStore.putString(KEY_PARKED_SERVER_URL, it) }
+            ?: settingsStore.remove(KEY_PARKED_SERVER_URL)
+        normalized.parkedAccessToken
+            ?.takeIf { it.isNotBlank() }
+            ?.let { settingsStore.putString(KEY_PARKED_ACCESS_TOKEN, it) }
+            ?: settingsStore.remove(KEY_PARKED_ACCESS_TOKEN)
         rememberBackend(normalized.serverUrl)
         activeConfigState.value = normalized
     }
@@ -181,26 +192,53 @@ class DesktopLettaConfigStore(
 
     private fun readConfig(): LettaConfig {
         val fallback = defaultDesktopLettaConfig()
-        val raw = LettaConfig(
-            id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
-            mode = settingsStore.getString(KEY_MODE)
-                ?.let { value -> runCatching { LettaConfig.Mode.valueOf(value) }.getOrNull() }
-                ?: fallback.mode,
-            serverUrl = settingsStore.getString(KEY_SERVER_URL, fallback.serverUrl).orEmpty().ifBlank {
-                fallback.serverUrl
-            },
-            accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
-        )
-        // letta-mobile-9v9nu: self-heal configs persisted before mode became
-        // authoritative — a LOCAL config that still carries a remote (most
-        // commonly stale iroh://) serverUrl from before this fix. Persist the
-        // cleaned value back so the on-disk file stops disagreeing with the
-        // in-memory config the rest of the app reads from `activeConfig`.
-        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(raw)
-        if (migrated !== raw) {
+        val raw = readRawConfig(fallback)
+        val restored = BackendConfigPolicy.restoreParkedRemoteBackend(raw)
+        val withFallbackUrl = applyFallbackUrl(restored, fallback)
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(withFallbackUrl)
+        persistMigrationIfNeeded(raw, restored, withFallbackUrl, migrated)
+        return migrated
+    }
+
+    private fun readRawConfig(fallback: LettaConfig): LettaConfig = LettaConfig(
+        id = settingsStore.getString(KEY_ID, fallback.id).orEmpty().ifBlank { fallback.id },
+        mode = settingsStore.getString(KEY_MODE)
+            ?.let { value -> runCatching { LettaConfig.Mode.valueOf(value) }.getOrNull() }
+            ?: fallback.mode,
+        serverUrl = settingsStore.getString(KEY_SERVER_URL).orEmpty(),
+        accessToken = settingsStore.getString(KEY_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
+        parkedServerUrl = settingsStore.getString(KEY_PARKED_SERVER_URL)?.takeIf { it.isNotBlank() },
+        parkedAccessToken = settingsStore.getString(KEY_PARKED_ACCESS_TOKEN)?.takeIf { it.isNotBlank() },
+    )
+
+    private fun applyFallbackUrl(restored: LettaConfig, fallback: LettaConfig): LettaConfig =
+        if (restored.mode == LettaConfig.Mode.LOCAL) {
+            restored.copy(serverUrl = restored.serverUrl.trim())
+        } else {
+            restored.copy(serverUrl = restored.serverUrl.trim().ifBlank { fallback.serverUrl.trim() })
+        }
+
+    private fun persistMigrationIfNeeded(
+        raw: LettaConfig,
+        restored: LettaConfig,
+        withFallbackUrl: LettaConfig,
+        migrated: LettaConfig,
+    ) {
+        if (restored !== raw || migrated !== withFallbackUrl) {
             settingsStore.putString(KEY_SERVER_URL, migrated.serverUrl)
         }
-        return migrated
+        if (migrated.parkedServerUrl != raw.parkedServerUrl) {
+            migrated.parkedServerUrl
+                ?.takeIf { it.isNotBlank() }
+                ?.let { settingsStore.putString(KEY_PARKED_SERVER_URL, it) }
+                ?: settingsStore.remove(KEY_PARKED_SERVER_URL)
+        }
+        if (migrated.parkedAccessToken != raw.parkedAccessToken) {
+            migrated.parkedAccessToken
+                ?.takeIf { it.isNotBlank() }
+                ?.let { settingsStore.putString(KEY_PARKED_ACCESS_TOKEN, it) }
+                ?: settingsStore.remove(KEY_PARKED_ACCESS_TOKEN)
+        }
     }
 
     private fun rememberBackend(serverUrl: String) {
@@ -222,6 +260,8 @@ class DesktopLettaConfigStore(
         private const val KEY_MODE = "letta.config.mode"
         private const val KEY_SERVER_URL = "letta.config.serverUrl"
         private const val KEY_ACCESS_TOKEN = "letta.config.accessToken"
+        private const val KEY_PARKED_SERVER_URL = "letta.config.parkedServerUrl"
+        private const val KEY_PARKED_ACCESS_TOKEN = "letta.config.parkedAccessToken"
         private const val KEY_RECENT_BACKENDS = "letta.config.recentBackends"
         private const val RECENT_SEPARATOR = "\n"
     }

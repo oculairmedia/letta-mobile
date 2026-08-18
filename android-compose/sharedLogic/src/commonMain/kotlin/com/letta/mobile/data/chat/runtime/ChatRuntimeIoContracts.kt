@@ -98,11 +98,21 @@ object BackendConfigPolicy {
         fallback: LettaConfig,
         generatedIdPrefix: String,
     ): LettaConfig {
-        val serverUrl = config.serverUrl.trim().ifBlank { fallback.serverUrl.trim() }
-        val candidate = config.copy(
-            id = config.id.trim().ifBlank { stableConfigId(generatedIdPrefix, serverUrl) },
+        val restored = restoreParkedRemoteBackend(config)
+        // A LOCAL config's blank serverUrl must stay blank rather than briefly
+        // adopting `fallback`'s (generic, usually remote) URL: that
+        // intermediate value would otherwise get parked by
+        // migrateStaleLocalServerUrl below, clobbering a real parked remote
+        // backend with a placeholder nobody asked to save.
+        val serverUrl = if (restored.mode == LettaConfig.Mode.LOCAL) {
+            restored.serverUrl.trim()
+        } else {
+            restored.serverUrl.trim().ifBlank { fallback.serverUrl.trim() }
+        }
+        val candidate = restored.copy(
+            id = restored.id.trim().ifBlank { stableConfigId(generatedIdPrefix, serverUrl) },
             serverUrl = serverUrl,
-            accessToken = config.accessToken?.trim()?.takeIf { it.isNotBlank() },
+            accessToken = restored.accessToken?.trim()?.takeIf { it.isNotBlank() },
         )
         return migrateStaleLocalServerUrl(candidate)
     }
@@ -127,7 +137,37 @@ object BackendConfigPolicy {
     fun migrateStaleLocalServerUrl(config: LettaConfig): LettaConfig {
         if (config.mode != LettaConfig.Mode.LOCAL) return config
         if (!hasRemoteServerUrl(config)) return config
-        return config.copy(serverUrl = "")
+        // letta-mobile-hhp6r: park the remote details being blanked instead of
+        // discarding them, so a later switch back to a remote Mode can restore
+        // them via [restoreParkedRemoteBackend] rather than forcing re-entry.
+        return config.copy(
+            serverUrl = "",
+            parkedServerUrl = config.serverUrl.trim(),
+            parkedAccessToken = config.accessToken?.trim()?.takeIf { it.isNotBlank() }
+                ?: config.parkedAccessToken,
+        )
+    }
+
+    /**
+     * letta-mobile-hhp6r: the inverse of the parking done in
+     * [migrateStaleLocalServerUrl]. When a config is switching to (or already
+     * sitting in) a non-LOCAL [LettaConfig.Mode] with no `serverUrl` typed in,
+     * restore the last parked remote backend instead of falling through to
+     * [normalize]'s generic `fallback` (which would otherwise silently swap in
+     * the default self-hosted URL and drop the user's real backend and token).
+     *
+     * A config that still has its own `serverUrl` is left untouched — parked
+     * data only fills a gap, it never overwrites an explicit value.
+     */
+    fun restoreParkedRemoteBackend(config: LettaConfig): LettaConfig {
+        if (config.mode == LettaConfig.Mode.LOCAL) return config
+        if (config.serverUrl.isNotBlank()) return config
+        val parkedUrl = config.parkedServerUrl?.trim()
+        if (parkedUrl.isNullOrBlank()) return config
+        return config.copy(
+            serverUrl = parkedUrl,
+            accessToken = config.accessToken?.takeIf { it.isNotBlank() } ?: config.parkedAccessToken,
+        )
     }
 
     private fun hasRemoteServerUrl(config: LettaConfig): Boolean {
