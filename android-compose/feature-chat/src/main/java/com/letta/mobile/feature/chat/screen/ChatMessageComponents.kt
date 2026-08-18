@@ -14,10 +14,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -43,6 +45,19 @@ import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.chatBubbleSender
 import com.letta.mobile.ui.theme.chatColors
 import com.letta.mobile.ui.theme.chatDimens
+
+// letta-mobile-bccty: feature-chat shell-side wiring for the shared
+// AgentMessageProvenanceLabel. The shared label takes (resolveName,
+// onAgentClick) as explicit parameters; we look them up here from the
+// available agents list (resolver) and leave the click as a no-op for now
+// (no agent-navigate action wired on Android yet — out of scope for
+// this bead).
+internal data class AndroidAgentMessageContext(
+    val resolveName: (String) -> String? = { null },
+    val onAgentClick: (String) -> Unit = {},
+)
+
+internal val LocalAndroidAgentMessageContext = staticCompositionLocalOf { AndroidAgentMessageContext() }
 
 internal fun UiMessage.displayRoleLabel(defaultLabel: String): String {
     val toolCall = toolCalls?.singleOrNull()
@@ -148,6 +163,31 @@ internal fun ChatMessageItem(
     ) {
         if (showAvatar) {
             MessageAvatar(role = message.role)
+            Spacer(modifier = Modifier.height(LettaSpacing.XXS))
+        }
+
+        // letta-mobile-bccty: surface the structured inter-agent provenance
+        // (sender, recipient, delivery state) above the bubble. The
+        // projection itself is built ONLY in sharedLogic/commonMain from
+        // structural signals (a2a wire envelope, agent_message_send args),
+        // so a regular user chat message never carries this field. We
+        // render the label for ANY non-null provenance (the projection
+        // already differentiates direction in [AgentMessageProvenanceLabel]
+        // via the arrow and content description); we previously filtered
+        // on direction == INBOUND which silently dropped the case where
+        // the local agent sent an a2a message and the result lives in
+        // the chat as a "user"-role row.
+        val provenance = message.agentMessageProvenance
+        if (provenance != null) {
+            var provenanceExpanded by remember(message.id) { mutableStateOf(false) }
+            val ctx = LocalAndroidAgentMessageContext.current
+            com.letta.mobile.ui.chat.provenance.AgentMessageProvenanceLabel(
+                provenance = provenance,
+                expanded = provenanceExpanded,
+                onToggleExpand = { provenanceExpanded = !provenanceExpanded },
+                resolveName = ctx.resolveName,
+                onAgentClick = ctx.onAgentClick,
+            )
             Spacer(modifier = Modifier.height(LettaSpacing.XXS))
         }
 
