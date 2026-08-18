@@ -32,17 +32,17 @@ internal class IrohToolRepositoryOps(
         fetchToolsPage(directory(), request)
 
     suspend fun setToolAttachment(request: ToolAttachmentRequest) {
-        directory().setToolAttached(request.agentId.value, request.toolId.value, request.attached)
+        directory().setToolAttached(request.agentId, request.toolId, request.attached)
     }
 
     suspend fun upsertTool(params: ToolCreateParams): Tool =
         directory().createTool(params).also(::upsertCache)
 
     suspend fun updateToolById(request: ToolUpdateByIdRequest): Tool =
-        directory().updateTool(request.toolId.value, request.params).also(::upsertCache)
+        directory().updateTool(request.toolId, request.params).also(::upsertCache)
 
     suspend fun deleteToolById(toolId: ToolId) {
-        directory().deleteTool(toolId.value)
+        directory().deleteTool(toolId)
         removeFromCache(toolId)
     }
 

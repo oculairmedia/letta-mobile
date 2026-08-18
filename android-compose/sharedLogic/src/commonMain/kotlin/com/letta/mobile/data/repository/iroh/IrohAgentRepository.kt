@@ -81,7 +81,7 @@ class IrohAgentRepository(
 
     override fun getAgent(id: AgentId): Flow<Agent> = flow {
         val agent = try {
-            directory().getAgent(id.value)
+            directory().getAgent(id)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -102,7 +102,7 @@ class IrohAgentRepository(
     }
 
     override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview =
-        directory().getContextWindow(agentId.value, conversationId?.value)
+        directory().getContextWindow(agentId, conversationId)
 
     override suspend fun checkpointAndRestoreConfig(agentId: AgentId, operation: suspend () -> Unit) {
         operation()
@@ -111,7 +111,7 @@ class IrohAgentRepository(
     override suspend fun createAgent(params: AgentCreateParams): Agent = unsupported("createAgent")
 
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
-        val agent = directory().updateAgent(id.value, params)
+        val agent = directory().updateAgent(id, params)
         updateAgentInCache(agent)
         return agent
     }

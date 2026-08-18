@@ -1,29 +1,31 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.BlockUpdateParams
 
 class IrohBlockApi(
     private val directory: IrohAdminRpcAgentDirectory,
 ) {
     suspend fun getBlockById(blockId: String): Block =
-        directory.getBlock(blockId) ?: throw NoSuchElementException("Block $blockId not found over iroh admin_rpc")
+        directory.getBlock(BlockId(blockId)) ?: throw NoSuchElementException("Block $blockId not found over iroh admin_rpc")
 
     suspend fun updateBlockById(blockId: String, value: String, limit: Int? = null): Block =
-        directory.updateBlock(blockId, BlockUpdateParams(value = value, limit = limit))
+        directory.updateBlock(BlockId(blockId), BlockUpdateParams(value = value, limit = limit))
 
     suspend fun deleteBlockById(blockId: String) {
-        directory.deleteBlock(blockId)
+        directory.deleteBlock(BlockId(blockId))
     }
 
     suspend fun createAndAttachBlock(agentId: String, label: String, value: String, limit: Int? = null): Block {
         val block = directory.createBlock(BlockCreateParams(label = label, value = value, limit = limit))
         return try {
-            directory.attachBlock(agentId, block.id.value)
+            directory.attachBlock(AgentId(agentId), block.id)
             block
         } catch (t: Throwable) {
-            runCatching { directory.deleteBlock(block.id.value) }
+            runCatching { directory.deleteBlock(block.id) }
             throw t
         }
     }
