@@ -32,11 +32,20 @@ import kotlinx.coroutines.flow.map
 
 internal fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
-internal fun sessionTestConfig(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = LettaConfig(
+@JvmInline
+internal value class TestServerUrl(val value: String)
+
+internal fun sessionTestConfig(
+    id: String,
+    serverUrl: TestServerUrl = TestServerUrl("https://$id.example.test"),
+): LettaConfig = LettaConfig(
     id = id,
     mode = LettaConfig.Mode.SELF_HOSTED,
-    serverUrl = serverUrl,
+    serverUrl = serverUrl.value,
 )
+
+internal fun sessionTestConfig(id: String, serverUrl: String): LettaConfig =
+    sessionTestConfig(id, TestServerUrl(serverUrl))
 
 internal class TestSessionGraphFactoryBuilder(
     var agentApi: FakeAgentApi = FakeAgentApi(),

@@ -48,111 +48,93 @@ import org.junit.Test
 class SessionScopedExecutionRepositoriesTest {
 
     @Test
-    fun `run repository proxy switches caches to rebuilt graph`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
+    fun `run repository proxy switches caches to rebuilt graph`() {
         val fakeRunApi = FakeRunApi().apply {
             runs = mutableListOf(sampleRun("run-a", "agent-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionGraphFactory {
-                this.runApi = fakeRunApi
+        assertExecutionProxySwitchesCaches(
+            setupGraph = { runApi = fakeRunApi },
+            createProxy = { sm, scope -> SessionScopedRunRepository(sm, scope) },
+            refresh = { it.refreshRuns(RunListParams()) },
+            observeIds = { it.runs.value.map { r -> r.id } },
+            mutateForBackendB = {
+                fakeRunApi.runs = mutableListOf(sampleRun("run-b", "agent-b"))
             },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+            expectedBefore = listOf("run-a"),
+            expectedAfter = listOf("run-b"),
         )
-        val runProxy = SessionScopedRunRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-
-        runProxy.refreshRuns(RunListParams())
-        advanceUntilIdle()
-        assertEquals(listOf("run-a"), runProxy.runs.value.map { it.id })
-
-        fakeRunApi.runs = mutableListOf(sampleRun("run-b", "agent-b"))
-        settingsRepository.activeConfigState.value = config("backend-b")
-        advanceUntilIdle()
-
-        assertEquals(emptyList<String>(), runProxy.runs.value.map { it.id })
-
-        runProxy.refreshRuns(RunListParams())
-        advanceUntilIdle()
-
-        assertEquals(listOf("run-b"), runProxy.runs.value.map { it.id })
     }
 
     @Test
-    fun `job repository proxy switches caches to rebuilt graph`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
+    fun `job repository proxy switches caches to rebuilt graph`() {
         val fakeJobApi = FakeJobApi().apply {
             jobs = mutableListOf(sampleJob("job-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
-        val sessionManager = SessionManager(
-            settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionGraphFactory {
-                this.jobApi = fakeJobApi
+        assertExecutionProxySwitchesCaches(
+            setupGraph = { jobApi = fakeJobApi },
+            createProxy = { sm, scope -> SessionScopedJobRepository(sm, scope) },
+            refresh = { it.refreshJobs(JobListParams()) },
+            observeIds = { it.jobs.value.map { j -> j.id } },
+            mutateForBackendB = {
+                fakeJobApi.jobs = mutableListOf(sampleJob("job-b"))
             },
-            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+            expectedBefore = listOf("job-a"),
+            expectedAfter = listOf("job-b"),
         )
-        val jobProxy = SessionScopedJobRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
-
-        jobProxy.refreshJobs(JobListParams())
-        advanceUntilIdle()
-        assertEquals(listOf("job-a"), jobProxy.jobs.value.map { it.id })
-
-        fakeJobApi.jobs = mutableListOf(sampleJob("job-b"))
-        settingsRepository.activeConfigState.value = config("backend-b")
-        advanceUntilIdle()
-
-        assertEquals(emptyList<String>(), jobProxy.jobs.value.map { it.id })
-
-        jobProxy.refreshJobs(JobListParams())
-        advanceUntilIdle()
-
-        assertEquals(listOf("job-b"), jobProxy.jobs.value.map { it.id })
     }
 
     @Test
-    fun `step repository proxy switches caches to rebuilt graph`() = runTest {
-        val dispatcher = StandardTestDispatcher(testScheduler)
+    fun `step repository proxy switches caches to rebuilt graph`() {
         val fakeStepApi = FakeStepApi().apply {
             steps = mutableListOf(sampleStep("step-a"))
         }
+        assertExecutionProxySwitchesCaches(
+            setupGraph = { stepApi = fakeStepApi },
+            createProxy = { sm, scope -> SessionScopedStepRepository(sm, scope) },
+            refresh = { it.refreshSteps(StepListParams()) },
+            observeIds = { it.steps.value.map { s -> s.id } },
+            mutateForBackendB = {
+                fakeStepApi.steps = mutableListOf(sampleStep("step-b"))
+            },
+            expectedBefore = listOf("step-a"),
+            expectedAfter = listOf("step-b"),
+        )
+    }
+
+    private fun <T, R> assertExecutionProxySwitchesCaches(
+        setupGraph: TestSessionGraphFactoryBuilder.() -> Unit,
+        createProxy: (SessionManager, CoroutineScope) -> T,
+        refresh: suspend (T) -> Unit,
+        observeIds: (T) -> List<R>,
+        mutateForBackendB: () -> Unit,
+        expectedBefore: List<R>,
+        expectedAfter: List<R>,
+    ) = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionGraphFactory {
-                this.stepApi = fakeStepApi
-            },
+            sessionGraphFactory = createTestSessionGraphFactory(setupGraph),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
-        val stepProxy = SessionScopedStepRepository(
-            sessionManager = sessionManager,
-            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
-        )
+        val proxy = createProxy(sessionManager, CoroutineScope(SupervisorJob() + dispatcher))
 
-        stepProxy.refreshSteps(StepListParams())
+        refresh(proxy)
         advanceUntilIdle()
-        assertEquals(listOf("step-a"), stepProxy.steps.value.map { it.id })
+        assertEquals(expectedBefore, observeIds(proxy))
 
-        fakeStepApi.steps = mutableListOf(sampleStep("step-b"))
+        mutateForBackendB()
         settingsRepository.activeConfigState.value = config("backend-b")
         advanceUntilIdle()
 
-        assertEquals(emptyList<String>(), stepProxy.steps.value.map { it.id })
+        assertEquals(emptyList<R>(), observeIds(proxy))
 
-        stepProxy.refreshSteps(StepListParams())
+        refresh(proxy)
         advanceUntilIdle()
-
-        assertEquals(listOf("step-b"), stepProxy.steps.value.map { it.id })
+        assertEquals(expectedAfter, observeIds(proxy))
     }
 
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
+    private fun config(id: String): LettaConfig = sessionTestConfig(id)
 
     private fun sampleRun(id: String, agentId: String) = Run(
         id = id,
