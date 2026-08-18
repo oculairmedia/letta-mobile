@@ -1,5 +1,6 @@
 package com.letta.mobile.data.repository.iroh
 
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.ScheduleCreateParams
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.data.repository.api.IScheduleRepository
@@ -19,7 +20,7 @@ class IrohScheduleRepository(
 
     override suspend fun refreshSchedules(agentId: String, limit: Int?, after: String?) {
         val schedules = try {
-            directory().listSchedules(agentId)
+            directory().listSchedules(AgentId(agentId))
         } catch (t: TimelineTransportHttpException) {
             if (t.code == 502 && "HTTP 404" in t.message.orEmpty()) emptyList() else throw t
         }
@@ -32,12 +33,12 @@ class IrohScheduleRepository(
         schedulesByAgentFlow.value[agentId]
             ?.firstOrNull { it.id == scheduledMessageId }
             ?.let { return it }
-        return directory().getSchedule(scheduledMessageId, agentId)
+        return directory().getSchedule(ScheduleId(scheduledMessageId), AgentId(agentId))
             ?: throw NoSuchElementException("Schedule $scheduledMessageId not found over iroh admin_rpc")
     }
 
     override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
-        val schedule = directory().createSchedule(agentId, params)
+        val schedule = directory().createSchedule(AgentId(agentId), params)
         schedulesByAgentFlow.update { current ->
             current.toMutableMap().apply {
                 put(agentId, get(agentId).orEmpty() + schedule)
@@ -47,7 +48,7 @@ class IrohScheduleRepository(
     }
 
     override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
-        directory().deleteSchedule(scheduledMessageId, agentId)
+        directory().deleteSchedule(ScheduleId(scheduledMessageId), AgentId(agentId))
         schedulesByAgentFlow.update { current ->
             current.toMutableMap().apply {
                 put(agentId, get(agentId).orEmpty().filterNot { it.id == scheduledMessageId })

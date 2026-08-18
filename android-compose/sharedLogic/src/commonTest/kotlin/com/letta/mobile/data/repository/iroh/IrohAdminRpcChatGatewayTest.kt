@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository.iroh
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.chat.runtime.ConversationSummary
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.MessageCreate
@@ -293,7 +294,7 @@ class IrohAdminRpcChatGatewayTest {
             ok("""{"id":"agent-1","name":"Renamed"}""")
         }
         val directory = IrohAdminRpcAgentDirectory(transport)
-        val agent = directory.updateAgent("agent-1", AgentUpdateParams(name = "Renamed"))
+        val agent = directory.updateAgent(AgentId("agent-1"), AgentUpdateParams(name = "Renamed"))
         assertEquals("agent-1", agent.id.value)
         assertEquals("Renamed", agent.name)
     }
@@ -311,7 +312,7 @@ class IrohAdminRpcChatGatewayTest {
         }
         val directory = IrohAdminRpcAgentDirectory(transport)
         val schedule = directory.createSchedule(
-            agentId = "agent-1",
+            agentId = AgentId("agent-1"),
             params = ScheduleCreateParams(
                 messages = listOf(ScheduleMessage(content = "hi", role = "user")),
                 schedule = ScheduleDefinition(type = "once", scheduledAt = 1.0),
@@ -373,7 +374,7 @@ class IrohAdminRpcChatGatewayTest {
             ok("""[{"id":"block-1","label":"persona","value":"Helpful"}]""")
         }
 
-        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
 
         assertEquals(1, blocks.size)
         assertEquals("block-1", blocks.single().id.value)
@@ -393,7 +394,7 @@ class IrohAdminRpcChatGatewayTest {
         }
 
         val failure = assertFailsWith<TimelineTransportHttpException> {
-            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
         }
 
         assertTrue(failure.message.orEmpty().contains("agent block read denied"))
@@ -405,7 +406,7 @@ class IrohAdminRpcChatGatewayTest {
         val transport = FakeIrohTransport()
 
         val failure = assertFailsWith<IllegalArgumentException> {
-            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("   ")
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("   "))
         }
 
         assertEquals("agent_id must not be blank", failure.message)
@@ -430,7 +431,7 @@ class IrohAdminRpcChatGatewayTest {
         }
 
         val failure = assertFailsWith<TimelineTransportHttpException> {
-            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
         }
 
         assertTrue(
@@ -448,7 +449,7 @@ class IrohAdminRpcChatGatewayTest {
             ok("[]")
         }
 
-        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+        val blocks = IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
 
         assertTrue(blocks.isEmpty(), "explicit [] must decode as a measured empty list")
         assertEquals(1, transport.rpcCalls.size)
@@ -461,7 +462,7 @@ class IrohAdminRpcChatGatewayTest {
         }
 
         val failure = assertFailsWith<TimelineTransportHttpException> {
-            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
         }
 
         assertTrue(failure.message.orEmpty().contains("has_more"))
@@ -474,7 +475,7 @@ class IrohAdminRpcChatGatewayTest {
         }
 
         val failure = assertFailsWith<TimelineTransportHttpException> {
-            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
         }
 
         assertTrue(failure.message.orEmpty().contains("has_more"))
@@ -490,7 +491,7 @@ class IrohAdminRpcChatGatewayTest {
         }
 
         val failure = assertFailsWith<TimelineTransportHttpException> {
-            IrohAdminRpcAgentDirectory(transport).listAgentBlocks("agent-1")
+            IrohAdminRpcAgentDirectory(transport).listAgentBlocks(AgentId("agent-1"))
         }
 
         assertTrue(failure.message.orEmpty().contains("exceeded"))
