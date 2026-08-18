@@ -59,9 +59,9 @@ internal class DesktopLocalBackendAdminGateway(
     )
 
     override suspend fun createAgent(params: AgentCreateParams): Agent =
-        throw UnsupportedOperationException("Local agent creation is not supported yet")
+        shared.createAgent(params)
 
-    override suspend fun listLlmModels(): List<LlmModel> = emptyList()
+    override suspend fun listLlmModels(): List<LlmModel> = shared.listLlmModels()
 
     override suspend fun sendConversationMessage(
         conversationId: String,
