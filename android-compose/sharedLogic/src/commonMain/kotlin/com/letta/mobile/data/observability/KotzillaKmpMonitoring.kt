@@ -1,25 +1,25 @@
 package com.letta.mobile.data.observability
 
-import io.kotzilla.generated.initKotzillaConfig
-
 /**
  * Shared Kotzilla SDK bootstrap for KMP targets (Desktop, future WasmJS).
  *
  * The Android target boots the SDK automatically at process start via a
  * ContentProvider injected by the Kotzilla Gradle plugin — no explicit call
- * needed in `Application.onCreate`. This wrapper exists for the targets that
- * do NOT get the ContentProvider: Desktop's `main()` (and any future
- * WasmJS browser entry point).
+ * needed in `Application.onCreate`. This wrapper is for the targets that do
+ * NOT get the ContentProvider: Desktop's `main()` (and any future WasmJS
+ * browser entry point).
  *
- * Calls `initKotzillaConfig()` from the generated `io.kotzilla.generated`
- * package, which initializes the SDK from `kotzilla.json` and registers
- * the API key/version on the global config registry. The Android auto-boot
- * path also invokes this function on the JVM side (the Android wrapper
- * does additional `KotzillaSDK.setup(application)` calls).
+ * Looks up `initKotzillaConfig()` reflectively from the
+ * `io.kotzilla.generated` package, which is generated at build time by the
+ * Kotzilla Gradle plugin from `kotzilla.json`. The reflective lookup keeps
+ * this file compiling when the plugin is not applied (e.g., CI without a
+ * developer's local kotzilla.json) — without it, the import fails
+ * `Unresolved reference 'generated'` and every downstream module red-fails.
  *
- * The `initKotzillaConfig()` function is generated at build time by the
- * Kotzilla Gradle plugin from `kotzilla.json` and is only on the classpath
- * when the plugin is applied to a KMP module that compiles `commonMain`.
+ * When the function isn't on the classpath (no kotzilla.json at build time,
+ * or the plugin wasn't applied), the wrapper is a no-op — matching the
+ * "SDK is opt-in" contract: developers who register on console.kotzilla.io
+ * get sessions; everyone else gets a clean compile and no overhead.
  *
  * Usage from Desktop `main()`:
  * ```kotlin
@@ -31,5 +31,9 @@ import io.kotzilla.generated.initKotzillaConfig
  */
 @Suppress("unused")
 fun startKotzillaMonitoring() {
-    initKotzillaConfig()
+    runCatching {
+        val generatedClass = Class.forName("io.kotzilla.generated.KotzillaGeneratedConfigKt")
+        val initMethod = generatedClass.declaredMethods.firstOrNull { it.name == "initKotzillaConfig" }
+        initMethod?.invoke(null)
+    }
 }
