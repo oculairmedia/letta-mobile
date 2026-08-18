@@ -42,48 +42,44 @@ class SessionScopedAdminRepositoriesTest {
     }
 
     @Test
-    fun `group repository proxy switches caches to rebuilt graph`() = runTest {
-        val api = FakeGroupApi().apply { groups = mutableListOf(sampleGroup(GroupId("group-a"), "Backend A Group")) }
-        assertProxySwitchesCaches(testScheduler, AdminProxySwitchSpec(api,
-            setup = { groupApi = api },
-            createProxy = { sm, scope -> SessionScopedGroupRepository(sm, scope) },
-            refresh = { it.refreshGroups() },
-            observeIds = { it.groups.value.map { g -> g.id } },
-            mutate = { api.groups = mutableListOf(sampleGroup(GroupId("group-b"), "Backend B Group")) },
-            before = listOf(GroupId("group-a")),
-            after = listOf(GroupId("group-b")),
-        ).toScenario())
+    fun `group, identity, and provider repository proxies switch caches to rebuilt graph`() = runTest {
+        val groupApi = FakeGroupApi().apply { groups = mutableListOf(sampleGroup(GroupId("group-a"), "Backend A Group")) }
+        val identityApi = FakeIdentityApi().apply { identities = mutableListOf(sampleIdentity(IdentityId("identity-a"), "Backend A Identity")) }
+        val providerApi = FakeProviderApi().apply { providers = mutableListOf(sampleProvider(ProviderId("provider-a"), "Backend A Provider")) }
+
+        val scenarios = listOf(
+            AdminProxySwitchSpec(groupApi,
+                setup = { this.groupApi = groupApi },
+                createProxy = { sm, scope -> SessionScopedGroupRepository(sm, scope) },
+                refresh = { it.refreshGroups() },
+                observeIds = { it.groups.value.map { g -> g.id } },
+                mutate = { it.groups = mutableListOf(sampleGroup(GroupId("group-b"), "Backend B Group")) },
+                before = listOf(GroupId("group-a")),
+                after = listOf(GroupId("group-b")),
+            ),
+            AdminProxySwitchSpec(identityApi,
+                setup = { this.identityApi = identityApi },
+                createProxy = { sm, scope -> SessionScopedIdentityRepository(sm, scope) },
+                refresh = { it.refreshIdentities() },
+                observeIds = { it.identities.value.map { i -> i.id } },
+                mutate = { it.identities = mutableListOf(sampleIdentity(IdentityId("identity-b"), "Backend B Identity")) },
+                before = listOf(IdentityId("identity-a")),
+                after = listOf(IdentityId("identity-b")),
+            ),
+            AdminProxySwitchSpec(providerApi,
+                setup = { this.providerApi = providerApi },
+                createProxy = { sm, scope -> SessionScopedProviderRepository(sm, scope) },
+                refresh = { it.refreshProviders() },
+                observeIds = { it.providers.value.map { p -> p.id } },
+                mutate = { it.providers = mutableListOf(sampleProvider(ProviderId("provider-b"), "Backend B Provider")) },
+                before = listOf(ProviderId("provider-a")),
+                after = listOf(ProviderId("provider-b")),
+            ),
+        )
+        for (spec in scenarios) {
+            assertProxySwitchesCaches(testScheduler, spec.toScenario())
+        }
     }
-
-    @Test
-    fun `identity repository proxy switches caches to rebuilt graph`() = runTest {
-        val api = FakeIdentityApi().apply { identities = mutableListOf(sampleIdentity(IdentityId("identity-a"), "Backend A Identity")) }
-        assertProxySwitchesCaches(testScheduler, AdminProxySwitchSpec(api,
-            setup = { identityApi = api },
-            createProxy = { sm, scope -> SessionScopedIdentityRepository(sm, scope) },
-            refresh = { it.refreshIdentities() },
-            observeIds = { it.identities.value.map { i -> i.id } },
-            mutate = { api.identities = mutableListOf(sampleIdentity(IdentityId("identity-b"), "Backend B Identity")) },
-            before = listOf(IdentityId("identity-a")),
-            after = listOf(IdentityId("identity-b")),
-        ).toScenario())
-    }
-
-    @Test
-    fun `provider repository proxy switches caches to rebuilt graph`() = runTest {
-        val api = FakeProviderApi().apply { providers = mutableListOf(sampleProvider(ProviderId("provider-a"), "Backend A Provider")) }
-        assertProxySwitchesCaches(testScheduler, AdminProxySwitchSpec(api,
-            setup = { providerApi = api },
-            createProxy = { sm, scope -> SessionScopedProviderRepository(sm, scope) },
-            refresh = { it.refreshProviders() },
-            observeIds = { it.providers.value.map { p -> p.id } },
-            mutate = { api.providers = mutableListOf(sampleProvider(ProviderId("provider-b"), "Backend B Provider")) },
-            before = listOf(ProviderId("provider-a")),
-            after = listOf(ProviderId("provider-b")),
-        ).toScenario())
-    }
-
-
 
     private fun sampleGroup(id: GroupId, description: String) = Group(
         id = id,
