@@ -56,6 +56,27 @@ class DesktopIrohTransportSelectionTest {
         assertFalse(shouldBindIrohTransport(localConfig))
     }
 
+    /**
+     * letta-mobile-hhp6r: after BackendConfigPolicy started parking a remote
+     * backend's serverUrl/accessToken (instead of discarding them) so they can
+     * be restored on a later switch back, a LOCAL config carries those details
+     * in `parkedServerUrl`/`parkedAccessToken` rather than `serverUrl`. Confirm
+     * the parked fields are inert for transport binding — only `serverUrl` (now
+     * always blank on LOCAL) and `mode` may influence this decision.
+     */
+    @Test
+    fun `local mode with parked iroh details never binds the iroh transport`() {
+        val localConfigWithParkedRemote = LettaConfig(
+            id = "local",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "",
+            parkedServerUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+            parkedAccessToken = "remote-token",
+        )
+
+        assertFalse(shouldBindIrohTransport(localConfigWithParkedRemote))
+    }
+
     @Test
     fun `non-local mode with an iroh url binds the iroh transport`() {
         val remoteConfig = LettaConfig(

@@ -27,6 +27,22 @@ data class LettaConfig(
     val localProviderBaseUrl: String? = null,
     val localProviderApiKey: String? = null,
     val localProviderModel: String? = null,
+    /**
+     * letta-mobile-hhp6r: a shelf for the most recently known remote
+     * backend's connection details, kept in sync whenever [BackendConfigPolicy]
+     * blanks [serverUrl] on a switch to [Mode.LOCAL] (see
+     * `BackendConfigPolicy.migrateStaleLocalServerUrl`). Switching back to a
+     * remote [Mode] with a blank [serverUrl] restores from here (see
+     * `BackendConfigPolicy.restoreParkedRemoteBackend`) instead of re-prompting
+     * for the URL and token.
+     *
+     * These fields are never read by routing or transport-binding code —
+     * `Mode.LOCAL` stays authoritative over `serverUrl`/`isIrohBackend()` (see
+     * `BackendKind`'s KDoc and letta-mobile-9v9nu). They exist purely to avoid
+     * losing data the user already entered.
+     */
+    val parkedServerUrl: String? = null,
+    val parkedAccessToken: String? = null,
 ) {
     enum class Mode {
         CLOUD,
