@@ -41,23 +41,6 @@ class InterAgentConversationPickerTest {
             throwOnList?.let { throw it }
             return agentScopedConversations
         }
-
-        override suspend fun refreshConversations(agentId: AgentId) = Unit
-        override suspend fun refreshConversations(agentId: String) = Unit
-
-        // Other interface members are not used by the picker; default
-        // impls from IConversationRepository (emptyList / Unit) cover
-        // them, so we don't need to stub each one.
-        override fun hasFreshConversations(agentId: AgentId, maxAgeMs: Long): Boolean = false
-        override suspend fun refreshConversationsIfStale(agentId: AgentId, maxAgeMs: Long): Boolean = false
-        override suspend fun getConversation(id: ConversationId): Conversation = error("unused by picker")
-        override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation = error("unused by picker")
-        override suspend fun deleteConversation(id: ConversationId, agentId: AgentId) = error("unused")
-        override suspend fun updateConversation(id: ConversationId, agentId: AgentId, summary: String) = error("unused")
-        override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean) = error("unused")
-        override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) = error("unused")
-        override suspend fun recompileConversation(id: ConversationId, dryRun: Boolean, agentId: AgentId?): String = error("unused")
-        override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation = error("unused")
     }
 
     private val testAgentId = AgentId("agent-meridian")
@@ -70,41 +53,38 @@ class InterAgentConversationPickerTest {
     private val convByUpdatedId = ConversationId("conv-by-updated")
     private val convByCreatedId = ConversationId("conv-by-created")
 
-    private const val TIME_OLD = "2026-08-10T12:00:00.000Z"
-    private const val TIME_RECENT = "2026-08-17T18:00:00.000Z"
-    private const val TIME_MID = "2026-08-15T12:00:00.000Z"
-    private const val TIME_AUTONOMOUS = "2026-08-18T00:00:00.000Z"
-    private const val TIME_UPDATED = "2026-08-15T00:00:00.000Z"
-    private const val TIME_CREATED = "2026-08-17T00:00:00.000Z"
+    private data class ConversationTime(
+        val lastMessageAt: String? = null,
+        val updatedAt: String? = null,
+        val createdAt: String? = null,
+    )
 
-    private fun conv(
+    private val timeOld = ConversationTime(lastMessageAt = "2026-08-10T12:00:00.000Z")
+    private val timeRecent = ConversationTime(lastMessageAt = "2026-08-17T18:00:00.000Z")
+    private val timeMid = ConversationTime(lastMessageAt = "2026-08-15T12:00:00.000Z")
+    private val timeAutonomous = ConversationTime(lastMessageAt = "2026-08-18T00:00:00.000Z")
+    private val timeUpdated = ConversationTime(updatedAt = "2026-08-15T00:00:00.000Z")
+    private val timeCreated = ConversationTime(createdAt = "2026-08-17T00:00:00.000Z")
+
+    private fun testConv(
         id: ConversationId,
-        lastMessageAt: String,
+        time: ConversationTime,
         klass: ConversationClass? = null,
     ) = Conversation(
         id = id,
         agentId = testAgentId,
-        lastMessageAt = lastMessageAt,
+        lastMessageAt = time.lastMessageAt,
+        updatedAt = time.updatedAt,
+        createdAt = time.createdAt,
         conversationClass = klass,
-    )
-
-    private fun convWithFallbackTimes(
-        id: ConversationId,
-        updatedAt: String? = null,
-        createdAt: String? = null,
-    ) = Conversation(
-        id = id,
-        agentId = testAgentId,
-        updatedAt = updatedAt,
-        createdAt = createdAt,
     )
 
     @Test
     fun returnsMostRecentInteractiveConversationId() = runBlocking {
         val conversations = listOf(
-            conv(convOldId, TIME_OLD),
-            conv(convRecentId, TIME_RECENT),
-            conv(convMidId, TIME_MID),
+            testConv(convOldId, timeOld),
+            testConv(convRecentId, timeRecent),
+            testConv(convMidId, timeMid),
         )
         val repo = FakeRepo(agentScopedConversations = conversations)
         assertEquals(
@@ -117,10 +97,10 @@ class InterAgentConversationPickerTest {
     @Test
     fun skipsAutonomousConversationsEvenIfMostRecent() = runBlocking {
         val conversations = listOf(
-            conv(convInteractiveId, TIME_RECENT),
+            testConv(convInteractiveId, timeRecent),
             // AUTONOMOUS with a NEWER timestamp must NOT win — the router
             // never routes to heartbeat/goal conversations.
-            conv(convAutonomousNewestId, TIME_AUTONOMOUS, klass = ConversationClass.AUTONOMOUS),
+            testConv(convAutonomousNewestId, timeAutonomous, klass = ConversationClass.AUTONOMOUS),
         )
         assertEquals(
             convInteractiveId.value,
@@ -132,9 +112,9 @@ class InterAgentConversationPickerTest {
     fun fallsBackToUpdatedAtThenCreatedAtWhenLastMessageAtMissing() = runBlocking {
         val conversations = listOf(
             // No lastMessageAt; updatedAt is older.
-            convWithFallbackTimes(convByUpdatedId, updatedAt = TIME_UPDATED),
+            testConv(convByUpdatedId, timeUpdated),
             // No lastMessageAt/updatedAt; createdAt is newest of the fallbacks.
-            convWithFallbackTimes(convByCreatedId, createdAt = TIME_CREATED),
+            testConv(convByCreatedId, timeCreated),
         )
         // updatedAt (08-15) vs createdAt (08-17): the created-only one is
         // lex-newer, so it wins under lastMessageAt?:updatedAt?:createdAt.
@@ -157,7 +137,7 @@ class InterAgentConversationPickerTest {
     @Test
     fun returnsNullWhenAllConversationsAreAutonomous() = runBlocking {
         val only = listOf(
-            conv(convAutonomousId, TIME_AUTONOMOUS, klass = ConversationClass.AUTONOMOUS),
+            testConv(convAutonomousId, timeAutonomous, klass = ConversationClass.AUTONOMOUS),
         )
         assertNull(
             pickOtherAgentConversation(
