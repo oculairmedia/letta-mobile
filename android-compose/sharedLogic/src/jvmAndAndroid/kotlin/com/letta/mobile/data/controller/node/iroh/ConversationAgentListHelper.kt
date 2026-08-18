@@ -8,40 +8,44 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+internal data class AgentListRequest(
+    val params: JsonObject?,
+    val context: AdminRpcRequestContext,
+    val tiers: NativeReadTiers,
+    val agentId: String,
+)
+
 internal object ConversationAgentListHelper {
     private const val MAX_AGENT_LIST_FETCH = 500
 
     fun listAgentConversations(
-        params: JsonObject?,
-        context: AdminRpcRequestContext,
-        tiers: NativeReadTiers,
-        agentId: String,
+        request: AgentListRequest,
         scopeFunc: (JsonElement, AdminRpcRequestContext) -> JsonElement,
     ): JsonElement {
-        val store = tiers.localBackendStore
+        val store = request.tiers.localBackendStore
             ?: return adminError("capability_unavailable: conversation.list_agent requires the local backend store")
-        if (!store.agentExists(agentId)) {
+        if (!store.agentExists(request.agentId)) {
             Telemetry.event(
                 "IrohNode", "conversation.list_agent.agent_missing",
-                "agentId" to agentId,
+                "agentId" to request.agentId,
                 level = Telemetry.Level.WARN,
             )
             return JsonArray(emptyList())
         }
-        val limit = (param(params, AdminParamKey("limit"))?.toIntOrNull() ?: 200)
+        val limit = (param(request.params, AdminParamKey("limit"))?.toIntOrNull() ?: 200)
             .coerceIn(1, MAX_AGENT_LIST_FETCH)
-        val archiveStatus = param(params, AdminParamKey("archive_status")) ?: "active"
+        val archiveStatus = param(request.params, AdminParamKey("archive_status")) ?: "active"
         val rows = store.listConversationsProjected(
-            agentId = agentId,
+            agentId = request.agentId,
             archiveStatus = archiveStatus,
             limit = limit,
             offset = 0,
         ) ?: return adminError("local_backend_error: listConversationsProjected returned null")
         val decoded = rows.mapNotNull { el ->
             val obj = el as? JsonObject ?: return@mapNotNull null
-            decodeConversationObject(obj, agentId)
+            decodeConversationObject(obj, request.agentId)
         }
-        return scopeFunc(JsonArray(decoded), context)
+        return scopeFunc(JsonArray(decoded), request.context)
     }
 
     private fun decodeConversationObject(obj: JsonObject, fallbackAgentId: String): JsonObject {

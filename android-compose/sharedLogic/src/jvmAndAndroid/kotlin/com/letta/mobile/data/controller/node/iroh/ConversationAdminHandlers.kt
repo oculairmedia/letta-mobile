@@ -86,7 +86,8 @@ object ConversationAdminHandlers {
         router.registerScoped("conversation.list_agent") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
                 ?: return@registerScoped adminError("missing_required: agent_id")
-            ConversationAgentListHelper.listAgentConversations(params, context, tiers, agentId, ::scopeConversationList)
+            val request = AgentListRequest(params, context, tiers, agentId)
+            ConversationAgentListHelper.listAgentConversations(request, ::scopeConversationList)
         }
     }
 
