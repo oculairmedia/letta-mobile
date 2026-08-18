@@ -410,6 +410,65 @@ class SessionManagerTest {
     }
 
     @Test
+    fun `agent repository proxy listAgentSummaries hits slim path not interface default`() = runTest {
+        // Fail-on-revert for the SessionScoped interface-default miss: without an
+        // override, Hilt's SessionScopedAgentRepository would take
+        // IAgentRepository.listAgentSummaries' deriving default (refreshAgents →
+        // full listAgents) and never dial listAgentsSlim. Same defect class as
+        // listConversationsForAgent on SessionScopedConversationRepository.
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        val fakeApi = FakeAgentApi().apply {
+            agents = mutableListOf(
+                TestData.agent(id = "a1", name = "Agent One", description = "first"),
+                TestData.agent(id = "a2", name = "Agent Two", description = null),
+            )
+        }
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val sessionManager = SessionManager(
+            settingsRepository = settingsRepository,
+            sessionGraphFactory = SessionGraphFactory(
+                fakeApi,
+                FakeAgentDao(),
+                FakeConversationApi(),
+                FakeConversationDao(),
+                FakeArchiveApi(),
+                FakeFolderApi(),
+                FakeGroupApi(),
+                FakeIdentityApi(),
+                fakeLettaApiClient(),
+                FakeMcpServerApi(),
+                FakeModelApi(),
+                FakePassageApi(),
+                FakeProjectApi(),
+                FakeProjectWorkApi(),
+                FakeRunApi(),
+                FakeJobApi(),
+                FakeProviderApi(),
+                FakeScheduleApi(),
+                FakeStepApi(),
+                FakeToolApi(),
+                appContext = mockk(relaxed = true),
+            ),
+            managerScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+        val proxy = SessionScopedAgentRepository(
+            sessionManager = sessionManager,
+            proxyScope = CoroutineScope(SupervisorJob() + dispatcher),
+        )
+
+        val summaries = proxy.listAgentSummaries()
+        advanceUntilIdle()
+
+        assertEquals(listOf("a1", "a2"), summaries.map { it.id.value })
+        assertEquals(listOf("Agent One", "Agent Two"), summaries.map { it.name })
+        assertEquals("first", summaries[0].description)
+        assertTrue(fakeApi.calls.contains("listAgentsSlim"))
+        assertFalse(fakeApi.calls.contains("listAgents"))
+        // Proxy's full-agent cache stays untouched — slim is a separate path.
+        assertTrue(proxy.agents.value.isEmpty())
+    }
+
+    @Test
     fun `conversation repository proxy switches caches to rebuilt graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
         val fakeConversationApi = FakeConversationApi().apply {

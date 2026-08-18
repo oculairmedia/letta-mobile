@@ -3,6 +3,7 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentSummary
 import com.letta.mobile.data.model.AgentUpdateParams
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ContextWindowOverview
@@ -65,6 +66,16 @@ class SessionScopedAgentRepository internal constructor(
         get() = sessionManager.current.agentRepository
 
     override suspend fun countAgents(): Int = sessionManager.withCurrentSession { it.agentRepository.countAgents() }
+
+    /**
+     * Must forward — [IAgentRepository.listAgentSummaries] has a deriving
+     * default that reads the full [agents] cache. Concrete [AgentRepository]
+     * overrides it to hit the slim wire path; without this override Hilt's
+     * SessionScoped binding silently takes the expensive default (same class
+     * as the listConversationsForAgent miss on SessionScopedConversationRepository).
+     */
+    override suspend fun listAgentSummaries(): List<AgentSummary> =
+        sessionManager.withCurrentSession { it.agentRepository.listAgentSummaries() }
 
     override suspend fun refreshAgents() = sessionManager.withCurrentSession {
         it.agentRepository.refreshAgents()
