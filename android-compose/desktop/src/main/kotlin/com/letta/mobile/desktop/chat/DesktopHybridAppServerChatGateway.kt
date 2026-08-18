@@ -2,9 +2,11 @@ package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.send.OutboundMessageCreate
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AskUserQuestion
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -24,7 +26,6 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import com.letta.mobile.data.transport.iroh.RuntimeEventServerFrameMapper
 import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeEventDraft
 import com.letta.mobile.runtime.RuntimeEventPayload
 import com.letta.mobile.runtime.RuntimeId
@@ -34,49 +35,54 @@ import com.letta.mobile.runtime.TurnEngine
 import com.letta.mobile.runtime.TurnInput
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.jvm.JvmInline
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.merge
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonPrimitive
-
 import kotlin.time.Duration.Companion.milliseconds
+
+/** Typed desktop turn identifier. */
+@JvmInline
+@Serializable
+value class DesktopTurnId(val value: String) {
+    override fun toString(): String = value
+}
+
+/** Typed desktop run identifier. */
+@JvmInline
+@Serializable
+value class DesktopRunId(val value: String) {
+    override fun toString(): String = value
+}
+
+/** Typed local message identifier. */
+@JvmInline
+@Serializable
+value class LocalMessageId(val value: String) {
+    override fun toString(): String = value
+}
+
+/** Typed working directory path. */
+@JvmInline
+@Serializable
+value class WorkingDirectoryPath(val value: String) {
+    override fun toString(): String = value
+}
+
+/** Typed approval request identifier. */
+@JvmInline
+@Serializable
+value class ApprovalRequestId(val value: String) {
+    override fun toString(): String = value
+}
+
 /**
  * Hybrid desktop chat gateway: live chat through the App Server TurnEngine,
  * listing/CRUD through HTTP.
- *
- * ROUTING:
- * - [sendConversationMessage]: resolves the conversation's agent, then drives
- *   [TurnEngine.runTurn] on an engine built Unrestricted (desktop has no
- *   approval UI; approvals auto-allow, matching the Android iroh engine —
- *   the mode is baked into the engine so its single runtime_start carries
- *   it, with no eager seed call) and projects the RuntimeEventDraft stream
- *   into LettaMessages via the SAME mappers the Android iroh path uses
- *   (RuntimeEventServerFrameMapper + WsFrameMapper), so ids/otids/prefixes are
- *   byte-identical and the shared timeline reducer dedups correctly.
- * - [streamConversation]: passive view of the App Server stream channel
- *   (stream_delta frames routed by their own runtime.conversation_id), with
- *   synthesized heartbeats so the sync loop's silence timeout doesn't cycle
- *   the subscription while the agent idles (same contract as
- *   IrohAdminRpcChatGateway.streamConversation). Heartbeats stop once
- *   [AppServerClient.isConnected] reports the client dropped.
- * - setConversationModel/setConversationArchived and the rest of
- *   [ChatGatewayExtras] delegate to [adminGateway]. For a bundled/LOCAL
- *   runtime that's [DesktopLocalBackendAdminGateway], which rides the SAME
- *   App Server connection as chat via native Listen V2 commands
- *   (`agent_create`, `list_models`, `conversation_update`, ...) — verified
- *   against `@letta-ai/letta-code` 0.29.12: the bundled runtime never
- *   implements `admin_rpc`, but does implement these first-class commands.
- *   For a remote backend it's the HTTP gateway (management operations stay
- *   HTTP there).
- * - conversation/message listing, agent CRUD, model catalog: delegated the
- *   same way — native App Server commands for LOCAL, HTTP for remote.
- *
- * LIFECYCLE: [close] tears down the HTTP gateway and, when this gateway rode
- * an iroh or WebSocket dial, the transport-level resources via
- * [DesktopTransportResources]. The engine/transport scope is owned by the
- * factory.
  */
 class DesktopHybridAppServerChatGateway internal constructor(
     private val turnEngine: TurnEngine,
@@ -95,71 +101,45 @@ class DesktopHybridAppServerChatGateway internal constructor(
     DesktopWorkingDirectoryController,
     AutoCloseable {
 
-    /**
-     * letta-mobile folder-settings #2: delegates to [AppServerTurnEngine],
-     * which owns the `client` request plumbing and the `externalToolRegistry`
-     * needed to re-advertise tools on a cwd-changing `runtime_start`. Returns
-     * null/false (never fabricates) when the active engine isn't an
-     * [AppServerTurnEngine] (e.g. under test doubles).
-     */
     override suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String? =
-        (turnEngine as? AppServerTurnEngine)?.currentWorkingDirectory(agentId, conversationId)
+        currentWorkingDirectory(AgentId(agentId), ConversationId(conversationId))?.value
+
+    suspend fun currentWorkingDirectory(agentId: AgentId, conversationId: ConversationId): WorkingDirectoryPath? =
+        (turnEngine as? AppServerTurnEngine)?.currentWorkingDirectory(agentId.value, conversationId.value)
+            ?.let(::WorkingDirectoryPath)
 
     override suspend fun setWorkingDirectory(agentId: String, conversationId: String, path: String): Boolean =
-        (turnEngine as? AppServerTurnEngine)?.setWorkingDirectory(agentId, conversationId, path) ?: false
+        setWorkingDirectory(AgentId(agentId), ConversationId(conversationId), WorkingDirectoryPath(path))
 
-    /**
-     * conversationId -> the canonical run id most recently seen on that
-     * conversation's in-flight turn. letta-mobile-lgns8.19 addresses the abort at
-     * that run so the server tears down the RIGHT run; a null entry still aborts
-     * (the server then targets whatever run is active for the runtime).
-     */
-    private val activeRunIdByConversation = ConcurrentHashMap<String, String>()
+    suspend fun setWorkingDirectory(agentId: AgentId, conversationId: ConversationId, path: WorkingDirectoryPath): Boolean =
+        (turnEngine as? AppServerTurnEngine)?.setWorkingDirectory(agentId.value, conversationId.value, path.value) ?: false
 
-    /**
-     * letta-mobile-lgns8.19: REAL server-side abort for the desktop stop button.
-     * Previously desktop only cancelled its local collect job, so a long tool call
-     * ran to completion and its output later surfaced as a ghost resume.
-     */
-    override suspend fun abortConversationTurn(conversationId: String): Boolean {
+    private val activeRunIdByConversation = ConcurrentHashMap<ConversationId, DesktopRunId>()
+
+    override suspend fun abortConversationTurn(conversationId: String): Boolean =
+        abortConversationTurn(ConversationId(conversationId))
+
+    suspend fun abortConversationTurn(conversationId: ConversationId): Boolean {
         val engine = turnEngine as? AppServerTurnEngine ?: return false
         val runId = activeRunIdByConversation[conversationId]
-        // Keyed abort: with concurrent runtimes the keyless overload targets the
-        // most recently started scope, which can abort the WRONG conversation.
         val agentId = runCatching { agentIdFor(conversationId) }.getOrNull() ?: return false
-        val response = engine.abort(agentId, conversationId, runId) ?: return false
-        // A response with success=false or aborted=false means no run was torn
-        // down (stale/already-terminal run id): report undelivered so the
-        // controller falls back to its local clear instead of holding the
-        // "stopping" state for the full terminal timeout.
+        val response = engine.abort(agentId.value, conversationId.value, runId?.value) ?: return false
         return response.success && response.aborted
     }
 
-    /**
-     * Answer / dismiss a parked runtime approval (e.g. AskUserQuestion) over the
-     * App Server input channel — desktop parity for the mobile approval-submit
-     * path. Mirrors [com.letta.mobile.data.controller.DefaultAppServerController.submitApproval]:
-     * an AskUserQuestion answer rides the `reason` channel (decoded here into an
-     * `updated_input` allow), and interactive tools resolve against letta-code's
-     * `perm-call_<callId>` control-request id — NOT the display approval id. The
-     * runtime scope is rebuilt from the conversation's agent/conversation ids
-     * (single-user desktop backend), matching the scope minted at runtime_start.
-     * See letta-mobile-vilsn.8.
-     */
     override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
+        val agentId = AgentId(submission.agentId)
+        val conversationId = ConversationId(submission.conversationId)
+        val requestId = ApprovalRequestId(submission.requestId)
         val scope = AppServerRuntimeScope(
-            agentId = submission.agentId,
-            conversationId = submission.conversationId,
+            agentId = agentId.value,
+            conversationId = conversationId.value,
         )
         val answerUpdatedInput =
             if (submission.approve) AskUserQuestion.decodeAnswerReason(submission.reason) else null
-        // letta-mobile-vilsn: answer against the REAL can_use_tool gate id the
-        // engine captured when it surfaced the approval (correct across providers:
-        // call_… vs toolu_…); the display id and the string heuristic don't match
-        // Claude's toolu_ ids. Heuristic remains only as a last-resort fallback.
         val appServerEngine = turnEngine as? AppServerTurnEngine
         val capturedRequestId = submission.toolCallId?.let { appServerEngine?.userInputApprovalId(it) }
-        val effectiveRequestId = capturedRequestId ?: submission.requestId
+        val effectiveRequestId = capturedRequestId ?: requestId.value
         val decision = AppServerApprovalDecisions.decide(
             approve = submission.approve,
             updatedInput = answerUpdatedInput,
@@ -181,72 +161,47 @@ class DesktopHybridAppServerChatGateway internal constructor(
         }
     }
 
-    /** conversationId -> agentId, learned on first send/stream per conversation. */
-    private val agentIdByConversation = ConcurrentHashMap<String, String>()
-
-    /**
-     * Conversations with a [sendConversationMessage] flow currently collecting.
-     * The passive [observedStreamMessages] projection and the send flow both
-     * project the same underlying frames but under DIFFERENT synthetic turnIds
-     * (send: `desktop-turn-<uuid>`, stream: `desktop-stream-turn-<conv>`), so
-     * their derived reasoning-message ids diverge and seq-based dedup misses
-     * the duplicate. Mirrors Android's ingestObserverFrame active-turn guard:
-     * while a conversation has a send in flight, the send flow is already
-     * emitting its frames, so the passive observer drops frames for that
-     * conversation at the source instead of re-emitting a duplicate bubble.
-     */
-    private val activeSendConversations = ConcurrentHashMap.newKeySet<String>()
-
-    /**
-     * Projects passively-observed [AppServerInboundFrame.StreamDelta] frames the
-     * SAME way [IrohChannelTransport.ingestObserverFrame] does: raw StreamDelta ->
-     * RuntimeEventDraft (this mapper turns client_tool_start/client_tool_end into
-     * ToolCallObserved/ToolReturnObserved, not just RemoteStreamFrame) -> ServerFrame
-     * (RuntimeEventServerFrameMapper) -> LettaMessage (WsFrameMapper). Without this
-     * step, other-client-initiated tool calls/returns never produce timeline cards
-     * because IrohStreamDeltaServerFrameMapper only understands
-     * assistant_message/reasoning_message/tool_call_message/tool_return_message.
-     */
+    private val agentIdByConversation = ConcurrentHashMap<ConversationId, AgentId>()
+    private val activeSendConversations = ConcurrentHashMap.newKeySet<ConversationId>()
     private val runtimeEventMapper = AppServerRuntimeEventMapper()
 
     override suspend fun sendConversationMessage(
         conversationId: String,
         request: MessageCreateRequest,
+    ): Flow<LettaMessage> = sendConversationMessage(ConversationId(conversationId), request)
+
+    suspend fun sendConversationMessage(
+        conversationId: ConversationId,
+        request: MessageCreateRequest,
     ): Flow<LettaMessage> {
         val agentId = agentIdFor(conversationId)
         val outbound = OutboundMessageCreate.decode(request)
-        val turnId = "desktop-turn-${UUID.randomUUID()}"
-        val syntheticRunId = "desktop-run-${UUID.randomUUID()}"
+        val turnId = DesktopTurnId("desktop-turn-${UUID.randomUUID()}")
+        val syntheticRunId = DesktopRunId("desktop-run-${UUID.randomUUID()}")
+        val localMsgId = outbound.otid?.let(::LocalMessageId)
+            ?: LocalMessageId("desktop-local-${UUID.randomUUID()}")
         val command = TurnCommand(
             backendId = BackendId(APP_SERVER_BACKEND_ID),
-            runtimeId = RuntimeId("$APP_SERVER_BACKEND_ID:$conversationId"),
-            agentId = com.letta.mobile.data.model.AgentId(agentId),
-            conversationId = ConversationId(conversationId),
+            runtimeId = RuntimeId("$APP_SERVER_BACKEND_ID:${conversationId.value}"),
+            agentId = agentId,
+            conversationId = com.letta.mobile.runtime.ConversationId(conversationId.value),
             input = TurnInput.UserMessage(
-                localMessageId = outbound.otid ?: "desktop-local-${UUID.randomUUID()}",
+                localMessageId = localMsgId.value,
                 text = outbound.text,
                 contentPartsJson = outbound.contentParts?.toString(),
             ),
         )
         return flow {
             activeSendConversations.add(conversationId)
-            // letta-mobile-br5g0: computed from the turn's OWN observed frames —
-            // did this turn actually put assistant content on screen?
             var deliveredAssistantContent = false
             var mainReplyCompleted = false
             try {
                 turnEngine.runTurn(command).collect { draft ->
-                    // letta-mobile-lgns8.19: remember the turn's canonical run id
-                    // so a stop can address the abort at the right run.
                     draft.runId?.value?.takeIf { it.isNotBlank() }?.let {
-                        activeRunIdByConversation[conversationId] = it
+                        activeRunIdByConversation[conversationId] = DesktopRunId(it)
                     }
                     val lifecycle = draft.payload as? RuntimeEventPayload.RunLifecycleChanged
                     if (lifecycle?.status == RuntimeRunStatus.Failed) {
-                        // letta-mobile-br5g0: a Failed terminal AFTER the main reply
-                        // completed is a trailing aux-step failure, not a dead turn.
-                        // Partial streamed content without a completed stop still
-                        // emits a visible ERROR row.
                         val notice = TurnFailureNotices.forFailedTerminal(
                             reason = lifecycle.reason,
                             deliveredAssistantContent = deliveredAssistantContent,
@@ -254,10 +209,10 @@ class DesktopHybridAppServerChatGateway internal constructor(
                         ) ?: return@collect
                         emit(
                             ErrorMessage(
-                                id = "turn-failed-${draft.runId?.value ?: turnId}",
+                                id = "turn-failed-${draft.runId?.value ?: turnId.value}",
                                 contentRaw = JsonPrimitive(notice.message),
                                 code = notice.kind,
-                                runId = draft.runId?.value ?: syntheticRunId,
+                                runId = draft.runId?.value ?: syntheticRunId.value,
                             ),
                         )
                         throw TimelineTransportHttpException(
@@ -287,10 +242,6 @@ class DesktopHybridAppServerChatGateway internal constructor(
         }
     }
 
-    /**
-     * Explicit main-reply completion only — parse failures and intermediate
-     * stops (requires_approval / error) return false.
-     */
     private fun marksMainReplyCompleted(payload: RuntimeEventPayload): Boolean = when (payload) {
         is RuntimeEventPayload.RemoteStreamFrame -> {
             payload.messageType == "stop_reason" &&
@@ -303,8 +254,11 @@ class DesktopHybridAppServerChatGateway internal constructor(
         else -> false
     }
 
-    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> {
-        val agentId = runCatching { agentIdFor(conversationId) }.getOrDefault("")
+    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
+        streamConversation(ConversationId(conversationId))
+
+    suspend fun streamConversation(conversationId: ConversationId): Flow<TimelineStreamFrame> {
+        val agentId = runCatching { agentIdFor(conversationId) }.getOrDefault(AgentId(""))
         val frames = flow {
             client.events.collect { received ->
                 observedStreamMessages(received, conversationId, agentId).forEach {
@@ -322,32 +276,29 @@ class DesktopHybridAppServerChatGateway internal constructor(
         return merge(frames, heartbeats)
     }
 
-    /**
-     * Per-frame projection for [streamConversation]'s passive observer loop:
-     * raw [AppServerReceivedFrame] -> (filtered to this conversation) ->
-     * RuntimeEventDraft(s) via [runtimeEventMapper] -> [LettaMessage]s via the
-     * SAME ServerFrame/WsFrameMapper chain [toLettaMessages] uses for the
-     * initiator send path, so ids/otids/prefixes stay byte-identical.
-     */
     private fun observedStreamMessages(
         received: AppServerReceivedFrame,
-        conversationId: String,
-        fallbackAgentId: String,
+        conversationId: ConversationId,
+        fallbackAgentId: AgentId,
     ): List<LettaMessage> {
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta
             ?: return emptyList()
-        if (streamDelta.runtime.conversationId != conversationId) return emptyList()
+        if (streamDelta.runtime.conversationId != conversationId.value) return emptyList()
         if (conversationId in activeSendConversations) return emptyList()
-        val effectiveAgentId = streamDelta.runtime.agentId.ifBlank { fallbackAgentId }
+        val effectiveAgentId = if (streamDelta.runtime.agentId.isNotBlank()) {
+            AgentId(streamDelta.runtime.agentId)
+        } else {
+            fallbackAgentId
+        }
         val command = streamObserverCommand(effectiveAgentId, conversationId)
         return runtimeEventMapper.map(command, received).flatMap { draft ->
             RuntimeEventServerFrameMapper.map(
                 payload = draft.payload,
                 context = RuntimeEventServerFrameMapper.Context(
-                    agentId = draft.agentId?.value ?: effectiveAgentId,
-                    conversationId = draft.conversationId?.value ?: conversationId,
-                    turnId = "desktop-stream-turn-$conversationId",
-                    runId = draft.runId?.value ?: "desktop-stream-run-$conversationId",
+                    agentId = draft.agentId?.value ?: effectiveAgentId.value,
+                    conversationId = draft.conversationId?.value ?: conversationId.value,
+                    turnId = "desktop-stream-turn-${conversationId.value}",
+                    runId = draft.runId?.value ?: "desktop-stream-run-${conversationId.value}",
                 ),
             ).mapNotNull(WsFrameMapper::toLettaMessage)
         }
@@ -372,16 +323,16 @@ class DesktopHybridAppServerChatGateway internal constructor(
         archiveStatus: String?,
     ): List<Conversation> = adminGateway.listConversations(limit, archiveStatus)
         .also { conversations ->
-            conversations.forEach { agentIdByConversation[it.id.value] = it.agentId.value }
+            conversations.forEach { agentIdByConversation[it.id] = it.agentId }
         }
 
     override suspend fun getConversation(conversationId: String): Conversation =
         adminGateway.getConversation(conversationId)
-            .also { agentIdByConversation[it.id.value] = it.agentId.value }
+            .also { agentIdByConversation[it.id] = it.agentId }
 
     override suspend fun deleteConversation(conversationId: String) {
         adminGateway.deleteConversation(conversationId)
-        agentIdByConversation.remove(conversationId)
+        agentIdByConversation.remove(ConversationId(conversationId))
     }
 
     override fun close() {
@@ -390,40 +341,34 @@ class DesktopHybridAppServerChatGateway internal constructor(
         transportResources?.close()
     }
 
-    /**
-     * Synthetic [TurnCommand] fed to [AppServerRuntimeEventMapper] for passively
-     * observed frames — mirrors [IrohChannelTransport.observerTurnCommand]. The
-     * command's ids are only fallback context; the wire envelope's own
-     * agent/conversation/run ids win (see [RuntimeEventDraft.agentId] etc. above).
-     */
-    private fun streamObserverCommand(agentId: String, conversationId: String): TurnCommand =
+    private fun streamObserverCommand(agentId: AgentId, conversationId: ConversationId): TurnCommand =
         TurnCommand(
             backendId = BackendId(APP_SERVER_BACKEND_ID),
-            runtimeId = RuntimeId("$APP_SERVER_BACKEND_ID:$conversationId"),
-            agentId = com.letta.mobile.data.model.AgentId(agentId),
-            conversationId = ConversationId(conversationId),
+            runtimeId = RuntimeId("$APP_SERVER_BACKEND_ID:${conversationId.value}"),
+            agentId = agentId,
+            conversationId = com.letta.mobile.runtime.ConversationId(conversationId.value),
             input = TurnInput.UserMessage(
-                localMessageId = "desktop-stream-observer-$conversationId",
+                localMessageId = "desktop-stream-observer-${conversationId.value}",
                 text = "",
             ),
         )
 
-    private suspend fun agentIdFor(conversationId: String): String =
-        agentIdByConversation[conversationId] ?: agentIdResolver(conversationId)
+    private suspend fun agentIdFor(conversationId: ConversationId): AgentId =
+        agentIdByConversation[conversationId] ?: AgentId(agentIdResolver(conversationId.value))
             .also { agentIdByConversation[conversationId] = it }
 
     private fun RuntimeEventDraft.toLettaMessages(
-        agentId: String,
-        conversationId: String,
-        turnId: String,
-        fallbackRunId: String,
+        agentId: AgentId,
+        conversationId: ConversationId,
+        turnId: DesktopTurnId,
+        fallbackRunId: DesktopRunId,
     ): List<LettaMessage> = RuntimeEventServerFrameMapper.map(
         payload = payload,
         context = RuntimeEventServerFrameMapper.Context(
-            agentId = agentId,
-            conversationId = conversationId,
-            turnId = turnId,
-            runId = runId?.value?.takeIf { it.isNotBlank() } ?: fallbackRunId,
+            agentId = agentId.value,
+            conversationId = conversationId.value,
+            turnId = turnId.value,
+            runId = runId?.value?.takeIf { it.isNotBlank() } ?: fallbackRunId.value,
         ),
     ).mapNotNull(WsFrameMapper::toLettaMessage)
 
