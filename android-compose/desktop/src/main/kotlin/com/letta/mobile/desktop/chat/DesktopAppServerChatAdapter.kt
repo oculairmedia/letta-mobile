@@ -94,7 +94,11 @@ internal suspend fun createDefaultDesktopChatGateway(
 private class DesktopRuntimeOwnedChatGateway(
     private val delegate: DesktopChatGateway,
     private val runtimeLease: DesktopLocalRuntimeLease,
-) : DesktopChatGateway by delegate, DesktopApprovalSubmitter, DesktopTurnAborter, AutoCloseable {
+) : DesktopChatGateway by delegate,
+    DesktopApprovalSubmitter,
+    DesktopTurnAborter,
+    DesktopWorkingDirectoryController,
+    AutoCloseable {
     override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
         (delegate as? DesktopApprovalSubmitter)?.submitApproval(submission)
             ?: error("The local App Server gateway cannot submit approvals")
@@ -102,6 +106,12 @@ private class DesktopRuntimeOwnedChatGateway(
 
     override suspend fun abortConversationTurn(conversationId: String): Boolean =
         (delegate as? DesktopTurnAborter)?.abortConversationTurn(conversationId) ?: false
+
+    override suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String? =
+        (delegate as? DesktopWorkingDirectoryController)?.currentWorkingDirectory(agentId, conversationId)
+
+    override suspend fun setWorkingDirectory(agentId: String, conversationId: String, path: String): Boolean =
+        (delegate as? DesktopWorkingDirectoryController)?.setWorkingDirectory(agentId, conversationId, path) ?: false
 
     override fun close() {
         try {

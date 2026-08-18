@@ -90,8 +90,20 @@ internal object DesktopLocalRuntimeHost : DesktopLocalRuntimeLifecycle {
 
     private val owners = mutableSetOf<String>()
 
-    fun backendDirectory(): File =
+    /** `~/.letta-mobile/local-backend` unless overridden — see [DesktopLocalBackendDirectorySettings]. */
+    fun defaultBackendDirectory(): File =
         File(System.getProperty("user.home"), ".letta-mobile/local-backend")
+
+    /**
+     * Directory the bundled local runtime uses for its data (agents,
+     * conversations, `providers/auth.json`) — user-configurable from Settings
+     * (see `DesktopLocalBackendDirectorySettingsCard`). Reads the live
+     * override on every call, so a change takes effect the next time the
+     * runtime process is (re)started, with no restart of the desktop app
+     * itself required.
+     */
+    fun backendDirectory(): File =
+        DesktopLocalBackendDirectoryPreference.override ?: defaultBackendDirectory()
 
     @Synchronized
     override fun acquire(): DesktopLocalRuntimeLease {

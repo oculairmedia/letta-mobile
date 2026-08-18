@@ -65,6 +65,7 @@ object AppServerProtocol {
         "write_memory_file_response",
         "get_reflection_settings_response",
         "set_reflection_settings_response",
+        "get_cwd_map_response",
         "agent_list_response",
         "agent_retrieve_response",
         "agent_create_response",
@@ -581,6 +582,21 @@ sealed interface AppServerCommand {
         val runtime: AppServerRuntimeScope,
         val settings: JsonObject,
         val scope: String? = null,
+    ) : AppServerCommand
+
+    /**
+     * Reads the FULL per-conversation working-directory map the runtime
+     * currently holds (letta-mobile folder-settings #2): every
+     * `agent:<id>::conversation:default` / `conversation:<id>` scope key it
+     * knows a working directory for, plus the process's boot directory as
+     * the fallback for scopes absent from the map. Not scoped to one
+     * runtime — this is a process-wide read, matching upstream's
+     * `get_cwd_map` (no `runtime` field on the request).
+     */
+    @Serializable
+    @SerialName("get_cwd_map")
+    data class GetCwdMap(
+        @SerialName("request_id") val requestId: String,
     ) : AppServerCommand
 
     // Channels host ownership (lgns8.23). The App Server accepts these on a bare
@@ -1257,6 +1273,27 @@ sealed interface AppServerInboundFrame {
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "set_reflection_settings_response"
+
+        @Transient override val runtime: AppServerRuntimeScope? = null
+    }
+
+    /**
+     * Response to [AppServerCommand.GetCwdMap]. [cwdMap] keys are scope keys
+     * ("conversation:<id>" or "agent:<id>::conversation:default" — see
+     * [WorkingDirectoryScopeKey]); values are absolute paths. A scope key
+     * absent from [cwdMap] hasn't been customized and falls back to
+     * [bootWorkingDirectory].
+     */
+    @Serializable
+    @SerialName("get_cwd_map_response")
+    data class GetCwdMapResponse(
+        @SerialName("request_id") override val requestId: String,
+        val success: Boolean,
+        @SerialName("cwd_map") val cwdMap: Map<String, String> = emptyMap(),
+        @SerialName("boot_working_directory") val bootWorkingDirectory: String? = null,
+        val error: String? = null,
+    ) : AppServerInboundFrame {
+        @Transient override val type: String = "get_cwd_map_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
     }
