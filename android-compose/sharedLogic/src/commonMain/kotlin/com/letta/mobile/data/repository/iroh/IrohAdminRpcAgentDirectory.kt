@@ -112,28 +112,44 @@ class IrohAdminRpcAgentDirectory(
         private set
 
     suspend fun listAgents(limit: Int = AGENT_LIST_LIMIT): List<Agent> {
-        val out = ArrayList<Agent>(minOf(limit, 64))
-        val seenIds = HashSet<String>()
+        val collector = AgentListCollector(limit)
         var offset = 0
-        var truncated = false
-        while (out.size < limit) {
-            val pageLimit = minOf(AGENT_LIST_PAGE_SIZE, limit - out.size)
-            val page = fetchAgentPage(pageLimit, offset)
+        while (collector.hasRoom) {
+            val page = fetchAgentPage(collector.remainingPageLimit, offset)
             if (page.isEmpty()) break
-            val fresh = page.filter { seenIds.add(it.id.value) }
-            val room = limit - out.size
-            if (fresh.size > room) truncated = true
-            out += fresh.take(room)
-            if (fresh.isEmpty()) {
-                truncated = true
-                break
-            }
-            if (page.size < pageLimit) break
+            val continuePaging = collector.consumePage(page)
+            if (!continuePaging) break
             offset += page.size
         }
-        if (out.size >= limit) truncated = true
-        lastAgentListTruncated = truncated
-        return out
+        lastAgentListTruncated = collector.isTruncated
+        return collector.collectedAgents
+    }
+
+    private class AgentListCollector(private val maxLimit: Int) {
+        private val agents = ArrayList<Agent>(minOf(maxLimit, 64))
+        private val seenIds = HashSet<String>()
+        var isTruncated = false
+            private set
+
+        val hasRoom: Boolean get() = agents.size < maxLimit
+        val remainingPageLimit: Int get() = minOf(AGENT_LIST_PAGE_SIZE, maxLimit - agents.size)
+        val collectedAgents: List<Agent> get() = agents
+
+        fun consumePage(page: List<Agent>): Boolean {
+            val fresh = page.filter { seenIds.add(it.id.value) }
+            val room = maxLimit - agents.size
+            if (fresh.size > room) isTruncated = true
+            agents += fresh.take(room)
+            if (fresh.isEmpty()) {
+                isTruncated = true
+                return false
+            }
+            if (page.size < AGENT_LIST_PAGE_SIZE || agents.size >= maxLimit) {
+                if (agents.size >= maxLimit) isTruncated = true
+                return false
+            }
+            return true
+        }
     }
 
     private suspend fun fetchAgentPage(limit: Int, offset: Int): List<Agent> = adminRpcDecodedList(
@@ -154,8 +170,6 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
-    suspend fun getAgent(agentId: String): Agent? = getAgent(AgentId(agentId))
-
     suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
         val paramsJson = json.encodeToJsonElement(AgentUpdateParams.serializer(), params).jsonObject
         val body = jsonBody {
@@ -169,8 +183,6 @@ class IrohAdminRpcAgentDirectory(
         )
     }
 
-    suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
-
     suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview {
         val body = jsonBody {
             put("agent_id", agentId.value)
@@ -183,9 +195,6 @@ class IrohAdminRpcAgentDirectory(
             body = body,
         )
     }
-
-    suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
-        getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
 
     suspend fun listTools(limit: Int, offset: Int): List<Tool> = adminRpcDecodedList(
         method = AdminRpcMethod("tool.list"),
@@ -215,8 +224,6 @@ class IrohAdminRpcAgentDirectory(
         )
     }
 
-    suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool = updateTool(ToolId(toolId), params)
-
     suspend fun deleteTool(toolId: ToolId) {
         adminRpcResult(
             method = AdminRpcMethod("tool.delete"),
@@ -224,8 +231,6 @@ class IrohAdminRpcAgentDirectory(
             body = entityIdBody("tool_id", toolId.value),
         )
     }
-
-    suspend fun deleteTool(toolId: String) = deleteTool(ToolId(toolId))
 
     suspend fun setToolAttached(agentId: AgentId, toolId: ToolId, attached: Boolean) {
         val action = if (attached) "attach" else "detach"
@@ -239,9 +244,6 @@ class IrohAdminRpcAgentDirectory(
         )
     }
 
-    suspend fun setToolAttached(agentId: String, toolId: String, attached: Boolean) =
-        setToolAttached(AgentId(agentId), ToolId(toolId), attached)
-
     suspend fun listSkills(agentId: AgentId? = null): List<Skill> {
         val body = jsonBody { agentId?.let { put("agent_id", it.value) } }
         val method = if (agentId == null) AdminRpcMethod("skill.list") else AdminRpcMethod("skill.list_agent")
@@ -250,8 +252,6 @@ class IrohAdminRpcAgentDirectory(
         val skillsElement = (result as? JsonObject)?.get("skills") ?: result
         return json.decodeFromJsonElement(ListSerializer(Skill.serializer()), skillsElement)
     }
-
-    suspend fun listSkills(agentId: String?): List<Skill> = listSkills(agentId?.let(::AgentId))
 
     suspend fun listAgentSlashCommands(agentId: AgentId): List<AgentSlashCommand> {
         val result = adminRpcResult(
@@ -262,37 +262,25 @@ class IrohAdminRpcAgentDirectory(
         return json.decodeFromJsonElement(SlashCommandsResponse.serializer(), result).commands
     }
 
-    suspend fun listAgentSlashCommands(agentId: String): List<AgentSlashCommand> =
-        listAgentSlashCommands(AgentId(agentId))
-
     suspend fun installSkill(agentId: AgentId, skillName: SkillName) {
-        adminRpcResult(
-            method = AdminRpcMethod("skill.install"),
-            path = AdminRpcPath("/v1/agents/${agentId.value}/skills"),
-            body = jsonBody {
-                put("agent_id", agentId.value)
-                put("name", skillName.value)
-                put("skill_path", skillName.value)
-            },
-        )
+        manageSkill(AdminRpcMethod("skill.install"), "/v1/agents/${agentId.value}/skills", agentId, skillName)
     }
-
-    suspend fun installSkill(agentId: String, skillName: String) =
-        installSkill(AgentId(agentId), SkillName(skillName))
 
     suspend fun uninstallSkill(agentId: AgentId, skillName: SkillName) {
+        manageSkill(AdminRpcMethod("skill.uninstall"), "/v1/agents/${agentId.value}/skills/${skillName.value}", agentId, skillName)
+    }
+
+    private suspend fun manageSkill(method: AdminRpcMethod, path: String, agentId: AgentId, skillName: SkillName) {
         adminRpcResult(
-            method = AdminRpcMethod("skill.uninstall"),
-            path = AdminRpcPath("/v1/agents/${agentId.value}/skills/${skillName.value}"),
+            method = method,
+            path = AdminRpcPath(path),
             body = jsonBody {
                 put("agent_id", agentId.value)
                 put("name", skillName.value)
+                if (method.value == "skill.install") put("skill_path", skillName.value)
             },
         )
     }
-
-    suspend fun uninstallSkill(agentId: String, skillName: String) =
-        uninstallSkill(AgentId(agentId), SkillName(skillName))
 
     suspend fun getBlock(blockId: BlockId): Block? {
         val result = adminRpcResultOrNull(
@@ -302,8 +290,6 @@ class IrohAdminRpcAgentDirectory(
         ) ?: return null
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
-
-    suspend fun getBlock(blockId: String): Block? = getBlock(BlockId(blockId))
 
     suspend fun listAgentBlocks(agentId: AgentId): List<Block> {
         require(agentId.value.isNotBlank()) { "agent_id must not be blank" }
@@ -337,25 +323,28 @@ class IrohAdminRpcAgentDirectory(
         return decodeAgentBlockPage(result)
     }
 
-    suspend fun listAgentBlocks(agentId: String): List<Block> = listAgentBlocks(AgentId(agentId))
-
     private fun decodeAgentBlockPage(result: JsonElement): AgentBlockPage = when (result) {
         is JsonArray -> AgentBlockPage(
             blocks = json.decodeFromJsonElement(ListSerializer(Block.serializer()), result),
             hasMore = false,
         )
-        is JsonObject -> AgentBlockPage(
-            blocks = result["blocks"]
-                ?.let { json.decodeFromJsonElement(ListSerializer(Block.serializer()), it) }
-                ?: throw TimelineTransportHttpException(502, "block.list_agent returned an object without blocks"),
-            hasMore = (result["has_more"] as? JsonPrimitive)
-                ?.takeUnless { it.isString }
-                ?.booleanOrNull
-                ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more"),
-        )
+        is JsonObject -> parseJsonObjectBlockPage(result)
         else -> throw TimelineTransportHttpException(
             502,
             "block.list_agent returned an unsupported result: $result",
+        )
+    }
+
+    private fun parseJsonObjectBlockPage(obj: JsonObject): AgentBlockPage {
+        val blocksElement = obj["blocks"]
+            ?: throw TimelineTransportHttpException(502, "block.list_agent returned an object without blocks")
+        val hasMorePrimitive = (obj["has_more"] as? JsonPrimitive)?.takeUnless { it.isString }
+            ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more")
+        val hasMore = hasMorePrimitive.booleanOrNull
+            ?: throw TimelineTransportHttpException(502, "block.list_agent returned invalid has_more")
+        return AgentBlockPage(
+            blocks = json.decodeFromJsonElement(ListSerializer(Block.serializer()), blocksElement),
+            hasMore = hasMore,
         )
     }
 
@@ -381,8 +370,6 @@ class IrohAdminRpcAgentDirectory(
         },
     )
 
-    suspend fun updateBlock(blockId: String, params: BlockUpdateParams): Block = updateBlock(BlockId(blockId), params)
-
     suspend fun deleteBlock(blockId: BlockId) {
         adminRpcResult(
             method = AdminRpcMethod("block.delete"),
@@ -390,8 +377,6 @@ class IrohAdminRpcAgentDirectory(
             body = entityIdBody("block_id", blockId.value),
         )
     }
-
-    suspend fun deleteBlock(blockId: String) = deleteBlock(BlockId(blockId))
 
     suspend fun attachBlock(agentId: AgentId, blockId: BlockId) {
         adminRpcResult(
@@ -403,8 +388,6 @@ class IrohAdminRpcAgentDirectory(
             },
         )
     }
-
-    suspend fun attachBlock(agentId: String, blockId: String) = attachBlock(AgentId(agentId), BlockId(blockId))
 
     suspend fun listSchedules(agentId: AgentId? = null): List<ScheduledMessage> {
         val body = jsonBody { agentId?.let { put("agent_id", it.value) } }
@@ -434,21 +417,11 @@ class IrohAdminRpcAgentDirectory(
         return scopedSchedules
     }
 
-    suspend fun listSchedules(agentId: String?): List<ScheduledMessage> = listSchedules(agentId?.let(::AgentId))
-
     suspend fun getSchedule(scheduleId: ScheduleId, agentId: AgentId? = null): ScheduledMessage? {
-        val body = jsonBody {
-            put("schedule_id", scheduleId.value)
-            agentId?.let { put("agent_id", it.value) }
-        }
-        val path = agentId?.let { "/v1/agents/${it.value}/schedule/${scheduleId.value}" }
-            ?: "/v1/schedules/${scheduleId.value}"
-        val result = scheduleGetResultOrNull(AdminRpcPath(path), body) ?: return null
+        val (path, body) = scheduleTarget(scheduleId, agentId)
+        val result = scheduleGetResultOrNull(path, body) ?: return null
         return json.decodeFromJsonElement(ScheduledMessage.serializer(), result)
     }
-
-    suspend fun getSchedule(scheduleId: String, agentId: String? = null): ScheduledMessage? =
-        getSchedule(ScheduleId(scheduleId), agentId?.let(::AgentId))
 
     suspend fun createSchedule(agentId: AgentId, params: ScheduleCreateParams): ScheduledMessage {
         val paramsJson = json.encodeToJsonElement(ScheduleCreateParams.serializer(), params).jsonObject
@@ -463,25 +436,24 @@ class IrohAdminRpcAgentDirectory(
         )
     }
 
-    suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage =
-        createSchedule(AgentId(agentId), params)
-
     suspend fun deleteSchedule(scheduleId: ScheduleId, agentId: AgentId? = null) {
+        val (path, body) = scheduleTarget(scheduleId, agentId)
+        adminRpcResult(
+            method = AdminRpcMethod("schedule.delete"),
+            path = path,
+            body = body,
+        )
+    }
+
+    private fun scheduleTarget(scheduleId: ScheduleId, agentId: AgentId?): Pair<AdminRpcPath, AdminRpcBody> {
         val body = jsonBody {
             put("schedule_id", scheduleId.value)
             agentId?.let { put("agent_id", it.value) }
         }
         val path = agentId?.let { "/v1/agents/${it.value}/schedule/${scheduleId.value}" }
             ?: "/v1/schedules/${scheduleId.value}"
-        adminRpcResult(
-            method = AdminRpcMethod("schedule.delete"),
-            path = AdminRpcPath(path),
-            body = body,
-        )
+        return AdminRpcPath(path) to body
     }
-
-    suspend fun deleteSchedule(scheduleId: String, agentId: String? = null) =
-        deleteSchedule(ScheduleId(scheduleId), agentId?.let(::AgentId))
 
     companion object {
         const val AGENT_LIST_LIMIT = 2500
