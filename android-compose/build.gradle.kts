@@ -26,6 +26,10 @@ plugins {
     id("com.mikepenz.aboutlibraries.plugin.android") version "14.2.1" apply false
     id("io.sentry.android.gradle") version "6.8.1" apply false
     id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
+    // Kotzilla observability — debug builds only (Android app module).
+    // See docs/observability/kotzilla.md for the rationale on why we don't
+    // ship the SDK in release APKs.
+    id("io.kotzilla.kotzilla-plugin") version "2.3.3" apply false
 }
 
 // Dependency Analysis is opt-in and advisory: AGP 9.2 is newer than the plugin's

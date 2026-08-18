@@ -27,6 +27,17 @@ plugins {
     id("org.jetbrains.kotlinx.kover") // version inherited from root
 }
 
+// Kotzilla observability — debug builds only, gated via Gradle property.
+// Applied conditionally after the plugins{} block so the SDK is not present
+// in release APKs at all (no ContentProvider, no startup overhead).
+//
+// Enable with: ./gradlew :app:assembleRootDebug -Pkotzilla=true
+// Disable with: omit the property (default — release builds stay clean).
+val kotzillaEnabled = providers.gradleProperty("kotzilla").orNull == "true"
+if (kotzillaEnabled) {
+    apply(plugin = "io.kotzilla.kotzilla-plugin")
+}
+
 kover {
     currentProject {
         createVariant("ci") {
@@ -34,6 +45,10 @@ kover {
         }
     }
 }
+
+// Kotzilla observability is configured after `computedVersionName` is resolved
+// (see below). The plugin is applied conditionally above; the extension
+// is configured there too.
 
 allOpen {
     annotation("javax.inject.Singleton")
@@ -150,6 +165,22 @@ val computedVersionName = computeVersionName().get() ?: "0.0.0-dev"
 val computedVersionCode = computeVersionCode(computedVersionName)
 
 logger.lifecycle("[versioning] versionName=$computedVersionName versionCode=$computedVersionCode")
+
+// Configure the Kotzilla extension once `computedVersionName` is in scope.
+// SDK 2.3.0+ supports Hilt natively (no Koin required) — see
+// https://doc.kotzilla.io/docs/getstartedCustom/setupNoKoin.
+// SharedLogic/Desktop wiring lives in follow-up PRs to keep this diff
+// scoped to the app module first.
+if (kotzillaEnabled) {
+    val kotzillaExt = extensions.getByName("kotzilla")
+    kotzillaExt.withGroovyBuilder {
+        setProperty("versionName", computedVersionName)
+        setProperty(
+            "displayLogs",
+            providers.gradleProperty("kotzilla.verbose").orNull.toBoolean(),
+        )
+    }
+}
 
 val embeddedLettaCodeVersion = "0.26.1"
 val embeddedLettaCodeIntegrity = "sha512-vI+UU6ZNyTLtKFqhvr5+AyGXj1/sF5oggjgwB6Q0y0t/Y6FaytIlzKhus/P9/LtziXZdbZmqItMGEbYSXk2/CQ=="
