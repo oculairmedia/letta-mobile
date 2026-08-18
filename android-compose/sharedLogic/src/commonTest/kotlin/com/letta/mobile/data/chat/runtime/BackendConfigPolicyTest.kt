@@ -45,14 +45,17 @@ class BackendConfigPolicyTest {
         assertNull(normalized.accessToken)
     }
 
+    private fun sampleStaleIrohConfig(token: String? = null, id: String = "desktop-361c792e") = LettaConfig(
+        id = id,
+        mode = LettaConfig.Mode.LOCAL,
+        serverUrl = STALE_LOCAL_IROH_URL,
+        accessToken = token,
+    )
+
     @Test
     fun normalizeMigratesStaleIrohServerUrlOnLocalModeConfig() {
         val normalized = BackendConfigPolicy.normalize(
-            config = LettaConfig(
-                id = "desktop-361c792e",
-                mode = LettaConfig.Mode.LOCAL,
-                serverUrl = STALE_LOCAL_IROH_URL,
-            ),
+            config = sampleStaleIrohConfig(),
             fallback = localFallback,
             generatedIdPrefix = "desktop",
         )
@@ -63,13 +66,7 @@ class BackendConfigPolicyTest {
 
     @Test
     fun migrateStaleLocalServerUrlClearsIrohUrlOnlyForLocalMode() {
-        val staleIroh = LettaConfig(
-            id = "desktop-361c792e",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = STALE_LOCAL_IROH_URL,
-        )
-
-        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(staleIroh)
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(sampleStaleIrohConfig())
 
         assertEquals("", migrated.serverUrl)
         assertEquals(LettaConfig.Mode.LOCAL, migrated.mode)
@@ -93,14 +90,7 @@ class BackendConfigPolicyTest {
 
     @Test
     fun migrateStaleLocalServerUrlParksRemoteDetailsInsteadOfDiscardingThem() {
-        val staleIroh = LettaConfig(
-            id = "desktop-361c792e",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = STALE_LOCAL_IROH_URL,
-            accessToken = "remote-token",
-        )
-
-        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(staleIroh)
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(sampleStaleIrohConfig(token = "remote-token"))
 
         assertEquals("", migrated.serverUrl)
         assertEquals(STALE_LOCAL_IROH_URL, migrated.parkedServerUrl)
@@ -112,13 +102,9 @@ class BackendConfigPolicyTest {
 
     @Test
     fun restoreParkedRemoteBackendFillsBlankRemoteServerUrlAndToken() {
-        val local = LettaConfig(
-            id = "desktop-local",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = STALE_LOCAL_IROH_URL,
-            accessToken = "remote-token",
+        val parked = BackendConfigPolicy.migrateStaleLocalServerUrl(
+            sampleStaleIrohConfig(token = "remote-token", id = "desktop-local"),
         )
-        val parked = BackendConfigPolicy.migrateStaleLocalServerUrl(local)
 
         // Switching back to a remote mode with no serverUrl typed in yet.
         val switchedBack = parked.copy(mode = LettaConfig.Mode.SELF_HOSTED)
