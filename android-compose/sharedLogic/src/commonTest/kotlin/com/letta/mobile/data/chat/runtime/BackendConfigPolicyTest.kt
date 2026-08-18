@@ -115,7 +115,7 @@ class BackendConfigPolicyTest {
     }
 
     @Test
-    fun restoreParkedRemoteBackendNeverOverwritesAnExplicitServerUrl() {
+    fun restoreParkedRemoteBackendPreservesConfigsThatDoNotRequireRestoration() {
         val explicit = LettaConfig(
             id = "desktop-explicit",
             mode = LettaConfig.Mode.SELF_HOSTED,
@@ -123,14 +123,6 @@ class BackendConfigPolicyTest {
             parkedServerUrl = STALE_LOCAL_IROH_URL,
             parkedAccessToken = "parked-token",
         )
-
-        val restored = BackendConfigPolicy.restoreParkedRemoteBackend(explicit)
-
-        assertEquals(explicit, restored)
-    }
-
-    @Test
-    fun restoreParkedRemoteBackendDoesNothingForLocalMode() {
         val local = LettaConfig(
             id = "desktop-local",
             mode = LettaConfig.Mode.LOCAL,
@@ -139,9 +131,8 @@ class BackendConfigPolicyTest {
             parkedAccessToken = "parked-token",
         )
 
-        val restored = BackendConfigPolicy.restoreParkedRemoteBackend(local)
-
-        assertEquals(local, restored)
+        assertEquals(explicit, BackendConfigPolicy.restoreParkedRemoteBackend(explicit))
+        assertEquals(local, BackendConfigPolicy.restoreParkedRemoteBackend(local))
     }
 
     private fun normalizeConfig(config: LettaConfig, fallback: LettaConfig = defaultFallback): LettaConfig =

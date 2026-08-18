@@ -19,7 +19,7 @@ interface ChatGateway : TimelineTransport {
     // count.
     suspend fun listConversationsForAgent(
         agentId: String,
-        limit: Int = DEFAULT_CONVERSATION_LIMIT,
+        limit: Int = DEFAULT_AGENT_CONVERSATION_LIMIT,
     ): List<Conversation> = emptyList()
     suspend fun getConversation(conversationId: String): Conversation
     suspend fun deleteConversation(conversationId: String) {
@@ -28,6 +28,7 @@ interface ChatGateway : TimelineTransport {
 
     companion object {
         const val DEFAULT_CONVERSATION_LIMIT = 40
+        const val DEFAULT_AGENT_CONVERSATION_LIMIT = 500
     }
 }
 
