@@ -80,7 +80,7 @@ class InterAgentConversationPickerTest {
     )
 
     @Test
-    fun returnsMostRecentInteractiveConversationId() = runBlocking {
+    fun returnsMostRecentInteractiveConversationId() = runTest {
         val conversations = listOf(
             testConv(convOldId, timeOld),
             testConv(convRecentId, timeRecent),
@@ -95,7 +95,7 @@ class InterAgentConversationPickerTest {
     }
 
     @Test
-    fun skipsAutonomousConversationsEvenIfMostRecent() = runBlocking {
+    fun skipsAutonomousConversationsEvenIfMostRecent() = runTest {
         val conversations = listOf(
             testConv(convInteractiveId, timeRecent),
             // AUTONOMOUS with a NEWER timestamp must NOT win — the router
@@ -109,7 +109,7 @@ class InterAgentConversationPickerTest {
     }
 
     @Test
-    fun fallsBackToUpdatedAtThenCreatedAtWhenLastMessageAtMissing() = runBlocking {
+    fun fallsBackToUpdatedAtThenCreatedAtWhenLastMessageAtMissing() = runTest {
         val conversations = listOf(
             // No lastMessageAt; updatedAt is older.
             testConv(convByUpdatedId, timeUpdated),
