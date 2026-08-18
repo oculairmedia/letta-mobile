@@ -7,7 +7,7 @@ import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.api.IConversationRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -125,7 +125,7 @@ class InterAgentConversationPickerTest {
     }
 
     @Test
-    fun returnsNullWhenNoConversationsExist() = runBlocking {
+    fun returnsNullWhenNoConversationsExist() = runTest {
         assertNull(
             pickOtherAgentConversation(
                 FakeRepo(agentScopedConversations = emptyList()),
@@ -135,7 +135,7 @@ class InterAgentConversationPickerTest {
     }
 
     @Test
-    fun returnsNullWhenAllConversationsAreAutonomous() = runBlocking {
+    fun returnsNullWhenAllConversationsAreAutonomous() = runTest {
         val only = listOf(
             testConv(convAutonomousId, timeAutonomous, klass = ConversationClass.AUTONOMOUS),
         )
@@ -148,7 +148,7 @@ class InterAgentConversationPickerTest {
     }
 
     @Test
-    fun listFailureIsSwallowedAndReturnsNull() = runBlocking {
+    fun listFailureIsSwallowedAndReturnsNull() = runTest {
         // If the appserver / wrapper is unreachable, the picker must not
         // crash the chat. Fall through to null and the existing null
         // handling opens a fresh conversation on the target agent.
