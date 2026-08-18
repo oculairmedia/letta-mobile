@@ -1,7 +1,12 @@
 package com.letta.mobile.data.repository.appserver
 
+import com.letta.mobile.data.controller.node.iroh.withDefaultContextWindow
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AppServerListModelsAdapter
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerProtocol
@@ -10,6 +15,8 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 
 class AppServerLocalAdminGateway(
@@ -62,6 +69,56 @@ class AppServerLocalAdminGateway(
         )
         return Payload(response.success, response.error, response.messages)
             .decodeList(Operation.MessageList, LettaMessage.serializer())
+    }
+
+    /**
+     * `agent_create` over the bundled App Server's native Listen V2 protocol.
+     * Verified against `@letta-ai/letta-code` 0.29.12 (`letta.js`): the local
+     * runtime's WS dispatcher handles `agent_create` as a first-class command
+     * (`backend.createAgent(body)`), passing the body straight through to
+     * `LocalBackend`/`HeadlessBackend` — the same shape the REST `/v1/agents`
+     * create body uses. [withDefaultContextWindow] is the same body default
+     * already proven for [AppServerCommand.AgentCreate] over the Iroh admin
+     * bridge (see `AgentAdminHandlers.register("agent.create")`); reused here
+     * rather than re-deriving the default.
+     */
+    suspend fun createAgent(params: AgentCreateParams): Agent {
+        val body = AppServerProtocol.json.encodeToJsonElement(AgentCreateParams.serializer(), params)
+            .jsonObject
+            .withDefaultContextWindow()
+        val response = client.agentCreate(
+            AppServerCommand.AgentCreate(
+                requestId = requestId(Operation.AgentCreate.requestName),
+                body = body,
+            ),
+        )
+        return Payload(response.success, response.error, response.agent)
+            .decode(Operation.AgentCreate, Agent.serializer())
+    }
+
+    /**
+     * `list_models` over the bundled App Server's native Listen V2 protocol.
+     * Verified against `@letta-ai/letta-code` 0.29.12 (`letta.js`,
+     * `handleModelToolsetCommand`): unlike `admin_rpc` (which the local
+     * runtime never handles — its `app_server_info` capability advertisement
+     * has no `admin_rpc` flag and the string never appears in the bundle),
+     * `list_models` IS wired end to end, backed by `LocalBackend`'s real
+     * model/provider catalog (`capabilities.localModelCatalog = true`), so it
+     * reflects providers (including litellm) the user has actually
+     * configured. Entries share the exact presentation shape
+     * [AppServerListModelsAdapter] already decodes for the Iroh admin_rpc
+     * `model.list` response — reused here rather than duplicated. Mirrors
+     * [com.letta.mobile.data.repository.iroh.IrohAdminRpcChatGateway.listLlmModels]:
+     * an unsuccessful/empty response degrades to an empty catalog instead of
+     * throwing, so a transient local-runtime hiccup doesn't crash the model
+     * picker.
+     */
+    suspend fun listLlmModels(): List<LlmModel> {
+        val response = client.listModels(
+            AppServerCommand.ListModels(requestId = requestId(Operation.ListModels.requestName)),
+        )
+        val entries = response.entries.takeIf { response.success } ?: return emptyList()
+        return AppServerListModelsAdapter.toLlmModels(entries)
     }
 
     suspend fun createConversation(agentId: String, summary: String?): Conversation {
@@ -119,6 +176,8 @@ class AppServerLocalAdminGateway(
         MessageList("message-list", "message listing", "messages"),
         ConversationCreate("conversation-create", "conversation creation", "conversation"),
         ConversationUpdate("conversation-update", "conversation update", "conversation"),
+        AgentCreate("agent-create", "agent creation", "agent"),
+        ListModels("list-models", "model listing", "models"),
         ;
 
         val failureMessage = "Bundled App Server $responseDescription failed"

@@ -894,7 +894,6 @@ class DesktopChatController(
         if (closed) return
         val controller = gateway as? DesktopWorkingDirectoryController
         val conversation = state.value.selectedConversation
-        val agentId = conversation?.agentId
         if (controller == null || agentId == null) {
             _selectedConversationWorkingDirectory.value = null
             return
@@ -1280,6 +1279,19 @@ class DesktopChatController(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (t: Throwable) {
+                // letta-mobile debugging note: this catch previously swallowed every
+                // failure into an indistinguishable empty dropdown (Result.failure
+                // has no sink). A timeout, an adapter exception, and "genuinely no
+                // models" all looked identical from the UI. Surface the exception
+                // class the same way MemoryOverview's section_degraded does, so the
+                // NEXT time the model picker is empty there's a log line instead of
+                // a guess.
+                Telemetry.event(
+                    TELEMETRY_TAG,
+                    "modelCatalog.loadFailed",
+                    "exceptionClass" to (t::class.simpleName ?: "Throwable"),
+                    level = Telemetry.Level.WARN,
+                )
                 Result.failure(t)
             }
         }.also { modelCatalogLoad = it }

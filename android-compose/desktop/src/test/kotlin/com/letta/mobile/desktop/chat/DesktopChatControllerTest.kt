@@ -1,8 +1,12 @@
 package com.letta.mobile.desktop.chat
 
+import com.letta.mobile.data.chat.runtime.ChatGatewayExtras
 import com.letta.mobile.data.chat.runtime.ConversationSummaryGateway
 import com.letta.mobile.data.chat.runtime.ConversationSummaryUpdate
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.LlmModel
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
@@ -55,6 +59,7 @@ class DesktopChatControllerTest {
 
         controller.close()
     }
+
 
     @Test
     fun startResolvesAgentNamesForConversationNavigation() = runTest {
@@ -741,6 +746,7 @@ open class FakeDesktopChatGateway(
         )
     }
 }
+
 
 private class CloseTrackingGateway(
     private val listConversationsBlock: suspend () -> List<Conversation>,

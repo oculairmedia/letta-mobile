@@ -62,10 +62,16 @@ import kotlin.time.Duration.Companion.milliseconds
  *   IrohAdminRpcChatGateway.streamConversation). Heartbeats stop once
  *   [AppServerClient.isConnected] reports the client dropped.
  * - setConversationModel/setConversationArchived and the rest of
- *   [ChatGatewayExtras] delegate to the HTTP gateway (chat rides the App
- *   Server; management operations stay HTTP — same hybrid split as listing).
- * - conversation/message listing, agent CRUD, model catalog: HTTP gateway —
- *   the App Server exposes no listing APIs yet.
+ *   [ChatGatewayExtras] delegate to [adminGateway]. For a bundled/LOCAL
+ *   runtime that's [DesktopLocalBackendAdminGateway], which rides the SAME
+ *   App Server connection as chat via native Listen V2 commands
+ *   (`agent_create`, `list_models`, `conversation_update`, ...) — verified
+ *   against `@letta-ai/letta-code` 0.29.12: the bundled runtime never
+ *   implements `admin_rpc`, but does implement these first-class commands.
+ *   For a remote backend it's the HTTP gateway (management operations stay
+ *   HTTP there).
+ * - conversation/message listing, agent CRUD, model catalog: delegated the
+ *   same way — native App Server commands for LOCAL, HTTP for remote.
  *
  * LIFECYCLE: [close] tears down the HTTP gateway and, when this gateway rode
  * an iroh or WebSocket dial, the transport-level resources via
@@ -423,5 +429,57 @@ class DesktopHybridAppServerChatGateway internal constructor(
 
     private companion object {
         const val APP_SERVER_BACKEND_ID = "desktop-app-server"
+    }
+}
+
+internal class DesktopRuntimeOwnedChatGateway(
+    private val delegate: DesktopChatGateway,
+    private val runtimeLease: com.letta.mobile.desktop.runtime.DesktopLocalRuntimeLease,
+) : DesktopChatGateway by delegate,
+    DesktopApprovalSubmitter,
+    DesktopTurnAborter,
+    DesktopWorkingDirectoryController,
+    ChatGatewayExtras,
+    AutoCloseable {
+    override suspend fun submitApproval(submission: DesktopApprovalSubmission) {
+        (delegate as? DesktopApprovalSubmitter)?.submitApproval(submission)
+            ?: error("The local App Server gateway cannot submit approvals")
+    }
+
+    override suspend fun abortConversationTurn(conversationId: String): Boolean =
+        (delegate as? DesktopTurnAborter)?.abortConversationTurn(conversationId) ?: false
+
+    override suspend fun currentWorkingDirectory(agentId: String, conversationId: String): String? =
+        (delegate as? DesktopWorkingDirectoryController)?.currentWorkingDirectory(agentId, conversationId)
+
+    override suspend fun setWorkingDirectory(agentId: String, conversationId: String, path: String): Boolean =
+        (delegate as? DesktopWorkingDirectoryController)?.setWorkingDirectory(agentId, conversationId, path) ?: false
+
+    override suspend fun createConversation(agentId: String, summary: String?): Conversation =
+        (delegate as? ChatGatewayExtras)?.createConversation(agentId, summary)
+            ?: error("The local App Server gateway cannot create conversations")
+
+    override suspend fun createAgent(params: com.letta.mobile.data.model.AgentCreateParams): com.letta.mobile.data.model.Agent =
+        (delegate as? ChatGatewayExtras)?.createAgent(params)
+            ?: error("The local App Server gateway cannot create agents")
+
+    override suspend fun listLlmModels(): List<com.letta.mobile.data.model.LlmModel> =
+        (delegate as? ChatGatewayExtras)?.listLlmModels()
+            ?: emptyList()
+
+    override suspend fun setConversationModel(conversationId: String, model: String): Conversation =
+        (delegate as? ChatGatewayExtras)?.setConversationModel(conversationId, model)
+            ?: error("The local App Server gateway cannot update conversation models")
+
+    override suspend fun setConversationArchived(conversationId: String, archived: Boolean): Conversation =
+        (delegate as? ChatGatewayExtras)?.setConversationArchived(conversationId, archived)
+            ?: error("The local App Server gateway cannot archive conversations")
+
+    override fun close() {
+        try {
+            (delegate as? AutoCloseable)?.close()
+        } finally {
+            runtimeLease.close()
+        }
     }
 }
