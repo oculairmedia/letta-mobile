@@ -25,22 +25,29 @@ import kotlin.test.assertNull
 class InterAgentConversationPickerTest {
 
     private class FakeRepo(
-        private val cached: List<Conversation>,
-        private val throwOnRefresh: Throwable? = null,
+        private val agentScopedConversations: List<Conversation>,
+        private val throwOnList: Throwable? = null,
     ) : IConversationRepository {
-        var refreshCount = 0
+        var listCount = 0
             private set
 
         override fun getConversations(agentId: AgentId): Flow<List<Conversation>> =
-            flowOf(cached)
+            flowOf(agentScopedConversations)
 
-        override fun getCachedConversations(agentId: AgentId): List<Conversation> = cached
+        override fun getCachedConversations(agentId: AgentId): List<Conversation> = agentScopedConversations
 
-        override suspend fun refreshConversations(agentId: AgentId) {
-            refreshCount++
-            throwOnRefresh?.let { throw it }
+        override suspend fun listConversationsForAgent(agentId: AgentId, limit: Int): List<Conversation> {
+            listCount++
+            throwOnList?.let { throw it }
+            return agentScopedConversations
         }
 
+        override suspend fun refreshConversations(agentId: AgentId) = Unit
+        override suspend fun refreshConversations(agentId: String) = Unit
+
+        // Other interface members are not used by the picker; default
+        // impls from IConversationRepository (emptyList / Unit) cover
+        // them, so we don't need to stub each one.
         override fun hasFreshConversations(agentId: AgentId, maxAgeMs: Long): Boolean = false
         override suspend fun refreshConversationsIfStale(agentId: AgentId, maxAgeMs: Long): Boolean = false
         override suspend fun getConversation(id: ConversationId): Conversation = error("unused by picker")
@@ -75,12 +82,12 @@ class InterAgentConversationPickerTest {
             conv("conv-recent", lastMessageAt = "2026-08-17T18:00:00.000Z"),
             conv("conv-mid",    lastMessageAt = "2026-08-15T12:00:00.000Z"),
         )
-        val repo = FakeRepo(cached = conversations)
+        val repo = FakeRepo(agentScopedConversations = conversations)
         assertEquals(
             "conv-recent",
             pickOtherAgentConversation(repo, AgentId("agent-meridian")),
         )
-        assertEquals(1, repo.refreshCount)
+        assertEquals(1, repo.listCount)
     }
 
     @Test
@@ -93,7 +100,7 @@ class InterAgentConversationPickerTest {
         )
         assertEquals(
             "conv-interactive",
-            pickOtherAgentConversation(FakeRepo(conversations), AgentId("agent-meridian")),
+            pickOtherAgentConversation(FakeRepo(agentScopedConversations = conversations), AgentId("agent-meridian")),
         )
     }
 
@@ -109,13 +116,18 @@ class InterAgentConversationPickerTest {
         // lex-newer, so it wins under lastMessageAt?:updatedAt?:createdAt.
         assertEquals(
             "conv-by-created",
-            pickOtherAgentConversation(FakeRepo(conversations), AgentId("agent-meridian")),
+            pickOtherAgentConversation(FakeRepo(agentScopedConversations = conversations), AgentId("agent-meridian")),
         )
     }
 
     @Test
     fun returnsNullWhenNoConversationsExist() = runBlocking {
-        assertNull(pickOtherAgentConversation(FakeRepo(emptyList()), AgentId("agent-meridian")))
+        assertNull(
+            pickOtherAgentConversation(
+                FakeRepo(agentScopedConversations = emptyList()),
+                AgentId("agent-meridian"),
+            ),
+        )
     }
 
     @Test
@@ -123,12 +135,23 @@ class InterAgentConversationPickerTest {
         val only = listOf(
             conv("conv-autonomous", lastMessageAt = "2026-08-18T00:00:00.000Z", klass = ConversationClass.AUTONOMOUS),
         )
-        assertNull(pickOtherAgentConversation(FakeRepo(only), AgentId("agent-meridian")))
+        assertNull(
+            pickOtherAgentConversation(
+                FakeRepo(agentScopedConversations = only),
+                AgentId("agent-meridian"),
+            ),
+        )
     }
 
     @Test
-    fun refreshFailureIsSwallowedAndReturnsNull() = runBlocking {
-        val repo = FakeRepo(cached = emptyList(), throwOnRefresh = RuntimeException("network down"))
+    fun listFailureIsSwallowedAndReturnsNull() = runBlocking {
+        // If the appserver / wrapper is unreachable, the picker must not
+        // crash the chat. Fall through to null and the existing null
+        // handling opens a fresh conversation on the target agent.
+        val repo = FakeRepo(
+            agentScopedConversations = emptyList(),
+            throwOnList = RuntimeException("network down"),
+        )
         assertNull(pickOtherAgentConversation(repo, AgentId("agent-meridian")))
     }
 }
