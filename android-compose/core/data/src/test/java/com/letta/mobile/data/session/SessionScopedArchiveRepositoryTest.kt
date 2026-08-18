@@ -48,7 +48,7 @@ class SessionScopedArchiveRepositoryTest {
         val fakeArchiveApi = FakeArchiveApi().apply {
             archives = mutableListOf(Archive(id = "archive-a", name = "Backend A"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -86,7 +86,7 @@ class SessionScopedArchiveRepositoryTest {
         assertEquals(listOf("archive-a"), proxy.archives.value.map { it.id })
 
         fakeArchiveApi.archives = mutableListOf(Archive(id = "archive-b", name = "Backend B"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), proxy.archives.value.map { it.id })
@@ -96,6 +96,4 @@ class SessionScopedArchiveRepositoryTest {
 
         assertEquals(listOf("archive-b"), proxy.archives.value.map { it.id })
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 }

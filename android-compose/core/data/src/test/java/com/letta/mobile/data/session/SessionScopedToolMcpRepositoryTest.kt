@@ -52,7 +52,7 @@ class SessionScopedToolMcpRepositoryTest {
         val fakeToolApi = FakeToolApi().apply {
             tools = mutableListOf(sampleTool("tool-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestSessionGraphFactory {
@@ -73,7 +73,7 @@ class SessionScopedToolMcpRepositoryTest {
         assertEquals(listOf("tool-a"), agentTools.first().map { it.id.value })
 
         fakeToolApi.tools = mutableListOf(sampleTool("tool-b"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), toolProxy.getTools().value.map { it.id.value })
@@ -95,7 +95,7 @@ class SessionScopedToolMcpRepositoryTest {
             servers = mutableListOf(sampleMcpServer("server-a"))
             serverTools["server-a"] = listOf(sampleTool("mcp-tool-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestSessionGraphFactory {
@@ -117,7 +117,7 @@ class SessionScopedToolMcpRepositoryTest {
 
         fakeMcpServerApi.servers = mutableListOf(sampleMcpServer("server-b"))
         fakeMcpServerApi.serverTools = mutableMapOf("server-a" to listOf(sampleTool("mcp-tool-b")))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<McpServerId>(), mcpProxy.servers.value.map { it.id })
@@ -131,8 +131,6 @@ class SessionScopedToolMcpRepositoryTest {
         assertEquals(listOf(McpServerId("server-b")), mcpProxy.servers.value.map { it.id })
         assertEquals(listOf("mcp-tool-b"), rebuiltServerTools.first().map { it.id.value })
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 
     private fun sampleTool(id: String) = Tool(
         id = ToolId(id),

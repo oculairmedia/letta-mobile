@@ -63,7 +63,7 @@ class SessionManagerTest {
     @Test
     fun `active config change rebuilds session graph and cancels previous scope`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -95,7 +95,7 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         val firstGraph = sessionManager.current
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         val secondGraph = sessionManager.current
@@ -107,7 +107,7 @@ class SessionManagerTest {
     @Test
     fun `transport adjacent state holders are recreated when graph rebuilds`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -138,7 +138,7 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         val firstGraph = sessionManager.current
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         val secondGraph = sessionManager.current
@@ -153,7 +153,7 @@ class SessionManagerTest {
     @Test
     fun `same backend config emission does not rebuild graph`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -185,7 +185,7 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         val firstGraph = sessionManager.current
-        settingsRepository.activeConfigState.value = config("backend-b", serverUrl = "https://backend-a.example.test")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b", serverUrl = "https://backend-a.example.test")
         advanceUntilIdle()
 
         assertEquals(System.identityHashCode(firstGraph), System.identityHashCode(sessionManager.current))
@@ -307,8 +307,6 @@ class SessionManagerTest {
             )
         }
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 
     private fun localConfig(
         id: String,

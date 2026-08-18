@@ -44,7 +44,7 @@ class SessionScopedChannelTransportTest {
     @Test
     fun `channel transport proxy switches to rebuilt graph state`() = runTest {
         val dispatcher = StandardTestDispatcher(testScheduler)
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -80,12 +80,10 @@ class SessionScopedChannelTransportTest {
 
         assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransportState.Idle)
 
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertTrue(proxy.state.value is com.letta.mobile.data.transport.ChannelTransportState.Idle)
         proxy.close()
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 }

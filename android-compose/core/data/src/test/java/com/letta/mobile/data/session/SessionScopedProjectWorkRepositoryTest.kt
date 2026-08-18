@@ -53,7 +53,7 @@ class SessionScopedProjectWorkRepositoryTest {
             issues["letta-mobile"] = listOf(sampleIssue("letta-mobile-a"))
             issueDetails["letta-mobile-a"] = sampleIssueDetail("letta-mobile-a", "Backend A")
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -97,7 +97,7 @@ class SessionScopedProjectWorkRepositoryTest {
         fakeProjectWorkApi.issues["letta-mobile"] = listOf(sampleIssue("letta-mobile-b"))
         fakeProjectWorkApi.issueDetails.clear()
         fakeProjectWorkApi.issueDetails["letta-mobile-b"] = sampleIssueDetail("letta-mobile-b", "Backend B")
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         workProxy.refreshReadyWork("letta-mobile")
@@ -110,10 +110,6 @@ class SessionScopedProjectWorkRepositoryTest {
         assertEquals("Backend B", backendBIssue.title)
         assertNull(workProxy.issueDetails.value["letta-mobile-a"])
     }
-
-    private fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 
     private fun sampleIssue(id: String) = ProjectIssueSummary(
         id = id,

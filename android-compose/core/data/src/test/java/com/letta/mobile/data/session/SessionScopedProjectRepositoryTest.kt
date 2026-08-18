@@ -49,7 +49,7 @@ class SessionScopedProjectRepositoryTest {
         val fakeProjectApi = FakeProjectApi().apply {
             projects = mutableListOf(sampleProject("project-a", "Backend A"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -88,7 +88,7 @@ class SessionScopedProjectRepositoryTest {
         assertTrue(projectProxy.hasFreshProjects(maxAgeMs = 60_000))
 
         fakeProjectApi.projects = mutableListOf(sampleProject("project-b", "Backend B"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), projectProxy.projects.value.map { it.identifier })
@@ -100,8 +100,6 @@ class SessionScopedProjectRepositoryTest {
         assertEquals(listOf("project-b"), projectProxy.projects.value.map { it.identifier })
         assertEquals("Backend B", projectProxy.getProject("project-b").name)
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 
     private fun sampleProject(identifier: String, name: String) = ProjectSummary(
         identifier = identifier,

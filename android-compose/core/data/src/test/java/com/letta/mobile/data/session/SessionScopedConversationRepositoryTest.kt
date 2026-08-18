@@ -48,7 +48,7 @@ class SessionScopedConversationRepositoryTest {
         val fakeConversationApi = FakeConversationApi().apply {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", agentId = "agent-1", summary = "Backend A"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -85,7 +85,7 @@ class SessionScopedConversationRepositoryTest {
         fakeConversationApi.conversations = mutableListOf(
             TestData.conversation(id = "conv-b", agentId = "agent-1", summary = "Backend B"),
         )
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         proxy.refreshConversations("agent-1")
@@ -93,6 +93,4 @@ class SessionScopedConversationRepositoryTest {
 
         assertEquals(listOf("conv-b"), proxy.getCachedConversations("agent-1").map { it.id.value })
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 }

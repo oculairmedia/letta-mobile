@@ -44,7 +44,7 @@ class SessionScopedAdminRepositoriesTest {
     @Test
     fun `group repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeGroupApi = FakeGroupApi().apply {
-            groups = mutableListOf(sampleGroup("group-a", "Backend A Group"))
+            groups = mutableListOf(sampleGroup(GroupId("group-a"), "Backend A Group"))
         }
         assertProxySwitchesCaches(
             testScheduler,
@@ -54,18 +54,18 @@ class SessionScopedAdminRepositoriesTest {
                 refresh = { it.refreshGroups() },
                 observeIds = { it.groups.value.map { g -> g.id } },
                 mutateForBackendB = {
-                    fakeGroupApi.groups = mutableListOf(sampleGroup("group-b", "Backend B Group"))
+                    fakeGroupApi.groups = mutableListOf(sampleGroup(GroupId("group-b"), "Backend B Group"))
                 },
                 expectedBefore = listOf(GroupId("group-a")),
                 expectedAfter = listOf(GroupId("group-b")),
-            ),
+                ),
         )
     }
 
     @Test
     fun `identity repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeIdentityApi = FakeIdentityApi().apply {
-            identities = mutableListOf(sampleIdentity("identity-a", "Backend A Identity"))
+            identities = mutableListOf(sampleIdentity(IdentityId("identity-a"), "Backend A Identity"))
         }
         assertProxySwitchesCaches(
             testScheduler,
@@ -75,7 +75,7 @@ class SessionScopedAdminRepositoriesTest {
                 refresh = { it.refreshIdentities() },
                 observeIds = { it.identities.value.map { i -> i.id } },
                 mutateForBackendB = {
-                    fakeIdentityApi.identities = mutableListOf(sampleIdentity("identity-b", "Backend B Identity"))
+                    fakeIdentityApi.identities = mutableListOf(sampleIdentity(IdentityId("identity-b"), "Backend B Identity"))
                 },
                 expectedBefore = listOf(IdentityId("identity-a")),
                 expectedAfter = listOf(IdentityId("identity-b")),
@@ -86,7 +86,7 @@ class SessionScopedAdminRepositoriesTest {
     @Test
     fun `provider repository proxy switches caches to rebuilt graph`() = runTest {
         val fakeProviderApi = FakeProviderApi().apply {
-            providers = mutableListOf(sampleProvider("provider-a", "Backend A Provider"))
+            providers = mutableListOf(sampleProvider(ProviderId("provider-a"), "Backend A Provider"))
         }
         assertProxySwitchesCaches(
             testScheduler,
@@ -96,7 +96,7 @@ class SessionScopedAdminRepositoriesTest {
                 refresh = { it.refreshProviders() },
                 observeIds = { it.providers.value.map { p -> p.id } },
                 mutateForBackendB = {
-                    fakeProviderApi.providers = mutableListOf(sampleProvider("provider-b", "Backend B Provider"))
+                    fakeProviderApi.providers = mutableListOf(sampleProvider(ProviderId("provider-b"), "Backend B Provider"))
                 },
                 expectedBefore = listOf(ProviderId("provider-a")),
                 expectedAfter = listOf(ProviderId("provider-b")),
@@ -104,22 +104,22 @@ class SessionScopedAdminRepositoriesTest {
         )
     }
 
-    private fun sampleGroup(id: String, description: String) = Group(
-        id = GroupId(id),
+    private fun sampleGroup(id: GroupId, description: String) = Group(
+        id = id,
         managerType = "round_robin",
         description = description,
         agentIds = listOf(AgentId("agent-1")),
     )
 
-    private fun sampleIdentity(id: String, name: String) = Identity(
-        id = IdentityId(id),
-        identifierKey = id,
+    private fun sampleIdentity(id: IdentityId, name: String) = Identity(
+        id = id,
+        identifierKey = id.value,
         name = name,
         identityType = "user",
     )
 
-    private fun sampleProvider(id: String, name: String) = Provider(
-        id = ProviderId(id),
+    private fun sampleProvider(id: ProviderId, name: String) = Provider(
+        id = id,
         name = name,
         providerType = "openai",
     )

@@ -56,7 +56,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
             llmModels = mutableListOf(sampleLlmModel("llm-a"))
             embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestSessionGraphFactory {
@@ -77,7 +77,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
 
         fakeModelApi.llmModels = mutableListOf(sampleLlmModel("llm-b"))
         fakeModelApi.embeddingModels = mutableListOf(sampleEmbeddingModel("embedding-b"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), modelProxy.llmModels.value.map { it.id })
@@ -97,7 +97,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
         val fakePassageApi = FakePassageApi().apply {
             setPassages("agent-1", listOf(Passage(id = "passage-a", text = "Backend A", agentId = "agent-1")))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestSessionGraphFactory {
@@ -119,7 +119,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
             "agent-1",
             listOf(Passage(id = "passage-b", text = "Backend B", agentId = "agent-1")),
         )
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), passages.value.map { it.id })
@@ -137,7 +137,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
         val fakeScheduleApi = FakeScheduleApi().apply {
             schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-a"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = createTestSessionGraphFactory {
@@ -155,7 +155,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
         assertEquals(listOf("schedule-a"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
 
         fakeScheduleApi.schedules["agent-1"] = mutableListOf(sampleScheduledMessage("schedule-b"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         assertEquals(emptyList<String>(), scheduleProxy.getSchedules("agent-1").first().map { it.id })
@@ -165,8 +165,6 @@ class SessionScopedModelSchedulePassageRepositoryTest {
 
         assertEquals(listOf("schedule-b"), scheduleProxy.getSchedules("agent-1").first().map { it.id })
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 
     private fun sampleLlmModel(id: String) = LlmModel(
         id = id,

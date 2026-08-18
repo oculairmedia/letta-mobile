@@ -52,7 +52,7 @@ class SessionScopedAgentRepositoryTest {
         val fakeApi = FakeAgentApi().apply {
             agents = mutableListOf(TestData.agent(id = "agent-a", name = "Backend A Agent"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -90,7 +90,7 @@ class SessionScopedAgentRepositoryTest {
         assertEquals(AgentId("agent-a"), proxy.agents.value.single().id)
 
         fakeApi.agents = mutableListOf(TestData.agent(id = "agent-b", name = "Backend B Agent"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         proxy.refreshAgents()
@@ -114,7 +114,7 @@ class SessionScopedAgentRepositoryTest {
                 TestData.agent(id = "a2", name = "Agent Two", description = null),
             )
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -158,6 +158,4 @@ class SessionScopedAgentRepositoryTest {
         // Proxy's full-agent cache stays untouched — slim is a separate path.
         assertTrue(proxy.agents.value.isEmpty())
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 }

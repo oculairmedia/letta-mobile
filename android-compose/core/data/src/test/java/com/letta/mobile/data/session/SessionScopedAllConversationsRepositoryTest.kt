@@ -52,7 +52,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val fakeConversationApi = FakeConversationApi().apply {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", summary = "Backend A"))
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -90,7 +90,7 @@ class SessionScopedAllConversationsRepositoryTest {
         assertEquals(listOf("conv-a"), conversationsProxy.conversations.value.map { it.id.value })
 
         fakeConversationApi.conversations = mutableListOf(TestData.conversation(id = "conv-b", summary = "Backend B"))
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceUntilIdle()
 
         conversationsProxy.refresh()
@@ -111,7 +111,7 @@ class SessionScopedAllConversationsRepositoryTest {
             conversations = mutableListOf(TestData.conversation(id = "conv-b", summary = "Backend B"))
             listDelayMillis = 50L
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -148,7 +148,7 @@ class SessionScopedAllConversationsRepositoryTest {
         var error: Throwable? = null
         val refreshJob = launch { error = runCatching { conversationsProxy.refresh() }.exceptionOrNull() }
         advanceTimeBy(1)
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceTimeBy(1)
         advanceUntilIdle()
         refreshJob.join()
@@ -169,7 +169,7 @@ class SessionScopedAllConversationsRepositoryTest {
             listDelayMillis = 50L
             staleTransportIaeCountdown = 1
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -206,7 +206,7 @@ class SessionScopedAllConversationsRepositoryTest {
         var error: Throwable? = null
         val refreshJob = launch { error = runCatching { conversationsProxy.refresh() }.exceptionOrNull() }
         advanceTimeBy(1)
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceTimeBy(1)
         advanceUntilIdle()
         refreshJob.join()
@@ -225,7 +225,7 @@ class SessionScopedAllConversationsRepositoryTest {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", summary = "Backend A"))
             staleTransportIaeCountdown = Int.MAX_VALUE
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -279,7 +279,7 @@ class SessionScopedAllConversationsRepositoryTest {
             conversations = mutableListOf(TestData.conversation(id = "conv-a", summary = "Backend A"))
             listDelayMillis = 200L
         }
-        val settingsRepository = FakeSettingsRepository(initialActiveConfig = config("backend-a"))
+        val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
@@ -317,13 +317,13 @@ class SessionScopedAllConversationsRepositoryTest {
         val refreshJob = launch { error = runCatching { conversationsProxy.refresh() }.exceptionOrNull() }
         // three attempts, each interrupted mid-flight by a fresh rebuild
         advanceTimeBy(1)
-        settingsRepository.activeConfigState.value = config("backend-b")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b")
         advanceTimeBy(1)
         advanceTimeBy(201)
-        settingsRepository.activeConfigState.value = config("backend-c")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-c")
         advanceTimeBy(1)
         advanceTimeBy(201)
-        settingsRepository.activeConfigState.value = config("backend-d")
+        settingsRepository.activeConfigState.value = sessionTestConfig("backend-d")
         advanceTimeBy(1)
         advanceTimeBy(201)
         advanceUntilIdle()
@@ -336,6 +336,4 @@ class SessionScopedAllConversationsRepositoryTest {
         )
         assertEquals(3, fakeConversationApi.calls.count { it == "listConversations" })
     }
-
-    private fun config(id: String, serverUrl: String = "https://$id.example.test"): LettaConfig = sessionTestConfig(id, serverUrl)
 }

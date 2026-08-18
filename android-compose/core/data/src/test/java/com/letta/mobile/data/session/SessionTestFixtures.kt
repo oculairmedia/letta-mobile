@@ -80,20 +80,14 @@ internal fun <T, R> assertProxySwitchesCaches(
     }
 }
 
-@JvmInline
-internal value class TestServerUrl(val value: String)
-
 internal fun sessionTestConfig(
     id: String,
-    serverUrl: TestServerUrl = TestServerUrl("https://$id.example.test"),
+    serverUrl: String = "https://$id.example.test",
 ): LettaConfig = LettaConfig(
     id = id,
     mode = LettaConfig.Mode.SELF_HOSTED,
-    serverUrl = serverUrl.value,
+    serverUrl = serverUrl,
 )
-
-internal fun sessionTestConfig(id: String, serverUrl: String): LettaConfig =
-    sessionTestConfig(id, TestServerUrl(serverUrl))
 
 internal class TestSessionGraphFactoryBuilder(
     var agentApi: FakeAgentApi = FakeAgentApi(),
