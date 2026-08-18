@@ -49,6 +49,28 @@ internal data class ProxySwitchScenario<T, R>(
     val expectedAfter: List<R>,
 )
 
+internal data class AdminProxySwitchSpec<A, T, R>(
+    val api: A,
+    val setup: TestSessionGraphFactoryBuilder.() -> Unit,
+    val createProxy: (SessionManager, CoroutineScope) -> T,
+    val refresh: suspend (T) -> Unit,
+    val observeIds: (T) -> List<R>,
+    val mutate: (A) -> Unit,
+    val before: List<R>,
+    val after: List<R>,
+)
+
+internal fun <A, T, R> AdminProxySwitchSpec<A, T, R>.toScenario(): ProxySwitchScenario<T, R> =
+    ProxySwitchScenario(
+        setupGraph = setup,
+        createProxy = createProxy,
+        refresh = refresh,
+        observeIds = observeIds,
+        mutateForBackendB = { mutate(api) },
+        expectedBefore = before,
+        expectedAfter = after,
+    )
+
 @OptIn(ExperimentalCoroutinesApi::class)
 internal fun <T, R> assertProxySwitchesCaches(
     scheduler: TestCoroutineScheduler,
@@ -80,18 +102,10 @@ internal fun <T, R> assertProxySwitchesCaches(
     }
 }
 
-internal data class SessionTestConfigSpec(
-    val id: String,
-    val serverUrl: String = "https://$id.example.test",
-)
-
-internal fun sessionTestConfig(id: String): LettaConfig =
-    sessionTestConfig(SessionTestConfigSpec(id))
-
-internal fun sessionTestConfig(spec: SessionTestConfigSpec): LettaConfig = LettaConfig(
-    id = spec.id,
+internal fun sessionTestConfig(id: String): LettaConfig = LettaConfig(
+    id = id,
     mode = LettaConfig.Mode.SELF_HOSTED,
-    serverUrl = spec.serverUrl,
+    serverUrl = "https://$id.example.test",
 )
 
 internal class TestSessionGraphFactoryBuilder(
