@@ -185,7 +185,7 @@ class SessionManagerTest {
         advanceUntilIdle()
 
         val firstGraph = sessionManager.current
-        settingsRepository.activeConfigState.value = sessionTestConfig("backend-b", serverUrl = "https://backend-a.example.test")
+        settingsRepository.activeConfigState.value = sessionTestConfig(SessionTestConfigSpec("backend-b", serverUrl = "https://backend-a.example.test"))
         advanceUntilIdle()
 
         assertEquals(System.identityHashCode(firstGraph), System.identityHashCode(sessionManager.current))

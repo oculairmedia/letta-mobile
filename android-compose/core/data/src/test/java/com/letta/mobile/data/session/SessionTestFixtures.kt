@@ -80,13 +80,18 @@ internal fun <T, R> assertProxySwitchesCaches(
     }
 }
 
-internal fun sessionTestConfig(
-    id: String,
-    serverUrl: String = "https://$id.example.test",
-): LettaConfig = LettaConfig(
-    id = id,
+internal data class SessionTestConfigSpec(
+    val id: String,
+    val serverUrl: String = "https://$id.example.test",
+)
+
+internal fun sessionTestConfig(id: String): LettaConfig =
+    sessionTestConfig(SessionTestConfigSpec(id))
+
+internal fun sessionTestConfig(spec: SessionTestConfigSpec): LettaConfig = LettaConfig(
+    id = spec.id,
     mode = LettaConfig.Mode.SELF_HOSTED,
-    serverUrl = serverUrl,
+    serverUrl = spec.serverUrl,
 )
 
 internal class TestSessionGraphFactoryBuilder(
