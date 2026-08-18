@@ -55,6 +55,12 @@ object ConversationAdminHandlers {
         nativeClient: AppServerClient?,
         tiers: NativeReadTiers,
     ) {
+        registerConversationListRoute(router, nativeClient)
+        registerConversationAgentListRoute(router, tiers)
+        registerConversationGetRoute(router, nativeClient)
+    }
+
+    private fun registerConversationListRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
@@ -76,18 +82,17 @@ object ConversationAdminHandlers {
             }
             scopeConversationList(conversations, context)
         }
-        // letta-mobile-i9h61.3.1: agent-scoped conversation list, served
-        // from the shared local-backend store (the same data the
-        // recipient's IrohAgentMessageRouter reads). Distinct from
-        // conversation.list (which is the App Server v2 command and is
-        // not agent-scoped in a way the client can rely on for
-        // cross-agent routing). Fail-closed when the store is unset or
-        // the agent doesn't exist.
+    }
+
+    private fun registerConversationAgentListRoute(router: AdminRpcRouter, tiers: NativeReadTiers) {
         router.registerScoped("conversation.list_agent") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
                 ?: return@registerScoped adminError("missing_required: agent_id")
             listAgentConversations(params, context, tiers, agentId)
         }
+    }
+
+    private fun registerConversationGetRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.registerScoped("conversation.get") { params, context ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, id)
