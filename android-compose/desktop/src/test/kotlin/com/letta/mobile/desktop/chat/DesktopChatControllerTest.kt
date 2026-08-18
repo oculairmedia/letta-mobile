@@ -344,13 +344,43 @@ class DesktopChatControllerTest {
     }
 
     @Test
-    fun blankServerUrlShowsConfigNeededWithoutConstructingGateway() = runTest {
+    fun blankServerUrlShowsConfigNeededWithoutConstructingGatewayForRemoteModes() = runTest {
+        val (state, gatewayConstructed) = executeBlankUrlController(LettaConfig.Mode.SELF_HOSTED)
+
+        assertEquals(DesktopChatConnectionState.ConfigNeeded, state.connectionState)
+        assertFalse(state.isRemoteBacked)
+        assertFalse(gatewayConstructed)
+        assertTrue(state.conversations.isEmpty())
+    }
+
+    /**
+     * letta-mobile-9v9nu regression: `Mode.LOCAL` is self-contained — it
+     * spawns the bundled runtime itself and, per BackendConfigPolicy's
+     * stale-URL migration, deliberately has a blank `serverUrl`. Before this
+     * fix `connectAndLoad` bailed out to `ConfigNeeded` for ANY blank
+     * `serverUrl`, so `gatewayFactory()` — and therefore
+     * `DesktopLocalRuntimeHost.acquire()` — was never invoked, and the app
+     * came up permanently empty in Local mode with zero telemetry and no
+     * `local-runtime.log`, silently, with no visible error.
+     */
+    @Test
+    fun blankServerUrlInLocalModeStillConstructsGatewayAndConnects() = runTest {
+        val (state, gatewayConstructed) = executeBlankUrlController(LettaConfig.Mode.LOCAL)
+
+        assertTrue(gatewayConstructed)
+        assertEquals(DesktopChatConnectionState.Live, state.connectionState)
+        assertTrue(state.isRemoteBacked)
+    }
+
+    private fun kotlinx.coroutines.test.TestScope.executeBlankUrlController(
+        mode: LettaConfig.Mode,
+    ): Pair<DesktopChatSurfaceState, Boolean> {
         var gatewayConstructed = false
         val controller = DesktopChatController(
             bootstrapState = defaultDesktopBootstrapState(
                 config = LettaConfig(
-                    id = "blank",
-                    mode = LettaConfig.Mode.LOCAL,
+                    id = "blank-$mode",
+                    mode = mode,
                     serverUrl = "",
                 ),
             ),
@@ -360,17 +390,11 @@ class DesktopChatControllerTest {
                 FakeDesktopChatGateway()
             },
         )
-
         controller.start()
         runCurrent()
-
         val state = controller.state.value
-        assertEquals(DesktopChatConnectionState.ConfigNeeded, state.connectionState)
-        assertFalse(state.isRemoteBacked)
-        assertFalse(gatewayConstructed)
-        assertTrue(state.conversations.isEmpty())
-
         controller.close()
+        return state to gatewayConstructed
     }
 
     @Test

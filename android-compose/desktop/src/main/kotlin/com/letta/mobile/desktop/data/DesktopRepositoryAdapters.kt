@@ -211,8 +211,11 @@ class DesktopRepositoryAdapters(
     config: LettaConfig? = null,
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
 ) {
-    private val irohMode = IrohChannelTransport.isIrohUrl(config?.serverUrl)
     private val localMode = config?.mode == LettaConfig.Mode.LOCAL
+    // letta-mobile-9v9nu: mode is authoritative — a LOCAL config never binds
+    // the remote Iroh transport, even if its serverUrl still carries a
+    // leftover iroh:// ticket from a prior remote session.
+    private val irohMode = !localMode && IrohChannelTransport.isIrohUrl(config?.serverUrl)
     private val localRepositories = if (localMode) {
         buildDesktopLocalRepositories()
     } else {

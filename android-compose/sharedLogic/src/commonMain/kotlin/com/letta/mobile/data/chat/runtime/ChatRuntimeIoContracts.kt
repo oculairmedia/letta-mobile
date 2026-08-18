@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentCreateParams
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LlmModel
+import com.letta.mobile.data.model.isIrohBackendUrl
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.timeline.TimelineTransport
 import kotlinx.coroutines.flow.Flow
@@ -82,17 +83,59 @@ interface SecureTokenStore {
 }
 
 object BackendConfigPolicy {
+    /**
+     * Network-scheme prefixes that never belong on a `Mode.LOCAL` config's
+     * `serverUrl`. Every real LOCAL config either leaves `serverUrl` blank or
+     * uses an opaque local placeholder (e.g. Android's
+     * `local-lettacode://device`) — none of those start with a network
+     * scheme, so any of these prefixes on a LOCAL config is leftover state
+     * from a prior remote session, not a legitimate value.
+     */
+    private val REMOTE_URL_PREFIXES = listOf("iroh://", "http://", "https://", "ws://", "wss://")
+
     fun normalize(
         config: LettaConfig,
         fallback: LettaConfig,
         generatedIdPrefix: String,
     ): LettaConfig {
         val serverUrl = config.serverUrl.trim().ifBlank { fallback.serverUrl.trim() }
-        return config.copy(
+        val candidate = config.copy(
             id = config.id.trim().ifBlank { stableConfigId(generatedIdPrefix, serverUrl) },
             serverUrl = serverUrl,
             accessToken = config.accessToken?.trim()?.takeIf { it.isNotBlank() },
         )
+        return migrateStaleLocalServerUrl(candidate)
+    }
+
+    /**
+     * letta-mobile-9v9nu: mode-authoritative migration for configs persisted
+     * before `Mode.LOCAL` became authoritative over `serverUrl` (see
+     * [com.letta.mobile.data.model.BackendKind.LOCAL_RUNTIME]'s KDoc). A
+     * config can end up with `mode == LOCAL` and a leftover remote
+     * `serverUrl` — most commonly an `iroh://` ticket kept from a prior
+     * remote session — after which URL-sniffing selectors (Iroh transport
+     * binding, subagent side-channel, admin HTTP APIs) silently route to the
+     * stale remote backend even though the UI and stored mode both say
+     * "Local runtime".
+     *
+     * Applied on every load (desktop) and every save ([normalize]) so a
+     * config already stuck in this state self-heals without the user having
+     * to hand-edit their settings file. Every other mode, and LOCAL configs
+     * that already have a blank or local-placeholder `serverUrl`, pass
+     * through unchanged.
+     */
+    fun migrateStaleLocalServerUrl(config: LettaConfig): LettaConfig {
+        if (config.mode != LettaConfig.Mode.LOCAL) return config
+        if (!hasRemoteServerUrl(config)) return config
+        return config.copy(serverUrl = "")
+    }
+
+    private fun hasRemoteServerUrl(config: LettaConfig): Boolean {
+        val url = config.serverUrl.trim()
+        if (url.isBlank()) return false
+        if (isIrohBackendUrl(url)) return true
+        val normalized = url.lowercase()
+        return REMOTE_URL_PREFIXES.any { normalized.startsWith(it) }
     }
 
     fun stableConfigId(prefix: String, serverUrl: String): String =

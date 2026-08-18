@@ -1,6 +1,8 @@
 package com.letta.mobile.data.chat.runtime
 
+import com.letta.mobile.data.model.BackendKind
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.model.backendKind
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -15,19 +17,13 @@ import kotlinx.coroutines.test.runTest
 class BackendConfigPolicyTest {
     @Test
     fun normalizeTrimsUrlTokenAndGeneratesStableId() {
-        val fallback = LettaConfig(
-            id = "fallback",
-            mode = LettaConfig.Mode.SELF_HOSTED,
-            serverUrl = "http://localhost:8283",
-        )
-
         val normalized = BackendConfigPolicy.normalize(
-            config = fallback.copy(
+            config = defaultFallback.copy(
                 id = " ",
                 serverUrl = " https://api.letta.com/ ",
                 accessToken = " token ",
             ),
-            fallback = fallback,
+            fallback = defaultFallback,
             generatedIdPrefix = "desktop",
         )
 
@@ -38,21 +34,74 @@ class BackendConfigPolicyTest {
 
     @Test
     fun normalizeUsesFallbackUrlAndDropsBlankToken() {
-        val fallback = LettaConfig(
-            id = "fallback",
-            mode = LettaConfig.Mode.SELF_HOSTED,
-            serverUrl = "http://localhost:8283",
-        )
-
         val normalized = BackendConfigPolicy.normalize(
-            config = fallback.copy(id = "", serverUrl = "", accessToken = " "),
-            fallback = fallback,
+            config = defaultFallback.copy(id = "", serverUrl = "", accessToken = " "),
+            fallback = defaultFallback,
             generatedIdPrefix = "desktop",
         )
 
         assertEquals(BackendConfigPolicy.stableConfigId("desktop", "http://localhost:8283"), normalized.id)
         assertEquals("http://localhost:8283", normalized.serverUrl)
         assertNull(normalized.accessToken)
+    }
+
+    @Test
+    fun normalizeMigratesStaleIrohServerUrlOnLocalModeConfig() {
+        val normalized = BackendConfigPolicy.normalize(
+            config = LettaConfig(
+                id = "desktop-361c792e",
+                mode = LettaConfig.Mode.LOCAL,
+                serverUrl = STALE_LOCAL_IROH_URL,
+            ),
+            fallback = localFallback,
+            generatedIdPrefix = "desktop",
+        )
+
+        assertEquals("", normalized.serverUrl)
+        assertEquals(LettaConfig.Mode.LOCAL, normalized.mode)
+    }
+
+    @Test
+    fun migrateStaleLocalServerUrlClearsIrohUrlOnlyForLocalMode() {
+        val staleIroh = LettaConfig(
+            id = "desktop-361c792e",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = STALE_LOCAL_IROH_URL,
+        )
+
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(staleIroh)
+
+        assertEquals("", migrated.serverUrl)
+        assertEquals(LettaConfig.Mode.LOCAL, migrated.mode)
+        // Same classification pinned as BackendKind's own KDoc promises: the
+        // routing decision must never disagree with what this migration produces.
+        assertEquals(BackendKind.LOCAL_RUNTIME, migrated.backendKind())
+    }
+
+    @Test
+    fun migrateStaleLocalServerUrlIgnoresNonLocalModes() {
+        val remoteConfig = LettaConfig(
+            id = "remote",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "iroh://abc@host:4501",
+        )
+
+        val migrated = BackendConfigPolicy.migrateStaleLocalServerUrl(remoteConfig)
+
+        assertEquals(remoteConfig.serverUrl, migrated.serverUrl)
+    }
+
+    @Test
+    fun migrateStaleLocalServerUrlLeavesBlankAndPlaceholderLocalUrlsAlone() {
+        val blank = LettaConfig(id = "local-blank", mode = LettaConfig.Mode.LOCAL, serverUrl = "")
+        val placeholder = LettaConfig(
+            id = "local-placeholder",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "local-lettacode://device",
+        )
+
+        assertEquals(blank, BackendConfigPolicy.migrateStaleLocalServerUrl(blank))
+        assertEquals(placeholder, BackendConfigPolicy.migrateStaleLocalServerUrl(placeholder))
     }
 
     @Test
@@ -102,5 +151,22 @@ class BackendConfigPolicyTest {
         override suspend fun saveActiveConfig(config: LettaConfig) {
             state.value = config
         }
+    }
+
+    private companion object {
+        const val STALE_LOCAL_IROH_URL =
+            "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501"
+
+        val defaultFallback = LettaConfig(
+            id = "fallback",
+            mode = LettaConfig.Mode.SELF_HOSTED,
+            serverUrl = "http://localhost:8283",
+        )
+
+        val localFallback = LettaConfig(
+            id = "fallback",
+            mode = LettaConfig.Mode.LOCAL,
+            serverUrl = "",
+        )
     }
 }
