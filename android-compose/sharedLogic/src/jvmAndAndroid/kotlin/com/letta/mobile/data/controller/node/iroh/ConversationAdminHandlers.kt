@@ -7,6 +7,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -32,11 +33,9 @@ object ConversationAdminHandlers {
     @Volatile
     internal var messageGetBudgetMsForTest: Long? = null
 
-    private val messageGetPageLimit: Int
-        get() = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
+    private fun messageGetPageLimit(): Int = messageGetPageLimitForTest ?: MESSAGE_GET_PAGE_LIMIT
 
-    private val messageGetBudgetMs: Long
-        get() = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
+    private fun messageGetBudgetMs(): Long = messageGetBudgetMsForTest ?: MESSAGE_GET_BUDGET_MS
 
     fun register(
         router: AdminRpcRouter,
@@ -44,7 +43,7 @@ object ConversationAdminHandlers {
         controller: com.letta.mobile.data.controller.AppServerController? = null,
     ) {
         val nativeClient = tiers.nativeClient
-        registerConversationReadRoutes(router, nativeClient)
+        registerConversationReadRoutes(router, nativeClient, tiers)
         registerConversationWriteRoutes(router, nativeClient, controller)
         registerMessageRoutes(router, nativeClient)
     }
@@ -52,7 +51,14 @@ object ConversationAdminHandlers {
     private fun registerConversationReadRoutes(
         router: AdminRpcRouter,
         nativeClient: AppServerClient?,
+        tiers: NativeReadTiers,
     ) {
+        registerConversationListRoute(router, nativeClient)
+        registerConversationAgentListRoute(router, tiers)
+        registerConversationGetRoute(router, nativeClient)
+    }
+
+    private fun registerConversationListRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.registerScoped("conversation.list") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
             val conversations = NativeAdmin.require(nativeClient, NativeAdminOp.ConversationList) { c ->
@@ -74,6 +80,18 @@ object ConversationAdminHandlers {
             }
             scopeConversationList(conversations, context)
         }
+    }
+
+    private fun registerConversationAgentListRoute(router: AdminRpcRouter, tiers: NativeReadTiers) {
+        router.registerScoped("conversation.list_agent") { params, context ->
+            val agentId = param(params, AdminParamKey("agent_id"))
+                ?: return@registerScoped adminError("missing_required: agent_id")
+            val request = AgentListRequest(params, context, tiers, agentId)
+            ConversationAgentListHelper.listAgentConversations(request, ::scopeConversationList)
+        }
+    }
+
+    private fun registerConversationGetRoute(router: AdminRpcRouter, nativeClient: AppServerClient?) {
         router.registerScoped("conversation.get") { params, context ->
             val id = params.requireParam(AdminParamKey("conversation_id"))
             requireConversationAccess(context, id)
@@ -243,7 +261,7 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         return try {
-            kotlinx.coroutines.withTimeout(messageGetBudgetMs) {
+            kotlinx.coroutines.withTimeout(messageGetBudgetMs()) {
                 walkMessagePages(nativeClient, conversationId, messageId, op)
             }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
@@ -260,7 +278,7 @@ object ConversationAdminHandlers {
         op: NativeAdminOp,
     ): JsonElement {
         var before: String? = null
-        val pageLimit = messageGetPageLimit
+        val pageLimit = messageGetPageLimit()
         repeat(MESSAGE_GET_MAX_PAGES) {
             val messages = NativeAdmin.require(nativeClient, op) { c ->
                 val native = c.conversationMessagesList(

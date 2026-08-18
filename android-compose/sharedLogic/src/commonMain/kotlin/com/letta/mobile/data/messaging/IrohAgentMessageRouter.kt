@@ -86,16 +86,43 @@ class IrohAgentMessageRouter(
         }
 
         // Most-recent INTERACTIVE conversation (never AUTONOMOUS/heartbeat).
-        val interactive = candidates
-            .filter { it.conversation.effectiveClass == ConversationClass.INTERACTIVE }
-            .maxByOrNull { recencyKey(it.conversation) }
+        // The "which conversation" half is shared with the client-side
+        // picker (letta-mobile-i9h61.3) via [pickMostRecentInteractive] so
+        // the two can never disagree; busy state only decides Deliver-vs-
+        // Queue, not which.
+        val interactive = pickMostRecentInteractive(candidates.map { it.conversation })
             ?: return RoutingDecision.CreateAndDeliver
 
-        return if (interactive.busy) {
-            RoutingDecision.Queue(interactive.conversation.id.value)
+        val state = candidates.first { it.conversation.id == interactive.id }
+        return if (state.busy) {
+            RoutingDecision.Queue(interactive.id.value)
         } else {
-            RoutingDecision.Deliver(interactive.conversation.id.value)
+            RoutingDecision.Deliver(interactive.id.value)
         }
+    }
+
+    companion object {
+        /**
+         * The exact recency key the router uses to order candidates.
+         * Shared with the client-side picker so both compute the same
+         * "most recent" conversation.
+         */
+        fun recencyKey(c: Conversation): String =
+            c.lastMessageAt ?: c.updatedAt ?: c.createdAt ?: ""
+
+        /**
+         * Pure most-recent-INTERACTIVE pick (never AUTONOMOUS/heartbeat).
+         * This is the "which conversation" half of [route]; the busy flag
+         * only decides Deliver-vs-Queue, not which. Exposed so the
+         * client-side tap-to-navigate picker (letta-mobile-i9h61.3) can
+         * run the identical deterministic policy against the target
+         * agent's conversation list and land on the same conversation the
+         * router chose at receive time.
+         */
+        fun pickMostRecentInteractive(conversations: List<Conversation>): Conversation? =
+            conversations
+                .filter { it.effectiveClass == ConversationClass.INTERACTIVE }
+                .maxByOrNull { recencyKey(it) }
     }
 
     /**
@@ -116,6 +143,4 @@ class IrohAgentMessageRouter(
         }
     }
 
-    private fun recencyKey(c: Conversation): String =
-        c.lastMessageAt ?: c.updatedAt ?: c.createdAt ?: ""
 }

@@ -245,6 +245,21 @@
       "post_shim_fallback": "none"
     },
     {
+      "method": "conversation.list_agent",
+      "handler": "ConversationAdminHandlers.kt",
+      "current_backend": "local_backend_store only (the same data the recipient's IrohAgentMessageRouter reads at receive time; not agent-scoped in the App Server v2 conversation.list command)",
+      "owner": "local_backend_store",
+      "public_contract": "conversation_list",
+      "native_contract": [],
+      "authorization_class": "admin_read",
+      "data_store": "letta_local_backend",
+      "fallback": "none",
+      "migration_slice": "none",
+      "production_first_route": "local_backend_store",
+      "post_shim_owner": "local_backend_store",
+      "post_shim_fallback": "deny_fail_closed"
+    },
+    {
       "method": "conversation.get",
       "handler": "ConversationAdminHandlers.kt",
       "current_backend": "app_server_v2 only (Phase 2 fail-closed; was native→shim)",

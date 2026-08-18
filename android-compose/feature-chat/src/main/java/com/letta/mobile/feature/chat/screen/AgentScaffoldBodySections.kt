@@ -14,6 +14,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import com.letta.mobile.feature.chat.R
+import com.letta.mobile.data.chat.routing.pickOtherAgentConversation
 import com.letta.mobile.feature.chat.screen.AndroidAgentMessageContext
 import com.letta.mobile.feature.chat.screen.LocalAndroidAgentMessageContext
 import com.letta.mobile.ui.haptics.HapticEffects
@@ -190,21 +192,27 @@ private fun AgentScaffoldChromeScaffold(state: AgentScaffoldRuntimeState) {
         val agentNamesById = remember(state.switchableAgents) {
             state.switchableAgents.associate { it.id.value to it.name }
         }
+        // letta-mobile-i9h61.3.4: use drawerConversationRepo (params OR Hilt
+        // ConversationPickerViewModel fallback) so the picker always has a
+        // live IConversationRepository. Using params.conversationRepository
+        // alone silently fell through to null — ChatGraph never passes it.
+        val conversationRepo = state.drawerConversationRepo
+        val scope = rememberCoroutineScope()
         CompositionLocalProvider(
             LocalAndroidAgentMessageContext provides AndroidAgentMessageContext(
                 resolveName = { id -> agentNamesById[id] },
                 onAgentClick = { id ->
-                    // letta-mobile-bccty: navigate to the OTHER agent's chat.
-                    // Pass null for conversationId — conversations are
-                    // appserver-resolved per-agent, so the target agent's
-                    // most recent conversation (or a fresh one) is opened
-                    // rather than trying to reuse the current agent's
-                    // conversation id which doesn't belong to the recipient.
-                    state.params.navigation.onSwitchConversation?.invoke(
-                        id,
-                        null,
-                        agentNamesById[id],
-                    )
+                    scope.launch {
+                        val resolvedConversationId = pickOtherAgentConversation(
+                            repo = conversationRepo,
+                            agentId = com.letta.mobile.data.model.AgentId(id),
+                        )
+                        state.params.navigation.onSwitchConversation?.invoke(
+                            id,
+                            resolvedConversationId,
+                            agentNamesById[id],
+                        )
+                    }
                 },
             ),
         ) {

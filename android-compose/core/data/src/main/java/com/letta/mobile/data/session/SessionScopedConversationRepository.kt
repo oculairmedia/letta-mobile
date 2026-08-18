@@ -59,4 +59,17 @@ class SessionScopedConversationRepository @Inject constructor(
 
     override suspend fun forkConversation(id: ConversationId, agentId: AgentId): Conversation =
         sessionManager.withCurrentSession { it.conversationRepository.forkConversation(id, agentId) }
+
+    // letta-mobile-i9h61.3.4: without this override the interface default
+    // (emptyList) silently wins — SessionScopedConversationRepository is
+    // what Hilt injects as IConversationRepository, so the tap-to-navigate
+    // picker never reached ConversationRepository.listConversationsForAgent
+    // / conversation.list_agent. Same delegation shape as every other method.
+    override suspend fun listConversationsForAgent(
+        agentId: AgentId,
+        limit: Int,
+    ): List<Conversation> =
+        sessionManager.withCurrentSession {
+            it.conversationRepository.listConversationsForAgent(agentId, limit)
+        }
 }

@@ -48,6 +48,37 @@ class IrohAdminRpcConversationListSource(
         return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
     }
 
+    // letta-mobile-i9h61.3.2: agent-scoped conversation list — the
+    // tap-to-navigate picker reads this for the OTHER agent's
+    // conversations (the same data the recipient's router uses to
+    // route at receive time). Distinct from [listConversations] (the
+    // App Server v2 command), which is not agent-scoped in a way the
+    // client can rely on for cross-agent routing. Wire shape mirrors
+    // the App Server v2 list (per the conversation.list_agent handler
+    // in sharedLogic).
+    suspend fun listConversationsForAgent(
+        agentId: AgentId,
+        limit: Int? = null,
+    ): List<Conversation> {
+        val params = buildJsonObject {
+            put("agent_id", agentId.value)
+            limit?.let { put("limit", it.toString()) }
+        }
+        val response = channelTransport.adminRpc(
+            method = "conversation.list_agent",
+            path = "/v1/conversations/list_agent",
+            body = params.toString(),
+        )
+        if (!response.success) {
+            // capability_unavailable (no local backend) or unknown agent
+            // — both fall through cleanly to emptyList() so the picker
+            // falls back to appserver-resolved fresh conversation.
+            return emptyList()
+        }
+        val result = response.result ?: return emptyList()
+        return json.decodeFromJsonElement(ListSerializer(Conversation.serializer()), result)
+    }
+
     // letta-mobile-qfa81 (P4 rows 3-6): conversation reads/writes whose
     // server handlers already exist (ConversationAdminHandlers).
 

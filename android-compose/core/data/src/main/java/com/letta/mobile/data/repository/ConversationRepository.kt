@@ -95,6 +95,22 @@ open class ConversationRepository(
 
     override fun getCachedConversations(agentId: AgentId): List<Conversation> = _conversationsByAgent.value[agentId] ?: emptyList()
 
+    // letta-mobile-i9h61.3.2: agent-scoped list for tap-to-navigate.
+    // The picker calls this on the OTHER agent (not the current one),
+    // so caching is not meaningful — each tap fetches fresh. Default
+    // IConversationRepository impl returns empty, so any gateway
+    // without the agent-scoped surface degrades cleanly.
+    override suspend fun listConversationsForAgent(
+        agentId: AgentId,
+        limit: Int,
+    ): List<Conversation> = refreshMutex.withLock {
+        val irohSource = irohConversationListSource
+        if (irohSource?.shouldUseIroh() != true) {
+            return@withLock emptyList()
+        }
+        irohSource.listConversationsForAgent(agentId, limit)
+    }
+
     override fun hasFreshConversations(agentId: AgentId, maxAgeMs: Long): Boolean {
         val lastRefreshAt = lastRefreshAtMillisByAgent[agentId] ?: return false
         return System.currentTimeMillis() - lastRefreshAt <= maxAgeMs
