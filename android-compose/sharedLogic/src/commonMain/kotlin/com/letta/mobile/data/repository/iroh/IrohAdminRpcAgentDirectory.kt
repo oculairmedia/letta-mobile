@@ -390,6 +390,11 @@ class IrohAdminRpcAgentDirectory(
     }
 
     suspend fun listSchedules(agentId: AgentId? = null): List<ScheduledMessage> {
+        val schedules = fetchScheduleList(agentId)
+        return if (agentId != null) filterAgentSchedules(schedules, agentId) else schedules
+    }
+
+    private suspend fun fetchScheduleList(agentId: AgentId?): List<ScheduledMessage> {
         val body = jsonBody { agentId?.let { put("agent_id", it.value) } }
         val path = agentId?.let { "/v1/agents/${it.value}/schedule" } ?: "/v1/schedules"
         val result = adminRpcResult(
@@ -400,9 +405,10 @@ class IrohAdminRpcAgentDirectory(
         if (result is JsonObject && "scheduled_messages" !in result) {
             throw TimelineTransportHttpException(502, "schedule.list returned a malformed result over iroh admin_rpc")
         }
-        val schedules = json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
-        if (agentId == null) return schedules
+        return json.decodeFromJsonElement(ScheduleListResponse.serializer(), result).scheduledMessages
+    }
 
+    private fun filterAgentSchedules(schedules: List<ScheduledMessage>, agentId: AgentId): List<ScheduledMessage> {
         val scopedSchedules = schedules.filter { it.agentId == agentId.value }
         val excludedCount = schedules.size - scopedSchedules.size
         if (excludedCount > 0) {
