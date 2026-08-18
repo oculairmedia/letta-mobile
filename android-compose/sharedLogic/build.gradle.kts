@@ -100,11 +100,37 @@ kotlin {
             }
         }
 
+        // letta-mobile-bccty: a slim Compose-Multiplatform UI source set that
+        // is JVM-free / native-free — anything that needs to render on every
+        // UI target (jvmAndAndroid + wasmJs) lives here without dragging
+        // jvmAndAndroid's JVM-only deps (ZXing core, CIO, Iroh JNI) into
+        // wasm, and without forcing Compose UI into commonMain where the
+        // wasmJs native compilation unit does not yet want it.
+        //
+        // Kept minimal: foundation + material3 + ui + animation + lucide
+        // icons is enough for the inter-agent message provenance label and
+        // anything similar (small shared UI atoms).
+        //
+        // Declared BEFORE `jvmAndAndroid` because Kotlin DSL `creating { }`
+        // blocks resolve `dependsOn(...)` eagerly, so the source set being
+        // depended on must already exist.
+        val composeUi by creating {
+            dependsOn(commonMain.get())
+            dependencies {
+                api("org.jetbrains.compose.foundation:foundation:1.10.0")
+                api("org.jetbrains.compose.material3:material3:1.9.0")
+                api("org.jetbrains.compose.ui:ui:1.10.0")
+                api("org.jetbrains.compose.animation:animation:1.10.0")
+                api("com.composables:icons-lucide:1.1.0")
+            }
+        }
+
         // Intermediate source set for UI platforms (android + jvm/desktop).
         // Compose-Multiplatform UI doesn't support native targets, so we create
         // a jvmAndAndroid source set for shared chat UI (slice 1).
         val jvmAndAndroid by creating {
             dependsOn(commonMain.get())
+            dependsOn(composeUi)
             dependencies {
                 // Compose-Multiplatform UI dependencies for shared chat UI (slice 1).
                 // foundation/ui stay aligned with the shared Compose plugin so
@@ -242,6 +268,7 @@ kotlin {
         // Ktor engine provides browser-native fetch/WebSocket transport.
         val wasmJsMain by getting {
             dependsOn(commonMain.get())
+            dependsOn(composeUi)
             dependencies {
                 implementation("io.ktor:ktor-client-js:3.5.0")
             }

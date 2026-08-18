@@ -214,7 +214,19 @@ internal fun MessageBubbleSurface(
 ) {
     val isUser = message.role == "user"
     val isLastAssistant = isStreaming && message.role == "assistant"
-    val style = bubbleStyle(role = message.role, isStreaming = isLastAssistant, isError = message.isError)
+    val style = bubbleStyle(
+        role = message.role,
+        isStreaming = isLastAssistant,
+        isError = message.isError,
+        // letta-mobile-bccty: when the message carries structured
+        // inter-agent provenance, the bubble is rendered in the
+        // tertiary-tinted "Inter-agent" style regardless of its row.
+        // Without this flag an outbound a2a message would look
+        // identical to a normal user prompt (the role column doesn't
+        // distinguish them); with it, the bubble's tint and label
+        // both say "this came from another agent."
+        isAgentMessage = message.agentMessageProvenance != null,
+    )
     val colors = MaterialTheme.chatColors
     val dimens = MaterialTheme.chatDimens
     val typo = MaterialTheme.chatTypography
