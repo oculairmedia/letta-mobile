@@ -894,6 +894,7 @@ class DesktopChatController(
         if (closed) return
         val controller = gateway as? DesktopWorkingDirectoryController
         val conversation = state.value.selectedConversation
+        val agentId = conversation?.agentId
         if (controller == null || agentId == null) {
             _selectedConversationWorkingDirectory.value = null
             return
