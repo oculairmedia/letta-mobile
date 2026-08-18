@@ -86,7 +86,7 @@ object ConversationAdminHandlers {
         router.registerScoped("conversation.list_agent") { params, context ->
             val agentId = param(params, AdminParamKey("agent_id"))
                 ?: return@registerScoped adminError("missing_required: agent_id")
-            listAgentConversations(params, context, tiers, agentId)
+            ConversationAgentListHelper.listAgentConversations(params, context, tiers, agentId, ::scopeConversationList)
         }
     }
 
@@ -323,74 +323,4 @@ object ConversationAdminHandlers {
             adminError("forbidden: conversation out of authorized scope")
         }
     }
-
-    /**
-     * letta-mobile-i9h61.3.1: serve `conversation.list_agent` from the
-     * shared local-backend store. The store is the same one the
-     * recipient's IrohAgentMessageRouter reads at receive time, so the
-     * client picker can run the shared policy on the data the router
-     * chose against. Returns a JsonArray of conversation objects in the
-     * same wire shape the App Server v2 conversation.list returns, so
-     * the client decode path is identical.
-     *
-     * Fail-closed when the store is unset or the agent is unknown —
-     * registered via CapabilityUnavailable at assembly time so the
-     * method is gated by store availability, not silently returning []
-     * (which would be indistinguishable from "agent has no conversations"
-     * and lets the picker fall through to a wrong / fresh conversation).
-     */
-    private fun listAgentConversations(
-        params: JsonObject?,
-        context: com.letta.mobile.data.controller.node.iroh.AdminRpcRequestContext,
-        tiers: NativeReadTiers,
-        agentId: String,
-    ): JsonElement {
-        val store = tiers.localBackendStore
-            ?: return adminError("capability_unavailable: conversation.list_agent requires the local backend store")
-        if (!store.agentExists(agentId)) {
-            Telemetry.event(
-                "IrohNode", "conversation.list_agent.agent_missing",
-                "agentId" to agentId,
-                level = Telemetry.Level.WARN,
-            )
-            return JsonArray(emptyList())
-        }
-        val limit = (param(params, AdminParamKey("limit"))?.toIntOrNull() ?: 200)
-            .coerceIn(1, MAX_AGENT_LIST_FETCH)
-        val archiveStatus = param(params, AdminParamKey("archive_status")) ?: "active"
-        val rows = store.listConversationsProjected(
-            agentId = agentId,
-            archiveStatus = archiveStatus,
-            limit = limit,
-            offset = 0,
-        ) ?: return adminError("local_backend_error: listConversationsProjected returned null")
-        val decoded = rows.mapNotNull { el ->
-            val obj = el as? JsonObject ?: return@mapNotNull null
-            decodeConversationObject(obj, agentId)
-        }
-        return scopeConversationList(JsonArray(decoded), context)
-    }
-
-    /**
-     * letta-mobile-i9h61.3.1: shape-parity decode for the
-     * conversation objects the local-backend store returns from
-     * [LocalBackendAdminStore.listConversationsProjected]. Mirrors
-     * `A2aWiring.decodeConversation` (iroh-wrapper-cli) — kept as a
-     * private copy because the admin handler must be self-contained
-     * (A2aWiring.decodeConversation is internal to the wrapper module).
-     * If the wrapper's shape diverges, both must be updated together.
-     */
-    private fun decodeConversationObject(obj: JsonObject, fallbackAgentId: String): JsonObject {
-        val id = obj["id"]?.jsonPrimitive?.contentOrNull ?: return obj
-        val agentId = obj["agent_id"]?.jsonPrimitive?.contentOrNull ?: fallbackAgentId
-        val updated = obj.toMutableMap()
-        updated["id"] = JsonPrimitive(id)
-        updated["agent_id"] = JsonPrimitive(agentId)
-        return JsonObject(updated)
-    }
-
-    /** Hard cap on per-call conversation fetch — the recipient's router reads all active
-     *  conversations at receive time, so the client picker doesn't need a full pagination
-     *  scheme; we fetch once with this cap and let the picker pick from the result. */
-    private const val MAX_AGENT_LIST_FETCH = 500
 }
