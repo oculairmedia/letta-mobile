@@ -93,18 +93,38 @@ class IrohLivenessProbeWiringTest {
                 "failures=${transport.livenessProbeFailuresToDeclareDead}",
         )
         // Detection must stay meaningfully faster than a user noticing an outage.
-        val worstCaseDetectionMs = transport.livenessProbeIntervalMs +
+        // Include maximum congestion deferral (young in-flight admin_rpc grace):
+        // congested soft-fails can cover roughly one grace window before hard failures
+        // accumulate, so the wiring budget is GRACE + FAILURES*(INTERVAL+TIMEOUT).
+        val maxCongestionDeferralMs = IrohLivenessProbe.CONGESTION_GRACE_MS
+        val worstCaseDetectionMs = maxCongestionDeferralMs +
             transport.livenessProbeFailuresToDeclareDead *
             (transport.livenessProbeIntervalMs + transport.livenessProbeTimeoutMs)
         assertTrue(
-            worstCaseDetectionMs <= 120_000L,
-            "worst-case detection must stay well under the ~40min incident window; " +
-                "worstCase=${worstCaseDetectionMs}ms",
+            worstCaseDetectionMs <= IrohLivenessProbe.MAX_DETECTION_MS,
+            "worst-case detection (including congestion deferral) must stay ≤ " +
+                "${IrohLivenessProbe.MAX_DETECTION_MS}ms; worstCase=${worstCaseDetectionMs}ms " +
+                "(grace=${maxCongestionDeferralMs}ms)",
+        )
+        assertTrue(
+            IrohLivenessProbe.MAX_DETECTION_MS <= 120_000L,
+            "absolute detection deadline must stay ≤120s; " +
+                "maxDetection=${IrohLivenessProbe.MAX_DETECTION_MS}ms",
         )
         assertEquals(
             IrohChannelTransport.LIVENESS_PROBE_INTERVAL_MS,
             transport.livenessProbeIntervalMs,
             "production construction must use the documented default interval",
+        )
+        assertEquals(
+            IrohLivenessProbe.TIMEOUT_MS,
+            transport.livenessProbeTimeoutMs,
+            "production construction must use the documented default timeout (parg0: 10s)",
+        )
+        assertEquals(
+            IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD,
+            transport.livenessProbeFailuresToDeclareDead,
+            "production construction must use the documented failure threshold (parg0: 2)",
         )
     }
 

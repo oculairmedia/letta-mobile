@@ -63,7 +63,7 @@ class IrohLivenessProbeTest {
         clientVersion = "test",
     )
 
-    // Compressed cadence: the production defaults (20s/5s) are asserted
+    // Compressed cadence: the production defaults (20s/10s) are asserted
     // separately by IrohLivenessProbeWiringTest.
     private val probeTimeoutMs = 150L
 
@@ -381,6 +381,199 @@ class IrohLivenessProbeTest {
         }
     }
 
+    // ============================================================
+    // 8. letta-mobile-parg0: CONGESTION ≠ DEATH.
+    //    A hung health.check while another young admin_rpc is in flight
+    //    must NOT redial (that is the intermittent false-dead on hydrate).
+    // ============================================================
+    @Test
+    fun probeTimeoutDuringInFlightAdminRpcDoesNotRedial() = runBlocking {
+        val calls = CopyOnWriteArrayList<ProbeCall>()
+        val dials = AtomicInteger(0)
+        val hangHealth = "session-1"
+        val transport = IrohChannelTransport(
+            scope = scope,
+            activeConfigProvider = { config },
+            testDialer = { dialConfig ->
+                val session = "session-${dials.incrementAndGet()}"
+                IrohConnectionHandle(
+                    config = dialConfig,
+                    ticket = "ticket",
+                    sessionId = session,
+                    adminRpcCall = { method, _, _ ->
+                        calls += ProbeCall(session, method, System.currentTimeMillis())
+                        if (session == hangHealth && method == "health.check") {
+                            delay(600_000L)
+                        }
+                        if (method == "model.list") {
+                            // Stay in flight longer than several probe budgets —
+                            // this is the congested hydrate concurrent with the probe.
+                            delay(600_000L)
+                        }
+                        AppServerInboundFrame.AdminRpcResponse(
+                            requestId = method,
+                            success = true,
+                            result = JsonPrimitive(session),
+                        )
+                    },
+                    connectionAlive = { true },
+                    close = {},
+                )
+            },
+            livenessProbeIntervalMs = COMPRESSED_PROBE_INTERVAL_MS,
+            livenessProbeTimeoutMs = probeTimeoutMs,
+            livenessProbeFailuresToDeclareDead = 2,
+            // Keep grace covering the whole assert window so soft-fail holds.
+            livenessCongestionGraceMs = 60_000L,
+        )
+        transport.connect("iroh://ticket", "", "device", "test")
+        val hydrate = scope.launch {
+            runCatching { transport.adminRpc("model.list", "/v1/models", null) }
+        }
+        try {
+            // Wait until the probe has had multiple chances to declare death.
+            delay((COMPRESSED_PROBE_INTERVAL_MS + probeTimeoutMs) * 6)
+            assertTrue(
+                calls.any { it.method == "health.check" },
+                "probe must still issue health.check; calls=${calls.toList()}",
+            )
+            assertEquals(
+                1, dials.get(),
+                "in-flight model.list must soft-fail probe timeouts (congestion), not redial; " +
+                    "dials=${dials.get()} calls=${calls.toList()}",
+            )
+            assertTrue(
+                transport.state.value is ChannelTransportState.Connected,
+                "state stays Connected under congestion; state=${transport.state.value}",
+            )
+        } finally {
+            hydrate.cancel()
+            transport.disconnect()
+        }
+    }
+
+    // ============================================================
+    // 8b. letta-mobile-parg0: congestion deferral is BOUNDED.
+    //    An admin_rpc that starts before the first probe and stays in flight
+    //    past the grace boundary must still reach declare-dead within the
+    //    compressed detection budget (not hang soft-failing forever).
+    // ============================================================
+    @Test
+    fun probeDeclaresDeadAfterCongestionGraceExpires() = runBlocking {
+        val calls = CopyOnWriteArrayList<ProbeCall>()
+        val dials = AtomicInteger(0)
+        val hangHealth = "session-1"
+        val intervalMs = COMPRESSED_PROBE_INTERVAL_MS
+        // Grace must outlast the first health.check timeout so that probe is
+        // classified CONGESTED (young model.list still in flight). A grace
+        // shorter than interval+timeout skips congestion and only exercises
+        // the plain TIMED_OUT ladder.
+        val graceMs = intervalMs + probeTimeoutMs + 200L
+        val failures = 2
+        val transport = IrohChannelTransport(
+            scope = scope,
+            activeConfigProvider = { config },
+            testDialer = { dialConfig ->
+                val session = "session-${dials.incrementAndGet()}"
+                IrohConnectionHandle(
+                    config = dialConfig,
+                    ticket = "ticket",
+                    sessionId = session,
+                    adminRpcCall = { method, _, _ ->
+                        calls += ProbeCall(session, method, System.currentTimeMillis())
+                        if (session == hangHealth && method == "health.check") {
+                            delay(600_000L)
+                        }
+                        if (method == "model.list") {
+                            delay(600_000L)
+                        }
+                        AppServerInboundFrame.AdminRpcResponse(
+                            requestId = method,
+                            success = true,
+                            result = JsonPrimitive(session),
+                        )
+                    },
+                    connectionAlive = { true },
+                    close = {},
+                )
+            },
+            livenessProbeIntervalMs = intervalMs,
+            livenessProbeTimeoutMs = probeTimeoutMs,
+            livenessProbeFailuresToDeclareDead = failures,
+            livenessCongestionGraceMs = graceMs,
+            // Absolute deadline also compressed so a stuck soft-fail cannot exceed budget.
+            livenessMaxDetectionMs = graceMs + failures * (intervalMs + probeTimeoutMs),
+        )
+        transport.connect("iroh://ticket", "", "device", "test")
+        // Start the congesting RPC BEFORE the first probe tick (CodeRabbit scenario).
+        val hydrate = scope.launch {
+            runCatching { transport.adminRpc("model.list", "/v1/models", null) }
+        }
+        try {
+            assertTrue(
+                awaitTrue { calls.any { it.method == "model.list" } },
+                "model.list must be in flight before the detection budget starts; calls=${calls.toList()}",
+            )
+            // Budget measured from in-flight start: one congested window (grace),
+            // then failures hard timeouts, plus one interval of scheduling slack.
+            val budgetMs = graceMs + failures * (intervalMs + probeTimeoutMs) + intervalMs
+            assertTrue(
+                awaitTrue(timeout = (budgetMs + 2_000L).milliseconds) { dials.get() >= 2 },
+                "after a congested probe and grace expiry, hung health.check must declare-dead " +
+                    "and redial within budget=${budgetMs}ms; dials=${dials.get()} calls=${calls.toList()}",
+            )
+        } finally {
+            hydrate.cancel()
+            transport.disconnect()
+        }
+    }
+
+    // ============================================================
+    // 9. letta-mobile-parg0: successful admin_rpc is proof of life —
+    //    suppresses probes the same way stream frames do.
+    // ============================================================
+    @Test
+    fun probeSkippedAfterSuccessfulAdminRpc() = runBlocking {
+        val calls = CopyOnWriteArrayList<ProbeCall>()
+        val dials = AtomicInteger(0)
+        val intervalMs = 800L
+        val transport = transportWith(
+            ProbeScenario(
+                calls = calls,
+                dials = dials,
+                hangHealthCheckOn = "session-1",
+                intervalMs = intervalMs,
+            ),
+        )
+        transport.connect("iroh://ticket", "", "device", "test")
+        try {
+            withTimeout(2.seconds) {
+                while (transport.state.value !is ChannelTransportState.Connected) delay(10.milliseconds)
+            }
+            // Keep refreshing proof-of-life via successful admin_rpc (not stream frames).
+            val pump = scope.launch {
+                while (true) {
+                    // Use a method that does NOT hang — bypass hangHealthCheckOn for non-health.
+                    // transportWith hangs only health.check; agent.list answers immediately.
+                    runCatching { transport.adminRpc("agent.list", "/v1/agents", null) }
+                    delay(100.milliseconds)
+                }
+            }
+            try {
+                delay((intervalMs * 4).milliseconds)
+                assertEquals(
+                    0, calls.count { it.method == "health.check" },
+                    "successful admin_rpc is proof of life — probe must be skipped; calls=${calls.toList()}",
+                )
+                assertEquals(1, dials.get(), "no redial while admin_rpc proof-of-life is fresh")
+            } finally {
+                pump.cancel()
+            }
+        } finally {
+            transport.disconnect()
+        }
+    }
+
     // ---- fanned-out stream frame helpers (shape per IrohObserverIngestionTest) ----
 
     private fun streamDelta(
@@ -408,7 +601,7 @@ class IrohLivenessProbeTest {
     private companion object {
         /**
          * Compressed cadence so these tests run in milliseconds. The PRODUCTION
-         * defaults (20s/5s) are asserted separately by IrohLivenessProbeWiringTest.
+         * defaults (20s/10s) are asserted separately by IrohLivenessProbeWiringTest.
          */
         const val COMPRESSED_PROBE_INTERVAL_MS = 300L
     }
