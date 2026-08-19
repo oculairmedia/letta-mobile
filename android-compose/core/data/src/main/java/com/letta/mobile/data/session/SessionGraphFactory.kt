@@ -79,6 +79,7 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.RuntimeEventOutbox
 import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
+import dagger.Lazy
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,11 +87,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 
 @Singleton
+// letta-mobile-g2ff0: agentDao and conversationDao are dagger.Lazy<T> so Room init
+// happens lazily on the first dao.get() (inside the suspend createBackend
+// method), not on the main thread during Hilt graph resolution. The
+// RuntimeEventOutbox/MemFsStore wrappers already encapsulate their own DB
+// access internally — they were not changed.
+// (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor rejects
+// @Provides methods returning framework types like Provider.)
 class SessionGraphFactory internal constructor(
     private val agentApi: AgentApi,
-    private val agentDao: AgentDao,
+    private val agentDao: Lazy<AgentDao>,
     private val conversationApi: ConversationApi,
-    private val conversationDao: ConversationDao,
+    private val conversationDao: Lazy<ConversationDao>,
     private val archiveApi: ArchiveApi,
     private val folderApi: FolderApi,
     private val groupApi: GroupApi,
@@ -121,9 +129,9 @@ class SessionGraphFactory internal constructor(
     constructor(
         @ApplicationContext appContext: Context,
         agentApi: AgentApi,
-        agentDao: AgentDao,
+        agentDao: Lazy<AgentDao>,
         conversationApi: ConversationApi,
-        conversationDao: ConversationDao,
+        conversationDao: Lazy<ConversationDao>,
         archiveApi: ArchiveApi,
         folderApi: FolderApi,
         groupApi: GroupApi,
@@ -193,9 +201,9 @@ class SessionGraphFactory internal constructor(
         val activeConfig = settingsRepository?.activeConfig?.value
         val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)
         runBlocking(Dispatchers.IO) {
-            agentDao.deleteAll()
-            conversationDao.deleteAll()
-            conversationDao.deleteAllRefreshStates()
+            agentDao.get().deleteAll()
+            conversationDao.get().deleteAll()
+            conversationDao.get().deleteAllRefreshStates()
         }
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val channelTransport = when {

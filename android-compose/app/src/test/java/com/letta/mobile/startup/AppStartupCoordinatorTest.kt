@@ -68,6 +68,7 @@ class AppStartupCoordinatorTest {
         } catch (_: CancellationException) {
             assertEquals(
                 listOf(
+                    "prewarm database",
                     "notification channel",
                     "automation auth bootstrap",
                     "production jank monitor",
@@ -86,6 +87,8 @@ class AppStartupCoordinatorTest {
         val calls = mutableListOf<String>()
 
         override suspend fun ensureNotificationChannel() = record("notification channel")
+
+        override suspend fun prewarmDatabase() = record("prewarm database")
 
         override suspend fun importPendingAutomationConfig() = record("automation auth bootstrap")
 
@@ -112,6 +115,7 @@ class AppStartupCoordinatorTest {
 
     private companion object {
         val ExpectedStartupOrder = listOf(
+            "prewarm database",
             "notification channel",
             "automation auth bootstrap",
             "production jank monitor",

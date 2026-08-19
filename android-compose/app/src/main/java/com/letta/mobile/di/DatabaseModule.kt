@@ -42,6 +42,13 @@ object DatabaseModule {
         return LettaDatabase.getDatabase(context)
     }
 
+    // letta-mobile-g2ff0: DAOs returned directly here, but the LettaDatabase
+    // singleton is the only thing that triggers Room.databaseBuilder.build().
+    // Consumers (AgentRepository, ConversationRepository, etc.) take Lazy<T>
+    // parameters and call .get() inside their existing repositoryScope.launch {}
+    // blocks — so the DB init happens off the main thread, lazily, the first
+    // time any DAO is actually accessed (typically on app foregrounding
+    // navigation, not on Hilt graph resolution at app startup).
     @Provides
     fun provideAgentDao(database: LettaDatabase): AgentDao {
         return database.agentDao()

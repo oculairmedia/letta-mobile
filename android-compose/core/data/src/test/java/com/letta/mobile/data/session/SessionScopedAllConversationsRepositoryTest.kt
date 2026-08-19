@@ -44,6 +44,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
+
+// letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because
+// production constructor now takes Lazy<AgentDao> / Lazy<ConversationDao>.
+private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 class SessionScopedAllConversationsRepositoryTest {
 
     @Test
@@ -57,9 +61,9 @@ class SessionScopedAllConversationsRepositoryTest {
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
                 FakeAgentApi(),
-                FakeAgentDao(),
+                lazyOf(FakeAgentDao()),
                 fakeConversationApi,
-                FakeConversationDao(),
+                lazyOf(FakeConversationDao()),
                 FakeArchiveApi(),
                 FakeFolderApi(),
                 FakeGroupApi(),
@@ -116,9 +120,9 @@ class SessionScopedAllConversationsRepositoryTest {
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
                 FakeAgentApi(),
-                FakeAgentDao(),
+                lazyOf(FakeAgentDao()),
                 fakeConversationApi,
-                FakeConversationDao(),
+                lazyOf(FakeConversationDao()),
                 FakeArchiveApi(),
                 FakeFolderApi(),
                 FakeGroupApi(),
@@ -174,9 +178,9 @@ class SessionScopedAllConversationsRepositoryTest {
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
                 FakeAgentApi(),
-                FakeAgentDao(),
+                lazyOf(FakeAgentDao()),
                 fakeConversationApi,
-                FakeConversationDao(),
+                lazyOf(FakeConversationDao()),
                 FakeArchiveApi(),
                 FakeFolderApi(),
                 FakeGroupApi(),
@@ -230,9 +234,9 @@ class SessionScopedAllConversationsRepositoryTest {
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
                 FakeAgentApi(),
-                FakeAgentDao(),
+                lazyOf(FakeAgentDao()),
                 fakeConversationApi,
-                FakeConversationDao(),
+                lazyOf(FakeConversationDao()),
                 FakeArchiveApi(),
                 FakeFolderApi(),
                 FakeGroupApi(),
@@ -284,9 +288,9 @@ class SessionScopedAllConversationsRepositoryTest {
             settingsRepository = settingsRepository,
             sessionGraphFactory = SessionGraphFactory(
                 FakeAgentApi(),
-                FakeAgentDao(),
+                lazyOf(FakeAgentDao()),
                 fakeConversationApi,
-                FakeConversationDao(),
+                lazyOf(FakeConversationDao()),
                 FakeArchiveApi(),
                 FakeFolderApi(),
                 FakeGroupApi(),
