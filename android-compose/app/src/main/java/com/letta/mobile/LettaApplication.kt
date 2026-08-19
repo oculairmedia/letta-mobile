@@ -9,9 +9,6 @@ import coil3.disk.DiskCache
 import coil3.memory.MemoryCache
 import coil3.network.ktor3.KtorNetworkFetcherFactory
 import coil3.request.crossfade
-import com.letta.mobile.crash.CrashReporter
-import com.letta.mobile.startup.AppStartupCoordinator
-import com.letta.mobile.util.EncryptedPrefsHelper
 import dagger.hilt.android.HiltAndroidApp
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
@@ -22,22 +19,19 @@ import javax.inject.Inject
 
 @HiltAndroidApp
 class LettaApplication : Application(), SingletonImageLoader.Factory {
-    @Inject
-    lateinit var crashReporter: CrashReporter
-
-    @Inject
-    internal lateinit var appStartupCoordinator: AppStartupCoordinator
-
     /**
-     * Eagerly inject the legacy static-bridge singleton (syf4 migration) so
-     * `getEncryptedPrefs(...)` calls from Hilt storage providers never see a
-     * null `INSTANCE`. Without this, the first caller to reach the static
-     * bridge before any other code requests the singleton will NPE on
-     * `INSTANCE!!`.
+     * Single field inject required by `@HiltAndroidApp`. Collaborators live on
+     * [LettaApplicationDependencies] via constructor injection.
+     *
+     * Constructing [LettaApplicationDependencies] eagerly creates
+     * [EncryptedPrefsHelper] so the legacy static-bridge singleton (syf4) is
+     * never null when storage providers call `getEncryptedPrefs(...)`.
      */
-    @Suppress("unused")
     @Inject
-    lateinit var encryptedPrefsHelper: EncryptedPrefsHelper
+    lateinit var deps: LettaApplicationDependencies
+
+    private val crashReporter get() = deps.crashReporter
+    private val appStartupCoordinator get() = deps.appStartupCoordinator
 
     private val imageHttpClient: HttpClient by lazy {
         val cacheDir = java.io.File(cacheDir, "coil_http_cache")
