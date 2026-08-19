@@ -50,6 +50,24 @@ val desktopNodeVersion = "24.13.1"
 val desktopLettaCodeVersion = "0.29.12"
 val desktopNodeArchiveName = "node-v$desktopNodeVersion-win-x64.zip"
 val desktopNodeArchiveSha256 = "fba577c4bb87df04d54dd87bbdaa5a2272f1f99a2acbf9152e1a91b8b5f0b279"
+// Desktop packages bundle JetBrains Runtime 25.0.4 (JBR) rather than Temurin.
+// JBR is the JetBrains-maintained OpenJDK 25 build that ships the
+// AWT/InputMethod bridge Compose Multiplatform uses to surface the OS
+// touch-keyboard on text input — Temurin's InputMethod bridge resolves to a
+// no-op for non-Swing text components, so the keyboard never pops on touch
+// devices. The bundled JCEF runtime used by the avatar/pet window is fetched
+// separately via jcefmaven, so we use the vanilla `jbrsdk` (not `jbrsdk_jcef`).
+// SHA-512 is published by JetBrains alongside the artifact.
+val jbrVersion = "25.0.4"
+val jbrBuild = "b508.27"
+val jbrPlatformSegment = "windows-x64"
+val jbrArchiveName = "jbrsdk-${jbrVersion}-${jbrPlatformSegment}-${jbrBuild}.zip"
+val jbrArchiveSha512 = "22e09469aaef1190d4320e0621ea35f7e944a872c38b7c485f817672cbe25461ffb82db151e93d413c1889cf42bc486041e54e10c30a2601aa8170ef19e4ed98"
+val jbrExtractDirName = "jbrsdk-${jbrVersion}-${jbrPlatformSegment}-${jbrBuild}"
+
+// Used by the JBR download below and by the existing Node runtime download
+// further down — declared here so both task blocks can read it.
+val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -270,22 +288,97 @@ tasks.register<JavaExec>("runShaderLookdev") {
 }
 
 /**
- * Lowest JDK that can RUN this app: Jewel ships class-file v69. Compilation
- * still targets JVM 21 for the Iroh binding, so this is deliberately not the
- * compile toolchain.
+ * Lowest JDK that can RUN this app: Jewel ships class-file v69 (Java 25).
+ * Compilation still targets JVM 21 for the Iroh binding, so this is
+ * deliberately not the compile toolchain.
  */
-val minimumRuntimeJdk = 26
+val minimumRuntimeJdk = 25
+
+// Layout for the JBR install that jpackage uses to build the runtime image.
+// The downloader mirrors the existing `downloadDesktopNodeRuntime` pattern:
+// idempotent PowerShell + SHA-512 verify + atomic rename. The extract task
+// unzips into `desktop-jbr-runtime/<jbrExtractDirName>/` so that
+// `packagingJavaHome` resolves to a fully-formed JDK with bin/, conf/, lib/.
+val desktopJbrArchive = layout.buildDirectory.file("downloads/$jbrArchiveName")
+val desktopJbrRoot = layout.buildDirectory.dir("desktop-jbr-runtime")
+val desktopJbrHome: Provider<Directory> = desktopJbrRoot.map { it.dir(jbrExtractDirName) }
+
+val downloadDesktopJbr = tasks.register<Exec>("downloadDesktopJbr") {
+    onlyIf { isWindowsHost }
+    inputs.property("jbrVersion", jbrVersion)
+    inputs.property("jbrBuild", jbrBuild)
+    inputs.property("sha512", jbrArchiveSha512)
+    outputs.file(desktopJbrArchive)
+    val target = desktopJbrArchive.get().asFile
+    val temporary = File(target.parentFile, "${target.name}.part")
+    val downloadScript = """
+        ${'$'}ErrorActionPreference = 'Stop'
+        function Get-Sha512([string]${'$'}Path) {
+            ${'$'}stream = [System.IO.File]::OpenRead(${'$'}Path)
+            try {
+                ${'$'}hasher = [System.Security.Cryptography.SHA512]::Create()
+                try { return ([System.BitConverter]::ToString(${'$'}hasher.ComputeHash(${'$'}stream)) -replace '-', '').ToLowerInvariant() }
+                finally { ${'$'}hasher.Dispose() }
+            } finally { ${'$'}stream.Dispose() }
+        }
+        New-Item -ItemType Directory -Force -Path '${target.parentFile.absolutePath}' | Out-Null
+        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-Sha512 '${target.absolutePath}') -eq '$jbrArchiveSha512')) { exit 0 }
+        Remove-Item -LiteralPath '${temporary.absolutePath}' -Force -ErrorAction SilentlyContinue
+        Invoke-WebRequest -UseBasicParsing 'https://cache-redirector.jetbrains.com/intellij-jbr/$jbrArchiveName' -OutFile '${temporary.absolutePath}'
+        if ((Get-Sha512 '${temporary.absolutePath}') -ne '$jbrArchiveSha512') { throw 'SHA-512 mismatch for $jbrArchiveName' }
+        Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
+    """.trimIndent()
+    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)
+    // Same constraint as the desktop packaging tasks (see comment on
+    // packageDistributionForCurrentOS in desktop.yml): the PowerShell script
+    // captures a File built from a Gradle Provider, so the task's config
+    // cannot be serialized into the configuration cache. The download itself
+    // is idempotent (sha-mismatched or missing files always re-download), so
+    // a single-use invocation per Gradle run is fine.
+    notCompatibleWithConfigurationCache(
+        "PowerShell download script captures a File resolved from a Gradle Provider, " +
+            "which the configuration cache cannot serialize.",
+    )
+}
+
+val extractDesktopJbr = tasks.register<Exec>("extractDesktopJbr") {
+    onlyIf { isWindowsHost }
+    dependsOn(downloadDesktopJbr)
+    val archive = desktopJbrArchive.get().asFile
+    val extractTo = desktopJbrRoot.get().asFile
+    val target = desktopJbrHome.get().asFile
+    val extractScript = """
+        ${'$'}ErrorActionPreference = 'Stop'
+        Add-Type -AssemblyName 'System.IO.Compression.FileSystem' -ErrorAction SilentlyContinue
+        if (-not (Test-Path -LiteralPath '${archive.absolutePath}')) { throw 'JBR archive missing on disk' }
+        if ((Test-Path -LiteralPath '${target.absolutePath}') -and (Get-ChildItem -LiteralPath '${target.absolutePath}' -ErrorAction SilentlyContinue | Select-Object -First 1)) { exit 0 }
+        New-Item -ItemType Directory -Force -Path '${extractTo.absolutePath}' | Out-Null
+        [System.IO.Compression.ZipFile]::ExtractToDirectory('${archive.absolutePath}', '${extractTo.absolutePath}')
+    """.trimIndent()
+    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", extractScript)
+    // Same constraint as the download task: the script captures Files
+    // resolved from Gradle Providers, so the task config cannot be
+    // serialized. The extraction is idempotent (exits 0 if the target dir
+    // already has content), so a single-use invocation per Gradle run is
+    // fine. Any task depending on this — packaging, :desktop:run — will
+    // therefore be config-cache-incompatible for that run, which is
+    // acceptable: the build is small and the JBR is already on disk.
+    notCompatibleWithConfigurationCache(
+        "PowerShell extract script captures Files resolved from Gradle Providers, " +
+            "which the configuration cache cannot serialize.",
+    )
+}
 
 /**
- * Install path of a JDK new enough to run the app, for jpackage's runtime
- * image. Null when the machine has no such JDK — packaging then fails loudly
- * in [verifyBundledRuntime] rather than producing an installer that cannot
- * start, and everything that is not packaging still builds on JDK 21.
+ * Install path of the JBR that jpackage will use to assemble the runtime
+ * image. Resolves to the extracted JBR JDK (bin/, conf/, lib/) when
+ * `downloadDesktopJbr` + `extractDesktopJbr` have run on a Windows host.
+ * Null otherwise (Linux/macOS packaging) — those paths are not exercised
+ * by CI but still build on JDK 21.
  */
 val packagingJavaHome: String? = runCatching {
-    javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(minimumRuntimeJdk))
-    }.get().metadata.installationPath.asFile.absolutePath
+    val home = desktopJbrHome.get().asFile
+    if (home.isDirectory && File(home, "bin").isDirectory) home.absolutePath else null
 }.getOrNull()
 
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
@@ -421,7 +514,6 @@ val desktopNodeExtractDir = layout.buildDirectory.dir("desktop-node-runtime")
 val desktopRuntimeInstallDir = layout.buildDirectory.dir("desktop-letta-code-runtime")
 val desktopAppResourcesDir = layout.buildDirectory.dir("generated/desktop-app-resources")
 val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("windows/letta-code-runtime") }
-val isWindowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
 
 val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntime") {
     onlyIf { isWindowsHost }
@@ -448,6 +540,13 @@ val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntim
         Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
     """.trimIndent()
     commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)
+    // PowerShell script captures a File resolved from a Gradle Provider, so
+    // the task config cannot be serialized. Idempotent SHA-256 check means
+    // re-running is cheap; this just keeps the configuration cache happy.
+    notCompatibleWithConfigurationCache(
+        "PowerShell download script captures a File resolved from a Gradle Provider, " +
+            "which the configuration cache cannot serialize.",
+    )
 }
 
 val extractDesktopNodeRuntime = tasks.register<Sync>("extractDesktopNodeRuntime") {
@@ -510,26 +609,46 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
 
 /**
  * Fails the build when a packaged distribution bundles a runtime too old to
- * load the app's own classes. `:desktop:run` overrides its launcher and so
- * never exercised the packaged runtime — the JVM-21 image shipped in v0.17.1
- * was only discovered by installing it. jpackage writes the image's version
- * into `runtime/release`, so the check is exact and costs nothing.
+ * load the app's own classes — or worse, the wrong one. `:desktop:run`
+ * overrides its launcher and so never exercised the packaged runtime — the
+ * JVM-21 image shipped in v0.17.1 was only discovered by installing it.
+ * jpackage writes the image's metadata into `runtime/release`, so the checks
+ * are exact and cost nothing.
+ *
+ * Two invariants:
+ *  - `JAVA_VERSION` is `>= minimumRuntimeJdk` (Jewel class-file v69 needs Java 25).
+ *  - `IMPLEMENTOR` (JBR's identifier) or `JAVA_VENDOR` contains `JetBrains` —
+ *    without this guarantee, a future toolchain change could silently swap
+ *    us back to Temurin and re-break touch IME on every install.
  */
 fun verifyBundledRuntime(distributableDir: File) {
     val release = distributableDir.walkTopDown()
         .firstOrNull { it.name == "release" && it.parentFile?.name == "runtime" }
         ?: error("No runtime/release under $distributableDir — cannot verify the bundled JVM.")
-    val version = release.readLines()
-        .firstNotNullOfOrNull { line ->
-            line.substringAfter("JAVA_VERSION=\"", "").substringBefore('"').takeIf { it.isNotBlank() }
-        }
-        ?: error("No JAVA_VERSION in $release — cannot verify the bundled JVM.")
+    val props = release.readLines().associate { line ->
+        val key = line.substringBefore('=', missingDelimiterValue = "").trim()
+        val value = line.substringAfter('=', missingDelimiterValue = "").trim().trim('"')
+        key to value
+    }
+    val version = props["JAVA_VERSION"].orEmpty()
+    val implementor = props["IMPLEMENTOR"].orEmpty()
+    val vendor = props["JAVA_VENDOR"].orEmpty()
+    require(version.isNotBlank()) { "No JAVA_VERSION in $release — cannot verify the bundled JVM." }
+    val isJbr = implementor.contains("JetBrains", ignoreCase = true) ||
+        vendor.contains("JetBrains", ignoreCase = true)
+    require(isJbr) {
+        "Bundled runtime is \"$implementor\" / \"$vendor\" but must be a JetBrains Runtime build. " +
+            "Compose Multiplatform's AWT input bridge requires JBR for touch IME; a " +
+            "non-JBR runtime will leave the touch keyboard non-functional. The " +
+            "`packagingJavaHome` set by [desktopJbrHome] should have supplied JBR — " +
+            "check that downloadDesktopJbr / extractDesktopJbr ran successfully."
+    }
     val feature = version.substringBefore('.').toIntOrNull()
         ?: error("Unparseable JAVA_VERSION \"$version\" in $release.")
     check(feature >= minimumRuntimeJdk) {
         "Bundled runtime is Java $version, but the app needs $minimumRuntimeJdk+ to load its own " +
             "dependencies (Jewel ships class-file v69). The installer would fail at startup with " +
-            "\"Failed to launch JVM\". Install a JDK $minimumRuntimeJdk toolchain and repackage."
+            "\"Failed to launch JVM\". Re-run downloadDesktopJbr and repackage."
     }
 }
 
@@ -542,14 +661,34 @@ tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith
 
 // Jewel ships Java-25 bytecode (class-file v69), while this module targets
 // JVM 21 for the Iroh binding. Gradle otherwise selects the compile toolchain
-// for `run`, which fails before the window is created. Keep development runs
-// on the installed JDK 26 runtime instead.
+// for `run`, which fails before the window is created. Run the dev launcher
+// against the extracted JBR so dev iteration matches the packaged runtime
+// (in particular, JBR's AWT input bridge is the only thing that produces a
+// working touch keyboard on Compose Multiplatform).
 afterEvaluate {
     tasks.named<JavaExec>("run") {
-        val runtimeLauncher = javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(26))
+        dependsOn(extractDesktopJbr)
+        val javaExe = desktopJbrHome.map { File(it.asFile, "bin/java.exe") }
+        doFirst {
+            setExecutable(javaExe.get())
         }
-        javaLauncher.set(runtimeLauncher)
-        setExecutable(runtimeLauncher.get().executablePath.asFile)
     }
+}
+
+// jpackage reads `packagingJavaHome` at task execution time, but
+// `nucleus.application { javaHome = ... }` is configured eagerly. The
+// extract task has `onlyIf { isWindowsHost }`, so on Linux/macOS this
+// dependency is a no-op (the packagingJavaHome branch is also a no-op
+// there because the host isn't Windows).
+tasks.matching {
+    it.name.startsWith("createDistributable") ||
+    it.name.startsWith("createReleaseDistributable") ||
+    it.name.startsWith("packageDistributionForCurrentOS") ||
+    it.name.startsWith("packageExe") ||
+    it.name.startsWith("packageMsi") ||
+    it.name.startsWith("packageDmg") ||
+    it.name.startsWith("packageDeb") ||
+    it.name.startsWith("packageRpm")
+}.configureEach {
+    dependsOn(extractDesktopJbr)
 }
