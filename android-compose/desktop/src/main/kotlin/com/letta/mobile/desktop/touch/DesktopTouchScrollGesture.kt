@@ -1,5 +1,6 @@
 package com.letta.mobile.desktop.touch
 
+import java.awt.event.MouseEvent
 import kotlin.math.abs
 import kotlin.math.exp
 
@@ -27,6 +28,53 @@ internal data class TouchSample(val x: Int, val y: Int, val timeMillis: Long)
 
 /** Scroll distance in device pixels, in screen-space (finger) direction. */
 internal data class TouchScrollDelta(val dx: Float, val dy: Float)
+
+/**
+ * Latches a gesture's touch-vs-mouse origin at `MOUSE_PRESSED` and holds that
+ * classification through the rest of the gesture, instead of trusting the
+ * accessor's flag on every individual event.
+ *
+ * Measured on real Windows touch hardware (see `DesktopWindowsTouchInput`'s
+ * class doc): `AWTAccessor`'s `isCausedByTouchEvent` is only ever true on
+ * `MOUSE_PRESSED` and `MOUSE_RELEASED`. It is unconditionally false on
+ * `MOUSE_DRAGGED` and the trailing `MOUSE_CLICKED` — for touch input just as
+ * much as for a real mouse — so those events carry no usable signal of their
+ * own. The gesture's origin can only be decided once, at press, and carried
+ * forward; reclassifying each event independently is what made drag-to-scroll
+ * and the touch keyboard dead on real hardware even though they worked
+ * against every hand-fed test event.
+ *
+ * Not thread safe: driven entirely from the AWT event dispatch thread, same
+ * as [DesktopTouchDragGesture].
+ */
+internal class DesktopTouchGestureLatch {
+    private var latched: Boolean? = null
+
+    /**
+     * Returns the effective touch classification for [eventId], given what the
+     * accessor reported for this specific event ([accessorSaysTouch]).
+     *
+     * `MOUSE_PRESSED` starts a new gesture and always re-latches from the
+     * accessor's (trustworthy, for this event id) verdict — so a press can
+     * never inherit a stale latch from whatever gesture came before it.
+     * `MOUSE_DRAGGED` and `MOUSE_RELEASED` inherit the latch. `MOUSE_CLICKED`
+     * also inherits the latch and then clears it, since it is the last event
+     * AWT synthesizes for a press/release pair. Any other event id (enter,
+     * exit, move, wheel — none of which participate in gesture tracking)
+     * passes the accessor's verdict through unchanged and leaves the latch
+     * alone.
+     *
+     * A `MOUSE_RELEASED` or `MOUSE_CLICKED` that arrives with no matching
+     * latched press (the shim attached mid-gesture) falls back to the
+     * accessor's verdict for that event rather than throwing or guessing.
+     */
+    fun classify(eventId: Int, accessorSaysTouch: Boolean): Boolean = when (eventId) {
+        MouseEvent.MOUSE_PRESSED -> accessorSaysTouch.also { latched = it }
+        MouseEvent.MOUSE_DRAGGED, MouseEvent.MOUSE_RELEASED -> latched ?: accessorSaysTouch
+        MouseEvent.MOUSE_CLICKED -> (latched ?: accessorSaysTouch).also { latched = null }
+        else -> accessorSaysTouch
+    }
+}
 
 /**
  * Which axis a gesture committed to. Locking on the first movement past the

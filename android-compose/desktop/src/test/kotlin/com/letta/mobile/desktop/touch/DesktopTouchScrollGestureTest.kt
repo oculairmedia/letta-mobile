@@ -1,8 +1,10 @@
 package com.letta.mobile.desktop.touch
 
+import java.awt.event.MouseEvent
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -132,5 +134,124 @@ class DesktopTouchScrollGestureTest {
     @Test
     fun `a zero-sized viewport cannot produce an infinite rotation`() {
         assertEquals(0.0, wheelRotationForDrag(dragPx = 50f, viewportExtentPx = 0))
+    }
+
+    // --- DesktopTouchGestureLatch --------------------------------------
+    //
+    // Measured on real Windows touch hardware: isCausedByTouchEvent is true
+    // only on MOUSE_PRESSED/MOUSE_RELEASED, and always false on
+    // MOUSE_DRAGGED/MOUSE_CLICKED, for touch input just as much as for a real
+    // mouse. These tests feed exactly that realistic flag pattern — never a
+    // flagged drag or click — through the latch, and (where relevant) through
+    // the drag gesture it gates, to prove the fix works against the event
+    // stream real hardware actually produces rather than an idealized one.
+
+    @Test
+    fun `a full touch gesture stays classified as touch through unflagged drags and click, and scrolls`() {
+        val latch = DesktopTouchGestureLatch()
+        val gesture = DesktopTouchDragGesture(slopPx = 12)
+
+        // Flagged press, as measured on real hardware.
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = true))
+        gesture.press(TouchSample(x = 100, y = 400, timeMillis = 0))
+
+        // Unflagged drags: the accessor lies (always false), but the latch
+        // must still report touch so the drag reaches the gesture and scrolls.
+        assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
+        assertNull(gesture.drag(TouchSample(x = 100, y = 396, timeMillis = 16)))
+
+        assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
+        val delta = assertNotNull(gesture.drag(TouchSample(x = 100, y = 360, timeMillis = 32)))
+        assertTrue(delta.dy < 0f, "expected upward scroll output, got $delta")
+
+        // Flagged release, as measured on real hardware.
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = true))
+        val end = gesture.release(TouchSample(x = 100, y = 340, timeMillis = 48))
+        assertIs<TouchGestureEnd.Scrolled>(end)
+
+        // Trailing unflagged click must still read back as touch.
+        assertTrue(latch.classify(MouseEvent.MOUSE_CLICKED, accessorSaysTouch = false))
+    }
+
+    @Test
+    fun `a realistic mouse drag is never classified as touch and never reaches the gesture`() {
+        val latch = DesktopTouchGestureLatch()
+
+        assertFalse(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_CLICKED, accessorSaysTouch = false))
+
+        // The production dispatch loop never even calls into
+        // DesktopTouchDragGesture when isTouch is false — a mouse drag
+        // produces no scroll simply by never reaching it.
+    }
+
+    @Test
+    fun `a tap's trailing unflagged click does not downgrade the origin from touch`() {
+        val latch = DesktopTouchGestureLatch()
+        val origin = DesktopTouchOriginTracker()
+
+        origin.record(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = true), atMillis = 0)
+        origin.record(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = true), atMillis = 10)
+        // AWT's synthesized click never carries the touch flag, even for a tap.
+        origin.record(latch.classify(MouseEvent.MOUSE_CLICKED, accessorSaysTouch = false), atMillis = 11)
+
+        assertTrue(origin.wasTouch(nowMillis = 11))
+    }
+
+    @Test
+    fun `a click with no matching press falls back to its own accessor verdict instead of throwing`() {
+        val latch = DesktopTouchGestureLatch()
+        // Shim attached mid-gesture: no MOUSE_PRESSED was ever latched.
+        assertFalse(latch.classify(MouseEvent.MOUSE_CLICKED, accessorSaysTouch = false))
+    }
+
+    @Test
+    fun `a release with no matching press falls back to its own accessor verdict instead of throwing`() {
+        val latch = DesktopTouchGestureLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = true))
+    }
+
+    @Test
+    fun `a mouse press right after a touch gesture is never classified as touch`() {
+        val latch = DesktopTouchGestureLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = true))
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = true))
+        assertTrue(latch.classify(MouseEvent.MOUSE_CLICKED, accessorSaysTouch = false))
+
+        // A fresh press always re-latches from its own flag, so it cannot
+        // inherit the previous gesture's touch classification.
+        assertFalse(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = false))
+    }
+
+    @Test
+    fun `a touch press right after a mouse gesture is never classified as mouse`() {
+        val latch = DesktopTouchGestureLatch()
+        assertFalse(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = false))
+
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = true))
+        assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED, accessorSaysTouch = true))
+    }
+
+    @Test
+    fun `enter, move and wheel events pass the accessor verdict through unlatched`() {
+        val latch = DesktopTouchGestureLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED, accessorSaysTouch = true))
+
+        // A hover/move/enter/wheel event mid-gesture (stylus, hover-capable
+        // digitizer) is not part of gesture tracking and must not consult or
+        // disturb the latch.
+        assertFalse(latch.classify(MouseEvent.MOUSE_MOVED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_ENTERED, accessorSaysTouch = false))
+        assertFalse(latch.classify(MouseEvent.MOUSE_WHEEL, accessorSaysTouch = false))
+
+        // The latched press classification survives untouched.
+        assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
     }
 }

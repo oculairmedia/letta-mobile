@@ -36,6 +36,16 @@ import kotlin.math.roundToInt
  * Wheel events are the one scroll input Compose Desktop accepts from AWT, and
  * they bypass the `PointerType.Mouse` drag ban entirely.
  *
+ * Measured directly on Windows touch hardware, with the exact reflective
+ * accessor this shim uses: `isCausedByTouchEvent` is true only on
+ * `MOUSE_PRESSED` and `MOUSE_RELEASED`. It is **always false on
+ * `MOUSE_DRAGGED` and `MOUSE_CLICKED`**, touch or mouse alike. Classifying
+ * each event independently — the original design — left drag-to-scroll and
+ * the touch keyboard both permanently dark on real hardware, because the
+ * event that actually carries the gesture (the drag) never reported touch.
+ * [DesktopTouchGestureLatch] is the fix: the classification is decided once,
+ * at press, and carried through drag/release/click by [TouchTranslatingEventQueue].
+ *
  * Windows only, and a no-op whenever the reflective touch hook is unavailable.
  */
 internal object DesktopWindowsTouchInput {
@@ -100,6 +110,14 @@ internal object DesktopWindowsTouchInput {
 
         private val gesture = DesktopTouchDragGesture()
 
+        /**
+         * Decides touch-vs-mouse once per gesture, at `MOUSE_PRESSED`, and
+         * carries that verdict through drag/release/click — see the class doc
+         * above and [DesktopTouchGestureLatch] for why per-event classification
+         * does not work on real hardware.
+         */
+        private val originLatch = DesktopTouchGestureLatch()
+
         /** Held back until the gesture is known to be a tap rather than a scroll. */
         private var withheldPress: MouseEvent? = null
 
@@ -121,7 +139,7 @@ internal object DesktopWindowsTouchInput {
                 super.dispatchEvent(event)
                 return
             }
-            val isTouch = accessor.isCausedByTouchEvent(event)
+            val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
             recordOrigin(event, isTouch)
             if (!isTouch) {
                 if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
@@ -141,6 +159,13 @@ internal object DesktopWindowsTouchInput {
             }
         }
 
+        /**
+         * Records the latch-corrected [isTouch] verdict, not the accessor's raw
+         * per-event flag. That matters most for `MOUSE_CLICKED`: the accessor
+         * always reports false on it, so recording the raw flag would silently
+         * downgrade every touch tap's origin to "mouse" right before the text
+         * field asks whether to raise the keyboard.
+         */
         private fun recordOrigin(event: MouseEvent, isTouch: Boolean) {
             when (event.id) {
                 MouseEvent.MOUSE_PRESSED,
