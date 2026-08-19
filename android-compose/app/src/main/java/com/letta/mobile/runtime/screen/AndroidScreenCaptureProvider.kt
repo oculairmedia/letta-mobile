@@ -5,20 +5,18 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Bundle
-import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.view.View
 import androidx.core.graphics.createBitmap
 import java.io.ByteArrayOutputStream
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 @Singleton
 class AndroidScreenCaptureProvider @Inject constructor(
@@ -87,14 +85,13 @@ class AndroidScreenCaptureProvider @Inject constructor(
 
         fun currentActivity(): Activity? {
             if (Looper.myLooper() == Looper.getMainLooper()) return current.get()
-            val result = AtomicReference<Activity?>()
-            val latch = CountDownLatch(1)
-            Handler(Looper.getMainLooper()).post {
-                result.set(current.get())
-                latch.countDown()
+            // Prefer Dispatchers.Main over Handler(Looper.getMainLooper()) so
+            // main-thread hops stay on the coroutine dispatcher (l2ew9.5).
+            return runBlocking {
+                withTimeout(MAIN_THREAD_WAIT_MS) {
+                    withContext(Dispatchers.Main.immediate) { current.get() }
+                }
             }
-            latch.await(MAIN_THREAD_WAIT_MS, TimeUnit.MILLISECONDS)
-            return result.get()
         }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit

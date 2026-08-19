@@ -20,10 +20,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.widget.Toast
 import com.letta.mobile.channel.ChatPushService
-import com.letta.mobile.crash.CrashReporter
 import com.letta.mobile.data.model.AppTheme
 import com.letta.mobile.data.model.ThemePreset
-import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import android.content.Intent
@@ -48,11 +46,15 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    /**
+     * Single field inject required by `@AndroidEntryPoint`. Collaborators live
+     * on [MainActivityDependencies] via constructor injection.
+     */
     @Inject
-    lateinit var settingsRepository: ISettingsRepository
+    lateinit var deps: MainActivityDependencies
 
-    @Inject
-    lateinit var crashReporter: CrashReporter
+    private val settingsRepository get() = deps.settingsRepository
+    private val crashReporter get() = deps.crashReporter
 
     private val launchTarget = mutableStateOf<AppLaunchTarget?>(null)
 
