@@ -71,7 +71,7 @@ class DesktopAppServerChatGatewayBuilder(
 
         val client = DefaultAppServerClient(transport)
         val localClientLease = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-            DesktopLocalAppServerClientRegistry.install(client)
+            DesktopLocalAppServerClientRegistry.shared.install(client)
         } else {
             null
         }
