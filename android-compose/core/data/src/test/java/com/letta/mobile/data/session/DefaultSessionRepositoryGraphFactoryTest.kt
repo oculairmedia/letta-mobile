@@ -67,18 +67,33 @@ class DefaultSessionRepositoryGraphFactoryTest {
     }
 
     @Test
-    fun `create with remote config uses config for descriptor`() {
-        val config = LettaConfig(
-            id = "test-remote",
-            mode = LettaConfig.Mode.CLOUD,
-            serverUrl = "https://test.letta.com",
-        )
-        val graph = factory(settingsRepository = settingsWith(config)).create()
+    fun `remote and local-disabled configs map to remote descriptors`() {
+        val remote = factory(
+            settingsRepository = settingsWith(
+                LettaConfig(
+                    id = "test-remote",
+                    mode = LettaConfig.Mode.CLOUD,
+                    serverUrl = "https://test.letta.com",
+                ),
+            ),
+        ).create()
+        assertEquals(BackendKind.RemoteLetta, remote.backendDescriptor.kind)
+        assertEquals("remote-letta:test-remote", remote.backendDescriptor.backendId.value)
+        assertEquals("https://test.letta.com", remote.backendDescriptor.label)
+        assertNull(remote.localRuntimeBackend)
 
-        assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
-        assertEquals("remote-letta:test-remote", graph.backendDescriptor.backendId.value)
-        assertEquals("https://test.letta.com", graph.backendDescriptor.label)
-        assertNull(graph.localRuntimeBackend)
+        val localDisabled = factory(
+            settingsRepository = settingsWith(
+                LettaConfig(
+                    id = "test-local",
+                    mode = LettaConfig.Mode.LOCAL,
+                    serverUrl = "local",
+                ),
+            ),
+            localRuntimeOptions = LocalRuntimeOptions.Disabled,
+        ).create()
+        assertEquals("remote-letta:test-local", localDisabled.backendDescriptor.backendId.value)
+        assertNull(localDisabled.localRuntimeBackend)
     }
 
     @Test
@@ -95,20 +110,6 @@ class DefaultSessionRepositoryGraphFactoryTest {
         assertTrue(graph.channelTransport is IrohChannelTransport)
         assertFalse(graph.scheduleRepository is ScheduleRepository)
         graph.close()
-    }
-
-    @Test
-    fun `create with local config but disabled options uses remote descriptor`() {
-        val config = LettaConfig(
-            id = "test-local",
-            mode = LettaConfig.Mode.LOCAL,
-            serverUrl = "local",
-        )
-        val graph = factory(settingsRepository = settingsWith(config)).create()
-
-        assertEquals(BackendKind.RemoteLetta, graph.backendDescriptor.kind)
-        assertEquals("remote-letta:test-local", graph.backendDescriptor.backendId.value)
-        assertNull(graph.localRuntimeBackend)
     }
 
     @Test
