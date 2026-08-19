@@ -70,30 +70,9 @@ class SessionManagerTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
-                FakeAgentApi(),
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-                settingsRepository = settingsRepository,
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                this.settingsRepository = settingsRepository
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         advanceUntilIdle()
@@ -114,29 +93,7 @@ class SessionManagerTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
-                FakeAgentApi(),
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory(),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         advanceUntilIdle()
@@ -160,30 +117,9 @@ class SessionManagerTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
-                FakeAgentApi(),
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-                settingsRepository = settingsRepository,
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                this.settingsRepository = settingsRepository
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         advanceUntilIdle()
@@ -204,31 +140,10 @@ class SessionManagerTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = localConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
-                FakeAgentApi(),
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-                settingsRepository = settingsRepository,
-                localRuntimeOptions = localRuntimeOptions(),
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                this.settingsRepository = settingsRepository
+                this.localRuntimeOptions = localRuntimeOptions()
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         advanceUntilIdle()

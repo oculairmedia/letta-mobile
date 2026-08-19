@@ -55,29 +55,9 @@ class SessionScopedConversationRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
-                FakeAgentApi(),
-                lazyOf(FakeAgentDao()),
-                fakeConversationApi,
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                conversationApi = fakeConversationApi
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val proxy = SessionScopedConversationRepository(sessionManager)

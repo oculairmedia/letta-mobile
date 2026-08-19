@@ -60,15 +60,18 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
+import com.letta.mobile.data.repository.IrohAdminRpcConversationListSource
+import com.letta.mobile.data.repository.IrohAdminRpcFolderSource
+import com.letta.mobile.data.repository.IrohAdminRpcGroupSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
-import com.letta.mobile.runtime.LocalLettaBackend
 import com.letta.mobile.runtime.RuntimeId
 import dagger.Lazy
+import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 
@@ -76,15 +79,12 @@ import kotlinx.coroutines.CoroutineScope
  * Hilt-owned assembler that wires session-scoped repositories onto a
  * [SessionGraph]. App consumers receive the same repositories through
  * SessionScoped* Hilt bindings; this class only builds each graph generation.
- *
- * Constructed via [SessionModule] (production) or
- * [createDefaultSessionRepositoryGraphFactory] (tests).
  */
 @Singleton
 // letta-mobile-g2ff0: agentDao and conversationDao are dagger.Lazy<T> so Room init
 // happens lazily on the first dao.get() (inside clearCachesForNewSession /
 // repositoryScope.launch), not on the main thread during Hilt graph resolution.
-class SessionGraphAssembler constructor(
+class SessionGraphAssembler @Inject constructor(
     private val agentApi: AgentApi,
     private val agentDao: Lazy<AgentDao>,
     private val conversationApi: ConversationApi,
@@ -116,189 +116,212 @@ class SessionGraphAssembler constructor(
         conversationDao.get().deleteAllRefreshStates()
     }
 
-    fun assemble(
-        graphId: Long,
-        activeConfig: LettaConfig?,
-        localRuntimeBackend: LocalLettaBackend?,
-        scope: CoroutineScope,
-        channelTransport: IChannelTransport,
-        settingsRepository: ISettingsRepository?,
-    ): SessionGraph {
-        val agentRepository = AgentRepository(
-            agentApi = agentApi,
-            agentDao = agentDao,
-            repositoryScope = scope,
-            localAgentSource = localAgentSource,
-            settingsRepository = settingsRepository,
-            transport = channelTransport,
-        )
-        val useIroh = IrohChannelTransport.shouldUseIroh(activeConfig?.serverUrl)
-        val irohConversationListSource = settingsRepository?.let {
-            com.letta.mobile.data.repository.IrohAdminRpcConversationListSource(
-                channelTransport = channelTransport,
-                settingsRepository = it,
-            )
-        }
+    fun assemble(request: SessionGraphAssembleRequest): SessionGraph {
+        val agentRepository = createAgentRepository(request)
+        val conversationRepos = createConversationRepos(request, agentRepository)
+        val adminRepositories = createAdminRepositories(request)
+        val useIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
         return SessionGraph(
-            id = graphId,
-            backendDescriptor = localRuntimeBackend?.descriptor ?: remoteLettaDescriptor(activeConfig),
-            localRuntimeBackend = localRuntimeBackend,
-            scope = scope,
+            id = request.graphId,
+            backendDescriptor = request.localRuntimeBackend?.descriptor
+                ?: remoteLettaDescriptor(request.activeConfig),
+            localRuntimeBackend = request.localRuntimeBackend,
+            scope = request.scope,
             agentRepository = agentRepository,
             blockRepository = blockRepository,
-            allConversationsRepository = AllConversationsRepository(
-                conversationApi = conversationApi,
-                conversationDao = conversationDao,
-                repositoryScope = scope,
-                localConversationSource = localConversationSource,
-                settingsRepository = settingsRepository,
-                irohConversationListSource = irohConversationListSource,
-            ),
-            channelTransport = channelTransport,
-            conversationRepository = ConversationRepository(
-                conversationApi = conversationApi,
-                agentRepository = agentRepository,
-                conversationDao = conversationDao,
-                repositoryScope = scope,
-                localConversationSource = localConversationSource,
-                settingsRepository = settingsRepository,
-                irohConversationListSource = irohConversationListSource,
-            ),
+            allConversationsRepository = conversationRepos.allConversations,
+            channelTransport = request.channelTransport,
+            conversationRepository = conversationRepos.conversation,
             cronRepository = CronRepository(
-                transport = channelTransport,
-                scope = scope,
+                transport = request.channelTransport,
+                scope = request.scope,
             ),
-            archiveRepository = ArchiveRepository(
-                archiveApi = archiveApi,
-                irohAdminRpcClient = settingsRepository?.let { settings ->
-                    IrohAdminRpcClient(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            folderRepository = FolderRepository(
-                folderApi = folderApi,
-                irohFolderSource = settingsRepository?.let { settings ->
-                    com.letta.mobile.data.repository.IrohAdminRpcFolderSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            groupRepository = GroupRepository(
-                groupApi = groupApi,
-                irohGroupSource = settingsRepository?.let { settings ->
-                    com.letta.mobile.data.repository.IrohAdminRpcGroupSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            identityRepository = IdentityRepository(
-                identityApi = identityApi,
-                irohIdentitySource = settingsRepository?.let { settings ->
-                    IrohAdminRpcIdentitySource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            mcpServerRepository = McpServerRepository(
-                mcpServerApi = mcpServerApi,
-                irohMcpSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcMcpSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            modelRepository = ModelRepository(
-                modelApi = modelApi,
-                localModelSource = localModelSource,
-                settingsRepository = settingsRepository,
-                irohModelSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcModelSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            passageRepository = PassageRepository(
-                passageApi = passageApi,
-                irohPassageSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcPassageSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            projectRepository = ProjectRepository(
-                projectApi = projectApi,
-                irohProjectSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcProjectSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
+            archiveRepository = adminRepositories.archive,
+            folderRepository = adminRepositories.folder,
+            groupRepository = adminRepositories.group,
+            identityRepository = adminRepositories.identity,
+            mcpServerRepository = adminRepositories.mcpServer,
+            modelRepository = adminRepositories.model,
+            passageRepository = adminRepositories.passage,
+            projectRepository = adminRepositories.project,
             projectWorkRepository = ProjectWorkRepository(projectWorkApi),
-            runRepository = RunRepository(
-                runApi = runApi,
-                irohRunSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcRunSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            jobRepository = JobRepository(
-                jobApi = jobApi,
-                irohJobSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcJobSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            providerRepository = ProviderRepository(
-                providerApi = providerApi,
-                irohProviderSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcProviderSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
-            scheduleRepository = if (useIroh) {
-                val directory = IrohAdminRpcAgentDirectory(channelTransport)
-                IrohScheduleRepository { directory }
-            } else {
-                ScheduleRepository(scheduleApi)
-            },
+            runRepository = adminRepositories.run,
+            jobRepository = adminRepositories.job,
+            providerRepository = adminRepositories.provider,
+            scheduleRepository = createScheduleRepository(useIroh, request.channelTransport),
             selfTodoRepository = SelfTodoRepository(
-                transport = channelTransport,
-                scope = scope,
+                transport = request.channelTransport,
+                scope = request.scope,
             ),
             stepRepository = StepRepository(stepApi),
             subagentRepository = SubagentRepository(
-                transport = channelTransport,
-                scope = scope,
+                transport = request.channelTransport,
+                scope = request.scope,
             ),
-            toolRepository = ToolRepository(
-                toolApi = toolApi,
-                irohToolSource = settingsRepository?.let { settings ->
-                    IrohAdminRpcToolSource(
-                        channelTransport = channelTransport,
-                        settingsRepository = settings,
-                    )
-                },
-            ),
+            toolRepository = adminRepositories.tool,
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(
                 apiClient = lettaApiClient,
-                scope = scope,
+                scope = request.scope,
             ),
         )
+    }
+
+    private fun createAgentRepository(request: SessionGraphAssembleRequest): AgentRepository =
+        AgentRepository(
+            agentApi = agentApi,
+            agentDao = agentDao,
+            repositoryScope = request.scope,
+            localAgentSource = localAgentSource,
+            settingsRepository = request.settingsRepository,
+            transport = request.channelTransport,
+        )
+
+    private fun createConversationRepos(
+        request: SessionGraphAssembleRequest,
+        agentRepository: AgentRepository,
+    ): ConversationRepos {
+        val irohConversationListSource = request.settingsRepository?.let {
+            IrohAdminRpcConversationListSource(
+                channelTransport = request.channelTransport,
+                settingsRepository = it,
+            )
+        }
+        return ConversationRepos(
+            allConversations = AllConversationsRepository(
+                conversationApi = conversationApi,
+                conversationDao = conversationDao,
+                repositoryScope = request.scope,
+                localConversationSource = localConversationSource,
+                settingsRepository = request.settingsRepository,
+                irohConversationListSource = irohConversationListSource,
+            ),
+            conversation = ConversationRepository(
+                conversationApi = conversationApi,
+                agentRepository = agentRepository,
+                conversationDao = conversationDao,
+                repositoryScope = request.scope,
+                localConversationSource = localConversationSource,
+                settingsRepository = request.settingsRepository,
+                irohConversationListSource = irohConversationListSource,
+            ),
+        )
+    }
+
+    private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories {
+        val catalog = createCatalogAdminRepositories(request)
+        val ops = createOpsAdminRepositories(request)
+        return AdminRepositories(
+            archive = catalog.archive,
+            folder = catalog.folder,
+            group = catalog.group,
+            identity = catalog.identity,
+            mcpServer = catalog.mcpServer,
+            model = catalog.model,
+            passage = ops.passage,
+            project = catalog.project,
+            run = ops.run,
+            job = ops.job,
+            provider = ops.provider,
+            tool = ops.tool,
+        )
+    }
+
+    private fun createCatalogAdminRepositories(request: SessionGraphAssembleRequest): CatalogAdminRepositories {
+        val transport = request.channelTransport
+        val settings = request.settingsRepository
+        return CatalogAdminRepositories(
+            archive = ArchiveRepository(
+                archiveApi = archiveApi,
+                irohAdminRpcClient = settings?.let {
+                    IrohAdminRpcClient(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            folder = FolderRepository(
+                folderApi = folderApi,
+                irohFolderSource = settings?.let {
+                    IrohAdminRpcFolderSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            group = GroupRepository(
+                groupApi = groupApi,
+                irohGroupSource = settings?.let {
+                    IrohAdminRpcGroupSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            identity = IdentityRepository(
+                identityApi = identityApi,
+                irohIdentitySource = settings?.let {
+                    IrohAdminRpcIdentitySource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            mcpServer = McpServerRepository(
+                mcpServerApi = mcpServerApi,
+                irohMcpSource = settings?.let {
+                    IrohAdminRpcMcpSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            model = ModelRepository(
+                modelApi = modelApi,
+                localModelSource = localModelSource,
+                settingsRepository = settings,
+                irohModelSource = settings?.let {
+                    IrohAdminRpcModelSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            project = ProjectRepository(
+                projectApi = projectApi,
+                irohProjectSource = settings?.let {
+                    IrohAdminRpcProjectSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+        )
+    }
+
+    private fun createOpsAdminRepositories(request: SessionGraphAssembleRequest): OpsAdminRepositories {
+        val transport = request.channelTransport
+        val settings = request.settingsRepository
+        return OpsAdminRepositories(
+            passage = PassageRepository(
+                passageApi = passageApi,
+                irohPassageSource = settings?.let {
+                    IrohAdminRpcPassageSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            run = RunRepository(
+                runApi = runApi,
+                irohRunSource = settings?.let {
+                    IrohAdminRpcRunSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            job = JobRepository(
+                jobApi = jobApi,
+                irohJobSource = settings?.let {
+                    IrohAdminRpcJobSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            provider = ProviderRepository(
+                providerApi = providerApi,
+                irohProviderSource = settings?.let {
+                    IrohAdminRpcProviderSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+            tool = ToolRepository(
+                toolApi = toolApi,
+                irohToolSource = settings?.let {
+                    IrohAdminRpcToolSource(channelTransport = transport, settingsRepository = it)
+                },
+            ),
+        )
+    }
+
+    private fun createScheduleRepository(
+        useIroh: Boolean,
+        channelTransport: IChannelTransport,
+    ) = if (useIroh) {
+        val directory = IrohAdminRpcAgentDirectory(channelTransport)
+        IrohScheduleRepository { directory }
+    } else {
+        ScheduleRepository(scheduleApi)
     }
 
     fun remoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
@@ -320,4 +343,42 @@ class SessionGraphAssembler constructor(
             ),
         )
     }
+
+    private data class ConversationRepos(
+        val allConversations: AllConversationsRepository,
+        val conversation: ConversationRepository,
+    )
+
+    private data class CatalogAdminRepositories(
+        val archive: ArchiveRepository,
+        val folder: FolderRepository,
+        val group: GroupRepository,
+        val identity: IdentityRepository,
+        val mcpServer: McpServerRepository,
+        val model: ModelRepository,
+        val project: ProjectRepository,
+    )
+
+    private data class OpsAdminRepositories(
+        val passage: PassageRepository,
+        val run: RunRepository,
+        val job: JobRepository,
+        val provider: ProviderRepository,
+        val tool: ToolRepository,
+    )
+
+    private data class AdminRepositories(
+        val archive: ArchiveRepository,
+        val folder: FolderRepository,
+        val group: GroupRepository,
+        val identity: IdentityRepository,
+        val mcpServer: McpServerRepository,
+        val model: ModelRepository,
+        val passage: PassageRepository,
+        val project: ProjectRepository,
+        val run: RunRepository,
+        val job: JobRepository,
+        val provider: ProviderRepository,
+        val tool: ToolRepository,
+    )
 }
