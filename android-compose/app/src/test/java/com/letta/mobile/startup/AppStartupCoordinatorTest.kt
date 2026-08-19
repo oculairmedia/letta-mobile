@@ -68,6 +68,7 @@ class AppStartupCoordinatorTest {
         } catch (_: CancellationException) {
             assertEquals(
                 listOf(
+                    "prewarm database",
                     "notification channel",
                     "automation auth bootstrap",
                     "production jank monitor",
