@@ -423,6 +423,8 @@ class IrohLivenessProbeTest {
             livenessProbeIntervalMs = COMPRESSED_PROBE_INTERVAL_MS,
             livenessProbeTimeoutMs = probeTimeoutMs,
             livenessProbeFailuresToDeclareDead = 2,
+            // Keep grace covering the whole assert window so soft-fail holds.
+            livenessCongestionGraceMs = 60_000L,
         )
         transport.connect("iroh://ticket", "", "device", "test")
         val hydrate = scope.launch {
@@ -443,6 +445,72 @@ class IrohLivenessProbeTest {
             assertTrue(
                 transport.state.value is ChannelTransportState.Connected,
                 "state stays Connected under congestion; state=${transport.state.value}",
+            )
+        } finally {
+            hydrate.cancel()
+            transport.disconnect()
+        }
+    }
+
+    // ============================================================
+    // 8b. letta-mobile-parg0: congestion deferral is BOUNDED.
+    //    An admin_rpc that starts before the first probe and stays in flight
+    //    past the grace boundary must still reach declare-dead within the
+    //    compressed detection budget (not hang soft-failing forever).
+    // ============================================================
+    @Test
+    fun probeDeclaresDeadAfterCongestionGraceExpires() = runBlocking {
+        val calls = CopyOnWriteArrayList<ProbeCall>()
+        val dials = AtomicInteger(0)
+        val hangHealth = "session-1"
+        val intervalMs = COMPRESSED_PROBE_INTERVAL_MS
+        val graceMs = 400L
+        val failures = 2
+        val transport = IrohChannelTransport(
+            scope = scope,
+            activeConfigProvider = { config },
+            testDialer = { dialConfig ->
+                val session = "session-${dials.incrementAndGet()}"
+                IrohConnectionHandle(
+                    config = dialConfig,
+                    ticket = "ticket",
+                    sessionId = session,
+                    adminRpcCall = { method, _, _ ->
+                        calls += ProbeCall(session, method, System.currentTimeMillis())
+                        if (session == hangHealth && method == "health.check") {
+                            delay(600_000L)
+                        }
+                        if (method == "model.list") {
+                            delay(600_000L)
+                        }
+                        AppServerInboundFrame.AdminRpcResponse(
+                            requestId = method,
+                            success = true,
+                            result = JsonPrimitive(session),
+                        )
+                    },
+                    connectionAlive = { true },
+                    close = {},
+                )
+            },
+            livenessProbeIntervalMs = intervalMs,
+            livenessProbeTimeoutMs = probeTimeoutMs,
+            livenessProbeFailuresToDeclareDead = failures,
+            livenessCongestionGraceMs = graceMs,
+            // Absolute deadline also compressed so a stuck soft-fail cannot exceed budget.
+            livenessMaxDetectionMs = graceMs + failures * (intervalMs + probeTimeoutMs),
+        )
+        transport.connect("iroh://ticket", "", "device", "test")
+        // Start the congesting RPC BEFORE the first probe tick (CodeRabbit scenario).
+        val hydrate = scope.launch {
+            runCatching { transport.adminRpc("model.list", "/v1/models", null) }
+        }
+        val budgetMs = graceMs + failures * (intervalMs + probeTimeoutMs) + intervalMs
+        try {
+            assertTrue(
+                awaitTrue(timeout = (budgetMs + 2_000L).milliseconds) { dials.get() >= 2 },
+                "after grace expires, hung health.check must declare-dead and redial within " +
+                    "budget=${budgetMs}ms; dials=${dials.get()} calls=${calls.toList()}",
             )
         } finally {
             hydrate.cancel()

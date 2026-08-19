@@ -42,6 +42,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * budget while the path is still alive. Recent proof-of-life (stream frames OR
  * successful admin_rpc) skips the probe; a timed-out probe while other young
  * admin_rpcs are in flight is recorded as congested and does not escalate.
+ * Congested outcomes do not reset the failure streak; an absolute
+ * [MAX_DETECTION_MS] deadline bounds deferral so detection stays ≤120s.
  *
  * @param millisSinceLastProofOfLife elapsed time since the last stream frame or
  *   successful admin_rpc; live traffic is already proof of life, so a probe due
@@ -57,6 +59,7 @@ internal class IrohLivenessProbe(
     private val intervalMs: Long,
     private val timeoutMs: Long,
     private val failuresToDeclareDead: Int,
+    private val maxDetectionMs: Long = MAX_DETECTION_MS,
     private val millisSinceLastProofOfLife: () -> Long,
     private val youngInFlightAdminRpcCount: () -> Int = { 0 },
     private val reportConnectionLost: (reason: String, handle: IrohConnectionHandle) -> Unit,
@@ -138,16 +141,34 @@ internal class IrohLivenessProbe(
      */
     private suspend fun runLoop(handle: IrohConnectionHandle, armed: Int) {
         var consecutiveFailures = 0
+        // Wall-clock bound across CONGESTED soft-fails: resetting the streak on
+        // every congested probe can push declare-dead past MAX_DETECTION_MS
+        // (RPC starts mid-interval → grace covers two probes → then N failures).
+        var unhealthySinceMs: Long? = null
         while (generation.value == armed) {
             val outcome = awaitNextOutcome(handle, armed)
+            val nowMs = System.currentTimeMillis()
             when (outcome) {
-                ProbeOutcome.ALIVE, ProbeOutcome.CONGESTED -> {
+                ProbeOutcome.ALIVE -> {
                     consecutiveFailures = 0
+                    unhealthySinceMs = null
+                }
+                ProbeOutcome.CONGESTED -> {
+                    // Congestion is not proof of life — do not reset the streak —
+                    // but also do not increment. Cap deferral with an absolute deadline.
+                    val since = unhealthySinceMs ?: nowMs.also { unhealthySinceMs = it }
+                    if (nowMs - since >= maxDetectionMs) {
+                        declareDead(handle, consecutiveFailures.coerceAtLeast(1))
+                        return
+                    }
                 }
                 ProbeOutcome.TIMED_OUT, ProbeOutcome.UNREACHABLE -> {
                     consecutiveFailures += 1
+                    val since = unhealthySinceMs ?: nowMs.also { unhealthySinceMs = it }
                     recordFailure(handle, outcome, consecutiveFailures)
-                    if (consecutiveFailures >= failuresToDeclareDead) {
+                    if (consecutiveFailures >= failuresToDeclareDead ||
+                        nowMs - since >= maxDetectionMs
+                    ) {
                         declareDead(handle, consecutiveFailures)
                         return
                     }
@@ -283,13 +304,21 @@ internal class IrohLivenessProbe(
          * (the probe is the real liveness signal; the keepalive only masks death).
          * One tiny bidi stream per interval => few RPCs/min steady state.
          *
-         * letta-mobile-parg0: timeout 10s / 3 failures so a congested but live path
-         * (concurrent model.list + message.list) is less likely to false-dead; worst
-         * case detection stays under the wiring gate's 120s budget.
+         * letta-mobile-parg0: timeout 10s / 2 failures. Congestion soft-fails must not
+         * erase the failure streak or unbounded-defer detection: worst case including
+         * [CONGESTION_GRACE_MS] deferral stays ≤ [MAX_DETECTION_MS] (wiring gate).
+         * Budget: GRACE + FAILURES*(INTERVAL+TIMEOUT) = 45s + 2*30s = 105s ≤ 120s.
          */
         const val INTERVAL_MS = 20_000L
         const val TIMEOUT_MS = 10_000L
-        const val FAILURES_TO_DECLARE_DEAD = 3
+        const val FAILURES_TO_DECLARE_DEAD = 2
+
+        /**
+         * Absolute wall-clock cap from the first non-ALIVE probe outcome (including
+         * CONGESTED) until declare-dead. Prevents congestion soft-fails from pushing
+         * detection past the 120s requirement.
+         */
+        const val MAX_DETECTION_MS = 120_000L
 
         /**
          * In-flight admin_rpc younger than this still count as congestion evidence.

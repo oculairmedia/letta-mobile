@@ -105,6 +105,10 @@ class IrohChannelTransport(
     internal val livenessProbeIntervalMs: Long = LIVENESS_PROBE_INTERVAL_MS,
     internal val livenessProbeTimeoutMs: Long = LIVENESS_PROBE_TIMEOUT_MS,
     internal val livenessProbeFailuresToDeclareDead: Int = LIVENESS_PROBE_FAILURES_TO_DECLARE_DEAD,
+    // letta-mobile-parg0: congestion grace is overridable so compressed tests can
+    // expire young-in-flight protection without waiting the production 45s window.
+    private val livenessCongestionGraceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS,
+    private val livenessMaxDetectionMs: Long = IrohLivenessProbe.MAX_DETECTION_MS,
 ) : IChannelTransport, RedialAwareChannelTransport, LivenessProbingChannelTransport {
     private val _state = MutableStateFlow<ChannelTransportState>(ChannelTransportState.Idle)
     override val state: StateFlow<ChannelTransportState> = _state.asStateFlow()
@@ -326,8 +330,11 @@ class IrohChannelTransport(
         intervalMs = livenessProbeIntervalMs,
         timeoutMs = livenessProbeTimeoutMs,
         failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
+        maxDetectionMs = livenessMaxDetectionMs,
         millisSinceLastProofOfLife = { adminRpcRetryState.millisSinceLastStream() },
-        youngInFlightAdminRpcCount = { adminRpcRetryState.youngInFlightAdminRpcCount() },
+        youngInFlightAdminRpcCount = {
+            adminRpcRetryState.youngInFlightAdminRpcCount(graceMs = livenessCongestionGraceMs)
+        },
         // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
         // after a redial destroys the healthy NEW handle.
         reportConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
@@ -1581,9 +1588,16 @@ class IrohChannelTransport(
                 supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}", first)
                 val newHandle = supervisor.ready()
                 newHandle.adminRpc(method = method, path = path, body = body).also {
+                    // Successful redial response clears the failure streak — otherwise
+                    // two fail-then-succeed cycles leave consecutiveFailures at threshold
+                    // and the next first-attempt failure forces an unnecessary reconnect.
+                    adminRpcRetryState.reset()
                     adminRpcRetryState.recordProofOfLife()
                 }
-            }.also { adminRpcRetryState.recordProofOfLife() }
+            }.also {
+                adminRpcRetryState.reset()
+                adminRpcRetryState.recordProofOfLife()
+            }
         } else {
             // Escalate: connection is idle and multiple failures accumulated
             Telemetry.event(
@@ -1598,6 +1612,7 @@ class IrohChannelTransport(
             supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}", first)
             val retry = supervisor.ready()
             return retry.adminRpc(method = method, path = path, body = body).also {
+                adminRpcRetryState.reset()
                 adminRpcRetryState.recordProofOfLife()
             }
         }
