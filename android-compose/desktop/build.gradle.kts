@@ -370,16 +370,15 @@ val extractDesktopJbr = tasks.register<Exec>("extractDesktopJbr") {
 }
 
 /**
- * Install path of the JBR that jpackage will use to assemble the runtime
- * image. Resolves to the extracted JBR JDK (bin/, conf/, lib/) when
- * `downloadDesktopJbr` + `extractDesktopJbr` have run on a Windows host.
- * Null otherwise (Linux/macOS packaging) — those paths are not exercised
- * by CI but still build on JDK 21.
+ * Lazily-resolved path to the JBR that jpackage uses to build the runtime
+ * image. Must be a Provider<String> rather than an eagerly-evaluated value
+ * so the resolution happens at jpackage execution time (after
+ * `extractDesktopJbr` has run). Reading the path at configuration time would
+ * see the directory as not-yet-existing and silently fall back to the
+ * toolchain's default JDK — which is exactly the silent Temurin regression
+ * the verifyBundledRuntime check is supposed to catch.
  */
-val packagingJavaHome: String? = runCatching {
-    val home = desktopJbrHome.get().asFile
-    if (home.isDirectory && File(home, "bin").isDirectory) home.absolutePath else null
-}.getOrNull()
+val packagingJavaHome: Provider<String> = desktopJbrHome.map { it.asFile.absolutePath }
 
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
 // transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
@@ -390,13 +389,17 @@ val packagingJavaHome: String? = runCatching {
 nucleus.application {
     mainClass = "com.letta.mobile.desktop.MainKt"
 
-    // jpackage builds its bundled runtime image from the TOOLCHAIN, not from
-    // JAVA_HOME — so a module targeting JVM 21 shipped a JVM 21 image that
-    // cannot load Jewel's Java-25 classes, and every installed build died on
-    // startup with jpackage's "Failed to launch JVM" dialog while
-    // `:desktop:run` (which overrides its launcher below) stayed fine.
-    // Release CI running on JDK 26 did not help for the same reason.
-    packagingJavaHome?.let { javaHome = it }
+    // jpackage builds its bundled runtime image from the JDK specified
+    // here, not from JAVA_HOME. Pass the JBR provider so the path is
+    // resolved AFTER extractDesktopJbr produces the directory. The previous
+    // Temurin/JDK-26 toolchain produced a JVM 21 image that couldn't load
+    // Jewel's Java-25 classes; JBR 25.0.4 satisfies the class-file v69
+    // minimum and additionally carries the AWT input bridge Compose
+    // Multiplatform requires for touch IME on text input (see
+    // letta-mobile-jbr for the touch-keyboard investigation; the JBR
+    // TLDR is that Temurin's InputMethod bridge is a no-op for non-Swing
+    // text components, so the touch keyboard never pops).
+    javaHome = packagingJavaHome
 
     // Windows touch input (see desktop/.../touch/DesktopWindowsTouchInput.kt).
     // AWT translates WM_TOUCH into ordinary MouseEvents and keeps the only
@@ -608,18 +611,61 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
 }
 
 /**
- * Fails the build when a packaged distribution bundles a runtime too old to
- * load the app's own classes — or worse, the wrong one. `:desktop:run`
- * overrides its launcher and so never exercised the packaged runtime — the
- * JVM-21 image shipped in v0.17.1 was only discovered by installing it.
- * jpackage writes the image's metadata into `runtime/release`, so the checks
- * are exact and cost nothing.
+ * Verify the JBR we're about to package IS actually a JetBrains Runtime.
+ * Runs against the source JBR (extractDesktopJbr's output) before jpackage
+ * runs, because jpackage strips IMPLEMENTOR/JAVA_VENDOR from the bundled
+ * runtime/release — there is no reliable post-package signal that the
+ * runtime is JBR vs stock OpenJDK. Treating this as a `doLast` rather
+ * than a Gradle config-time check means extractDesktopJbr has already
+ * populated the directory by the time we read it.
  *
- * Two invariants:
- *  - `JAVA_VERSION` is `>= minimumRuntimeJdk` (Jewel class-file v69 needs Java 25).
- *  - `IMPLEMENTOR` (JBR's identifier) or `JAVA_VENDOR` contains `JetBrains` —
- *    without this guarantee, a future toolchain change could silently swap
- *    us back to Temurin and re-break touch IME on every install.
+ * The vendor guarantee matters: a future toolchain change could silently
+ * swap the source back to Temurin and re-break touch IME on every install
+ * (Temurin's InputMethod bridge is a no-op for non-Swing text components,
+ * so the keyboard never pops on Compose Multiplatform text input).
+ */
+tasks.matching {
+    it.name.startsWith("createDistributable") ||
+    it.name.startsWith("createReleaseDistributable") ||
+    it.name.startsWith("packageDistributionForCurrentOS")
+}.configureEach {
+    dependsOn(extractDesktopJbr)
+    doLast {
+        if (!isWindowsHost) return@doLast
+        val release = File(desktopJbrHome.get().asFile, "release")
+        require(release.isFile) { "Missing JBR release file at $release — extractDesktopJbr did not produce one." }
+        val props = release.readLines().associate { line ->
+            val key = line.substringBefore('=', missingDelimiterValue = "").trim()
+            val value = line.substringAfter('=', missingDelimiterValue = "").trim().trim('"')
+            key to value
+        }
+        val implementor = props["IMPLEMENTOR"].orEmpty()
+        val vendor = props["JAVA_VENDOR"].orEmpty()
+        val isJbr = implementor.contains("JetBrains", ignoreCase = true) ||
+            vendor.contains("JetBrains", ignoreCase = true)
+        check(isJbr) {
+            "Source JBR vendor is \"$implementor\" / \"$vendor\" but must be a JetBrains Runtime build. " +
+                "Compose Multiplatform's AWT input bridge requires JBR for touch IME; a " +
+                "non-JBR source will produce a non-functional touch keyboard in the installer. " +
+                "Check the [jbrArchiveName] and [jbrArchiveSha512] constants — they pin to a " +
+                "specific JBR release and rejecting repointing to a different runtime."
+        }
+        logger.lifecycle("verifyJbrSource: bundled runtime is JBR ($implementor / $vendor).")
+    }
+}
+
+/**
+ * Fails the build when a packaged distribution bundles a runtime too old to
+ * load the app's own classes. `:desktop:run` overrides its launcher and so
+ * never exercised the packaged runtime — the JVM-21 image shipped in
+ * v0.17.1 was only discovered by installing it. jpackage writes the
+ * image's version metadata into `runtime/release` even though it strips
+ * the more identifying fields, so a version check is still reliable.
+ *
+ * Note: this check intentionally does NOT verify JetBrains vendor — see
+ * the `verifyJbrSource` doLast above. That guard runs against the
+ * pre-package JBR source so the vendor can still be confirmed before
+ * jpackage strips it.
  */
 fun verifyBundledRuntime(distributableDir: File) {
     val release = distributableDir.walkTopDown()
@@ -631,18 +677,7 @@ fun verifyBundledRuntime(distributableDir: File) {
         key to value
     }
     val version = props["JAVA_VERSION"].orEmpty()
-    val implementor = props["IMPLEMENTOR"].orEmpty()
-    val vendor = props["JAVA_VENDOR"].orEmpty()
     require(version.isNotBlank()) { "No JAVA_VERSION in $release — cannot verify the bundled JVM." }
-    val isJbr = implementor.contains("JetBrains", ignoreCase = true) ||
-        vendor.contains("JetBrains", ignoreCase = true)
-    require(isJbr) {
-        "Bundled runtime is \"$implementor\" / \"$vendor\" but must be a JetBrains Runtime build. " +
-            "Compose Multiplatform's AWT input bridge requires JBR for touch IME; a " +
-            "non-JBR runtime will leave the touch keyboard non-functional. The " +
-            "`packagingJavaHome` set by [desktopJbrHome] should have supplied JBR — " +
-            "check that downloadDesktopJbr / extractDesktopJbr ran successfully."
-    }
     val feature = version.substringBefore('.').toIntOrNull()
         ?: error("Unparseable JAVA_VERSION \"$version\" in $release.")
     check(feature >= minimumRuntimeJdk) {
@@ -650,6 +685,7 @@ fun verifyBundledRuntime(distributableDir: File) {
             "dependencies (Jewel ships class-file v69). The installer would fail at startup with " +
             "\"Failed to launch JVM\". Re-run downloadDesktopJbr and repackage."
     }
+    logger.lifecycle("verifyBundledRuntime: bundled runtime is Java $version (>= $minimumRuntimeJdk required).")
 }
 
 tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith("createReleaseDistributable") }
@@ -675,20 +711,7 @@ afterEvaluate {
     }
 }
 
-// jpackage reads `packagingJavaHome` at task execution time, but
-// `nucleus.application { javaHome = ... }` is configured eagerly. The
-// extract task has `onlyIf { isWindowsHost }`, so on Linux/macOS this
-// dependency is a no-op (the packagingJavaHome branch is also a no-op
-// there because the host isn't Windows).
-tasks.matching {
-    it.name.startsWith("createDistributable") ||
-    it.name.startsWith("createReleaseDistributable") ||
-    it.name.startsWith("packageDistributionForCurrentOS") ||
-    it.name.startsWith("packageExe") ||
-    it.name.startsWith("packageMsi") ||
-    it.name.startsWith("packageDmg") ||
-    it.name.startsWith("packageDeb") ||
-    it.name.startsWith("packageRpm")
-}.configureEach {
-    dependsOn(extractDesktopJbr)
-}
+// Packaging tasks depend on extractDesktopJbr via the verifyJbrSource
+// configureEach block above (the doLast needs the directory to exist on
+// disk to read its release file). All packaging entry points are covered
+// by that match — no separate dependency wiring here.
