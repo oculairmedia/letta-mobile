@@ -464,7 +464,11 @@ class IrohLivenessProbeTest {
         val dials = AtomicInteger(0)
         val hangHealth = "session-1"
         val intervalMs = COMPRESSED_PROBE_INTERVAL_MS
-        val graceMs = 400L
+        // Grace must outlast the first health.check timeout so that probe is
+        // classified CONGESTED (young model.list still in flight). A grace
+        // shorter than interval+timeout skips congestion and only exercises
+        // the plain TIMED_OUT ladder.
+        val graceMs = intervalMs + probeTimeoutMs + 200L
         val failures = 2
         val transport = IrohChannelTransport(
             scope = scope,
@@ -505,12 +509,18 @@ class IrohLivenessProbeTest {
         val hydrate = scope.launch {
             runCatching { transport.adminRpc("model.list", "/v1/models", null) }
         }
-        val budgetMs = graceMs + failures * (intervalMs + probeTimeoutMs) + intervalMs
         try {
             assertTrue(
+                awaitTrue { calls.any { it.method == "model.list" } },
+                "model.list must be in flight before the detection budget starts; calls=${calls.toList()}",
+            )
+            // Budget measured from in-flight start: one congested window (grace),
+            // then failures hard timeouts, plus one interval of scheduling slack.
+            val budgetMs = graceMs + failures * (intervalMs + probeTimeoutMs) + intervalMs
+            assertTrue(
                 awaitTrue(timeout = (budgetMs + 2_000L).milliseconds) { dials.get() >= 2 },
-                "after grace expires, hung health.check must declare-dead and redial within " +
-                    "budget=${budgetMs}ms; dials=${dials.get()} calls=${calls.toList()}",
+                "after a congested probe and grace expiry, hung health.check must declare-dead " +
+                    "and redial within budget=${budgetMs}ms; dials=${dials.get()} calls=${calls.toList()}",
             )
         } finally {
             hydrate.cancel()
