@@ -34,6 +34,10 @@ import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
+// letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because the
+// production constructor now takes Lazy<AgentDao> / Lazy<ConversationDao>.
+private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -52,7 +56,7 @@ class ConversationRepositoryTest {
             .build()
         fakeApi = FakeConversationApi()
         val agentRepository = FakeAgentRepository()
-        repository = ConversationRepository(fakeApi, agentRepository, database.conversationDao())
+        repository = ConversationRepository(fakeApi, agentRepository, lazyOf(database.conversationDao()))
     }
 
     @After
@@ -180,7 +184,7 @@ class ConversationRepositoryTest {
         repository = ConversationRepository(
             fakeApi,
             FakeAgentRepository(),
-            database.conversationDao(),
+            lazyOf(database.conversationDao()),
             localConversationSource = localSource,
             settingsRepository = settingsRepository,
         )
@@ -276,7 +280,7 @@ class ConversationRepositoryTest {
         repository = ConversationRepository(
             httpThatThrows,
             FakeAgentRepository(),
-            database.conversationDao(),
+            lazyOf(database.conversationDao()),
             settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )
@@ -302,7 +306,7 @@ class ConversationRepositoryTest {
         repository = ConversationRepository(
             fakeApi,
             FakeAgentRepository(),
-            database.conversationDao(),
+            lazyOf(database.conversationDao()),
             settingsRepository = settings,
             irohConversationListSource = IrohAdminRpcConversationListSource(transport, settings),
         )

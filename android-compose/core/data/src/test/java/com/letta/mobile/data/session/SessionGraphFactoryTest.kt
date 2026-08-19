@@ -44,6 +44,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+
+// letta-mobile-g2ff0: tests must wrap the DAOs in dagger.Lazy because the
+// production constructor now takes Lazy<ConversationDao> / Lazy<AgentDao>.
+private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 class SessionGraphFactoryTest {
 
     private val agentApi: AgentApi = mockk(relaxed = true)
@@ -72,9 +76,9 @@ class SessionGraphFactoryTest {
     fun `create clears daos and produces remote descriptor by default`() {
         val factory = SessionGraphFactory(
             agentApi = agentApi,
-            agentDao = agentDao,
+            agentDao = lazyOf(agentDao),
             conversationApi = conversationApi,
-            conversationDao = conversationDao,
+            conversationDao = lazyOf(conversationDao),
             archiveApi = archiveApi,
             folderApi = folderApi,
             groupApi = groupApi,
@@ -118,9 +122,9 @@ class SessionGraphFactoryTest {
 
         val factory = SessionGraphFactory(
             agentApi = agentApi,
-            agentDao = agentDao,
+            agentDao = lazyOf(agentDao),
             conversationApi = conversationApi,
-            conversationDao = conversationDao,
+            conversationDao = lazyOf(conversationDao),
             archiveApi = archiveApi,
             folderApi = folderApi,
             groupApi = groupApi,
@@ -162,9 +166,9 @@ class SessionGraphFactoryTest {
         every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
         val factory = SessionGraphFactory(
             agentApi = agentApi,
-            agentDao = agentDao,
+            agentDao = lazyOf(agentDao),
             conversationApi = conversationApi,
-            conversationDao = conversationDao,
+            conversationDao = lazyOf(conversationDao),
             archiveApi = archiveApi,
             folderApi = folderApi,
             groupApi = groupApi,
@@ -205,9 +209,9 @@ class SessionGraphFactoryTest {
 
         val factory = SessionGraphFactory(
             agentApi = agentApi,
-            agentDao = agentDao,
+            agentDao = lazyOf(agentDao),
             conversationApi = conversationApi,
-            conversationDao = conversationDao,
+            conversationDao = lazyOf(conversationDao),
             archiveApi = archiveApi,
             folderApi = folderApi,
             groupApi = groupApi,
@@ -266,9 +270,9 @@ class SessionGraphFactoryTest {
 
         val factory = SessionGraphFactory(
             agentApi = agentApi,
-            agentDao = agentDao,
+            agentDao = lazyOf(agentDao),
             conversationApi = conversationApi,
-            conversationDao = conversationDao,
+            conversationDao = lazyOf(conversationDao),
             archiveApi = archiveApi,
             folderApi = folderApi,
             groupApi = groupApi,
@@ -319,9 +323,9 @@ class SessionGraphFactoryTest {
 
         val factory = SessionGraphFactory(
             agentApi = agentApi,
-            agentDao = agentDao,
+            agentDao = lazyOf(agentDao),
             conversationApi = conversationApi,
-            conversationDao = conversationDao,
+            conversationDao = lazyOf(conversationDao),
             archiveApi = archiveApi,
             folderApi = folderApi,
             groupApi = groupApi,

@@ -29,13 +29,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
+import dagger.Lazy
 
 internal fun defaultAllConversationsScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+// letta-mobile-g2ff0: conversationDao is dagger.Lazy<ConversationDao> so Room
+// init happens lazily on the first dao.get() (inside the init {} launch),
+// not on the main thread during Hilt graph resolution. Nullable stays —
+// callers without a DAO (tests, previews) pass null and skip the cache-load
+// branch. (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor
+// rejects @Provides methods returning framework types like Provider.)
 open class AllConversationsRepository(
     private val conversationApi: ConversationApi,
-    private val conversationDao: ConversationDao? = null,
+    private val conversationDao: Lazy<ConversationDao>? = null,
     private val repositoryScope: CoroutineScope,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
@@ -45,7 +52,7 @@ open class AllConversationsRepository(
     @Inject
     constructor(
         conversationApi: ConversationApi,
-        conversationDao: ConversationDao?,
+        conversationDao: Lazy<ConversationDao>?,
         localConversationSource: LocalRuntimeConversationSource,
         settingsRepository: ISettingsRepository,
     ) : this(
@@ -59,7 +66,7 @@ open class AllConversationsRepository(
     /** Remote-only convenience constructor (tests, previews). */
     constructor(
         conversationApi: ConversationApi,
-        conversationDao: ConversationDao? = null,
+        conversationDao: Lazy<ConversationDao>? = null,
     ) : this(conversationApi, conversationDao, defaultAllConversationsScope())
 
     private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
@@ -76,7 +83,7 @@ open class AllConversationsRepository(
     init {
         repositoryScope.launch {
             try {
-                val cached = conversationDao?.getAllOnce()?.map { it.toConversation() }.orEmpty()
+                val cached = conversationDao?.get()?.getAllOnce()?.map { it.toConversation() }.orEmpty()
                 if (cached.isNotEmpty()) {
                     _conversations.value = cached
                 }
@@ -155,8 +162,8 @@ open class AllConversationsRepository(
             // for the rationale; same invariant — stale cached conversations
             // from the previous backend visible after switch is a cross-
             // backend leak we'd rather surface than silently log.
-            conversationDao?.deleteAll()
-            conversationDao?.deleteAllRefreshStates()
+            conversationDao?.get()?.deleteAll()
+            conversationDao?.get()?.deleteAllRefreshStates()
         }
     }
 
@@ -204,14 +211,14 @@ open class AllConversationsRepository(
             }
         }
         repositoryScope.launch {
-            conversationDao?.upsert(ConversationEntity.fromConversation(conversation))
+            conversationDao?.get()?.upsert(ConversationEntity.fromConversation(conversation))
         }
     }
 
     override fun handleOptimisticDelete(conversationId: ConversationId) {
         _conversations.update { current -> current.filter { it.id != conversationId } }
         repositoryScope.launch {
-            conversationDao?.delete(conversationId.value)
+            conversationDao?.get()?.delete(conversationId.value)
         }
     }
 
@@ -283,6 +290,6 @@ open class AllConversationsRepository(
     }
 
     private suspend fun cacheConversations(conversations: List<Conversation>) {
-        conversationDao?.upsertAll(conversations.map { ConversationEntity.fromConversation(it) })
+        conversationDao?.get()?.upsertAll(conversations.map { ConversationEntity.fromConversation(it) })
     }
 }
