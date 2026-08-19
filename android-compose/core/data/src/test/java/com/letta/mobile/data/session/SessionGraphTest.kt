@@ -66,7 +66,7 @@ class SessionGraphTest {
     @Test
     fun `session graph exposes shared backend descriptor from active config`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val graph = createTestSessionRepositoryGraphFactory {
+        val graph = createTestDefaultSessionRepositoryGraphFactory {
             this.settingsRepository = settingsRepository
         }.create()
 
@@ -81,7 +81,7 @@ class SessionGraphTest {
 
     @Test
     fun `session graph satisfies shared repository graph contract`() = runTest {
-        val graph = createTestSessionRepositoryGraphFactory().create()
+        val graph = createTestDefaultSessionRepositoryGraphFactory().create()
 
         val sharedGraph: SessionRepositoryGraph = graph
 
@@ -95,7 +95,7 @@ class SessionGraphTest {
     @Test
     fun `session graph can select local runtime backend behind internal option`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = localConfig("backend-a"))
-        val graph = createTestSessionRepositoryGraphFactory {
+        val graph = createTestDefaultSessionRepositoryGraphFactory {
             this.settingsRepository = settingsRepository
             this.localRuntimeOptions = createLocalRuntimeOptions()
         }.create()
@@ -132,7 +132,7 @@ class SessionGraphTest {
         val settingsRepository = FakeSettingsRepository(
             initialActiveConfig = localConfig("backend-a", serverUrl = "local-koog://device"),
         )
-        val graph = createTestSessionRepositoryGraphFactory {
+        val graph = createTestDefaultSessionRepositoryGraphFactory {
             this.settingsRepository = settingsRepository
             this.localRuntimeOptions = createLocalRuntimeOptions(
                 createLocalRuntimeProvider(),
@@ -159,7 +159,7 @@ class SessionGraphTest {
     @Test
     fun `session graph keeps remote backend for non-local config when local runtime is available`() = runTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
-        val graph = createTestSessionRepositoryGraphFactory {
+        val graph = createTestDefaultSessionRepositoryGraphFactory {
             this.settingsRepository = settingsRepository
             this.localRuntimeOptions = createLocalRuntimeOptions()
         }.create()

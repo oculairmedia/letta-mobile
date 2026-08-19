@@ -55,7 +55,7 @@ class SessionScopedToolMcpRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionRepositoryGraphFactory {
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
                 this.toolApi = fakeToolApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -98,7 +98,7 @@ class SessionScopedToolMcpRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionRepositoryGraphFactory {
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
                 this.mcpServerApi = fakeMcpServerApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),

@@ -59,7 +59,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionRepositoryGraphFactory {
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
                 this.modelApi = fakeModelApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -100,7 +100,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionRepositoryGraphFactory {
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
                 this.passageApi = fakePassageApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
@@ -140,7 +140,7 @@ class SessionScopedModelSchedulePassageRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = createTestSessionRepositoryGraphFactory {
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
                 this.scheduleApi = fakeScheduleApi
             },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
