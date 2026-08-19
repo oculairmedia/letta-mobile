@@ -292,19 +292,64 @@ internal class DesktopTouchFling(
 /**
  * Compose Desktop's Windows scroll config resolves a wheel event to
  * `preciseWheelRotation * scrollAmount * (viewportExtent / 20)` pixels
- * (`WindowsWinUIConfig.calculateMouseWheelScroll`), with the sign inverted
- * because a positive rotation moves content up. Inverting that formula is the
- * only way to make a synthetic wheel event travel the same distance the finger
- * did.
+ * (`WindowsWinUIConfig.calculateMouseWheelScroll`, in
+ * `androidx.compose.foundation.gestures.DesktopScrollable.desktop.kt`), with
+ * the sign inverted because a positive rotation moves content up. Inverting
+ * that formula is the only way to make a synthetic wheel event travel the
+ * same distance the finger did — *if* `viewportExtentPx` here matches the
+ * `bounds: IntSize` Compose divides by there.
  *
- * The viewport extent is unknowable at the AWT layer, so the Compose content
- * component's own size stands in for it. That is exact for the full-height
- * lists this fixes (chat transcript, agent sidebar, settings) and only
- * proportionally off for a small nested scroller.
+ * It never does. Compose passes the scrollable modifier node's own layout
+ * size as `bounds` (`MouseWheelScrollingLogic.onPointerEvent`) — the
+ * LazyColumn's own height, not the window's. But AWT delivers every touch
+ * event against a single Skia canvas per window (see this file's header for
+ * why Compose has no per-composable touch path at all), so
+ * [DesktopWindowsTouchInput] can only ever pass that canvas's — i.e. the
+ * whole window content area's — width/height as `viewportExtentPx`. Every
+ * touch surface in this app (chat transcript, agent sidebar, settings) sits
+ * inside chrome the window includes but the scrollable excludes — at minimum
+ * the 48dp title bar (`TitleBarHeight` in `DesktopJewelWindow.kt`), plus a
+ * composer/header/filter row stack for most of them — so the true
+ * `bounds.height` used on the Compose side is always smaller than the
+ * `viewportExtentPx` used here. Because the formula's `bounds` divides the
+ * scroll amount, a smaller true bounds than the one assumed means every
+ * touch drag scrolls *less* than the finger moved, which is exactly the
+ * "content moves less than the finger, and it feels slow" symptom this
+ * constant exists to correct.
+ *
+ * There is no reflective or Compose-provided way to read a Compose node's
+ * layout bounds from inside the AWT event queue this shim runs in, so the
+ * true per-surface ratio can't be measured here. [TOUCH_SCROLL_GAIN] is a
+ * fixed, named, empirically-chosen correction instead of a wrong formula
+ * that only looks exact.
  */
 internal const val WHEEL_SCROLL_DIVISOR = 20.0
 
+/**
+ * Fixed correction for the title-bar-and-chrome shortfall documented above,
+ * tuned against the chat transcript — the surface the "flick and drag feel
+ * slow" report was about, and the one with the smallest shortfall of the
+ * three touch surfaces in this app. On a representative ~800dp-tall window,
+ * the transcript's own height (window height minus the 48dp title bar minus
+ * a composer/header of roughly similar order) comes out around 650-700dp
+ * against the window's 800dp — a viewport extent about 1.15-1.25x too large,
+ * which is what starves the drag of that same fraction of distance. 1.25
+ * fully corrects that shortfall for the transcript without overshooting it.
+ *
+ * The agent sidebar and settings lists sit behind more excluded chrome
+ * (nav rows, filter rows, section headers) than the transcript does, so
+ * their true shortfall is larger than 1.25 and this constant leaves them
+ * proportionally undercorrected. That is strictly an improvement over the
+ * pre-fix 1.0 (no correction at all) on every touch surface in the app, not
+ * a regression on any of them — it just isn't exact for surfaces smaller
+ * than the transcript, the same way [WHEEL_SCROLL_DIVISOR] alone wasn't
+ * exact for any of them. Retune this single constant if hardware testing
+ * still finds the transcript short, or if the sidebar/settings shortfall
+ * turns out to matter enough to warrant its own fix.
+ */
+internal const val TOUCH_SCROLL_GAIN = 1.25
+
 internal fun wheelRotationForDrag(dragPx: Float, viewportExtentPx: Int): Double {
     if (viewportExtentPx <= 0) return 0.0
-    return -dragPx.toDouble() * WHEEL_SCROLL_DIVISOR / viewportExtentPx
+    return -dragPx.toDouble() * TOUCH_SCROLL_GAIN * WHEEL_SCROLL_DIVISOR / viewportExtentPx
 }

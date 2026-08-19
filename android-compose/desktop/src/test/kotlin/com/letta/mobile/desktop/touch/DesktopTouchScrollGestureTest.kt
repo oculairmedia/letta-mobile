@@ -114,21 +114,61 @@ class DesktopTouchScrollGestureTest {
     }
 
     @Test
-    fun `wheel rotation inverts Compose's Windows scroll formula`() {
+    fun `wheel rotation inverts Compose's Windows scroll formula, scaled by the calibrated gain`() {
         // WindowsWinUIConfig resolves a wheel event to
-        // -preciseWheelRotation * scrollAmount * (extent / 20) pixels.
+        // -preciseWheelRotation * scrollAmount * (extent / 20) pixels. When the
+        // extent handed to both sides of the formula is the same value, the
+        // round trip reproduces dragPx scaled by TOUCH_SCROLL_GAIN exactly --
+        // the gain is a deliberate multiplier here, not an inversion error.
         val extent = 800
         val dragPx = -120f
         val rotation = wheelRotationForDrag(dragPx, extent)
 
         val composePixels = -rotation * (extent / WHEEL_SCROLL_DIVISOR)
-        assertEquals(dragPx.toDouble(), composePixels, 0.001)
+        assertEquals(dragPx.toDouble() * TOUCH_SCROLL_GAIN, composePixels, 0.001)
+    }
+
+    @Test
+    fun `the calibrated gain closes the transcript's title-bar-and-chrome extent gap`() {
+        // viewportExtentPx is what DesktopWindowsTouchInput actually has: the
+        // whole window content area, because AWT delivers touch through one
+        // Skia canvas per window (see wheelRotationForDrag's KDoc). trueBoundsPx
+        // approximates what WindowsWinUIConfig actually divides by on the other
+        // side -- the chat transcript LazyColumn's own height once the 48dp
+        // title bar and composer chrome are excluded -- reproducing the ratio
+        // TOUCH_SCROLL_GAIN was tuned against.
+        val viewportExtentPx = 800
+        val trueBoundsPx = 650
+        val dragPx = -200f
+
+        val rotation = wheelRotationForDrag(dragPx, viewportExtentPx)
+        val actualPixelsMoved = -rotation * (trueBoundsPx / WHEEL_SCROLL_DIVISOR)
+
+        // Within 5% of tracking the finger 1:1, versus the ~19% shortfall
+        // (650/800) an uncorrected formula would produce.
+        assertEquals(dragPx.toDouble(), actualPixelsMoved, abs(dragPx.toDouble()) * 0.05)
     }
 
     @Test
     fun `dragging up scrolls the content up, matching a positive wheel rotation`() {
         assertTrue(wheelRotationForDrag(dragPx = -50f, viewportExtentPx = 500) > 0.0)
         assertTrue(wheelRotationForDrag(dragPx = 50f, viewportExtentPx = 500) < 0.0)
+    }
+
+    @Test
+    fun `sequential drag events lose no fractional distance to rounding`() {
+        // wheelRotationForDrag returns a Double and DesktopWindowsTouchInput
+        // hands the same Double straight through as MouseWheelEvent's
+        // preciseWheelRotation (the field WindowsWinUIConfig actually reads on
+        // Windows -- see ComposeSceneMediator.onMouseWheelEvent). Nothing here
+        // rounds or truncates per event, so many small per-event drags must sum
+        // to the same total as one big drag of the same overall distance,
+        // instead of leaking a fractional remainder to the void on every frame.
+        val extent = 800
+        val wholeDragRotation = wheelRotationForDrag(dragPx = -10f, extent)
+        var summedRotation = 0.0
+        repeat(10) { summedRotation += wheelRotationForDrag(dragPx = -1f, extent) }
+        assertEquals(wholeDragRotation, summedRotation, 1e-6)
     }
 
     @Test
