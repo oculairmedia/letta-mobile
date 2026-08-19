@@ -87,11 +87,13 @@ class AndroidScreenCaptureProvider @Inject constructor(
             if (Looper.myLooper() == Looper.getMainLooper()) return current.get()
             // Prefer Dispatchers.Main over Handler(Looper.getMainLooper()) so
             // main-thread hops stay on the coroutine dispatcher (l2ew9.5).
-            return runBlocking {
-                withTimeout(MAIN_THREAD_WAIT_MS) {
-                    withContext(Dispatchers.Main.immediate) { current.get() }
+            return runCatching {
+                runBlocking {
+                    withTimeout(MAIN_THREAD_WAIT_MS) {
+                        withContext(Dispatchers.Main.immediate) { current.get() }
+                    }
                 }
-            }
+            }.getOrNull()
         }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
