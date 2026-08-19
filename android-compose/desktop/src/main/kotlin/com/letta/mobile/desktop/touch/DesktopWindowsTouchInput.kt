@@ -51,6 +51,11 @@ import kotlin.math.roundToInt
  * [DesktopTouchGestureLatch] is the fix: the classification is decided once,
  * at press, and carried through drag/release/click by [TouchTranslatingEventQueue].
  *
+ * A gesture that starts inside a region published to [DesktopTouchDragExclusion]
+ * — e.g. Nucleus's title bar, whose own drag-to-move needs an unmolested
+ * press+drag stream — is passed through untouched instead of being withheld
+ * and translated, decided once at press and latched for the whole gesture.
+ *
  * Windows only, and a no-op whenever the reflective touch hook is unavailable.
  */
 internal object DesktopWindowsTouchInput {
@@ -101,10 +106,11 @@ internal object DesktopWindowsTouchInput {
         }
     }
 
-    private fun isManaged(component: Component?): Boolean {
-        val target = component ?: return false
+    /** The managed [Window] a component's events belong to, or null if the shim doesn't own it. */
+    private fun managedWindow(component: Component?): Window? {
+        val target = component ?: return null
         val window = target as? Window ?: SwingUtilities.getWindowAncestor(target)
-        return window != null && window in windows
+        return window?.takeIf { it in windows }
     }
 
     /**
@@ -126,6 +132,13 @@ internal object DesktopWindowsTouchInput {
          */
         private val originLatch = DesktopTouchGestureLatch()
 
+        /**
+         * Whether the current gesture's `MOUSE_PRESSED` landed inside a
+         * published [DesktopTouchDragExclusion] region (e.g. the title bar).
+         * See [DesktopTouchDragExclusionLatch] for why only the press decides.
+         */
+        private val exclusionLatch = DesktopTouchDragExclusionLatch()
+
         /** Held back until the gesture is known to be a tap rather than a scroll. */
         private var withheldPress: MouseEvent? = null
 
@@ -138,14 +151,12 @@ internal object DesktopWindowsTouchInput {
         private var flingTimer: Timer? = null
 
         override fun dispatchEvent(event: AWTEvent) {
-            // Safety net for an interrupted gesture: if the window loses
-            // focus mid-drag, Windows may never deliver a MOUSE_RELEASED for
-            // the finger still down. cancelFling() unconditionally restores
-            // smooth scrolling, so this guarantees the suppression never gets
-            // stuck off.
-            if (event is WindowEvent &&
-                (event.id == WindowEvent.WINDOW_LOST_FOCUS || event.id == WindowEvent.WINDOW_DEACTIVATED)
-            ) {
+            if (isGestureInterruptingFocusLoss(event)) {
+                // Safety net for an interrupted gesture: if the window loses
+                // focus mid-drag, Windows may never deliver a MOUSE_RELEASED
+                // for the finger still down. cancelFling() unconditionally
+                // restores smooth scrolling, so this guarantees the
+                // suppression never gets stuck off.
                 cancelFling()
                 super.dispatchEvent(event)
                 return
@@ -154,11 +165,45 @@ internal object DesktopWindowsTouchInput {
                 super.dispatchEvent(event)
                 return
             }
+            dispatchMouse(event)
+        }
+
+        private fun isGestureInterruptingFocusLoss(event: AWTEvent): Boolean =
+            event is WindowEvent &&
+                (event.id == WindowEvent.WINDOW_LOST_FOCUS || event.id == WindowEvent.WINDOW_DEACTIVATED)
+
+        /** Entry point for every [MouseEvent] this queue is asked to dispatch. */
+        private fun dispatchMouse(event: MouseEvent) {
             val component = event.source as? Component
-            if (!isManaged(component)) {
+            val window = managedWindow(component)
+            if (window == null) {
+                // Not one of ours (a different window, or a source with no
+                // window ancestor at all): the shim has nothing to say about it.
                 super.dispatchEvent(event)
                 return
             }
+            if (dispatchIfExcluded(event, window)) return
+            dispatchClassified(event, requireNotNull(component))
+        }
+
+        /**
+         * Handles [event] and returns true when it fell inside a
+         * [DesktopTouchDragExclusion] region — e.g. Nucleus's title bar — and
+         * was therefore passed straight through instead of being classified
+         * as touch or mouse at all.
+         */
+        private fun dispatchIfExcluded(event: MouseEvent, window: Window): Boolean {
+            val excluded = exclusionLatch.classify(event.id) {
+                DesktopTouchDragExclusion.contains(window, event.xOnScreen, event.yOnScreen)
+            }
+            if (!excluded) return false
+            if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
+            super.dispatchEvent(event)
+            return true
+        }
+
+        /** Classifies [event] as touch or mouse and routes it accordingly. */
+        private fun dispatchClassified(event: MouseEvent, component: Component) {
             val isTouch = originLatch.classify(event.id, accessor.isCausedByTouchEvent(event))
             recordOrigin(event, isTouch)
             if (!isTouch) {
@@ -166,10 +211,15 @@ internal object DesktopWindowsTouchInput {
                 super.dispatchEvent(event)
                 return
             }
+            dispatchTouchGesture(event, component)
+        }
+
+        /** Feeds a touch-classified [event] into the press/drag/release gesture state machine. */
+        private fun dispatchTouchGesture(event: MouseEvent, component: Component) {
             when (event.id) {
                 MouseEvent.MOUSE_PRESSED -> onTouchPress(event)
-                MouseEvent.MOUSE_DRAGGED -> onTouchDrag(event, requireNotNull(component))
-                MouseEvent.MOUSE_RELEASED -> onTouchRelease(event, requireNotNull(component))
+                MouseEvent.MOUSE_DRAGGED -> onTouchDrag(event, component)
+                MouseEvent.MOUSE_RELEASED -> onTouchRelease(event, component)
                 MouseEvent.MOUSE_CLICKED ->
                     if (suppressNextClick) suppressNextClick = false else super.dispatchEvent(event)
                 // Enter/exit/move carry no gesture state; letting them through

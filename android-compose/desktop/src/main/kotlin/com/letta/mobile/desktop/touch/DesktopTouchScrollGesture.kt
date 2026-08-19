@@ -77,6 +77,48 @@ internal class DesktopTouchGestureLatch {
 }
 
 /**
+ * Latches whether a gesture's press landed inside a
+ * [DesktopTouchDragExclusionRegistry] region (e.g. Nucleus's title bar) and
+ * holds that verdict for the rest of the gesture — the same reasoning as
+ * [DesktopTouchGestureLatch]: a finger that presses inside the excluded
+ * region and then drags outside it must stay excluded rather than suddenly
+ * starting to scroll mid-drag, so only `MOUSE_PRESSED` ever consults
+ * [excludedAtPress].
+ *
+ * The latch clears itself after `MOUSE_CLICKED` — the last event a tap
+ * inside the excluded region produces (release, then a synthesized click) —
+ * so a stale verdict can never leak past a completed tap. A plain drag that
+ * ends at release with no trailing click leaves the latch set; that is
+ * harmless, since the next gesture's own `MOUSE_PRESSED` always re-evaluates
+ * [excludedAtPress] and overwrites it unconditionally rather than trusting
+ * whatever the latch already holds. A release or click that arrives with no
+ * matching press — the shim attached mid-gesture — falls back to the latch's
+ * initial `false`, degrading to "not excluded" rather than guessing, the same
+ * fallback [DesktopTouchGestureLatch] uses.
+ *
+ * Not thread safe: driven entirely from the AWT event dispatch thread, same
+ * as [DesktopTouchGestureLatch] and [DesktopTouchDragGesture].
+ */
+internal class DesktopTouchDragExclusionLatch {
+    private var latched = false
+
+    /**
+     * Returns whether the current gesture is excluded. [excludedAtPress] is
+     * evaluated only when [eventId] is `MOUSE_PRESSED`.
+     */
+    fun classify(eventId: Int, excludedAtPress: () -> Boolean): Boolean {
+        if (eventId == MouseEvent.MOUSE_PRESSED) {
+            latched = excludedAtPress()
+        }
+        val result = latched
+        if (eventId == MouseEvent.MOUSE_CLICKED) {
+            latched = false
+        }
+        return result
+    }
+}
+
+/**
  * Which axis a gesture committed to. Locking on the first movement past the
  * slop keeps a vertical list from stealing a horizontal swipe (and vice versa)
  * the way an un-axis-locked wheel translation would.

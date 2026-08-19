@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -24,12 +25,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.WindowState
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
+import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
 import dev.nucleusframework.window.BasicTitleBar
@@ -42,6 +46,8 @@ import dev.nucleusframework.window.styling.DecoratedWindowStyle
 import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
+import java.awt.Rectangle
+import kotlin.math.roundToInt
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
@@ -169,9 +175,33 @@ internal fun DesktopJewelWindow(
                     windowStyle = windowStyle,
                     titleBarStyle = titleBarStyle,
                 ) {
+                    // Windows touchscreens: DesktopWindowsTouchInput swallows every
+                    // touch drag and replays it as wheel-scroll, which would eat the
+                    // title bar's own drag-to-move gesture before Nucleus ever sees
+                    // it. Publishing these bounds tells the shim to leave gestures
+                    // that start here alone (letta-mobile touch-title-bar regression).
+                    // Screen coordinates sidestep both the density scaling between
+                    // Compose's px space and AWT's, and any offset between the AWT
+                    // component that receives the touch event and this content.
+                    DisposableEffect(window) {
+                        onDispose { DesktopTouchDragExclusion.publish(window, null) }
+                    }
                     BasicTitleBar(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
+                        modifier = Modifier.onGloballyPositioned { coordinates ->
+                            val topLeft = coordinates.positionOnScreen()
+                            val size = coordinates.size
+                            DesktopTouchDragExclusion.publish(
+                                window,
+                                Rectangle(
+                                    topLeft.x.roundToInt(),
+                                    topLeft.y.roundToInt(),
+                                    size.width,
+                                    size.height,
+                                ),
+                            )
+                        },
                     ) {
                         Row(
                             modifier = Modifier

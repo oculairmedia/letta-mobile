@@ -254,4 +254,128 @@ class DesktopTouchScrollGestureTest {
         // The latched press classification survives untouched.
         assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED, accessorSaysTouch = false))
     }
+
+    // --- DesktopTouchDragExclusionLatch --------------------------------
+
+    @Test
+    fun `a press inside an excluded region passes through unmodified`() {
+        val latch = DesktopTouchDragExclusionLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED) { true })
+    }
+
+    @Test
+    fun `a press outside any excluded region still scrolls`() {
+        val latch = DesktopTouchDragExclusionLatch()
+        assertFalse(latch.classify(MouseEvent.MOUSE_PRESSED) { false })
+        assertFalse(latch.classify(MouseEvent.MOUSE_DRAGGED) { error("must not be consulted mid-gesture") })
+        assertFalse(latch.classify(MouseEvent.MOUSE_RELEASED) { error("must not be consulted mid-gesture") })
+    }
+
+    @Test
+    fun `a gesture starting inside an excluded region stays excluded after the finger wanders out`() {
+        val latch = DesktopTouchDragExclusionLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED) { true })
+
+        // The finger has left the region; if this were re-evaluated per event
+        // the gesture would flip to scrolling mid-drag. Only the press may
+        // consult the predicate at all — a lambda that would answer "false"
+        // must never even run for a dragged/released event.
+        assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED) { error("must not be consulted mid-gesture") })
+        assertTrue(latch.classify(MouseEvent.MOUSE_DRAGGED) { error("must not be consulted mid-gesture") })
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED) { error("must not be consulted mid-gesture") })
+    }
+
+    @Test
+    fun `a plain excluded drag with no trailing click leaves the latch set, but the next press still re-evaluates`() {
+        val latch = DesktopTouchDragExclusionLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED) { true })
+        // A drag beyond the click threshold: AWT never synthesizes MOUSE_CLICKED,
+        // so the latch has nothing to reset it on. It stays "excluded" — inert
+        // until a new gesture's own press unconditionally overwrites it.
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED) { true })
+
+        assertFalse(latch.classify(MouseEvent.MOUSE_PRESSED) { false })
+        assertFalse(latch.classify(MouseEvent.MOUSE_DRAGGED) { error("must not be consulted mid-gesture") })
+    }
+
+    @Test
+    fun `the exclusion latch clears after a tap's trailing click`() {
+        val latch = DesktopTouchDragExclusionLatch()
+        assertTrue(latch.classify(MouseEvent.MOUSE_PRESSED) { true })
+        assertTrue(latch.classify(MouseEvent.MOUSE_RELEASED) { true })
+        // MOUSE_CLICKED reports the still-latched verdict, then clears it.
+        assertTrue(latch.classify(MouseEvent.MOUSE_CLICKED) { error("must not be consulted on click") })
+
+        assertFalse(latch.classify(MouseEvent.MOUSE_PRESSED) { false })
+    }
+
+    @Test
+    fun `a release or click with no matching press degrades to not excluded instead of guessing`() {
+        // Shim attached mid-gesture: no MOUSE_PRESSED was ever latched.
+        assertFalse(DesktopTouchDragExclusionLatch().classify(MouseEvent.MOUSE_RELEASED) { true })
+        assertFalse(DesktopTouchDragExclusionLatch().classify(MouseEvent.MOUSE_CLICKED) { true })
+    }
+
+    // --- DesktopTouchDragExclusionRegistry ------------------------------
+    //
+    // Tested against the generic registry with plain Any() stand-ins for the
+    // window key: WeakHashMap keys on identity, so any distinct object works,
+    // and a bare Any() never touches AWT or risks a HeadlessException the way
+    // constructing a real java.awt.Window would on a display-less test runner.
+
+    @Test
+    fun `an unpublished window degrades to not excluded instead of throwing`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        assertFalse(registry.contains(window, screenX = 0, screenY = 0))
+    }
+
+    @Test
+    fun `a point inside the published rect is excluded, a point outside is not`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        registry.publish(window, java.awt.Rectangle(100, 200, 300, 48))
+
+        assertTrue(registry.contains(window, screenX = 150, screenY = 210))
+        assertFalse(registry.contains(window, screenX = 50, screenY = 210))
+        assertFalse(registry.contains(window, screenX = 150, screenY = 500))
+    }
+
+    @Test
+    fun `clearing the published bounds degrades back to not excluded`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        registry.publish(window, java.awt.Rectangle(0, 0, 100, 100))
+        assertTrue(registry.contains(window, screenX = 10, screenY = 10))
+
+        registry.publish(window, null)
+        assertFalse(registry.contains(window, screenX = 10, screenY = 10))
+    }
+
+    @Test
+    fun `two windows keep independent excluded regions`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val windowA = Any()
+        val windowB = Any()
+        registry.publish(windowA, java.awt.Rectangle(0, 0, 50, 50))
+
+        assertTrue(registry.contains(windowA, screenX = 10, screenY = 10))
+        assertFalse(registry.contains(windowB, screenX = 10, screenY = 10))
+    }
+
+    // --- DesktopTouchDragExclusionLatch + DesktopTouchDragExclusionRegistry,
+    // wired together the way TouchTranslatingEventQueue.dispatchEvent does ---
+
+    @Test
+    fun `end to end, a press inside the published title bar bounds is excluded and a press outside scrolls`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        registry.publish(window, java.awt.Rectangle(0, 0, 800, 48))
+
+        val insideGesture = DesktopTouchDragExclusionLatch()
+        assertTrue(insideGesture.classify(MouseEvent.MOUSE_PRESSED) { registry.contains(window, 400, 20) })
+
+        val outsideGesture = DesktopTouchDragExclusionLatch()
+        assertFalse(outsideGesture.classify(MouseEvent.MOUSE_PRESSED) { registry.contains(window, 400, 300) })
+    }
 }
