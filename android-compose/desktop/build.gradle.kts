@@ -304,6 +304,17 @@ nucleus.application {
     // Release CI running on JDK 26 did not help for the same reason.
     packagingJavaHome?.let { javaHome = it }
 
+    // Windows touch input (see desktop/.../touch/DesktopWindowsTouchInput.kt).
+    // AWT translates WM_TOUCH into ordinary MouseEvents and keeps the only
+    // "this came from a finger" flag behind sun.awt.AWTAccessor, which is not
+    // an exported package. Without this the shim degrades to a no-op (logged
+    // once) and touch drag-to-scroll plus the touch keyboard stay dead.
+    // Nucleus feeds `jvmArgs` to BOTH the `run` task and jpackage's
+    // --java-options, so dev runs and installed builds stay in sync; verify a
+    // packaged build with:
+    //   findstr add-opens "<install dir>\app\Letta Desktop.cfg"
+    jvmArgs("--add-opens=java.desktop/sun.awt=ALL-UNNAMED")
+
     // Native Image is intentionally opt-in: the JVM distribution remains the
     // compatibility build for JCEF and Iroh, while release engineers can run
     // `-PnucleusGraalvm=true` to benchmark the native launcher.
