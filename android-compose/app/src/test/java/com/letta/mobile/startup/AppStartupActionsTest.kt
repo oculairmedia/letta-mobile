@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import com.letta.mobile.channel.ChannelHeartbeatScheduler
 import com.letta.mobile.channel.ChannelNotificationPublisher
+import com.letta.mobile.data.local.LettaDatabase
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.debug.AutomationAuthBootstrap
 import com.letta.mobile.performance.DebugPerformanceMonitor
@@ -27,12 +28,14 @@ class AppStartupActionsTest {
     private val lazySettingsRepository: Lazy<ISettingsRepository> = mockk()
     private val channelHeartbeatScheduler: ChannelHeartbeatScheduler = mockk(relaxed = true)
     private val application: Application = mockk()
+    private val database: Lazy<LettaDatabase> = mockk()
 
     private lateinit var startupActions: DefaultAppStartupActions
 
     @Before
     fun setUp() {
         every { lazySettingsRepository.get() } returns settingsRepository
+        every { database.get() } returns mockk()
         mockkObject(AutomationAuthBootstrap)
         mockkObject(ProductionJankStatsMonitor)
         mockkObject(DebugPerformanceMonitor)
@@ -41,7 +44,8 @@ class AppStartupActionsTest {
             context = context,
             channelNotificationPublisher = channelNotificationPublisher,
             settingsRepository = lazySettingsRepository,
-            channelHeartbeatScheduler = channelHeartbeatScheduler
+            channelHeartbeatScheduler = channelHeartbeatScheduler,
+            database = database
         )
     }
 

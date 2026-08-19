@@ -1,6 +1,8 @@
 package com.letta.mobile.data.session
 
 import com.letta.mobile.data.api.LettaApiClient
+import com.letta.mobile.data.local.AgentDao
+import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
@@ -28,6 +30,10 @@ import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.advanceUntilIdle
 import org.junit.Assert.assertEquals
+
+// letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because the
+// production constructor now takes Lazy<AgentDao> / Lazy<ConversationDao>.
+private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 
 internal fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
@@ -102,9 +108,9 @@ internal fun sessionTestConfig(id: String): LettaConfig = LettaConfig(
 
 internal class TestSessionGraphFactoryBuilder(
     var agentApi: FakeAgentApi = FakeAgentApi(),
-    var agentDao: FakeAgentDao = FakeAgentDao(),
+    var agentDao: dagger.Lazy<AgentDao> = lazyOf(FakeAgentDao()),
     var conversationApi: FakeConversationApi = FakeConversationApi(),
-    var conversationDao: FakeConversationDao = FakeConversationDao(),
+    var conversationDao: dagger.Lazy<ConversationDao> = lazyOf(FakeConversationDao()),
     var archiveApi: FakeArchiveApi = FakeArchiveApi(),
     var folderApi: FakeFolderApi = FakeFolderApi(),
     var groupApi: FakeGroupApi = FakeGroupApi(),
