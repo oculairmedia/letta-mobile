@@ -4,16 +4,15 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonClassDiscriminator
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
-/**
- * Patch body for [AppServerCommand.ChannelAccountUpdate]. Upstream validates
- * with `hasOnlyFields(patch, CHANNEL_ACCOUNT_UPDATE_FIELDS)`, so every field
- * here must stay within {display_name, enabled, dm_policy, allowed_users,
- * config}; `config` is intentionally absent (see the command doc).
- */
 @Serializable
 data class AppServerChannelAccountPatch(
     val enabled: Boolean? = null,
