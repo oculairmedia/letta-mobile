@@ -51,7 +51,7 @@ enum class BackendKind {
 /**
  * True when the backend is an `iroh://` node (bare, or a corrupted
  * `https://iroh://` saved config). Mirrors `IrohChannelTransport.isIrohUrl`,
- * which is what `SessionGraphFactory` uses to bind the transport — the two
+ * which is what `DefaultSessionRepositoryGraphFactory` uses to bind the transport — the two
  * MUST agree, otherwise routing and transport disagree about the backend.
  */
 fun LettaConfig.isIrohBackend(): Boolean = isIrohBackendUrl(serverUrl)

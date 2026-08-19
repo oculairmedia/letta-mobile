@@ -38,13 +38,19 @@ import kotlinx.coroutines.launch
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import dagger.Lazy
 
 internal fun defaultAgentRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+// letta-mobile-g2ff0: agentDao is dagger.Lazy<AgentDao> so Room.databaseBuilder.build()
+// runs lazily on the first dao.get() (inside an existing repositoryScope.launch
+// {} block), not synchronously during Hilt graph resolution on the main thread.
+// (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor rejects
+// @Provides methods returning framework types like Provider.)
 open class AgentRepository(
     private val agentApi: AgentApi,
-    private val agentDao: AgentDao,
+    private val agentDao: Lazy<AgentDao>,
     private val repositoryScope: CoroutineScope = defaultAgentRepositoryScope(),
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
@@ -71,7 +77,7 @@ open class AgentRepository(
     init {
         repositoryScope.launch {
             try {
-                val cached = agentDao.getAllOnce().map { it.toAgent() }
+                val cached = agentDao.get().getAllOnce().map { it.toAgent() }
                 if (cached.isNotEmpty()) {
                     _agents.value = cached
                 }
@@ -156,7 +162,7 @@ open class AgentRepository(
             // hard-to-diagnose cross-backend leak. The orchestrator
             // (BackendSwitchInvalidator) aggregates per-cache failures so the
             // switch flow can decide what to do.
-            agentDao.deleteAll()
+            agentDao.get().deleteAll()
         }
     }
 
@@ -170,7 +176,7 @@ open class AgentRepository(
         if (localSource != null && isLocalRuntimeActive()) {
             val local = localSource.listAgents()
             _agents.update { local }
-            agentDao.insertAll(local.map { AgentEntity.fromAgent(it) })
+            agentDao.get().insertAll(local.map { AgentEntity.fromAgent(it) })
             lastRefreshAtMillis = System.currentTimeMillis()
             return
         }
@@ -181,11 +187,11 @@ open class AgentRepository(
         lastRefreshAtMillis = System.currentTimeMillis()
         try {
             val entities = fresh.map { AgentEntity.fromAgent(it) }
-            agentDao.insertAll(entities)
+            agentDao.get().insertAll(entities)
             if (fresh.isEmpty()) {
-                agentDao.deleteAll()
+                agentDao.get().deleteAll()
             } else {
-                agentDao.deleteExcept(fresh.map { it.id.value })
+                agentDao.get().deleteExcept(fresh.map { it.id.value })
             }
         } catch (e: Exception) {
             Log.w("AgentRepository", "Failed to cache agents to Room", e)
@@ -334,7 +340,7 @@ open class AgentRepository(
         updateAgentInCache(fresh)
         // Persist the transport-driven refresh to the Room cache so a pushed
         // agent_updated change survives an app restart (CodeRabbit #517).
-        runCatching { agentDao.upsert(AgentEntity.fromAgent(fresh)) }
+        runCatching { agentDao.get().upsert(AgentEntity.fromAgent(fresh)) }
             .onFailure { e -> Log.w("AgentRepository", "agent_updated cache persist failed for ${agentId.value}", e) }
         fresh
     }
@@ -347,7 +353,7 @@ open class AgentRepository(
                 _agents.update { current -> current.filterNot { it.id == agentId } }
                 // Targeted single-agent delete — not a broad deleteExcept that
                 // could race with a stale in-memory list (CodeRabbit #517).
-                runCatching { agentDao.deleteById(agentId.value) }
+                runCatching { agentDao.get().deleteById(agentId.value) }
                     .onFailure { e -> Log.w("AgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", e) }
                 return@collect
             }
@@ -438,7 +444,7 @@ open class AgentRepository(
             hidden = params.hidden,
             compactionSettings = params.compactionSettings,
         )
-        agentDao.upsert(AgentEntity.fromAgent(agent))
+        agentDao.get().upsert(AgentEntity.fromAgent(agent))
         updateAgentInCache(agent)
         // Room is wiped on every session-graph creation; the durable copy
         // lives in the local-runtime store (letta-mobile-y5c9u).
@@ -456,7 +462,7 @@ open class AgentRepository(
             // decides whether the next turn uses embedded runtime or remote
             // transport from the updated model/metadata binding.
             localSource.persistAgent(preview)
-            agentDao.upsert(AgentEntity.fromAgent(preview))
+            agentDao.get().upsert(AgentEntity.fromAgent(preview))
             updateAgentInCache(preview)
             return preview
         }
@@ -487,7 +493,7 @@ open class AgentRepository(
         }
         _agents.update { current -> current.filterNot { it.id == id } }
         try {
-            agentDao.deleteExcept(_agents.value.map { it.id.value })
+            agentDao.get().deleteExcept(_agents.value.map { it.id.value })
         } catch (e: Exception) {
             Log.w("AgentRepository", "Failed to update cached agents after delete", e)
         }

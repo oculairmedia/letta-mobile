@@ -57,6 +57,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.compose")
     id("dev.nucleusframework")
+    // Kotzilla observability — JVM (Desktop) target. The plugin's
+    // generated `io.kotzilla.generated.initKotzillaConfig()` is called
+    // from Desktop's `main()` via the shared `startKotzillaMonitoring()`
+    // wrapper in sharedLogic/jvmMain. Per-platform wiring because
+    // sharedLogic is a KMP module and the plugin generates code into
+    // commonMain that pulls in JVM/Android-only SDK classes — applying
+    // it there breaks Kotlin/Native test targets.
+    id("io.kotzilla.kotzilla-plugin")
 }
 
 composeCompiler {
@@ -215,6 +223,12 @@ dependencies {
     implementation("io.ktor:ktor-client-websockets:$ktorVersion")
     implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    // Kotzilla SDK — JVM Compose variant for Desktop's instrumentation.
+    // The wrapper in sharedLogic/jvmMain calls initKotzillaConfig() from
+    // the generated `io.kotzilla.generated` package (reflective lookup so
+    // the wrapper still compiles when the plugin isn't applied, e.g.
+    // CI without a developer's local kotzilla.json).
+    implementation("io.kotzilla:kotzilla-sdk-compose-jvm:2.3.3")
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.compose.ui:ui-test:1.11.1")

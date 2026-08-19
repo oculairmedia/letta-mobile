@@ -32,6 +32,9 @@ class AppStartupCoordinator @Inject constructor(
     }
 
     private fun startupTasks(application: Application): List<AppStartupTask> = listOf(
+        AppStartupTask("prewarm database") {
+            actions.prewarmDatabase()
+        },
         AppStartupTask("notification channel") {
             actions.ensureNotificationChannel()
         },

@@ -114,7 +114,7 @@ open class LettaApiClient @Inject constructor(
         // anything still landing here has no Iroh path and must fail visibly.
         //
         // letta-mobile-lgns8.10.4.1: keys on shouldUseIroh(), not isIrohUrl().
-        // shouldUseIroh() is the SAME predicate SessionGraphFactory uses to bind
+        // shouldUseIroh() is the SAME predicate DefaultSessionRepositoryGraphFactory uses to bind
         // IrohChannelTransport, so the admin-HTTP guard and the transport binding
         // can no longer disagree. The old isIrohUrl() form left one documented
         // hole: under a debug-force build (DEBUG_FORCE_IROH_URL non-blank) the

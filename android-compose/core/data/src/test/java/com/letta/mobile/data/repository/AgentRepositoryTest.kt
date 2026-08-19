@@ -33,18 +33,22 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
+// letta-mobile-g2ff0: tests must wrap DAOs in dagger.Lazy because the
+// production constructor now takes Lazy<AgentDao> / Lazy<ConversationDao>.
+private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
+
 @OptIn(ExperimentalCoroutinesApi::class)
 @Tag("integration")
 class AgentRepositoryTest {
 
     private lateinit var fakeApi: FakeAgentApi
-    private lateinit var fakeDao: FakeAgentDao
+    private lateinit var fakeDao: dagger.Lazy<AgentDao>
     private lateinit var repository: AgentRepository
 
     @Before
     fun setup() {
         fakeApi = FakeAgentApi()
-        fakeDao = FakeAgentDao()
+        fakeDao = lazyOf(FakeAgentDao())
         repository = AgentRepository(fakeApi, fakeDao)
     }
 
@@ -357,8 +361,8 @@ class AgentRepositoryTest {
         assertEquals("google/gemma-3n-E2B-it-litert-lm", agent.model)
         assertTrue(agent.tools.isEmpty())
         assertEquals(listOf(agent.id), repository.agents.value.map { it.id })
-        assertEquals(listOf(agent.id.value), fakeDao.getAllOnce().map { it.id })
-        assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, fakeDao.getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RUNTIME_KEY]?.jsonPrimitive?.contentOrNull)
+        assertEquals(listOf(agent.id.value), fakeDao.get().getAllOnce().map { it.id })
+        assertEquals(LocalAgentRuntimeMetadata.LOCAL_LETTA_CODE_RUNTIME, fakeDao.get().getAllOnce().single().toAgent().metadata[LocalAgentRuntimeMetadata.RUNTIME_KEY]?.jsonPrimitive?.contentOrNull)
         assertFalse(fakeApi.calls.any { it.startsWith("createAgent") })
     }
 
@@ -551,7 +555,7 @@ class AgentRepositoryTest {
                 throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
             }
         }
-        val repo = AgentRepository(apiThatThrows, FakeAgentDao())
+        val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()))
         repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
     }
 
@@ -591,7 +595,7 @@ class AgentRepositoryTest {
         }
         val repo = AgentRepository(
             apiThatThrows,
-            FakeAgentDao(),
+            lazyOf(FakeAgentDao()),
             settingsRepository = settings,
             transport = transport,
             irohAgentSource = irohSource,
@@ -629,7 +633,7 @@ class AgentRepositoryTest {
             }
             override suspend fun listAgents(limit: Int?, offset: Int?, tags: List<String>?): List<com.letta.mobile.data.model.Agent> = emptyList()
         }
-        val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
+        val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
         val result = repo.createAgent(com.letta.mobile.data.model.AgentCreateParams(name = "Test Agent"))
         assertEquals("Created Agent", result.name)
         assertTrue(transport.adminRpcCalls.any { it.method == "agent.create" })
@@ -652,7 +656,7 @@ class AgentRepositoryTest {
                 throw com.letta.mobile.data.api.IrohAdminApiUnavailableException("Raw HTTP forbidden")
             }
         }
-        val repo = AgentRepository(apiThatThrows, FakeAgentDao(), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
+        val repo = AgentRepository(apiThatThrows, lazyOf(FakeAgentDao()), settingsRepository = settings, transport = transport, irohAgentSource = irohSource)
         repo.deleteAgent(AgentId("a1"))
         assertEquals(1, transport.adminRpcCalls.size)
     }
@@ -668,7 +672,7 @@ class AgentRepositoryTest {
                 return totalAgents.drop(currentOffset).take(serverCap)
             }
         }
-        val repo = AgentRepository(apiWithSmallPageCap, FakeAgentDao())
+        val repo = AgentRepository(apiWithSmallPageCap, lazyOf(FakeAgentDao()))
         repo.refreshAgents()
         assertEquals(60, repo.agents.value.size)
     }

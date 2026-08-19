@@ -34,10 +34,10 @@ interface AppServerTransportAdapter {
  * Registry for transport adapters. Resolves [AppServerEndpoint] descriptors
  * to concrete [AppServerTransport] implementations.
  *
- * The Ktor WebSocket adapter is registered by default for "ws" and "wss".
- * Future adapters (Iroh QUIC, etc.) can be registered before use.
+ * Prefer constructing a fresh instance in tests. Production code uses
+ * [AppServerTransportRegistry.shared] (letta-mobile-l2ew9.4).
  */
-object AppServerTransportRegistry {
+class AppServerTransportRegistry {
     private val adapters = mutableMapOf<String, AppServerTransportAdapter>()
 
     /**
@@ -77,7 +77,20 @@ object AppServerTransportRegistry {
     /**
      * Clears all registered adapters. Useful for testing.
      */
-    internal fun clearForTest() {
+    fun clearForTest() {
         adapters.clear()
+    }
+
+    companion object {
+        val shared: AppServerTransportRegistry = AppServerTransportRegistry()
+
+        fun register(adapter: AppServerTransportAdapter) = shared.register(adapter)
+        fun getAdapter(scheme: String): AppServerTransportAdapter? = shared.getAdapter(scheme)
+        fun createTransport(
+            endpoint: AppServerEndpoint,
+            scope: CoroutineScope,
+            protocol: AppServerProtocol = AppServerProtocol,
+        ): AppServerTransport = shared.createTransport(endpoint, scope, protocol)
+        internal fun clearForTest() = shared.clearForTest()
     }
 }

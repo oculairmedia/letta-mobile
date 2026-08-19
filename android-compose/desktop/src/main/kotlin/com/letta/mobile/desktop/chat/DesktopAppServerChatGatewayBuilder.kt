@@ -30,15 +30,18 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.withContext
 
 /**
- * Factory for the desktop chat gateway backed by the App Server controller.
+ * Builds the desktop chat gateway backed by the App Server controller.
  *
- * Wires the controller stack (transport -> client -> controller) for either an
+ * Wires the controller stack (transport -> client -> turn engine) for either an
  * iroh:// backend (QUIC, peer to the Android path) or a WebSocket App Server,
  * authenticates the iroh session, and returns a hybrid gateway that routes
  * send/stream through the controller. LOCAL admin reads/writes share that same
  * child-owned protocol session; remote backends retain their HTTP admin path.
+ *
+ * Desktop does not use Hilt; callers inject this builder (or a test fake of
+ * [DesktopAppServerChatGatewayFactory]) instead of constructing the stack inline.
  */
-class DesktopAppServerControllerGatewayFactory(
+class DesktopAppServerChatGatewayBuilder(
     /** Coroutine scope for the controller and transport. */
     private val controllerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
     /**
@@ -68,7 +71,7 @@ class DesktopAppServerControllerGatewayFactory(
 
         val client = DefaultAppServerClient(transport)
         val localClientLease = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-            DesktopLocalAppServerClientRegistry.install(client)
+            DesktopLocalAppServerClientRegistry.shared.install(client)
         } else {
             null
         }

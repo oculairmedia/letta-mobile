@@ -8,6 +8,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover")
+    // Kotzilla plugin intentionally NOT applied here. The plugin generates
+    // code into commonMain that pulls in JVM/Android-only SDK classes
+    // (`io.kotzilla.sdk.*`), which breaks Kotlin/Native (hostNative) test
+    // targets — `compileKotlinHostNative` fails on every PR. Apply the
+    // plugin per-platform instead:
+    //   - :app (Android) — gated by -Pkotzilla=true, applies kotzilla.json
+    //     from this module's source set
+    //   - :desktop (JVM) — applied unconditionally, uses the same kotzilla.json
+    // The shared `KotzillaKmpMonitoring` wrapper lives in this module's
+    // jvmMain (JVM-only reflection) and is callable from both.
 }
 
 kover {

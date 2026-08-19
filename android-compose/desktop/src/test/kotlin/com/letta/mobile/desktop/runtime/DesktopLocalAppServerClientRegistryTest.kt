@@ -2,7 +2,6 @@ package com.letta.mobile.desktop.runtime
 
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
-import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
@@ -18,18 +17,19 @@ import kotlinx.coroutines.TimeoutCancellationException
 class DesktopLocalAppServerClientRegistryTest {
     @Test
     fun `repository generation waits for each next client`() = runTest {
-        val baseline = DesktopLocalAppServerClientRegistry.generation()
+        val registry = DesktopLocalAppServerClientRegistry()
+        val baseline = registry.generation()
         val first = FakeClient()
         val second = FakeClient()
-        val waiting = async { DesktopLocalAppServerClientRegistry.awaitClientAfter(baseline) }
+        val waiting = async { registry.awaitClientAfter(baseline) }
         runCurrent()
 
-        val firstLease = DesktopLocalAppServerClientRegistry.install(first)
+        val firstLease = registry.install(first)
         assertSame(first, waiting.await())
-        val firstGeneration = DesktopLocalAppServerClientRegistry.generation()
-        val waitingForSecond = async { DesktopLocalAppServerClientRegistry.awaitClientAfter(firstGeneration) }
+        val firstGeneration = registry.generation()
+        val waitingForSecond = async { registry.awaitClientAfter(firstGeneration) }
         runCurrent()
-        val secondLease = DesktopLocalAppServerClientRegistry.install(second)
+        val secondLease = registry.install(second)
         firstLease.close()
 
         assertSame(second, waitingForSecond.await())
@@ -38,23 +38,25 @@ class DesktopLocalAppServerClientRegistryTest {
 
     @Test
     fun `repository wait is bounded while a gateway is unavailable`() = runTest {
-        val baseline = DesktopLocalAppServerClientRegistry.generation()
+        val registry = DesktopLocalAppServerClientRegistry()
+        val baseline = registry.generation()
 
         assertFailsWith<TimeoutCancellationException> {
-            DesktopLocalAppServerClientRegistry.awaitClientAfter(baseline, timeoutMs = 1)
+            registry.awaitClientAfter(baseline, timeoutMs = 1)
         }
     }
 
     @Test
     fun `current client follows the latest installed generation`() = runTest {
+        val registry = DesktopLocalAppServerClientRegistry()
         val first = FakeClient()
         val second = FakeClient()
-        val firstLease = DesktopLocalAppServerClientRegistry.install(first)
+        val firstLease = registry.install(first)
 
-        assertSame(first, DesktopLocalAppServerClientRegistry.currentClient())
-        val secondLease = DesktopLocalAppServerClientRegistry.install(second)
+        assertSame(first, registry.currentClient())
+        val secondLease = registry.install(second)
         firstLease.close()
-        assertSame(second, DesktopLocalAppServerClientRegistry.currentClient())
+        assertSame(second, registry.currentClient())
 
         secondLease.close()
     }

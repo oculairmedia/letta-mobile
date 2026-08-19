@@ -36,7 +36,7 @@ internal fun defaultCronScope(): CoroutineScope =
  * letta-mobile-lgns8.10.4.1 — TRANSPORT: this repository speaks only the
  * common [IChannelTransport] cron surface (`sendCronList` / `sendCronAdd` /
  * `sendCronDelete`). It does NOT speak the shim WS cron protocol directly, and
- * the concrete wire format is chosen by whichever transport `SessionGraphFactory`
+ * the concrete wire format is chosen by whichever transport `DefaultSessionRepositoryGraphFactory`
  * bound for the active backend:
  *
  *  - `iroh://` config -> `IrohChannelTransport`, which bridges each of these

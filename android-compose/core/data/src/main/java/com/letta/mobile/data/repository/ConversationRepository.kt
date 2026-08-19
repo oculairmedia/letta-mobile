@@ -26,14 +26,20 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import dagger.Lazy
 
 internal fun defaultConversationRepositoryScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+// letta-mobile-g2ff0: conversationDao is dagger.Lazy<ConversationDao> so Room init
+// happens lazily on the first dao.get() call (inside repositoryScope.launch
+// {} blocks), not synchronously on the main thread during Hilt graph resolution.
+// (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor rejects
+// @Provides methods returning framework types like Provider.)
 open class ConversationRepository(
     private val conversationApi: ConversationApi,
     private val agentRepository: IAgentRepository,
-    private val conversationDao: ConversationDao,
+    private val conversationDao: Lazy<ConversationDao>,
     repositoryScope: CoroutineScope = defaultConversationRepositoryScope(),
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val settingsRepository: ISettingsRepository? = null,
@@ -46,11 +52,11 @@ open class ConversationRepository(
     init {
         repositoryScope.launch {
             try {
-                val cached = conversationDao.getAllOnce().map { it.toConversation() }
+                val cached = conversationDao.get().getAllOnce().map { it.toConversation() }
                 if (cached.isNotEmpty()) {
                     _conversationsByAgent.value = cached.groupBy { it.agentId }
                 }
-                conversationDao.getAllRefreshStatesOnce().forEach { state ->
+                conversationDao.get().getAllRefreshStatesOnce().forEach { state ->
                     lastRefreshAtMillisByAgent[AgentId(state.agentId)] = state.lastRefreshAtMillis
                 }
             } catch (e: Exception) {
@@ -60,7 +66,7 @@ open class ConversationRepository(
     }
 
     override fun getConversations(agentId: AgentId): Flow<List<Conversation>> {
-        return conversationDao.observeForAgent(agentId.value).map { rows ->
+        return conversationDao.get().observeForAgent(agentId.value).map { rows ->
             rows.map { it.toConversation() }.also { conversations ->
                 updateMemoryCache(agentId, conversations)
             }
@@ -77,8 +83,8 @@ open class ConversationRepository(
             lastRefreshAtMillisByAgent.clear()
             // Propagate DAO failure. See AgentRepository.clearForBackendSwitch
             // for the rationale.
-            conversationDao.deleteAll()
-            conversationDao.deleteAllRefreshStates()
+            conversationDao.get().deleteAll()
+            conversationDao.get().deleteAllRefreshStates()
         }
     }
 
@@ -132,7 +138,7 @@ open class ConversationRepository(
             }
             fetched.also { conversation -> upsertCachedConversation(conversation) }
         } catch (e: Exception) {
-            conversationDao.getByIdOnce(id.value)?.toConversation() ?: throw e
+            conversationDao.get().getByIdOnce(id.value)?.toConversation() ?: throw e
         }
     }
 
@@ -248,19 +254,19 @@ open class ConversationRepository(
 
     private suspend fun snapshotForAgent(agentId: AgentId): List<Conversation> {
         return getCachedConversations(agentId).ifEmpty {
-            conversationDao.getForAgentOnce(agentId.value).map { it.toConversation() }
+            conversationDao.get().getForAgentOnce(agentId.value).map { it.toConversation() }
         }
     }
 
     private suspend fun upsertCachedConversation(conversation: Conversation, markAgentFresh: Boolean = false) {
-        conversationDao.upsert(ConversationEntity.fromConversation(conversation))
+        conversationDao.get().upsert(ConversationEntity.fromConversation(conversation))
         val current = snapshotForAgent(conversation.agentId)
         val updated = listOf(conversation) + current.filterNot { it.id == conversation.id }
         updateMemoryCache(conversation.agentId, updated)
         if (markAgentFresh) {
             val refreshedAt = System.currentTimeMillis()
             lastRefreshAtMillisByAgent[conversation.agentId] = refreshedAt
-            conversationDao.upsertRefreshState(
+            conversationDao.get().upsertRefreshState(
                 ConversationRefreshEntity(agentId = conversation.agentId.value, lastRefreshAtMillis = refreshedAt),
             )
         }
@@ -271,7 +277,7 @@ open class ConversationRepository(
         conversations: List<Conversation>,
         refreshedAtMillis: Long,
     ) {
-        conversationDao.replaceForAgent(
+        conversationDao.get().replaceForAgent(
             agentId = agentId.value,
             conversations = conversations.map { ConversationEntity.fromConversation(it, cachedAtEpochMs = refreshedAtMillis) },
             refreshedAtMillis = refreshedAtMillis,

@@ -14,7 +14,7 @@ import org.junit.Test
  * letta-mobile-lgns8.10.4.1 — cron off the shim WS.
  *
  * `CronRepository` speaks only the common `IChannelTransport` cron surface; the
- * wire format is decided by whichever transport `SessionGraphFactory` bound for
+ * wire format is decided by whichever transport `DefaultSessionRepositoryGraphFactory` bound for
  * the active backend:
  *
  *  - `iroh://` config -> `IrohChannelTransport`, which bridges every cron call

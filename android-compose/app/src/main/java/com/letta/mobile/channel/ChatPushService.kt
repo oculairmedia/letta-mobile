@@ -78,16 +78,22 @@ fun clearIngestedListenerIfActive(
 @AndroidEntryPoint
 class ChatPushService : Service() {
 
-    @Inject lateinit var timelineRepository: TimelineRepository
-    @Inject lateinit var conversationApi: ConversationApi
-    @Inject lateinit var agentRepository: IAgentRepository
-    @Inject lateinit var notificationDeliveryCoordinator: NotificationDeliveryCoordinator
-    @Inject lateinit var channelNotificationPublisher: ChannelNotificationPublisher
-    @Inject lateinit var currentConversationTracker: CurrentConversationTracker
+    /**
+     * Single field inject required by `@AndroidEntryPoint`. Collaborators live
+     * on [ChatPushServiceDependencies] via constructor injection.
+     */
+    @Inject lateinit var deps: ChatPushServiceDependencies
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var warmupJob: Job? = null
     private var installedIngestedListener: IngestedMessageListener? = null
+
+    private val timelineRepository get() = deps.timelineRepository
+    private val conversationApi get() = deps.conversationApi
+    private val agentRepository get() = deps.agentRepository
+    private val notificationDeliveryCoordinator get() = deps.notificationDeliveryCoordinator
+    private val channelNotificationPublisher get() = deps.channelNotificationPublisher
+    private val currentConversationTracker get() = deps.currentConversationTracker
 
     override fun onBind(intent: Intent?): IBinder? = null
 
