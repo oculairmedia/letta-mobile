@@ -78,7 +78,7 @@ class SessionGraphFactoryTest {
     // localRuntimeOptions).
     private fun factory(
         settingsRepository: ISettingsRepository? = null,
-        localRuntimeOptions: LocalRuntimeOptions? = null,
+        localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     ): SessionGraphFactory = SessionGraphFactory(
         agentApi = agentApi,
         agentDao = lazyOf(agentDao),
@@ -173,8 +173,7 @@ class SessionGraphFactoryTest {
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
 
         val factory = factory(
-            settingsRepository = settingsRepository,
-            localRuntimeOptions = LocalRuntimeOptions.Disabled
+            settingsRepository = settingsRepository
         )
 
         val graph = factory.create()
