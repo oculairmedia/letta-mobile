@@ -4,6 +4,7 @@ import java.awt.Rectangle
 import java.awt.Window
 import java.util.Collections
 import java.util.WeakHashMap
+import kotlin.math.roundToInt
 
 /**
  * Registry of screen-space regions inside a window that [DesktopWindowsTouchInput]
@@ -59,3 +60,28 @@ internal class DesktopTouchDragExclusionRegistry<K : Any> {
 
 /** Process-wide registry shared by the title bar (publisher) and the touch shim (reader). */
 internal val DesktopTouchDragExclusion = DesktopTouchDragExclusionRegistry<Window>()
+
+/**
+ * Builds the screen-space [Rectangle] to publish for a title-bar-shaped
+ * region, or null when [screenX]/[screenY] are not finite.
+ *
+ * The non-finite case is real, not defensive paranoia: Compose's
+ * `LayoutCoordinates.positionOnScreen()` returns `Offset.Unspecified` — NaN
+ * in both components — while a layout is not yet attached to a screen,
+ * which happens during a window's very first composition pass. Rounding a
+ * NaN throws `IllegalArgumentException` and crashed app startup outright
+ * before this guard existed.
+ *
+ * Returning null (rather than clamping to some fallback rectangle) is
+ * deliberate: the caller is expected to feed this straight into
+ * [DesktopTouchDragExclusionRegistry.publish], where null *clears* any
+ * previously published bounds. A stale rectangle left over content is worse
+ * than the title bar briefly reporting "not excluded" for one frame — a
+ * missed touch-drag-to-move is recoverable the moment the next layout pass
+ * republishes real bounds, whereas a wrong exclusion rectangle sitting over
+ * ordinary content would silently and durably break scrolling there.
+ */
+internal fun screenExclusionRectOrNull(screenX: Float, screenY: Float, width: Int, height: Int): Rectangle? {
+    if (!screenX.isFinite() || !screenY.isFinite()) return null
+    return Rectangle(screenX.roundToInt(), screenY.roundToInt(), width, height)
+}

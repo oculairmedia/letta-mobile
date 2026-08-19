@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionOnScreen
 import androidx.compose.ui.text.font.FontWeight
@@ -34,6 +35,7 @@ import androidx.compose.ui.window.WindowState
 import com.letta.mobile.data.lens.LensDestination
 import com.letta.mobile.data.lens.WorkPlayMode
 import com.letta.mobile.desktop.touch.DesktopTouchDragExclusion
+import com.letta.mobile.desktop.touch.screenExclusionRectOrNull
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import dev.nucleusframework.window.AwtDecoratedWindowScope
 import dev.nucleusframework.window.BasicTitleBar
@@ -47,7 +49,6 @@ import dev.nucleusframework.window.styling.TitleBarColors
 import dev.nucleusframework.window.styling.TitleBarMetrics
 import dev.nucleusframework.window.styling.TitleBarStyle
 import java.awt.Rectangle
-import kotlin.math.roundToInt
 
 /** Overflow entry points surfaced next to the sidebar toggle while the
  * sidebar is collapsed — see [DesktopSidebarOverflowMenu]. */
@@ -190,17 +191,7 @@ internal fun DesktopJewelWindow(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
                         modifier = Modifier.onGloballyPositioned { coordinates ->
-                            val topLeft = coordinates.positionOnScreen()
-                            val size = coordinates.size
-                            DesktopTouchDragExclusion.publish(
-                                window,
-                                Rectangle(
-                                    topLeft.x.roundToInt(),
-                                    topLeft.y.roundToInt(),
-                                    size.width,
-                                    size.height,
-                                ),
-                            )
+                            DesktopTouchDragExclusion.publish(window, titleBarScreenBoundsOrNull(coordinates))
                         },
                     ) {
                         Row(
@@ -300,4 +291,16 @@ internal fun DesktopJewelWindow(
             }
         }
     }
+}
+
+/**
+ * The title bar's screen-space bounds for [DesktopTouchDragExclusion], or
+ * null when [coordinates] cannot yet be resolved to a screen position (see
+ * [screenExclusionRectOrNull] for why that happens and why null — meaning
+ * "clear any previously published bounds" — is the deliberate fail-safe
+ * choice rather than a best-effort rectangle).
+ */
+private fun titleBarScreenBoundsOrNull(coordinates: LayoutCoordinates): Rectangle? {
+    val topLeft = coordinates.positionOnScreen()
+    return screenExclusionRectOrNull(topLeft.x, topLeft.y, coordinates.size.width, coordinates.size.height)
 }

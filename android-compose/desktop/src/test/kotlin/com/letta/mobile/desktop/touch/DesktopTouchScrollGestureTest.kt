@@ -378,4 +378,63 @@ class DesktopTouchScrollGestureTest {
         val outsideGesture = DesktopTouchDragExclusionLatch()
         assertFalse(outsideGesture.classify(MouseEvent.MOUSE_PRESSED) { registry.contains(window, 400, 300) })
     }
+
+    // --- screenExclusionRectOrNull ---------------------------------------
+    //
+    // Regression coverage for a real startup crash: Compose's
+    // LayoutCoordinates.positionOnScreen() returns Offset.Unspecified (NaN in
+    // both components) before the title bar's layout is attached to a
+    // screen, which happens during the window's very first composition.
+    // roundToInt() throws IllegalArgumentException on NaN, and that crashed
+    // app startup outright. These tests pin the guard, and the fact that the
+    // resulting null flows harmlessly through the publish path instead of
+    // throwing or leaving a stale rectangle behind.
+
+    @Test
+    fun `a NaN screen position never throws and yields no rectangle`() {
+        assertNull(screenExclusionRectOrNull(Float.NaN, Float.NaN, width = 800, height = 48))
+        assertNull(screenExclusionRectOrNull(Float.NaN, 20f, width = 800, height = 48))
+        assertNull(screenExclusionRectOrNull(400f, Float.NaN, width = 800, height = 48))
+    }
+
+    @Test
+    fun `an infinite screen position also yields no rectangle`() {
+        assertNull(screenExclusionRectOrNull(Float.POSITIVE_INFINITY, 20f, width = 800, height = 48))
+        assertNull(screenExclusionRectOrNull(400f, Float.NEGATIVE_INFINITY, width = 800, height = 48))
+    }
+
+    @Test
+    fun `a finite screen position builds the expected rectangle`() {
+        val rect = assertNotNull(screenExclusionRectOrNull(100f, 200.4f, width = 800, height = 48))
+        assertEquals(java.awt.Rectangle(100, 200, 800, 48), rect)
+    }
+
+    @Test
+    fun `publishing a NaN-derived bounds never throws and leaves the window not excluded`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+
+        // Simulates the exact call site in DesktopJewelWindow.kt: the result
+        // of screenExclusionRectOrNull is fed straight into publish().
+        registry.publish(window, screenExclusionRectOrNull(Float.NaN, Float.NaN, width = 800, height = 48))
+
+        assertFalse(registry.contains(window, screenX = 10, screenY = 10))
+    }
+
+    @Test
+    fun `a NaN position clears a previously published rectangle rather than leaving it stale`() {
+        val registry = DesktopTouchDragExclusionRegistry<Any>()
+        val window = Any()
+        registry.publish(window, java.awt.Rectangle(0, 0, 800, 48))
+        assertTrue(registry.contains(window, screenX = 10, screenY = 10))
+
+        // A later layout pass reports an unresolved position (e.g. the
+        // window was briefly detached). The fail-safe direction is "not
+        // excluded" — a stale rectangle sitting over ordinary content would
+        // silently and durably break scrolling there, which is worse than
+        // the title bar losing touch-drag-to-move for one frame.
+        registry.publish(window, screenExclusionRectOrNull(Float.NaN, Float.NaN, width = 800, height = 48))
+
+        assertFalse(registry.contains(window, screenX = 10, screenY = 10))
+    }
 }
