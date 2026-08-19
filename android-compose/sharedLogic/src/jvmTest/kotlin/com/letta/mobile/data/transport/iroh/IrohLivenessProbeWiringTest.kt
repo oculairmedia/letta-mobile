@@ -106,6 +106,16 @@ class IrohLivenessProbeWiringTest {
             transport.livenessProbeIntervalMs,
             "production construction must use the documented default interval",
         )
+        assertEquals(
+            IrohLivenessProbe.TIMEOUT_MS,
+            transport.livenessProbeTimeoutMs,
+            "production construction must use the documented default timeout (parg0: 10s)",
+        )
+        assertEquals(
+            IrohLivenessProbe.FAILURES_TO_DECLARE_DEAD,
+            transport.livenessProbeFailuresToDeclareDead,
+            "production construction must use the documented failure threshold (parg0: 3)",
+        )
     }
 
     @Test

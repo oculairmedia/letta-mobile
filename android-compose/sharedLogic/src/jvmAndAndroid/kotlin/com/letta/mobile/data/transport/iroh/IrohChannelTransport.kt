@@ -326,7 +326,8 @@ class IrohChannelTransport(
         intervalMs = livenessProbeIntervalMs,
         timeoutMs = livenessProbeTimeoutMs,
         failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
-        millisSinceLastStream = { adminRpcRetryState.millisSinceLastStream() },
+        millisSinceLastProofOfLife = { adminRpcRetryState.millisSinceLastStream() },
+        youngInFlightAdminRpcCount = { adminRpcRetryState.youngInFlightAdminRpcCount() },
         // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
         // after a redial destroys the healthy NEW handle.
         reportConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
@@ -787,13 +788,18 @@ class IrohChannelTransport(
             .filter { it.conversationId != conversationId && !it.hasTerminal }
             .joinToString(",") { it.conversationId }
 
-    // letta-mobile-34xoj: track consecutive admin_rpc failures and last stream frame
+    // letta-mobile-34xoj: track consecutive admin_rpc failures and last proof-of-life
     // time to decide retry-on-same-connection vs. escalate-to-reconnect.
+    // letta-mobile-parg0: proof-of-life includes successful admin_rpc (not only
+    // stream frames), and in-flight admin_rpc ages feed the liveness congestion gate.
     private val adminRpcRetryState = AdminRpcRetryState()
     private class AdminRpcRetryState {
         private val mutex = Mutex()
         @Volatile var consecutiveFailures = 0
-        @Volatile var lastStreamFrameMs = System.currentTimeMillis()
+        @Volatile private var lastProofOfLifeMs = System.currentTimeMillis()
+        /** Opaque tokens → start epoch ms for in-flight ChannelTransport.adminRpc. */
+        private val inFlightStartByToken = ConcurrentHashMap<Long, Long>()
+        private val nextInFlightToken = java.util.concurrent.atomic.AtomicLong(0L)
 
         suspend fun recordFailure(): Int = mutex.withLock {
             consecutiveFailures += 1
@@ -804,11 +810,38 @@ class IrohChannelTransport(
             consecutiveFailures = 0
         }
 
-        fun recordStreamActivity() {
-            lastStreamFrameMs = System.currentTimeMillis()
+        fun recordProofOfLife() {
+            lastProofOfLifeMs = System.currentTimeMillis()
         }
 
-        fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastStreamFrameMs
+        /** Alias kept for stream-frame call sites (emitBoth). */
+        fun recordStreamActivity() = recordProofOfLife()
+
+        fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
+
+        fun beginAdminRpc(): Long {
+            val token = nextInFlightToken.incrementAndGet()
+            inFlightStartByToken[token] = System.currentTimeMillis()
+            return token
+        }
+
+        fun endAdminRpc(token: Long) {
+            inFlightStartByToken.remove(token)
+        }
+
+        /**
+         * Count of in-flight admin_rpc calls younger than [graceMs]. Stale hung
+         * calls (older than grace) do not protect the liveness probe forever.
+         */
+        fun youngInFlightAdminRpcCount(graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): Int {
+            val now = System.currentTimeMillis()
+            var count = 0
+            for (startMs in inFlightStartByToken.values) {
+                val age = now - startMs
+                if (age in 0 until graceMs) count += 1
+            }
+            return count
+        }
     }
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
@@ -1450,6 +1483,21 @@ class IrohChannelTransport(
         // server-side viewer with no user action. Recorded before the call so a
         // hydrate that only succeeds on retry/redial is still captured.
         recordViewedConversationFrom(method, path)
+        // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
+        // openBi is progressing — the liveness probe must not declare-dead over it.
+        val inFlightToken = adminRpcRetryState.beginAdminRpc()
+        try {
+            return adminRpcTracked(method = method, path = path, body = body)
+        } finally {
+            adminRpcRetryState.endAdminRpc(inFlightToken)
+        }
+    }
+
+    private suspend fun adminRpcTracked(
+        method: String,
+        path: String,
+        body: String?,
+    ): AppServerInboundFrame.AdminRpcResponse {
         // letta-mobile-34xoj: first attempt
         val first = supervisor.ready()
         val firstAttempt = runCatching {
@@ -1457,6 +1505,9 @@ class IrohChannelTransport(
         }
         if (firstAttempt.isSuccess) {
             adminRpcRetryState.reset()
+            // letta-mobile-parg0: successful admin_rpc is proof of life (not only
+            // stream frames) — suppresses the next liveness probe window.
+            adminRpcRetryState.recordProofOfLife()
             return firstAttempt.getOrThrow()
         }
 
@@ -1529,8 +1580,10 @@ class IrohChannelTransport(
                 )
                 supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}", first)
                 val newHandle = supervisor.ready()
-                newHandle.adminRpc(method = method, path = path, body = body)
-            }
+                newHandle.adminRpc(method = method, path = path, body = body).also {
+                    adminRpcRetryState.recordProofOfLife()
+                }
+            }.also { adminRpcRetryState.recordProofOfLife() }
         } else {
             // Escalate: connection is idle and multiple failures accumulated
             Telemetry.event(
@@ -1544,7 +1597,9 @@ class IrohChannelTransport(
             )
             supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}", first)
             val retry = supervisor.ready()
-            return retry.adminRpc(method = method, path = path, body = body)
+            return retry.adminRpc(method = method, path = path, body = body).also {
+                adminRpcRetryState.recordProofOfLife()
+            }
         }
     }
 

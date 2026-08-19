@@ -37,8 +37,18 @@ import kotlin.time.Duration.Companion.milliseconds
  * It is a LIVENESS test, not a health test: any answer from the peer counts as
  * alive (see [classifyProbeError]).
  *
- * @param millisSinceLastStream elapsed time since the last stream frame; live
- *   traffic is already proof of life, so a probe due within that window is skipped.
+ * letta-mobile-parg0: CONGESTION ≠ DEATH. Under heavy concurrent admin_rpc
+ * (model.list / message.list hydrate), a fresh health.check can miss its probe
+ * budget while the path is still alive. Recent proof-of-life (stream frames OR
+ * successful admin_rpc) skips the probe; a timed-out probe while other young
+ * admin_rpcs are in flight is recorded as congested and does not escalate.
+ *
+ * @param millisSinceLastProofOfLife elapsed time since the last stream frame or
+ *   successful admin_rpc; live traffic is already proof of life, so a probe due
+ *   within that window is skipped.
+ * @param youngInFlightAdminRpcCount admin_rpc calls (via the channel transport)
+ *   that are still open and younger than [CONGESTION_GRACE_MS]. Used to soft-fail
+ *   probe timeouts instead of declaring the connection dead.
  * @param reportConnectionLost the supervisor's loss entry point. Attribution is
  *   MANDATORY: an unattributed report landing after a redial destroys the healthy
  *   NEW handle (the r3i1z regression), so the dying handle is always passed along.
@@ -47,7 +57,8 @@ internal class IrohLivenessProbe(
     private val intervalMs: Long,
     private val timeoutMs: Long,
     private val failuresToDeclareDead: Int,
-    private val millisSinceLastStream: () -> Long,
+    private val millisSinceLastProofOfLife: () -> Long,
+    private val youngInFlightAdminRpcCount: () -> Int = { 0 },
     private val reportConnectionLost: (reason: String, handle: IrohConnectionHandle) -> Unit,
 ) {
     /**
@@ -105,6 +116,8 @@ internal class IrohLivenessProbe(
             "sessionId" to handle.sessionId,
             "generation" to armed.toString(),
             "intervalMs" to intervalMs.toString(),
+            "timeoutMs" to timeoutMs.toString(),
+            "failuresToDeclareDead" to failuresToDeclareDead.toString(),
         )
         job = scope.launch { runLoop(handle, armed) }
     }
@@ -127,27 +140,31 @@ internal class IrohLivenessProbe(
         var consecutiveFailures = 0
         while (generation.value == armed) {
             val outcome = awaitNextOutcome(handle, armed)
-            if (outcome == ProbeOutcome.ALIVE) {
-                consecutiveFailures = 0
-                continue
+            when (outcome) {
+                ProbeOutcome.ALIVE, ProbeOutcome.CONGESTED -> {
+                    consecutiveFailures = 0
+                }
+                ProbeOutcome.TIMED_OUT, ProbeOutcome.UNREACHABLE -> {
+                    consecutiveFailures += 1
+                    recordFailure(handle, outcome, consecutiveFailures)
+                    if (consecutiveFailures >= failuresToDeclareDead) {
+                        declareDead(handle, consecutiveFailures)
+                        return
+                    }
+                }
             }
-            consecutiveFailures += 1
-            recordFailure(handle, outcome, consecutiveFailures)
-            if (consecutiveFailures < failuresToDeclareDead) continue
-            declareDead(handle, consecutiveFailures)
-            return
         }
     }
 
     /**
-     * One tick of the loop: wait the interval, then either skip (recent stream
-     * traffic already proves life) or run a bounded probe. A superseded generation
+     * One tick of the loop: wait the interval, then either skip (recent traffic
+     * already proves life) or run a bounded probe. A superseded generation
      * reports ALIVE so the caller's loop condition ends it without side effects.
      */
     private suspend fun awaitNextOutcome(handle: IrohConnectionHandle, armed: Int): ProbeOutcome {
         val forced = awaitTick()
         if (generation.value != armed) return ProbeOutcome.ALIVE
-        if (skipForRecentStreamTraffic(forced)) return ProbeOutcome.ALIVE
+        if (skipForRecentProofOfLife(forced)) return ProbeOutcome.ALIVE
         val outcome = probeOnce(handle)
         return if (generation.value == armed) outcome else ProbeOutcome.ALIVE
     }
@@ -158,6 +175,8 @@ internal class IrohLivenessProbe(
             "sessionId" to handle.sessionId,
             "consecutiveFailures" to consecutiveFailures.toString(),
             "timedOut" to (outcome == ProbeOutcome.TIMED_OUT),
+            "proofOfLifeAgeMs" to millisSinceLastProofOfLife().toString(),
+            "youngInFlightAdminRpc" to youngInFlightAdminRpcCount().toString(),
         )
     }
 
@@ -166,12 +185,23 @@ internal class IrohLivenessProbe(
         withTimeoutOrNull(intervalMs.milliseconds) { wakeups.receive() } != null
 
     /**
-     * Live stream traffic is already proof of life — never probe (or escalate)
-     * mid-turn. A forced probe (app resume) bypasses this: "recent" activity may
-     * predate a long background window.
+     * Live stream frames OR successful admin_rpc are already proof of life — never
+     * probe (or escalate) while that window is fresh. A forced probe (app resume)
+     * bypasses this: "recent" activity may predate a long background window.
      */
-    private fun skipForRecentStreamTraffic(forced: Boolean): Boolean =
-        !forced && millisSinceLastStream() < intervalMs
+    private fun skipForRecentProofOfLife(forced: Boolean): Boolean {
+        if (forced) return false
+        val ageMs = millisSinceLastProofOfLife()
+        val skip = ageMs < intervalMs
+        if (skip) {
+            Telemetry.event(
+                "IrohLiveness", "probe.skipped",
+                "reason" to "recent_proof_of_life",
+                "ageMs" to ageMs.toString(),
+            )
+        }
+        return skip
+    }
 
     /**
      * One bounded `health.check` round trip.
@@ -179,9 +209,13 @@ internal class IrohLivenessProbe(
      * TIMEOUT TRAP: `health.check` is legacy-fallback-safe, so a stream failure
      * falls back to the control channel with its own 30s timeout (worst case ~60s
      * per call). The probe MUST bound the call itself rather than inherit that.
+     *
+     * letta-mobile-parg0: a timeout while other young admin_rpcs are in flight is
+     * congestion on a live path, not a black hole — return [ProbeOutcome.CONGESTED]
+     * so we do not tear down the connection (and cancel those in-flight RPCs).
      */
-    private suspend fun probeOnce(handle: IrohConnectionHandle): ProbeOutcome =
-        withTimeoutOrNull(timeoutMs.milliseconds) {
+    private suspend fun probeOnce(handle: IrohConnectionHandle): ProbeOutcome {
+        val outcome = withTimeoutOrNull(timeoutMs.milliseconds) {
             try {
                 // ANY response — including success=false — proves the peer answered,
                 // which is the only thing this probe measures. Escalating on an
@@ -194,6 +228,20 @@ internal class IrohLivenessProbe(
                 classifyProbeError(error)
             }
         } ?: ProbeOutcome.TIMED_OUT
+
+        if (outcome != ProbeOutcome.TIMED_OUT) return outcome
+        val youngInFlight = youngInFlightAdminRpcCount()
+        if (youngInFlight > 0) {
+            Telemetry.event(
+                "IrohLiveness", "probe.congested",
+                "sessionId" to handle.sessionId,
+                "youngInFlightAdminRpc" to youngInFlight.toString(),
+                "timeoutMs" to timeoutMs.toString(),
+            )
+            return ProbeOutcome.CONGESTED
+        }
+        return ProbeOutcome.TIMED_OUT
+    }
 
     /**
      * Same rule as `IrohChannelTransport.adminRpc`'s request-isolation guard: a
@@ -218,6 +266,8 @@ internal class IrohLivenessProbe(
             "IrohLiveness", "probe.declared_dead",
             "sessionId" to handle.sessionId,
             "failures" to failures.toString(),
+            "proofOfLifeAgeMs" to millisSinceLastProofOfLife().toString(),
+            "youngInFlightAdminRpc" to youngInFlightAdminRpcCount().toString(),
         )
         reportConnectionLost(
             "liveness_probe_failed: no health.check response in ${timeoutMs}ms x $failures",
@@ -225,18 +275,29 @@ internal class IrohLivenessProbe(
         )
     }
 
-    private enum class ProbeOutcome { ALIVE, TIMED_OUT, UNREACHABLE }
+    private enum class ProbeOutcome { ALIVE, TIMED_OUT, UNREACHABLE, CONGESTED }
 
     companion object {
         /**
          * Interval is deliberately LONGER than IrohAppServerTransport's 15s keepalive
          * (the probe is the real liveness signal; the keepalive only masks death).
-         * One tiny bidi stream per interval => 3 RPCs/min steady state, worst-case
-         * detection ~interval + failures x timeout (~45s).
+         * One tiny bidi stream per interval => few RPCs/min steady state.
+         *
+         * letta-mobile-parg0: timeout 10s / 3 failures so a congested but live path
+         * (concurrent model.list + message.list) is less likely to false-dead; worst
+         * case detection stays under the wiring gate's 120s budget.
          */
         const val INTERVAL_MS = 20_000L
-        const val TIMEOUT_MS = 5_000L
-        const val FAILURES_TO_DECLARE_DEAD = 2
+        const val TIMEOUT_MS = 10_000L
+        const val FAILURES_TO_DECLARE_DEAD = 3
+
+        /**
+         * In-flight admin_rpc younger than this still count as congestion evidence.
+         * Matches [IrohAppServerTransport.ADMIN_RPC_TIMEOUT_MS] (30s) plus slack so a
+         * nearly-timed-out hydrate still protects the probe.
+         */
+        const val CONGESTION_GRACE_MS = 45_000L
+
         const val HEALTH_CHECK_METHOD = "health.check"
         const val HEALTH_CHECK_PATH = "/v1/health"
     }
