@@ -107,7 +107,7 @@ fun createDesktopLettaHttpClient(): HttpClient = HttpClient(CIO) {
         json(desktopChatJson)
     }
     // This client also backs the desktop App Server WebSocket transport
-    // (DesktopAppServerControllerGatewayFactory.buildWebSocketTransport), which
+    // (DesktopAppServerChatGatewayBuilder.buildWebSocketTransport), which
     // calls httpClient.webSocket(...) — that requires the plugin, and
     // letta-mobile-lgns8.21.7 requires the inbound frame ceiling with it.
     install(WebSockets) { applyAppServerDefaults() }

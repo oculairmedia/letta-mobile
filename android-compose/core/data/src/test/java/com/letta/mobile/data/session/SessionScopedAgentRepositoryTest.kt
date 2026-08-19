@@ -59,29 +59,9 @@ class SessionScopedAgentRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
-                fakeApi,
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = fakeApi
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val proxy = SessionScopedAgentRepository(
@@ -121,29 +101,9 @@ class SessionScopedAgentRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
-                fakeApi,
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory {
+                agentApi = fakeApi
+            },
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val proxy = SessionScopedAgentRepository(

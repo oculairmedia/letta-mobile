@@ -37,7 +37,7 @@ import kotlinx.serialization.json.put
  * runs before the desktop App Server controller stack is handed a live
  * connection (finding 6: factory auth wiring).
  */
-class DesktopAppServerControllerGatewayFactoryTest {
+class DesktopAppServerChatGatewayBuilderTest {
 
     @Test
     fun auth_advertisesFramePartCapabilityAndToken() = runTest {

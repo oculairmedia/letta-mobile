@@ -212,7 +212,7 @@ class DesktopAppServerChatAdapterTest {
             enabled = true,
             serverUrl = null, // Missing server URL
         )
-        val factory = DesktopAppServerControllerGatewayFactory()
+        val factory = DesktopAppServerChatGatewayBuilder()
 
         assertFailsWith<IllegalArgumentException> {
             factory.create(config, appServerConfig)
