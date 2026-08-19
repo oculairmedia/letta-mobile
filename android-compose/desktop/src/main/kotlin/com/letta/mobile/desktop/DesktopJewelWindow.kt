@@ -73,6 +73,7 @@ internal data class DesktopHeaderChromeState(
     val activeConversationId: String? = null,
     val onSelectConversationTab: (String) -> Unit = {},
     val onCloseConversationTab: (String) -> Unit = {},
+    val onReorderConversationTab: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
 ) {
     companion object {
         val Empty = DesktopHeaderChromeState(
@@ -216,6 +217,7 @@ internal fun DesktopJewelWindow(
                                         activeConversationId = header.activeConversationId,
                                         onSelect = header.onSelectConversationTab,
                                         onClose = header.onCloseConversationTab,
+                                        onReorder = header.onReorderConversationTab,
                                         modifier = Modifier
                                             .fillMaxHeight()
                                             .widthIn(

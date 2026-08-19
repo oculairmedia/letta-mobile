@@ -291,6 +291,10 @@ internal fun LettaDesktopApp(
         }
     }
 
+    fun reorderConversationTab(conversationId: String, targetIndex: Int) {
+        conversationTabsState = ConversationTabsReducer.reorder(conversationTabsState, conversationId, targetIndex)
+    }
+
     fun closeConversationTab(conversationId: String) {
         val result = ConversationTabsReducer.close(conversationTabsState, conversationId)
         val fallbackId = result.fallbackConversationId
@@ -998,6 +1002,7 @@ internal fun LettaDesktopApp(
                 selectedDestination = DesktopDestination.Conversations
             },
             onCloseConversationTab = ::closeConversationTab,
+            onReorderConversationTab = ::reorderConversationTab,
         )
         SideEffect { onHeaderChromeChange(headerChrome) }
     }
