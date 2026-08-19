@@ -11,6 +11,7 @@ import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinUser
 import com.sun.jna.ptr.PointerByReference
 import dev.nucleusframework.core.runtime.Platform
+import java.awt.Toolkit
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -22,28 +23,88 @@ internal interface DesktopTouchKeyboardController {
 }
 
 /**
- * Raises and dismisses the Windows touch keyboard (TabTip) for Compose text
- * fields.
+ * Reflectively binds the JDK's own private touch-keyboard natives on
+ * `sun.awt.windows.WToolkit`: `showTouchKeyboard(boolean)` and
+ * `hideTouchKeyboard()`.
  *
- * Windows will not do this by itself. `WToolkit.showOrHideTouchKeyboard` bails
- * out immediately unless the focused AWT component is a `TextComponent` or a
- * `JTextComponent`; Compose paints its text fields into a Skia canvas, so the
- * focused component is always the Compose panel and the private native
- * `showTouchKeyboard` is never reached. Compose's own text path drives AWT
- * `InputMethodRequests` (IME), which is unrelated to TabTip, and Compose
- * accessibility is Java Access Bridge rather than UI Automation, so Windows'
- * UIA-based auto-invoke has nothing to latch onto either.
+ * Measured directly on Windows 11 touch hardware: calling these two natives —
+ * reflectively, from the EDT, with a normal focused window — raises and
+ * dismisses the real touch keyboard. This is what the JDK itself calls from
+ * `WToolkit.showOrHideTouchKeyboard`, which never fires for Compose because
+ * that method only triggers for a focused `java.awt.TextComponent` /
+ * `javax.swing.text.JTextComponent`, and Compose paints its text fields into a
+ * Skia canvas — the focused AWT component is always the Compose panel. Calling
+ * the private natives directly sidesteps that focused-component gate entirely.
  *
- * So we ask TabTip directly. Showing goes through the undocumented but stable
- * `ITipInvocation` COM interface (the same one the shell uses); dismissal is a
- * `WM_SYSCOMMAND`/`SC_CLOSE` to TabTip's own window, because the public
- * `IFrameworkInputPane` surface exposes no `Hide`. If COM is unavailable —
- * TabTip not running, service disabled — showing falls back to launching
- * `TabTip.exe`.
+ * Needs `--add-opens java.desktop/sun.awt.windows=ALL-UNNAMED` (a different
+ * package from the `sun.awt` open `DesktopTouchEventAccessor` uses). Without
+ * it, [bindOrNull] returns null and the caller falls back.
+ */
+internal object DesktopJdkTouchKeyboardAccessor {
+
+    /**
+     * Binds against [toolkit] — defaults to the live AWT toolkit
+     * (`sun.awt.windows.WToolkit` on Windows) — or returns null when the
+     * methods cannot be found (no `--add-opens`, non-Windows JDK build, a
+     * future JDK that renames or drops them).
+     *
+     * [toolkit] is a parameter purely so a test can bind against a stand-in
+     * object exposing matching method signatures and prove the invoke wrapper
+     * never propagates a failure, without touching the real AWT toolkit or
+     * popping a real keyboard on a CI box.
+     */
+    fun bindOrNull(toolkit: Any = Toolkit.getDefaultToolkit()): DesktopTouchKeyboardController? = runCatching {
+        val showMethod = toolkit.javaClass
+            .getDeclaredMethod("showTouchKeyboard", Boolean::class.javaPrimitiveType)
+            .apply { isAccessible = true }
+        val hideMethod = toolkit.javaClass
+            .getDeclaredMethod("hideTouchKeyboard")
+            .apply { isAccessible = true }
+
+        object : DesktopTouchKeyboardController {
+            override fun show() {
+                // A per-call throw must never escape into AWT's dispatch loop.
+                runCatching { showMethod.invoke(toolkit, true) }
+            }
+
+            override fun hide() {
+                runCatching { hideMethod.invoke(toolkit) }
+            }
+        }
+    }.getOrNull()
+}
+
+/**
+ * Raises and dismisses the Windows touch keyboard for Compose text fields.
  *
- * All work runs on a dedicated single-thread executor: it keeps COM
- * initialization off the AWT event dispatch thread and keeps a slow
- * `TabTip.exe` launch from stalling a frame.
+ * The primary mechanism is [DesktopJdkTouchKeyboardAccessor]: the JDK's own
+ * private `WToolkit.showTouchKeyboard`/`hideTouchKeyboard` natives, called
+ * reflectively. Verified visually on real Windows 11 touch hardware.
+ *
+ * ### Why not COM `ITipInvocation` (the previous approach)
+ *
+ * The original implementation asked TabTip directly via the undocumented
+ * `ITipInvocation` COM interface, with a `TabTip.exe` launch as fallback. Both
+ * are dead on measured Windows 11 hardware:
+ *
+ * - `CoCreateInstance(CLSID_UIHostNoLaunch, ..., IID_ITipInvocation, ...)`
+ *   returns `hr=0x80040154` (`REGDB_E_CLASSNOTREG`). `UIHostNoLaunch` is not a
+ *   registered COM class on this Windows 11 build, so this path can never
+ *   succeed here — it is not a transient failure.
+ * - The `TabTip.exe`-relaunch fallback is a silent no-op whenever TabTip is
+ *   already running (its window already exists), which is the common case —
+ *   so what the user actually experienced was total silence.
+ * - Windows 11 hosts the touch keyboard in `TextInputHost.exe`, not the
+ *   legacy TabTip window, so `FindWindow("IPTip_Main_Window")` plus
+ *   `IsWindowVisible`/`WS_DISABLED` is a **proven false negative**: while the
+ *   keyboard was genuinely on screen, that check still reported
+ *   `visible=false disabled=true`. Any visibility gate built on it is
+ *   actively wrong on this OS, not merely unreliable — do not resurrect it.
+ *
+ * The COM/TabTip path is kept only as a secondary fallback for pre-Win11
+ * hosts where `UIHostNoLaunch` might still resolve; the JDK route above is
+ * always tried first and is expected to be the only path that ever fires on
+ * current hardware.
  */
 internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
 
@@ -61,19 +122,54 @@ internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
     /** TabTip's top-level window class, unchanged since Windows 8. */
     private const val TABTIP_WINDOW_CLASS = "IPTip_Main_Window"
 
+    private const val SC_CLOSE = 0xF060
+
+    /** Used only by the legacy COM/TabTip fallback below. */
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "letta-touch-keyboard").apply { isDaemon = true }
     }
 
     private val comInitialized = AtomicBoolean(false)
-    private val failureLogged = AtomicBoolean(false)
+    private val jdkBindFailureLogged = AtomicBoolean(false)
+    private val fallbackFailureLogged = AtomicBoolean(false)
+
+    /**
+     * Bound once, up front, the same fail-safe way
+     * [DesktopTouchEventAccessor.bindOrNull] binds: null means "unavailable",
+     * logged once, and every call becomes the COM/TabTip fallback.
+     */
+    private val jdkController: DesktopTouchKeyboardController? by lazy {
+        DesktopJdkTouchKeyboardAccessor.bindOrNull().also { bound ->
+            if (bound == null && jdkBindFailureLogged.compareAndSet(false, true)) {
+                DesktopCrashReporter.logCrash(
+                    IllegalStateException(
+                        "WToolkit.showTouchKeyboard/hideTouchKeyboard are unavailable; expected " +
+                            "--add-opens java.desktop/sun.awt.windows=ALL-UNNAMED. Falling back to " +
+                            "the legacy COM/TabTip path, which is known dead on Windows 11.",
+                    ),
+                    context = "windows touch keyboard bind",
+                )
+            }
+        }
+    }
 
     override fun show() {
         if (Platform.Current != Platform.Windows) return
-        submit("show touch keyboard") {
-            // Toggle really does toggle, so a second show while the pane is up
-            // would dismiss it — check first.
-            if (!isTouchKeyboardVisible()) {
+        // Matches the JDK's own usage: WToolkit calls this synchronously from
+        // the EDT, and the native call itself is a fast, non-blocking IPC
+        // nudge to TextInputHost — no dedicated thread needed for this path.
+        val jdk = jdkController
+        if (jdk != null) {
+            jdk.show()
+            return
+        }
+        submitFallback("show touch keyboard") {
+            // Toggle really does toggle, so only invoke it when the fallback
+            // is actually reachable and TabTip isn't already visible; there is
+            // no reliable visibility check on Windows 11 (see class doc), but
+            // this fallback is only exercised pre-Win11 where the legacy
+            // window state check is trustworthy.
+            if (!isLegacyTabTipVisible()) {
                 if (!toggleViaComHost()) launchTabTip()
             }
         }
@@ -81,8 +177,13 @@ internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
 
     override fun hide() {
         if (Platform.Current != Platform.Windows) return
-        submit("hide touch keyboard") {
-            val hwnd = User32.INSTANCE.FindWindow(TABTIP_WINDOW_CLASS, null) ?: return@submit
+        val jdk = jdkController
+        if (jdk != null) {
+            jdk.hide()
+            return
+        }
+        submitFallback("hide touch keyboard") {
+            val hwnd = User32.INSTANCE.FindWindow(TABTIP_WINDOW_CLASS, null) ?: return@submitFallback
             User32.INSTANCE.PostMessage(
                 hwnd,
                 WinUser.WM_SYSCOMMAND,
@@ -92,14 +193,14 @@ internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
         }
     }
 
-    private fun submit(context: String, action: () -> Unit) {
+    private fun submitFallback(context: String, action: () -> Unit) {
         executor.execute {
             runCatching {
                 initializeCom()
                 action()
             }.onFailure { error ->
                 // Never fatal: the app is fully usable with a hardware keyboard.
-                if (failureLogged.compareAndSet(false, true)) {
+                if (fallbackFailureLogged.compareAndSet(false, true)) {
                     DesktopCrashReporter.logCrash(error, context = context)
                 }
             }
@@ -139,15 +240,16 @@ internal object DesktopWindowsTouchKeyboard : DesktopTouchKeyboardController {
         return true
     }
 
-    private fun isTouchKeyboardVisible(): Boolean {
+    /**
+     * Legacy Windows 8/10 visibility check. Measured false-negative on
+     * Windows 11 (see class doc) — never call this to gate the JDK path
+     * above; it exists only for the pre-Win11 COM fallback.
+     */
+    private fun isLegacyTabTipVisible(): Boolean {
         val hwnd = User32.INSTANCE.FindWindow(TABTIP_WINDOW_CLASS, null) ?: return false
-        // TabTip keeps its window alive and merely disables it while dismissed,
-        // so IsWindowVisible alone reports a false positive.
         val style = User32.INSTANCE.GetWindowLong(hwnd, WinUser.GWL_STYLE)
         return User32.INSTANCE.IsWindowVisible(hwnd) && (style and WinUser.WS_DISABLED) == 0
     }
-
-    private const val SC_CLOSE = 0xF060
 
     /**
      * Minimal `ITipInvocation` binding. JNA has no type library support, so the

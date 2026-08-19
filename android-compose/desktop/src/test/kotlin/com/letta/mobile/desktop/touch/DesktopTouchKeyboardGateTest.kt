@@ -5,6 +5,7 @@ import java.awt.event.MouseEvent
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -118,4 +119,38 @@ class DesktopTouchKeyboardGateTest {
 
     /** `java.awt.Component` itself has no headless check, unlike its widgets. */
     private class HeadlessComponent : Component()
+
+    // --- DesktopJdkTouchKeyboardAccessor -----------------------------------
+
+    /** Exposes the two method names WToolkit is expected to carry, but throws from both. */
+    @Suppress("unused")
+    private class FailingStandInToolkit {
+        fun showTouchKeyboard(show: Boolean) {
+            throw IllegalStateException("boom: $show")
+        }
+
+        fun hideTouchKeyboard() {
+            throw IllegalStateException("boom")
+        }
+    }
+
+    @Test
+    fun `binding against a stand-in with matching methods succeeds, and invoke failures never throw`() {
+        val controller = assertNotNull(DesktopJdkTouchKeyboardAccessor.bindOrNull(FailingStandInToolkit()))
+        // Both natives throw on this stand-in; the wrapper must swallow that.
+        controller.show()
+        controller.hide()
+    }
+
+    @Test
+    fun `binding against an object without the expected methods returns null, never throws`() {
+        assertEquals(null, DesktopJdkTouchKeyboardAccessor.bindOrNull(Any()))
+    }
+
+    @Test
+    fun `binding against the live AWT toolkit never throws`() {
+        // Exercises the real lookup path without ever invoking show or hide,
+        // so this never pops a real keyboard on a CI machine.
+        DesktopJdkTouchKeyboardAccessor.bindOrNull()
+    }
 }

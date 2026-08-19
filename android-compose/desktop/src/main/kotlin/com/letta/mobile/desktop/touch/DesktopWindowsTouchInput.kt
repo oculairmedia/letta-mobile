@@ -10,6 +10,7 @@ import java.awt.Window
 import java.awt.event.InputEvent
 import java.awt.event.MouseEvent
 import java.awt.event.MouseWheelEvent
+import java.awt.event.WindowEvent
 import java.util.Collections
 import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -34,7 +35,11 @@ import kotlin.math.roundToInt
  * press/drag/release events, and replays them as either a tap (press+release,
  * unchanged) or a stream of synthetic [MouseWheelEvent]s plus a kinetic fling.
  * Wheel events are the one scroll input Compose Desktop accepts from AWT, and
- * they bypass the `PointerType.Mouse` drag ban entirely.
+ * they bypass the `PointerType.Mouse` drag ban entirely. Every synthetic wheel
+ * event a touch drag emits would otherwise be smoothed through Compose's
+ * `tween` animation like a real mouse wheel, visibly lagging the finger;
+ * [DesktopTouchSmoothScrollSuppressor] turns that animation off for the
+ * duration of each drag/fling and restores it afterwards.
  *
  * Measured directly on Windows touch hardware, with the exact reflective
  * accessor this shim uses: `isCausedByTouchEvent` is true only on
@@ -80,8 +85,10 @@ internal object DesktopWindowsTouchInput {
             return
         }
 
+        val smoothScroll = DesktopTouchSmoothScrollSuppressor(DesktopSmoothScrollSwitch.bindOrNull())
+
         runCatching {
-            Toolkit.getDefaultToolkit().systemEventQueue.push(TouchTranslatingEventQueue(accessor))
+            Toolkit.getDefaultToolkit().systemEventQueue.push(TouchTranslatingEventQueue(accessor, smoothScroll))
         }.onFailure { error ->
             logDegradation(error)
             installed.set(false)
@@ -106,6 +113,7 @@ internal object DesktopWindowsTouchInput {
      */
     private class TouchTranslatingEventQueue(
         private val accessor: DesktopTouchEventAccessor,
+        private val smoothScroll: DesktopTouchSmoothScrollSuppressor,
     ) : EventQueue() {
 
         private val gesture = DesktopTouchDragGesture()
@@ -130,6 +138,18 @@ internal object DesktopWindowsTouchInput {
         private var flingTimer: Timer? = null
 
         override fun dispatchEvent(event: AWTEvent) {
+            // Safety net for an interrupted gesture: if the window loses
+            // focus mid-drag, Windows may never deliver a MOUSE_RELEASED for
+            // the finger still down. cancelFling() unconditionally restores
+            // smooth scrolling, so this guarantees the suppression never gets
+            // stuck off.
+            if (event is WindowEvent &&
+                (event.id == WindowEvent.WINDOW_LOST_FOCUS || event.id == WindowEvent.WINDOW_DEACTIVATED)
+            ) {
+                cancelFling()
+                super.dispatchEvent(event)
+                return
+            }
             if (event !is MouseEvent) {
                 super.dispatchEvent(event)
                 return
@@ -186,6 +206,11 @@ internal object DesktopWindowsTouchInput {
 
         private fun onTouchDrag(event: MouseEvent, component: Component) {
             val delta = gesture.drag(event.toSample()) ?: return
+            // The gesture just committed to scrolling (or already had): keep
+            // wheel deltas applying immediately instead of through Compose's
+            // tween, so content tracks the finger 1:1. Idempotent — cheap to
+            // call on every drag sample.
+            smoothScroll.begin()
             withheldPress = null
             dispatchScroll(component, event, delta)
         }
@@ -238,7 +263,13 @@ internal object DesktopWindowsTouchInput {
 
         private fun startFling(component: Component, source: MouseEvent, end: TouchGestureEnd.Scrolled) {
             val fling = DesktopTouchFling(end.velocityX, end.velocityY)
-            if (fling.isFinished) return
+            if (fling.isFinished) {
+                // Drag scrolled but lift-off carried no coasting velocity: the
+                // gesture is already over, so restore smooth scrolling now —
+                // no timer will run to do it later.
+                smoothScroll.end()
+                return
+            }
             var lastFrameMillis = System.currentTimeMillis()
             val timer = Timer(FLING_FRAME_MILLIS, null)
             timer.addActionListener {
@@ -248,6 +279,7 @@ internal object DesktopWindowsTouchInput {
                 if (delta == null || !component.isShowing) {
                     timer.stop()
                     if (flingTimer === timer) flingTimer = null
+                    smoothScroll.end()
                 } else {
                     dispatchScroll(component, source, delta)
                 }
@@ -259,6 +291,11 @@ internal object DesktopWindowsTouchInput {
         private fun cancelFling() {
             flingTimer?.stop()
             flingTimer = null
+            // Unconditional and idempotent: covers a fling interrupted by a
+            // new press, a non-touch press, or the window-focus-loss guard in
+            // dispatchEvent above — every path that can end a gesture without
+            // going through the normal release/fling-finish flow.
+            smoothScroll.end()
         }
 
         private fun MouseEvent.toSample() = TouchSample(x = x, y = y, timeMillis = `when`)
