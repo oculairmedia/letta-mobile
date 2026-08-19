@@ -1,13 +1,13 @@
 package com.letta.mobile.channel
 
 import androidx.work.ListenableWorker
-import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.repository.ConversationInspectorMessage
+import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.IConversationInspectorMessageRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
@@ -18,25 +18,38 @@ import javax.inject.Singleton
 @Singleton
 class ChannelHeartbeatSync @Inject constructor(
     private val settingsRepository: ISettingsRepository,
-    private val conversationApi: ConversationApi,
     private val messageRepository: IConversationInspectorMessageRepository,
     private val agentRepository: IAgentRepository,
     private val syncStateStore: IChannelSyncStateStore,
     private val notificationDeliveryCoordinator: NotificationDeliveryCoordinator,
+    // letta-mobile data-efficiency Phase4 (M1): heartbeat reads its
+    // conversation list from the shared cache that ChatPushService already
+    // keeps warm, instead of issuing an independent
+    // GET /v1/conversations every 15 minutes.
+    private val allConversationsRepository: IAllConversationsRepository,
 ) {
     suspend fun run(): ListenableWorker.Result {
         if (settingsRepository.getActiveConfig().first() == null) {
             return ListenableWorker.Result.success()
         }
 
-        val conversations = try {
-            conversationApi.listConversations(
-                limit = 100,
-                order = "desc",
-                orderBy = "last_message_at",
-            )
-        } catch (error: Exception) {
-            return ListenableWorker.Result.retry()
+        // letta-mobile data-efficiency Phase4 (M1): the 15-minute heartbeat
+        // reads its conversation list from the shared cache that
+        // ChatPushService already keeps warm. Falls back to a refresh if
+        // the cache is stale (no ChatPushService in the foreground, or it's
+        // been > 60s since the last refresh). refresh() failure retries the
+        // worker instead of silently running against an empty list.
+        val conversations = if (allConversationsRepository.hasFreshConversations(maxAgeMs = 60_000)) {
+            allConversationsRepository.conversations.value
+        } else {
+            val refreshed = runCatching { allConversationsRepository.refresh() }
+            if (refreshed.isFailure) {
+                return ListenableWorker.Result.retry()
+            }
+            allConversationsRepository.conversations.value
+        }
+        if (conversations.isEmpty()) {
+            return ListenableWorker.Result.success()
         }
 
         // Wire diet (letta-mobile-hxxlz): the heartbeat only needs id→name to
