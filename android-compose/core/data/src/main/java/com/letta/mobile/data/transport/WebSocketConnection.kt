@@ -75,7 +75,7 @@ internal class WebSocketConnection(
         listener: WebSocketListener,
     ) {
         // letta-mobile-lgns8.10.4.1: an Iroh-configured client must open ZERO
-        // connections to the LettaShim. `SessionGraphFactory` already binds
+        // connections to the LettaShim. `DefaultSessionRepositoryGraphFactory` already binds
         // `IrohChannelTransport` for `iroh://` configs, so reaching here with
         // an Iroh URL means the transport binding and the routing decision
         // have diverged. Fail loudly instead of silently dialing :8291.

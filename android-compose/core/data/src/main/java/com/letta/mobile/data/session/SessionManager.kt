@@ -21,13 +21,13 @@ internal fun defaultSessionManagerScope(): CoroutineScope =
 @Singleton
 class SessionManager internal constructor(
     private val settingsRepository: ISettingsRepository,
-    private val sessionGraphFactory: SessionGraphFactory,
+    private val sessionGraphFactory: SessionRepositoryGraphFactory<SessionGraph>,
     private val managerScope: CoroutineScope,
 ) : SessionRepositoryGraphProvider<SessionGraph> {
     @Inject
     constructor(
         settingsRepository: ISettingsRepository,
-        sessionGraphFactory: SessionGraphFactory,
+        sessionGraphFactory: DefaultSessionRepositoryGraphFactory,
     ) : this(
         settingsRepository = settingsRepository,
         sessionGraphFactory = sessionGraphFactory,

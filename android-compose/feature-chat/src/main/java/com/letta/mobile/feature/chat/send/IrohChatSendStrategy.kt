@@ -15,7 +15,7 @@ import kotlinx.coroutines.Job
  *
  * Both strategies drive the same [WsChatSendCoordinator]. That is deliberate
  * and not an alias: the coordinator is transport-neutral — it talks to the
- * `IChannelTransport` that `SessionGraphFactory` bound for the active config
+ * `IChannelTransport` that `DefaultSessionRepositoryGraphFactory` bound for the active config
  * (`IrohChannelTransport` for `iroh://`, the shim `ChannelTransport` for a
  * shim config). What the two strategies separate is the *routing decision* and
  * its telemetry, so "an Iroh client selected a shim route" is a type-level

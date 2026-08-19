@@ -160,7 +160,7 @@ private fun LettaConfig.isProbeExempt(): Boolean =
 
 /**
  * lgns8.10.4.1: classification must agree with the transport binding.
- * `SessionGraphFactory` binds `IrohChannelTransport` on
+ * `DefaultSessionRepositoryGraphFactory` binds `IrohChannelTransport` on
  * [IrohChannelTransport.shouldUseIroh], which is `isIrohUrl(url)` OR the
  * debug-only `DEBUG_FORCE_IROH_URL` override. Keying only on the URL shape left
  * a debug-force build classifying an Iroh session as a shim/REST backend — and

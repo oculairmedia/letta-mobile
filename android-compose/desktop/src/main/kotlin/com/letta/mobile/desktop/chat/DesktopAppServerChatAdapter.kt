@@ -100,7 +100,7 @@ internal object DesktopAppServerChatGateways {
 
     fun defaultFactory(): DesktopAppServerChatGatewayFactory? {
         return try {
-            DesktopAppServerControllerGatewayFactory()
+            DesktopAppServerChatGatewayBuilder()
         } catch (_: Throwable) {
             null
         }

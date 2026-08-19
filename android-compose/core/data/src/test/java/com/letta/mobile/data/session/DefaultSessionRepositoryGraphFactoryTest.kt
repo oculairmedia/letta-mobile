@@ -44,12 +44,10 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-
-// letta-mobile-g2ff0: tests must wrap the DAOs in dagger.Lazy because the
-// production constructor now takes Lazy<ConversationDao> / Lazy<AgentDao>.
+// letta-mobile-g2ff0: wrap DAOs in dagger.Lazy for the Lazy-typed constructor.
 private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 
-class SessionGraphFactoryTest {
+class DefaultSessionRepositoryGraphFactoryTest {
 
     private val agentApi: AgentApi = mockk(relaxed = true)
     private val agentDao: AgentDao = mockk(relaxed = true)
@@ -73,41 +71,31 @@ class SessionGraphFactoryTest {
     private val toolApi: ToolApi = mockk(relaxed = true)
     private val appContext: android.content.Context = mockk(relaxed = true)
 
-    // letta-mobile-g2ff0: helper to reduce duplication — most tests use the
-    // same relaxed mocks; callers only specify what differs (settingsRepository,
-    // localRuntimeOptions).
-    private fun factory(
-        settingsRepository: ISettingsRepository? = null,
-        localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
-    ): SessionGraphFactory = SessionGraphFactory(
-        agentApi = agentApi,
-        agentDao = lazyOf(agentDao),
-        conversationApi = conversationApi,
-        conversationDao = lazyOf(conversationDao),
-        archiveApi = archiveApi,
-        folderApi = folderApi,
-        groupApi = groupApi,
-        identityApi = identityApi,
-        lettaApiClient = lettaApiClient,
-        mcpServerApi = mcpServerApi,
-        modelApi = modelApi,
-        passageApi = passageApi,
-        projectApi = projectApi,
-        projectWorkApi = projectWorkApi,
-        runApi = runApi,
-        jobApi = jobApi,
-        providerApi = providerApi,
-        scheduleApi = scheduleApi,
-        stepApi = stepApi,
-        toolApi = toolApi,
-        appContext = appContext,
-        settingsRepository = settingsRepository,
-        localRuntimeOptions = localRuntimeOptions,
-    )
-
     @Test
     fun `create clears daos and produces remote descriptor by default`() {
-        val factory = factory()
+        val factory = createDefaultSessionRepositoryGraphFactory(
+            agentApi = agentApi,
+            agentDao = lazyOf(agentDao),
+            conversationApi = conversationApi,
+            conversationDao = lazyOf(conversationDao),
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
+        )
 
         val graph = factory.create()
 
@@ -131,7 +119,30 @@ class SessionGraphFactoryTest {
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
         every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
 
-        val factory = factory(settingsRepository = settingsRepository)
+        val factory = createDefaultSessionRepositoryGraphFactory(
+            agentApi = agentApi,
+            agentDao = lazyOf(agentDao),
+            conversationApi = conversationApi,
+            conversationDao = lazyOf(conversationDao),
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
+            settingsRepository = settingsRepository
+        )
 
         val graph = factory.create()
 
@@ -152,7 +163,30 @@ class SessionGraphFactoryTest {
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
         every { appContext.filesDir } returns java.io.File(System.getProperty("java.io.tmpdir"), "letta-session-graph-test")
-        val factory = factory(settingsRepository = settingsRepository)
+        val factory = createDefaultSessionRepositoryGraphFactory(
+            agentApi = agentApi,
+            agentDao = lazyOf(agentDao),
+            conversationApi = conversationApi,
+            conversationDao = lazyOf(conversationDao),
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
+            settingsRepository = settingsRepository,
+        )
 
         val graph = factory.create()
 
@@ -172,8 +206,30 @@ class SessionGraphFactoryTest {
         val settingsRepository: ISettingsRepository = mockk()
         every { settingsRepository.activeConfig } returns MutableStateFlow(config)
 
-        val factory = factory(
-            settingsRepository = settingsRepository
+        val factory = createDefaultSessionRepositoryGraphFactory(
+            agentApi = agentApi,
+            agentDao = lazyOf(agentDao),
+            conversationApi = conversationApi,
+            conversationDao = lazyOf(conversationDao),
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
+            settingsRepository = settingsRepository,
+            localRuntimeOptions = LocalRuntimeOptions.Disabled
         )
 
         val graph = factory.create()
@@ -211,7 +267,28 @@ class SessionGraphFactoryTest {
         val runtimeEventOutbox: RuntimeEventOutbox = mockk()
         val memFsStore: MemFsStore = mockk()
 
-        val factory = factory(
+        val factory = createDefaultSessionRepositoryGraphFactory(
+            agentApi = agentApi,
+            agentDao = lazyOf(agentDao),
+            conversationApi = conversationApi,
+            conversationDao = lazyOf(conversationDao),
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,
@@ -243,7 +320,28 @@ class SessionGraphFactoryTest {
         val runtimeEventOutbox: RuntimeEventOutbox = mockk()
         val memFsStore: MemFsStore = mockk()
 
-        val factory = factory(
+        val factory = createDefaultSessionRepositoryGraphFactory(
+            agentApi = agentApi,
+            agentDao = lazyOf(agentDao),
+            conversationApi = conversationApi,
+            conversationDao = lazyOf(conversationDao),
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+            appContext = appContext,
             settingsRepository = settingsRepository,
             localRuntimeOptions = LocalRuntimeOptions.Enabled(
                 runtimeEventOutbox = runtimeEventOutbox,

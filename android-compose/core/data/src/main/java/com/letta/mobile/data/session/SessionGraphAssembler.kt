@@ -60,41 +60,31 @@ import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
 import com.letta.mobile.data.repository.api.LocalRuntimeModelSource
-import com.letta.mobile.data.timeline.ConversationCursorStore
-import com.letta.mobile.data.timeline.NoOpConversationCursorStore
-import com.letta.mobile.data.transport.ChannelTransport
-import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
+import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
-import com.letta.mobile.data.transport.iroh.IrohConnectConfig
-import com.letta.mobile.data.transport.api.NoOpChannelTransport
-import com.letta.mobile.data.transport.RunCursorStore
 import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.BackendId
 import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LocalLettaBackend
-import com.letta.mobile.runtime.MemFsStore
 import com.letta.mobile.runtime.RuntimeId
-import com.letta.mobile.runtime.RuntimeEventOutbox
-import java.util.concurrent.atomic.AtomicLong
-import javax.inject.Inject
 import dagger.Lazy
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.runBlocking
 
+/**
+ * Hilt-owned assembler that wires session-scoped repositories onto a
+ * [SessionGraph]. App consumers receive the same repositories through
+ * SessionScoped* Hilt bindings; this class only builds each graph generation.
+ *
+ * Constructed via [SessionModule] (production) or
+ * [createDefaultSessionRepositoryGraphFactory] (tests).
+ */
 @Singleton
 // letta-mobile-g2ff0: agentDao and conversationDao are dagger.Lazy<T> so Room init
-// happens lazily on the first dao.get() (inside the suspend createBackend
-// method), not on the main thread during Hilt graph resolution. The
-// RuntimeEventOutbox/MemFsStore wrappers already encapsulate their own DB
-// access internally — they were not changed.
-// (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor rejects
-// @Provides methods returning framework types like Provider.)
-class SessionGraphFactory internal constructor(
+// happens lazily on the first dao.get() (inside clearCachesForNewSession /
+// repositoryScope.launch), not on the main thread during Hilt graph resolution.
+class SessionGraphAssembler constructor(
     private val agentApi: AgentApi,
     private val agentDao: Lazy<AgentDao>,
     private val conversationApi: ConversationApi,
@@ -116,153 +106,23 @@ class SessionGraphFactory internal constructor(
     private val stepApi: StepApi,
     private val toolApi: ToolApi,
     private val blockRepository: BlockRepository? = null,
-    private val runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
-    private val conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
-    private val settingsRepository: ISettingsRepository? = null,
-    private val localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
     private val localConversationSource: LocalRuntimeConversationSource? = null,
     private val localAgentSource: LocalRuntimeAgentSource? = null,
     private val localModelSource: LocalRuntimeModelSource? = null,
-    @ApplicationContext private val appContext: Context,
-) : SessionRepositoryGraphFactory<SessionGraph> {
-    @Inject
-    constructor(
-        @ApplicationContext appContext: Context,
-        agentApi: AgentApi,
-        agentDao: Lazy<AgentDao>,
-        conversationApi: ConversationApi,
-        conversationDao: Lazy<ConversationDao>,
-        archiveApi: ArchiveApi,
-        folderApi: FolderApi,
-        groupApi: GroupApi,
-        identityApi: IdentityApi,
-        lettaApiClient: LettaApiClient,
-        mcpServerApi: McpServerApi,
-        modelApi: ModelApi,
-        passageApi: PassageApi,
-        projectApi: ProjectApi,
-        projectWorkApi: ProjectWorkApi,
-        runApi: RunApi,
-        jobApi: JobApi,
-        providerApi: ProviderApi,
-        scheduleApi: ScheduleApi,
-        stepApi: StepApi,
-        toolApi: ToolApi,
-        blockRepository: BlockRepository,
-        runtimeEventOutbox: RuntimeEventOutbox,
-        memFsStore: MemFsStore,
-        localRuntimeProviders: Set<@JvmSuppressWildcards LocalRuntimeProvider>,
-        localConversationSource: LocalRuntimeConversationSource,
-        localAgentSource: LocalRuntimeAgentSource,
-        localModelSource: LocalRuntimeModelSource,
-        runCursorStore: RunCursorStore = RunCursorStore.inMemory(),
-        conversationCursorStore: ConversationCursorStore = NoOpConversationCursorStore,
-        settingsRepository: ISettingsRepository? = null,
-    ) : this(
-        agentApi = agentApi,
-        agentDao = agentDao,
-        conversationApi = conversationApi,
-        conversationDao = conversationDao,
-        archiveApi = archiveApi,
-        folderApi = folderApi,
-        groupApi = groupApi,
-        identityApi = identityApi,
-        lettaApiClient = lettaApiClient,
-        mcpServerApi = mcpServerApi,
-        modelApi = modelApi,
-        passageApi = passageApi,
-        projectApi = projectApi,
-        projectWorkApi = projectWorkApi,
-        runApi = runApi,
-        jobApi = jobApi,
-        providerApi = providerApi,
-        scheduleApi = scheduleApi,
-        stepApi = stepApi,
-        toolApi = toolApi,
-        blockRepository = blockRepository,
-        runCursorStore = runCursorStore,
-        conversationCursorStore = conversationCursorStore,
-        settingsRepository = settingsRepository,
-        appContext = appContext,
-        localConversationSource = localConversationSource,
-        localAgentSource = localAgentSource,
-        localModelSource = localModelSource,
-        localRuntimeOptions = LocalRuntimeOptions.Enabled(
-            runtimeEventOutbox = runtimeEventOutbox,
-            memFsStore = memFsStore,
-            providers = localRuntimeProviders,
-        ),
-    )
-
-    private val nextId = AtomicLong(0L)
-
-    override fun create(): SessionGraph {
-        val graphId = nextId.incrementAndGet()
-        val activeConfig = settingsRepository?.activeConfig?.value
-        val localRuntimeBackend = localRuntimeOptions.createBackend(activeConfig)
-        runBlocking(Dispatchers.IO) {
-            agentDao.get().deleteAll()
-            conversationDao.get().deleteAll()
-            conversationDao.get().deleteAllRefreshStates()
-        }
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val channelTransport = when {
-            IrohChannelTransport.shouldUseIroh(activeConfig?.serverUrl) -> {
-                com.letta.mobile.util.Telemetry.event(
-                    "IrohSelect", "transport", "chosen" to "iroh",
-                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                )
-                IrohChannelTransport(
-                    scope = scope,
-                    onConnect = { com.letta.mobile.runtime.iroh.IrohAndroidInit.install(appContext) },
-                    // d6e8g.9: persist a stable device NodeId (0600 key file in
-                    // the app-private filesDir) so reconnects reuse one identity
-                    // — required for server-side pairing to bind this device.
-                    secretKeyStore = com.letta.mobile.data.controller.node.iroh.FileIrohSecretKeyStore(
-                        java.io.File(appContext.filesDir, "iroh-client-identity.key").path,
-                    ),
-                    activeConfigProvider = {
-                        settingsRepository?.activeConfig?.value?.let { config ->
-                            IrohConnectConfig(
-                                baseShimUrl = config.serverUrl,
-                                token = config.accessToken.orEmpty(),
-                                deviceId = "android-letta-mobile",
-                                clientVersion = "android-iroh-active-config",
-                            )
-                        }
-                    },
-                )
-            }
-            localRuntimeBackend != null -> {
-                com.letta.mobile.util.Telemetry.event(
-                    "IrohSelect", "transport", "chosen" to "noop-local",
-                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                )
-                NoOpChannelTransport()
-            }
-            else -> {
-                com.letta.mobile.util.Telemetry.event(
-                    "IrohSelect", "transport", "chosen" to "ws-default",
-                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                )
-                ChannelTransport(scope, runCursorStore, conversationCursorStore)
-            }
-        }
-        return createSessionGraph(
-            graphId = graphId,
-            activeConfig = activeConfig,
-            localRuntimeBackend = localRuntimeBackend,
-            scope = scope,
-            channelTransport = channelTransport
-        )
+) {
+    suspend fun clearCachesForNewSession() {
+        agentDao.get().deleteAll()
+        conversationDao.get().deleteAll()
+        conversationDao.get().deleteAllRefreshStates()
     }
 
-    private fun createSessionGraph(
+    fun assemble(
         graphId: Long,
         activeConfig: LettaConfig?,
         localRuntimeBackend: LocalLettaBackend?,
         scope: CoroutineScope,
-        channelTransport: com.letta.mobile.data.transport.api.IChannelTransport
+        channelTransport: IChannelTransport,
+        settingsRepository: ISettingsRepository?,
     ): SessionGraph {
         val agentRepository = AgentRepository(
             agentApi = agentApi,
@@ -441,29 +301,7 @@ class SessionGraphFactory internal constructor(
         )
     }
 
-    private fun LocalRuntimeOptions.createBackend(config: LettaConfig?): LocalLettaBackend? {
-        if (config?.mode != LettaConfig.Mode.LOCAL) {
-            return null
-        }
-        return when (this) {
-            LocalRuntimeOptions.Disabled -> null
-            is LocalRuntimeOptions.Enabled -> {
-                val provider = providers
-                    .filter { it.supports(config) }
-                    .maxWithOrNull(compareBy<LocalRuntimeProvider> { it.priority }.thenBy { it.providerId })
-                    ?: return null
-                LocalLettaBackend(
-                    descriptor = provider.descriptor(config),
-                    engine = provider.turnEngine(config),
-                    outbox = runtimeEventOutbox,
-                    memFsStore = memFsStore,
-                    onInterrupt = provider::interruptActiveTurn,
-                )
-            }
-        }
-    }
-
-    private fun remoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
+    fun remoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
         val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: "default"
         val label = config?.serverUrl?.trim()?.takeIf { it.isNotBlank() } ?: "https://api.letta.com"
         return BackendDescriptor(
@@ -482,15 +320,4 @@ class SessionGraphFactory internal constructor(
             ),
         )
     }
-
-}
-
-internal sealed interface LocalRuntimeOptions {
-    data object Disabled : LocalRuntimeOptions
-
-    data class Enabled(
-        val runtimeEventOutbox: RuntimeEventOutbox,
-        val memFsStore: MemFsStore,
-        val providers: Set<LocalRuntimeProvider>,
-    ) : LocalRuntimeOptions
 }

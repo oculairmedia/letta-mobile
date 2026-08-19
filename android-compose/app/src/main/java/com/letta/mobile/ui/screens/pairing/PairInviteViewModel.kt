@@ -26,7 +26,7 @@ import javax.inject.Inject
  * up the on-device identity + peer store and republishes [uiState].
  *
  * UNVERIFIED: reuses the SAME secret-key file
- * (`iroh-client-identity.key`) that `SessionGraphFactory` already binds for
+ * (`iroh-client-identity.key`) that `DefaultSessionRepositoryGraphFactory` already binds for
  * this device's outbound Iroh connections (d6e8g.9), on the theory that a
  * device's Iroh identity is a single stable NodeId regardless of whether
  * it's dialing out or being dialed into. Whether the phone's actual

@@ -59,7 +59,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
+            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
                 FakeAgentApi(),
                 lazyOf(FakeAgentDao()),
                 fakeConversationApi,
@@ -118,7 +118,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
+            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
                 FakeAgentApi(),
                 lazyOf(FakeAgentDao()),
                 fakeConversationApi,
@@ -176,7 +176,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
+            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
                 FakeAgentApi(),
                 lazyOf(FakeAgentDao()),
                 fakeConversationApi,
@@ -232,7 +232,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
+            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
                 FakeAgentApi(),
                 lazyOf(FakeAgentDao()),
                 fakeConversationApi,
@@ -286,7 +286,7 @@ class SessionScopedAllConversationsRepositoryTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
+            sessionGraphFactory = createDefaultSessionRepositoryGraphFactory(
                 FakeAgentApi(),
                 lazyOf(FakeAgentDao()),
                 fakeConversationApi,

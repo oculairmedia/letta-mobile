@@ -38,7 +38,7 @@ private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 internal fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
 internal data class ProxySwitchScenario<T, R>(
-    val setupGraph: TestSessionGraphFactoryBuilder.() -> Unit,
+    val setupGraph: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit,
     val createProxy: (SessionManager, CoroutineScope) -> T,
     val refresh: suspend (T) -> Unit,
     val observeIds: (T) -> List<R>,
@@ -49,7 +49,7 @@ internal data class ProxySwitchScenario<T, R>(
 
 internal data class AdminProxySwitchSpec<A, T, R>(
     val api: A,
-    val setup: TestSessionGraphFactoryBuilder.() -> Unit,
+    val setup: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit,
     val createProxy: (SessionManager, CoroutineScope) -> T,
     val refresh: suspend (T) -> Unit,
     val observeIds: (T) -> List<R>,
@@ -78,7 +78,7 @@ internal fun <T, R> assertProxySwitchesCaches(
     val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
     val sessionManager = SessionManager(
         settingsRepository = settingsRepository,
-        sessionGraphFactory = createTestSessionGraphFactory(scenario.setupGraph),
+        sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory(scenario.setupGraph),
         managerScope = CoroutineScope(SupervisorJob() + dispatcher),
     )
     val proxy = scenario.createProxy(sessionManager, CoroutineScope(SupervisorJob() + dispatcher))
@@ -106,7 +106,7 @@ internal fun sessionTestConfig(id: String): LettaConfig = LettaConfig(
     serverUrl = "https://$id.example.test",
 )
 
-internal class TestSessionGraphFactoryBuilder(
+internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var agentApi: FakeAgentApi = FakeAgentApi(),
     var agentDao: dagger.Lazy<AgentDao> = lazyOf(FakeAgentDao()),
     var conversationApi: FakeConversationApi = FakeConversationApi(),
@@ -130,7 +130,7 @@ internal class TestSessionGraphFactoryBuilder(
     var settingsRepository: FakeSettingsRepository? = null,
     var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
 ) {
-    fun build(): SessionGraphFactory = SessionGraphFactory(
+    fun build(): DefaultSessionRepositoryGraphFactory = createDefaultSessionRepositoryGraphFactory(
         agentApi = agentApi,
         agentDao = agentDao,
         conversationApi = conversationApi,
@@ -157,6 +157,6 @@ internal class TestSessionGraphFactoryBuilder(
     )
 }
 
-internal fun createTestSessionGraphFactory(
-    init: TestSessionGraphFactoryBuilder.() -> Unit = {},
-): SessionGraphFactory = TestSessionGraphFactoryBuilder().apply(init).build()
+internal fun createTestDefaultSessionRepositoryGraphFactory(
+    init: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit = {},
+): DefaultSessionRepositoryGraphFactory = TestDefaultSessionRepositoryGraphFactoryBuilder().apply(init).build()
