@@ -6,8 +6,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeout
 
-/** Shares the single child-owned App Server session with LOCAL repository adapters. */
-internal object DesktopLocalAppServerClientRegistry {
+/**
+ * Shares the single child-owned App Server session with LOCAL repository adapters.
+ *
+ * Instance-based (not a process-global `object`) so tests can isolate generations
+ * and desktop bootstrap can inject a shared singleton (letta-mobile-l2ew9.4).
+ */
+class DesktopLocalAppServerClientRegistry {
     private data class Entry(val generation: Long, val token: String?, val client: AppServerClient?)
 
     private var nextGeneration = 0L
@@ -38,5 +43,10 @@ internal object DesktopLocalAppServerClientRegistry {
         timeoutMs: Long = 10_000L,
     ): AppServerClient = withTimeout(timeoutMs) {
         entry.first { it.generation > generation && it.client != null }.client!!
+    }
+
+    companion object {
+        /** Process-wide registry used by desktop bootstrap wiring. */
+        val shared: DesktopLocalAppServerClientRegistry = DesktopLocalAppServerClientRegistry()
     }
 }
