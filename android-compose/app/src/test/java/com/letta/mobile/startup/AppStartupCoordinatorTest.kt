@@ -87,6 +87,8 @@ class AppStartupCoordinatorTest {
 
         override suspend fun ensureNotificationChannel() = record("notification channel")
 
+        override suspend fun prewarmDatabase() = record("prewarm database")
+
         override suspend fun importPendingAutomationConfig() = record("automation auth bootstrap")
 
         override suspend fun installProductionJankStats(application: Application) =
@@ -112,6 +114,7 @@ class AppStartupCoordinatorTest {
 
     private companion object {
         val ExpectedStartupOrder = listOf(
+            "prewarm database",
             "notification channel",
             "automation auth bootstrap",
             "production jank monitor",
