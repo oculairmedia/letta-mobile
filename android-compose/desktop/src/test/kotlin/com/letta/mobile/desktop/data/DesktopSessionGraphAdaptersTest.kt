@@ -8,6 +8,7 @@ import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
+import com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.runtime.BackendKind
@@ -58,6 +59,45 @@ class DesktopSessionGraphAdaptersTest {
 
         assertIs<DesktopLettaHttpAdminRepositories>(adapters.scheduleRepository)
         assertIs<DesktopLettaHttpAdminRepositories>(adapters.toolRepository)
+    }
+
+    /**
+     * Regression test for the memory graph's "blocks" section going dark on
+     * remote (non-LOCAL, non-Iroh) backends: [DesktopRepositoryAdapters]
+     * bound `agentRepository`/`scheduleRepository`/`toolRepository` through
+     * [selectIrohOrHttp] but left `blockRepository` hard-wired to
+     * `unavailableRepository()` for every mode except LOCAL, even though
+     * both the Iroh bundle and the HTTP admin repositories already implement
+     * [com.letta.mobile.data.repository.api.IAgentBlockRepository]. That
+     * made `MemoryParityController`'s "blocks" section throw
+     * `DesktopRepositoryUnavailableException` for every self-hosted/cloud
+     * backend, degrading the memory graph even though a working repository
+     * was available.
+     */
+    @Test
+    fun selfHostedModeBindsBlockRepositoryThroughHttpAdmin() {
+        val adapters = DesktopRepositoryAdapters(
+            LettaConfig(
+                id = "desktop-self-hosted",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "http://localhost:8283",
+            ),
+        )
+
+        assertIs<DesktopLettaHttpAdminRepositories>(adapters.blockRepository)
+    }
+
+    @Test
+    fun irohModeBindsBlockRepositoryThroughIroh() {
+        val adapters = DesktopRepositoryAdapters(
+            LettaConfig(
+                id = "desktop-iroh",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+            ),
+        )
+
+        assertIs<IrohAgentBlockRepository>(adapters.blockRepository)
     }
 
     /**
