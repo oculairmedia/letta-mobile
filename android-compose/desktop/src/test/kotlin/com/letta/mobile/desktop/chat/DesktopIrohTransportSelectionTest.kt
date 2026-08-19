@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 /**
  * letta-mobile-cq2ju: desktop selects the Iroh transport for iroh:// backends and
  * the WebSocket transport otherwise, mirroring the Android repository branch. This
- * guards the scheme-detection the DesktopAppServerControllerGatewayFactory uses to
+ * guards the scheme-detection the DesktopAppServerChatGatewayBuilder uses to
  * choose IrohAppServerTransportAdapter vs KtorAppServerWebSocketTransport.
  */
 class DesktopIrohTransportSelectionTest {

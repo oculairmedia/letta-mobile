@@ -51,29 +51,7 @@ class SessionScopedChannelTransportTest {
         val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
         val sessionManager = SessionManager(
             settingsRepository = settingsRepository,
-            sessionGraphFactory = SessionGraphFactory(
-                FakeAgentApi(),
-                lazyOf(FakeAgentDao()),
-                FakeConversationApi(),
-                lazyOf(FakeConversationDao()),
-                FakeArchiveApi(),
-                FakeFolderApi(),
-                FakeGroupApi(),
-                FakeIdentityApi(),
-                fakeLettaApiClient(),
-                FakeMcpServerApi(),
-                FakeModelApi(),
-                FakePassageApi(),
-                FakeProjectApi(),
-                FakeProjectWorkApi(),
-                FakeRunApi(),
-                FakeJobApi(),
-                FakeProviderApi(),
-                FakeScheduleApi(),
-                FakeStepApi(),
-                FakeToolApi(),
-                appContext = mockk(relaxed = true),
-            ),
+            sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory(),
             managerScope = CoroutineScope(SupervisorJob() + dispatcher),
         )
         val proxy = SessionScopedChannelTransport(

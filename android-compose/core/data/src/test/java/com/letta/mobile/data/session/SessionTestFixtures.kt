@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.LettaApiClient
 import com.letta.mobile.data.local.AgentDao
 import com.letta.mobile.data.local.ConversationDao
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.testutil.FakeAgentApi
 import com.letta.mobile.testutil.FakeArchiveApi
 import com.letta.mobile.testutil.FakeConversationApi
@@ -38,7 +39,7 @@ private fun <T> lazyOf(value: T): dagger.Lazy<T> = dagger.Lazy { value }
 internal fun fakeLettaApiClient(): LettaApiClient = mockk(relaxed = true)
 
 internal data class ProxySwitchScenario<T, R>(
-    val setupGraph: TestSessionGraphFactoryBuilder.() -> Unit,
+    val setupGraph: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit,
     val createProxy: (SessionManager, CoroutineScope) -> T,
     val refresh: suspend (T) -> Unit,
     val observeIds: (T) -> List<R>,
@@ -49,7 +50,7 @@ internal data class ProxySwitchScenario<T, R>(
 
 internal data class AdminProxySwitchSpec<A, T, R>(
     val api: A,
-    val setup: TestSessionGraphFactoryBuilder.() -> Unit,
+    val setup: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit,
     val createProxy: (SessionManager, CoroutineScope) -> T,
     val refresh: suspend (T) -> Unit,
     val observeIds: (T) -> List<R>,
@@ -78,7 +79,7 @@ internal fun <T, R> assertProxySwitchesCaches(
     val settingsRepository = FakeSettingsRepository(initialActiveConfig = sessionTestConfig("backend-a"))
     val sessionManager = SessionManager(
         settingsRepository = settingsRepository,
-        sessionGraphFactory = createTestSessionGraphFactory(scenario.setupGraph),
+        sessionGraphFactory = createTestDefaultSessionRepositoryGraphFactory(scenario.setupGraph),
         managerScope = CoroutineScope(SupervisorJob() + dispatcher),
     )
     val proxy = scenario.createProxy(sessionManager, CoroutineScope(SupervisorJob() + dispatcher))
@@ -106,7 +107,7 @@ internal fun sessionTestConfig(id: String): LettaConfig = LettaConfig(
     serverUrl = "https://$id.example.test",
 )
 
-internal class TestSessionGraphFactoryBuilder(
+internal class TestDefaultSessionRepositoryGraphFactoryBuilder(
     var agentApi: FakeAgentApi = FakeAgentApi(),
     var agentDao: dagger.Lazy<AgentDao> = lazyOf(FakeAgentDao()),
     var conversationApi: FakeConversationApi = FakeConversationApi(),
@@ -127,36 +128,43 @@ internal class TestSessionGraphFactoryBuilder(
     var scheduleApi: FakeScheduleApi = FakeScheduleApi(),
     var stepApi: FakeStepApi = FakeStepApi(),
     var toolApi: FakeToolApi = FakeToolApi(),
-    var settingsRepository: FakeSettingsRepository? = null,
+    var settingsRepository: ISettingsRepository? = null,
     var localRuntimeOptions: LocalRuntimeOptions = LocalRuntimeOptions.Disabled,
+    var appContext: android.content.Context = mockk(relaxed = true),
 ) {
-    fun build(): SessionGraphFactory = SessionGraphFactory(
-        agentApi = agentApi,
-        agentDao = agentDao,
-        conversationApi = conversationApi,
-        conversationDao = conversationDao,
-        archiveApi = archiveApi,
-        folderApi = folderApi,
-        groupApi = groupApi,
-        identityApi = identityApi,
-        lettaApiClient = lettaApiClient,
-        mcpServerApi = mcpServerApi,
-        modelApi = modelApi,
-        passageApi = passageApi,
-        projectApi = projectApi,
-        projectWorkApi = projectWorkApi,
-        runApi = runApi,
-        jobApi = jobApi,
-        providerApi = providerApi,
-        scheduleApi = scheduleApi,
-        stepApi = stepApi,
-        toolApi = toolApi,
-        appContext = mockk(relaxed = true),
+    fun build(): DefaultSessionRepositoryGraphFactory = DefaultSessionRepositoryGraphFactory(
+        assembler = SessionGraphAssembler(
+            agentApi = agentApi,
+            agentDao = agentDao,
+            conversationApi = conversationApi,
+            conversationDao = conversationDao,
+            archiveApi = archiveApi,
+            folderApi = folderApi,
+            groupApi = groupApi,
+            identityApi = identityApi,
+            lettaApiClient = lettaApiClient,
+            mcpServerApi = mcpServerApi,
+            modelApi = modelApi,
+            passageApi = passageApi,
+            projectApi = projectApi,
+            projectWorkApi = projectWorkApi,
+            runApi = runApi,
+            jobApi = jobApi,
+            providerApi = providerApi,
+            scheduleApi = scheduleApi,
+            stepApi = stepApi,
+            toolApi = toolApi,
+        ),
+        channelTransportFactory = SessionChannelTransportFactory(
+            appContext = appContext,
+            runCursorStore = com.letta.mobile.data.transport.RunCursorStore.inMemory(),
+            conversationCursorStore = com.letta.mobile.data.timeline.NoOpConversationCursorStore,
+        ),
         settingsRepository = settingsRepository,
         localRuntimeOptions = localRuntimeOptions,
     )
 }
 
-internal fun createTestSessionGraphFactory(
-    init: TestSessionGraphFactoryBuilder.() -> Unit = {},
-): SessionGraphFactory = TestSessionGraphFactoryBuilder().apply(init).build()
+internal fun createTestDefaultSessionRepositoryGraphFactory(
+    init: TestDefaultSessionRepositoryGraphFactoryBuilder.() -> Unit = {},
+): DefaultSessionRepositoryGraphFactory = TestDefaultSessionRepositoryGraphFactoryBuilder().apply(init).build()
