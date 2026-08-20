@@ -25,27 +25,23 @@ import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
+import com.letta.mobile.data.session.DEFAULT_REMOTE_LETTA_URL
+import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
+import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
+import com.letta.mobile.data.session.SessionBackendBinding
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphFactory
-import com.letta.mobile.data.session.SessionRepositoryGraphProvider
+import com.letta.mobile.data.session.remoteLettaBackendDescriptor
+import com.letta.mobile.data.session.sessionBackendBinding
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
-import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
-import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.BackendKind
 import com.letta.mobile.runtime.LettaBackend
-import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-
-private const val DEFAULT_REMOTE_LETTA_URL = "https://api.letta.com"
 
 class DesktopRepositoryUnavailableException(
     contractName: String,
@@ -141,40 +137,11 @@ class DesktopSessionGraphFactory(
 }
 
 class DesktopSessionGraphProvider(
-    private val factory: SessionRepositoryGraphFactory<DesktopSessionGraph>,
-) : SessionRepositoryGraphProvider<DesktopSessionGraph> {
-    private val currentGraphFlow = MutableStateFlow(factory.create())
-    override val currentGraph: StateFlow<DesktopSessionGraph> = currentGraphFlow
-    private val sessionErrorFlow = MutableStateFlow<Throwable?>(null)
-    override val sessionError: StateFlow<Throwable?> = sessionErrorFlow
-
-    override val current: DesktopSessionGraph
-        get() = currentGraph.value
-
-    @Synchronized
-    override fun rebuild(): DesktopSessionGraph {
-        val previous = currentGraphFlow.value
-        return try {
-            val next = factory.create()
-            currentGraphFlow.value = next
-            previous.close()
-            sessionErrorFlow.value = null
-            next
-        } catch (t: Throwable) {
-            sessionErrorFlow.value = t
-            throw t
-        }
-    }
-
-    override suspend fun <T> withCurrentSession(block: suspend (DesktopSessionGraph) -> T): T {
-        val graph = current
-        val result = block(graph)
-        if (current !== graph) {
-            throw CancellationException("Desktop session switched during operation")
-        }
-        return result
-    }
-}
+    factory: SessionRepositoryGraphFactory<DesktopSessionGraph>,
+) : DefaultSessionRepositoryGraphProvider<DesktopSessionGraph>(
+    factory = factory,
+    sessionSwitchMessage = "Desktop session switched during operation",
+)
 
 class DesktopChatSessionGraph internal constructor(
     override val repositories: DesktopSessionGraph,
@@ -211,11 +178,13 @@ class DesktopRepositoryAdapters(
     config: LettaConfig? = null,
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
 ) {
-    private val localMode = config?.mode == LettaConfig.Mode.LOCAL
-    // letta-mobile-9v9nu: mode is authoritative — a LOCAL config never binds
-    // the remote Iroh transport, even if its serverUrl still carries a
-    // leftover iroh:// ticket from a prior remote session.
-    private val irohMode = !localMode && IrohChannelTransport.isIrohUrl(config?.serverUrl)
+    // letta-mobile-9v9nu: mode is authoritative — LOCAL never binds remote Iroh
+    // even if serverUrl still carries a leftover iroh:// ticket.
+    private val binding = config.sessionBackendBinding(
+        forceIroh = IrohChannelTransport.shouldUseIroh(config?.serverUrl),
+    )
+    private val localMode = binding == SessionBackendBinding.LocalRuntime
+    private val irohMode = binding == SessionBackendBinding.Iroh
     private val localRepositories = if (localMode) {
         buildDesktopLocalRepositories()
     } else {
@@ -258,22 +227,9 @@ class DesktopRepositoryAdapters(
     val vibesyncEventStreamRepository: IVibesyncEventStreamRepository = unavailableRepository()
 }
 
-fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
-    val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: "default"
-    val label = config?.serverUrl?.trim()?.takeIf { it.isNotBlank() } ?: DEFAULT_REMOTE_LETTA_URL
-    return BackendDescriptor(
-        backendId = BackendId("desktop-remote-letta:$backendKey"),
-        runtimeId = RuntimeId("desktop-remote-letta:$backendKey"),
-        kind = BackendKind.RemoteLetta,
-        label = label,
-        capabilities = BackendCapabilities(
-            supportsStreaming = true,
-            supportsMemFs = true,
-            supportsToolEvents = true,
-            supportsToolExecution = true,
-            supportsApprovals = true,
-            supportsAgentFileImport = true,
-            supportsAgentFileExport = true,
-        ),
+fun desktopRemoteLettaDescriptor(config: LettaConfig?): BackendDescriptor =
+    remoteLettaBackendDescriptor(
+        config = config,
+        idPrefix = DESKTOP_REMOTE_LETTA_ID_PREFIX,
+        defaultLabel = DEFAULT_REMOTE_LETTA_URL,
     )
-}

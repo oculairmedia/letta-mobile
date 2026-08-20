@@ -31,4 +31,4 @@ feature-editagent        Android presentation
 
 ## Target graph
 
-See [kmp-structure-migration-epic.md](kmp-structure-migration-epic.md). Next: Phase 3d/wasm when web adopts `:sharedUI`, then Phase 4 session graph.
+See [kmp-structure-migration-epic.md](kmp-structure-migration-epic.md). Next: Phase 4c desktop stub shrink; Phase 3d/wasm when web adopts `:sharedUI`.

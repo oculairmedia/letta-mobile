@@ -65,11 +65,7 @@ import com.letta.mobile.data.repository.IrohAdminRpcFolderSource
 import com.letta.mobile.data.repository.IrohAdminRpcGroupSource
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
-import com.letta.mobile.runtime.BackendCapabilities
 import com.letta.mobile.runtime.BackendDescriptor
-import com.letta.mobile.runtime.BackendId
-import com.letta.mobile.runtime.BackendKind
-import com.letta.mobile.runtime.RuntimeId
 import dagger.Lazy
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -120,7 +116,10 @@ class SessionGraphAssembler @Inject constructor(
         val agentRepository = createAgentRepository(request)
         val conversationRepos = createConversationRepos(request, agentRepository)
         val adminRepositories = createAdminRepositories(request)
-        val useIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl)
+        val binding = request.activeConfig.sessionBackendBinding(
+            forceIroh = IrohChannelTransport.shouldUseIroh(request.activeConfig?.serverUrl),
+        )
+        val useIroh = binding.bindsIroh()
         return SessionGraph(
             id = request.graphId,
             backendDescriptor = request.localRuntimeBackend?.descriptor
@@ -324,25 +323,8 @@ class SessionGraphAssembler @Inject constructor(
         ScheduleRepository(scheduleApi)
     }
 
-    fun remoteLettaDescriptor(config: LettaConfig?): BackendDescriptor {
-        val backendKey = config?.id?.takeIf { it.isNotBlank() } ?: "default"
-        val label = config?.serverUrl?.trim()?.takeIf { it.isNotBlank() } ?: "https://api.letta.com"
-        return BackendDescriptor(
-            backendId = BackendId("remote-letta:$backendKey"),
-            runtimeId = RuntimeId("remote-letta:$backendKey"),
-            kind = BackendKind.RemoteLetta,
-            label = label,
-            capabilities = BackendCapabilities(
-                supportsStreaming = true,
-                supportsMemFs = true,
-                supportsToolEvents = true,
-                supportsToolExecution = true,
-                supportsApprovals = true,
-                supportsAgentFileImport = true,
-                supportsAgentFileExport = true,
-            ),
-        )
-    }
+    fun remoteLettaDescriptor(config: LettaConfig?): BackendDescriptor =
+        remoteLettaBackendDescriptor(config, ANDROID_REMOTE_LETTA_ID_PREFIX)
 
     private data class ConversationRepos(
         val allConversations: AllConversationsRepository,

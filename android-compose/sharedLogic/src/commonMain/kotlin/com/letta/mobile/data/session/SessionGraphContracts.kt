@@ -33,6 +33,10 @@ import kotlinx.coroutines.flow.StateFlow
  * Android-only list/paging repositories remain platform-side until a paging
  * neutral contract exists; this graph intentionally includes only contracts
  * already safe for commonMain consumers.
+ *
+ * Hosts obtain graphs via [SessionRepositoryGraphFactory] and hold them in a
+ * [SessionRepositoryGraphProvider] — prefer [DefaultSessionRepositoryGraphProvider]
+ * so Android and Desktop share rebuild / switch semantics.
  */
 interface SessionRepositoryGraph {
     val id: Long
