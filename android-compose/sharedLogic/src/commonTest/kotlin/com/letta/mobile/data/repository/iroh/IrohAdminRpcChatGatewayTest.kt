@@ -631,7 +631,7 @@ class IrohAdminRpcChatGatewayTest {
         ts = "2026-07-09T00:00:00Z",
         agentId = "agent-1",
         conversationId = turn.conversationId,
-        content = content,
+        contentRaw = kotlinx.serialization.json.JsonPrimitive(content),
         otid = "otid-$id",
     )
 
