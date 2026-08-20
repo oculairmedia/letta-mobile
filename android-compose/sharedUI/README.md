@@ -8,9 +8,10 @@ or projection/reducers here — those stay in `:sharedLogic`.
 
 **Depends on:** `:sharedLogic` (and Compose Multiplatform).
 
-**Consumers (Phase 3d):** `:app`, `:desktop`, `:web` will depend on this module
-once UI sources move out of `:sharedLogic` (Phase 3b).
+**Consumers:** `:designsystem` (`api`), `:feature-chat`, `:desktop`. `:app` and
+`:feature-editagent` receive shared UI transitively via designsystem.
 
-Created empty in KMP structure migration Phase 3a so Gradle/IDE can wire the
-module before source moves. See `docs/architecture/kmp-structure-migration-epic.md`
-Phase 3.
+**Kept in `:sharedLogic`:** chat timeline projector/presenter, streaming text
+smoother core, tool-display registries, and commonMain projection / token types.
+
+See `docs/architecture/kmp-structure-migration-epic.md` Phase 3.

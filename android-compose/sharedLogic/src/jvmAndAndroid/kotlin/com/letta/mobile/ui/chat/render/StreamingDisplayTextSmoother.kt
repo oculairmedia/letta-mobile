@@ -124,6 +124,9 @@ class StreamingDisplayTextSmoother(
 
 const val ENABLE_HEADLESS_STREAMING_REVEAL = true
 
+/** Shared visible streaming-text cadence, aligned with StreamingMarkdownText. */
+const val STREAMING_TEXT_PAINT_INTERVAL_MS = 50L
+
 private fun String.codePointCountCompat(): Int {
     var count = 0
     var index = 0

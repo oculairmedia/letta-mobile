@@ -92,6 +92,7 @@ kotlin {
 dependencies {
     implementation(project(":core:android-data"))
     implementation(project(":sharedLogic"))
+    implementation(project(":sharedUI"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     implementation("io.github.vinceglb:filekit-core:0.15.0")

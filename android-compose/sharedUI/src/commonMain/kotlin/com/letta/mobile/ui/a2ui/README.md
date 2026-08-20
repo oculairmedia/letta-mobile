@@ -6,12 +6,12 @@ agent-authored payloads for mobile chat, desktop chat, or standalone desktop sur
 
 Authoritative implementation files:
 
-- Renderer: `android-compose/sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderer.kt`
+- Renderer: `android-compose/sharedUI/src/commonMain/kotlin/com/letta/mobile/ui/a2ui/A2uiRenderer.kt`
 - Protocol models and catalog negotiation: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiProtocol.kt`
 - Surface state and binding resolver: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiSurfaceManager.kt`
 - JSON Pointer data model: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiDataModel.kt`
 - Action context resolution: `android-compose/sharedLogic/src/commonMain/kotlin/com/letta/mobile/data/a2ui/A2uiActions.kt`
-- Shared renderer support tests: `android-compose/sharedLogic/src/jvmAndAndroidTest/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupportTest.kt`
+- Shared renderer support tests: `android-compose/sharedUI/src/jvmTest/kotlin/com/letta/mobile/ui/a2ui/A2uiRendererSupportTest.kt`
 - Android renderer tests and examples: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererTest.kt`
 - WS round-trip tests: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiToolApprovalRoundTripTest.kt`
 - Screenshot tests: `android-compose/feature-chat/src/test/java/com/letta/mobile/feature/chat/A2uiRendererScreenshotTest.kt`

@@ -108,6 +108,3 @@ fun rememberSmoothedStreamingText(
 
     return displayedText
 }
-
-/** Shared visible streaming-text cadence, aligned with StreamingMarkdownText. */
-const val STREAMING_TEXT_PAINT_INTERVAL_MS = 50L
