@@ -94,8 +94,30 @@ internal fun TimelineEvent.Confirmed.willCompleteWith(returnedCallIds: Set<Strin
         callId.isNotBlank() && (callId in returnedCallIds || callId in toolReturnContentByCallId)
     }
 
+/**
+ * letta-mobile-hga00: deliberately NOT gated on [hasExplicitDecision] — the
+ * Letta server sends an `approve=null` response echo for auto-approved
+ * (bypassPermissions) tool calls (see [hasAnyApprovalResponse]), and that
+ * echo is the ONLY signal the LIVE stream reducer ([matchingApprovalEvent],
+ * used by TimelineStreamReducer) gets that the request is resolved. A
+ * long-running auto-approved tool (e.g. a multi-minute shell command) has
+ * no ToolReturnMessage yet to flip `approvalDecided` via `willCompleteWith`,
+ * so gating this match on an explicit decision left the approval-request
+ * card (and its Approve/Reject buttons) rendered for the tool's entire
+ * execution window even though it was already resolved server-side.
+ * Requiring an explicit decision here previously matched the historical
+ * intent (only real approve/reject responses should resolve the card), but
+ * it silently discarded the auto-approve echo instead — the snapshot/
+ * reconcile path (`applyReturnsAndResponsesFromSnapshot`) already treats any
+ * response echo as resolving evidence via [hasAnyApprovalResponse]; this
+ * keeps the live and snapshot paths consistent. The Approved/Rejected LABEL
+ * is unaffected: it is derived separately in [TimelineEventToUiMessage] from
+ * `approvalDecided` alone (never `null`-approve is never surfaced as
+ * "Rejected" — see that file's chip logic), so resolving the card here
+ * cannot mislabel an auto-approval as an explicit decision.
+ */
 internal fun TimelineEvent.Confirmed.matchesApprovalResponse(response: ApprovalResponseMessage): Boolean =
-    response.hasExplicitDecision() && approvalRequestId == response.approvalRequestId &&
+    approvalRequestId == response.approvalRequestId &&
         (runId.isNullOrBlank() || response.runId.isNullOrBlank() || runId == response.runId)
 
 internal fun Timeline.matchingApprovalEvent(response: ApprovalResponseMessage): TimelineEvent.Confirmed? =
