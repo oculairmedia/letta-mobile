@@ -36,12 +36,15 @@ class SessionChannelTransportFactory @Inject constructor(
         settingsRepository: ISettingsRepository?,
     ): IChannelTransport {
         val forceIroh = IrohChannelTransport.shouldUseIroh(activeConfig?.serverUrl)
+        fun reportChoice(chosen: String) {
+            com.letta.mobile.util.Telemetry.event(
+                "IrohSelect", "transport", "chosen" to chosen,
+                "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
+            )
+        }
         return when (activeConfig.sessionBackendBinding(forceIroh = forceIroh)) {
             SessionBackendBinding.Iroh -> {
-                com.letta.mobile.util.Telemetry.event(
-                    "IrohSelect", "transport", "chosen" to "iroh",
-                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                )
+                reportChoice("iroh")
                 IrohChannelTransport(
                     scope = scope,
                     onConnect = { com.letta.mobile.runtime.iroh.IrohAndroidInit.install(appContext) },
@@ -64,24 +67,15 @@ class SessionChannelTransportFactory @Inject constructor(
                 )
             }
             SessionBackendBinding.LocalRuntime -> {
-                com.letta.mobile.util.Telemetry.event(
-                    "IrohSelect", "transport", "chosen" to "noop-local",
-                    "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                )
+                reportChoice("noop-local")
                 NoOpChannelTransport()
             }
             SessionBackendBinding.RemoteHttpOrWs -> {
                 if (localRuntimeBackend != null) {
-                    com.letta.mobile.util.Telemetry.event(
-                        "IrohSelect", "transport", "chosen" to "noop-local",
-                        "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                    )
+                    reportChoice("noop-local")
                     NoOpChannelTransport()
                 } else {
-                    com.letta.mobile.util.Telemetry.event(
-                        "IrohSelect", "transport", "chosen" to "ws-default",
-                        "mode" to activeConfig?.mode?.name, "url" to activeConfig?.serverUrl,
-                    )
+                    reportChoice("ws-default")
                     ChannelTransport(scope, runCursorStore, conversationCursorStore)
                 }
             }

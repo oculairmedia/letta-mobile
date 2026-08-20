@@ -181,7 +181,7 @@ class DesktopRepositoryAdapters(
     // letta-mobile-9v9nu: mode is authoritative — LOCAL never binds remote Iroh
     // even if serverUrl still carries a leftover iroh:// ticket.
     private val binding = config.sessionBackendBinding(
-        forceIroh = IrohChannelTransport.isIrohUrl(config?.serverUrl),
+        forceIroh = IrohChannelTransport.shouldUseIroh(config?.serverUrl),
     )
     private val localMode = binding == SessionBackendBinding.LocalRuntime
     private val irohMode = binding == SessionBackendBinding.Iroh

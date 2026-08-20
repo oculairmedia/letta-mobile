@@ -33,8 +33,11 @@ open class DefaultSessionRepositoryGraphProvider<Graph : SessionRepositoryGraph>
         try {
             val next = factory.create()
             currentGraphFlow.value = next
-            previous.close()
             sessionErrorFlow.value = null
+            // Close after publish: a close failure must not mark sessionError or
+            // undo a successful swap (SessionManager also stamps its backend key
+            // only after rebuild returns).
+            runCatching { previous.close() }
             next
         } catch (t: Throwable) {
             sessionErrorFlow.value = t

@@ -34,6 +34,9 @@ class SessionManager internal constructor(
         managerScope = defaultSessionManagerScope(),
     )
 
+    private val keyLock = Any()
+
+    @Volatile
     private var graphBackendKey: BackendConnectionKey? =
         settingsRepository.activeConfig.value?.backendConnectionKey()
 
@@ -54,16 +57,32 @@ class SessionManager internal constructor(
 
     private fun rebuildIfBackendChanged(config: LettaConfig) {
         val nextKey = config.backendConnectionKey()
-        if (nextKey == graphBackendKey) return
-        rebuildTrackingKey(nextKey)
+        if (nextKey == synchronized(keyLock) { graphBackendKey }) return
+        rebuildTrackingKey(requestedKey = nextKey, force = false)
     }
 
     override fun rebuild(): SessionGraph =
-        rebuildTrackingKey(settingsRepository.activeConfig.value?.backendConnectionKey())
+        rebuildTrackingKey(
+            requestedKey = settingsRepository.activeConfig.value?.backendConnectionKey(),
+            force = true,
+        )
 
-    private fun rebuildTrackingKey(nextKey: BackendConnectionKey?): SessionGraph {
+    /**
+     * Serialize [graphBackendKey] with [super.rebuild] so concurrent collector
+     * and public rebuild callers cannot stamp a stale key after a newer swap.
+     * After a successful create, re-read activeConfig so the tracked key matches
+     * the config the factory observed (best-effort under [keyLock]).
+     */
+    private fun rebuildTrackingKey(
+        requestedKey: BackendConnectionKey?,
+        force: Boolean,
+    ): SessionGraph = synchronized(keyLock) {
+        if (!force && requestedKey != null && requestedKey == graphBackendKey) {
+            return current
+        }
         val next = super.rebuild()
-        graphBackendKey = nextKey
-        return next
+        graphBackendKey = settingsRepository.activeConfig.value?.backendConnectionKey()
+            ?: requestedKey
+        next
     }
 }

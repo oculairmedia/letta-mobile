@@ -89,10 +89,25 @@ class DefaultSessionRepositoryGraphProviderTest {
 
         assertEquals("session switched", error.message)
     }
+
+    @Test
+    fun rebuildKeepsPublishedGraphWhenPreviousCloseFails() {
+        val factory = CountingStubGraphFactory(failOnCloseIds = setOf(1L))
+        val provider = DefaultSessionRepositoryGraphProvider(factory)
+        val first = provider.current
+
+        val second = provider.rebuild()
+
+        assertEquals(second, provider.current)
+        assertNull(provider.sessionError.value)
+        assertTrue(first.closeAttempted)
+        assertFalse(second.closed)
+    }
 }
 
 private class CountingStubGraphFactory(
     private val failOnCreate: Int? = null,
+    private val failOnCloseIds: Set<Long> = emptySet(),
 ) : SessionRepositoryGraphFactory<StubSessionGraph> {
     var createCount: Int = 0
         private set
@@ -102,14 +117,20 @@ private class CountingStubGraphFactory(
         if (failOnCreate != null && createCount == failOnCreate) {
             error("create failed")
         }
-        return StubSessionGraph(id = createCount.toLong())
+        return StubSessionGraph(
+            id = createCount.toLong(),
+            failOnClose = failOnCloseIds.contains(createCount.toLong()),
+        )
     }
 }
 
 private class StubSessionGraph(
     override val id: Long,
+    private val failOnClose: Boolean = false,
 ) : SessionRepositoryGraph {
     var closed: Boolean = false
+        private set
+    var closeAttempted: Boolean = false
         private set
 
     override val backendDescriptor: BackendDescriptor = BackendDescriptor(
@@ -154,6 +175,8 @@ private class StubSessionGraph(
     override val blockRepository: IAgentBlockRepository? get() = null
 
     override fun close() {
+        closeAttempted = true
+        if (failOnClose) error("close failed")
         closed = true
     }
 
