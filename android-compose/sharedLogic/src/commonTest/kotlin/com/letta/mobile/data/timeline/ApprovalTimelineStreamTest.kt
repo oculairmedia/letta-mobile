@@ -34,6 +34,29 @@ class ApprovalTimelineStreamTest {
     }
 
     @Test
+    fun autoApproveEchoWithNullApproveDecidesTheCardWithoutAToolReturn() {
+        // letta-mobile-hga00: the Letta server sends an approve=null response
+        // echo for auto-approved (bypassPermissions) tool calls — the ONLY
+        // resolution signal the live stream reducer gets before the tool
+        // finishes. A long-running auto-approved tool (e.g. a multi-minute
+        // shell command) has no ToolReturnMessage yet, so if this echo were
+        // discarded for lacking an explicit decision, the approval card (and
+        // its Approve/Reject buttons) would render stuck for the tool's
+        // entire execution window despite already being resolved.
+        val seeded = reduce(
+            frame = request(calls = listOf(call("call-approval", "danger"))),
+        ).next
+
+        val output = reduce(
+            prev = seeded,
+            frame = response(approve = null, runId = "run-1"),
+        )
+
+        val event = output.next.events.single() as TimelineEvent.Confirmed
+        assertEquals(true, event.approvalDecided)
+    }
+
+    @Test
     fun earlyPartialReturnDoesNotDecideMultiCallApproval() {
         val output = reduceWithPending(
             request(calls = listOf(call("call-a", "read"), call("call-b", "write"))),
@@ -96,7 +119,7 @@ class ApprovalTimelineStreamTest {
         toolCalls = calls,
     )
 
-    private fun response(approve: Boolean, runId: String? = "run-1") = ApprovalResponseMessage(
+    private fun response(approve: Boolean?, runId: String? = "run-1") = ApprovalResponseMessage(
         id = "response-1",
         approvalRequestId = "approval-1",
         approve = approve,
