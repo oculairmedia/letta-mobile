@@ -89,6 +89,7 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":sharedLogic"))
+    api(project(":sharedUI"))
     implementation(project(":core:android-data"))
 
     implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
