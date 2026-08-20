@@ -4,10 +4,9 @@ plugins {
     id("org.jetbrains.kotlin.multiplatform")
     id("com.android.kotlin.multiplatform.library")
     id("org.jetbrains.kotlin.plugin.serialization")
-    // Compose plugin kept only so commonMain can use compose.runtime (@Immutable /
-    // @Stable on projection models). Compose UI lives in :sharedUI (Phase 3b).
-    id("org.jetbrains.compose")
-    id("org.jetbrains.kotlin.plugin.compose")
+    // Phase 3c: no Compose Gradle plugins here. Projection models still use
+    // compose.runtime (@Immutable/@Stable, MutableState) as a plain Maven
+    // dependency — Compose UI + compiler live in :sharedUI.
     id("io.gitlab.arturbosch.detekt")
     id("org.jetbrains.kotlinx.kover")
     // Kotzilla plugin intentionally NOT applied here. The plugin generates
@@ -91,7 +90,8 @@ kotlin {
                 // 0.7.1 to match the version the Compose calendar library
                 // (kizitonwose) pulls; 0.7.0 moved Instant to kotlin.time.
                 api("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
-                // Projection / UI-state annotations only — no Compose UI here.
+                // Runtime-only: @Immutable/@Stable + MutableState for projection
+                // / A2UI data models. No Compose UI toolkit — that is :sharedUI.
                 api("org.jetbrains.compose.runtime:runtime:1.10.0")
                 api("io.ktor:ktor-http:3.5.0")
                 api("io.ktor:ktor-io:3.5.0")

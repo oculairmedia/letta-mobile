@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–2 merged; Phase 3a scaffold in #1254; Phase 3b source move in flight)  
+**Status:** in progress (Phase 0–3a merged; Phase 3b in #1255; Phase 3c Compose trim in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -213,6 +213,7 @@ Steps (separate PRs):
 - [ ] New UI composables default to `:sharedUI`
 - [x] **3a:** `:sharedUI` module included, depends on `:sharedLogic`, android+jvm targets only
 - [x] **3b:** UI sources moved from `composeUi` / `jvmAndAndroid` UI packages; consumers wired
+- [x] **3c:** Compose UI plugins/toolkit removed from `:sharedLogic` (runtime-only retained)
 
 ### Risk
 

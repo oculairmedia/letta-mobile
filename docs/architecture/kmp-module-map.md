@@ -4,12 +4,12 @@ Gradle root: **`android-compose/`**. Open that directory (or link only that Grad
 
 `:web` is included in `android-compose/settings.gradle.kts`; re-sync Gradle in the IDE if it is missing from the module list.
 
-## Current graph (after Phase 0–3b)
+## Current graph (after Phase 0–3c)
 
 ```text
 sharedLogic              KMP library — contracts, transport, timeline, reducers,
-                         paging APIs, chat projection (presenter/projector);
-                         no Compose UI after Phase 3b
+                         paging APIs, chat projection; Compose *runtime* only
+                         (@Immutable/@Stable, MutableState) — no UI toolkit
 sharedUI                 KMP Compose UI (android + jvm) — A2UI, markdown, icons,
                          bubble/style helpers, CustomColors
 core:ids                 KMP identifiers
@@ -27,6 +27,8 @@ feature-editagent        Android presentation
 
 **Rule:** `:sharedUI` depends on `:sharedLogic` only among project modules (not on app/feature/desktop). Enforced by `SharedUiIsolationTest`.
 
+**Rule:** `:sharedLogic` must not apply Compose UI plugins or toolkit deps (foundation/material3/ui/coil/markdown/lucide). Runtime-only is allowed.
+
 ## Target graph
 
-See [kmp-structure-migration-epic.md](kmp-structure-migration-epic.md). Next: Phase 3c trim remaining Compose plugin surface from `:sharedLogic` if unused; Phase 3d/wasm when web adopts `:sharedUI`.
+See [kmp-structure-migration-epic.md](kmp-structure-migration-epic.md). Next: Phase 3d/wasm when web adopts `:sharedUI`, then Phase 4 session graph.
