@@ -33,7 +33,14 @@ object WsFrameMapper {
     fun toLettaMessage(frame: ServerFrame): LettaMessage? = when (frame) {
         is ServerFrame.UserMessage -> UserMessage(
             id = frame.id,
-            contentRaw = JsonPrimitive(frame.content),
+            // letta-mobile-utw4u: pass `contentRaw` verbatim so a multimodal
+            // `content_parts` array survives the wire-frame → model hop and
+            // [extractAttachments] can pull the image base64 out at the
+            // projector. The pre-utw4u [JsonPrimitive(frame.content)] collapsed
+            // the array into a string and dropped every image on observers.
+            // Falls back to the text projection for legacy frames that only
+            // set [frame.content] (pre-utw4u wire shapes).
+            contentRaw = frame.contentRaw ?: JsonPrimitive(frame.content),
             date = frame.ts,
             runId = frame.runId,
             otid = frame.otid,

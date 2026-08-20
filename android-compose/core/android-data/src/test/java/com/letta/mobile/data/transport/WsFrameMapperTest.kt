@@ -48,6 +48,85 @@ class WsFrameMapperTest : WordSpec({
             mapped.seqId shouldBe 7
         }
 
+        // letta-mobile-utw4u: a multimodal `content_parts` array on the wire
+        // MUST reach the model `UserMessage.contentRaw` verbatim — flattening
+        // it into a JsonPrimitive here was the root cause of mobile→desktop
+        // image fanout silently dropping. The legacy `.content` String
+        // projection must still expose the text portion for callers that
+        // didn't ask for attachments (IrohProbeMetrics, MergeTracer, etc.).
+        "preserve multimodal content_parts arrays end-to-end through UserMessage" {
+            val contentParts = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("look at this"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("FAOUT_PNG+/=="))
+                    })
+                })
+            }
+            val frame = ServerFrame.UserMessage(
+                id = "cm-user-1",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                turnId = "T", runId = "R",
+                contentRaw = contentParts,
+                otid = "cm-1",
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            // contentRaw survived the wire-frame → model hop, so
+            // [extractAttachments] can resolve the image at the projector.
+            mapped.contentRaw.toString().contains("FAOUT_PNG") shouldBe true
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().base64 shouldBe "FAOUT_PNG+/=="
+            mapped.attachments.single().mediaType shouldBe "image/png"
+            // Legacy String projection still works for callers that don't
+            // need attachments (IrohProbeMetrics, MergeTracer, etc.).
+            mapped.content.contains("look at this") shouldBe true
+        }
+
+        // letta-mobile-utw4u: live wire frames occasionally serialize with
+        // FLAT image parts `{ type:"image", data:"…", mimeType:"image/jpeg" }`
+        // — no `source` wrapper. The pre-utw4u parseLettaImagePart required
+        // `source` and dropped those parts on the floor; the model extractor
+        // must read the flat shape so observers don't render a text bubble
+        // with an empty image placeholder.
+        "decode flat image content parts (no source wrapper) on UserMessage" {
+            val contentParts = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("hi"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("data", JsonPrimitive("FLAT_JPEG=="))
+                    put("mimeType", JsonPrimitive("image/jpeg"))
+                })
+            }
+            val frame = ServerFrame.UserMessage(
+                id = "cm-user-2",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                runId = "R",
+                contentRaw = contentParts,
+                otid = "cm-2",
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().base64 shouldBe "FLAT_JPEG=="
+            mapped.attachments.single().mediaType shouldBe "image/jpeg"
+        }
+
         "preserve the cm-stream- prefix on assistant_message ids" {
             val frame = ServerFrame.AssistantMessage(
                 id = "cm-stream-letta-msg-3",

@@ -11,6 +11,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 // ─── Server → client ───────────────────────────────────────────────
 
@@ -237,6 +239,17 @@ sealed interface ServerFrame {
      * `otid` echoes the client's [SendMessageFrame.otid] when present
      * so mobile's `dedupeOptimisticContentTwins` can collapse the
      * stream-vs-disk twins on reconcile.
+     *
+     * `contentRaw` (letta-mobile-utw4u) carries the unmolested wire content:
+     * a bare string for text-only sends OR the verbatim `content_parts`
+     * JSON array for multimodal sends (text + base64 image). The legacy
+     * [content] String is a derived projection of the text-only view and
+     * exists purely so pre-existing callers that read `.content` as a
+     * plain String (IrohProbeMetrics, MergeTracer, the chat timeline's
+     * "what did the user say" check) keep compiling and reporting the
+     * same human-readable text. New code that needs attachments MUST go
+     * through [contentRaw] — flattening multimodal content into a String
+     * was the root cause of image fanout silently dropping on observers.
      */
     @Serializable
     data class UserMessage(
@@ -248,11 +261,26 @@ sealed interface ServerFrame {
         @SerialName("conversation_id") val conversationId: String? = null,
         @SerialName("turn_id") val turnId: String? = null,
         @SerialName("run_id") val runId: String? = null,
-        val content: String,
+        @SerialName("content")
+        val contentRaw: JsonElement? = null,
         val otid: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
-    ) : ServerFrame
+    ) : ServerFrame {
+        /**
+         * Text-only projection of [contentRaw]. Returns the string when the
+         * wire carried a bare string; concatenates text parts when it carried
+         * a multimodal array. Empty when [contentRaw] is null. Callers that
+         * need attachments MUST use [contentRaw] — this projection discards
+         * image parts.
+         */
+        val content: String
+            get() = when (val raw = contentRaw) {
+                null -> ""
+                is JsonPrimitive -> raw.contentOrNull ?: raw.toString()
+                else -> raw.toString()
+            }
+    }
 
     @Serializable
     data class AssistantMessage(

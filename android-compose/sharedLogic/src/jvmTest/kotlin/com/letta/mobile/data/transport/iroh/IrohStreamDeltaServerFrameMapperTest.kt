@@ -2,12 +2,14 @@ package com.letta.mobile.data.transport.iroh
 
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.runtime.RuntimeEventPayload
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 class IrohStreamDeltaServerFrameMapperTest {
     @Test
@@ -381,6 +383,130 @@ class IrohStreamDeltaServerFrameMapperTest {
             ).single(),
         )
         assertEquals("wire-otid-123", frame.otid)
+    }
+
+    /**
+     * letta-mobile-utw4u (root-cause guard): the fanned-out user echo arrives
+     * as a `user_message` delta whose `content` is a multimodal `content_parts`
+     * JSON array (text + base64 image), NOT a bare string. The pre-utw4u
+     * `contentText()` flattened the array into a string of base64 garbage and
+     * dropped the image on every observer. The mapper must forward the raw
+     * JsonElement on [ServerFrame.UserMessage.contentRaw] so the WsFrameMapper
+     * hop and the timeline reducer can rebuild the image attachment.
+     */
+    @Test
+    fun userMessageDeltaForwardsMultimodalContentPartsArrayVerbatim() {
+        val frame = assertIs<ServerFrame.UserMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 1,
+                  "idempotency_key": "evt-user-mp",
+                  "delta": {
+                    "message_type": "user_message",
+                    "id": "cm-user-cm-mp",
+                    "otid": "cm-mp",
+                    "content": [
+                      {"type": "text", "text": "look at this"},
+                      {"type": "image", "source": {"type": "base64", "media_type": "image/png", "data": "IROP_PNG+"}}
+                    ],
+                    "run_id": "run-app"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+        // contentRaw is the verbatim array — the image base64 must be present.
+        val raw = frame.contentRaw ?: fail("contentRaw must carry the array, not be null")
+        assertTrue(
+            raw.toString().contains("IROP_PNG+"),
+            "image base64 must survive the mapper hop; got=${raw}",
+        )
+        // Legacy `.content` projection still exposes the text portion for
+        // callers that don't ask for attachments.
+        assertTrue(
+            frame.content.contains("look at this"),
+            "text projection must remain human-readable; got=${frame.content}",
+        )
+    }
+
+    /**
+     * letta-mobile-utw4u (flat-shape guard): the live wire / persisted rows
+     * occasionally emit image parts as `{ type:"image", data:"…", mimeType:"…" }`
+     * without a `source` wrapper. The mapper must still carry the flat shape
+     * through; the downstream [parseLettaImagePart] is the layer responsible
+     * for resolving it into [MessageContentPart.Image]. This test pins the
+     * mapper's role (transport-preserving only) so a future "be helpful"
+     * refactor cannot regress into flattening either.
+     */
+    @Test
+    fun userMessageDeltaForwardsFlatImageContentPartVerbatim() {
+        val frame = assertIs<ServerFrame.UserMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 1,
+                  "idempotency_key": "evt-user-flat",
+                  "delta": {
+                    "message_type": "user_message",
+                    "id": "cm-user-cm-flat",
+                    "otid": "cm-flat",
+                    "content": [
+                      {"type": "text", "text": "hi"},
+                      {"type": "image", "data": "FLATMAP_JPEG=", "mimeType": "image/jpeg"}
+                    ],
+                    "run_id": "run-app"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+        val raw = frame.contentRaw ?: fail("contentRaw must carry the array, not be null")
+        assertTrue(
+            raw.toString().contains("FLATMAP_JPEG="),
+            "flat-shape image base64 must survive verbatim; got=${raw}",
+        )
+        assertTrue(
+            raw.toString().contains("image/jpeg"),
+            "flat-shape mimeType must survive verbatim; got=${raw}",
+        )
+    }
+
+    /**
+     * letta-mobile-utw4u (text-only regression): the pre-utw4u behaviour
+     * for plain-text sends must not change. A bare string `content` on the
+     * wire still surfaces as a JsonPrimitive on `contentRaw` (so the
+     * downstream extractAttachments returns []) and the legacy `.content`
+     * projection equals the bare string.
+     */
+    @Test
+    fun userMessageDeltaWithPlainStringContentStillSurfacesAsJsonPrimitive() {
+        val frame = assertIs<ServerFrame.UserMessage>(
+            map(
+                """
+                {
+                  "type": "stream_delta",
+                  "event_seq": 1,
+                  "idempotency_key": "evt-user-text",
+                  "delta": {
+                    "message_type": "user_message",
+                    "id": "cm-user-cm-text",
+                    "otid": "cm-text",
+                    "content": "hello",
+                    "run_id": "run-app"
+                  }
+                }
+                """.trimIndent(),
+            ).single(),
+        )
+        assertEquals("hello", frame.content)
+        val raw = frame.contentRaw
+        assertTrue(
+            raw is JsonPrimitive && raw.contentOrNull == "hello",
+            "text-only contentRaw must be a JsonPrimitive with the bare string; got=${raw}",
+        )
     }
 
     private fun map(body: String): List<ServerFrame> =

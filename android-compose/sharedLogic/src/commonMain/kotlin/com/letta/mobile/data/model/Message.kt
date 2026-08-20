@@ -201,6 +201,17 @@ private fun extractContentPartResponse(raw: JsonElement?): String? {
 }
 
 private fun parseLettaImagePart(obj: JsonObject): MessageContentPart.Image? {
+    // letta-mobile-utw4u: live wire / persisted rows occasionally emit the
+    // FLAT image shape `{ "type":"image", "data":"…", "mimeType":"image/png" }`
+    // — `data`/`mimeType` live directly on the object, NOT under `source`.
+    // The pre-utw4u parser required `source` and dropped those parts on the
+    // floor (mobile → desktop image fanout silently missing). Detect that
+    // shape FIRST so neither path tries to dereference a missing `source`.
+    val flatData = obj.fieldContent("data")
+    val flatMediaType = obj.fieldContent("mimeType") ?: obj.fieldContent("media_type")
+    if (!flatData.isNullOrBlank() && !flatMediaType.isNullOrBlank()) {
+        return MessageContentPart.Image(base64 = flatData, mediaType = flatMediaType)
+    }
     val source = obj["source"] as? JsonObject ?: return null
     return when (source.fieldContent("type")) {
         "base64" -> {

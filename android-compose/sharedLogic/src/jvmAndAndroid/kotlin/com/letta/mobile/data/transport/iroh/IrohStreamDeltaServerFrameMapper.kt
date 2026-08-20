@@ -57,6 +57,13 @@ internal object IrohStreamDeltaServerFrameMapper {
             // the reducer collapse replays idempotently (eaczz.5). Emitting it here
             // (instead of a separate observer-only mapper) keeps observer frame
             // shape byte-identical to what the initiator path would produce.
+            //
+            // letta-mobile-utw4u: `content` on the wire is EITHER a plain string
+            // (text-only sends) OR a multimodal `content_parts` array (text +
+            // base64 image). The previous [delta.contentText()] flattens the array
+            // into "look at this..." plus base64 garbage, dropping every image on
+            // every observer. Forward [contentRaw] verbatim; [ServerFrame.UserMessage.content]
+            // derives the text-only projection for legacy String readers.
             "user_message" -> listOf(
                 ServerFrame.UserMessage(
                     id = delta.string("id") ?: meta.messageId(),
@@ -65,7 +72,7 @@ internal object IrohStreamDeltaServerFrameMapper {
                     conversationId = meta.conversationId,
                     turnId = meta.turnId,
                     runId = meta.runId,
-                    content = delta.contentText(),
+                    contentRaw = delta["content"]?.takeIf { it != JsonNull } ?: JsonPrimitive(delta.contentText()),
                     otid = delta.string("otid") ?: delta.string("client_message_id"),
                     seq = meta.eventSeq,
                     seqId = meta.seqId,
