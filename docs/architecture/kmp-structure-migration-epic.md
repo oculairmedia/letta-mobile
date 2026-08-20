@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–1 in PR #1252; Phase 2 rename in flight)  
+**Status:** in progress (Phase 0–2 merged; Phase 3a `:sharedUI` scaffold in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -211,6 +211,7 @@ Steps (separate PRs):
 - [ ] A2UI renderer + shared chat markdown/bubbles still work on Android and Desktop
 - [ ] `:sharedLogic:allTests` + `:desktop:test` green
 - [ ] New UI composables default to `:sharedUI`
+- [x] **3a:** `:sharedUI` module included, depends on `:sharedLogic`, android+jvm targets only
 
 ### Risk
 
