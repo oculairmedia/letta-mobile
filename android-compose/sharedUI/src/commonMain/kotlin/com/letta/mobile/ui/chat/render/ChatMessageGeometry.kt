@@ -7,7 +7,6 @@ import com.letta.mobile.data.model.UiImageAttachment
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.model.UiSubagentDispatch
 import com.letta.mobile.data.model.UiToolCall
-import java.util.LinkedHashMap
 import kotlin.math.roundToInt
 import com.letta.mobile.data.chat.projection.ChatRenderItem
 
@@ -32,28 +31,34 @@ data class ChatRenderItemGeometrySignature(
 )
 
 class ChatMessageGeometryState(
-    private val maxEntries: Int = 240,
+    maxEntries: Int = 240,
 ) {
-    private val exactHeights = object : LinkedHashMap<ChatRenderItemGeometrySignature, Int>(maxEntries, 0.75f, false) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<ChatRenderItemGeometrySignature, Int>?): Boolean =
-            size > maxEntries
+    init {
+        // letta-mobile-1260 (CodeRabbit review): reject negative capacity so
+        // the trim loop never permanently satisfies `size > maxEntries` (which
+        // would loop forever on every insert). Zero is allowed as a legitimate
+        // "never cache anything" mode — the trim loop simply evicts whatever
+        // was just inserted, matching the post-insertion > maxEntries check.
+        require(maxEntries >= 0) {
+            "maxEntries must be >= 0 (got $maxEntries)"
+        }
     }
+    private val maxEntries: Int = maxEntries
+    // Insertion-order linked map (commonMain-safe). Lookups must not reorder
+    // entries — access-order promotion defeated per-frame dedup on recycled
+    // slots. Evict oldest-by-insertion when full.
+    private val exactHeights = linkedMapOf<ChatRenderItemGeometrySignature, Int>()
 
     /**
      * Records a measured height for [signature]. Skips the write when the
      * stored height is already exactly [heightPx] — this dedups per-frame
      * `onSizeChanged` callbacks during scroll for items whose measured size
-     * has not changed, eliminating the LinkedHashMap reorder that previously
-     * caused a hitch when scrolling past user prompts.
+     * has not changed.
      *
-     * The backing cache is intentionally constructed with `accessOrder = false`
-     * (insertion-order) so that the dedup's `get` lookup does NOT promote the
-     * signature to the MRU position. With `accessOrder = true`, every `get` of
-     * an existing entry would relink it to the tail of the internal list —
-     * which would defeat the per-frame dedup on any subsequent scroll frame
-     * for a recycled slot. Recency-based eviction is not desired here; the
-     * cache only needs to be bounded by size and evict old-by-insertion when
-     * full.
+     * The backing cache is insertion-order so the dedup's `get` lookup does
+     * NOT promote the signature to the MRU position. Recency-based eviction
+     * is not desired here; the cache only needs to be bounded by size and
+     * evict old-by-insertion when full.
      */
     fun recordMeasuredHeight(
         signature: ChatRenderItemGeometrySignature,
@@ -61,7 +66,13 @@ class ChatMessageGeometryState(
     ) {
         val safeHeight = heightPx.coerceAtLeast(0)
         if (exactHeights[signature] == safeHeight) return
+        val isNew = signature !in exactHeights
         exactHeights[signature] = safeHeight
+        if (isNew) {
+            while (exactHeights.size > maxEntries) {
+                exactHeights.remove(exactHeights.keys.first())
+            }
+        }
     }
 
     /**
