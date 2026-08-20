@@ -823,8 +823,19 @@ internal fun formatDateTime(
 internal fun LocalTime?.orNow(): LocalTime =
     this ?: Clock.System.now().toLocalDateTime(TimeZone.UTC).time.truncatedToMinute()
 
+/**
+ * Returns a `LocalTime` with seconds and sub-minute components dropped.
+ * `kotlinx.datetime.LocalTime` only carries hour + minute, so the constructor
+ * with `(hour, minute)` is the canonical zero-second / zero-nano representation.
+ */
 private fun LocalTime.truncatedToMinute(): LocalTime = LocalTime(hour, minute)
 
+/**
+ * Renders `LocalTime` as `HH:mm` (24-hour, zero-padded). Replaces the previous
+ * `DateTimeFormatter.ofPattern("HH:mm")` so the wire format is independent of
+ * the JDK's locale-sensitive formatter. The output is byte-identical to
+ * `DateTimeFormatter.ISO_LOCAL_TIME.format(...)` for any whole-minute value.
+ */
 private fun LocalTime.formatHm(): String =
     "${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
 
