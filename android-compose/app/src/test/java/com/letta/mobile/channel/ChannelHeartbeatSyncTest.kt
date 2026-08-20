@@ -332,17 +332,21 @@ class ChannelHeartbeatSyncTest {
 private class FakeAllConversationsRepository(
     private val conversationsProvider: () -> List<Conversation>,
 ) : IAllConversationsRepository {
-    override val conversations: StateFlow<List<Conversation>> =
-        MutableStateFlow(conversationsProvider())
+    private val conversationsState = MutableStateFlow(conversationsProvider())
+    override val conversations: StateFlow<List<Conversation>> = conversationsState
     override val hasMore: StateFlow<Boolean> = MutableStateFlow(false)
 
-    override fun hasFreshConversations(maxAgeMs: Long): Boolean = true
+    override fun hasFreshConversations(maxAgeMs: Long): Boolean {
+        // Tests mutate the backing conversation list between heartbeat runs.
+        // Production ChatPushService keeps this cache warm; here we re-seed
+        // from the provider before claiming freshness so the heartbeat sees
+        // those mutations without forcing a refresh() path.
+        conversationsState.value = conversationsProvider()
+        return true
+    }
 
     override suspend fun refresh() {
-        // Sync the underlying StateFlow with the provider on every refresh so
-        // tests that mutate the fixture's conversationApi.conversations see
-        // those changes on the next heartbeat.
-        (conversations as MutableStateFlow).value = conversationsProvider()
+        conversationsState.value = conversationsProvider()
     }
 
     override suspend fun loadNextPage() = throw UnsupportedOperationException()
