@@ -67,31 +67,3 @@ class SessionManager internal constructor(
         return next
     }
 }
-
-private data class BackendConnectionKey(
-    val mode: LettaConfig.Mode,
-    val serverUrl: String,
-    val accessToken: String?,
-    val localModelPath: String?,
-    val localModelHandle: String?,
-    val localModelRuntime: String?,
-    val localModelAccelerator: String?,
-    val localModelMaxTokens: Int?,
-    val localProviderBaseUrl: String?,
-    val localProviderApiKey: String?,
-    val localProviderModel: String?,
-)
-
-private fun LettaConfig.backendConnectionKey(): BackendConnectionKey = BackendConnectionKey(
-    mode = mode,
-    serverUrl = serverUrl,
-    accessToken = accessToken,
-    localModelPath = localModelPath,
-    localModelHandle = localModelHandle,
-    localModelRuntime = localModelRuntime,
-    localModelAccelerator = localModelAccelerator,
-    localModelMaxTokens = localModelMaxTokens,
-    localProviderBaseUrl = localProviderBaseUrl,
-    localProviderApiKey = localProviderApiKey,
-    localProviderModel = localProviderModel,
-)
