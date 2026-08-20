@@ -370,15 +370,17 @@ val extractDesktopJbr = tasks.register<Exec>("extractDesktopJbr") {
 }
 
 /**
- * Lazily-resolved path to the JBR that jpackage uses to build the runtime
- * image. Must be a Provider<String> rather than an eagerly-evaluated value
- * so the resolution happens at jpackage execution time (after
- * `extractDesktopJbr` has run). Reading the path at configuration time would
- * see the directory as not-yet-existing and silently fall back to the
- * toolchain's default JDK — which is exactly the silent Temurin regression
- * the verifyBundledRuntime check is supposed to catch.
+ * Path to the JBR that jpackage uses to build the runtime image.
+ *
+ * Nucleus's `javaHome` is a plain String (not a Property/Provider), so we
+ * resolve the path at configuration time. That is safe: `layout.buildDirectory`
+ * yields an absolute path even before `extractDesktopJbr` creates the dir.
+ * The earlier regression was an *existence* check that returned null and
+ * skipped `javaHome=` entirely — never the path computation itself.
+ * Packaging tasks still `dependsOn(extractDesktopJbr)` so the dir exists
+ * before jpackage runs.
  */
-val packagingJavaHome: Provider<String> = desktopJbrHome.map { it.asFile.absolutePath }
+val packagingJavaHome: String = desktopJbrHome.get().asFile.absolutePath
 
 // RUNTIME NOTE: this module compiles to JVM 21 bytecode (required by the
 // transitively-consumed Iroh transport binding, computer.iroh:iroh:1.0.0). The
@@ -390,8 +392,8 @@ nucleus.application {
     mainClass = "com.letta.mobile.desktop.MainKt"
 
     // jpackage builds its bundled runtime image from the JDK specified
-    // here, not from JAVA_HOME. Pass the JBR provider so the path is
-    // resolved AFTER extractDesktopJbr produces the directory. The previous
+    // here, not from JAVA_HOME. Always point at the JBR path (do not gate
+    // on directory existence at config time). The previous
     // Temurin/JDK-26 toolchain produced a JVM 21 image that couldn't load
     // Jewel's Java-25 classes; JBR 25.0.4 satisfies the class-file v69
     // minimum and additionally carries the AWT input bridge Compose
