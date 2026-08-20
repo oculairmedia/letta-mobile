@@ -33,7 +33,7 @@ tasks.test {
 }
 
 val architectureTest by tasks.registering(Test::class) {
-    description = "Run advisory Kotlin source and JVM bytecode architecture checks."
+    description = "Run Kotlin source and JVM bytecode architecture checks (hard fail)."
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs
     classpath = sourceSets.test.get().runtimeClasspath
@@ -41,7 +41,6 @@ val architectureTest by tasks.registering(Test::class) {
     filter {
         includeTestsMatching("*RepositoryArchitectureTest")
     }
-    ignoreFailures = providers.gradleProperty("architecture.strict").orNull != "true"
     reports.junitXml.required.set(true)
     reports.html.required.set(true)
 }

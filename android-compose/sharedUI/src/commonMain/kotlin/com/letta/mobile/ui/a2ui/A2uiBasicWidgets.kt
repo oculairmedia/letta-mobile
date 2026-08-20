@@ -77,7 +77,7 @@ import com.letta.mobile.ui.icons.LettaIcons
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
-import java.time.LocalTime
+import kotlinx.datetime.LocalTime
 
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -456,7 +456,7 @@ internal fun A2uiDateTimeInput(
     var pendingDateMillis by remember { mutableStateOf(value.toDateMillis()) }
     val haptic = LocalHapticFeedback.current
     val datePickerState = rememberDatePickerState(initialSelectedDateMillis = value.toDateMillis())
-    val initialTime = value.toLocalTime() ?: LocalTime.NOON
+    val initialTime = value.toLocalTime() ?: LocalTime(12, 0)
     val timePickerState = rememberTimePickerState(
         initialHour = initialTime.hour,
         initialMinute = initialTime.minute,
@@ -541,7 +541,7 @@ internal fun A2uiDateTimeInput(
                             value = JsonPrimitive(
                                 formatDateTime(
                                     dateMillis = pendingDateMillis,
-                                    time = LocalTime.of(timePickerState.hour, timePickerState.minute),
+                                    time = LocalTime(timePickerState.hour, timePickerState.minute),
                                     enableDate = enableDate,
                                     enableTime = enableTime,
                                 ),
