@@ -2,8 +2,6 @@ package com.letta.mobile.desktop
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -38,13 +36,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.AwaitPointerEventScope
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.PointerId
-import androidx.compose.ui.input.pointer.PointerInputChange
-import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -55,7 +47,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @Immutable
@@ -78,33 +69,6 @@ private val TabSpacing = 4.dp
  * nothing left to animate. */
 private const val TabReorderShiftAnimationMillis = 150
 
-/** Left edge and width of a laid-out tab, in px, relative to the tab row's
- * own (unscrolled) content coordinates. Captured from `onGloballyPositioned`
- * so the drag math always reflects the order actually on screen rather than
- * an assumed uniform tab width. */
-private data class TabBoundsPx(val left: Float, val width: Float)
-
-/**
- * In-progress reorder gesture: which tab, the index it started at, and the
- * cumulative horizontal pointer movement since the drag began, in px
- * relative to its pre-drag position. Exists only while a drag is live; see
- * [DraggedTabOverlay] for why dropping simply clears it rather than
- * animating anywhere.
- */
-private data class TabDragState(
-    val conversationId: String,
-    val startIndex: Int,
-    val deltaPx: Float,
-)
-
-/** [TabBoundsPx] for every laid-out tab plus the spacing constant used to
- * convert between them and px — the two values the drag-preview math
- * ([dragShiftPx], [DesktopConversationTabRowSlot]) always needs together. */
-private data class TabLayoutMetrics(
-    val bounds: Map<String, TabBoundsPx>,
-    val spacingPx: Float,
-)
-
 /** The row-level tab actions ([DesktopConversationTabRow]'s own
  * `onSelect`/`onClose`), always wired together at each per-tab call site. */
 private data class TabRowActions(
@@ -117,15 +81,6 @@ private data class TabRowActions(
 private data class TabItemActions(
     val onSelect: () -> Unit,
     val onClose: () -> Unit,
-)
-
-/** The three callbacks a tab's drag recognizer ([detectTabDragGesture])
- * reports through, always wired together as a unit from
- * [DesktopConversationTabRow] down to [DesktopConversationTabItem]. */
-private data class TabDragCallbacks(
-    val onDragStart: () -> Unit,
-    val onDrag: (deltaPx: Float) -> Unit,
-    val onDragStop: () -> Unit,
 )
 
 /** The purely visual state of one rendered tab item: whether it reads as
@@ -350,57 +305,6 @@ private fun DraggedTabOverlay(
     )
 }
 
-/**
- * Where a tab dragged by [drag] currently belongs among [tabs], expressed as
- * an index into the *pre-drag* order. Compares the dragged tab's live center
- * (its last laid-out center plus the accumulated pointer delta) against the
- * still-tabs' laid-out centers: it has crossed a neighbor once its center
- * passes that neighbor's center. Pure and side-effect free so it can be unit
- * tested without a Compose UI test harness.
- */
-private fun computeDragTargetIndex(
-    tabs: List<DesktopConversationTab>,
-    bounds: Map<String, TabBoundsPx>,
-    drag: TabDragState,
-): Int {
-    val draggedBounds = bounds[drag.conversationId] ?: return drag.startIndex
-    val draggedCenter = draggedBounds.left + draggedBounds.width / 2f + drag.deltaPx
-    var target = drag.startIndex
-    tabs.forEachIndexed { index, tab ->
-        if (tab.conversationId == drag.conversationId) return@forEachIndexed
-        val neighborBounds = bounds[tab.conversationId] ?: return@forEachIndexed
-        val neighborCenter = neighborBounds.left + neighborBounds.width / 2f
-        when {
-            index < drag.startIndex && draggedCenter < neighborCenter -> target = minOf(target, index)
-            index > drag.startIndex && draggedCenter > neighborCenter -> target = maxOf(target, index)
-        }
-    }
-    return target.coerceIn(0, tabs.lastIndex)
-}
-
-/**
- * The px offset a non-dragged tab at [index] should animate to so it visibly
- * makes room for the dragged tab landing at [targetIndex] — the "other tabs
- * shift to show where it will land" behavior. Tabs strictly between the
- * drag's start and target position shift by one dragged-tab-width (plus
- * spacing) toward the vacated slot; everything else stays put.
- */
-private fun dragShiftPx(
-    index: Int,
-    drag: TabDragState,
-    targetIndex: Int,
-    layout: TabLayoutMetrics,
-): Float {
-    if (index == drag.startIndex || targetIndex == drag.startIndex) return 0f
-    val draggedWidth = layout.bounds[drag.conversationId]?.width ?: return 0f
-    val step = draggedWidth + layout.spacingPx
-    return when {
-        targetIndex < drag.startIndex && index in targetIndex until drag.startIndex -> step
-        targetIndex > drag.startIndex && index in (drag.startIndex + 1)..targetIndex -> -step
-        else -> 0f
-    }
-}
-
 @Composable
 private fun DesktopConversationTabItem(
     tab: DesktopConversationTab,
@@ -487,87 +391,6 @@ private fun DesktopConversationTabItem(
             }
         }
     }
-}
-
-/**
- * Hand-rolled press+drag+release recognizer for one tab, replacing
- * `Modifier.draggable` — see the comment at this function's call site in
- * [DesktopConversationTabItem] for why. Claims the press immediately, then
- * hands off to [trackTabDrag] to read the rest of the gesture.
- */
-private suspend fun PointerInputScope.detectTabDragGesture(touchSlop: Float, callbacks: TabDragCallbacks) {
-    awaitEachGesture {
-        val down = awaitFirstDown(requireUnconsumed = false)
-        down.consume()
-        val didDrag = trackTabDrag(down.id, touchSlop, callbacks)
-        if (didDrag) callbacks.onDragStop()
-    }
-}
-
-/**
- * Reads move events for [pointerId] until it's released, folding each one
- * through [applyDragDelta] to report horizontal deltas via
- * [TabDragCallbacks.onDrag] once cumulative movement crosses [touchSlop].
- * Returns whether a drag was ever started, so the caller knows whether to
- * report [TabDragCallbacks.onDragStop] at all.
- */
-private suspend fun AwaitPointerEventScope.trackTabDrag(
-    pointerId: PointerId,
-    touchSlop: Float,
-    callbacks: TabDragCallbacks,
-): Boolean {
-    var tracking = TabDragTrackingState()
-    while (true) {
-        val change = nextPressedChange(pointerId) ?: break
-        tracking = applyDragDelta(change, tracking, touchSlop, callbacks)
-    }
-    return tracking.isDragging
-}
-
-/** Reads the next pointer event and returns [pointerId]'s change from it,
- * or null once that pointer is released (or simply absent) — the one
- * condition under which [trackTabDrag]'s loop ends. */
-private suspend fun AwaitPointerEventScope.nextPressedChange(pointerId: PointerId): PointerInputChange? {
-    val event = awaitPointerEvent(PointerEventPass.Main)
-    val change = event.changes.firstOrNull { it.id == pointerId } ?: return null
-    return change.takeIf { it.pressed }
-}
-
-/** Cumulative horizontal movement tracked while a tab's press hasn't yet
- * crossed touch slop, and whether it has. */
-private data class TabDragTrackingState(
-    val isDragging: Boolean = false,
-    val accumulatedDx: Float = 0f,
-)
-
-/**
- * Folds one pointer [change] into [state]: while still under touch slop,
- * accumulates its horizontal movement without consuming it — leaving
- * Surface's own tap detector a clean, unconsumed down-then-up to recognize
- * a plain click from. The instant accumulated movement crosses [touchSlop],
- * or on every change after, it consumes the change and reports through
- * [TabDragCallbacks.onDragStart]/[TabDragCallbacks.onDrag] instead.
- */
-private fun applyDragDelta(
-    change: PointerInputChange,
-    state: TabDragTrackingState,
-    touchSlop: Float,
-    callbacks: TabDragCallbacks,
-): TabDragTrackingState {
-    val dx = change.positionChange().x
-    if (state.isDragging) {
-        change.consume()
-        callbacks.onDrag(dx)
-        return state
-    }
-    val accumulatedDx = state.accumulatedDx + dx
-    if (abs(accumulatedDx) <= touchSlop) {
-        return state.copy(accumulatedDx = accumulatedDx)
-    }
-    change.consume()
-    callbacks.onDragStart()
-    callbacks.onDrag(accumulatedDx)
-    return state.copy(isDragging = true, accumulatedDx = accumulatedDx)
 }
 
 @Composable
