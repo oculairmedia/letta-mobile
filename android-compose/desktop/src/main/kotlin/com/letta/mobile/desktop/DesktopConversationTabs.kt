@@ -30,7 +30,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.positionChange
@@ -93,30 +95,69 @@ private suspend fun PointerInputScope.detectEagerDrag(
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         down.consume()
-        var dragging = false
-        var accumulated = Offset.Zero
+        val callbacks = EagerDragCallbacks(onDragStart, onDragEnd, onDragCancel, onDrag)
+        var tracking = EagerDragTrackingState()
         while (true) {
-            val event = awaitPointerEvent(PointerEventPass.Main)
-            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-            if (!change.pressed) {
-                if (dragging) onDragEnd() else onDragCancel()
-                break
-            }
-            val delta = change.positionChange()
-            if (dragging) {
-                change.consume()
-                onDrag(change, delta)
-            } else {
-                accumulated += delta
-                if (accumulated.getDistance() > touchSlop) {
-                    dragging = true
-                    change.consume()
-                    onDragStart(change.position)
-                    onDrag(change, accumulated)
-                }
-            }
+            val change = nextPressedEagerDragChange(down.id) ?: break
+            tracking = applyEagerDragDelta(change, tracking, touchSlop, callbacks)
         }
+        if (tracking.dragging) callbacks.onDragEnd() else callbacks.onDragCancel()
     }
+}
+
+/** The four [DragGestureDetector] callbacks, grouped so [detectEagerDrag]'s
+ * loop only has to thread one value instead of four. */
+private data class EagerDragCallbacks(
+    val onDragStart: (Offset) -> Unit,
+    val onDragEnd: () -> Unit,
+    val onDragCancel: () -> Unit,
+    val onDrag: (change: PointerInputChange, dragAmount: Offset) -> Unit,
+)
+
+/** Cumulative pointer movement tracked while a press hasn't yet crossed
+ * touch slop, and whether it has. */
+private data class EagerDragTrackingState(
+    val dragging: Boolean = false,
+    val accumulated: Offset = Offset.Zero,
+)
+
+/** Reads the next pointer event and returns [pointerId]'s change from it,
+ * or null once that pointer is released (or simply absent) -- the one
+ * condition under which [detectEagerDrag]'s loop ends. */
+private suspend fun AwaitPointerEventScope.nextPressedEagerDragChange(pointerId: PointerId): PointerInputChange? {
+    val event = awaitPointerEvent(PointerEventPass.Main)
+    val change = event.changes.firstOrNull { it.id == pointerId } ?: return null
+    return change.takeIf { it.pressed }
+}
+
+/**
+ * Folds one pointer [change] into [state]: while still under touch slop,
+ * accumulates its movement without consuming it, leaving a plain click
+ * elsewhere in the modifier chain a clean, unconsumed down-then-up to
+ * recognize. The instant accumulated movement crosses [touchSlop], or on
+ * every change after, it consumes the change and reports through
+ * [EagerDragCallbacks.onDragStart]/[EagerDragCallbacks.onDrag] instead.
+ */
+private fun applyEagerDragDelta(
+    change: PointerInputChange,
+    state: EagerDragTrackingState,
+    touchSlop: Float,
+    callbacks: EagerDragCallbacks,
+): EagerDragTrackingState {
+    val delta = change.positionChange()
+    if (state.dragging) {
+        change.consume()
+        callbacks.onDrag(change, delta)
+        return state
+    }
+    val accumulated = state.accumulated + delta
+    if (accumulated.getDistance() <= touchSlop) {
+        return state.copy(accumulated = accumulated)
+    }
+    change.consume()
+    callbacks.onDragStart(change.position)
+    callbacks.onDrag(change, accumulated)
+    return state.copy(dragging = true, accumulated = accumulated)
 }
 
 /**
