@@ -229,7 +229,7 @@ class DesktopRepositoryAdapters(
     val agentRepository: IAgentRepository = localRepositories?.agentRepository
         ?: selectIrohOrHttp(irohRepositories?.agentRepository, adminRepositories)
     val blockRepository: IAgentBlockRepository = localRepositories?.blockRepository
-        ?: unavailableRepository()
+        ?: selectIrohOrHttp(irohRepositories?.blockRepository, adminRepositories)
     val archiveRepository: IArchiveRepository = unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
     val cronRepository: ICronRepository = unavailableRepository()
