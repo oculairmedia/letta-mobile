@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -33,10 +35,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -46,9 +52,11 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @Immutable
 internal data class DesktopConversationTab(
@@ -61,21 +69,37 @@ internal data class DesktopConversationTab(
  * drag-shift math below so the two stay in sync. */
 private val TabSpacing = 4.dp
 
+/** How long the "make room for the dragged tab" shift and the post-drop
+ * settle-into-place animation run. Shared so the settle animation has a
+ * known duration: [DesktopConversationTabRow] clears the drag state once it
+ * completes, which is also how long the parent has to commit the reorder
+ * (see the overlay doc below) before the hand-off from the floating overlay
+ * back to the row's own layout would be visible. */
+private const val TabReorderAnimationMillis = 150
+
 /** Left edge and width of a laid-out tab, in px, relative to the tab row's
  * own (unscrolled) content coordinates. Captured from `onGloballyPositioned`
  * so the drag math always reflects the order actually on screen rather than
  * an assumed uniform tab width. */
 private data class TabBoundsPx(val left: Float, val width: Float)
 
-/** In-progress reorder gesture: which tab is being dragged, the index it
- * started at, and the cumulative horizontal pointer movement since the drag
- * began (used to derive a live target index, not to place the tab itself —
- * the dragged tab is rendered with a draw-only [graphicsLayer] translation so
- * this offset never feeds back into the recorded [TabBoundsPx]). */
+/**
+ * In-progress (or just-dropped, still settling) reorder gesture: which tab,
+ * the index it started at, and its current horizontal offset in px relative
+ * to its pre-drag position. While a pointer is actually down, [deltaPx]
+ * tracks the live cumulative pointer movement. Once dropped, [settling]
+ * flips true and [deltaPx] is overwritten once with the analytically
+ * computed resting offset (see [restingDragDeltaPx]) so the floating
+ * overlay animates straight there instead of snapping to zero and waiting
+ * for the reordered list to come back around — see the overlay doc below
+ * for why that hand-off, not the reducer, was the actual "reorder doesn't
+ * stick" bug.
+ */
 private data class TabDragState(
     val conversationId: String,
     val startIndex: Int,
     val deltaPx: Float,
+    val settling: Boolean = false,
 )
 
 @Composable
@@ -94,55 +118,192 @@ internal fun DesktopConversationTabRow(
     // the tab list itself is reordered.
     val bounds = remember { mutableStateMapOf<String, TabBoundsPx>() }
     var dragState by remember { mutableStateOf<TabDragState?>(null) }
+    val scrollState = rememberScrollState()
     val currentDragState = dragState
     val targetIndex = currentDragState?.let { computeDragTargetIndex(tabs, bounds, it) }
 
-    Row(
-        modifier = modifier.horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(TabSpacing),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        tabs.forEachIndexed { index, tab ->
-            val isDragging = currentDragState?.conversationId == tab.conversationId
-            val shiftPx by animateFloatAsState(
-                targetValue = if (currentDragState != null && targetIndex != null && !isDragging) {
-                    dragShiftPx(index, currentDragState, targetIndex, bounds, spacingPx)
-                } else {
-                    0f
-                },
-                animationSpec = tween(durationMillis = 150),
-                label = "conversationTabReorderShift",
-            )
-            val renderOffsetPx = if (isDragging) currentDragState.deltaPx else shiftPx
-            DesktopConversationTabItem(
-                tab = tab,
-                active = tab.conversationId == activeConversationId,
-                dragging = isDragging,
-                renderOffsetPx = renderOffsetPx,
-                onSelect = { onSelect(tab.conversationId) },
-                onClose = { onClose(tab.conversationId) },
-                onBoundsChanged = { left, width ->
-                    bounds[tab.conversationId] = TabBoundsPx(left, width)
-                },
-                onDragStart = {
-                    dragState = TabDragState(conversationId = tab.conversationId, startIndex = index, deltaPx = 0f)
-                },
-                onDrag = { delta ->
-                    dragState = dragState?.let { it.copy(deltaPx = it.deltaPx + delta) }
-                },
-                onDragStop = {
-                    val drag = dragState
-                    dragState = null
-                    if (drag != null) {
-                        val finalTarget = computeDragTargetIndex(tabs, bounds, drag)
-                        if (finalTarget != drag.startIndex) {
-                            onReorder(drag.conversationId, finalTarget)
-                        }
-                    }
-                },
-            )
-        }
+    fun beginDrag(tab: DesktopConversationTab, index: Int) {
+        dragState = TabDragState(conversationId = tab.conversationId, startIndex = index, deltaPx = 0f)
     }
+
+    fun updateDrag(deltaPx: Float) {
+        dragState = dragState?.copy(deltaPx = dragState!!.deltaPx + deltaPx)
+    }
+
+    fun endDrag() {
+        val drag = dragState ?: return
+        val finalTarget = computeDragTargetIndex(tabs, bounds, drag)
+        if (finalTarget != drag.startIndex) {
+            onReorder(drag.conversationId, finalTarget)
+        }
+        val restingDeltaPx = restingDragDeltaPx(tabs, bounds, drag, finalTarget, spacingPx)
+        dragState = restingDeltaPx?.let { drag.copy(deltaPx = it, settling = true) }
+    }
+
+    Box(modifier = modifier) {
+        Row(
+            modifier = Modifier.horizontalScroll(scrollState),
+            horizontalArrangement = Arrangement.spacedBy(TabSpacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            tabs.forEachIndexed { index, tab ->
+                DesktopConversationTabRowSlot(
+                    tab = tab,
+                    index = index,
+                    active = tab.conversationId == activeConversationId,
+                    dragState = currentDragState,
+                    targetIndex = targetIndex,
+                    bounds = bounds,
+                    spacingPx = spacingPx,
+                    onSelect = onSelect,
+                    onClose = onClose,
+                    onBoundsChanged = { left, width -> bounds[tab.conversationId] = TabBoundsPx(left, width) },
+                    onDragStart = { beginDrag(tab, index) },
+                    onDrag = ::updateDrag,
+                    onDragStop = ::endDrag,
+                )
+            }
+        }
+
+        DraggedTabOverlay(
+            tabs = tabs,
+            dragState = currentDragState,
+            bounds = bounds,
+            scrollOffsetPx = scrollState.value.toFloat(),
+            activeConversationId = activeConversationId,
+            onClose = onClose,
+            onSettled = { dragState = null },
+        )
+    }
+}
+
+/**
+ * One tab's slot inside the Row: computes the "make room for the dragged
+ * tab" shift animation for a non-dragged neighbor, and renders the tab item
+ * itself — invisible (but still laid out, still bounds-tracked, still
+ * gesture-live) while it's the one being dragged, since [DraggedTabOverlay]
+ * is what actually draws it in that state. Split out from
+ * [DesktopConversationTabRow] to keep that composable's own body short.
+ */
+@Composable
+private fun DesktopConversationTabRowSlot(
+    tab: DesktopConversationTab,
+    index: Int,
+    active: Boolean,
+    dragState: TabDragState?,
+    targetIndex: Int?,
+    bounds: Map<String, TabBoundsPx>,
+    spacingPx: Float,
+    onSelect: (String) -> Unit,
+    onClose: (String) -> Unit,
+    onBoundsChanged: (left: Float, width: Float) -> Unit,
+    onDragStart: () -> Unit,
+    onDrag: (deltaPx: Float) -> Unit,
+    onDragStop: () -> Unit,
+) {
+    val isDragging = dragState?.conversationId == tab.conversationId
+    val shiftPx by animateFloatAsState(
+        targetValue = if (dragState != null && targetIndex != null && !isDragging) {
+            dragShiftPx(index, dragState, targetIndex, bounds, spacingPx)
+        } else {
+            0f
+        },
+        animationSpec = tween(durationMillis = TabReorderAnimationMillis),
+        label = "conversationTabReorderShift",
+    )
+    DesktopConversationTabItem(
+        tab = tab,
+        active = active,
+        dragging = false,
+        visible = !isDragging,
+        renderOffsetPx = if (isDragging) 0f else shiftPx,
+        onSelect = { onSelect(tab.conversationId) },
+        onClose = { onClose(tab.conversationId) },
+        onBoundsChanged = onBoundsChanged,
+        onDragStart = onDragStart,
+        onDrag = onDrag,
+        onDragStop = onDragStop,
+    )
+}
+
+/**
+ * Renders the actively-dragged (or just-dropped, still settling) tab as a
+ * floating overlay above the row, positioned by absolute offset rather than
+ * translated in place inside the Row. The Row's own copy of the same tab
+ * ([DesktopConversationTabRowSlot] with `visible = false`) stays mounted so
+ * it keeps its layout slot, bounds tracking, and pointer input gesture
+ * alive; this overlay is purely a visual mirror driven by [dragState] with
+ * no gesture handling of its own.
+ *
+ * Overlaying, instead of translating the tab in place, is what fixes the
+ * clipping bug: `Modifier.horizontalScroll` clips its content to the row's
+ * own content bounds, and that clip applies to anything drawn inside it no
+ * matter how far a child's own `graphicsLayer` translates it — so once the
+ * dragged tab moved roughly a neighbor's width past where the row's content
+ * used to end, it got cut off. Something drawn in a plain sibling `Box`,
+ * outside the scrolled subtree, is never subject to that clip. The
+ * trade-off: the dragged tab now also visually escapes the row's own edges
+ * (nothing clips it against the title bar's available width either), and it
+ * needs its own explicit correction for the row's current scroll offset
+ * ([scrollOffsetPx]) rather than inheriting one for free the way an in-row
+ * child would.
+ *
+ * It also fixes the "reorder doesn't stick" bug, which turned out to be
+ * this same draw-only-transform mechanism, not the reducer or the state
+ * wiring up to it (both are covered by
+ * [DesktopConversationTabsReorderPersistenceTest]/[DesktopConversationTabsHopTest]
+ * and hold up under a real driven drag). Dropping a tab used to null out the
+ * drag state immediately, which snapped the dragged tab's translateX back
+ * to zero — its *original* slot's position — a full frame or more before
+ * the reordered list came back down through the app's state (that hand-off
+ * goes through a `SideEffect` into a separate composable's `remember`ed
+ * var; see `LettaDesktopApp.kt`'s `onHeaderChromeChange` and `Main.kt`'s
+ * `headerChrome`). That snap-back was visible as a revert whenever the new
+ * order hadn't landed yet. Now [DesktopConversationTabRow.endDrag] instead
+ * moves [dragState] into `settling = true` with the analytically-computed
+ * resting offset ([restingDragDeltaPx]) as its new `deltaPx`, so this
+ * overlay animates smoothly from wherever it was to where the tab will
+ * actually end up, and only calls [onSettled] (clearing the drag state,
+ * handing back to the row's own now-reordered layout) once that animation
+ * finishes — by which point the state hand-off above has had a full
+ * [TabReorderAnimationMillis] to land.
+ */
+@Composable
+private fun DraggedTabOverlay(
+    tabs: List<DesktopConversationTab>,
+    dragState: TabDragState?,
+    bounds: Map<String, TabBoundsPx>,
+    scrollOffsetPx: Float,
+    activeConversationId: String?,
+    onClose: (String) -> Unit,
+    onSettled: () -> Unit,
+) {
+    if (dragState == null) return
+    val draggedTab = tabs.firstOrNull { it.conversationId == dragState.conversationId } ?: return
+    val originLeftPx = bounds[dragState.conversationId]?.left ?: return
+    val liveDeltaPx by animateFloatAsState(
+        targetValue = dragState.deltaPx,
+        animationSpec = if (dragState.settling) tween(TabReorderAnimationMillis) else snap(),
+        label = "conversationTabDragOverlayOffset",
+        finishedListener = { if (dragState.settling) onSettled() },
+    )
+    val overlayXPx = originLeftPx - scrollOffsetPx + liveDeltaPx
+    DesktopConversationTabItem(
+        tab = draggedTab,
+        active = draggedTab.conversationId == activeConversationId,
+        dragging = true,
+        visible = true,
+        renderOffsetPx = 0f,
+        // No explicit zIndex needed: this overlay is the Box's second child
+        // (after the Row), so it already draws on top by declaration order.
+        modifier = Modifier.offset { IntOffset(x = overlayXPx.roundToInt(), y = 0) },
+        onSelect = {},
+        onClose = { onClose(draggedTab.conversationId) },
+        onBoundsChanged = { _, _ -> },
+        onDragStart = {},
+        onDrag = {},
+        onDragStop = {},
+    )
 }
 
 /**
@@ -197,11 +358,47 @@ private fun dragShiftPx(
     }
 }
 
+/**
+ * The horizontal pixel delta — relative to the dragged tab's own pre-drag
+ * position, i.e. directly comparable to [TabDragState.deltaPx] — it will
+ * end up at once [targetIndex] is committed: simulates removing the dragged
+ * tab from [tabs] and reinserting it at [targetIndex], then sums neighbor
+ * widths from [bounds] up to that slot. Computed analytically from the same
+ * [bounds] the drag itself already tracked, rather than by waiting for the
+ * reordered list to come back down from the app's state, so the dropped tab
+ * always has a real place to animate to instead of snapping to zero. Pure
+ * and unit-testable; returns null only when a tab's width hasn't been
+ * recorded yet (a layout pass hasn't happened), in which case the caller
+ * clears the drag immediately rather than settling.
+ */
+private fun restingDragDeltaPx(
+    tabs: List<DesktopConversationTab>,
+    bounds: Map<String, TabBoundsPx>,
+    drag: TabDragState,
+    targetIndex: Int,
+    spacingPx: Float,
+): Float? {
+    val originLeftPx = bounds[drag.conversationId]?.left ?: return null
+    val reordered = tabs.map { it.conversationId }.toMutableList()
+    val fromIndex = reordered.indexOf(drag.conversationId)
+    if (fromIndex < 0) return null
+    reordered.removeAt(fromIndex)
+    reordered.add(targetIndex.coerceIn(0, reordered.size), drag.conversationId)
+    var cursor = 0f
+    for (conversationId in reordered) {
+        val width = bounds[conversationId]?.width ?: return null
+        if (conversationId == drag.conversationId) return cursor - originLeftPx
+        cursor += width + spacingPx
+    }
+    return null
+}
+
 @Composable
 private fun DesktopConversationTabItem(
     tab: DesktopConversationTab,
     active: Boolean,
     dragging: Boolean,
+    visible: Boolean,
     renderOffsetPx: Float,
     onSelect: () -> Unit,
     onClose: () -> Unit,
@@ -209,16 +406,17 @@ private fun DesktopConversationTabItem(
     onDragStart: () -> Unit,
     onDrag: (deltaPx: Float) -> Unit,
     onDragStop: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember(tab.conversationId) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
-    val viewConfiguration = LocalViewConfiguration.current
+    val touchSlop = LocalViewConfiguration.current.touchSlop
     // Browser-style tab strip: the active tab is painted in the page background
     // so it reads as the front edge of the content below it, while inactive tabs
     // recede into the title bar (surfaceContainerLow) and only lift on hover.
     Surface(
         onClick = onSelect,
-        modifier = Modifier
+        modifier = modifier
             .fillMaxHeight()
             .widthIn(min = 132.dp, max = 220.dp)
             .padding(top = 5.dp)
@@ -227,8 +425,10 @@ private fun DesktopConversationTabItem(
             }
             // Draw-only transform: keeps the item's laid-out position (and
             // therefore onGloballyPositioned's report of it) stable while it
-            // visually follows the pointer or slides aside for a neighbor.
+            // slides aside for a neighbor. The item currently being dragged
+            // is not drawn here at all (see `visible`/DraggedTabOverlay).
             .graphicsLayer { translationX = renderOffsetPx }
+            .alpha(if (visible) 1f else 0f)
             .zIndex(if (dragging) 1f else 0f)
             .then(if (dragging) Modifier.shadow(4.dp, RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)) else Modifier)
             // This tab strip lives inside Nucleus's custom title bar
@@ -238,9 +438,9 @@ private fun DesktopConversationTabItem(
             // Modifier.draggable defers consuming the initiating press until
             // touch slop is crossed (its down is registered but not claimed),
             // which leaves a window, however small, where a press that starts
-            // a drag looks unclaimed to that outer listener. A hand-rolled
-            // pointerInput claims the press the instant it lands instead, so
-            // no ancestor/sibling chrome can ever treat a tab-drag as "nobody
+            // a drag looks unclaimed to that outer listener. detectTabDragGesture
+            // claims the press the instant it lands instead, so no
+            // ancestor/sibling chrome can ever treat a tab-drag as "nobody
             // wants this." Foundation's own tap detector inside Surface's
             // onClick doesn't gate on prior consumption of the down (it
             // always claims its own down), so eagerly consuming here doesn't
@@ -252,32 +452,12 @@ private fun DesktopConversationTabItem(
             // the button's own clickable consumes its down first and this
             // handler only tracks the pointer id from its own down.
             .pointerInput(tab.conversationId) {
-                val touchSlop = viewConfiguration.touchSlop
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    down.consume()
-                    var isDragging = false
-                    var accumulatedDx = 0f
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.pressed) break
-                        val dx = change.positionChange().x
-                        if (isDragging) {
-                            change.consume()
-                            onDrag(dx)
-                        } else {
-                            accumulatedDx += dx
-                            if (abs(accumulatedDx) > touchSlop) {
-                                isDragging = true
-                                change.consume()
-                                onDragStart()
-                                onDrag(accumulatedDx)
-                            }
-                        }
-                    }
-                    if (isDragging) onDragStop()
-                }
+                detectTabDragGesture(
+                    touchSlop = touchSlop,
+                    onDragStart = onDragStart,
+                    onDrag = onDrag,
+                    onDragStop = onDragStop,
+                )
             },
         shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
         color = when {
@@ -304,6 +484,64 @@ private fun DesktopConversationTabItem(
             }
         }
     }
+}
+
+/**
+ * Hand-rolled press+drag+release recognizer for one tab, replacing
+ * `Modifier.draggable` — see the comment at this function's call site in
+ * [DesktopConversationTabItem] for why. Claims the press immediately, then
+ * hands off to [trackTabDrag] to read the rest of the gesture.
+ */
+private suspend fun PointerInputScope.detectTabDragGesture(
+    touchSlop: Float,
+    onDragStart: () -> Unit,
+    onDrag: (deltaPx: Float) -> Unit,
+    onDragStop: () -> Unit,
+) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false)
+        down.consume()
+        val didDrag = trackTabDrag(down.id, touchSlop, onDragStart, onDrag)
+        if (didDrag) onDragStop()
+    }
+}
+
+/**
+ * Reads move events for [pointerId] until it's released, reporting
+ * horizontal deltas via [onDrag] once cumulative movement crosses
+ * [touchSlop] (calling [onDragStart] the moment it does). Small,
+ * sub-threshold moves are read but never consumed, so Surface's own tap
+ * detector still sees a clean, unconsumed down-then-up for a plain click.
+ * Returns whether a drag was ever started, so the caller knows whether to
+ * report [onDragStop] at all.
+ */
+private suspend fun AwaitPointerEventScope.trackTabDrag(
+    pointerId: PointerId,
+    touchSlop: Float,
+    onDragStart: () -> Unit,
+    onDrag: (deltaPx: Float) -> Unit,
+): Boolean {
+    var isDragging = false
+    var accumulatedDx = 0f
+    while (true) {
+        val event = awaitPointerEvent(PointerEventPass.Main)
+        val change = event.changes.firstOrNull { it.id == pointerId } ?: break
+        if (!change.pressed) break
+        val dx = change.positionChange().x
+        if (isDragging) {
+            change.consume()
+            onDrag(dx)
+        } else {
+            accumulatedDx += dx
+            if (abs(accumulatedDx) > touchSlop) {
+                isDragging = true
+                change.consume()
+                onDragStart()
+                onDrag(accumulatedDx)
+            }
+        }
+    }
+    return isDragging
 }
 
 @Composable
