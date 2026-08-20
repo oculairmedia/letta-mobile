@@ -47,7 +47,8 @@ For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/lett
 | `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire-shape schemas |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
-| `sharedLogic/` | **KMP shared module** — platform-neutral domain/transport plus shared Android/Desktop A2UI renderer and LettaIcons |
+| `sharedLogic/` | **KMP shared module** — platform-neutral domain/transport plus shared Android/Desktop A2UI renderer and LettaIcons (UI → `:sharedUI` in Phase 3) |
+| `sharedUI/` | **KMP Compose UI** — android + jvm shared composables (scaffold Phase 3a) |
 | `desktop/` | Compose Desktop — windowing, Ktor engine, OS lock, installer |
 | `cli/` `appserver-cli/` | JVM tooling for probes, restart-replay evidence, shim-off parity gates |
 

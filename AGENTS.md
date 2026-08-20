@@ -55,8 +55,9 @@ git push --force-with-lease                 # safe force-push to your branch
 | Area | Module path | Put logic here | Host binding only |
 | --- | --- | --- | --- |
 | Shared domain / transport / timeline | `android-compose/sharedLogic/` | repositories, reducers, mappers, RPC, caching | — |
+| Shared Compose UI (Android + Desktop) | `android-compose/sharedUI/` | shared composables, A2UI renderer, markdown/bubbles (after Phase 3b) | — |
 | Android UI / navigation | `android-compose/app/`, `feature-*` | Compose screens, ViewModels that call shared APIs | Activity, Hilt, permissions |
-| Design system / A2UI | `android-compose/designsystem/`, `android-compose/sharedLogic/src/jvmAndAndroid/.../a2ui/` | reusable components/theme; shared Android/Desktop A2UI renderer | — |
+| Design system / A2UI | `android-compose/designsystem/`, `android-compose/sharedLogic/src/jvmAndAndroid/.../a2ui/` (→ `:sharedUI` after Phase 3b) | reusable components/theme; shared Android/Desktop A2UI renderer | — |
 | Desktop shell | `android-compose/desktop/` | — | windowing, installer, Ktor engine, OS lock |
 | CLI / probes | `android-compose/cli/`, `appserver-cli/` | JVM tooling | — |
 
