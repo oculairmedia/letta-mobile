@@ -8,7 +8,6 @@ import com.letta.mobile.data.tooloutput.ToolOutputBlock
 import com.letta.mobile.data.tooloutput.ToolOutputDocument
 import com.letta.mobile.data.tooloutput.ToolOutputParser
 import com.letta.mobile.ui.theme.customColors
-import java.util.LinkedHashMap
 
 private const val TOOL_OUTPUT_DOCUMENT_CACHE_ENTRIES = 32
 private const val TOOL_OUTPUT_HIGHLIGHT_CACHE_ENTRIES = 128
@@ -116,20 +115,24 @@ private class ToolOutputLruCache<K, V>(
     private val maxEntries: Int,
 ) {
     private val lock = Any()
-    private val values = object : LinkedHashMap<K, V>(maxEntries, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<K, V>?): Boolean =
-            size > maxEntries
-    }
+    private val values = linkedMapOf<K, V>()
 
     fun get(key: K): V? = synchronized(lock) {
-        values[key]
+        val value = values.remove(key) ?: return null
+        values[key] = value
+        value
     }
 
     fun getOrPut(key: K, producer: () -> V): V {
         get(key)?.let { return it }
         val produced = producer()
         return synchronized(lock) {
-            values[key] ?: produced.also { values[key] = it }
+            values[key]?.let { return it }
+            values[key] = produced
+            while (values.size > maxEntries) {
+                values.remove(values.keys.first())
+            }
+            produced
         }
     }
 

@@ -35,13 +35,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.put
-import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
-import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.LocalTime
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.atStartOfDayIn
+import kotlinx.datetime.toLocalDateTime
 import kotlin.math.roundToInt
-import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Clock
+import kotlin.time.Instant
 
 
 @Composable
@@ -778,23 +779,28 @@ internal fun JsonElement?.choiceSelection(): Set<String> = when (this) {
     else -> emptySet()
 }
 
-private val validationRegexCache = ConcurrentHashMap<String, Regex>()
+private val validationRegexCache = mutableMapOf<String, Regex>()
+private val validationRegexLock = Any()
 
 internal fun String.matchesValidation(pattern: String): Boolean =
-    runCatching { validationRegexCache.getOrPut(pattern) { Regex(pattern) }.matches(this) }.getOrDefault(true)
+    runCatching {
+        val regex = synchronized(validationRegexLock) {
+            validationRegexCache.getOrPut(pattern) { Regex(pattern) }
+        }
+        regex.matches(this)
+    }.getOrDefault(true)
 
 internal fun String.toDateMillis(): Long? =
     runCatching {
-        LocalDate.parse(take(DateIsoLength), DateTimeFormatter.ISO_LOCAL_DATE)
-            .atStartOfDay()
-            .toInstant(ZoneOffset.UTC)
-            .toEpochMilli()
+        LocalDate.parse(take(DateIsoLength))
+            .atStartOfDayIn(TimeZone.UTC)
+            .toEpochMilliseconds()
     }.getOrNull()
 
 internal fun String.toLocalTime(): LocalTime? {
     val timeText = substringAfter('T', missingDelimiterValue = substringAfter(' ', missingDelimiterValue = this))
     return runCatching {
-        LocalTime.parse(timeText.take(TimeIsoLength), DateTimeFormatter.ISO_LOCAL_TIME)
+        LocalTime.parse(timeText.take(TimeIsoLength))
     }.getOrNull()
 }
 
@@ -805,24 +811,28 @@ internal fun formatDateTime(
     enableTime: Boolean,
 ): String {
     val date = dateMillis
-        ?.let { Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate() }
-        ?: LocalDate.now(ZoneOffset.UTC)
+        ?.let { Instant.fromEpochMilliseconds(it).toLocalDateTime(TimeZone.UTC).date }
+        ?: Clock.System.now().toLocalDateTime(TimeZone.UTC).date
     return when {
-        enableDate && enableTime -> "${date.format(DateTimeFormatter.ISO_LOCAL_DATE)}T${time.orNow().format(TimeFormatter)}"
-        enableDate -> date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        else -> time.orNow().format(TimeFormatter)
+        enableDate && enableTime -> "${date}T${time.orNow().formatHm()}"
+        enableDate -> date.toString()
+        else -> time.orNow().formatHm()
     }
 }
 
 internal fun LocalTime?.orNow(): LocalTime =
-    this ?: LocalTime.now(ZoneOffset.UTC).withSecond(0).withNano(0)
+    this ?: Clock.System.now().toLocalDateTime(TimeZone.UTC).time.truncatedToMinute()
+
+private fun LocalTime.truncatedToMinute(): LocalTime = LocalTime(hour, minute)
+
+private fun LocalTime.formatHm(): String =
+    "${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}"
 
 internal val JsonElement.jsonPrimitiveOrNull: JsonPrimitive?
     get() = this as? JsonPrimitive
 
 internal const val DateIsoLength = 10
 internal const val TimeIsoLength = 5
-internal val TimeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 internal const val MaxRenderDepth = 32
 internal const val DefaultToolApprovalTimeoutSeconds = 30
 internal const val A2uiButtonLocalTimeoutMillis = 10_000L
