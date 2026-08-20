@@ -1,7 +1,6 @@
 package com.letta.mobile.desktop
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -69,13 +68,14 @@ internal data class DesktopConversationTab(
  * drag-shift math below so the two stay in sync. */
 private val TabSpacing = 4.dp
 
-/** How long the "make room for the dragged tab" shift and the post-drop
- * settle-into-place animation run. Shared so the settle animation has a
- * known duration: [DesktopConversationTabRow] clears the drag state once it
- * completes, which is also how long the parent has to commit the reorder
- * (see the overlay doc below) before the hand-off from the floating overlay
- * back to the row's own layout would be visible. */
-private const val TabReorderAnimationMillis = 150
+/** How long the "make room for the dragged tab" shift animation runs for a
+ * non-dragged neighbor. The dragged tab itself (and the overlay that draws
+ * it) is never animated: it tracks the pointer 1:1 while live, and on drop
+ * the state commit is synchronous (verified against the running app — see
+ * the "reorder doesn't stick" note on [DraggedTabOverlay]), so clearing the
+ * drag state hands back to the row's own already-correct layout with
+ * nothing left to animate. */
+private const val TabReorderShiftAnimationMillis = 150
 
 /** Left edge and width of a laid-out tab, in px, relative to the tab row's
  * own (unscrolled) content coordinates. Captured from `onGloballyPositioned`
@@ -84,22 +84,16 @@ private const val TabReorderAnimationMillis = 150
 private data class TabBoundsPx(val left: Float, val width: Float)
 
 /**
- * In-progress (or just-dropped, still settling) reorder gesture: which tab,
- * the index it started at, and its current horizontal offset in px relative
- * to its pre-drag position. While a pointer is actually down, [deltaPx]
- * tracks the live cumulative pointer movement. Once dropped, [settling]
- * flips true and [deltaPx] is overwritten once with the analytically
- * computed resting offset (see [restingDragDeltaPx]) so the floating
- * overlay animates straight there instead of snapping to zero and waiting
- * for the reordered list to come back around — see the overlay doc below
- * for why that hand-off, not the reducer, was the actual "reorder doesn't
- * stick" bug.
+ * In-progress reorder gesture: which tab, the index it started at, and the
+ * cumulative horizontal pointer movement since the drag began, in px
+ * relative to its pre-drag position. Exists only while a drag is live; see
+ * [DraggedTabOverlay] for why dropping simply clears it rather than
+ * animating anywhere.
  */
 private data class TabDragState(
     val conversationId: String,
     val startIndex: Int,
     val deltaPx: Float,
-    val settling: Boolean = false,
 )
 
 @Composable
@@ -136,8 +130,19 @@ internal fun DesktopConversationTabRow(
         if (finalTarget != drag.startIndex) {
             onReorder(drag.conversationId, finalTarget)
         }
-        val restingDeltaPx = restingDragDeltaPx(tabs, bounds, drag, finalTarget, spacingPx)
-        dragState = restingDeltaPx?.let { drag.copy(deltaPx = it, settling = true) }
+        // The reorder above commits synchronously — LettaDesktopApp.kt's
+        // conversationTabsState update and the SideEffect that hands the
+        // new tab order back down to this row both land in the very next
+        // composition, not some frames later. So there is nowhere useful to
+        // animate the overlay to: clearing the drag state right here hands
+        // back to the row's own copy of this tab, which recomposes in the
+        // same pass already sitting in its correct new slot. Confirmed
+        // against the running app rather than assumed — an earlier version
+        // of this code animated the overlay toward an analytically-computed
+        // resting offset to cover a hand-off delay that, measured, does not
+        // exist; that animation was the visible hitch on drop, not a fix
+        // for one.
+        dragState = null
     }
 
     Box(modifier = modifier) {
@@ -172,7 +177,6 @@ internal fun DesktopConversationTabRow(
             scrollOffsetPx = scrollState.value.toFloat(),
             activeConversationId = activeConversationId,
             onClose = onClose,
-            onSettled = { dragState = null },
         )
     }
 }
@@ -208,7 +212,7 @@ private fun DesktopConversationTabRowSlot(
         } else {
             0f
         },
-        animationSpec = tween(durationMillis = TabReorderAnimationMillis),
+        animationSpec = tween(durationMillis = TabReorderShiftAnimationMillis),
         label = "conversationTabReorderShift",
     )
     DesktopConversationTabItem(
@@ -227,13 +231,12 @@ private fun DesktopConversationTabRowSlot(
 }
 
 /**
- * Renders the actively-dragged (or just-dropped, still settling) tab as a
- * floating overlay above the row, positioned by absolute offset rather than
- * translated in place inside the Row. The Row's own copy of the same tab
- * ([DesktopConversationTabRowSlot] with `visible = false`) stays mounted so
- * it keeps its layout slot, bounds tracking, and pointer input gesture
- * alive; this overlay is purely a visual mirror driven by [dragState] with
- * no gesture handling of its own.
+ * Renders the actively-dragged tab as a floating overlay above the row,
+ * positioned by absolute offset rather than translated in place inside the
+ * Row. The Row's own copy of the same tab ([DesktopConversationTabRowSlot]
+ * with `visible = false`) stays mounted so it keeps its layout slot, bounds
+ * tracking, and pointer input gesture alive; this overlay is purely a
+ * visual mirror driven by [dragState] with no gesture handling of its own.
  *
  * Overlaying, instead of translating the tab in place, is what fixes the
  * clipping bug: `Modifier.horizontalScroll` clips its content to the row's
@@ -248,25 +251,23 @@ private fun DesktopConversationTabRowSlot(
  * ([scrollOffsetPx]) rather than inheriting one for free the way an in-row
  * child would.
  *
- * It also fixes the "reorder doesn't stick" bug, which turned out to be
- * this same draw-only-transform mechanism, not the reducer or the state
- * wiring up to it (both are covered by
- * [DesktopConversationTabsReorderPersistenceTest]/[DesktopConversationTabsHopTest]
- * and hold up under a real driven drag). Dropping a tab used to null out the
- * drag state immediately, which snapped the dragged tab's translateX back
- * to zero — its *original* slot's position — a full frame or more before
- * the reordered list came back down through the app's state (that hand-off
- * goes through a `SideEffect` into a separate composable's `remember`ed
- * var; see `LettaDesktopApp.kt`'s `onHeaderChromeChange` and `Main.kt`'s
- * `headerChrome`). That snap-back was visible as a revert whenever the new
- * order hadn't landed yet. Now [DesktopConversationTabRow.endDrag] instead
- * moves [dragState] into `settling = true` with the analytically-computed
- * resting offset ([restingDragDeltaPx]) as its new `deltaPx`, so this
- * overlay animates smoothly from wherever it was to where the tab will
- * actually end up, and only calls [onSettled] (clearing the drag state,
- * handing back to the row's own now-reordered layout) once that animation
- * finishes — by which point the state hand-off above has had a full
- * [TabReorderAnimationMillis] to land.
+ * This overlay simply disappears — [DesktopConversationTabRow.endDrag]
+ * clears [dragState] outright, no settle animation — because the reorder
+ * it fires on drop commits synchronously (confirmed by instrumenting the
+ * running app, not assumed): `LettaDesktopApp.kt`'s `conversationTabsState`
+ * update and the `SideEffect` that hands the new tab order back down
+ * through `Main.kt`'s `headerChrome` to this row both land in the same
+ * composition the drop itself happens in. An earlier version of this code
+ * held the overlay for an extra ~150ms, animating it toward an
+ * analytically-computed resting offset to cover a hand-off delay that,
+ * measured, does not exist; the row underneath had already relaid-out into
+ * the new (correct) order for that entire window, so the overlay and the
+ * row disagreed on this tab's position for the animation's whole duration
+ * — that mismatch, snapped away when the overlay finally cleared, was
+ * exactly the visible hitch on release. Clearing immediately means the
+ * hand-off is just "this frame draws the overlay one last time at its live
+ * position, the very next frame the row's own already-correct copy draws
+ * in its place" — no gap for the two to disagree in.
  */
 @Composable
 private fun DraggedTabOverlay(
@@ -276,18 +277,11 @@ private fun DraggedTabOverlay(
     scrollOffsetPx: Float,
     activeConversationId: String?,
     onClose: (String) -> Unit,
-    onSettled: () -> Unit,
 ) {
     if (dragState == null) return
     val draggedTab = tabs.firstOrNull { it.conversationId == dragState.conversationId } ?: return
     val originLeftPx = bounds[dragState.conversationId]?.left ?: return
-    val liveDeltaPx by animateFloatAsState(
-        targetValue = dragState.deltaPx,
-        animationSpec = if (dragState.settling) tween(TabReorderAnimationMillis) else snap(),
-        label = "conversationTabDragOverlayOffset",
-        finishedListener = { if (dragState.settling) onSettled() },
-    )
-    val overlayXPx = originLeftPx - scrollOffsetPx + liveDeltaPx
+    val overlayXPx = originLeftPx - scrollOffsetPx + dragState.deltaPx
     DesktopConversationTabItem(
         tab = draggedTab,
         active = draggedTab.conversationId == activeConversationId,
@@ -356,41 +350,6 @@ private fun dragShiftPx(
         targetIndex > drag.startIndex && index in (drag.startIndex + 1)..targetIndex -> -step
         else -> 0f
     }
-}
-
-/**
- * The horizontal pixel delta — relative to the dragged tab's own pre-drag
- * position, i.e. directly comparable to [TabDragState.deltaPx] — it will
- * end up at once [targetIndex] is committed: simulates removing the dragged
- * tab from [tabs] and reinserting it at [targetIndex], then sums neighbor
- * widths from [bounds] up to that slot. Computed analytically from the same
- * [bounds] the drag itself already tracked, rather than by waiting for the
- * reordered list to come back down from the app's state, so the dropped tab
- * always has a real place to animate to instead of snapping to zero. Pure
- * and unit-testable; returns null only when a tab's width hasn't been
- * recorded yet (a layout pass hasn't happened), in which case the caller
- * clears the drag immediately rather than settling.
- */
-private fun restingDragDeltaPx(
-    tabs: List<DesktopConversationTab>,
-    bounds: Map<String, TabBoundsPx>,
-    drag: TabDragState,
-    targetIndex: Int,
-    spacingPx: Float,
-): Float? {
-    val originLeftPx = bounds[drag.conversationId]?.left ?: return null
-    val reordered = tabs.map { it.conversationId }.toMutableList()
-    val fromIndex = reordered.indexOf(drag.conversationId)
-    if (fromIndex < 0) return null
-    reordered.removeAt(fromIndex)
-    reordered.add(targetIndex.coerceIn(0, reordered.size), drag.conversationId)
-    var cursor = 0f
-    for (conversationId in reordered) {
-        val width = bounds[conversationId]?.width ?: return null
-        if (conversationId == drag.conversationId) return cursor - originLeftPx
-        cursor += width + spacingPx
-    }
-    return null
 }
 
 @Composable
