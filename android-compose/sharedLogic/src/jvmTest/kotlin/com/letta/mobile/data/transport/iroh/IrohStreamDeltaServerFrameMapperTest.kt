@@ -393,6 +393,13 @@ class IrohStreamDeltaServerFrameMapperTest {
      * dropped the image on every observer. The mapper must forward the raw
      * JsonElement on [ServerFrame.UserMessage.contentRaw] so the WsFrameMapper
      * hop and the timeline reducer can rebuild the image attachment.
+     *
+     * CodeRabbit review (2026-08-20): assert the raw/structural contract
+     * exactly (not via substring) so a regression where the array is
+     * re-stringified cannot pass through `contains(...)` checks. Also pin
+     * the legacy `.content` text projection to `"look at this"` exactly —
+     * the pre-fix projection leaked the base64 via `raw.toString()` and
+     * downstream text-only consumers reported garbage.
      */
     @Test
     fun userMessageDeltaForwardsMultimodalContentPartsArrayVerbatim() {
@@ -417,18 +424,28 @@ class IrohStreamDeltaServerFrameMapperTest {
                 """.trimIndent(),
             ).single(),
         )
-        // contentRaw is the verbatim array — the image base64 must be present.
+        // contentRaw survives the mapper hop as the verbatim JSON array.
+        // CodeRabbit: equality, not substring.
         val raw = frame.contentRaw ?: fail("contentRaw must carry the array, not be null")
-        assertTrue(
-            raw.toString().contains("IROP_PNG+"),
-            "image base64 must survive the mapper hop; got=${raw}",
-        )
-        // Legacy `.content` projection still exposes the text portion for
-        // callers that don't ask for attachments.
-        assertTrue(
-            frame.content.contains("look at this"),
-            "text projection must remain human-readable; got=${frame.content}",
-        )
+        assertIs<kotlinx.serialization.json.JsonArray>(raw)
+        assertEquals(2, raw.size)
+        // Cast to JsonObject first so the bracket-index resolves to
+        // JsonObject.get, not MatchGroupCollection.get (Kotlin can't infer
+        // the type from JsonArray index access alone).
+        val textPart = assertIs<kotlinx.serialization.json.JsonObject>(raw[0])
+        val imagePartOuter = assertIs<kotlinx.serialization.json.JsonObject>(raw[1])
+        assertEquals("text", (textPart["type"] as? JsonPrimitive)?.contentOrNull)
+        assertEquals("look at this", (textPart["text"] as? JsonPrimitive)?.contentOrNull)
+        // Image part preserves source.media_type + source.data verbatim.
+        val imageSource = assertIs<kotlinx.serialization.json.JsonObject>(imagePartOuter["source"]
+            ?: fail("image part must have a `source` field; got=${imagePartOuter}"))
+        assertEquals("base64", (imageSource["type"] as? JsonPrimitive)?.contentOrNull)
+        assertEquals("image/png", (imageSource["media_type"] as? JsonPrimitive)?.contentOrNull)
+        assertEquals("IROP_PNG+", (imageSource["data"] as? JsonPrimitive)?.contentOrNull)
+        // Legacy `.content` projection exposes ONLY the text portion — base64
+        // image data must NOT leak through, otherwise text-only consumers
+        // (IrohProbeMetrics, MergeTracer) report garbage.
+        assertEquals("look at this", frame.content)
     }
 
     /**
@@ -464,14 +481,18 @@ class IrohStreamDeltaServerFrameMapperTest {
             ).single(),
         )
         val raw = frame.contentRaw ?: fail("contentRaw must carry the array, not be null")
-        assertTrue(
-            raw.toString().contains("FLATMAP_JPEG="),
-            "flat-shape image base64 must survive verbatim; got=${raw}",
-        )
-        assertTrue(
-            raw.toString().contains("image/jpeg"),
-            "flat-shape mimeType must survive verbatim; got=${raw}",
-        )
+        assertIs<kotlinx.serialization.json.JsonArray>(raw)
+        // CodeRabbit review: equality, not substring. The flat-shape image
+        // part must survive verbatim — neither `data` nor `mimeType` get
+        // re-shaped by the mapper. Cast to JsonObject so bracket-index
+        // resolves to JsonObject.get (not MatchGroupCollection.get).
+        val imagePart = assertIs<kotlinx.serialization.json.JsonObject>(raw[1])
+        assertEquals("image", (imagePart["type"] as? JsonPrimitive)?.contentOrNull)
+        assertEquals("FLATMAP_JPEG=", (imagePart["data"] as? JsonPrimitive)?.contentOrNull)
+        assertEquals("image/jpeg", (imagePart["mimeType"] as? JsonPrimitive)?.contentOrNull)
+        // Legacy `.content` text projection locks to the text portion.
+        // CodeRabbit: exactly equal, not `contains`.
+        assertEquals("hi", frame.content)
     }
 
     /**
