@@ -1,0 +1,16 @@
+# Starter version catalog (KMP structure migration Phase 0).
+# Prefer adding new shared versions here; do not bulk-migrate existing
+# hardcoded coordinates in the same PR as a module move.
+[versions]
+paging = "3.5.0"
+konsist = "0.17.3"
+archunit = "1.4.2"
+junit-jupiter = "6.1.0"
+junit-platform = "6.1.0"
+
+[libraries]
+androidx-paging-common = { module = "androidx.paging:paging-common", version.ref = "paging" }
+konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }

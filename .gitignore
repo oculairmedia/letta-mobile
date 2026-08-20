@@ -33,6 +33,9 @@ kotzilla.json
 *.db
 .beads-credential-key
 
+# Orphan KMP shared-ui build output (module is not in settings.gradle.kts)
+android-compose/shared-ui/
+
 # Kotlin compiler error logs
 android-compose/.kotlin/
 android-compose/native/mermaid_renderer/target/

@@ -50,8 +50,9 @@ The included Gradle modules are now the practical module map:
 ```text
 android-compose/
   app/                 application wiring, DI, navigation, platform services
-  core/                API clients, repositories, session graph, timeline
-  core/domain/         small domain module, still underused
+  core/data/           Android Room/Hilt/session wiring
+  core/ids + runtime   KMP foundations
+  sharedLogic/         portable contracts, timeline, transport (includes former core/domain APIs)
   designsystem/        reusable Material 3 UI foundations
   feature-chat/        chat feature state and WS send coordinator
   feature-editagent/   edit-agent feature
@@ -102,9 +103,10 @@ For letta-mobile specifically:
   stay Android-specific and eventually become the analog of `androidApp`, not
   the shared KMP substrate.
 - `core` currently mixes repository implementations, API clients, timeline
-  code, and a small `core/domain` module. The KMP extraction should split
-  portable contracts and reducers out of `core` instead of making all of `core`
-  multiplatform at once.
+  code, and Android session wiring. Portable contracts live in `sharedLogic`
+  (including the former `:core:domain` paging/message APIs). The KMP extraction
+  should keep splitting portable code out of `core/data` instead of making all
+  of `core` multiplatform at once.
 - `feature-chat` and `designsystem` should only move toward `sharedUI` if we
   commit to Compose Multiplatform UI sharing. If iOS uses SwiftUI or another
   native UI, it should depend on `sharedLogic` and avoid Compose dependencies.

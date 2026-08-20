@@ -83,7 +83,7 @@ class MessageRepositoryBoundaryTest {
     private fun repositorySource(relativePath: String): String {
         val root = repositoryRoot()
         val path = if (relativePath.contains("IMessageRepository")) {
-            root.resolve("core/domain/src/main/java/com/letta/mobile/data/repository/api/IMessageRepository.kt")
+            root.resolve("sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/IMessageRepository.kt")
         } else {
             root.resolve("core/data/src/main/java/com/letta/mobile/data/repository/MessageRepository.kt")
         }

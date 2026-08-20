@@ -159,6 +159,10 @@ kotlin {
                 // androidx.compose.ui.platform.LocalContext).
                 api("org.jetbrains.compose.animation:animation:1.10.0")
                 api("com.composables:icons-lucide:1.1.0")
+                // Paging-common is Android/JVM only. Former :core:domain contracts
+                // (IMessageRepository, IAllConversationsRepository) live in this
+                // source set because they expose PagingData / java.time.Instant.
+                api(libs.androidx.paging.common)
                 api("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
                 // Shared Android/Desktop Markdown paint layer. Semantic streaming
                 // structure lives alongside it in this source set; platform

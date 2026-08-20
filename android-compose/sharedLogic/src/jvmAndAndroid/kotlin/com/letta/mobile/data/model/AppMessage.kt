@@ -5,6 +5,9 @@ import java.time.Instant
 /**
  * Application-level message model for UI display.
  * Simplified from the API's LettaMessage types.
+ *
+ * Lives in jvmAndAndroid (not commonMain): [date] is [java.time.Instant], and
+ * paging consumers live on Android/Desktop JVM hosts.
  */
 data class AppMessage(
     val id: String,

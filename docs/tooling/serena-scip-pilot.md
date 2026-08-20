@@ -41,7 +41,6 @@ this stack requires JDK 21 or newer; the script uses the common Linux JDK 21
 path when present or accepts an explicit `SCIP_JAVA_HOME`. It asks scip-java to
 compile only representative JVM/shared tasks:
 
-- `:core:domain:compileKotlin`
 - `:core:ids:compileKotlinJvm`
 - `:core:runtime:compileKotlinJvm`
 - `:sharedLogic:compileKotlinJvm`
