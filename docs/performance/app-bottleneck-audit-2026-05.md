@@ -28,7 +28,7 @@ The highest-confidence bottlenecks are not broad Compose issues. They are avoida
 **Observed architecture:**
 
 - `bot` owns gateway/WebSocket behavior.
-- `core/data/timeline` owns timeline ingestion and reconcile.
+- `sharedLogic` timeline owns timeline ingestion and reconcile.
 - `app/ui/screens/chat/AdminChatViewModel.kt` still coordinates route resolution, Client Mode send orchestration, timeline observation, notification flags, composer gates, project context, reset, and search.
 
 **Risk:** Even when the slow part is upstream model/tool execution, dense VM orchestration makes it difficult to distinguish real server latency from client-side state churn or repeated observer work.

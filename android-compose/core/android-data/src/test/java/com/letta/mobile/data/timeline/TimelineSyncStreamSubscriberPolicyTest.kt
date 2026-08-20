@@ -28,7 +28,7 @@ class TimelineSyncStreamSubscriberPolicyTest {
         while (cursor.name != "android-compose" && cursor.parent != null) {
             cursor = cursor.parent
         }
-        require(Files.exists(cursor.resolve("core/data/build.gradle.kts"))) {
+        require(Files.exists(cursor.resolve("core/android-data/build.gradle.kts"))) {
             "Could not locate android-compose root from ${System.getProperty("user.dir")}"
         }
         return cursor

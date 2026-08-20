@@ -13,6 +13,7 @@ class SharedLogicIsolationTest {
         val gradle = sharedLogicBuild.readText()
         val forbiddenProjectDeps = listOf(
             """project(":app")""",
+            """project(":core:android-data")""",
             """project(":core:data")""",
             """project(":core:domain")""",
             """project(":designsystem")""",

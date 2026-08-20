@@ -7,7 +7,7 @@ Beads: `letta-mobile-ph9ws.14`, `letta-mobile-ph9ws.15`, `letta-mobile-lgns8.1`
 ## Scope
 
 This note audits the current REST/Admin clients under
-`android-compose/core/data/src/main/java/com/letta/mobile/data/api` and the
+`android-compose/core/android-data/src/main/java/com/letta/mobile/data/api` and the
 repository/UI surfaces that depend on them. It also records the multi-client
 App Server control-session decision for the `letta-mobile-ph9ws` migration.
 

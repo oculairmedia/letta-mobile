@@ -396,7 +396,7 @@ fun dedupeGroupedMessagesForLazyKeys(
  * Optimistic-id prefixes minted by the Client Mode timeline reducer
  * (`ClientModeTimelineStreamReducer`), the conversation coordinator's
  * fresh-route bootstrap (`ChatConversationCoordinator`), and the
- * Letta `newOtid()` helper in `core/data/timeline/Timeline.kt`.
+ * Letta `newOtid()` helper in `sharedLogic` timeline (`Timeline.kt`).
  *
  * Anything bearing one of these prefixes is a candidate for fuzzy
  * collapse against an adjacent server-issued twin.

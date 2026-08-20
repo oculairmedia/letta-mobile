@@ -43,7 +43,7 @@ For App Server contract work, also provision Node `v24.18.0` and `@letta-ai/lett
 |---|---|
 | `app/` | Android app — screens, navigation, ViewModels, Hilt DI |
 | `feature-chat/` `feature-editagent/` | Compose feature modules |
-| `core/data/` | Repositories, Room DB, transport-bound data sources |
+| `core/android-data/` | Repositories, Room DB, transport-bound data sources |
 | `core/runtime/` | App Server runtime contracts, turn lifecycle interfaces |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire-shape schemas |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
