@@ -83,7 +83,6 @@ kotlin {
 }
 
 dependencies {
-    api(project(":core:domain"))
     api(project(":sharedLogic"))
 
     implementation("com.google.dagger:hilt-android:2.59.2")

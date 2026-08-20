@@ -1727,14 +1727,13 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.7")
     implementation("androidx.hilt:hilt-navigation-compose:1.4.0-beta01")
 
-    // CameraX (letta-mobile-g2d2i: QR pairing scanner). No version catalog
-    // exists in this repo (see gradle/libs.versions.toml — absent), so these
-    // follow the file's existing convention of pinned literal versions.
-    // Deliberately ImageAnalysis + zxing:core (already a transitive
-    // sharedLogic dependency via core:data -> sharedLogic) instead of ML Kit
-    // barcode scanning: ML Kit either bundles a large model (APK bloat) or
-    // requires Google Play Services (unbundled), which the Root/Sideload
-    // flavors cannot assume.
+    // CameraX (letta-mobile-g2d2i: QR pairing scanner). Versions that are
+    // already centralized live in gradle/libs.versions.toml; CameraX stays
+    // pinned here until that catalog grows. Deliberately ImageAnalysis +
+    // zxing:core (already a transitive sharedLogic dependency via core:data
+    // -> sharedLogic) instead of ML Kit barcode scanning: ML Kit either
+    // bundles a large model (APK bloat) or requires Google Play Services
+    // (unbundled), which the Root/Sideload flavors cannot assume.
     val cameraxVersion = "1.4.2"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")

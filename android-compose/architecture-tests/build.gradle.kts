@@ -14,14 +14,14 @@ kotlin {
 }
 
 dependencies {
-    testImplementation("com.lemonappdev:konsist:0.17.3")
-    testImplementation("com.tngtech.archunit:archunit:1.4.2")
-    testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
+    testImplementation(libs.konsist)
+    testImplementation(libs.archunit)
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.withType<Test>().configureEach {
-    dependsOn(":core:ids:jvmMainClasses", ":core:domain:classes")
+    dependsOn(":core:ids:jvmMainClasses", ":sharedLogic:jvmMainClasses")
     useJUnitPlatform()
     systemProperty("architecture.projectRoot", rootProject.projectDir.parentFile.absolutePath)
 }

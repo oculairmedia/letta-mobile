@@ -28,7 +28,6 @@ Everything under [`android-compose/`](android-compose/).
 | `feature-chat/` | Chat screens, presenters |
 | `feature-editagent/` | Agent editor |
 | `core/data/` | Repositories, Room database, data sources |
-| `core/domain/` | Domain models, repository interfaces, business rules |
 | `core/runtime/` | Turn engine, runtime event fanout |
 | `core/ids/` `core/schemas/` | Shared identifiers and wire schemas |
 | `designsystem/` | Reusable Android Compose UI, theming, and dialogs |
