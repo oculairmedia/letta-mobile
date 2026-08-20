@@ -35,7 +35,18 @@ internal suspend fun PointerInputScope.detectTabDragGesture(touchSlop: Float, ca
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         down.consume()
+        // TEMPORARY (letta-mobile #1249 touch-reorder diagnosis): confirms
+        // whether a press even reaches this pointerInput at all, and
+        // whether it goes on to cross touch slop and become a recognized
+        // drag. If "press seen" never prints for a finger drag, the event
+        // is being claimed before Compose's gesture system -- most likely
+        // Nucleus's native title-bar drag-to-move. If "press seen" prints
+        // but "drag started" never does, the press arrives but slop is
+        // never crossed (a different bug, e.g. touch move deltas not
+        // matching what this recognizer expects).
+        System.err.println("TABTOUCHDIAG press seen type=" + down.type + " id=" + down.id)
         val didDrag = trackTabDrag(down.id, touchSlop, callbacks)
+        System.err.println("TABTOUCHDIAG gesture ended didDrag=$didDrag")
         if (didDrag) callbacks.onDragStop()
     }
 }

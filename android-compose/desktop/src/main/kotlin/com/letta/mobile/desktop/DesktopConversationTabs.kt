@@ -26,6 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -119,6 +120,9 @@ internal fun DesktopConversationTabRow(
     val currentDragState = dragState
 
     fun beginDrag(tab: DesktopConversationTab, index: Int) {
+        // TEMPORARY (letta-mobile #1249 touch-reorder diagnosis): confirms
+        // touch slop was actually crossed and the drag recognizer started.
+        System.err.println("TABTOUCHDIAG drag started conversationId=" + tab.conversationId)
         dragState = TabDragState(conversationId = tab.conversationId, startIndex = index, deltaPx = 0f)
     }
 
@@ -156,21 +160,32 @@ internal fun DesktopConversationTabRow(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             tabs.forEachIndexed { index, tab ->
-                DesktopConversationTabRowSlot(
-                    tab = tab,
-                    index = index,
-                    active = tab.conversationId == activeConversationId,
-                    tabs = tabs,
-                    dragState = currentDragState,
-                    layout = layout,
-                    actions = actions,
-                    onBoundsChanged = { left, width -> bounds[tab.conversationId] = TabBoundsPx(left, width) },
-                    dragCallbacks = TabDragCallbacks(
-                        onDragStart = { beginDrag(tab, index) },
-                        onDrag = ::updateDrag,
-                        onDragStop = ::endDrag,
-                    ),
-                )
+                // Keyed by conversationId, not just positional loop index:
+                // without this, Compose reuses each slot's composable
+                // instance -- and its remembered animateFloatAsState for
+                // shiftPx -- by LIST POSITION across a reorder, not by
+                // which tab it is. On drop, the just-settled dragged tab
+                // would inherit whatever in-flight shift a DIFFERENT tab
+                // left behind in that position and visibly animate in
+                // from there: the "snaps back to its old spot, then
+                // animates to the new one" bug.
+                key(tab.conversationId) {
+                    DesktopConversationTabRowSlot(
+                        tab = tab,
+                        index = index,
+                        active = tab.conversationId == activeConversationId,
+                        tabs = tabs,
+                        dragState = currentDragState,
+                        layout = layout,
+                        actions = actions,
+                        onBoundsChanged = { left, width -> bounds[tab.conversationId] = TabBoundsPx(left, width) },
+                        dragCallbacks = TabDragCallbacks(
+                            onDragStart = { beginDrag(tab, index) },
+                            onDrag = ::updateDrag,
+                            onDragStop = ::endDrag,
+                        ),
+                    )
+                }
             }
         }
 

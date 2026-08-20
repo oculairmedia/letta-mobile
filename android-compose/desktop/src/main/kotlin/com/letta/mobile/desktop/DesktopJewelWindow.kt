@@ -192,7 +192,12 @@ internal fun DesktopJewelWindow(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
                         modifier = Modifier.onGloballyPositioned { coordinates ->
-                            DesktopTouchDragExclusion.publish(window, titleBarScreenBoundsOrNull(coordinates))
+                            val bounds = titleBarScreenBoundsOrNull(coordinates)
+                            // TEMPORARY (letta-mobile #1249 touch-reorder diagnosis):
+                            // confirms the exclusion rectangle actually covers where
+                            // the tab strip renders on screen.
+                            System.err.println("TABTOUCHDIAG titleBarBounds=$bounds")
+                            DesktopTouchDragExclusion.publish(window, bounds)
                         },
                     ) {
                         Row(

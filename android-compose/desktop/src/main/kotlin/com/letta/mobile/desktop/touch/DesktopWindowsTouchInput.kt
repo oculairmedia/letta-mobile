@@ -196,6 +196,15 @@ internal object DesktopWindowsTouchInput {
             val excluded = exclusionLatch.classify(event.id) {
                 DesktopTouchDragExclusion.contains(window, event.xOnScreen, event.yOnScreen)
             }
+            // TEMPORARY (letta-mobile #1249 touch-reorder diagnosis): confirms
+            // whether a touch press landing on the tab strip is recognized as
+            // falling inside the published title-bar exclusion region at all.
+            if (event.id == MouseEvent.MOUSE_PRESSED) {
+                System.err.println(
+                    "TABTOUCHDIAG exclusion press screen=(" + event.xOnScreen + "," + event.yOnScreen +
+                        ") excluded=" + excluded,
+                )
+            }
             if (!excluded) return false
             if (event.id == MouseEvent.MOUSE_PRESSED) cancelFling()
             super.dispatchEvent(event)
