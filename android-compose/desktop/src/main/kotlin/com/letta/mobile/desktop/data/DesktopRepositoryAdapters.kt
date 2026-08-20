@@ -3,6 +3,10 @@ package com.letta.mobile.desktop.data
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.chat.runtime.ChatSessionGraph
 import com.letta.mobile.data.model.LettaConfig
+import com.letta.mobile.data.repository.ActiveConfigSettingsRepository
+import com.letta.mobile.data.repository.CronRepository
+import com.letta.mobile.data.repository.SelfTodoRepository
+import com.letta.mobile.data.repository.SubagentRepository
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IAgentBlockRepository
 import com.letta.mobile.data.repository.api.IArchiveRepository
@@ -25,6 +29,8 @@ import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
+import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
+import com.letta.mobile.data.repository.iroh.buildIrohAdminReadRepositories
 import com.letta.mobile.data.session.DEFAULT_REMOTE_LETTA_URL
 import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.DESKTOP_REMOTE_LETTA_ID_PREFIX
@@ -36,12 +42,15 @@ import com.letta.mobile.data.session.sessionBackendBinding
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
-import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.runtime.BackendDescriptor
 import com.letta.mobile.runtime.LettaBackend
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 
 class DesktopRepositoryUnavailableException(
     contractName: String,
@@ -97,20 +106,29 @@ class DesktopSessionGraph internal constructor(
 class DesktopSessionGraphFactory(
     private val configProvider: () -> LettaConfig? = { null },
     private val channelTransportFactory: () -> IChannelTransport = ::NoOpChannelTransport,
-    private val repositoryAdaptersFactory: (LettaConfig?) -> DesktopRepositoryAdapters = ::DesktopRepositoryAdapters,
+    private val irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+    private val repositoryAdaptersFactory: (LettaConfig?, IChannelTransport) -> DesktopRepositoryAdapters =
+        { config, transport ->
+            DesktopRepositoryAdapters(
+                config = config,
+                irohAgentDirectoryProvider = irohAgentDirectoryProvider,
+                channelTransport = transport,
+            )
+        },
 ) : SessionRepositoryGraphFactory<DesktopSessionGraph> {
     private val nextId = AtomicLong(0L)
 
     override fun create(): DesktopSessionGraph {
         val config = configProvider()
-        val adapters = repositoryAdaptersFactory(config)
+        val channelTransport = channelTransportFactory()
+        val adapters = repositoryAdaptersFactory(config, channelTransport)
         return DesktopSessionGraph(
             id = nextId.incrementAndGet(),
             backendDescriptor = desktopRemoteLettaDescriptor(config),
             localRuntimeBackend = null,
             agentRepository = adapters.agentRepository,
             blockRepository = adapters.blockRepository,
-            channelTransport = channelTransportFactory(),
+            channelTransport = channelTransport,
             conversationRepository = adapters.conversationRepository,
             cronRepository = adapters.cronRepository,
             archiveRepository = adapters.archiveRepository,
@@ -177,6 +195,7 @@ fun defaultDesktopChatSessionGraphFactory(
 class DesktopRepositoryAdapters(
     config: LettaConfig? = null,
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+    channelTransport: IChannelTransport = NoOpChannelTransport(),
 ) {
     // letta-mobile-9v9nu: mode is authoritative — LOCAL never binds remote Iroh
     // even if serverUrl still carries a leftover iroh:// ticket.
@@ -192,34 +211,67 @@ class DesktopRepositoryAdapters(
     }
     private val adminRepositories = buildHttpAdminRepositories(config, irohMode)
     private val irohRepositories = buildIrohRepositories(irohMode, irohAgentDirectoryProvider)
+    private val irohAdminReads = if (irohMode) {
+        buildIrohAdminReadRepositories(
+            channelTransport = channelTransport,
+            settingsRepository = ActiveConfigSettingsRepository(config),
+        )
+    } else {
+        null
+    }
+    private val transportBoundJob = SupervisorJob()
+    private val transportBoundScope = CoroutineScope(transportBoundJob + Dispatchers.Default)
+    private val boundCronRepository = CronRepository(channelTransport, transportBoundScope)
+    private val boundSelfTodoRepository = SelfTodoRepository(channelTransport, transportBoundScope)
+    private val boundSubagentRepository = SubagentRepository(
+        transport = channelTransport,
+        scope = transportBoundScope,
+        includeAll = true,
+    )
 
-    val closeables: List<AutoCloseable> = listOfNotNull(adminRepositories)
+    val closeables: List<AutoCloseable> = listOfNotNull(
+        adminRepositories,
+        AutoCloseable {
+            boundSubagentRepository.close()
+            transportBoundJob.cancel()
+        },
+    )
 
     val agentRepository: IAgentRepository = localRepositories?.agentRepository
         ?: selectIrohOrHttp(irohRepositories?.agentRepository, adminRepositories)
     val blockRepository: IAgentBlockRepository = localRepositories?.blockRepository
         ?: selectIrohOrHttp(irohRepositories?.blockRepository, adminRepositories)
-    val archiveRepository: IArchiveRepository = unavailableRepository()
+    val archiveRepository: IArchiveRepository =
+        irohAdminReads?.archiveRepository ?: unavailableRepository()
     val conversationRepository: IConversationRepository = unavailableRepository()
-    val cronRepository: ICronRepository = unavailableRepository()
-    val folderRepository: IFolderRepository = unavailableRepository()
-    val groupRepository: IGroupRepository = unavailableRepository()
-    val identityRepository: IIdentityRepository = unavailableRepository()
-    val jobRepository: IJobRepository = unavailableRepository()
-    val mcpServerRepository: IMcpServerRepository = unavailableRepository()
-    val modelRepository: IModelRepository = unavailableRepository()
-    val passageRepository: IPassageRepository = unavailableRepository()
+    val cronRepository: ICronRepository = boundCronRepository
+    val folderRepository: IFolderRepository =
+        irohAdminReads?.folderRepository ?: unavailableRepository()
+    val groupRepository: IGroupRepository =
+        irohAdminReads?.groupRepository ?: unavailableRepository()
+    val identityRepository: IIdentityRepository =
+        irohAdminReads?.identityRepository ?: unavailableRepository()
+    val jobRepository: IJobRepository =
+        irohAdminReads?.jobRepository ?: unavailableRepository()
+    val mcpServerRepository: IMcpServerRepository =
+        irohAdminReads?.mcpServerRepository ?: unavailableRepository()
+    val modelRepository: IModelRepository =
+        irohAdminReads?.modelRepository ?: unavailableRepository()
+    val passageRepository: IPassageRepository =
+        irohAdminReads?.passageRepository ?: unavailableRepository()
     val projectRepository: IProjectRepository = unavailableRepository()
     val projectWorkRepository: IProjectWorkRepository = unavailableRepository()
-    val providerRepository: IProviderRepository = unavailableRepository()
-    val runRepository: IRunRepository = unavailableRepository()
+    val providerRepository: IProviderRepository =
+        irohAdminReads?.providerRepository ?: unavailableRepository()
+    val runRepository: IRunRepository =
+        irohAdminReads?.runRepository ?: unavailableRepository()
     val scheduleRepository: IScheduleRepository = selectIrohOrHttp(
         irohRepositories?.scheduleRepository,
         adminRepositories,
     )
-    val selfTodoRepository: ISelfTodoRepository = unavailableRepository()
+    val selfTodoRepository: ISelfTodoRepository = boundSelfTodoRepository
     val stepRepository: IStepRepository = unavailableRepository()
-    val subagentRepository: ISubagentRepository = unavailableRepository()
+    val subagentRepository: ISubagentRepository = boundSubagentRepository
     val toolRepository: IToolRepository = selectIrohOrHttp(
         irohRepositories?.toolRepository,
         adminRepositories,

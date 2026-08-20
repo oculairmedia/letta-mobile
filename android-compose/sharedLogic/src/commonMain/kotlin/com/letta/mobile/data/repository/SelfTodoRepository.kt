@@ -1,13 +1,13 @@
 package com.letta.mobile.data.repository
 
-import android.util.Log
-import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.model.SelfTodoSnapshot
 import com.letta.mobile.data.model.SubagentStatus
+import com.letta.mobile.data.model.SubagentTodo
 import com.letta.mobile.data.repository.api.ISelfTodoRepository
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.ToolCallPayload
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,8 +19,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import javax.inject.Inject
-import javax.inject.Singleton
 
 /**
  * Long-lived coroutine scope [SelfTodoRepository] uses for its event
@@ -28,7 +26,7 @@ import javax.inject.Singleton
  * same pattern [SubagentRepository] uses. Exposed as a factory so tests can
  * substitute a [kotlinx.coroutines.test.TestScope].
  */
-internal fun defaultSelfTodoScope(): CoroutineScope =
+fun defaultSelfTodoScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
 /**
@@ -38,30 +36,13 @@ internal fun defaultSelfTodoScope(): CoroutineScope =
  * `TodoWrite`. The latest snapshot per `conversationId` is folded into a
  * single [MutableStateFlow] map (snapshot-by-replacement).
  *
- * This is deliberately client-side and reuses the existing mobile WS:
- * TodoWrite for the primary agent is NOT carried by the shim's dispatched-
- * subagent registry (MOBILE_WS_PROTOCOL.md §13) — it shows up as an ordinary
- * tool call in the live stream. We parse the tool-call `arguments` (the
- * canonical TodoWrite shape `{"todos":[{content,status,activeForm}, ...]}`)
- * and key the result by the frame's `conversation_id`.
- *
- * Perf: each emission for a conversation is the full todo list, never a
- * delta, so downstream reduces by simple replacement — no per-frame
- * rebuilds, preserving the rmzmo streaming-jank work.
+ * Platform-neutral (commonMain) so Android and Desktop share one impl
+ * (Phase 4c).
  */
-@Singleton
 open class SelfTodoRepository(
     private val transport: IChannelTransport,
-    scope: CoroutineScope,
+    scope: CoroutineScope = defaultSelfTodoScope(),
 ) : ISelfTodoRepository {
-    /**
-     * Hilt-friendly constructor — uses a fresh [defaultSelfTodoScope] tied
-     * to the singleton's lifetime. Tests inject their own scope via the
-     * primary constructor.
-     */
-    @Inject
-    constructor(transport: IChannelTransport) : this(transport, defaultSelfTodoScope())
-
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private val snapshots = MutableStateFlow<Map<String, SelfTodoSnapshot>>(emptyMap())
@@ -125,12 +106,6 @@ open class SelfTodoRepository(
         }
     }
 
-    /**
-     * Parse the TodoWrite tool-call `arguments` JSON into the canonical
-     * [SubagentTodo] list. Returns null (caller ignores the frame) when the
-     * payload can't be parsed or carries no `todos` array, so a malformed
-     * delta never clobbers a previously good snapshot.
-     */
     private fun parseTodos(arguments: String): List<SubagentTodo>? {
         if (arguments.isBlank()) return null
         return runCatching {
@@ -145,7 +120,12 @@ open class SelfTodoRepository(
                 )
             }
         }.onFailure { e ->
-            Log.w(TAG, "failed to parse TodoWrite arguments: ${e.message}")
+            Telemetry.event(
+                TAG,
+                "todowrite.parse.failed",
+                "error" to (e.message ?: e::class.simpleName),
+                level = Telemetry.Level.WARN,
+            )
         }.getOrNull()
     }
 

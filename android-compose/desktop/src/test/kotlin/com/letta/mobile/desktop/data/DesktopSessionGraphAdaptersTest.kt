@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.repository.iroh.IrohAgentBlockRepository
 import com.letta.mobile.data.timeline.TimelineStreamFrame
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.runtime.BackendKind
 import java.nio.file.Files
@@ -118,8 +119,48 @@ class DesktopSessionGraphAdaptersTest {
             ),
         )
 
-        assertFalse(adapters.toolRepository is DesktopIrohToolRepository)
-        assertFalse(adapters.scheduleRepository is DesktopIrohScheduleRepository)
+        assertFalse(adapters.toolRepository is com.letta.mobile.data.repository.iroh.IrohToolRepository)
+        assertFalse(adapters.scheduleRepository is com.letta.mobile.data.repository.iroh.IrohScheduleRepository)
+    }
+
+    @Test
+    fun irohModeBindsSharedCronSelfTodoSubagentAndAdminReads() = runTest {
+        val adapters = DesktopRepositoryAdapters(
+            config = LettaConfig(
+                id = "desktop-iroh",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "iroh://330415cc15c111596d0b18b730441be7717b92822b7517ccc09f92bb3946fa7f@192.168.50.90:4501",
+            ),
+            channelTransport = NoOpChannelTransport(),
+        )
+
+        assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
+        assertIs<com.letta.mobile.data.repository.SelfTodoRepository>(adapters.selfTodoRepository)
+        assertIs<com.letta.mobile.data.repository.SubagentRepository>(adapters.subagentRepository)
+
+        val adminError = runCatching { adapters.folderRepository.refreshFolders() }.exceptionOrNull()
+        assertFalse(
+            adminError is DesktopRepositoryUnavailableException,
+            "Iroh admin reads should be bound, not unavailable proxies",
+        )
+        adapters.closeables.forEach { it.close() }
+    }
+
+    @Test
+    fun selfHostedHttpModeKeepsAdminReadsUnavailableWithoutHttpImpl() = runTest {
+        val adapters = DesktopRepositoryAdapters(
+            LettaConfig(
+                id = "desktop-self-hosted",
+                mode = LettaConfig.Mode.SELF_HOSTED,
+                serverUrl = "http://localhost:8283",
+            ),
+        )
+
+        assertIs<com.letta.mobile.data.repository.CronRepository>(adapters.cronRepository)
+        val error = assertFailsWith<DesktopRepositoryUnavailableException> {
+            adapters.folderRepository.countFolders()
+        }
+        assertTrue(error.message.orEmpty().contains("IFolderRepository"))
     }
 
     @Test
