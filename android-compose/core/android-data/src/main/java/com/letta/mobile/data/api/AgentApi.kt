@@ -15,7 +15,7 @@ import javax.inject.Singleton
 @Singleton
 open class AgentApi @Inject constructor(
     private val apiClient: LettaApiClient
-) {
+) : com.letta.mobile.data.repository.api.AgentRemoteSource {
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
@@ -23,10 +23,10 @@ open class AgentApi @Inject constructor(
         coerceInputValues = true
     }
 
-    open suspend fun listAgents(
-        limit: Int? = null,
-        offset: Int? = null,
-        tags: List<String>? = null
+    open override suspend fun listAgents(
+        limit: Int?,
+        offset: Int?,
+        tags: List<String>?
     ): List<Agent> {
         val (client, baseUrl) = apiClient.session()
 
@@ -54,10 +54,10 @@ open class AgentApi @Inject constructor(
      * The default full-agent [listAgents] path is unchanged and still used by
      * screens that need full [Agent] objects (edit-agent, chat config, …).
      */
-    open suspend fun listAgentsSlim(
-        limit: Int? = null,
-        offset: Int? = null,
-        tags: List<String>? = null
+    open override suspend fun listAgentsSlim(
+        limit: Int?,
+        offset: Int?,
+        tags: List<String>?
     ): List<AgentSummary> {
         val (client, baseUrl) = apiClient.session()
 
@@ -76,7 +76,7 @@ open class AgentApi @Inject constructor(
         )
     }
 
-    open suspend fun getAgent(agentId: AgentId): Agent {
+    open override suspend fun getAgent(agentId: AgentId): Agent {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/${agentId.value}")
@@ -88,7 +88,7 @@ open class AgentApi @Inject constructor(
 
     open suspend fun getAgent(agentId: String): Agent = getAgent(AgentId(agentId))
 
-    open suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId? = null): ContextWindowOverview {
+    open override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
         val (client, baseUrl) = apiClient.session()
 
         return client.prepareGet("$baseUrl/v1/agents/${agentId.value}/context") {
@@ -107,7 +107,7 @@ open class AgentApi @Inject constructor(
     open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
         getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
 
-    open suspend fun countAgents(): Int {
+    open override suspend fun countAgents(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/count")
@@ -117,7 +117,7 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createAgent(params: AgentCreateParams): Agent {
+    open override suspend fun createAgent(params: AgentCreateParams): Agent {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents") {
@@ -130,7 +130,7 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
+    open override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}") {
@@ -145,7 +145,7 @@ open class AgentApi @Inject constructor(
 
     open suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
 
-    open suspend fun deleteAgent(agentId: AgentId) {
+    open override suspend fun deleteAgent(agentId: AgentId) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/${agentId.value}")
@@ -156,7 +156,7 @@ open class AgentApi @Inject constructor(
 
     open suspend fun deleteAgent(agentId: String) = deleteAgent(AgentId(agentId))
 
-    open suspend fun exportAgent(agentId: AgentId): String {
+    open override suspend fun exportAgent(agentId: AgentId): String {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/${agentId.value}/export")
@@ -168,7 +168,7 @@ open class AgentApi @Inject constructor(
 
     open suspend fun exportAgent(agentId: String): String = exportAgent(AgentId(agentId))
 
-    open suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
+    open override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.submitFormWithBinaryData(
@@ -190,7 +190,7 @@ open class AgentApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun attachArchive(agentId: AgentId, archiveId: String) {
+    open override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/attach/$archiveId")
@@ -201,7 +201,7 @@ open class AgentApi @Inject constructor(
 
     open suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
 
-    open suspend fun detachArchive(agentId: AgentId, archiveId: String) {
+    open override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/detach/$archiveId")

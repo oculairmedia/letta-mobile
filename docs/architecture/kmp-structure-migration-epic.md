@@ -282,6 +282,8 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **Suggested slice PRs:** agents → conversations → tools → schedules → memory blocks.
 
+**5a (agents — in progress):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+
 ### Acceptance (per slice)
 
 - [ ] No duplicate impl class for same transport in `core:android-data` and `desktop/data`

@@ -1,0 +1,600 @@
+package com.letta.mobile.data.repository
+
+import com.letta.mobile.data.model.Agent
+import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.model.AgentCreateParams
+import com.letta.mobile.data.model.AgentRuntimeBinding
+import com.letta.mobile.data.model.AgentSummary
+import com.letta.mobile.data.model.AgentUpdateParams
+import com.letta.mobile.data.model.ContextWindowOverview
+import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.AgentImportParams
+import com.letta.mobile.data.model.ImportedAgentsResponse
+import com.letta.mobile.data.repository.api.AgentIrohSource
+import com.letta.mobile.data.repository.api.AgentLocalCache
+import com.letta.mobile.data.repository.api.AgentRemoteSource
+import com.letta.mobile.data.repository.api.ISettingsRepository
+import kotlin.time.Clock
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
+import com.letta.mobile.data.repository.api.LocalRuntimeAgentSource
+import com.letta.mobile.data.session.BackendScopedCache
+import com.letta.mobile.data.repository.api.IAgentRepository
+import com.letta.mobile.data.transport.ChannelTransportState
+import com.letta.mobile.data.transport.ServerFrame
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.util.Telemetry
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+
+fun defaultCachedAgentRepositoryScope(): CoroutineScope =
+    CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+// Phase 5a: platform-neutral cached agent repository. Android supplies Room via
+// [localCache]; Iroh via [irohAgentSource].
+open class CachedAgentRepository(
+    private val remote: AgentRemoteSource,
+    private val localCache: (() -> AgentLocalCache)? = null,
+    private val repositoryScope: CoroutineScope = defaultCachedAgentRepositoryScope(),
+    private val localAgentSource: LocalRuntimeAgentSource? = null,
+    private val settingsRepository: ISettingsRepository? = null,
+    private val transport: IChannelTransport? = null,
+    // letta-mobile-71orq: Iroh admin_rpc agent reads. Platform wires
+    // [AgentIrohSource] (Android: IrohAdminRpcAgentSource).
+    private val irohAgentSource: AgentIrohSource? = null,
+) : IAgentRepository, BackendScopedCache {
+    private val _agents = MutableStateFlow<List<Agent>>(emptyList())
+    override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+    private val _isRefreshing = MutableStateFlow(false)
+    override val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+    private val _refreshError = MutableStateFlow<Throwable?>(null)
+    override val refreshError: StateFlow<Throwable?> = _refreshError.asStateFlow()
+    private val refreshMutex = Mutex()
+    private var lastRefreshAtMillis: Long = 0L
+
+    init {
+        repositoryScope.launch {
+            val cache = localCache?.invoke() ?: return@launch
+            try {
+                val cached = cache.getAllOnce()
+                if (cached.isNotEmpty()) {
+                    _agents.value = cached
+                }
+            } catch (e: Exception) {
+                Telemetry.event("CachedAgentRepository", "Failed to load cached agents", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+            }
+        }
+        transport?.let { channelTransport ->
+            repositoryScope.launch { observeAgentUpdated(channelTransport) }
+            repositoryScope.launch { observeReconnects(channelTransport) }
+        }
+    }
+
+    override suspend fun countAgents(): Int {
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.countAgents()
+        }
+        return remote.countAgents()
+    }
+
+    /**
+     * Slim agent list for picker UIs (Schedules dropdown). Hits the
+     * admin-shim's opt-in `GET /v1/agents?slim=true` so the picker pulls a
+     * small `{id, name, description}` projection instead of the ~621KB full
+     * agents payload. Deliberately SEPARATE from [refreshAgents]/[agents],
+     * which full-object consumers (edit-agent, chat config, …) still need.
+     *
+     * Local-runtime mode has no remote API, so it derives summaries from the
+     * on-device agents (via the shared cache / interface default).
+     */
+    override suspend fun listAgentSummaries(): List<AgentSummary> {
+        if (isLocalRuntimeActive()) {
+            return super.listAgentSummaries()
+        }
+        if (irohAgentSource?.shouldUseIroh() == true) {
+            return irohAgentSource.listAgents()
+                .distinctBy { it.id }
+                .map { AgentSummary(id = it.id, name = it.name, description = it.description) }
+        }
+        return fetchSlimAgentSummaries()
+    }
+
+    private suspend fun fetchSlimAgentSummaries(): List<AgentSummary> {
+        val merged = mutableListOf<AgentSummary>()
+        var offset = 0
+        while (true) {
+            val page = remote.listAgentsSlim(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
+            if (page.isEmpty()) break
+            val existingIds = merged.asSequence().map { it.id }.toSet()
+            val newAgents = page.filter { it.id !in existingIds }
+            if (newAgents.isEmpty()) break
+            merged += newAgents
+            if (isFinalPage(page.size)) break
+            offset += page.size
+        }
+        return merged
+    }
+
+    override suspend fun refreshAgents() = refreshMutex.withLock {
+        _isRefreshing.value = true
+        try {
+            refreshAgentsLocked()
+            _refreshError.value = null
+        } catch (t: Throwable) {
+            _refreshError.value = t
+            throw t
+        } finally {
+            _isRefreshing.value = false
+        }
+    }
+
+    override suspend fun clearForBackendSwitch() {
+        refreshMutex.withLock {
+            _agents.value = emptyList()
+            _isRefreshing.value = false
+            _refreshError.value = null
+            lastRefreshAtMillis = 0L
+            // Propagate DAO failure to the caller. Swallowing here would leave
+            // stale agent rows from the previous backend visible after switch
+            // while the in-memory state has already been cleared, which is a
+            // hard-to-diagnose cross-backend leak. The orchestrator
+            // (BackendSwitchInvalidator) aggregates per-cache failures so the
+            // switch flow can decide what to do.
+            // Persist when a local cache is bound (Room on Android).
+            localCache?.invoke()?.deleteAll()
+        }
+    }
+
+    private fun isLocalRuntimeActive(): Boolean =
+        localAgentSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)
+
+    private suspend fun refreshAgentsLocked() {
+        // Local-runtime mode: agents persist in the on-device store; the
+        // Room cache is wiped per session and must be repopulated from it.
+        val localSource = localAgentSource
+        if (localSource != null && isLocalRuntimeActive()) {
+            val local = localSource.listAgents()
+            _agents.update { local }
+            localCache?.invoke()?.insertAll(local)
+            lastRefreshAtMillis = nowMillis()
+            return
+        }
+        val fresh = fetchAgentsForCache { partial ->
+            _agents.update { partial }
+        }
+        _agents.update { fresh }
+        lastRefreshAtMillis = nowMillis()
+        try {
+            val cache = localCache?.invoke() ?: return
+            cache.insertAll(fresh)
+            if (fresh.isEmpty()) {
+                cache.deleteAll()
+            } else {
+                cache.deleteExcept(fresh.map { it.id.value })
+            }
+        } catch (e: Exception) {
+            Telemetry.event("CachedAgentRepository", "Failed to cache agents to Room", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+        }
+    }
+
+    private suspend fun fetchAgentsForCache(
+        onProgress: suspend (List<Agent>) -> Unit = {},
+    ): List<Agent> {
+        // letta-mobile-71orq: in iroh:// mode the raw HTTP AgentApi hard-fails
+        // at the purity choke-point, so the agents cache would stay empty and
+        // conversation rows fall back to agentId.take(8). Route the list over
+        // the agent.list admin_rpc handler instead. The handler returns the
+        // full list, so no client-side pagination is needed here.
+        if (irohAgentSource?.shouldUseIroh() == true) {
+            val agents = irohAgentSource.listAgents().distinctBy { it.id }
+            if (agents.isNotEmpty()) onProgress(agents)
+            return agents
+        }
+        return fetchRemoteAgentsLoop(onProgress)
+    }
+
+    private suspend fun fetchRemoteAgentsLoop(
+        onProgress: suspend (List<Agent>) -> Unit,
+    ): List<Agent> {
+        val merged = mutableListOf<Agent>()
+        var offset = 0
+        while (true) {
+            val page = remote.listAgents(limit = CACHE_REFRESH_PAGE_SIZE, offset = offset)
+            if (page.isEmpty()) break
+
+            val existingIds = merged.asSequence().map { it.id }.toSet()
+            val newAgents = page.filter { it.id !in existingIds }
+            if (newAgents.isEmpty()) {
+                Telemetry.event("CachedAgentRepository", "Agent list offset pagination made no progress; falling back to count-sized fetch", level = Telemetry.Level.WARN)
+                return fetchAgentsWithoutOffsetFallback(onProgress)
+            }
+
+            merged += newAgents
+            onProgress(merged.toList())
+            if (isFinalPage(page.size)) break
+            offset += page.size
+        }
+        return merged
+    }
+
+    private fun isFinalPage(pageSize: Int): Boolean =
+        pageSize < CACHE_REFRESH_PAGE_SIZE && pageSize % 20 != 0
+
+    private suspend fun fetchAgentsWithoutOffsetFallback(
+        onProgress: suspend (List<Agent>) -> Unit,
+    ): List<Agent> {
+        val fallbackLimit = runCatching { remote.countAgents() }
+            .getOrDefault(FALLBACK_FULL_FETCH_LIMIT)
+            .coerceAtLeast(CACHE_REFRESH_PAGE_SIZE)
+        val fullList = remote.listAgents(limit = fallbackLimit, offset = null)
+            .distinctBy { it.id }
+        if (fullList.isNotEmpty()) {
+            onProgress(fullList)
+        }
+        return fullList
+    }
+
+    override fun getCachedAgent(id: AgentId): Agent? {
+        val cache = _agents.value
+        val hit = cache.find { it.id == id }
+        if (hit == null) {
+            // letta-mobile-z5lqt: telemetry only. A miss previously returned
+            // null with no signal at all, so a truncated roster was invisible
+            // here. Stays pure and non-suspending: no fetch, no retry, and the
+            // null return is unchanged.
+            RosterNameTelemetry.cacheMiss(
+                agentId = id.value,
+                cacheSize = cache.size,
+                source = "CachedAgentRepository",
+            )
+        }
+        return hit
+    }
+
+    fun hasFreshAgents(maxAgeMs: Long): Boolean {
+        return _agents.value.isNotEmpty() && nowMillis() - lastRefreshAtMillis <= maxAgeMs
+    }
+
+    override suspend fun refreshAgentsIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
+        if (hasFreshAgents(maxAgeMs)) return@withLock false
+        _isRefreshing.value = true
+        try {
+            refreshAgentsLocked()
+            _refreshError.value = null
+        } catch (t: Throwable) {
+            _refreshError.value = t
+            throw t
+        } finally {
+            _isRefreshing.value = false
+        }
+        true
+    }
+
+    override fun getAgent(id: AgentId): Flow<Agent> = flow {
+        // H5 (data-efficiency-audit): read the cached entry + the bulk
+        // freshness marker from ONE synchronized snapshot so a concurrent
+        // refreshAgents() cannot race us into emitting a pre-refresh cached
+        // value the user no longer has.
+        val snapshot = refreshMutex.withLock {
+            val cached = _agents.value.find { it.id == id }
+            cached to nowMillis()
+        }
+        val cached = snapshot.first
+        val snapshotAgeMs = snapshot.second - lastRefreshAtMillis
+        if (cached != null) {
+            emit(cached)
+        }
+        if (cached != null && snapshotAgeMs <= SINGLE_AGENT_FRESH_WINDOW_MS) return@flow
+        val localSource = localAgentSource
+        if (localSource != null && isLocalRuntimeActive()) {
+            // No remote API for local agents; serve the durable store copy
+            // when the in-memory cache missed (cold start).
+            if (cached == null) {
+                val stored = localSource.listAgents().find { it.id == id }
+                    ?: throw NoSuchElementException("Local agent ${id.value} not found in the on-device store.")
+                emit(stored)
+                updateAgentInCache(stored)
+            }
+            return@flow
+        }
+        val fresh = fetchAgentRemote(id)
+        emit(fresh)
+        updateAgentInCache(fresh)
+    }
+
+    /**
+     * Fetch a single agent from the active backend. Routes over the Iroh admin
+     * RPC control channel when the backend is iroh:// (letta-mobile-71orq),
+     * falling back to the raw HTTP AgentApi otherwise.
+     */
+    private suspend fun fetchAgentRemote(id: AgentId): Agent =
+        if (irohAgentSource?.shouldUseIroh() == true) {
+            irohAgentSource.getAgent(id)
+        } else {
+            remote.getAgent(id)
+        }
+
+    private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatching {
+        val fresh = fetchAgentRemote(agentId)
+        updateAgentInCache(fresh)
+        // Persist the transport-driven refresh to the Room cache so a pushed
+        // agent_updated change survives an app restart (CodeRabbit #517).
+        runCatching { localCache?.invoke()?.upsert(fresh) }
+            .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${agentId.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
+        fresh
+    }
+
+    private suspend fun observeAgentUpdated(channelTransport: IChannelTransport) {
+        channelTransport.events.collect { frame ->
+            if (frame !is ServerFrame.AgentUpdated) return@collect
+            val agentId = AgentId(frame.agentId)
+            if (frame.reason == "deleted") {
+                _agents.update { current -> current.filterNot { it.id == agentId } }
+                // Targeted single-agent delete — not a broad deleteExcept that
+                // could race with a stale in-memory list (CodeRabbit #517).
+                runCatching { localCache?.invoke()?.deleteById(agentId.value) }
+                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
+                return@collect
+            }
+            // Ephemeral letta-code subagents (`agent-local-*`, transient
+            // "Letta Code" workers) churn in bursts while a run fans out;
+            // don't issue a per-agent GET for each one — they are not part of
+            // the human agent list and the next bulk refresh reconciles them
+            // (letta-mobile-vcmin).
+            if (isEphemeralSubagentId(agentId)) return@collect
+            refreshAgent(agentId)
+                .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated refresh failed for ${frame.agentId}", "detail" to e.message, level = Telemetry.Level.WARN) }
+        }
+    }
+
+    private suspend fun observeReconnects(channelTransport: IChannelTransport) {
+        var wasConnected: Boolean? = null
+        channelTransport.state.collect { state ->
+            val nowConnected = state is ChannelTransportState.Connected
+            if (wasConnected == false && nowConnected) {
+                // One paged list call instead of a GET /v1/agents/{id} per
+                // cached agent: with ~100 cached agents (mostly ephemeral
+                // `agent-local-*` subagents) the per-agent loop serialized
+                // ~5s of sequential requests on every reconnect
+                // (letta-mobile-vcmin).
+                runCatching { refreshAgents() }
+                    .onFailure { e -> Telemetry.event("CachedAgentRepository", "reconnect agent refresh failed", "detail" to e.message, level = Telemetry.Level.WARN) }
+            }
+            wasConnected = nowConnected
+        }
+    }
+
+    private fun isEphemeralSubagentId(id: AgentId): Boolean =
+        id.value.startsWith(EPHEMERAL_SUBAGENT_ID_PREFIX)
+
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+        val localSource = localAgentSource
+        if (localSource != null && isLocalRuntimeActive()) {
+            // No remote API for local agents; estimate from the on-disk
+            // transcript (same chars/4 heuristic letta.js uses internally).
+            return localSource.contextWindowOverview(agentId) ?: ContextWindowOverview()
+        }
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return irohSource.getContextWindow(agentId, conversationId)
+        }
+        return remote.getContextWindow(agentId, conversationId)
+    }
+
+    override suspend fun createAgent(params: AgentCreateParams): Agent {
+        val irohSource = irohAgentSource
+        val agent = if (irohSource != null && irohSource.shouldUseIroh()) {
+            val json = kotlinx.serialization.json.Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                explicitNulls = false
+                coerceInputValues = true
+            }
+            val paramsJson = json.encodeToString(AgentCreateParams.serializer(), params)
+            irohSource.createAgent(paramsJson)
+        } else {
+            remote.createAgent(params)
+        }
+        refreshAgents()
+        return agent
+    }
+
+    @OptIn(ExperimentalUuidApi::class)
+    override suspend fun createLocalAgent(params: AgentCreateParams): Agent {
+        val agent = Agent(
+            id = AgentId("local-agent-${Uuid.random()}"),
+            name = params.name?.takeIf { it.isNotBlank() } ?: "Local Agent",
+            description = params.description,
+            metadata = params.metadata.orEmpty(),
+            model = params.model,
+            embedding = params.embedding,
+            modelSettings = params.modelSettings,
+            llmConfig = params.llmConfig,
+            embeddingConfig = params.embeddingConfig,
+            contextWindowLimit = params.contextWindowLimit,
+            responseFormat = params.responseFormat,
+            tags = params.tags ?: persistentListOf(),
+            system = params.system,
+            enableSleeptime = params.enableSleeptime,
+            agentType = params.agentType,
+            messageBufferAutoclear = params.messageBufferAutoclear,
+            timezone = params.timezone,
+            maxFilesOpen = params.maxFilesOpen,
+            perFileViewWindowCharLimit = params.perFileViewWindowCharLimit,
+            hidden = params.hidden,
+            compactionSettings = params.compactionSettings,
+        )
+        localCache?.invoke()?.upsert(agent)
+        updateAgentInCache(agent)
+        // Room is wiped on every session-graph creation; the durable copy
+        // lives in the local-runtime store (letta-mobile-y5c9u).
+        localAgentSource?.persistAgent(agent)
+        return agent
+    }
+
+    override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
+        val cached = _agents.value.find { it.id == id }
+        val preview = cached?.withUpdates(params)
+        val localSource = localAgentSource
+        if (localSource != null && preview != null && id.value.startsWith("local-agent-")) {
+            // Local agents have no remote API even when their selected model is
+            // cloud/API-backed. Persist the update locally; the routing layer
+            // decides whether the next turn uses embedded runtime or remote
+            // transport from the updated model/metadata binding.
+            localSource.persistAgent(preview)
+            localCache?.invoke()?.upsert(preview)
+            updateAgentInCache(preview)
+            return preview
+        }
+        // P4 iroh purity: raw HTTP AgentApi hard-fails in iroh:// mode; route
+        // the update over admin_rpc agent.update (model switch from the drawer
+        // failed with "Couldn't switch model" without this).
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            val agent = irohSource.updateAgent(
+                id,
+                kotlinx.serialization.json.Json { encodeDefaults = false; explicitNulls = false }
+                    .encodeToString(AgentUpdateParams.serializer(), params),
+            )
+            refreshAgents()
+            return agent
+        }
+        val agent = remote.updateAgent(id, params)
+        refreshAgents()
+        return agent
+    }
+
+    override suspend fun deleteAgent(id: AgentId) {
+        val irohSource = irohAgentSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            irohSource.deleteAgent(id)
+        } else {
+            remote.deleteAgent(id)
+        }
+        _agents.update { current -> current.filterNot { it.id == id } }
+        try {
+            localCache?.invoke()?.deleteExcept(_agents.value.map { it.id.value })
+        } catch (e: Exception) {
+            Telemetry.event("CachedAgentRepository", "Failed to update cached agents after delete", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
+        }
+    }
+
+    override suspend fun exportAgent(id: AgentId): String {
+        return remote.exportAgent(id)
+    }
+
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
+        val response = remote.importAgent(params)
+        refreshAgents()
+        return response
+    }
+
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
+        remote.attachArchive(agentId, archiveId)
+        refreshAgents()
+    }
+
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
+        remote.detachArchive(agentId, archiveId)
+        refreshAgents()
+    }
+
+    private fun Agent.withUpdates(params: AgentUpdateParams): Agent = copy(
+        name = params.name ?: name,
+        description = params.description ?: description,
+        model = params.model ?: model,
+        modelSettings = params.modelSettings ?: modelSettings,
+        llmConfig = params.llmConfig ?: llmConfig,
+        system = params.system ?: system,
+        tags = params.tags ?: tags,
+        metadata = params.metadata ?: metadata,
+        contextWindowLimit = params.contextWindowLimit ?: contextWindowLimit,
+    )
+
+    private fun updateAgentInCache(agent: Agent) {
+        _agents.update { current ->
+            val index = current.indexOfFirst { it.id == agent.id }
+            if (index >= 0) {
+                current.toMutableList().apply { this[index] = agent }
+            } else {
+                current + agent
+            }
+        }
+    }
+
+    override suspend fun checkpointAndRestoreConfig(
+        agentId: AgentId,
+        operation: suspend () -> Unit
+    ) {
+        val agent = fetchAgentRemote(agentId)
+        val checkpoint = com.letta.mobile.data.model.AgentConfigCheckpoint.from(agent)
+        
+        try {
+            operation()
+        } finally {
+            val updatedAgent = fetchAgentRemote(agentId)
+            if (!checkpoint.matches(updatedAgent)) {
+                Telemetry.event("CachedAgentRepository", "Agent config drift detected after operation, restoring checkpoint", level = Telemetry.Level.WARN)
+                Telemetry.event(
+                    "CachedAgentRepository",
+                    "configDriftDetected",
+                    "agentId" to agentId,
+                    "originalModel" to checkpoint.model,
+                    "driftedModel" to updatedAgent.model,
+                    level = Telemetry.Level.WARN
+                )
+                updateAgent(agentId, checkpoint.toUpdateParams())
+                Telemetry.event(
+                    "CachedAgentRepository",
+                    "configRestored",
+                    "agentId" to agentId,
+                    "restoredModel" to checkpoint.model
+                )
+            }
+        }
+    }
+
+    private fun nowMillis(): Long = Clock.System.now().toEpochMilliseconds()
+
+    private companion object {
+        const val CACHE_REFRESH_PAGE_SIZE = 50
+        const val FALLBACK_FULL_FETCH_LIMIT = 5_000
+
+        /**
+         * Id prefix letta-code mints for ephemeral subagent workers (the
+         * transient "Letta Code" agents that fan out during a run). Distinct
+         * from the on-device `local-agent-*` prefix used by
+         * [createLocalAgent].
+         */
+        const val EPHEMERAL_SUBAGENT_ID_PREFIX = "agent-local-"
+
+        /**
+         * H5 (data-efficiency-audit): if the bulk agent list was refreshed
+         * within this window, [getAgent] trusts the cached copy and skips the
+         * per-agent GET. 30 s covers a chat-open + reply cycle without
+         * risking a stale read for users who keep a chat open across a long
+         * idle period.
+         */
+        const val SINGLE_AGENT_FRESH_WINDOW_MS = 30_000L
+    }
+
+    /**
+     * H5 (data-efficiency-audit) test seam: lets unit tests force the bulk
+     * cache to look stale (or fresh) without sleeping the test dispatcher.
+     */
+    fun setLastRefreshForTest(epochMs: Long) {
+        lastRefreshAtMillis = epochMs
+    }
+}
