@@ -185,28 +185,39 @@ internal fun DesktopJewelWindow(
                     // Screen coordinates sidestep both the density scaling between
                     // Compose's px space and AWT's, and any offset between the AWT
                     // component that receives the touch event and this content.
+                    //
+                    // Measured from this Row -- our own content -- rather than from
+                    // BasicTitleBar's own outer modifier. The latter was tried first
+                    // and reported a rectangle offset downward by exactly one title
+                    // bar height (TitleBarHeight, 84px at the density this shipped
+                    // and was diagnosed against) from where the title bar and tabs
+                    // actually render on screen (confirmed against real touch
+                    // coordinates landing inside the true region but outside the
+                    // published one). BasicTitleBar's own children -- this Row
+                    // included -- render at the correct position throughout; only
+                    // BasicTitleBar's own onGloballyPositioned callback reported a
+                    // wrong one for itself, for reasons that appear to originate
+                    // inside Nucleus's own title-bar layout/native-frame-height
+                    // plumbing (TitleBarLayoutPolicy's applyTitleBar callback and the
+                    // JNI nativeSetTitleBarHeight path), not in anything this file
+                    // controls. Measuring our own Row sidesteps that entirely instead
+                    // of trying to correct a number we don't have a verified formula
+                    // for.
                     DisposableEffect(window) {
                         onDispose { DesktopTouchDragExclusion.publish(window, null) }
                     }
                     BasicTitleBar(
                         style = titleBarStyle,
                         layoutPolicy = TitleBarLayoutPolicy.FillCenter,
-                        modifier = Modifier.onGloballyPositioned { coordinates ->
-                            val bounds = titleBarScreenBoundsOrNull(coordinates)
-                            // TEMPORARY (letta-mobile #1249 touch-reorder diagnosis):
-                            // confirms the exclusion rectangle actually covers where
-                            // the tab strip renders on screen.
-                            System.err.println(
-                                "TABTOUCHDIAG publish windowIdentity=" +
-                                    System.identityHashCode(window) + " titleBarBounds=" + bounds,
-                            )
-                            DesktopTouchDragExclusion.publish(window, bounds)
-                        },
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 8.dp),
+                                .padding(start = 8.dp)
+                                .onGloballyPositioned { coordinates ->
+                                    val bounds = titleBarScreenBoundsOrNull(coordinates)
+                                    DesktopTouchDragExclusion.publish(window, bounds)
+                                },
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             // Sidebar toggle: the one control that survives

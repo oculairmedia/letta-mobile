@@ -2,7 +2,6 @@ package com.letta.mobile.desktop
 
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
@@ -24,7 +25,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
@@ -41,7 +44,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.DragGestureDetector
-import sh.calvin.reorderable.ReorderableRow
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 
 @Immutable
 internal data class DesktopConversationTab(
@@ -162,14 +166,35 @@ private fun applyEagerDragDelta(
 
 /**
  * Horizontal, drag-to-reorder conversation tab strip, built on
- * `sh.calvin.reorderable`'s [ReorderableRow] — the same library already used
- * for the mobile dashboard's pinned-items grid
+ * `sh.calvin.reorderable`'s lazy-list variant — the same library already
+ * used for the mobile dashboard's pinned-items grid
  * (app/.../HomeScreenWidgets.kt's `ReorderablePinnedItemsGrid`). It owns
  * keyed item tracking, neighbor reflow while dragging, drag-from-any-index
  * (including the first), and the drop-settle animation; a hand-rolled
  * version of all four shipped with real bugs (a positional-slot mismatch
  * that corrupted the drop animation, and reflow/first-index bugs in the
  * from-scratch shift math) that this replaces rather than patches around.
+ *
+ * `LazyRow` specifically, not the library's plain-`Row` variant
+ * (`ReorderableRow`) originally used here: `Modifier.horizontalScroll`
+ * calls Foundation's `clipScrollableContainer`, an unconditional draw clip
+ * to the row's own bounds, which cut off the dragged tab the moment it
+ * translated past that boundary — the exact clipping bug this tab strip
+ * had before an overlay was built to work around it (since deleted along
+ * with the rest of the hand-rolled code). `LazyRow`'s own implementation
+ * never applies that clip — it only culls items outside the visible
+ * range during layout, not draw-time clipping of what *is* placed — so a
+ * dragged item's `graphicsLayer` translation is never cut off, with no
+ * portal/overlay needed.
+ *
+ * The lazy API reports reorders differently than the plain-Row one:
+ * `onMove` fires on every neighbor crossed mid-drag (so the local
+ * [currentList] mirrors the live preview), not once at drop. The actual
+ * [onReorder] callback — (conversationId, targetIndex), matching
+ * [com.letta.mobile.data.desktopshell.ConversationTabsReducer.reorder]'s
+ * contract — still fires exactly once, when dragging stops, computed from
+ * where the dragged tab (tracked by id, not index, since indices shift
+ * under it mid-drag) ended up in [currentList].
  *
  * [EagerPressDragGestureDetector] is the one piece kept custom: the
  * library's default gesture detector has the same deferred-press-
@@ -185,23 +210,53 @@ internal fun DesktopConversationTabRow(
     modifier: Modifier = Modifier,
     onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
 ) {
-    val scrollState = rememberScrollState()
-    ReorderableRow(
-        list = tabs,
-        onSettle = { fromIndex, toIndex -> onReorder(tabs[fromIndex].conversationId, toIndex) },
-        modifier = modifier.horizontalScroll(scrollState),
+    var currentList by remember(tabs) { mutableStateOf(tabs) }
+    val lazyListState = rememberLazyListState()
+    val reorderableState = rememberReorderableLazyListState(lazyListState) { from, to ->
+        currentList = currentList.toMutableList().apply { add(to.index, removeAt(from.index)) }
+    }
+
+    LazyRow(
+        state = lazyListState,
+        modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(TabSpacing),
         verticalAlignment = Alignment.CenterVertically,
-    ) { _, tab, isDragging ->
-        ReorderableItem {
-            DesktopConversationTabItem(
-                tab = tab,
-                active = tab.conversationId == activeConversationId,
-                dragging = isDragging,
-                onSelect = { onSelect(tab.conversationId) },
-                onClose = { onClose(tab.conversationId) },
-                modifier = Modifier.draggableHandle(dragGestureDetector = EagerPressDragGestureDetector),
-            )
+    ) {
+        items(currentList, key = { it.conversationId }) { tab ->
+            ReorderableItem(reorderableState, key = tab.conversationId) { isDragging ->
+                DesktopConversationTabItem(
+                    tab = tab,
+                    active = tab.conversationId == activeConversationId,
+                    dragging = isDragging,
+                    onSelect = { onSelect(tab.conversationId) },
+                    onClose = { onClose(tab.conversationId) },
+                    // onDragStopped, not a DisposableEffect/LaunchedEffect
+                    // keyed on `isDragging`: ReorderableCollectionItemScopeImpl's
+                    // own draggableHandle sets its *internal* dragging flag
+                    // (draggingItemKey, which is what `isDragging` here
+                    // reflects) from inside a `coroutineScope.launch { }` --
+                    // asynchronous, not guaranteed to have run yet by the time
+                    // a fast press-drag-release finishes. A first version of
+                    // this used `isDragging`'s own transition to fire
+                    // onReorder and it silently never fired in exactly that
+                    // scenario (an automated drag, and plausibly any real
+                    // drag fast enough to race the launch): onMove still
+                    // updated `currentList`'s live preview correctly, but
+                    // the commit never happened, invisible unless something
+                    // asserts on onReorder itself rather than on the
+                    // rendered result. onDragStopped's own plumbing calls
+                    // `reorderableLazyCollectionState.onDragStop()`
+                    // synchronously, not launched, so it's the reliable
+                    // "this item's gesture just ended" signal.
+                    modifier = Modifier.draggableHandle(
+                        dragGestureDetector = EagerPressDragGestureDetector,
+                        onDragStopped = {
+                            val targetIndex = currentList.indexOfFirst { it.conversationId == tab.conversationId }
+                            if (targetIndex >= 0) onReorder(tab.conversationId, targetIndex)
+                        },
+                    ),
+                )
+            }
         }
     }
 }

@@ -77,7 +77,7 @@ class DesktopConversationTabsUiTest {
             }
         }
 
-        // Drag the first tab ("First") to the right, just past the second
+        // Drag the first tab ("First") to the right, past the second
         // tab's center, then release. This should cross the reorder
         // threshold and land "First" at index 1 -- not further: these tabs
         // are minimum-width (132dp, short labels), so a bigger move would
@@ -85,7 +85,7 @@ class DesktopConversationTabsUiTest {
         onNodeWithText("First").performMouseInput {
             moveTo(center)
             press()
-            moveBy(Offset(x = 150f, y = 0f))
+            moveBy(Offset(x = 200f, y = 0f))
             release()
         }
         // sh.calvin.reorderable calls onSettle only after its drop-settle
