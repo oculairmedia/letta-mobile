@@ -105,13 +105,6 @@ private data class TabLayoutMetrics(
     val spacingPx: Float,
 )
 
-/** Which drag (if any) a non-dragged tab's shift animation should react to,
- * and where it's currently headed. */
-private data class TabDragPreview(
-    val dragState: TabDragState?,
-    val targetIndex: Int?,
-)
-
 /** The row-level tab actions ([DesktopConversationTabRow]'s own
  * `onSelect`/`onClose`), always wired together at each per-tab call site. */
 private data class TabRowActions(
@@ -169,7 +162,6 @@ internal fun DesktopConversationTabRow(
     var dragState by remember { mutableStateOf<TabDragState?>(null) }
     val scrollState = rememberScrollState()
     val currentDragState = dragState
-    val targetIndex = currentDragState?.let { computeDragTargetIndex(tabs, layout.bounds, it) }
 
     fun beginDrag(tab: DesktopConversationTab, index: Int) {
         dragState = TabDragState(conversationId = tab.conversationId, startIndex = index, deltaPx = 0f)
@@ -213,7 +205,8 @@ internal fun DesktopConversationTabRow(
                     tab = tab,
                     index = index,
                     active = tab.conversationId == activeConversationId,
-                    dragPreview = TabDragPreview(currentDragState, targetIndex),
+                    tabs = tabs,
+                    dragState = currentDragState,
                     layout = layout,
                     actions = actions,
                     onBoundsChanged = { left, width -> bounds[tab.conversationId] = TabBoundsPx(left, width) },
@@ -250,17 +243,18 @@ private fun DesktopConversationTabRowSlot(
     tab: DesktopConversationTab,
     index: Int,
     active: Boolean,
-    dragPreview: TabDragPreview,
+    tabs: List<DesktopConversationTab>,
+    dragState: TabDragState?,
     layout: TabLayoutMetrics,
     actions: TabRowActions,
     onBoundsChanged: (left: Float, width: Float) -> Unit,
     dragCallbacks: TabDragCallbacks,
 ) {
-    val dragState = dragPreview.dragState
     val isDragging = dragState?.conversationId == tab.conversationId
+    val targetIndex = dragState?.let { computeDragTargetIndex(tabs, layout.bounds, it) }
     val shiftPx by animateFloatAsState(
-        targetValue = if (dragState != null && dragPreview.targetIndex != null && !isDragging) {
-            dragShiftPx(index, dragState, dragPreview.targetIndex, layout)
+        targetValue = if (dragState != null && targetIndex != null && !isDragging) {
+            dragShiftPx(index, dragState, targetIndex, layout)
         } else {
             0f
         },
