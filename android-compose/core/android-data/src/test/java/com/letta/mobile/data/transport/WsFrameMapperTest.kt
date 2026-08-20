@@ -48,6 +48,169 @@ class WsFrameMapperTest : WordSpec({
             mapped.seqId shouldBe 7
         }
 
+        // letta-mobile-utw4u: a multimodal `content_parts` array on the wire
+        // MUST reach the model `UserMessage.contentRaw` verbatim — flattening
+        // it into a JsonPrimitive here was the root cause of mobile→desktop
+        // image fanout silently dropping. The legacy `.content` String
+        // projection must still expose ONLY the text portion for callers that
+        // didn't ask for attachments (IrohProbeMetrics, MergeTracer, etc.).
+        // CodeRabbit review (2026-08-20): assert the raw/structural contract
+        // exactly (not via substring) so a regression where the projection
+        // re-flattens the array cannot pass through `contains(...)` checks.
+        "preserve multimodal content_parts arrays end-to-end through UserMessage" {
+            val contentParts = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("look at this"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("FAOUT_PNG+/=="))
+                    })
+                })
+            }
+            val frame = ServerFrame.UserMessage(
+                id = "cm-user-1",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                turnId = "T", runId = "R",
+                contentRaw = contentParts,
+                otid = "cm-1",
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            // contentRaw survives the wire-frame → model hop, so
+            // [extractAttachments] can resolve the image at the projector.
+            mapped.contentRaw shouldBe contentParts
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().base64 shouldBe "FAOUT_PNG+/=="
+            mapped.attachments.single().mediaType shouldBe "image/png"
+            // Legacy String projection exposes ONLY the text portion —
+            // base64 image data must NOT leak through, otherwise text-only
+            // consumers (IrohProbeMetrics, MergeTracer) report garbage.
+            mapped.content shouldBe "look at this"
+        }
+
+        // letta-mobile-utw4u: live wire frames occasionally serialize with
+        // FLAT image parts `{ type:"image", data:"…", mimeType:"image/jpeg" }`
+        // — no `source` wrapper. The pre-utw4u parseLettaImagePart required
+        // `source` and dropped those parts on the floor; the model extractor
+        // must read the flat shape so observers don't render a text bubble
+        // with an empty image placeholder. CodeRabbit review: also pin the
+        // text projection exactly to "hi" so the text-only contract stays
+        // locked.
+        "decode flat image content parts (no source wrapper) on UserMessage" {
+            val contentParts = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("hi"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("data", JsonPrimitive("FLAT_JPEG=="))
+                    put("mimeType", JsonPrimitive("image/jpeg"))
+                })
+            }
+            val frame = ServerFrame.UserMessage(
+                id = "cm-user-2",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                runId = "R",
+                contentRaw = contentParts,
+                otid = "cm-2",
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            mapped.contentRaw shouldBe contentParts
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().base64 shouldBe "FLAT_JPEG=="
+            mapped.attachments.single().mediaType shouldBe "image/jpeg"
+            mapped.content shouldBe "hi"
+        }
+
+        // letta-mobile-utw4u (CodeRabbit review): when contentRaw carries a
+        // multimodal array whose ONLY parts are images (no text at all), the
+        // legacy `.content` projection must be empty rather than leaking the
+        // base64 through `toString()`. This pins the post-fix extraction
+        // policy — without it, a regression that re-flattens via `raw.toString()`
+        // would silently restore the data leak.
+        "text projection is empty when multimodal content has no text parts" {
+            val contentParts = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("NOTEXT_IMG=="))
+                    })
+                })
+            }
+            val frame = ServerFrame.UserMessage(
+                id = "cm-user-no-text",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                runId = "R",
+                contentRaw = contentParts,
+                otid = "cm-nt",
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            mapped.contentRaw shouldBe contentParts
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().base64 shouldBe "NOTEXT_IMG=="
+            // No text parts in the array → legacy projection is empty.
+            mapped.content shouldBe ""
+        }
+
+        // letta-mobile-utw4u (CodeRabbit review): when contentRaw carries a
+        // multimodal array with multiple text parts (live `look at this` and
+        // `and also this` style messages), the projection concatenates them
+        // with `\n` so human-readable text is preserved end-to-end.
+        "text projection concatenates multiple text parts with newlines" {
+            val contentParts = buildJsonArray {
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("look at this"))
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("image"))
+                    put("source", buildJsonObject {
+                        put("type", JsonPrimitive("base64"))
+                        put("media_type", JsonPrimitive("image/png"))
+                        put("data", JsonPrimitive("MULTI_PNG="))
+                    })
+                })
+                add(buildJsonObject {
+                    put("type", JsonPrimitive("text"))
+                    put("text", JsonPrimitive("and also this"))
+                })
+            }
+            val frame = ServerFrame.UserMessage(
+                id = "cm-user-multi-text",
+                ts = "t",
+                agentId = "a", conversationId = "c",
+                runId = "R",
+                contentRaw = contentParts,
+                otid = "cm-mt",
+            )
+
+            val mapped = WsFrameMapper.toLettaMessage(frame)
+
+            mapped.shouldBeInstanceOf<UserMessage>()
+            mapped.content shouldBe "look at this\nand also this"
+            mapped.attachments.size shouldBe 1
+            mapped.attachments.single().base64 shouldBe "MULTI_PNG="
+        }
+
         "preserve the cm-stream- prefix on assistant_message ids" {
             val frame = ServerFrame.AssistantMessage(
                 id = "cm-stream-letta-msg-3",

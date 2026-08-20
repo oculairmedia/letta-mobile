@@ -8,9 +8,12 @@ import com.letta.mobile.data.model.SubagentTodo
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNames
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 // ─── Server → client ───────────────────────────────────────────────
 
@@ -237,6 +240,17 @@ sealed interface ServerFrame {
      * `otid` echoes the client's [SendMessageFrame.otid] when present
      * so mobile's `dedupeOptimisticContentTwins` can collapse the
      * stream-vs-disk twins on reconcile.
+     *
+     * `contentRaw` (letta-mobile-utw4u) carries the unmolested wire content:
+     * a bare string for text-only sends OR the verbatim `content_parts`
+     * JSON array for multimodal sends (text + base64 image). The legacy
+     * [content] String is a derived projection of the text-only view and
+     * exists purely so pre-existing callers that read `.content` as a
+     * plain String (IrohProbeMetrics, MergeTracer, the chat timeline's
+     * "what did the user say" check) keep compiling and reporting the
+     * same human-readable text. New code that needs attachments MUST go
+     * through [contentRaw] — flattening multimodal content into a String
+     * was the root cause of image fanout silently dropping on observers.
      */
     @Serializable
     data class UserMessage(
@@ -248,11 +262,44 @@ sealed interface ServerFrame {
         @SerialName("conversation_id") val conversationId: String? = null,
         @SerialName("turn_id") val turnId: String? = null,
         @SerialName("run_id") val runId: String? = null,
-        val content: String,
+        @SerialName("content")
+        val contentRaw: JsonElement? = null,
         val otid: String? = null,
         val seq: Long? = null,
         @SerialName("seq_id") val seqId: Int? = null,
-    ) : ServerFrame
+    ) : ServerFrame {
+        /**
+         * Text-only projection of [contentRaw]. Returns the bare string
+         * when the wire carried a bare string; extracts and concatenates
+         * `{"type":"text","text":"…"}` parts when the wire carried a
+         * multimodal array (image base64 and other non-text parts are
+         * intentionally discarded). Empty when [contentRaw] is null or
+         * carries no text parts. Callers that need attachments MUST use
+         * [contentRaw] — this projection is for human-readable text only.
+         *
+         * letta-mobile-utw4u (CodeRabbit review feedback): the pre-fix
+         * implementation did `raw.toString()` on the array branch, which
+         * leaked the entire `content_parts` JSON (including base64 image
+         * data) into the legacy `.content` String. Text-only consumers
+         * like IrohProbeMetrics and MergeTracer would then report
+         * base64 garbage instead of the actual user-typed text. Mirrors
+         * the same extraction policy as
+         * `OutboundMessageCreate.firstTextPart()` on the send side so
+         * what the recipient sees as "text" matches what the sender
+         * declared as text.
+         */
+        val content: String
+            get() = when (val raw = contentRaw) {
+                null -> ""
+                is JsonPrimitive -> raw.contentOrNull ?: raw.toString()
+                is JsonArray -> raw.asSequence()
+                    .filterIsInstance<JsonObject>()
+                    .filter { (it["type"] as? JsonPrimitive)?.contentOrNull == "text" }
+                    .mapNotNull { (it["text"] as? JsonPrimitive)?.contentOrNull }
+                    .joinToString(separator = "\n")
+                else -> ""
+            }
+    }
 
     @Serializable
     data class AssistantMessage(
