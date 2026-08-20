@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.AwaitPointerEventScope
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -96,6 +97,56 @@ private data class TabDragState(
     val deltaPx: Float,
 )
 
+/** [TabBoundsPx] for every laid-out tab plus the spacing constant used to
+ * convert between them and px — the two values the drag-preview math
+ * ([dragShiftPx], [DesktopConversationTabRowSlot]) always needs together. */
+private data class TabLayoutMetrics(
+    val bounds: Map<String, TabBoundsPx>,
+    val spacingPx: Float,
+)
+
+/** Which drag (if any) a non-dragged tab's shift animation should react to,
+ * and where it's currently headed. */
+private data class TabDragPreview(
+    val dragState: TabDragState?,
+    val targetIndex: Int?,
+)
+
+/** The row-level tab actions ([DesktopConversationTabRow]'s own
+ * `onSelect`/`onClose`), always wired together at each per-tab call site. */
+private data class TabRowActions(
+    val onSelect: (conversationId: String) -> Unit,
+    val onClose: (conversationId: String) -> Unit,
+)
+
+/** [TabRowActions] already bound to one tab's id — what
+ * [DesktopConversationTabItem] itself actually invokes. */
+private data class TabItemActions(
+    val onSelect: () -> Unit,
+    val onClose: () -> Unit,
+)
+
+/** The three callbacks a tab's drag recognizer ([detectTabDragGesture])
+ * reports through, always wired together as a unit from
+ * [DesktopConversationTabRow] down to [DesktopConversationTabItem]. */
+private data class TabDragCallbacks(
+    val onDragStart: () -> Unit,
+    val onDrag: (deltaPx: Float) -> Unit,
+    val onDragStop: () -> Unit,
+)
+
+/** The purely visual state of one rendered tab item: whether it reads as
+ * selected, whether it's the one currently floating in
+ * [DraggedTabOverlay], whether the row's own copy should even be drawn
+ * (see [DesktopConversationTabRowSlot]'s doc), and its current
+ * make-room/drag draw offset. */
+private data class TabItemDisplay(
+    val active: Boolean,
+    val dragging: Boolean,
+    val visible: Boolean,
+    val renderOffsetPx: Float,
+)
+
 @Composable
 internal fun DesktopConversationTabRow(
     tabs: List<DesktopConversationTab>,
@@ -106,15 +157,19 @@ internal fun DesktopConversationTabRow(
     onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
 ) {
     val density = LocalDensity.current
-    val spacingPx = with(density) { TabSpacing.toPx() }
     // Bounds are keyed by conversationId and refreshed every layout pass, so
     // they stay valid across recompositions without needing to be reset when
-    // the tab list itself is reordered.
+    // the tab list itself is reordered. Kept as its own mutable reference
+    // (rather than reading it back out of `layout` below) so the
+    // onBoundsChanged callback can still assign into it directly —
+    // TabLayoutMetrics.bounds is typed as a read-only Map for every other
+    // consumer, which is all the drag-preview math ever needs.
     val bounds = remember { mutableStateMapOf<String, TabBoundsPx>() }
+    val layout = TabLayoutMetrics(bounds = bounds, spacingPx = with(density) { TabSpacing.toPx() })
     var dragState by remember { mutableStateOf<TabDragState?>(null) }
     val scrollState = rememberScrollState()
     val currentDragState = dragState
-    val targetIndex = currentDragState?.let { computeDragTargetIndex(tabs, bounds, it) }
+    val targetIndex = currentDragState?.let { computeDragTargetIndex(tabs, layout.bounds, it) }
 
     fun beginDrag(tab: DesktopConversationTab, index: Int) {
         dragState = TabDragState(conversationId = tab.conversationId, startIndex = index, deltaPx = 0f)
@@ -126,7 +181,7 @@ internal fun DesktopConversationTabRow(
 
     fun endDrag() {
         val drag = dragState ?: return
-        val finalTarget = computeDragTargetIndex(tabs, bounds, drag)
+        val finalTarget = computeDragTargetIndex(tabs, layout.bounds, drag)
         if (finalTarget != drag.startIndex) {
             onReorder(drag.conversationId, finalTarget)
         }
@@ -145,6 +200,8 @@ internal fun DesktopConversationTabRow(
         dragState = null
     }
 
+    val actions = TabRowActions(onSelect = onSelect, onClose = onClose)
+
     Box(modifier = modifier) {
         Row(
             modifier = Modifier.horizontalScroll(scrollState),
@@ -156,16 +213,15 @@ internal fun DesktopConversationTabRow(
                     tab = tab,
                     index = index,
                     active = tab.conversationId == activeConversationId,
-                    dragState = currentDragState,
-                    targetIndex = targetIndex,
-                    bounds = bounds,
-                    spacingPx = spacingPx,
-                    onSelect = onSelect,
-                    onClose = onClose,
+                    dragPreview = TabDragPreview(currentDragState, targetIndex),
+                    layout = layout,
+                    actions = actions,
                     onBoundsChanged = { left, width -> bounds[tab.conversationId] = TabBoundsPx(left, width) },
-                    onDragStart = { beginDrag(tab, index) },
-                    onDrag = ::updateDrag,
-                    onDragStop = ::endDrag,
+                    dragCallbacks = TabDragCallbacks(
+                        onDragStart = { beginDrag(tab, index) },
+                        onDrag = ::updateDrag,
+                        onDragStop = ::endDrag,
+                    ),
                 )
             }
         }
@@ -173,7 +229,7 @@ internal fun DesktopConversationTabRow(
         DraggedTabOverlay(
             tabs = tabs,
             dragState = currentDragState,
-            bounds = bounds,
+            bounds = layout.bounds,
             scrollOffsetPx = scrollState.value.toFloat(),
             activeConversationId = activeConversationId,
             onClose = onClose,
@@ -194,21 +250,17 @@ private fun DesktopConversationTabRowSlot(
     tab: DesktopConversationTab,
     index: Int,
     active: Boolean,
-    dragState: TabDragState?,
-    targetIndex: Int?,
-    bounds: Map<String, TabBoundsPx>,
-    spacingPx: Float,
-    onSelect: (String) -> Unit,
-    onClose: (String) -> Unit,
+    dragPreview: TabDragPreview,
+    layout: TabLayoutMetrics,
+    actions: TabRowActions,
     onBoundsChanged: (left: Float, width: Float) -> Unit,
-    onDragStart: () -> Unit,
-    onDrag: (deltaPx: Float) -> Unit,
-    onDragStop: () -> Unit,
+    dragCallbacks: TabDragCallbacks,
 ) {
+    val dragState = dragPreview.dragState
     val isDragging = dragState?.conversationId == tab.conversationId
     val shiftPx by animateFloatAsState(
-        targetValue = if (dragState != null && targetIndex != null && !isDragging) {
-            dragShiftPx(index, dragState, targetIndex, bounds, spacingPx)
+        targetValue = if (dragState != null && dragPreview.targetIndex != null && !isDragging) {
+            dragShiftPx(index, dragState, dragPreview.targetIndex, layout)
         } else {
             0f
         },
@@ -217,16 +269,18 @@ private fun DesktopConversationTabRowSlot(
     )
     DesktopConversationTabItem(
         tab = tab,
-        active = active,
-        dragging = false,
-        visible = !isDragging,
-        renderOffsetPx = if (isDragging) 0f else shiftPx,
-        onSelect = { onSelect(tab.conversationId) },
-        onClose = { onClose(tab.conversationId) },
+        display = TabItemDisplay(
+            active = active,
+            dragging = false,
+            visible = !isDragging,
+            renderOffsetPx = if (isDragging) 0f else shiftPx,
+        ),
+        actions = TabItemActions(
+            onSelect = { actions.onSelect(tab.conversationId) },
+            onClose = { actions.onClose(tab.conversationId) },
+        ),
         onBoundsChanged = onBoundsChanged,
-        onDragStart = onDragStart,
-        onDrag = onDrag,
-        onDragStop = onDragStop,
+        dragCallbacks = dragCallbacks,
     )
 }
 
@@ -284,19 +338,21 @@ private fun DraggedTabOverlay(
     val overlayXPx = originLeftPx - scrollOffsetPx + dragState.deltaPx
     DesktopConversationTabItem(
         tab = draggedTab,
-        active = draggedTab.conversationId == activeConversationId,
-        dragging = true,
-        visible = true,
-        renderOffsetPx = 0f,
+        display = TabItemDisplay(
+            active = draggedTab.conversationId == activeConversationId,
+            dragging = true,
+            visible = true,
+            renderOffsetPx = 0f,
+        ),
+        actions = TabItemActions(
+            onSelect = {},
+            onClose = { onClose(draggedTab.conversationId) },
+        ),
+        onBoundsChanged = { _, _ -> },
+        dragCallbacks = TabDragCallbacks(onDragStart = {}, onDrag = {}, onDragStop = {}),
         // No explicit zIndex needed: this overlay is the Box's second child
         // (after the Row), so it already draws on top by declaration order.
         modifier = Modifier.offset { IntOffset(x = overlayXPx.roundToInt(), y = 0) },
-        onSelect = {},
-        onClose = { onClose(draggedTab.conversationId) },
-        onBoundsChanged = { _, _ -> },
-        onDragStart = {},
-        onDrag = {},
-        onDragStop = {},
     )
 }
 
@@ -339,12 +395,11 @@ private fun dragShiftPx(
     index: Int,
     drag: TabDragState,
     targetIndex: Int,
-    bounds: Map<String, TabBoundsPx>,
-    spacingPx: Float,
+    layout: TabLayoutMetrics,
 ): Float {
     if (index == drag.startIndex || targetIndex == drag.startIndex) return 0f
-    val draggedWidth = bounds[drag.conversationId]?.width ?: return 0f
-    val step = draggedWidth + spacingPx
+    val draggedWidth = layout.bounds[drag.conversationId]?.width ?: return 0f
+    val step = draggedWidth + layout.spacingPx
     return when {
         targetIndex < drag.startIndex && index in targetIndex until drag.startIndex -> step
         targetIndex > drag.startIndex && index in (drag.startIndex + 1)..targetIndex -> -step
@@ -355,16 +410,10 @@ private fun dragShiftPx(
 @Composable
 private fun DesktopConversationTabItem(
     tab: DesktopConversationTab,
-    active: Boolean,
-    dragging: Boolean,
-    visible: Boolean,
-    renderOffsetPx: Float,
-    onSelect: () -> Unit,
-    onClose: () -> Unit,
+    display: TabItemDisplay,
+    actions: TabItemActions,
     onBoundsChanged: (left: Float, width: Float) -> Unit,
-    onDragStart: () -> Unit,
-    onDrag: (deltaPx: Float) -> Unit,
-    onDragStop: () -> Unit,
+    dragCallbacks: TabDragCallbacks,
     modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember(tab.conversationId) { MutableInteractionSource() }
@@ -374,7 +423,7 @@ private fun DesktopConversationTabItem(
     // so it reads as the front edge of the content below it, while inactive tabs
     // recede into the title bar (surfaceContainerLow) and only lift on hover.
     Surface(
-        onClick = onSelect,
+        onClick = actions.onSelect,
         modifier = modifier
             .fillMaxHeight()
             .widthIn(min = 132.dp, max = 220.dp)
@@ -386,10 +435,16 @@ private fun DesktopConversationTabItem(
             // therefore onGloballyPositioned's report of it) stable while it
             // slides aside for a neighbor. The item currently being dragged
             // is not drawn here at all (see `visible`/DraggedTabOverlay).
-            .graphicsLayer { translationX = renderOffsetPx }
-            .alpha(if (visible) 1f else 0f)
-            .zIndex(if (dragging) 1f else 0f)
-            .then(if (dragging) Modifier.shadow(4.dp, RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)) else Modifier)
+            .graphicsLayer { translationX = display.renderOffsetPx }
+            .alpha(if (display.visible) 1f else 0f)
+            .zIndex(if (display.dragging) 1f else 0f)
+            .then(
+                if (display.dragging) {
+                    Modifier.shadow(4.dp, RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp))
+                } else {
+                    Modifier
+                },
+            )
             // This tab strip lives inside Nucleus's custom title bar
             // (DesktopJewelWindow.kt), whose chrome owns a press listener of
             // its own — the native drag-to-move-window gesture — gated on
@@ -411,16 +466,11 @@ private fun DesktopConversationTabItem(
             // the button's own clickable consumes its down first and this
             // handler only tracks the pointer id from its own down.
             .pointerInput(tab.conversationId) {
-                detectTabDragGesture(
-                    touchSlop = touchSlop,
-                    onDragStart = onDragStart,
-                    onDrag = onDrag,
-                    onDragStop = onDragStop,
-                )
+                detectTabDragGesture(touchSlop = touchSlop, callbacks = dragCallbacks)
             },
         shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
         color = when {
-            active -> MaterialTheme.colorScheme.background
+            display.active -> MaterialTheme.colorScheme.background
             hovered -> MaterialTheme.colorScheme.surfaceContainer
             else -> Color.Transparent
         },
@@ -431,13 +481,13 @@ private fun DesktopConversationTabItem(
         Box {
             DesktopConversationTabLabel(
                 tab = tab,
-                active = active,
+                active = display.active,
                 modifier = Modifier.align(Alignment.Center),
             )
-            if (hovered || active) {
+            if (hovered || display.active) {
                 DesktopConversationTabCloseButton(
                     title = tab.title,
-                    onClose = onClose,
+                    onClose = actions.onClose,
                     modifier = Modifier.align(Alignment.CenterEnd),
                 )
             }
@@ -451,56 +501,79 @@ private fun DesktopConversationTabItem(
  * [DesktopConversationTabItem] for why. Claims the press immediately, then
  * hands off to [trackTabDrag] to read the rest of the gesture.
  */
-private suspend fun PointerInputScope.detectTabDragGesture(
-    touchSlop: Float,
-    onDragStart: () -> Unit,
-    onDrag: (deltaPx: Float) -> Unit,
-    onDragStop: () -> Unit,
-) {
+private suspend fun PointerInputScope.detectTabDragGesture(touchSlop: Float, callbacks: TabDragCallbacks) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false)
         down.consume()
-        val didDrag = trackTabDrag(down.id, touchSlop, onDragStart, onDrag)
-        if (didDrag) onDragStop()
+        val didDrag = trackTabDrag(down.id, touchSlop, callbacks)
+        if (didDrag) callbacks.onDragStop()
     }
 }
 
 /**
- * Reads move events for [pointerId] until it's released, reporting
- * horizontal deltas via [onDrag] once cumulative movement crosses
- * [touchSlop] (calling [onDragStart] the moment it does). Small,
- * sub-threshold moves are read but never consumed, so Surface's own tap
- * detector still sees a clean, unconsumed down-then-up for a plain click.
+ * Reads move events for [pointerId] until it's released, folding each one
+ * through [applyDragDelta] to report horizontal deltas via
+ * [TabDragCallbacks.onDrag] once cumulative movement crosses [touchSlop].
  * Returns whether a drag was ever started, so the caller knows whether to
- * report [onDragStop] at all.
+ * report [TabDragCallbacks.onDragStop] at all.
  */
 private suspend fun AwaitPointerEventScope.trackTabDrag(
     pointerId: PointerId,
     touchSlop: Float,
-    onDragStart: () -> Unit,
-    onDrag: (deltaPx: Float) -> Unit,
+    callbacks: TabDragCallbacks,
 ): Boolean {
-    var isDragging = false
-    var accumulatedDx = 0f
+    var tracking = TabDragTrackingState()
     while (true) {
-        val event = awaitPointerEvent(PointerEventPass.Main)
-        val change = event.changes.firstOrNull { it.id == pointerId } ?: break
-        if (!change.pressed) break
-        val dx = change.positionChange().x
-        if (isDragging) {
-            change.consume()
-            onDrag(dx)
-        } else {
-            accumulatedDx += dx
-            if (abs(accumulatedDx) > touchSlop) {
-                isDragging = true
-                change.consume()
-                onDragStart()
-                onDrag(accumulatedDx)
-            }
-        }
+        val change = nextPressedChange(pointerId) ?: break
+        tracking = applyDragDelta(change, tracking, touchSlop, callbacks)
     }
-    return isDragging
+    return tracking.isDragging
+}
+
+/** Reads the next pointer event and returns [pointerId]'s change from it,
+ * or null once that pointer is released (or simply absent) — the one
+ * condition under which [trackTabDrag]'s loop ends. */
+private suspend fun AwaitPointerEventScope.nextPressedChange(pointerId: PointerId): PointerInputChange? {
+    val event = awaitPointerEvent(PointerEventPass.Main)
+    val change = event.changes.firstOrNull { it.id == pointerId } ?: return null
+    return change.takeIf { it.pressed }
+}
+
+/** Cumulative horizontal movement tracked while a tab's press hasn't yet
+ * crossed touch slop, and whether it has. */
+private data class TabDragTrackingState(
+    val isDragging: Boolean = false,
+    val accumulatedDx: Float = 0f,
+)
+
+/**
+ * Folds one pointer [change] into [state]: while still under touch slop,
+ * accumulates its horizontal movement without consuming it — leaving
+ * Surface's own tap detector a clean, unconsumed down-then-up to recognize
+ * a plain click from. The instant accumulated movement crosses [touchSlop],
+ * or on every change after, it consumes the change and reports through
+ * [TabDragCallbacks.onDragStart]/[TabDragCallbacks.onDrag] instead.
+ */
+private fun applyDragDelta(
+    change: PointerInputChange,
+    state: TabDragTrackingState,
+    touchSlop: Float,
+    callbacks: TabDragCallbacks,
+): TabDragTrackingState {
+    val dx = change.positionChange().x
+    if (state.isDragging) {
+        change.consume()
+        callbacks.onDrag(dx)
+        return state
+    }
+    val accumulatedDx = state.accumulatedDx + dx
+    if (abs(accumulatedDx) <= touchSlop) {
+        return state.copy(accumulatedDx = accumulatedDx)
+    }
+    change.consume()
+    callbacks.onDragStart()
+    callbacks.onDrag(accumulatedDx)
+    return state.copy(isDragging = true, accumulatedDx = accumulatedDx)
 }
 
 @Composable
