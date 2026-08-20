@@ -31,8 +31,19 @@ data class ChatRenderItemGeometrySignature(
 )
 
 class ChatMessageGeometryState(
-    private val maxEntries: Int = 240,
+    maxEntries: Int = 240,
 ) {
+    init {
+        // letta-mobile-1260 (CodeRabbit review): reject negative capacity so
+        // the trim loop never permanently satisfies `size > maxEntries` (which
+        // would loop forever on every insert). Zero is allowed as a legitimate
+        // "never cache anything" mode — the trim loop simply evicts whatever
+        // was just inserted, matching the post-insertion > maxEntries check.
+        require(maxEntries >= 0) {
+            "maxEntries must be >= 0 (got $maxEntries)"
+        }
+    }
+    private val maxEntries: Int = maxEntries
     // Insertion-order linked map (commonMain-safe). Lookups must not reorder
     // entries — access-order promotion defeated per-frame dedup on recycled
     // slots. Evict oldest-by-insertion when full.
