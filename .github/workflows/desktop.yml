@@ -68,6 +68,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-konan-
 
+      - name: Cache JetBrains Runtime (JBR 25.0.4) for packaged desktop runtime
+        # desktop.yml bundles JBR 25.0.4 in the EXE/MSI runtime image (see
+        # desktop/build.gradle.kts downloadDesktopJbr). The archive lands in
+        # the build downloads dir under D:\l (the WiX-friendly packaging
+        # workspace). Cache the zip so subsequent runs skip the ~180MB pull.
+        uses: actions/cache@v4
+        with:
+          path: D:\l\downloads
+          key: ${{ runner.os }}-jbr-${{ hashFiles('android-compose/desktop/build.gradle.kts') }}
+          restore-keys: |
+            ${{ runner.os }}-jbr-
+
       - name: Build Windows EXE + MSI installers
         env:
           # WiX still resolves source files through MAX_PATH-limited Win32 APIs.

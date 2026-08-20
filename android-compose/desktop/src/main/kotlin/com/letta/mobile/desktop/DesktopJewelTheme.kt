@@ -62,7 +62,7 @@ internal fun DesktopJewelTheme(content: @Composable () -> Unit) {
  *
  * `LocalCustomColors` is provided with the same fixed brand agent-status values
  * the Android `deriveCustomColors()` uses. Desktop only depends on
- * `:sharedLogic` (where `CustomColors`/`LocalCustomColors` live), not on
+ * `:sharedUI` (where `CustomColors`/`LocalCustomColors` live), not on
  * `:designsystem`, so the values are constructed inline here.
  */
 @Composable
