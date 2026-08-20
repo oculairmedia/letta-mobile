@@ -13,3 +13,6 @@
 ## 2024-10-25 - Replace maxOfOrNull on visibleItemsInfo
 **Learning:** In Jetpack Compose, `LazyListState.layoutInfo.visibleItemsInfo` is inherently sorted by index representing the currently visible items on the screen. Using `maxOfOrNull { it.index }` forces the creation of an iterator and evaluates a lambda for each element. This wastes memory per evaluation frame.
 **Action:** When finding the maximum index of visible items, always use `lastOrNull()?.index` which relies on O(1) list access to get the last element (which will always have the maximum index) and avoids iterator allocations.
+## 2024-10-25 - Avoid derivedStateOf for Sticky Header Top Bounds
+**Learning:** In Jetpack Compose, reading `listState.layoutInfo.visibleItemsInfo` inside `derivedStateOf` to check if a sticky header is pinned forces the lambda to re-evaluate continuously on every scroll pixel, as `layoutInfo` allocates new instances per frame.
+**Action:** Replace `derivedStateOf` with `snapshotFlow { listState.firstVisibleItemIndex }` in a `LaunchedEffect`, map the index to the stable underlying data array (e.g., `rows.getOrNull(index - 1)`), and update a `mutableStateOf`. This prevents severe GC pressure and scroll jank by triggering only when the visible item index actually changes, rather than on every pixel.
