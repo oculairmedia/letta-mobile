@@ -3,27 +3,27 @@ package com.letta.mobile.data.session
 import android.util.Log
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.api.ISettingsRepository
-import java.util.concurrent.locks.ReentrantLock
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.concurrent.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 internal fun defaultSessionManagerScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+/**
+ * Android session graph provider: shared rebuild semantics from
+ * [DefaultSessionRepositoryGraphProvider], plus auto-rebuild when the active
+ * backend connection key changes (including same-id local model edits).
+ */
 @Singleton
 class SessionManager internal constructor(
     private val settingsRepository: ISettingsRepository,
-    private val sessionGraphFactory: SessionRepositoryGraphFactory<SessionGraph>,
+    sessionGraphFactory: SessionRepositoryGraphFactory<SessionGraph>,
     private val managerScope: CoroutineScope,
-) : SessionRepositoryGraphProvider<SessionGraph> {
+) : DefaultSessionRepositoryGraphProvider<SessionGraph>(sessionGraphFactory) {
     @Inject
     constructor(
         settingsRepository: ISettingsRepository,
@@ -34,11 +34,8 @@ class SessionManager internal constructor(
         managerScope = defaultSessionManagerScope(),
     )
 
-    private var graphBackendKey: BackendConnectionKey? = settingsRepository.activeConfig.value?.backendConnectionKey()
-    private val _currentGraph = MutableStateFlow(sessionGraphFactory.create())
-    override val currentGraph: StateFlow<SessionGraph> = _currentGraph.asStateFlow()
-    private val _sessionError = MutableStateFlow<Throwable?>(null)
-    override val sessionError: StateFlow<Throwable?> = _sessionError.asStateFlow()
+    private var graphBackendKey: BackendConnectionKey? =
+        settingsRepository.activeConfig.value?.backendConnectionKey()
 
     init {
         managerScope.launch {
@@ -55,41 +52,19 @@ class SessionManager internal constructor(
         }
     }
 
-    private val rebuildLock = ReentrantLock()
-
     private fun rebuildIfBackendChanged(config: LettaConfig) {
         val nextKey = config.backendConnectionKey()
         if (nextKey == graphBackendKey) return
-        rebuild(nextKey)
+        rebuildTrackingKey(nextKey)
     }
 
-    override fun rebuild(): SessionGraph = rebuild(settingsRepository.activeConfig.value?.backendConnectionKey())
+    override fun rebuild(): SessionGraph =
+        rebuildTrackingKey(settingsRepository.activeConfig.value?.backendConnectionKey())
 
-    private fun rebuild(nextBackendKey: BackendConnectionKey?): SessionGraph = rebuildLock.withLock {
-        val previous = _currentGraph.value
-        try {
-            val next = sessionGraphFactory.create()
-            _currentGraph.value = next
-            graphBackendKey = nextBackendKey
-            previous.close()
-            _sessionError.value = null
-            next
-        } catch (t: Throwable) {
-            _sessionError.value = t
-            throw t
-        }
-    }
-
-    override val current: SessionGraph
-        get() = _currentGraph.value
-
-    override suspend fun <T> withCurrentSession(block: suspend (SessionGraph) -> T): T {
-        val graph = current
-        val result = block(graph)
-        if (current !== graph) {
-            throw kotlinx.coroutines.CancellationException("Session switched during operation")
-        }
-        return result
+    private fun rebuildTrackingKey(nextKey: BackendConnectionKey?): SessionGraph {
+        val next = super.rebuild()
+        graphBackendKey = nextKey
+        return next
     }
 }
 

@@ -25,9 +25,9 @@ import com.letta.mobile.data.repository.api.IStepRepository
 import com.letta.mobile.data.repository.api.ISubagentRepository
 import com.letta.mobile.data.repository.api.IToolRepository
 import com.letta.mobile.data.repository.api.IVibesyncEventStreamRepository
+import com.letta.mobile.data.session.DefaultSessionRepositoryGraphProvider
 import com.letta.mobile.data.session.SessionRepositoryGraph
 import com.letta.mobile.data.session.SessionRepositoryGraphFactory
-import com.letta.mobile.data.session.SessionRepositoryGraphProvider
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import com.letta.mobile.data.transport.iroh.IrohChannelTransport
@@ -41,9 +41,6 @@ import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.desktop.chat.createDefaultDesktopChatGateway
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 
 private const val DEFAULT_REMOTE_LETTA_URL = "https://api.letta.com"
 
@@ -141,40 +138,11 @@ class DesktopSessionGraphFactory(
 }
 
 class DesktopSessionGraphProvider(
-    private val factory: SessionRepositoryGraphFactory<DesktopSessionGraph>,
-) : SessionRepositoryGraphProvider<DesktopSessionGraph> {
-    private val currentGraphFlow = MutableStateFlow(factory.create())
-    override val currentGraph: StateFlow<DesktopSessionGraph> = currentGraphFlow
-    private val sessionErrorFlow = MutableStateFlow<Throwable?>(null)
-    override val sessionError: StateFlow<Throwable?> = sessionErrorFlow
-
-    override val current: DesktopSessionGraph
-        get() = currentGraph.value
-
-    @Synchronized
-    override fun rebuild(): DesktopSessionGraph {
-        val previous = currentGraphFlow.value
-        return try {
-            val next = factory.create()
-            currentGraphFlow.value = next
-            previous.close()
-            sessionErrorFlow.value = null
-            next
-        } catch (t: Throwable) {
-            sessionErrorFlow.value = t
-            throw t
-        }
-    }
-
-    override suspend fun <T> withCurrentSession(block: suspend (DesktopSessionGraph) -> T): T {
-        val graph = current
-        val result = block(graph)
-        if (current !== graph) {
-            throw CancellationException("Desktop session switched during operation")
-        }
-        return result
-    }
-}
+    factory: SessionRepositoryGraphFactory<DesktopSessionGraph>,
+) : DefaultSessionRepositoryGraphProvider<DesktopSessionGraph>(
+    factory = factory,
+    sessionSwitchMessage = "Desktop session switched during operation",
+)
 
 class DesktopChatSessionGraph internal constructor(
     override val repositories: DesktopSessionGraph,

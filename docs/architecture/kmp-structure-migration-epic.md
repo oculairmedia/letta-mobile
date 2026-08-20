@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–3a merged; Phase 3b in #1255; Phase 3c Compose trim in flight)  
+**Status:** in progress (Phase 0–3c merged; Phase 4a shared provider in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -231,22 +231,24 @@ Medium — Gradle source-set surgery.
 
 ### Scope
 
-**Already shared:** `SessionRepositoryGraph`, `SessionRepositoryGraphFactory`, `SessionRepositoryGraphProvider` in `sharedLogic/commonMain`.
+**Already shared:** `SessionRepositoryGraph`, `SessionRepositoryGraphFactory`, `SessionRepositoryGraphProvider`, and (Phase 4a) `DefaultSessionRepositoryGraphProvider` in `sharedLogic/commonMain`.
 
 **Still split:**
 
-- Android: `SessionManager`, `SessionGraphAssembler`, `SessionScoped*` in `core:android-data`
-- Desktop: `DesktopSessionGraph`, `DesktopRepositoryAdapters`
+- Android: `SessionManager` (auto-rebuild on config), `SessionGraphAssembler`, `SessionScoped*` in `core:android-data`
+- Desktop: `DesktopSessionGraph`, `DesktopSessionGraphFactory`, `DesktopRepositoryAdapters`
 
-- Move **platform-neutral** assembly rules into `sharedLogic`.
-- Android factory becomes thin binder (Room + Hilt).
-- Desktop factory implements same provider contract; delete duplicate stubs where sharedLogic already has impl.
+**Slices:**
+
+- **4a (this PR):** shared `DefaultSessionRepositoryGraphProvider` — Android `SessionManager` and desktop `DesktopSessionGraphProvider` extend it so rebuild / `sessionError` / `withCurrentSession` stay identical.
+- **4b:** move platform-neutral assembly helpers toward sharedLogic; thin Android (Room + Hilt) / Desktop binders.
+- **4c:** shrink desktop “unavailable repository” stubs where sharedLogic already has HTTP/Iroh/App Server impls.
 
 ### Acceptance
 
-- [ ] Android and Desktop obtain graphs through the same shared factory *contract*
+- [x] Android and Desktop obtain graphs through the same shared *provider* contract (`DefaultSessionRepositoryGraphProvider`)
 - [ ] Desktop “unavailable repository” surface shrinks for iroh/App Server paths
-- [ ] Session/backend switch tests green on both hosts
+- [x] Session/backend switch tests green on both hosts (shared commonTest + existing host tests)
 
 ### Risk
 
