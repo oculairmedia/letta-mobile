@@ -196,7 +196,10 @@ internal fun DesktopJewelWindow(
                             // TEMPORARY (letta-mobile #1249 touch-reorder diagnosis):
                             // confirms the exclusion rectangle actually covers where
                             // the tab strip renders on screen.
-                            System.err.println("TABTOUCHDIAG titleBarBounds=$bounds")
+                            System.err.println(
+                                "TABTOUCHDIAG publish windowIdentity=" +
+                                    System.identityHashCode(window) + " titleBarBounds=" + bounds,
+                            )
                             DesktopTouchDragExclusion.publish(window, bounds)
                         },
                     ) {

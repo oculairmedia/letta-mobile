@@ -201,8 +201,8 @@ internal object DesktopWindowsTouchInput {
             // falling inside the published title-bar exclusion region at all.
             if (event.id == MouseEvent.MOUSE_PRESSED) {
                 System.err.println(
-                    "TABTOUCHDIAG exclusion press screen=(" + event.xOnScreen + "," + event.yOnScreen +
-                        ") excluded=" + excluded,
+                    "TABTOUCHDIAG exclusion press windowIdentity=" + System.identityHashCode(window) +
+                        " screen=(" + event.xOnScreen + "," + event.yOnScreen + ") excluded=" + excluded,
                 )
             }
             if (!excluded) return false
