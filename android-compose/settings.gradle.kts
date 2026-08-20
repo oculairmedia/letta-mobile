@@ -51,7 +51,7 @@ rootProject.name = "LettaMobile"
 include(":app")
 include(":core:ids")
 include(":core:runtime")
-include(":core:data")
+include(":core:android-data")
 include(":core:testutil")
 include(":avatar:core")
 include(":avatar:catalog")

@@ -76,10 +76,10 @@ in-app inspector.
 
 | Tag                  | Owner module                              | Purpose |
 |----------------------|-------------------------------------------|---------|
-| `TimelineSync`       | core/data/timeline/TimelineSyncLoop.kt    | sync loop, stream subscriber, reconcile |
-| `Timeline`           | core/data/timeline/Timeline.kt            | timeline data-structure invariants |
-| `TimelineRepo`       | core/data/timeline/TimelineRepository.kt  | repository cache |
-| `Http`               | core/data/api/TelemetryInterceptor.kt     | HTTP round trips |
+| `TimelineSync`       | sharedLogic/.../timeline/TimelineSyncLoop.kt | sync loop, stream subscriber, reconcile |
+| `Timeline`           | sharedLogic/.../timeline/Timeline.kt         | timeline data-structure invariants |
+| `TimelineRepo`       | sharedLogic/.../timeline/TimelineRepository.kt | repository cache |
+| `Http`               | core/android-data/.../api/TelemetryInterceptor.kt | HTTP round trips |
 | `App`                | app/LettaApplication.kt                   | process startup, lifecycle, init failures |
 | `Crash`              | app/crash/CrashReporter.kt                | crash persistence and previous-crash surfacing |
 | `ChatPushService`    | app/channel/ChatPushService.kt            | foreground service lifecycle |

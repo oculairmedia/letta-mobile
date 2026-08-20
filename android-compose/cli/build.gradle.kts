@@ -45,7 +45,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
     implementation(project(":sharedLogic"))
     // letta-mobile-zsgad: `app-server-serve-iroh` now lives in the pure-JVM
     // :iroh-wrapper-cli module so it can ship as an installable distribution

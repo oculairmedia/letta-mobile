@@ -89,7 +89,7 @@ dependencies {
     implementation(composeBom)
 
     implementation(project(":sharedLogic"))
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
 
     implementation("io.coil-kt.coil3:coil-compose:3.5.0-beta01")
     implementation("io.coil-kt.coil3:coil-svg:3.5.0-beta01")

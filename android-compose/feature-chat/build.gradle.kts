@@ -90,7 +90,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
     implementation(project(":sharedLogic"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))

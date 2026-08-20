@@ -195,8 +195,8 @@ class ShimRetirementArchitectureGateTest {
          */
         val SHIM_MOBILE_WS_ALLOWED = setOf(
             // The Android shim WS transport + its own doc comment.
-            "android-compose/core/data/src/main/java/com/letta/mobile/data/transport/WebSocketConnection.kt",
-            "android-compose/core/data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt",
+            "android-compose/core/android-data/src/main/java/com/letta/mobile/data/transport/WebSocketConnection.kt",
+            "android-compose/core/android-data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt",
             // The desktop shim WS transport.
             "android-compose/desktop/src/main/kotlin/com/letta/mobile/desktop/data/DesktopWsChannelTransport.kt",
             // Wire-shape contracts / renderer docs that describe the protocol.

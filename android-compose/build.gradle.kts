@@ -203,7 +203,7 @@ subprojects {
 // ---------------------------------------------------------------------------
 dependencies {
     kover(project(":app"))
-    kover(project(":core:data"))
+    kover(project(":core:android-data"))
     kover(project(":sharedLogic"))
     kover(project(":designsystem"))
     kover(project(":feature-chat"))
@@ -311,7 +311,7 @@ subprojects {
 // applied to the same module, generateKotzillaConfig must run BEFORE the KSP
 // tasks (the SDK's runtime config lives in the same Kotlin source set KSP reads
 // from, and KSP validation rejects missing dependencies). Required for any
-// module that uses Hilt/Dagger/Room/Moshi + Kotzilla together — core/data today.
+// module that uses Hilt/Dagger/Room/Moshi + Kotzilla together — core/android-data today.
 //
 // See: https://doc.kotzilla.io/docs/getstartedCustom/setupNoKoin (1.3)
 subprojects {

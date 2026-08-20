@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–1 landing as the first PR)  
+**Status:** in progress (Phase 0–1 in PR #1252; Phase 2 rename in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -21,9 +21,9 @@ The repo started as Android-only and now ships **Android + Compose Desktop + was
 |---|---|
 | Portable logic lives in one monolith | `:sharedLogic` (commonMain + custom UI source sets) |
 | “Domain” depends on shared logic (inverted) | `:core:domain` → `api(project(":sharedLogic"))` |
-| Android session/Room/Hilt mixed with “core” naming | `:core:data` |
+| Android session/Room/Hilt mixed with “core” naming | `:core:android-data` (renamed from `:core:data` in Phase 2) |
 | Shared Compose UI inside logic module | `sharedLogic/composeUi`, `sharedLogic/jvmAndAndroid` |
-| Desktop re-implements bindings | `desktop/data/*` vs `core/data/session/*` |
+| Desktop re-implements bindings | `desktop/data/*` vs `core/android-data/session/*` |
 | IDE/repo layout confusion | Gradle root is `android-compose/`; IntelliJ opens repo root; orphan `shared-ui/` build dir |
 | Runnable apps not grouped | `app/`, `desktop/`, `web/` siblings under `android-compose/` |
 
@@ -54,7 +54,7 @@ android-compose/
 ```text
 apps → feature-* / designsystem → sharedUI → sharedLogic → core:ids, core:runtime
 apps → core:android-data          (Android only)
-sharedLogic must NOT depend on :app, :desktop, :core:data, :designsystem, :feature-*
+sharedLogic must NOT depend on :app, :desktop, :core:android-data, :designsystem, :feature-*
 ```
 
 ---
@@ -107,7 +107,7 @@ flowchart LR
 - Treat **`android-compose/`** as the primary IntelliJ/Gradle project root for daily KMP work.
 - Sync **`web`** into IDE Gradle modules; remove or gitignore orphan **`shared-ui/`** (artifacts only, not in `settings.gradle.kts`).
 - Add **`docs/architecture/kmp-module-map.md`** — current vs target module graph (one page).
-- Extend **`architecture-tests`**: `:sharedLogic` must not depend on `:app`, `:core:data`, `:designsystem`, `:feature-*`, `:desktop`.
+- Extend **`architecture-tests`**: `:sharedLogic` must not depend on `:app`, `:core:android-data`, `:designsystem`, `:feature-*`, `:desktop`.
 - Begin **`gradle/libs.versions.toml`** (desktop already notes absence of version catalog).
 
 ### Acceptance
@@ -134,7 +134,7 @@ Low — no production logic moves.
 `:core:domain` is ~10 JVM files and **`api(project(":sharedLogic"))`** — inverted. Repository APIs already live in `sharedLogic/commonMain`.
 
 - Merge remaining types into `sharedLogic/commonMain` (dedupe with existing `repository/api/*`).
-- Update `:core:data` to depend on `:sharedLogic` only.
+- Update `:core:android-data` to depend on `:sharedLogic` only.
 - Remove `:core:domain` from `settings.gradle.kts`, kover, architecture-tests.
 - Point ArchUnit bytecode scan at `sharedLogic` jvmMain instead of `core/domain`.
 
@@ -172,9 +172,9 @@ Package rename (`com.letta.mobile.data` paths) is **optional** — defer to avoi
 
 ### Acceptance
 
-- [ ] Gradle project name reflects Android-only role
+- [x] Gradle project name reflects Android-only role
 - [ ] CI green
-- [ ] README states “no portable logic here”
+- [x] README states “no portable logic here”
 
 ### Risk
 

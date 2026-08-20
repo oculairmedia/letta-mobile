@@ -23,7 +23,7 @@ kotlin {
 }
 
 dependencies {
-    api(project(":core:data"))
+    api(project(":core:android-data"))
     api(project(":sharedLogic"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     

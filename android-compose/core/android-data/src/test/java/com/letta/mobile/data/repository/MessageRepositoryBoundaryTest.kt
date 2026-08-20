@@ -85,7 +85,7 @@ class MessageRepositoryBoundaryTest {
         val path = if (relativePath.contains("IMessageRepository")) {
             root.resolve("sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/IMessageRepository.kt")
         } else {
-            root.resolve("core/data/src/main/java/com/letta/mobile/data/repository/MessageRepository.kt")
+            root.resolve("core/android-data/src/main/java/com/letta/mobile/data/repository/MessageRepository.kt")
         }
         return path.readText()
     }
@@ -95,7 +95,7 @@ class MessageRepositoryBoundaryTest {
         while (cursor.name != "android-compose" && cursor.parent != null) {
             cursor = cursor.parent
         }
-        require(Files.exists(cursor.resolve("core/data/build.gradle.kts"))) {
+        require(Files.exists(cursor.resolve("core/android-data/build.gradle.kts"))) {
             "Could not locate android-compose root from ${System.getProperty("user.dir")}" 
         }
         return cursor

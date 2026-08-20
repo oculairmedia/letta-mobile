@@ -1695,7 +1695,7 @@ kotlin {
 }
 
 dependencies {
-    implementation(project(":core:data"))
+    implementation(project(":core:android-data"))
     testImplementation(project(":core:testutil"))
     implementation(project(":designsystem"))
     implementation(project(":feature-chat"))
@@ -1730,7 +1730,7 @@ dependencies {
     // CameraX (letta-mobile-g2d2i: QR pairing scanner). Versions that are
     // already centralized live in gradle/libs.versions.toml; CameraX stays
     // pinned here until that catalog grows. Deliberately ImageAnalysis +
-    // zxing:core (already a transitive sharedLogic dependency via core:data
+    // zxing:core (already a transitive sharedLogic dependency via core:android-data
     // -> sharedLogic) instead of ML Kit barcode scanning: ML Kit either
     // bundles a large model (APK bloat) or requires Google Play Services
     // (unbundled), which the Root/Sideload flavors cannot assume.
