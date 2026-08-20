@@ -2,9 +2,8 @@ package com.letta.mobile.desktop
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.Orientation
-import androidx.compose.foundation.gestures.draggable
-import androidx.compose.foundation.gestures.rememberDraggableState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -37,14 +36,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlin.math.abs
 
 @Immutable
 internal data class DesktopConversationTab(
@@ -208,6 +212,7 @@ private fun DesktopConversationTabItem(
 ) {
     val interactionSource = remember(tab.conversationId) { MutableInteractionSource() }
     val hovered by interactionSource.collectIsHoveredAsState()
+    val viewConfiguration = LocalViewConfiguration.current
     // Browser-style tab strip: the active tab is painted in the page background
     // so it reads as the front edge of the content below it, while inactive tabs
     // recede into the title bar (surfaceContainerLow) and only lift on hover.
@@ -226,19 +231,54 @@ private fun DesktopConversationTabItem(
             .graphicsLayer { translationX = renderOffsetPx }
             .zIndex(if (dragging) 1f else 0f)
             .then(if (dragging) Modifier.shadow(4.dp, RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp)) else Modifier)
-            // A plain horizontal draggable composes cleanly with Surface's own
-            // onClick: Foundation's touch-slop detection consumes the pointer
-            // move (not the initial down) once a real drag is recognized,
-            // which cancels the coexisting tap gesture — so a click that never
-            // moves past the slop still reaches onSelect, and a drag that
+            // This tab strip lives inside Nucleus's custom title bar
+            // (DesktopJewelWindow.kt), whose chrome owns a press listener of
+            // its own — the native drag-to-move-window gesture — gated on
+            // "was this press already consumed by something else." A plain
+            // Modifier.draggable defers consuming the initiating press until
+            // touch slop is crossed (its down is registered but not claimed),
+            // which leaves a window, however small, where a press that starts
+            // a drag looks unclaimed to that outer listener. A hand-rolled
+            // pointerInput claims the press the instant it lands instead, so
+            // no ancestor/sibling chrome can ever treat a tab-drag as "nobody
+            // wants this." Foundation's own tap detector inside Surface's
+            // onClick doesn't gate on prior consumption of the down (it
+            // always claims its own down), so eagerly consuming here doesn't
+            // stop a plain click from reaching onSelect; only once real
+            // horizontal movement crosses touch slop do we also consume the
+            // move, which is what cancels the coexisting tap gesture (same
+            // cancellation Foundation's draggable relied on). A drag that
             // starts on the close button never reaches here at all, because
-            // the button's own clickable consumes its down first.
-            .draggable(
-                orientation = Orientation.Horizontal,
-                state = rememberDraggableState { delta -> onDrag(delta) },
-                onDragStarted = { onDragStart() },
-                onDragStopped = { onDragStop() },
-            ),
+            // the button's own clickable consumes its down first and this
+            // handler only tracks the pointer id from its own down.
+            .pointerInput(tab.conversationId) {
+                val touchSlop = viewConfiguration.touchSlop
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    down.consume()
+                    var isDragging = false
+                    var accumulatedDx = 0f
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Main)
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.pressed) break
+                        val dx = change.positionChange().x
+                        if (isDragging) {
+                            change.consume()
+                            onDrag(dx)
+                        } else {
+                            accumulatedDx += dx
+                            if (abs(accumulatedDx) > touchSlop) {
+                                isDragging = true
+                                change.consume()
+                                onDragStart()
+                                onDrag(accumulatedDx)
+                            }
+                        }
+                    }
+                    if (isDragging) onDragStop()
+                }
+            },
         shape = RoundedCornerShape(topStart = 9.dp, topEnd = 9.dp),
         color = when {
             active -> MaterialTheme.colorScheme.background
