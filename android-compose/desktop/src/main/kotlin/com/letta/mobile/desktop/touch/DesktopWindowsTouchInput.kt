@@ -82,12 +82,6 @@ internal object DesktopWindowsTouchInput {
     private val PAN_UNIT_PIXELS =
         System.getProperty("letta.touchPanUnitPixels")?.toDoubleOrNull() ?: 2.5
 
-    /** Beyond this a "swipe" is sensor noise, not a gesture worth coasting on. */
-    private const val MAX_PAN_VELOCITY_PX_PER_MS = 6f
-
-    /** Weight of the newest sample in the velocity average; the rest is history. */
-    private const val PAN_VELOCITY_SMOOTHING = 0.35f
-
     private val windows: MutableSet<Window> =
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
     private val installed = AtomicBoolean(false)
@@ -175,20 +169,8 @@ internal object DesktopWindowsTouchInput {
 
         private var flingTimer: Timer? = null
 
-        /**
-         * Smoothed px/ms of the in-flight touch pan, per axis; seeds the coast
-         * at lift-off.
-         *
-         * Tracked separately because a single pan interleaves both axes — a
-         * mostly-vertical swipe still emits small horizontal samples of the
-         * opposite sign between the vertical ones. Averaging them together lets
-         * the minor axis drag the major axis' velocity toward (and past) zero,
-         * which shows up as a fling that kicks backwards on release.
-         */
-        private var panVelocityX = 0f
-        private var panVelocityY = 0f
-        private var panLastMillisX = 0L
-        private var panLastMillisY = 0L
+        /** Seeds the coast at lift-off; see [DesktopTouchPanVelocity]. */
+        private val panVelocity = DesktopTouchPanVelocity()
 
         override fun dispatchEvent(event: AWTEvent) {
             if (isGestureInterruptingFocusLoss(event)) {
@@ -249,10 +231,7 @@ internal object DesktopWindowsTouchInput {
                     // Compose animates each wheel delta through a tween meant for
                     // discrete notches; at a pan's ~10ms cadence that reads as lag.
                     smoothScroll.begin()
-                    panVelocityX = 0f
-                    panVelocityY = 0f
-                    panLastMillisX = event.getWhen()
-                    panLastMillisY = event.getWhen()
+                    panVelocity.reset(event.getWhen())
                 }
 
                 TOUCH_SCROLL_END -> {
@@ -261,40 +240,14 @@ internal object DesktopWindowsTouchInput {
                 }
             }
 
-            trackPanVelocity(pixels, event.getWhen(), horizontal)
+            panVelocity.record(pixels, event.getWhen(), horizontal)
             dispatchScroll(component, event, panDelta(pixels, horizontal))
             return true
         }
 
-        /**
-         * Exponentially-smoothed px/ms over the pan, so the coast is driven by
-         * the sustained speed of the swipe rather than whichever single sample
-         * happened to land last.
-         */
-        private fun trackPanVelocity(pixels: Float, whenMillis: Long, horizontal: Boolean) {
-            val last = if (horizontal) panLastMillisX else panLastMillisY
-            val elapsed = (whenMillis - last).coerceAtLeast(1L)
-            val instant = (pixels / elapsed).coerceIn(-MAX_PAN_VELOCITY_PX_PER_MS, MAX_PAN_VELOCITY_PX_PER_MS)
-            if (horizontal) {
-                panLastMillisX = whenMillis
-                panVelocityX = panVelocityX * (1f - PAN_VELOCITY_SMOOTHING) + instant * PAN_VELOCITY_SMOOTHING
-            } else {
-                panLastMillisY = whenMillis
-                panVelocityY = panVelocityY * (1f - PAN_VELOCITY_SMOOTHING) + instant * PAN_VELOCITY_SMOOTHING
-            }
-        }
-
         private fun startPanFling(component: Component, source: MouseWheelEvent) {
-            // Coast on the dominant axis only. A swipe that is 95% vertical
-            // should not drift sideways on release just because the pan carried
-            // a little horizontal jitter.
-            val dominantHorizontal = abs(panVelocityX) > abs(panVelocityY)
-            val fling = DesktopTouchFling(
-                velocityX = if (dominantHorizontal) panVelocityX else 0f,
-                velocityY = if (dominantHorizontal) 0f else panVelocityY,
-            )
-            panVelocityX = 0f
-            panVelocityY = 0f
+            val velocity = panVelocity.dominant()
+            val fling = DesktopTouchFling(velocityX = velocity.dx, velocityY = velocity.dy)
             if (fling.isFinished) {
                 smoothScroll.end()
                 return
