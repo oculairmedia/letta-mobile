@@ -29,11 +29,11 @@ class IrohAdminRpcModelSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.ModelIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listLlmModels(): List<LlmModel> {
+    override suspend fun listLlmModels(): List<LlmModel> {
         val response = channelTransport.adminRpc(
             method = "model.list",
             path = "/v1/models",
@@ -46,7 +46,7 @@ class IrohAdminRpcModelSource(
         return AppServerListModelsAdapter.toLlmModels(array)
     }
 
-    suspend fun listEmbeddingModels(): List<EmbeddingModel> {
+    override suspend fun listEmbeddingModels(): List<EmbeddingModel> {
         val response = channelTransport.adminRpc(
             method = "model.list.embedding",
             path = "/v1/models/embedding",
