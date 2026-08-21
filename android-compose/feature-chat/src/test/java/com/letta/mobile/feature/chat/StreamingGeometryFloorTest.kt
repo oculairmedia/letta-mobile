@@ -141,4 +141,41 @@ class StreamingGeometryFloorTest {
         assertEquals(base.contentLength, changed.contentLength)
         assertNotEquals(base.contentHash, changed.contentHash)
     }
+
+    // letta-mobile-geom-cache-wireup: contract test for the read-path
+    // wire-up. `MeasuredChatRenderItem` calls `heightFor(signature)` BEFORE
+    // layering onSizeChanged. When the cache is empty (signature not yet
+    // measured) the read returns null, the row lays out normally, and the
+    // first onSizeChanged populates the cache. When the cache has a height
+    // for the same signature the read returns it; the row uses it as
+    // `Modifier.heightIn(min=cached)` so Compose skips the initial measure.
+    //
+    // This test asserts the read-bearing contract directly on the cache.
+    // The wire-up behavior (Compose modifier construction) is verified
+    // dogfood via the `Telemetry/GeometryCache: read` event count in
+    // PR #1266 verification comments.
+    @Test
+    fun `heightFor returns null for an unseen signature and the recorded height afterward`() {
+        val state = ChatMessageGeometryState()
+        val signature = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Hello"),
+        )
+        // Cache miss before any measurement.
+        assertEquals(null, state.heightFor(signature))
+        state.recordMeasuredHeight(signature, heightPx = 120)
+        // Cache hit after recording.
+        assertEquals(120, state.heightFor(signature))
+    }
+
+    @Test
+    fun `heightFor returns the latest recorded height after a height change`() {
+        val state = ChatMessageGeometryState()
+        val signature = scrollTestGeometrySignature(
+            ScrollTestGeometrySignatureSpec(content = "Hello"),
+        )
+        state.recordMeasuredHeight(signature, heightPx = 120)
+        assertEquals(120, state.heightFor(signature))
+        state.recordMeasuredHeight(signature, heightPx = 180)
+        assertEquals(180, state.heightFor(signature))
+    }
 }

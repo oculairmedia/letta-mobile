@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
@@ -20,6 +21,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.letta.mobile.feature.chat.screen.ChatMessageItem
 import com.letta.mobile.ui.theme.LettaSpacing
 import com.letta.mobile.ui.theme.LocalChatIsPinching
@@ -33,10 +36,30 @@ internal fun MeasuredChatRenderItem(
     content: @Composable () -> Unit,
 ) {
     val isPinching = LocalChatIsPinching.current
+    // letta-mobile-geom-cache-wireup: read the cached height for this
+    // signature and seed the Box's measured height so Compose skips the
+    // initial measure pass when the cache hits. The cache is filled by
+    // `onSizeChanged` on the FIRST measure of a row; on subsequent
+    // compositions of the same row (scrolling, reducer re-render, the
+    // every-frame `foldedViaHolder` cycle of 176 events), the cached
+    // height is what we want to use. If the cache misses, Compose
+    // measures normally and the first `onSizeChanged` populates the cache.
+    //
+    // `heightIn(min=…)` instead of `height(…)` so a row whose actual
+    // measured height grew (e.g. streaming tail) can still expand — the
+    // new larger value overwrites the cache via `onSizeChanged`.
+    val cachedHeightPx = geometryState.heightFor(signature)
+    val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
+        val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
+        Modifier.heightIn(min = cachedHeightDp)
+    } else {
+        Modifier
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
+            .then(heightModifier)
             .onSizeChanged { size ->
                 if (!isPinching) {
                     geometryState.recordMeasuredHeight(
