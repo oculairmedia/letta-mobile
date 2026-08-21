@@ -295,7 +295,12 @@ private fun createSubagentTransport(
     irohMode: Boolean,
     chatScope: CoroutineScope,
 ): DesktopWsChannelTransport? =
-    activeConfig.takeIf { it.serverUrl.isNotBlank() && !it.accessToken.isNullOrBlank() && !irohMode }
+    activeConfig.takeIf {
+        it.mode != LettaConfig.Mode.LOCAL &&
+            it.serverUrl.isNotBlank() &&
+            !it.accessToken.isNullOrBlank() &&
+            !irohMode
+    }
         ?.let { DesktopWsChannelTransport(chatScope) }
 
 /** Inputs for the active-subagent registry. */

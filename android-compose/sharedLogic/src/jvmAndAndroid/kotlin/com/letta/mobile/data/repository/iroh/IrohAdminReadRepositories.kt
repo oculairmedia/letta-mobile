@@ -403,25 +403,27 @@ internal class IrohPassageRepository(
 
     override suspend fun createPassage(agentId: String, text: String): Passage {
         val passage = source.createPassage(agentId, text)
-        replaceCached(agentId, passagesByAgent.value[agentId].orEmpty() + passage)
+        mutateCached(agentId) { it + passage }
         return passage
     }
 
     override suspend fun deletePassage(agentId: String, passageId: String) {
         source.deletePassage(agentId, passageId)
-        replaceCached(
-            agentId,
-            passagesByAgent.value[agentId].orEmpty().filterNot { it.id == passageId },
-        )
+        mutateCached(agentId) { current -> current.filterNot { it.id == passageId } }
     }
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> =
         unsupported("passage.searchArchival($agentId)")
 
     private fun replaceCached(agentId: String, passages: List<Passage>) {
+        mutateCached(agentId) { passages }
+    }
+
+    private fun mutateCached(agentId: String, transform: (List<Passage>) -> List<Passage>) {
         synchronized(cacheLock) {
-            passagesByAgent.update { it + (agentId to passages) }
-            flowsByAgent[agentId]?.value = passages
+            val next = transform(passagesByAgent.value[agentId].orEmpty())
+            passagesByAgent.update { it + (agentId to next) }
+            flowsByAgent[agentId]?.value = next
         }
     }
 }

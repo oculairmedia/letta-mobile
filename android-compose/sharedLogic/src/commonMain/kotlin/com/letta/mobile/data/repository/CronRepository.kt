@@ -6,6 +6,9 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
+import kotlinx.atomicfu.locks.SynchronizedObject
+import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +53,7 @@ open class CronRepository(
     private val scope: CoroutineScope = defaultCronScope(),
 ) : ICronRepository {
     private val stateMutex = Mutex()
+    private val stateMapLock = SynchronizedObject()
     private val stateByAgent = mutableMapOf<String, MutableStateFlow<List<CronTask>>>()
     private val inFlightRefresh = mutableMapOf<String, CompletableDeferred<Result<List<CronTask>>>>()
     private val initialized = mutableSetOf<String>()
@@ -159,7 +163,9 @@ open class CronRepository(
         stateMutex.withLock { stateForUnlocked(agentId) }
 
     private fun stateForUnlocked(agentId: String): MutableStateFlow<List<CronTask>> =
-        stateByAgent.getOrPut(agentId) { MutableStateFlow(emptyList()) }
+        synchronized(stateMapLock) {
+            stateByAgent.getOrPut(agentId) { MutableStateFlow(emptyList()) }
+        }
 
     private suspend fun observePushEvents() {
         transport.events.collect { frame ->
@@ -213,17 +219,4 @@ open class CronRepository(
         private const val TAG = "CronRepository"
     }
 }
-
-/**
- * Like [runCatching], but rethrows [CancellationException] so structured
- * cancellation is not turned into Result.failure.
- */
-private suspend inline fun <T> runCatchingCancellable(block: suspend () -> T): Result<T> =
-    try {
-        Result.success(block())
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (t: Throwable) {
-        Result.failure(t)
-    }
 

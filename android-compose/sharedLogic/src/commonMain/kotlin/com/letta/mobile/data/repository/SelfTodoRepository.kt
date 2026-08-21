@@ -123,7 +123,7 @@ open class SelfTodoRepository(
             Telemetry.event(
                 TAG,
                 "todowrite.parse.failed",
-                "error" to (e.message ?: e::class.simpleName),
+                "error" to (e::class.simpleName ?: "unknown"),
                 level = Telemetry.Level.WARN,
             )
         }.getOrNull()
