@@ -26,8 +26,8 @@ import javax.inject.Singleton
 @Singleton
 open class FolderApi @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
-    open suspend fun countFolders(): Int {
+) : com.letta.mobile.data.repository.api.FolderRemoteSource {
+    open override suspend fun countFolders(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/count")
@@ -37,7 +37,7 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveFolder(folderId: String): Folder {
+    open override suspend fun retrieveFolder(folderId: String): Folder {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/$folderId")
@@ -47,7 +47,7 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveFolderMetadata(includeDetailedPerSourceMetadata: Boolean = false): OrganizationSourcesStats {
+    open override suspend fun retrieveFolderMetadata(includeDetailedPerSourceMetadata: Boolean): OrganizationSourcesStats {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/folders/metadata") {
@@ -59,12 +59,12 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listFolders(
-        before: String? = null,
-        after: String? = null,
-        limit: Int? = null,
-        order: String? = null,
-        name: String? = null,
+    open override suspend fun listFolders(
+        before: String?,
+        after: String?,
+        limit: Int?,
+        order: String?,
+        name: String?,
     ): List<Folder> {
         val (client, baseUrl) = apiClient.session()
 
@@ -81,7 +81,7 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createFolder(params: FolderCreateParams): Folder {
+    open override suspend fun createFolder(params: FolderCreateParams): Folder {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/folders/") {
@@ -94,7 +94,7 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
+    open override suspend fun updateFolder(folderId: String, params: FolderUpdateParams): Folder {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/folders/$folderId") {
@@ -107,7 +107,7 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteFolder(folderId: String) {
+    open override suspend fun deleteFolder(folderId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/folders/$folderId")
@@ -116,13 +116,13 @@ open class FolderApi @Inject constructor(
         }
     }
 
-    open suspend fun uploadFileToFolder(
+    open override suspend fun uploadFileToFolder(
         folderId: String,
         fileName: String,
         fileBytes: ByteArray,
-        duplicateHandling: String? = null,
-        customName: String? = null,
-        contentType: ContentType = ContentType.Application.OctetStream,
+        duplicateHandling: String?,
+        customName: String?,
+        contentType: ContentType,
     ): FileMetadata {
         val (client, baseUrl) = apiClient.session()
 
@@ -144,12 +144,12 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listAgentsForFolder(
+    open override suspend fun listAgentsForFolder(
         folderId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
     ): List<String> {
         val (client, baseUrl) = apiClient.session()
 
@@ -165,12 +165,12 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listFolderPassages(
+    open override suspend fun listFolderPassages(
         folderId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
     ): List<Passage> {
         val (client, baseUrl) = apiClient.session()
 
@@ -186,13 +186,13 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listFolderFiles(
+    open override suspend fun listFolderFiles(
         folderId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-        includeContent: Boolean? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+        includeContent: Boolean?,
     ): List<FileMetadata> {
         val (client, baseUrl) = apiClient.session()
 
@@ -209,7 +209,7 @@ open class FolderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteFileFromFolder(folderId: String, fileId: String) {
+    open override suspend fun deleteFileFromFolder(folderId: String, fileId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/folders/$folderId/$fileId")

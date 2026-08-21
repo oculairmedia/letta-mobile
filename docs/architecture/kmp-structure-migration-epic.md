@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5e + Phase 6a in flight)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5f + Phase 6a in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -290,7 +290,9 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5d (schedules — #1268):** `CachedScheduleRepository` + `ScheduleRemoteSource`; Android thin binder. Desktop keeps `IrohScheduleRepository`.
 
-**5e (memory blocks — this PR):** `CachedBlockRepository` + `BlockRemoteSource` / `BlockIrohSource`; `PaginationHelpers` moved into `sharedLogic`. Desktop `IrohAgentBlockRepository` unify deferred.
+**5e (memory blocks — #1269):** `CachedBlockRepository` + `BlockRemoteSource` / `BlockIrohSource`; `PaginationHelpers` moved into `sharedLogic`. Desktop `IrohAgentBlockRepository` unify deferred.
+
+**5f (folders — this PR):** `CachedFolderRepository` + `FolderRemoteSource` / `FolderIrohSource`; Android thin binder. Desktop folder admin reads stay on existing Iroh path until unify.
 
 ### Acceptance (per slice)
 
