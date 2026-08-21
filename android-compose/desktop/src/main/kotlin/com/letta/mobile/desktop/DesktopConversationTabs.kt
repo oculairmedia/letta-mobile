@@ -59,15 +59,11 @@ internal data class DesktopConversationTab(
 /** Horizontal gap between tabs. */
 private val TabSpacing = 4.dp
 
-/** Default reserved blank lane at the trailing edge of the strip so native
- * title-bar dragging always has somewhere to land — see [DesktopConversationTabRow]'s
- * `dragLaneWidth` parameter for why this is real (if invisible) row content
- * rather than a width constraint on the row itself. */
+/** Reserved blank lane at the trailing edge of the strip so native title-bar
+ * dragging always has somewhere to land. Applied as padding on the row, which
+ * keeps it outside the row's own (clipping) viewport — see
+ * [DesktopConversationTabRow]. */
 internal val DefaultTabStripDragLaneWidth = 96.dp
-
-/** Stable key for the trailing drag-lane spacer item, distinct from any
- * [DesktopConversationTab.conversationId]. */
-private const val DragLaneItemKey = "desktop-conversation-tab-strip-drag-lane"
 
 /**
  * A [DragGestureDetector] that claims the initiating press the instant it
@@ -247,7 +243,16 @@ internal fun DesktopConversationTabRow(
 
     LazyRow(
         state = lazyListState,
-        modifier = modifier,
+        // The window-drag lane is reserved by shrinking the row itself rather
+        // than by a trailing item inside it. LazyRow *does* clip to its own
+        // viewport -- `LazyList` composes `Modifier.scrollableArea`, which
+        // begins `clipScrollableContainer(orientation)` -- so any content the
+        // drag can reach beyond that viewport is cut off, which is exactly what
+        // an in-row lane item allowed: a ~200dp tab dragged into a 96dp lane
+        // hung ~100dp past the edge and was clipped there. Padding keeps the
+        // lane outside the row's bounds, so the furthest right a tab can be
+        // dragged is the last tab's own slot, which is always fully visible.
+        modifier = modifier.padding(end = dragLaneWidth),
         horizontalArrangement = Arrangement.spacedBy(TabSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -286,14 +291,6 @@ internal fun DesktopConversationTabRow(
                     ),
                 )
             }
-        }
-        // Real (if invisible) row content, not a width constraint on the row
-        // itself -- see the dragLaneWidth doc above for why. Not a
-        // ReorderableItem: it never participates in reordering, so it needs
-        // none of that item type's drag/key machinery, only a stable key of
-        // its own so LazyRow doesn't confuse it with a tab during recomposition.
-        item(key = DragLaneItemKey) {
-            Box(modifier = Modifier.width(dragLaneWidth).fillMaxHeight())
         }
     }
 }
