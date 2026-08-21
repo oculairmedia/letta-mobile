@@ -20,14 +20,14 @@ import javax.inject.Singleton
 @Singleton
 open class ProviderApi @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
-    open suspend fun listProviders(
-        before: String? = null,
-        after: String? = null,
-        limit: Int? = null,
-        order: String? = null,
-        name: String? = null,
-        providerType: String? = null,
+) : com.letta.mobile.data.repository.api.ProviderRemoteSource {
+    open override suspend fun listProviders(
+        before: String?,
+        after: String?,
+        limit: Int?,
+        order: String?,
+        name: String?,
+        providerType: String?,
     ): List<Provider> {
         val (client, baseUrl) = apiClient.session()
 
@@ -45,7 +45,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveProvider(providerId: String): Provider {
+    open override suspend fun retrieveProvider(providerId: String): Provider {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/providers/$providerId")
@@ -55,7 +55,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createProvider(params: ProviderCreateParams): Provider {
+    open override suspend fun createProvider(params: ProviderCreateParams): Provider {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/") {
@@ -68,7 +68,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
+    open override suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/providers/$providerId") {
@@ -81,7 +81,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun checkProvider(params: ProviderCheckParams) {
+    open override suspend fun checkProvider(params: ProviderCheckParams) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/check") {
@@ -93,7 +93,7 @@ open class ProviderApi @Inject constructor(
         }
     }
 
-    open suspend fun checkExistingProvider(providerId: String) {
+    open override suspend fun checkExistingProvider(providerId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/$providerId/check")
@@ -102,7 +102,7 @@ open class ProviderApi @Inject constructor(
         }
     }
 
-    open suspend fun deleteProvider(providerId: String) {
+    open override suspend fun deleteProvider(providerId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/providers/$providerId")
