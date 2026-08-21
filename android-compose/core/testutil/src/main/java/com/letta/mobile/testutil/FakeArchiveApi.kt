@@ -4,7 +4,9 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ArchiveApi
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Archive
+import com.letta.mobile.data.model.ArchiveAgentsListParams
 import com.letta.mobile.data.model.ArchiveCreateParams
+import com.letta.mobile.data.model.ArchiveListParams
 import com.letta.mobile.data.model.ArchiveUpdateParams
 import io.mockk.mockk
 
@@ -13,17 +15,10 @@ class FakeArchiveApi : ArchiveApi(mockk(relaxed = true)) {
     var shouldFail = false
     val calls = mutableListOf<String>()
 
-    override suspend fun listArchives(
-        before: String?,
-        after: String?,
-        limit: Int?,
-        order: String?,
-        name: String?,
-        agentId: String?,
-    ): List<Archive> {
+    override suspend fun listArchives(params: ArchiveListParams): List<Archive> {
         calls.add("listArchives")
         if (shouldFail) throw ApiException(500, "Server error")
-        return archives.filter { name == null || it.name == name }
+        return archives.filter { params.name == null || it.name == params.name }
     }
 
     override suspend fun retrieveArchive(archiveId: String): Archive {
@@ -58,14 +53,8 @@ class FakeArchiveApi : ArchiveApi(mockk(relaxed = true)) {
         return archives.removeAt(index)
     }
 
-    override suspend fun listAgentsForArchive(
-        archiveId: String,
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
-    ): List<Agent> {
-        calls.add("listAgentsForArchive:$archiveId")
+    override suspend fun listAgentsForArchive(params: ArchiveAgentsListParams): List<Agent> {
+        calls.add("listAgentsForArchive:${params.archiveId}")
         if (shouldFail) throw ApiException(500, "Server error")
         return listOf(TestData.agent(id = "agent-1"))
     }
