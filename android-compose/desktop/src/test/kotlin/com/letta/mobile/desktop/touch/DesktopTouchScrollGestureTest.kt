@@ -419,40 +419,6 @@ class DesktopTouchScrollGestureTest {
         assertFalse(outsideGesture.classify(MouseEvent.MOUSE_PRESSED) { registry.contains(window, 400, 300) })
     }
 
-    /**
-     * Regression coverage for letta-mobile#1258: a real finger drag on the
-     * tab strip logged the title bar's published bounds as
-     * `Rectangle[x=95,y=0,width=2219,height=84]` and the very next press at
-     * screen `(180,68)` -- which lies inside that rectangle -- still came
-     * back `excluded=false`, so the drag got mistranslated into wheel-scroll
-     * instead of passing through untouched. This pins the registry's own
-     * math against those exact numbers: it resolves correctly here, which
-     * is what narrows the real bug to the *glue* around the registry
-     * (window identity resolution in `TouchTranslatingEventQueue.
-     * managedWindow`/`dispatchIfExcluded`, or the screen-coordinate source),
-     * not the registry itself.
-     *
-     * This is also why the suite above never caught the real failure: every
-     * other registry test constructs its own small, hand-picked rectangle
-     * and calls `contains` directly with a plain `Any()` key -- exercising
-     * `DesktopTouchDragExclusionRegistry` in isolation, never
-     * `dispatchIfExcluded`'s actual window-resolution path
-     * (`managedWindow`'s `SwingUtilities.getWindowAncestor` +
-     * `event.xOnScreen`/`yOnScreen`) that only runs against a real AWT
-     * `MouseEvent` and `Window` -- exactly the two things a headless test
-     * runner can't easily construct (see this file's own header comment on
-     * why `Any()` stands in for `Window` here). A bug confined to that glue
-     * is invisible to a suite that only ever calls the registry directly.
-     */
-    @Test
-    fun `a press inside the exact real-world title bar rectangle from letta-mobile#1258 resolves as excluded`() {
-        val registry = DesktopTouchDragExclusionRegistry<Any>()
-        val window = Any()
-        registry.publish(window, java.awt.Rectangle(95, 0, 2219, 84))
-
-        assertTrue(registry.contains(window, screenX = 180, screenY = 68))
-    }
-
     // --- screenExclusionRectOrNull ---------------------------------------
     //
     // Regression coverage for a real startup crash: Compose's

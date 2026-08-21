@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -42,6 +43,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
@@ -56,6 +58,16 @@ internal data class DesktopConversationTab(
 
 /** Horizontal gap between tabs. */
 private val TabSpacing = 4.dp
+
+/** Default reserved blank lane at the trailing edge of the strip so native
+ * title-bar dragging always has somewhere to land — see [DesktopConversationTabRow]'s
+ * `dragLaneWidth` parameter for why this is real (if invisible) row content
+ * rather than a width constraint on the row itself. */
+internal val DefaultTabStripDragLaneWidth = 96.dp
+
+/** Stable key for the trailing drag-lane spacer item, distinct from any
+ * [DesktopConversationTab.conversationId]. */
+private const val DragLaneItemKey = "desktop-conversation-tab-strip-drag-lane"
 
 /**
  * A [DragGestureDetector] that claims the initiating press the instant it
@@ -200,6 +212,22 @@ private fun applyEagerDragDelta(
  * library's default gesture detector has the same deferred-press-
  * consumption behavior that originally broke mouse dragging against
  * Nucleus's native title-bar drag-to-move (see that detector's own doc).
+ *
+ * [dragLaneWidth] is spent as a real trailing item inside this `LazyRow`,
+ * not as a `widthIn(max = ...)` constraint on the row's own modifier the way
+ * an earlier version of this composable did. `LazyRow` itself applies no
+ * draw-time clip to its content (verified against the Compose Foundation
+ * 1.11.1 sources this project builds against: `ClipScrollableContainer` is
+ * only ever wired into `Modifier.horizontalScroll`/`verticalScroll`, never
+ * into `LazyRow`/`LazyColumn`) — but a `widthIn(max = ...)`-constrained row
+ * still only *measures and virtualizes* items inside that narrower width.
+ * Dragging a tab into the space beyond it, into what was meant to be the
+ * blank drag lane, moved the tab outside the row's own measured viewport,
+ * where the library's neighbor-reflow bookkeeping and this row's own item
+ * virtualization stopped agreeing on where the dragged tab actually was —
+ * visible as the tab getting cut off mid-drag. Folding the lane into the
+ * row's own item list keeps every position a tab can be dragged to inside
+ * the row's own bounds instead.
  */
 @Composable
 internal fun DesktopConversationTabRow(
@@ -208,6 +236,7 @@ internal fun DesktopConversationTabRow(
     onSelect: (String) -> Unit,
     onClose: (String) -> Unit,
     modifier: Modifier = Modifier,
+    dragLaneWidth: Dp = DefaultTabStripDragLaneWidth,
     onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
 ) {
     var currentList by remember(tabs) { mutableStateOf(tabs) }
@@ -257,6 +286,14 @@ internal fun DesktopConversationTabRow(
                     ),
                 )
             }
+        }
+        // Real (if invisible) row content, not a width constraint on the row
+        // itself -- see the dragLaneWidth doc above for why. Not a
+        // ReorderableItem: it never participates in reordering, so it needs
+        // none of that item type's drag/key machinery, only a stable key of
+        // its own so LazyRow doesn't confuse it with a tab during recomposition.
+        item(key = DragLaneItemKey) {
+            Box(modifier = Modifier.width(dragLaneWidth).fillMaxHeight())
         }
     }
 }
