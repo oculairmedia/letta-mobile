@@ -26,11 +26,11 @@ class IrohAdminRpcToolSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.ToolIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listTools(): List<Tool> {
+    override suspend fun listTools(): List<Tool> {
         val response = channelTransport.adminRpc(
             method = "tool.list",
             path = "/v1/tools",
@@ -41,7 +41,7 @@ class IrohAdminRpcToolSource(
         return json.decodeFromJsonElement(ListSerializer(Tool.serializer()), result)
     }
 
-    suspend fun createTool(params: ToolCreateParams): Tool {
+    override suspend fun createTool(params: ToolCreateParams): Tool {
         val response = channelTransport.adminRpc(
             method = "tool.create",
             path = "/v1/tools",
@@ -52,7 +52,7 @@ class IrohAdminRpcToolSource(
         return json.decodeFromJsonElement(Tool.serializer(), result)
     }
 
-    suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+    override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
         // Merge tool_id with params by parsing params and adding tool_id
         val paramsJson = json.encodeToString(ToolUpdateParams.serializer(), params)
         val parsed = json.parseToJsonElement(paramsJson) as? kotlinx.serialization.json.JsonObject
@@ -71,7 +71,7 @@ class IrohAdminRpcToolSource(
         return json.decodeFromJsonElement(Tool.serializer(), result)
     }
 
-    suspend fun deleteTool(toolId: String) {
+    override suspend fun deleteTool(toolId: String) {
         val params = buildJsonObject { put("tool_id", toolId) }
         val response = channelTransport.adminRpc(
             method = "tool.delete",
@@ -81,7 +81,7 @@ class IrohAdminRpcToolSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc tool.delete failed")
     }
 
-    suspend fun attachTool(agentId: String, toolId: String) {
+    override suspend fun attachTool(agentId: String, toolId: String) {
         val response = channelTransport.adminRpc(
             method = "tool.attach",
             path = "/v1/agents/$agentId/tools/attach/$toolId",
@@ -93,7 +93,7 @@ class IrohAdminRpcToolSource(
         if (!response.success) error(response.error ?: "Iroh admin_rpc tool.attach failed")
     }
 
-    suspend fun detachTool(agentId: String, toolId: String) {
+    override suspend fun detachTool(agentId: String, toolId: String) {
         val response = channelTransport.adminRpc(
             method = "tool.detach",
             path = "/v1/agents/$agentId/tools/detach/$toolId",

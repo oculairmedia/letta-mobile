@@ -11,11 +11,11 @@ import javax.inject.Singleton
 @Singleton
 open class ToolApi @Inject constructor(
     private val apiClient: LettaApiClient
-) {
-    open suspend fun listTools(
-        tags: List<String>? = null,
-        limit: Int? = null,
-        offset: Int? = null
+) : com.letta.mobile.data.repository.api.ToolRemoteSource {
+    open override suspend fun listTools(
+        tags: List<String>?,
+        limit: Int?,
+        offset: Int?,
     ): List<Tool> {
         val (client, baseUrl) = apiClient.session()
 
@@ -40,7 +40,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun countTools(): Int {
+    open override suspend fun countTools(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/tools/count")
@@ -63,7 +63,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun upsertTool(params: ToolCreateParams): Tool {
+    open override suspend fun upsertTool(params: ToolCreateParams): Tool {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.put("$baseUrl/v1/tools") {
@@ -76,7 +76,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+    open override suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/tools/$toolId") {
@@ -102,7 +102,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteTool(toolId: String) {
+    open override suspend fun deleteTool(toolId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/tools/$toolId")
@@ -111,7 +111,7 @@ open class ToolApi @Inject constructor(
         }
     }
 
-    open suspend fun attachTool(agentId: String, toolId: String) {
+    open override suspend fun attachTool(agentId: String, toolId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/tools/attach/$toolId") {
@@ -122,7 +122,7 @@ open class ToolApi @Inject constructor(
         }
     }
 
-    open suspend fun detachTool(agentId: String, toolId: String) {
+    open override suspend fun detachTool(agentId: String, toolId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/tools/detach/$toolId") {
