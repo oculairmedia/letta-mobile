@@ -495,7 +495,10 @@ class ConversationsViewModelTest {
         override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {}
     }
 
-    private class FakeAgentRepository : AgentRepository(FakeAgentApi(), mockk(relaxed = true)) {
+    private class FakeAgentRepository : AgentRepository(
+        FakeAgentApi(),
+        dagger.Lazy { mockk<AgentDao>(relaxed = true) },
+    ) {
         private val _agents = MutableStateFlow(listOf(Agent(id = AgentId("a1"), name = "Agent One")))
         override val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
         fun setAgents(list: List<Agent>) { _agents.value = list }

@@ -42,8 +42,8 @@ class IrohAdminRpcAgentSource(
         coerceInputValues = true
     },
     private val agentDirectory: IrohAdminRpcAgentDirectory = IrohAdminRpcAgentDirectory(channelTransport),
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.AgentIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
     /**
@@ -53,7 +53,7 @@ class IrohAdminRpcAgentSource(
      * AgentUpdateParams JSON is merged with the id so unknown-body fields are
      * simply passed through.
      */
-    suspend fun updateAgent(id: AgentId, paramsJson: String): Agent {
+    override suspend fun updateAgent(id: AgentId, paramsJson: String): Agent {
         val body = buildJsonObject {
             put("agent_id", id.value)
             val parsed = runCatching { json.parseToJsonElement(paramsJson) }.getOrNull()
@@ -71,7 +71,7 @@ class IrohAdminRpcAgentSource(
         return json.decodeFromJsonElement(Agent.serializer(), result)
     }
 
-    suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
         val params = buildJsonObject {
             put("agent_id", agentId.value)
             conversationId?.let { put("conversation_id", it.value) }
@@ -90,7 +90,7 @@ class IrohAdminRpcAgentSource(
         return json.decodeFromJsonElement(ContextWindowOverview.serializer(), result)
     }
 
-    suspend fun getAgent(id: AgentId): Agent {
+    override suspend fun getAgent(id: AgentId): Agent {
         val params = buildJsonObject { put("agent_id", id.value) }
         val response = channelTransport.adminRpc(
             method = "agent.get",
@@ -106,7 +106,7 @@ class IrohAdminRpcAgentSource(
      * Create an agent over admin_rpc (server AgentAdminHandlers `agent.create`
      * proxies POST /v1/agents). P4 purity client batch.
      */
-    suspend fun createAgent(paramsJson: String): Agent {
+    override suspend fun createAgent(paramsJson: String): Agent {
         val response = channelTransport.adminRpc(
             method = "agent.create",
             path = "/v1/agents",
@@ -121,7 +121,7 @@ class IrohAdminRpcAgentSource(
      * Delete an agent over admin_rpc (server AgentAdminHandlers `agent.delete`
      * proxies DELETE /v1/agents/{id}). P4 purity client batch.
      */
-    suspend fun deleteAgent(id: AgentId) {
+    override suspend fun deleteAgent(id: AgentId) {
         val params = buildJsonObject { put("agent_id", id.value) }
         val response = channelTransport.adminRpc(
             method = "agent.delete",
@@ -137,7 +137,7 @@ class IrohAdminRpcAgentSource(
      * resolved a name in the conversation list and fell back to `agentId.take(8)`
      * (letta-mobile-71orq).
      */
-    suspend fun listAgents(): List<Agent> {
+    override suspend fun listAgents(): List<Agent> {
         val merged = mutableListOf<Agent>()
         val seenIds = HashSet<String>()
         var offset = 0
@@ -227,7 +227,7 @@ class IrohAdminRpcAgentSource(
      * letta-mobile-ulz2b.1: authoritative roster size via the shared
      * [IrohAdminRpcAgentDirectory.countAgents] seam. Never silent-0 on failure.
      */
-    suspend fun countAgents(): Int = agentDirectory.countAgents()
+    override suspend fun countAgents(): Int = agentDirectory.countAgents()
 
     /**
      * letta-mobile-z5lqt: compare the swept roster against the authoritative
