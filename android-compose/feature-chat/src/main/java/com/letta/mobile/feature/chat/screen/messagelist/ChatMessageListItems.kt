@@ -19,6 +19,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -48,7 +50,21 @@ internal fun MeasuredChatRenderItem(
     // `heightIn(min=…)` instead of `height(…)` so a row whose actual
     // measured height grew (e.g. streaming tail) can still expand — the
     // new larger value overwrites the cache via `onSizeChanged`.
-    val cachedHeightPx = geometryState.heightFor(signature)
+    //
+    // First-render gate: the cache is in-memory only and loses everything
+    // when the activity is recreated (e.g. navigating to a different
+    // conversation and back). On the cold-cache "jump back to current
+    // feature" path every row is a miss, and the cache MISS path is the
+    // same cost as pre-fix — except the per-row `heightFor` lookup adds
+    // a tiny constant. To avoid amplifying the cold-path cost we
+    // DON'T apply the heightIn modifier on the row's first render in
+    // this composable instance. The row still measures normally and
+    // `onSizeChanged` still records the height; subsequent renders
+    // (within the same activity) use the cached height. The cost of
+    // recording the height on the first render is one Map.put — the
+    // savings on subsequent renders are the avoidance of re-measurement.
+    val hasMeasuredOnce = remember(signature) { mutableStateOf(false) }
+    val cachedHeightPx = if (hasMeasuredOnce.value) geometryState.heightFor(signature) else null
     val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
         val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
         Modifier.heightIn(min = cachedHeightDp)
@@ -66,6 +82,7 @@ internal fun MeasuredChatRenderItem(
                         signature = signature,
                         heightPx = size.height,
                     )
+                    hasMeasuredOnce.value = true
                 }
             },
     ) {
