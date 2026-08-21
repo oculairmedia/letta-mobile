@@ -14,18 +14,18 @@ class IrohAdminRpcConversationListSource(
     private val channelTransport: IChannelTransport,
     private val settingsRepository: ISettingsRepository,
     private val json: Json = Json { ignoreUnknownKeys = true; isLenient = true },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.ConversationIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listConversations(
+    override suspend fun listConversations(
         agentId: AgentId?,
-        limit: Int? = null,
-        after: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
-        order: String? = null,
-        orderBy: String? = null,
+        limit: Int?,
+        after: String?,
+        archiveStatus: String?,
+        summarySearch: String?,
+        order: String?,
+        orderBy: String?,
     ): List<Conversation> {
         val params = buildJsonObject {
             agentId?.value?.let { put("agent_id", it) }
@@ -56,9 +56,9 @@ class IrohAdminRpcConversationListSource(
     // client can rely on for cross-agent routing. Wire shape mirrors
     // the App Server v2 list (per the conversation.list_agent handler
     // in sharedLogic).
-    suspend fun listConversationsForAgent(
+    override suspend fun listConversationsForAgent(
         agentId: AgentId,
-        limit: Int? = null,
+        limit: Int?,
     ): List<Conversation> {
         val params = buildJsonObject {
             put("agent_id", agentId.value)
@@ -82,7 +82,7 @@ class IrohAdminRpcConversationListSource(
     // letta-mobile-qfa81 (P4 rows 3-6): conversation reads/writes whose
     // server handlers already exist (ConversationAdminHandlers).
 
-    suspend fun getConversation(id: ConversationId): Conversation {
+    override suspend fun getConversation(id: ConversationId): Conversation {
         val response = channelTransport.adminRpc(
             method = "conversation.get",
             path = "/v1/conversations/${id.value}",
@@ -93,7 +93,7 @@ class IrohAdminRpcConversationListSource(
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
-    suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
+    override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
         val body = buildJsonObject {
             put("agent_id", agentId.value)
             summary?.let { put("summary", it) }
@@ -108,7 +108,7 @@ class IrohAdminRpcConversationListSource(
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
-    suspend fun updateConversation(id: ConversationId, summary: String): Conversation {
+    override suspend fun updateConversation(id: ConversationId, summary: String): Conversation {
         val body = buildJsonObject { put("summary", summary) }
         val response = channelTransport.adminRpc(
             method = "conversation.update",
@@ -120,7 +120,7 @@ class IrohAdminRpcConversationListSource(
         return json.decodeFromJsonElement(Conversation.serializer(), result)
     }
 
-    suspend fun deleteConversation(id: ConversationId) {
+    override suspend fun deleteConversation(id: ConversationId) {
         // App Server v2 has no conversation_delete; archive is the supported lifecycle.
         setConversationArchived(id, archived = true)
     }
@@ -131,7 +131,7 @@ class IrohAdminRpcConversationListSource(
      * (`/v1/conversations/{id}`); the method name selects the value the server
      * handler PATCHes. The handler returns the updated [Conversation].
      */
-    suspend fun setConversationArchived(id: ConversationId, archived: Boolean): Conversation {
+    override suspend fun setConversationArchived(id: ConversationId, archived: Boolean): Conversation {
         val method = if (archived) "conversation.archive" else "conversation.restore"
         val response = channelTransport.adminRpc(
             method = method,

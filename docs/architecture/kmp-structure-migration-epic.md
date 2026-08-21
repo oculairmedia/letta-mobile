@@ -1,8 +1,8 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–3c merged; Phase 4a–4b on `refactor/kmp-structure-phase-4`)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b conversations + Phase 6a entrypoint docs next)  
 **Priority:** P2  
-**Labels:** `kmp`, `architecture`, `migration`  
+**Labels:** `kmp`, `architecture`, `migration`
 **Related docs:**
 
 - [kmp-extraction-current-state.md](kmp-extraction-current-state.md) — what is already landed in `:sharedLogic`
@@ -282,7 +282,9 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **Suggested slice PRs:** agents → conversations → tools → schedules → memory blocks.
 
-**5a (agents — in progress):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+**5a (agents — merged #1263):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+
+**5b (conversations — this PR):** same pattern for agent-scoped `ConversationRepository` (`CachedConversationRepository` + `RoomConversationLocalCache` / Iroh / HTTP seams). `AllConversationsRepository` (paging) deferred as **5b.2** if needed.
 
 ### Acceptance (per slice)
 
