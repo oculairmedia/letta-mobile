@@ -7,6 +7,7 @@ import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,23 +69,50 @@ open class CronRepository(
     }
 
     override suspend fun refresh(agentId: String): Result<List<CronTask>> {
+        // Join any in-flight refresh WITHOUT holding [stateMutex] across await —
+        // holding the lock while awaiting deadlocks the owner (it needs the mutex
+        // to publish results / clear inFlightRefresh).
         stateMutex.withLock {
-            inFlightRefresh[agentId]?.takeIf { !it.isCompleted }?.let { return it.await() }
-        }
+            inFlightRefresh[agentId]?.takeIf { !it.isCompleted }
+        }?.let { return it.await() }
+
         val deferred = CompletableDeferred<Result<List<CronTask>>>()
-        stateMutex.withLock {
-            val previous = inFlightRefresh.put(agentId, deferred)
-            previous?.takeIf { !it.isCompleted }?.cancel()
+        val lostRace = stateMutex.withLock {
+            val existing = inFlightRefresh[agentId]
+            if (existing != null && !existing.isCompleted) {
+                existing
+            } else {
+                inFlightRefresh[agentId] = deferred
+                null
+            }
         }
-        val result = runCatching {
+        if (lostRace != null) {
+            return lostRace.await()
+        }
+
+        val result = try {
             val response = transport.sendCronList(agentId = agentId)
             if (!response.success) {
                 throw IllegalStateException(response.error ?: "cron_list failed")
             }
             val tasks = response.tasks
             stateFor(agentId).value = tasks
-            tasks
+            Result.success(tasks)
+        } catch (cancelled: CancellationException) {
+            // Propagate cancellation; do not complete the shared deferred as
+            // Result.failure(CancellationException) — that swallows structured
+            // cancellation and leaves waiters / test scopes hanging.
+            deferred.cancel(cancelled)
+            stateMutex.withLock {
+                if (inFlightRefresh[agentId] === deferred) {
+                    inFlightRefresh.remove(agentId)
+                }
+            }
+            throw cancelled
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
+
         deferred.complete(result)
         stateMutex.withLock {
             if (inFlightRefresh[agentId] === deferred) {
@@ -94,36 +122,38 @@ open class CronRepository(
         return result
     }
 
-    override suspend fun addSchedule(params: CronAddParams): Result<CronTask> = runCatching {
-        val response = transport.sendCronAdd(
-            agentId = params.agentId,
-            name = params.name,
-            description = params.description,
-            prompt = params.prompt,
-            recurring = params.recurring,
-            cron = params.cron,
-            every = params.every,
-            at = params.at,
-            timezone = params.timezone,
-            conversationId = params.conversationId,
-        )
-        val task = response.task
-        if (!response.success || task == null) {
-            throw IllegalStateException(response.error ?: "cron_add failed")
+    override suspend fun addSchedule(params: CronAddParams): Result<CronTask> =
+        runCatchingCancellable {
+            val response = transport.sendCronAdd(
+                agentId = params.agentId,
+                name = params.name,
+                description = params.description,
+                prompt = params.prompt,
+                recurring = params.recurring,
+                cron = params.cron,
+                every = params.every,
+                at = params.at,
+                timezone = params.timezone,
+                conversationId = params.conversationId,
+            )
+            val task = response.task
+            if (!response.success || task == null) {
+                throw IllegalStateException(response.error ?: "cron_add failed")
+            }
+            stateFor(params.agentId).update { current ->
+                if (current.any { it.id == task.id }) current else current + task
+            }
+            task
         }
-        stateFor(params.agentId).update { current ->
-            if (current.any { it.id == task.id }) current else current + task
-        }
-        task
-    }
 
-    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> = runCatching {
-        val response = transport.sendCronDelete(taskId)
-        if (!response.success) {
-            throw IllegalStateException(response.error ?: "cron_delete failed")
+    override suspend fun deleteSchedule(agentId: String, taskId: String): Result<Unit> =
+        runCatchingCancellable {
+            val response = transport.sendCronDelete(taskId)
+            if (!response.success) {
+                throw IllegalStateException(response.error ?: "cron_delete failed")
+            }
+            stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
         }
-        stateFor(agentId).update { list -> list.filterNot { it.id == taskId } }
-    }
 
     private suspend fun stateFor(agentId: String): MutableStateFlow<List<CronTask>> =
         stateMutex.withLock { stateForUnlocked(agentId) }
@@ -136,16 +166,19 @@ open class CronRepository(
             if (frame !is ServerFrame.CronsUpdated) return@collect
             val agents = stateMutex.withLock { initialized.toList() }
             agents.forEach { agentId ->
-                runCatching { refresh(agentId) }
-                    .onFailure { e ->
-                        Telemetry.event(
-                            TAG,
-                            "crons_updated.refresh.failed",
-                            "agentId" to agentId,
-                            "error" to (e.message ?: e::class.simpleName),
-                            level = Telemetry.Level.WARN,
-                        )
-                    }
+                try {
+                    refresh(agentId)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (e: Throwable) {
+                    Telemetry.event(
+                        TAG,
+                        "crons_updated.refresh.failed",
+                        "agentId" to agentId,
+                        "error" to (e.message ?: e::class.simpleName),
+                        level = Telemetry.Level.WARN,
+                    )
+                }
             }
         }
     }
@@ -157,16 +190,19 @@ open class CronRepository(
             if (wasConnected == false && nowConnected) {
                 val agents = stateMutex.withLock { initialized.toList() }
                 agents.forEach { agentId ->
-                    runCatching { refresh(agentId) }
-                        .onFailure { e ->
-                            Telemetry.event(
-                                TAG,
-                                "reconnect.refresh.failed",
-                                "agentId" to agentId,
-                                "error" to (e.message ?: e::class.simpleName),
-                                level = Telemetry.Level.WARN,
-                            )
-                        }
+                    try {
+                        refresh(agentId)
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (e: Throwable) {
+                        Telemetry.event(
+                            TAG,
+                            "reconnect.refresh.failed",
+                            "agentId" to agentId,
+                            "error" to (e.message ?: e::class.simpleName),
+                            level = Telemetry.Level.WARN,
+                        )
+                    }
                 }
             }
             wasConnected = nowConnected
@@ -177,3 +213,17 @@ open class CronRepository(
         private const val TAG = "CronRepository"
     }
 }
+
+/**
+ * Like [runCatching], but rethrows [CancellationException] so structured
+ * cancellation is not turned into Result.failure.
+ */
+private suspend inline fun <T> runCatchingCancellable(block: suspend () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (t: Throwable) {
+        Result.failure(t)
+    }
+
