@@ -20,8 +20,8 @@ import javax.inject.Singleton
 @Singleton
 open class StepApi @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
-    open suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> {
+) : com.letta.mobile.data.repository.api.StepRemoteSource {
+    open override suspend fun listSteps(params: StepListParams): List<Step> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/") {
@@ -46,7 +46,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveStep(stepId: String): Step {
+    open override suspend fun retrieveStep(stepId: String): Step {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId")
@@ -56,7 +56,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveStepMetrics(stepId: String): StepMetrics {
+    open override suspend fun retrieveStepMetrics(stepId: String): StepMetrics {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/metrics")
@@ -66,7 +66,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveStepTrace(stepId: String): ProviderTrace? {
+    open override suspend fun retrieveStepTrace(stepId: String): ProviderTrace? {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/trace")
@@ -76,12 +76,12 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listStepMessages(
+    open override suspend fun listStepMessages(
         stepId: String,
-        before: String? = null,
-        after: String? = null,
-        limit: Int? = null,
-        order: String? = null,
+        before: String?,
+        after: String?,
+        limit: Int?,
+        order: String?,
     ): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
@@ -98,7 +98,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
+    open override suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/steps/$stepId/feedback") {

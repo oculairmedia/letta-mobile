@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5l + Phase 6a in flight)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5m + Phase 6a in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -304,7 +304,9 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5k (jobs / runs / passages — #1274):** `CachedJobRepository`, `CachedRunRepository`, `CachedPassageRepository` + matching remote/Iroh seams.
 
-**5l (models / MCP — this PR):** `CachedModelRepository` + `CachedMcpServerRepository` with remote/Iroh seams (local-runtime model source preserved).
+**5l (models / MCP — #1275):** `CachedModelRepository` + `CachedMcpServerRepository` with remote/Iroh seams (local-runtime model source preserved).
+
+**5m (steps — this PR):** `CachedStepRepository` + `StepRemoteSource`; Android thin binder.
 
 ### Acceptance (per slice)
 
