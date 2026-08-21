@@ -65,8 +65,11 @@ open class CachedAgentRepository(
 
     init {
         repositoryScope.launch {
-            val cache = localCache?.invoke() ?: return@launch
+            // Resolve + read inside try: Lazy/DAO failures must not escape as
+            // uncaught Dispatchers.IO exceptions (tests historically passed a
+            // broken Lazy mock; production Room build can also throw).
             try {
+                val cache = localCache?.invoke() ?: return@launch
                 val cached = cache.getAllOnce()
                 if (cached.isNotEmpty()) {
                     _agents.value = cached
