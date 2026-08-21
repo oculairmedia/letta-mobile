@@ -23,14 +23,14 @@ class IrohAdminRpcGroupSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.GroupIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listGroups(
-        managerType: String? = null,
-        projectId: String? = null,
-        showHiddenGroups: Boolean? = null,
+    override suspend fun listGroups(
+        managerType: String?,
+        projectId: String?,
+        showHiddenGroups: Boolean?,
     ): List<Group> {
         val params = buildJsonObject {
             managerType?.let { put("manager_type", it) }

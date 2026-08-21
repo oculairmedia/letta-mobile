@@ -24,8 +24,8 @@ import javax.inject.Singleton
 @Singleton
 open class IdentityApi @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
-    open suspend fun listIdentities(): List<Identity> {
+) : com.letta.mobile.data.repository.api.IdentityRemoteSource {
+    open override suspend fun listIdentities(): List<Identity> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/")
@@ -35,7 +35,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun countIdentities(): Int {
+    open override suspend fun countIdentities(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/count")
@@ -45,7 +45,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveIdentity(identityId: String): Identity {
+    open override suspend fun retrieveIdentity(identityId: String): Identity {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/identities/$identityId")
@@ -55,7 +55,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createIdentity(params: IdentityCreateParams): Identity {
+    open override suspend fun createIdentity(params: IdentityCreateParams): Identity {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/identities/") {
@@ -68,7 +68,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun upsertIdentity(params: IdentityUpsertParams): Identity {
+    open override suspend fun upsertIdentity(params: IdentityUpsertParams): Identity {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.put("$baseUrl/v1/identities/") {
@@ -81,7 +81,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity {
+    open override suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/identities/$identityId") {
@@ -94,7 +94,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteIdentity(identityId: String) {
+    open override suspend fun deleteIdentity(identityId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/identities/$identityId")
@@ -103,7 +103,7 @@ open class IdentityApi @Inject constructor(
         }
     }
 
-    open suspend fun upsertIdentityProperties(identityId: String, properties: List<IdentityProperty>): Identity {
+    open override suspend fun upsertIdentityProperties(identityId: String, properties: List<IdentityProperty>): Identity {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.put("$baseUrl/v1/identities/$identityId/properties") {
@@ -116,12 +116,12 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listAgentsForIdentity(
+    open override suspend fun listAgentsForIdentity(
         identityId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
     ): List<Agent> {
         val (client, baseUrl) = apiClient.session()
 
@@ -137,12 +137,12 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listBlocksForIdentity(
+    open override suspend fun listBlocksForIdentity(
         identityId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
     ): List<Block> {
         val (client, baseUrl) = apiClient.session()
 
@@ -158,7 +158,7 @@ open class IdentityApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun attachIdentity(agentId: String, identityId: String) {
+    open override suspend fun attachIdentity(agentId: String, identityId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/identities/attach/$identityId")
@@ -167,7 +167,7 @@ open class IdentityApi @Inject constructor(
         }
     }
 
-    open suspend fun detachIdentity(agentId: String, identityId: String) {
+    open override suspend fun detachIdentity(agentId: String, identityId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/identities/detach/$identityId")
