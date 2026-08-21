@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–3c merged; Phase 4a–4b on `refactor/kmp-structure-phase-4`)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5e + Phase 6a in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -282,7 +282,15 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **Suggested slice PRs:** agents → conversations → tools → schedules → memory blocks.
 
-**5a (agents — in progress):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+**5a (agents — merged #1263):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+
+**5b (conversations — #1265):** `CachedConversationRepository` + Room/Iroh/HTTP seams. `AllConversationsRepository` (paging) deferred as **5b.2**.
+
+**5c (tools — #1267):** `CachedToolRepository` + `ToolRemoteSource` / `ToolIrohSource`; Android thin binder. Desktop `IrohToolRepository` unify deferred.
+
+**5d (schedules — this PR):** `CachedScheduleRepository` + `ScheduleRemoteSource`; Android thin binder. Desktop keeps `IrohScheduleRepository`.
+
+**5e (memory blocks — follow-on):** `CachedBlockRepository` + `BlockRemoteSource` / `BlockIrohSource`; move `PaginationHelpers` into sharedLogic.
 
 ### Acceptance (per slice)
 

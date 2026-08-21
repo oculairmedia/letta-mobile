@@ -19,11 +19,11 @@ import javax.inject.Singleton
 @Singleton
 open class ScheduleApi @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
-    open suspend fun listSchedules(
+) : com.letta.mobile.data.repository.api.ScheduleRemoteSource {
+    open override suspend fun listSchedules(
         agentId: String,
-        limit: Int? = null,
-        after: String? = null,
+        limit: Int?,
+        after: String?,
     ): ScheduleListResponse {
         val (client, baseUrl) = apiClient.session()
 
@@ -37,7 +37,7 @@ open class ScheduleApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
+    open override suspend fun retrieveSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/schedule/$scheduledMessageId")
@@ -47,7 +47,7 @@ open class ScheduleApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
+    open override suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/schedule") {
@@ -60,7 +60,7 @@ open class ScheduleApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
+    open override suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/$agentId/schedule/$scheduledMessageId")
