@@ -16,21 +16,29 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.model.UserMessage
 import java.time.Instant
 
-internal data class ToolCallContext(
+private data class ToolCallContext(
     val name: String,
     val arguments: String,
 )
 
-class MessageMappingState internal constructor(
-    internal val toolCallsById: MutableMap<String, ToolCallContext> = mutableMapOf(),
-)
+class MessageMappingState {
+    private val toolCallsById = mutableMapOf<String, ToolCallContext>()
 
-internal fun List<LettaMessage>.mapToAppMessages(): List<AppMessage> {
+    internal fun remember(callId: String?, name: String?, arguments: String) {
+        if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
+            toolCallsById[callId] = ToolCallContext(name, arguments)
+        }
+    }
+
+    internal fun toolNameForCall(callId: String?): String? = callId?.let { toolCallsById[it]?.name }
+}
+
+fun List<LettaMessage>.mapToAppMessages(): List<AppMessage> {
     val state = MessageMappingState()
     return mapNotNull { it.mapToAppMessage(state) }
 }
 
-internal fun LettaMessage.mapToAppMessage(state: MessageMappingState): AppMessage? {
+fun LettaMessage.mapToAppMessage(state: MessageMappingState): AppMessage? {
     return when (this) {
         is UserMessage -> AppMessage(
             id = id,
@@ -134,17 +142,11 @@ private fun ToolReturnMessage.mapToolReturn(state: MessageMappingState): AppMess
         content = toolReturn.funcResponse ?: "",
         runId = runId,
         stepId = stepId,
-        toolName = state.toolCallsById[callId]?.name ?: name,
+        toolName = state.toolNameForCall(callId) ?: name,
         toolCallId = callId,
         toolReturnStatus = toolReturn.status,
         attachments = attachments,
     )
-}
-
-private fun MessageMappingState.remember(callId: String?, name: String?, arguments: String) {
-    if (!callId.isNullOrBlank() && !name.isNullOrBlank()) {
-        toolCallsById[callId] = ToolCallContext(name, arguments)
-    }
 }
 
 private fun String?.toInstantOrNow(): Instant =
@@ -153,3 +155,10 @@ private fun String?.toInstantOrNow(): Instant =
     } catch (_: Exception) {
         Instant.now()
     }
+
+/** Public mapping facade retained for callers while implementations stay direction-focused. */
+fun List<LettaMessage>.toAppMessages(): List<AppMessage> = mapToAppMessages()
+
+fun LettaMessage.toAppMessage(): AppMessage? = mapToAppMessage(MessageMappingState())
+
+fun LettaMessage.toAppMessage(state: MessageMappingState): AppMessage? = mapToAppMessage(state)

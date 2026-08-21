@@ -51,6 +51,8 @@ class MessageApiTimelineTransport(
         messageApi.listMessages(
             agentId = AgentId(agentId),
             limit = limit,
+            before = null,
+            after = null,
             order = order,
             conversationId = conversationId?.let(::ConversationId),
         )
