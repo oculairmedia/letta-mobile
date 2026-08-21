@@ -28,8 +28,10 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = listOf(DesktopConversationTab("conversation-1", "First", "Ada")),
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = { closedId = it },
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = { closedId = it },
+                    ),
                 )
             }
         }
@@ -47,8 +49,10 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = threeTabs,
                     activeConversationId = "conversation-1",
-                    onSelect = { selectedId = it },
-                    onClose = {},
+                    actions = DesktopConversationTabActions(
+                        onSelect = { selectedId = it },
+                        onClose = {},
+                    ),
                 )
             }
         }
@@ -67,12 +71,14 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = threeTabs,
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { conversationId, targetIndex ->
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { conversationId, targetIndex ->
                         reorderedId = conversationId
                         reorderedTarget = targetIndex
                     },
+                    ),
                 )
             }
         }
@@ -108,9 +114,11 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = threeTabs,
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { _, _ -> reorderCalled = true },
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { _, _ -> reorderCalled = true },
+                    ),
                 )
             }
         }

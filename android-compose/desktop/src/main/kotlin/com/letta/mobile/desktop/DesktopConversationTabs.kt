@@ -49,6 +49,18 @@ import sh.calvin.reorderable.DragGestureDetector
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
+/**
+ * What the tab strip can do to a conversation. Grouped rather than passed as
+ * three loose lambdas: they are one collaborator, they always travel together,
+ * and naming them keeps the row's own parameter list about *what* it renders.
+ */
+@Immutable
+internal data class DesktopConversationTabActions(
+    val onSelect: (conversationId: String) -> Unit = {},
+    val onClose: (conversationId: String) -> Unit = {},
+    val onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
+)
+
 @Immutable
 internal data class DesktopConversationTab(
     val conversationId: String,
@@ -229,11 +241,9 @@ private fun applyEagerDragDelta(
 internal fun DesktopConversationTabRow(
     tabs: List<DesktopConversationTab>,
     activeConversationId: String?,
-    onSelect: (String) -> Unit,
-    onClose: (String) -> Unit,
+    actions: DesktopConversationTabActions,
     modifier: Modifier = Modifier,
     dragLaneWidth: Dp = DefaultTabStripDragLaneWidth,
-    onReorder: (conversationId: String, targetIndex: Int) -> Unit = { _, _ -> },
 ) {
     var currentList by remember(tabs) { mutableStateOf(tabs) }
     val lazyListState = rememberLazyListState()
@@ -262,8 +272,8 @@ internal fun DesktopConversationTabRow(
                     tab = tab,
                     active = tab.conversationId == activeConversationId,
                     dragging = isDragging,
-                    onSelect = { onSelect(tab.conversationId) },
-                    onClose = { onClose(tab.conversationId) },
+                    onSelect = { actions.onSelect(tab.conversationId) },
+                    onClose = { actions.onClose(tab.conversationId) },
                     // onDragStopped, not a DisposableEffect/LaunchedEffect
                     // keyed on `isDragging`: ReorderableCollectionItemScopeImpl's
                     // own draggableHandle sets its *internal* dragging flag
@@ -286,7 +296,7 @@ internal fun DesktopConversationTabRow(
                         dragGestureDetector = EagerPressDragGestureDetector,
                         onDragStopped = {
                             val targetIndex = currentList.indexOfFirst { it.conversationId == tab.conversationId }
-                            if (targetIndex >= 0) onReorder(tab.conversationId, targetIndex)
+                            if (targetIndex >= 0) actions.onReorder(tab.conversationId, targetIndex)
                         },
                     ),
                 )

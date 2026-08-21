@@ -44,11 +44,13 @@ class DesktopConversationTabsReorderPersistenceTest {
                 DesktopConversationTabRow(
                     tabs = tabs,
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { conversationId, targetIndex ->
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { conversationId, targetIndex ->
                         state = ConversationTabsReducer.reorder(state, conversationId, targetIndex)
                     },
+                    ),
                 )
             }
         }
@@ -100,11 +102,13 @@ class DesktopConversationTabsReorderPersistenceTest {
                 DesktopConversationTabRow(
                     tabs = tabs,
                     activeConversationId = ids.first(),
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { conversationId, targetIndex ->
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { conversationId, targetIndex ->
                         state = ConversationTabsReducer.reorder(state, conversationId, targetIndex)
                     },
+                    ),
                 )
             }
         }

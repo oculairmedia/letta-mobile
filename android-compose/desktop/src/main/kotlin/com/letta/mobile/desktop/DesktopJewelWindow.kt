@@ -273,9 +273,11 @@ internal fun DesktopJewelWindow(
                                     DesktopConversationTabRow(
                                         tabs = header.conversationTabs,
                                         activeConversationId = header.activeConversationId,
-                                        onSelect = header.onSelectConversationTab,
-                                        onClose = header.onCloseConversationTab,
-                                        onReorder = header.onReorderConversationTab,
+                                        actions = DesktopConversationTabActions(
+                                            onSelect = header.onSelectConversationTab,
+                                            onClose = header.onCloseConversationTab,
+                                            onReorder = header.onReorderConversationTab,
+                                        ),
                                         dragLaneWidth = MinimumTitleBarDragWidth,
                                         modifier = Modifier.fillMaxHeight(),
                                     )
