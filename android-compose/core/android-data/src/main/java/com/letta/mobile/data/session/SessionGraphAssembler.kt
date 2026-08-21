@@ -30,7 +30,7 @@ import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
-import com.letta.mobile.data.repository.IrohAdminRpcClient
+import com.letta.mobile.data.repository.IrohAdminRpcArchiveSource
 import com.letta.mobile.data.repository.IrohAdminRpcIdentitySource
 import com.letta.mobile.data.repository.IrohAdminRpcJobSource
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
@@ -231,8 +231,8 @@ class SessionGraphAssembler @Inject constructor(
         return CatalogAdminRepositories(
             archive = ArchiveRepository(
                 archiveApi = archiveApi,
-                irohAdminRpcClient = settings?.let {
-                    IrohAdminRpcClient(channelTransport = transport, settingsRepository = it)
+                irohArchiveSource = settings?.let {
+                    IrohAdminRpcArchiveSource(channelTransport = transport, settingsRepository = it)
                 },
             ),
             folder = FolderRepository(
