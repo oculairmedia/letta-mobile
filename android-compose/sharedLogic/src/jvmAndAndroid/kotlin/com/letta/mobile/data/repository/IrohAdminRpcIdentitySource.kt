@@ -23,11 +23,11 @@ class IrohAdminRpcIdentitySource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.IdentityIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listIdentities(): List<Identity> {
+    override suspend fun listIdentities(): List<Identity> {
         val response = channelTransport.adminRpc(
             method = "identity.list",
             path = "/v1/identities",
@@ -38,7 +38,7 @@ class IrohAdminRpcIdentitySource(
         return json.decodeFromJsonElement(ListSerializer(Identity.serializer()), result)
     }
 
-    suspend fun getIdentity(identityId: String): Identity {
+    override suspend fun getIdentity(identityId: String): Identity {
         val params = buildJsonObject { put("identity_id", identityId) }
         val response = channelTransport.adminRpc(
             method = "identity.get",
