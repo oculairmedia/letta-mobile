@@ -28,8 +28,10 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = listOf(DesktopConversationTab("conversation-1", "First", "Ada")),
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = { closedId = it },
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = { closedId = it },
+                    ),
                 )
             }
         }
@@ -47,8 +49,10 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = threeTabs,
                     activeConversationId = "conversation-1",
-                    onSelect = { selectedId = it },
-                    onClose = {},
+                    actions = DesktopConversationTabActions(
+                        onSelect = { selectedId = it },
+                        onClose = {},
+                    ),
                 )
             }
         }
@@ -67,28 +71,32 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = threeTabs,
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { conversationId, targetIndex ->
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { conversationId, targetIndex ->
                         reorderedId = conversationId
                         reorderedTarget = targetIndex
                     },
+                    ),
                 )
             }
         }
 
-        // Drag the first tab ("First") to the right, past the second tab's
-        // center, then release. This should cross the reorder threshold and
-        // land "First" at index 1.
+        // Drag the first tab ("First") to the right, past the second
+        // tab's center, then release. This should cross the reorder
+        // threshold and land "First" at index 1 -- not further: these tabs
+        // are minimum-width (132dp, short labels), so a bigger move would
+        // legitimately overshoot into the third tab's territory too.
         onNodeWithText("First").performMouseInput {
             moveTo(center)
             press()
-            // Move well past a single tab's width (tabs are 132-220dp wide)
-            // so the drag definitely crosses the second tab's center.
-            moveBy(Offset(x = 250f, y = 0f))
-            moveBy(Offset(x = 10f, y = 0f))
+            moveBy(Offset(x = 200f, y = 0f))
             release()
         }
+        // sh.calvin.reorderable calls onSettle only after its drop-settle
+        // spring animation finishes, not synchronously on release.
+        waitForIdle()
 
         assertEquals(
             "conversation-1",
@@ -106,9 +114,11 @@ class DesktopConversationTabsUiTest {
                 DesktopConversationTabRow(
                     tabs = threeTabs,
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { _, _ -> reorderCalled = true },
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { _, _ -> reorderCalled = true },
+                    ),
                 )
             }
         }
@@ -121,6 +131,7 @@ class DesktopConversationTabsUiTest {
             moveBy(Offset(x = 8f, y = 0f))
             release()
         }
+        waitForIdle()
 
         assertNull(if (reorderCalled) "reorder" else null)
     }
