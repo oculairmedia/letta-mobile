@@ -17,12 +17,12 @@ import javax.inject.Singleton
 @Singleton
 class PassageApi @Inject constructor(
     private val apiClient: LettaApiClient
-) {
-    suspend fun listPassages(
+) : com.letta.mobile.data.repository.api.PassageRemoteSource {
+    override suspend fun listPassages(
         agentId: String,
-        limit: Int? = null,
-        after: String? = null,
-        search: String? = null,
+        limit: Int?,
+        after: String?,
+        search: String?,
     ): List<Passage> {
         val (client, baseUrl) = apiClient.session()
 
@@ -37,7 +37,7 @@ class PassageApi @Inject constructor(
         return response.body()
     }
 
-    suspend fun createPassage(agentId: String, params: PassageCreateParams): Passage {
+    override suspend fun createPassage(agentId: String, params: PassageCreateParams): Passage {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/archival-memory") {
@@ -58,7 +58,7 @@ class PassageApi @Inject constructor(
         }
     }
 
-    suspend fun deletePassage(agentId: String, passageId: String) {
+    override suspend fun deletePassage(agentId: String, passageId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/$agentId/archival-memory/$passageId")
@@ -67,10 +67,10 @@ class PassageApi @Inject constructor(
         }
     }
 
-    suspend fun searchArchival(
+    override suspend fun searchArchival(
         agentId: String,
         query: String,
-        limit: Int? = null,
+        limit: Int?,
     ): List<Passage> {
         return listPassages(agentId = agentId, limit = limit, search = query)
     }

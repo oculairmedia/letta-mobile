@@ -23,11 +23,11 @@ class IrohAdminRpcJobSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.JobIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listJobs(): List<Job> {
+    override suspend fun listJobs(): List<Job> {
         val response = channelTransport.adminRpc(
             method = "job.list",
             path = "/v1/jobs",
@@ -38,7 +38,7 @@ class IrohAdminRpcJobSource(
         return json.decodeFromJsonElement(ListSerializer(Job.serializer()), result)
     }
 
-    suspend fun getJob(jobId: String): Job {
+    override suspend fun getJob(jobId: String): Job {
         val params = buildJsonObject { put("job_id", jobId) }
         val response = channelTransport.adminRpc(
             method = "job.get",

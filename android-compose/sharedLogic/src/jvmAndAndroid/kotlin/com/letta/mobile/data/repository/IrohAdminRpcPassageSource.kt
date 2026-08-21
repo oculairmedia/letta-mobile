@@ -17,11 +17,11 @@ class IrohAdminRpcPassageSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.PassageIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listPassages(agentId: String): List<Passage> {
+    override suspend fun listPassages(agentId: String): List<Passage> {
         val params = buildJsonObject { put("agent_id", agentId) }
         val response = channelTransport.adminRpc(
             method = "passage.list",
@@ -33,7 +33,7 @@ class IrohAdminRpcPassageSource(
         return json.decodeFromJsonElement(ListSerializer(Passage.serializer()), result)
     }
 
-    suspend fun createPassage(agentId: String, text: String): Passage {
+    override suspend fun createPassage(agentId: String, text: String): Passage {
         val response = channelTransport.adminRpc(
             method = "passage.create",
             path = "/v1/agents/$agentId/archival-memory",
@@ -47,7 +47,7 @@ class IrohAdminRpcPassageSource(
         return json.decodeFromJsonElement(Passage.serializer(), result)
     }
 
-    suspend fun deletePassage(agentId: String, passageId: String) {
+    override suspend fun deletePassage(agentId: String, passageId: String) {
         val response = channelTransport.adminRpc(
             method = "passage.delete",
             path = "/v1/agents/$agentId/archival-memory/$passageId",
