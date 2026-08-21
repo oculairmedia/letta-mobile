@@ -12,6 +12,8 @@ class FakeScheduleApi : ScheduleApi(mockk(relaxed = true)) {
     var schedules = mutableMapOf<String, MutableList<ScheduledMessage>>()
     var shouldFail = false
     val calls = mutableListOf<String>()
+    /** When set, [listSchedules] suspends until this deferred completes. */
+    var listSchedulesGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
 
     /**
      * Crons served by the `/v1/crons` fallback. When [cronRouteAvailable]
@@ -24,10 +26,11 @@ class FakeScheduleApi : ScheduleApi(mockk(relaxed = true)) {
 
     override suspend fun listSchedules(agentId: String, limit: Int?, after: String?): ScheduleListResponse {
         calls.add("listSchedules:$agentId")
+        listSchedulesGate?.await()
         if (shouldFail) throw ApiException(500, "Server error")
         return ScheduleListResponse(
             hasNextPage = false,
-            scheduledMessages = schedules[agentId].orEmpty(),
+            scheduledMessages = schedules[agentId].orEmpty().toList(),
         )
     }
 

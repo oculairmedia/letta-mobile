@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.SchedulePayload
 import com.letta.mobile.data.model.ScheduledMessage
 import com.letta.mobile.testutil.FakeScheduleApi
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -80,6 +81,47 @@ class ScheduleRepositoryTest {
 
         assertEquals("s1", result.id)
         assertEquals("one-time", result.schedule.type)
+    }
+
+    @Test
+    fun `deleteSchedule stays absent when refresh was in flight`() = runTest {
+        fakeApi.schedules["a1"] = mutableListOf(sampleScheduledMessage(id = "s1"))
+        repository.refreshSchedules("a1")
+        fakeApi.calls.clear()
+
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        fakeApi.listSchedulesGate = gate
+
+        val refreshDeferred = async {
+            repository.refreshSchedules("a1")
+        }
+        testScheduler.runCurrent()
+        assertTrue("listSchedules:a1" in fakeApi.calls)
+
+        // Without per-agent serialization, delete would finish while listSchedules
+        // is gated, then a stale refresh would restore s1. With the mutex, delete
+        // waits until refresh completes, then removes s1 for good.
+        val deleteDeferred = async {
+            repository.deleteSchedule("a1", "s1")
+        }
+        testScheduler.runCurrent()
+        gate.complete(Unit)
+        refreshDeferred.await()
+        deleteDeferred.await()
+
+        assertTrue(repository.getSchedules("a1").first().none { it.id == "s1" })
+    }
+
+    @Test
+    fun `refreshSchedules with after merges pages`() = runTest {
+        fakeApi.schedules["a1"] = mutableListOf(sampleScheduledMessage(id = "s1"))
+        repository.refreshSchedules("a1")
+        fakeApi.schedules["a1"] = mutableListOf(sampleScheduledMessage(id = "s2"))
+
+        repository.refreshSchedules("a1", after = "s1")
+
+        val ids = repository.getSchedules("a1").first().map { it.id }
+        assertEquals(listOf("s1", "s2"), ids)
     }
 
     private fun sampleScheduledMessage(
