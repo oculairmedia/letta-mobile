@@ -48,8 +48,8 @@ CI check (`sharedLogic:allTests` + `desktop:test`) backstops this.
 |---|---|
 | Android | `./gradlew :app:assembleDebug` |
 | Compose Desktop | `./gradlew :desktop:run` |
-| Browser WASM | `:web` (see CI `web-wasm`) |
-| CLI / probes | `:cli`, `:appserver-cli` |
+| Browser WASM | `./gradlew :web:wasmJsBrowserDevelopmentRun` (CI job `web-wasm`) |
+| CLI / probes | `./gradlew :cli:run`; App Server contract probes via `:appserver-cli` (see [`kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md)) |
 
 Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md).
 
