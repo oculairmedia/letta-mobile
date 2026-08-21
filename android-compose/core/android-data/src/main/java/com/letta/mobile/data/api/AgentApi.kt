@@ -35,10 +35,7 @@ open class AgentApi @Inject constructor(
             parameter("offset", offset)
             tags?.forEach { parameter("tags", it) }
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     /**
@@ -67,12 +64,10 @@ open class AgentApi @Inject constructor(
             parameter("offset", offset)
             tags?.forEach { parameter("tags", it) }
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
+        val body = response.requireSuccess().bodyAsText()
         return json.decodeFromString(
             kotlinx.serialization.builtins.ListSerializer(AgentSummary.serializer()),
-            response.bodyAsText(),
+            body,
         )
     }
 
@@ -80,10 +75,7 @@ open class AgentApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/${agentId.value}")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     open suspend fun getAgent(agentId: String): Agent = getAgent(AgentId(agentId))
@@ -111,10 +103,7 @@ open class AgentApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/count")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     open override suspend fun createAgent(params: AgentCreateParams): Agent {
@@ -124,10 +113,7 @@ open class AgentApi @Inject constructor(
             contentType(ContentType.Application.Json)
             setBody(params)
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     open override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
@@ -137,10 +123,7 @@ open class AgentApi @Inject constructor(
             contentType(ContentType.Application.Json)
             setBody(params)
         }
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     open suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
@@ -149,9 +132,7 @@ open class AgentApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/${agentId.value}")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
+        response.requireSuccess()
     }
 
     open suspend fun deleteAgent(agentId: String) = deleteAgent(AgentId(agentId))
@@ -160,10 +141,7 @@ open class AgentApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/${agentId.value}/export")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     open suspend fun exportAgent(agentId: String): String = exportAgent(AgentId(agentId))
@@ -184,19 +162,14 @@ open class AgentApi @Inject constructor(
                 params.stripMessages?.let { append("strip_messages", it.toString()) }
             }
         )
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
-        return response.body()
+        return response.requireSuccess().body()
     }
 
     open override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/attach/$archiveId")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
+        response.requireSuccess()
     }
 
     open suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
@@ -205,12 +178,17 @@ open class AgentApi @Inject constructor(
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/detach/$archiveId")
-        if (response.status.value !in 200..299) {
-            throw ApiException(response.status.value, response.bodyAsText())
-        }
+        response.requireSuccess()
     }
 
     open suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
+
+    private suspend fun HttpResponse.requireSuccess(): HttpResponse {
+        if (status.value !in 200..299) {
+            throw ApiException(status.value, bodyAsText())
+        }
+        return this
+    }
 
     private suspend fun HttpResponse.bodyAsTextAtMost(maxBytes: Int): String {
         val declaredLength = headers[HttpHeaders.ContentLength]?.toLongOrNull()

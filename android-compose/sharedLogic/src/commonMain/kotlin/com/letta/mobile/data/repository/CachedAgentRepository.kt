@@ -309,21 +309,29 @@ open class CachedAgentRepository(
             emit(cached)
         }
         if (cached != null && snapshotAgeMs <= SINGLE_AGENT_FRESH_WINDOW_MS) return@flow
-        val localSource = localAgentSource
-        if (localSource != null && isLocalRuntimeActive()) {
-            // No remote API for local agents; serve the durable store copy
-            // when the in-memory cache missed (cold start).
-            if (cached == null) {
-                val stored = localSource.listAgents().find { it.id == id }
-                    ?: throw NoSuchElementException("Local agent ${id.value} not found in the on-device store.")
-                emit(stored)
-                updateAgentInCache(stored)
-            }
-            return@flow
-        }
+        if (emitLocalAgentIfActive(id, cached)) return@flow
         val fresh = fetchAgentRemote(id)
         emit(fresh)
         updateAgentInCache(fresh)
+    }
+
+    /**
+     * Local-runtime path for [getAgent]: no remote API. Returns true when this
+     * flow should stop (local mode handled); false to continue with remote fetch.
+     */
+    private suspend fun kotlinx.coroutines.flow.FlowCollector<Agent>.emitLocalAgentIfActive(
+        id: AgentId,
+        cached: Agent?,
+    ): Boolean {
+        val localSource = localAgentSource ?: return false
+        if (!isLocalRuntimeActive()) return false
+        if (cached == null) {
+            val stored = localSource.listAgents().find { it.id == id }
+                ?: throw NoSuchElementException("Local agent ${id.value} not found in the on-device store.")
+            emit(stored)
+            updateAgentInCache(stored)
+        }
+        return true
     }
 
     /**
@@ -458,14 +466,12 @@ open class CachedAgentRepository(
 
     override suspend fun updateAgent(id: AgentId, params: AgentUpdateParams): Agent {
         val cached = _agents.value.find { it.id == id }
-        val preview = cached?.withUpdates(params)
-        val localSource = localAgentSource
-        if (localSource != null && preview != null && id.value.startsWith("local-agent-")) {
+        localAgentUpdate(id, cached, params)?.let { (source, preview) ->
             // Local agents have no remote API even when their selected model is
             // cloud/API-backed. Persist the update locally; the routing layer
             // decides whether the next turn uses embedded runtime or remote
             // transport from the updated model/metadata binding.
-            localSource.persistAgent(preview)
+            source.persistAgent(preview)
             localCache?.invoke()?.upsert(preview)
             updateAgentInCache(preview)
             return preview
@@ -486,6 +492,17 @@ open class CachedAgentRepository(
         val agent = remote.updateAgent(id, params)
         refreshAgents()
         return agent
+    }
+
+    private fun localAgentUpdate(
+        id: AgentId,
+        cached: Agent?,
+        params: AgentUpdateParams,
+    ): Pair<LocalRuntimeAgentSource, Agent>? {
+        val source = localAgentSource ?: return null
+        val preview = cached?.let { applyAgentUpdates(it, params) } ?: return null
+        if (!id.value.startsWith("local-agent-")) return null
+        return source to preview
     }
 
     override suspend fun deleteAgent(id: AgentId) {
@@ -525,17 +542,21 @@ open class CachedAgentRepository(
         refreshAgents()
     }
 
-    private fun Agent.withUpdates(params: AgentUpdateParams): Agent = copy(
-        name = params.name ?: name,
-        description = params.description ?: description,
-        model = params.model ?: model,
-        modelSettings = params.modelSettings ?: modelSettings,
-        llmConfig = params.llmConfig ?: llmConfig,
-        system = params.system ?: system,
-        tags = params.tags ?: tags,
-        metadata = params.metadata ?: metadata,
-        contextWindowLimit = params.contextWindowLimit ?: contextWindowLimit,
+    private fun applyAgentCoreUpdates(agent: Agent, params: AgentUpdateParams): Agent = agent.copy(
+        name = params.name ?: agent.name,
+        description = params.description ?: agent.description,
+        model = params.model ?: agent.model,
+        modelSettings = params.modelSettings ?: agent.modelSettings,
     )
+
+    private fun applyAgentUpdates(agent: Agent, params: AgentUpdateParams): Agent =
+        applyAgentCoreUpdates(agent, params).copy(
+            llmConfig = params.llmConfig ?: agent.llmConfig,
+            system = params.system ?: agent.system,
+            tags = params.tags ?: agent.tags,
+            metadata = params.metadata ?: agent.metadata,
+            contextWindowLimit = params.contextWindowLimit ?: agent.contextWindowLimit,
+        )
 
     private fun updateAgentInCache(agent: Agent) {
         _agents.update { current ->
