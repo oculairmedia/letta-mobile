@@ -2,7 +2,9 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Archive
+import com.letta.mobile.data.model.ArchiveAgentsListParams
 import com.letta.mobile.data.model.ArchiveCreateParams
+import com.letta.mobile.data.model.ArchiveListParams
 import com.letta.mobile.data.model.ArchiveUpdateParams
 import com.letta.mobile.data.repository.api.ArchiveIrohSource
 import com.letta.mobile.data.repository.api.ArchiveRemoteSource
@@ -34,12 +36,12 @@ open class CachedArchiveRepository(
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
                 remote.listArchives(
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
-                    name = name,
-                    agentId = agentId,
+                    ArchiveListParams(
+                        limit = limit,
+                        after = after,
+                        name = name,
+                        agentId = agentId,
+                    ),
                 )
             },
             extractCursor = { archive -> archive.id },
@@ -75,11 +77,11 @@ open class CachedArchiveRepository(
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
                 remote.listAgentsForArchive(
-                    archiveId = archiveId,
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
+                    ArchiveAgentsListParams(
+                        archiveId = archiveId,
+                        limit = limit,
+                        after = after,
+                    ),
                 )
             },
             extractCursor = { agent -> agent.id.value },
