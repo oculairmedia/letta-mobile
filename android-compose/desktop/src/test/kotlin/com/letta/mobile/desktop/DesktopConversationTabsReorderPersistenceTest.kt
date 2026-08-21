@@ -14,6 +14,7 @@ import androidx.compose.ui.test.runComposeUiTest
 import com.letta.mobile.data.desktopshell.ConversationTabsReducer
 import com.letta.mobile.data.desktopshell.ConversationTabsState
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 // Regression coverage for letta-mobile#1249's second finding: PR #1247's own
@@ -43,11 +44,13 @@ class DesktopConversationTabsReorderPersistenceTest {
                 DesktopConversationTabRow(
                     tabs = tabs,
                     activeConversationId = "conversation-1",
-                    onSelect = {},
-                    onClose = {},
-                    onReorder = { conversationId, targetIndex ->
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { conversationId, targetIndex ->
                         state = ConversationTabsReducer.reorder(state, conversationId, targetIndex)
                     },
+                    ),
                 )
             }
         }
@@ -74,5 +77,59 @@ class DesktopConversationTabsReorderPersistenceTest {
                 "dragging First past it, but First is still left of (or at) Second " +
                 "(First=$firstLeftAfter, Second=$secondLeftAfter)",
         )
+    }
+
+    // Regression coverage for letta-mobile#1258's hardware findings: with the
+    // hand-rolled shift math, dragging the FIRST tab specifically reverted,
+    // and with more than a couple of tabs some neighbors failed to reflow
+    // (two tabs could render on top of each other mid-drag). Both were
+    // symptoms of bugs in from-scratch reorder math this PR deletes in favor
+    // of sh.calvin.reorderable's own (library-owned, not hand-rolled) index
+    // math. This drags tab index 0 specifically, across five tabs, and
+    // asserts every tab ends up at a distinct, correctly-ordered position --
+    // not just that the dragged tab's own position is right.
+    @Test
+    fun draggingTheFirstTabAmongManyReflowsEveryNeighborToADistinctPosition() = runComposeUiTest {
+        val ids = (1..5).map { "conversation-$it" }
+        val idToTab = ids.associateWith { id ->
+            val n = id.removePrefix("conversation-")
+            DesktopConversationTab(id, "Tab $n", "Agent $n")
+        }
+        setContent {
+            var state by remember { mutableStateOf(ConversationTabsState(ids)) }
+            val tabs = state.openConversationIds.mapNotNull { idToTab[it] }
+            DesktopMaterialTheme {
+                DesktopConversationTabRow(
+                    tabs = tabs,
+                    activeConversationId = ids.first(),
+                    actions = DesktopConversationTabActions(
+                        onSelect = {},
+                        onClose = {},
+                        onReorder = { conversationId, targetIndex ->
+                        state = ConversationTabsReducer.reorder(state, conversationId, targetIndex)
+                    },
+                    ),
+                )
+            }
+        }
+
+        // Drag "Tab 1" (index 0) two tabs to the right.
+        onNodeWithText("Tab 1").performMouseInput {
+            moveTo(center)
+            press()
+            moveBy(Offset(x = 280f, y = 0f))
+            release()
+        }
+        waitForIdle()
+
+        val leftByLabel = (1..5).associate { n -> "Tab $n" to onNodeWithText("Tab $n").fetchSemanticsNode().boundsInRoot.left }
+        val orderedByPosition = leftByLabel.entries.sortedBy { it.value }.map { it.key }
+
+        // "Tab 1" must have actually moved (not reverted), and every tab
+        // must occupy a distinct horizontal slot -- no overlap, no neighbor
+        // left stuck in its original spot on top of another tab.
+        assertTrue(orderedByPosition.first() != "Tab 1", "Tab 1 did not move at all: $orderedByPosition")
+        val distinctLefts = leftByLabel.values.map { it }.distinct()
+        assertEquals(5, distinctLefts.size, "two or more tabs rendered at the same position: $leftByLabel")
     }
 }

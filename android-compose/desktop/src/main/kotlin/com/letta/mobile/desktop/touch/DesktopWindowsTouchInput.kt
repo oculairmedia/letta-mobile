@@ -16,6 +16,7 @@ import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.SwingUtilities
 import javax.swing.Timer
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -62,6 +63,24 @@ internal object DesktopWindowsTouchInput {
 
     /** ~60Hz; matches the cadence Windows delivers touch moves at. */
     private const val FLING_FRAME_MILLIS = 16
+
+    /** `sun.awt.event.TouchEvent` phases, as they appear in `scrollType`. */
+    private const val TOUCH_SCROLL_BEGIN = 2
+    private const val TOUCH_SCROLL_UPDATE = 3
+    private const val TOUCH_SCROLL_END = 4
+    private val TOUCH_PAN_SCROLL_TYPES =
+        setOf(TOUCH_SCROLL_BEGIN, TOUCH_SCROLL_UPDATE, TOUCH_SCROLL_END)
+
+    /**
+     * Pixels of content travel per pan unit the JDK reports.
+     *
+     * The units are not pixels: hardware traces show ~4-5 per event at a ~10ms
+     * cadence for an ordinary swipe, so this is the calibration that decides how
+     * far a swipe carries. Override with `-Dletta.touchPanUnitPixels=` to retune
+     * on a running build rather than through a rebuild.
+     */
+    private val PAN_UNIT_PIXELS =
+        System.getProperty("letta.touchPanUnitPixels")?.toDoubleOrNull() ?: 2.5
 
     private val windows: MutableSet<Window> =
         Collections.newSetFromMap(WeakHashMap<Window, Boolean>())
@@ -150,6 +169,9 @@ internal object DesktopWindowsTouchInput {
 
         private var flingTimer: Timer? = null
 
+        /** Seeds the coast at lift-off; see [DesktopTouchPanVelocity]. */
+        private val panVelocity = DesktopTouchPanVelocity()
+
         override fun dispatchEvent(event: AWTEvent) {
             if (isGestureInterruptingFocusLoss(event)) {
                 // Safety net for an interrupted gesture: if the window loses
@@ -165,8 +187,91 @@ internal object DesktopWindowsTouchInput {
                 super.dispatchEvent(event)
                 return
             }
+            if (event is MouseWheelEvent && dispatchTouchPan(event)) return
             dispatchMouse(event)
         }
+
+        /**
+         * Handles a Windows touch pan, returning true when the event was
+         * consumed and must not reach Compose unchanged.
+         *
+         * Measured on real touch hardware: a finger swipe delivers **no**
+         * `MOUSE_DRAGGED` at all. Windows pans the surface itself and the JDK
+         * reports it as [MouseWheelEvent]s whose `scrollType` carries the touch
+         * phase (`sun.awt.event.TouchEvent`'s TOUCH_BEGIN/UPDATE/END = 2/3/4,
+         * where AWT's own types are 0 and 1) and whose rotation is a small pan
+         * unit, decaying through a short tail after lift-off. That is why the
+         * drag path above never runs for a swipe: its whole reason for existing
+         * is events that this hardware never produces.
+         *
+         * Two things then go wrong if the events are passed through untouched.
+         * Compose multiplies rotation by `viewport / 20` on the assumption it is
+         * a mouse notch (`WindowsWinUIConfig`), turning a few pan units into
+         * most of a screen — the "acceleration". And the coast the drag path
+         * would have supplied never happens, so scrolling stops dead at lift-off.
+         * Rescaling each unit to a sane pixel distance and feeding the same
+         * velocity/[DesktopTouchFling] machinery the drag path uses fixes both.
+         */
+        private fun dispatchTouchPan(event: MouseWheelEvent): Boolean {
+            if (event.scrollType !in TOUCH_PAN_SCROLL_TYPES) return false
+            val component = event.source as? Component ?: return false
+            if (managedWindow(component) == null) return false
+            // A pan is unambiguously a finger, so the touch-keyboard gate should
+            // see it even though AWT does not flag wheel events as touch-caused.
+            DesktopTouchOrigin.record(isTouch = true, atMillis = System.currentTimeMillis())
+
+            val horizontal = (event.modifiersEx and InputEvent.SHIFT_DOWN_MASK) != 0
+            // Negated so the sign survives dispatchScroll's own inversion and the
+            // content still follows the finger the way the raw event did.
+            val pixels = (-event.preciseWheelRotation * PAN_UNIT_PIXELS).toFloat()
+
+            when (event.scrollType) {
+                TOUCH_SCROLL_BEGIN -> {
+                    cancelFling()
+                    // Compose animates each wheel delta through a tween meant for
+                    // discrete notches; at a pan's ~10ms cadence that reads as lag.
+                    smoothScroll.begin()
+                    panVelocity.reset(event.getWhen())
+                }
+
+                TOUCH_SCROLL_END -> {
+                    startPanFling(component, event)
+                    return true
+                }
+            }
+
+            panVelocity.record(TouchPanSample(pixels, event.getWhen(), horizontal))
+            dispatchScroll(component, event, panDelta(pixels, horizontal))
+            return true
+        }
+
+        private fun startPanFling(component: Component, source: MouseWheelEvent) {
+            val velocity = panVelocity.dominant()
+            val fling = DesktopTouchFling(velocityX = velocity.dx, velocityY = velocity.dy)
+            if (fling.isFinished) {
+                smoothScroll.end()
+                return
+            }
+            var lastFrameMillis = System.currentTimeMillis()
+            val timer = Timer(FLING_FRAME_MILLIS, null)
+            timer.addActionListener {
+                val now = System.currentTimeMillis()
+                val delta = fling.advance(now - lastFrameMillis)
+                lastFrameMillis = now
+                if (delta == null || !component.isShowing) {
+                    timer.stop()
+                    if (flingTimer === timer) flingTimer = null
+                    smoothScroll.end()
+                } else {
+                    dispatchScroll(component, source, delta)
+                }
+            }
+            flingTimer = timer
+            timer.start()
+        }
+
+        private fun panDelta(pixels: Float, horizontal: Boolean) =
+            if (horizontal) TouchScrollDelta(dx = pixels, dy = 0f) else TouchScrollDelta(dx = 0f, dy = pixels)
 
         private fun isGestureInterruptingFocusLoss(event: AWTEvent): Boolean =
             event is WindowEvent &&

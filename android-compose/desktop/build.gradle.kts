@@ -233,6 +233,12 @@ dependencies {
     implementation("org.jetbrains.skiko:skiko-awt:0.9.37.3")
     implementation("io.github.justdeko:kuiver:$kuiverVersion")
     implementation("sh.calvin.autolinktext:autolinktext:$autoLinkTextVersion")
+    // Conversation tab strip drag-to-reorder (letta-mobile#1258): same
+    // library the mobile dashboard already uses for its pinned-items grid
+    // (see app/build.gradle.kts and HomeScreenWidgets.kt's
+    // ReorderablePinnedItemsGrid) -- Kotlin Multiplatform, resolves to the
+    // JVM/desktop artifact here via Gradle module metadata.
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.arjunjadeja:texty:$textyVersion")
     implementation("com.kizitonwose.calendar:compose-multiplatform:$calendarVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")

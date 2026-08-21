@@ -353,3 +353,71 @@ internal fun wheelRotationForDrag(dragPx: Float, viewportExtentPx: Int): Double 
     if (viewportExtentPx <= 0) return 0.0
     return -dragPx.toDouble() * TOUCH_SCROLL_GAIN * WHEEL_SCROLL_DIVISOR / viewportExtentPx
 }
+
+/**
+ * Smoothed per-axis velocity of a Windows touch pan, used to seed the coast
+ * when the finger lifts.
+ *
+ * Axes are tracked separately on purpose. A single pan interleaves both: a
+ * mostly-vertical swipe still emits small horizontal samples, frequently of
+ * the opposite sign, between the vertical ones. Folding them into one running
+ * average lets the minor axis pull the major axis' velocity toward — and past
+ * — zero, which shows up on hardware as a fling that kicks backwards on
+ * release.
+ */
+internal class DesktopTouchPanVelocity(
+    private val maxPxPerMs: Float = MAX_PAN_VELOCITY_PX_PER_MS,
+    private val smoothing: Float = PAN_VELOCITY_SMOOTHING,
+) {
+    private var velocityX = 0f
+    private var velocityY = 0f
+    private var lastMillisX = 0L
+    private var lastMillisY = 0L
+
+    fun reset(atMillis: Long) {
+        velocityX = 0f
+        velocityY = 0f
+        lastMillisX = atMillis
+        lastMillisY = atMillis
+    }
+
+    fun record(sample: TouchPanSample) {
+        val last = if (sample.horizontal) lastMillisX else lastMillisY
+        val elapsed = (sample.atMillis - last).coerceAtLeast(1L)
+        val instant = (sample.pixels / elapsed).coerceIn(-maxPxPerMs, maxPxPerMs)
+        if (sample.horizontal) {
+            lastMillisX = sample.atMillis
+            velocityX = velocityX * (1f - smoothing) + instant * smoothing
+        } else {
+            lastMillisY = sample.atMillis
+            velocityY = velocityY * (1f - smoothing) + instant * smoothing
+        }
+    }
+
+    /**
+     * The velocity to coast on: the dominant axis only, so a near-vertical
+     * swipe does not drift sideways on release because of pan jitter.
+     */
+    fun dominant(): TouchScrollDelta =
+        if (abs(velocityX) > abs(velocityY)) {
+            TouchScrollDelta(dx = velocityX, dy = 0f)
+        } else {
+            TouchScrollDelta(dx = 0f, dy = velocityY)
+        }
+}
+
+/**
+ * One sample of an in-flight Windows touch pan: how far the content should
+ * travel, when the sample landed, and which axis it belongs to.
+ */
+internal data class TouchPanSample(
+    val pixels: Float,
+    val atMillis: Long,
+    val horizontal: Boolean,
+)
+
+/** Beyond this a "swipe" is sensor noise, not a gesture worth coasting on. */
+internal const val MAX_PAN_VELOCITY_PX_PER_MS = 6f
+
+/** Weight of the newest sample in the velocity average; the rest is history. */
+internal const val PAN_VELOCITY_SMOOTHING = 0.35f
