@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
@@ -18,28 +19,20 @@ class IrohAdminRpcConversationListSource(
     override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    override suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int?,
-        after: String?,
-        archiveStatus: String?,
-        summarySearch: String?,
-        order: String?,
-        orderBy: String?,
-    ): List<Conversation> {
-        val params = buildJsonObject {
-            agentId?.value?.let { put("agent_id", it) }
-            limit?.let { put("limit", it.toString()) }
-            after?.let { put("after", it) }
-            archiveStatus?.let { put("archive_status", it) }
-            summarySearch?.let { put("summary_search", it) }
-            order?.let { put("order", it) }
-            orderBy?.let { put("order_by", it) }
+    override suspend fun listConversations(params: ConversationListParams): List<Conversation> {
+        val rpcParams = buildJsonObject {
+            params.agentId?.value?.let { put("agent_id", it) }
+            params.limit?.let { put("limit", it.toString()) }
+            params.after?.let { put("after", it) }
+            params.archiveStatus?.let { put("archive_status", it) }
+            params.summarySearch?.let { put("summary_search", it) }
+            params.order?.let { put("order", it) }
+            params.orderBy?.let { put("order_by", it) }
         }
         val response = channelTransport.adminRpc(
             method = "conversation.list",
             path = "/v1/conversations",
-            body = params.toString(),
+            body = rpcParams.toString(),
         )
         if (!response.success) {
             error(response.error ?: "Iroh admin_rpc conversation.list failed")

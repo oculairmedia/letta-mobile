@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.model.ConversationUpdateParams
 import io.mockk.mockk
 import kotlinx.coroutines.delay
@@ -25,15 +26,7 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     val peakConcurrentListConversations = java.util.concurrent.atomic.AtomicInteger(0)
     private val inFlightListConversations = java.util.concurrent.atomic.AtomicInteger(0)
 
-    override suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int?,
-        after: String?,
-        archiveStatus: String?,
-        summarySearch: String?,
-        order: String?,
-        orderBy: String?,
-    ): List<Conversation> {
+    override suspend fun listConversations(params: ConversationListParams): List<Conversation> {
         val inFlight = inFlightListConversations.incrementAndGet()
         var observedPeak = peakConcurrentListConversations.get()
         while (inFlight > observedPeak && !peakConcurrentListConversations.compareAndSet(observedPeak, inFlight)) {
@@ -41,30 +34,30 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
         }
         try {
             calls.add("listConversations")
-            listLimits.add(limit)
+            listLimits.add(params.limit)
             if (listDelayMillis > 0L) delay(listDelayMillis.milliseconds)
             if (staleTransportIaeCountdown > 0) {
                 staleTransportIaeCountdown--
                 throw IllegalStateException("admin_rpc is not supported by this transport")
             }
             if (shouldFail) throw ApiException(500, "Server error")
-        val filtered = if (agentId != null) {
-            conversations.filter { it.agentId == agentId }
+        val filtered = if (params.agentId != null) {
+            conversations.filter { it.agentId == params.agentId }
         } else {
             conversations.toList()
         }
         val matching = filtered.filter { conversation ->
-            when (archiveStatus) {
+            when (params.archiveStatus) {
                 "archived" -> conversation.archived == true
                 "unarchived" -> conversation.archived != true
                 else -> true
             }
         }.filter { conversation ->
-            summarySearch == null || conversation.summary?.contains(summarySearch, ignoreCase = true) == true
+            params.summarySearch == null || conversation.summary?.contains(params.summarySearch, ignoreCase = true) == true
         }
-            val afterIndex = after?.let { cursor -> matching.indexOfFirst { it.id.value == cursor } } ?: -1
+            val afterIndex = params.after?.let { cursor -> matching.indexOfFirst { it.id.value == cursor } } ?: -1
             val afterPage = if (afterIndex >= 0) matching.drop(afterIndex + 1) else matching
-            return limit?.let { afterPage.take(it) } ?: afterPage
+            return params.limit?.let { afterPage.take(it) } ?: afterPage
         } finally {
             inFlightListConversations.decrementAndGet()
         }

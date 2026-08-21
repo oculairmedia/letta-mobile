@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.model.ConversationUpdateParams
 import kotlinx.coroutines.flow.Flow
 
@@ -14,15 +15,7 @@ import kotlinx.coroutines.flow.Flow
  * through [ConversationIrohSource].
  */
 interface ConversationRemoteSource {
-    suspend fun listConversations(
-        agentId: AgentId? = null,
-        limit: Int? = null,
-        after: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
-        order: String? = null,
-        orderBy: String? = null,
-    ): List<Conversation>
+    suspend fun listConversations(params: ConversationListParams = ConversationListParams()): List<Conversation>
 
     suspend fun getConversation(conversationId: ConversationId): Conversation
     suspend fun createConversation(params: ConversationCreateParams): Conversation
@@ -70,15 +63,7 @@ interface ConversationLocalCache {
  */
 interface ConversationIrohSource {
     fun shouldUseIroh(): Boolean
-    suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int? = null,
-        after: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
-        order: String? = null,
-        orderBy: String? = null,
-    ): List<Conversation>
+    suspend fun listConversations(params: ConversationListParams = ConversationListParams()): List<Conversation>
 
     suspend fun listConversationsForAgent(agentId: AgentId, limit: Int? = null): List<Conversation>
     suspend fun getConversation(id: ConversationId): Conversation

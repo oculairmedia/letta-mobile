@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.model.ConversationUpdateParams
 import com.letta.mobile.data.repository.api.ConversationIrohSource
 import com.letta.mobile.data.repository.api.ConversationLocalCache
@@ -52,28 +53,11 @@ open class CachedConversationRepository(
         repositoryScope.launch {
             try {
                 val cache = localCache?.invoke() ?: return@launch
-                val cached = cache.getAllOnce()
-                val refreshStates = cache.getAllRefreshStatesOnce()
-                refreshMutex.withLock {
-                    // Do not overwrite a refresh that completed while getAllOnce
-                    // was suspended — that would publish a stale roster while
-                    // lastRefreshAtMillis still looks fresh.
-                    if (cached.isNotEmpty() && _conversationsByAgent.value.isEmpty()) {
-                        _conversationsByAgent.value = cached.groupBy { it.agentId }
-                    }
-                    if (lastRefreshAtMillisByAgent.isEmpty() && refreshStates.isNotEmpty()) {
-                        lastRefreshAtMillisByAgent.putAll(refreshStates)
-                    }
-                }
+                hydrateFromLocalCacheOnStartup(cache)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (e: Exception) {
-                Telemetry.event(
-                    "CachedConversationRepository",
-                    "Failed to load cached conversations",
-                    "error" to (e.message ?: e.toString()),
-                    level = Telemetry.Level.WARN,
-                )
+                logStartupCacheFailure(e)
             }
         }
     }
@@ -106,12 +90,9 @@ open class CachedConversationRepository(
     }
 
     private suspend fun refreshConversationsLocked(agentId: AgentId) {
-        val irohSource = irohConversationSource
-        val conversations = if (irohSource?.shouldUseIroh() == true) {
-            irohSource.listConversations(agentId = agentId)
-        } else {
-            remote.listConversations(agentId = agentId)
-        }
+        val params = ConversationListParams(agentId = agentId)
+        val conversations = activeIrohSource()?.listConversations(params)
+            ?: remote.listConversations(params)
         writeAgentConversations(agentId, conversations, nowMillis())
     }
 
@@ -127,10 +108,7 @@ open class CachedConversationRepository(
         agentId: AgentId,
         limit: Int,
     ): List<Conversation> = refreshMutex.withLock {
-        val irohSource = irohConversationSource
-        if (irohSource?.shouldUseIroh() != true) {
-            return@withLock emptyList()
-        }
+        val irohSource = activeIrohSource() ?: return@withLock emptyList()
         irohSource.listConversationsForAgent(agentId, limit)
     }
 
@@ -148,12 +126,7 @@ open class CachedConversationRepository(
 
     override suspend fun getConversation(id: ConversationId): Conversation {
         return try {
-            val irohSource = irohConversationSource
-            val fetched = if (irohSource?.shouldUseIroh() == true) {
-                irohSource.getConversation(id)
-            } else {
-                remote.getConversation(id)
-            }
+            val fetched = fetchConversationFromActiveSource(id)
             fetched.also { conversation -> upsertCachedConversation(conversation) }
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -163,18 +136,7 @@ open class CachedConversationRepository(
     }
 
     override suspend fun createConversation(agentId: AgentId, summary: String?): Conversation {
-        val irohSource = irohConversationSource
-        val conversation = when {
-            localConversationSource != null &&
-                AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value) ->
-                localConversationSource.createConversation(agentId, summary)
-            irohSource?.shouldUseIroh() == true ->
-                irohSource.createConversation(agentId, summary)
-            else -> {
-                val params = ConversationCreateParams(agentId = agentId, summary = summary)
-                remote.createConversation(params)
-            }
-        }
+        val conversation = createConversationViaActiveSource(agentId, summary)
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
     }
@@ -185,12 +147,7 @@ open class CachedConversationRepository(
         writeAgentConversations(agentId, optimistic, nowMillis())
 
         try {
-            val irohSource = irohConversationSource
-            if (irohSource?.shouldUseIroh() == true) {
-                irohSource.deleteConversation(id)
-            } else {
-                remote.deleteConversation(id)
-            }
+            activeIrohSource()?.deleteConversation(id) ?: remote.deleteConversation(id)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (e: Exception) {
@@ -200,61 +157,27 @@ open class CachedConversationRepository(
     }
 
     override suspend fun updateConversation(id: ConversationId, agentId: AgentId, summary: String) {
-        val snapshot = snapshotForAgent(agentId)
-        val conversationIndex = snapshot.indexOfFirst { it.id == id }
-        if (conversationIndex < 0) return
-
-        val optimisticList = snapshot.toMutableList()
-        optimisticList[conversationIndex] = snapshot[conversationIndex].copy(summary = summary)
-        writeAgentConversations(agentId, optimisticList, nowMillis())
-
-        try {
-            val irohSource = irohConversationSource
-            val updated = if (irohSource?.shouldUseIroh() == true) {
-                irohSource.updateConversation(id, summary)
-            } else {
-                remote.updateConversation(id, ConversationUpdateParams(summary = summary))
-            }
-            writeAgentConversations(
-                agentId = agentId,
-                conversations = optimisticList.map { if (it.id == updated.id) updated else it },
-                refreshedAtMillis = nowMillis(),
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            writeAgentConversations(agentId, snapshot, nowMillis())
-            throw e
-        }
+        mutateConversationOptimistically(
+            id = id,
+            agentId = agentId,
+            applyOptimistic = { conversation -> conversation.copy(summary = summary) },
+            remoteMutate = {
+                activeIrohSource()?.updateConversation(id, summary)
+                    ?: remote.updateConversation(id, ConversationUpdateParams(summary = summary))
+            },
+        )
     }
 
     override suspend fun setConversationArchived(id: ConversationId, agentId: AgentId, archived: Boolean) {
-        val snapshot = snapshotForAgent(agentId)
-        val conversationIndex = snapshot.indexOfFirst { it.id == id }
-        if (conversationIndex < 0) return
-
-        val optimisticList = snapshot.toMutableList()
-        optimisticList[conversationIndex] = snapshot[conversationIndex].copy(archived = archived)
-        writeAgentConversations(agentId, optimisticList, nowMillis())
-
-        try {
-            val irohSource = irohConversationSource
-            val updated = if (irohSource?.shouldUseIroh() == true) {
-                irohSource.setConversationArchived(id, archived)
-            } else {
-                remote.updateConversation(id, ConversationUpdateParams(archived = archived))
-            }
-            writeAgentConversations(
-                agentId = agentId,
-                conversations = optimisticList.map { if (it.id == updated.id) updated else it },
-                refreshedAtMillis = nowMillis(),
-            )
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (e: Exception) {
-            writeAgentConversations(agentId, snapshot, nowMillis())
-            throw e
-        }
+        mutateConversationOptimistically(
+            id = id,
+            agentId = agentId,
+            applyOptimistic = { conversation -> conversation.copy(archived = archived) },
+            remoteMutate = {
+                activeIrohSource()?.setConversationArchived(id, archived)
+                    ?: remote.updateConversation(id, ConversationUpdateParams(archived = archived))
+            },
+        )
     }
 
     override suspend fun cancelConversation(id: ConversationId, agentId: AgentId?) {
@@ -277,6 +200,81 @@ open class CachedConversationRepository(
         val conversation = remote.forkConversation(id, agentId)
         upsertCachedConversation(conversation, markAgentFresh = true)
         return conversation
+    }
+
+    private suspend fun hydrateFromLocalCacheOnStartup(cache: ConversationLocalCache) {
+        val cached = cache.getAllOnce()
+        val refreshStates = cache.getAllRefreshStatesOnce()
+        refreshMutex.withLock {
+            // Do not overwrite a refresh that completed while getAllOnce
+            // was suspended — that would publish a stale roster while
+            // lastRefreshAtMillis still looks fresh.
+            if (cached.isNotEmpty() && _conversationsByAgent.value.isEmpty()) {
+                _conversationsByAgent.value = cached.groupBy { it.agentId }
+            }
+            if (lastRefreshAtMillisByAgent.isEmpty() && refreshStates.isNotEmpty()) {
+                lastRefreshAtMillisByAgent.putAll(refreshStates)
+            }
+        }
+    }
+
+    private fun logStartupCacheFailure(error: Exception) {
+        Telemetry.event(
+            "CachedConversationRepository",
+            "Failed to load cached conversations",
+            "error" to (error.message ?: error.toString()),
+            level = Telemetry.Level.WARN,
+        )
+    }
+
+    private fun activeIrohSource(): ConversationIrohSource? =
+        irohConversationSource?.takeIf { it.shouldUseIroh() }
+
+    private suspend fun fetchConversationFromActiveSource(id: ConversationId): Conversation =
+        activeIrohSource()?.getConversation(id) ?: remote.getConversation(id)
+
+    private suspend fun createConversationViaActiveSource(agentId: AgentId, summary: String?): Conversation {
+        val irohSource = activeIrohSource()
+        return when {
+            localConversationSource != null &&
+                AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value) ->
+                localConversationSource.createConversation(agentId, summary)
+            irohSource != null ->
+                irohSource.createConversation(agentId, summary)
+            else -> {
+                val params = ConversationCreateParams(agentId = agentId, summary = summary)
+                remote.createConversation(params)
+            }
+        }
+    }
+
+    private suspend fun mutateConversationOptimistically(
+        id: ConversationId,
+        agentId: AgentId,
+        applyOptimistic: (Conversation) -> Conversation,
+        remoteMutate: suspend () -> Conversation,
+    ) {
+        val snapshot = snapshotForAgent(agentId)
+        val conversationIndex = snapshot.indexOfFirst { it.id == id }
+        if (conversationIndex < 0) return
+
+        val optimisticList = snapshot.toMutableList()
+        optimisticList[conversationIndex] = applyOptimistic(snapshot[conversationIndex])
+        writeAgentConversations(agentId, optimisticList, nowMillis())
+
+        try {
+            val updated = remoteMutate()
+            writeAgentConversations(
+                agentId = agentId,
+                conversations = optimisticList.map { if (it.id == updated.id) updated else it },
+                refreshedAtMillis = nowMillis(),
+            )
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (e: Exception) {
+            writeAgentConversations(agentId, snapshot, nowMillis())
+            throw e
+        }
     }
 
     private suspend fun snapshotForAgent(agentId: AgentId): List<Conversation> {

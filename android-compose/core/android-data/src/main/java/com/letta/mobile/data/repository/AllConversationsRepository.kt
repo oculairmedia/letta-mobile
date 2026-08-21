@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCountEstimate
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.paging.ConversationPagingSource
 import com.letta.mobile.data.model.AgentRuntimeBinding
 import com.letta.mobile.data.repository.api.IAllConversationsRepository
@@ -105,17 +106,7 @@ open class AllConversationsRepository(
         order = "desc",
         orderBy = "last_message_at",
         pageLoader = irohConversationListSource?.takeIf { it.shouldUseIroh() }?.let { source ->
-            { pageAgentId, limit, after, pageArchiveStatus, pageSummarySearch, order, orderBy ->
-                source.listConversations(
-                    agentId = pageAgentId,
-                    limit = limit,
-                    after = after,
-                    archiveStatus = pageArchiveStatus,
-                    summarySearch = pageSummarySearch,
-                    order = order,
-                    orderBy = orderBy,
-                )
-            }
+            { params -> source.listConversations(params) }
         },
     )
 
@@ -258,16 +249,19 @@ open class AllConversationsRepository(
         val irohSource = irohConversationListSource
         return if (irohSource?.shouldUseIroh() == true) {
             irohSource.listConversations(
-                agentId = null,
-                limit = PAGE_SIZE,
-                after = after,
-                order = "desc",
-                orderBy = "last_message_at",
+                ConversationListParams(
+                    limit = PAGE_SIZE,
+                    after = after,
+                    order = "desc",
+                    orderBy = "last_message_at",
+                ),
             )
         } else {
             conversationApi.listConversations(
-                limit = PAGE_SIZE,
-                after = after,
+                ConversationListParams(
+                    limit = PAGE_SIZE,
+                    after = after,
+                ),
             )
         }
     }

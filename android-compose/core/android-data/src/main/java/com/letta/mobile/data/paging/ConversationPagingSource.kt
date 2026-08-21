@@ -5,16 +5,9 @@ import androidx.paging.PagingState
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationListParams
 
-internal typealias ConversationPageLoader = suspend (
-    agentId: AgentId?,
-    limit: Int,
-    after: String?,
-    archiveStatus: String?,
-    summarySearch: String?,
-    order: String?,
-    orderBy: String?,
-) -> List<Conversation>
+internal typealias ConversationPageLoader = suspend (ConversationListParams) -> List<Conversation>
 
 class ConversationPagingSource(
     private val conversationApi: ConversationApi,
@@ -30,23 +23,27 @@ class ConversationPagingSource(
         return try {
             val conversations = if (pageLoader != null) {
                 pageLoader.invoke(
-                    agentId,
-                    params.loadSize,
-                    params.key,
-                    archiveStatus,
-                    summarySearch,
-                    order,
-                    orderBy,
+                    ConversationListParams(
+                        agentId = agentId,
+                        limit = params.loadSize,
+                        after = params.key,
+                        archiveStatus = archiveStatus,
+                        summarySearch = summarySearch,
+                        order = order,
+                        orderBy = orderBy,
+                    ),
                 )
             } else {
                 conversationApi.listConversations(
-                    agentId = agentId,
-                    limit = params.loadSize,
-                    after = params.key,
-                    archiveStatus = archiveStatus,
-                    summarySearch = summarySearch,
-                    order = order,
-                    orderBy = orderBy,
+                    ConversationListParams(
+                        agentId = agentId,
+                        limit = params.loadSize,
+                        after = params.key,
+                        archiveStatus = archiveStatus,
+                        summarySearch = summarySearch,
+                        order = order,
+                        orderBy = orderBy,
+                    ),
                 )
             }
             LoadResult.Page(

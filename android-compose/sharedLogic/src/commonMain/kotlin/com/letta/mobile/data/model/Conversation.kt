@@ -52,3 +52,14 @@ data class ConversationUpdateParams(
     val model: String? = null,
     @SerialName("model_settings") val modelSettings: ModelSettings? = null,
 )
+
+@Serializable
+data class ConversationListParams(
+    @SerialName("agent_id") val agentId: AgentId? = null,
+    val limit: Int? = null,
+    val after: String? = null,
+    @SerialName("archive_status") val archiveStatus: String? = null,
+    @SerialName("summary_search") val summarySearch: String? = null,
+    val order: String? = null,
+    @SerialName("order_by") val orderBy: String? = null,
+)

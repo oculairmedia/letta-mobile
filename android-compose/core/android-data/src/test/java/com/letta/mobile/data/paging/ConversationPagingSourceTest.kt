@@ -229,9 +229,7 @@ class ConversationPagingSourceTest {
                 ),
             ),
         )
-        return { agentId, limit, after, archiveStatus, summarySearch, order, orderBy ->
-            source.listConversations(agentId, limit, after, archiveStatus, summarySearch, order, orderBy)
-        }
+        return { params -> source.listConversations(params) }
     }
 
     private fun irohSuccess(conversations: List<Conversation>) = AppServerInboundFrame.AdminRpcResponse(

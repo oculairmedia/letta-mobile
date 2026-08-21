@@ -12,25 +12,17 @@ import javax.inject.Singleton
 open class ConversationApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) : com.letta.mobile.data.repository.api.ConversationRemoteSource {
-    open override suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int?,
-        after: String?,
-        archiveStatus: String?,
-        summarySearch: String?,
-        order: String?,
-        orderBy: String?,
-    ): List<Conversation> {
+    open override suspend fun listConversations(params: ConversationListParams): List<Conversation> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/conversations") {
-            parameter("agent_id", agentId?.value)
-            parameter("limit", limit)
-            parameter("after", after)
-            parameter("archive_status", archiveStatus)
-            parameter("summary_search", summarySearch)
-            parameter("order", order)
-            parameter("order_by", orderBy)
+            parameter("agent_id", params.agentId?.value)
+            parameter("limit", params.limit)
+            parameter("after", params.after)
+            parameter("archive_status", params.archiveStatus)
+            parameter("summary_search", params.summarySearch)
+            parameter("order", params.order)
+            parameter("order_by", params.orderBy)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -46,7 +38,17 @@ open class ConversationApi @Inject constructor(
         summarySearch: String? = null,
         order: String? = null,
         orderBy: String? = null,
-    ): List<Conversation> = listConversations(agentId?.let(::AgentId), limit, after, archiveStatus, summarySearch, order, orderBy)
+    ): List<Conversation> = listConversations(
+        ConversationListParams(
+            agentId = agentId?.let(::AgentId),
+            limit = limit,
+            after = after,
+            archiveStatus = archiveStatus,
+            summarySearch = summarySearch,
+            order = order,
+            orderBy = orderBy,
+        ),
+    )
 
     open override suspend fun getConversation(conversationId: ConversationId): Conversation {
         val (client, baseUrl) = apiClient.session()

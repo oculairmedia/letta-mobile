@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.ConversationCreateParams
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.model.ConversationUpdateParams
 import io.mockk.mockk
 
@@ -22,15 +23,7 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
     private val inFlightListConversations = java.util.concurrent.atomic.AtomicInteger(0)
     val peakConcurrentListConversations = java.util.concurrent.atomic.AtomicInteger(0)
 
-    override suspend fun listConversations(
-        agentId: AgentId?,
-        limit: Int?,
-        after: String?,
-        archiveStatus: String?,
-        summarySearch: String?,
-        order: String?,
-        orderBy: String?,
-    ): List<Conversation> {
+    override suspend fun listConversations(params: ConversationListParams): List<Conversation> {
         calls.add("listConversations")
         val inFlight = inFlightListConversations.incrementAndGet()
         // Update peak using a CAS-style spin so concurrent updates don't
@@ -41,19 +34,19 @@ class FakeConversationApi : ConversationApi(mockk(relaxed = true)) {
         }
         try {
             if (shouldFail) throw ApiException(500, "Server error")
-            val filtered = if (agentId != null) {
-                conversations.filter { it.agentId == agentId }
+            val filtered = if (params.agentId != null) {
+                conversations.filter { it.agentId == params.agentId }
             } else {
                 conversations.toList()
             }
             return filtered.filter { conversation ->
-                when (archiveStatus) {
+                when (params.archiveStatus) {
                     "archived" -> conversation.archived == true
                     "unarchived" -> conversation.archived != true
                     else -> true
                 }
             }.filter { conversation ->
-                summarySearch == null || conversation.summary?.contains(summarySearch, ignoreCase = true) == true
+                params.summarySearch == null || conversation.summary?.contains(params.summarySearch, ignoreCase = true) == true
             }
         } finally {
             inFlightListConversations.decrementAndGet()
