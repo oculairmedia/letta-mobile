@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
 import com.letta.mobile.data.model.FolderId
+import com.letta.mobile.data.model.FolderListParams
 import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.LettaConfig
@@ -45,7 +46,7 @@ class FolderRepositoryTest {
             )
         )
         val apiThatThrows = object : FakeFolderApi() {
-            override suspend fun listFolders(before: String?, after: String?, limit: Int?, order: String?, name: String?): List<Folder> {
+            override suspend fun listFolders(params: FolderListParams): List<Folder> {
                 throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
             }
         }
@@ -72,7 +73,7 @@ class FolderRepositoryTest {
         }
         val irohSource = IrohAdminRpcFolderSource(transport, settings)
         val apiThatThrows = object : FakeFolderApi() {
-            override suspend fun listFolders(before: String?, after: String?, limit: Int?, order: String?, name: String?): List<Folder> {
+            override suspend fun listFolders(params: FolderListParams): List<Folder> {
                 throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
             }
         }

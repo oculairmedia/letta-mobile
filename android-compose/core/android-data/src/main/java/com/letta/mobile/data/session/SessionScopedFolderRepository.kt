@@ -3,6 +3,7 @@ package com.letta.mobile.data.session
 import com.letta.mobile.data.model.FileMetadata
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
+import com.letta.mobile.data.model.FolderFileUploadParams
 import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.OrganizationSourcesStats
@@ -64,21 +65,8 @@ class SessionScopedFolderRepository internal constructor(
 
     override suspend fun deleteFolder(folderId: FolderId) = sessionManager.withCurrentSession { it.folderRepository.deleteFolder(folderId) }
 
-    override suspend fun uploadFileToFolder(
-        folderId: FolderId,
-        fileName: String,
-        fileBytes: ByteArray,
-        duplicateHandling: String?,
-        customName: String?,
-        contentType: ContentType,
-    ): FileMetadata = sessionManager.withCurrentSession { it.folderRepository.uploadFileToFolder(
-        folderId = folderId,
-        fileName = fileName,
-        fileBytes = fileBytes,
-        duplicateHandling = duplicateHandling,
-        customName = customName,
-        contentType = contentType,
-    ) }
+    override suspend fun uploadFileToFolder(params: FolderFileUploadParams): FileMetadata =
+        sessionManager.withCurrentSession { it.folderRepository.uploadFileToFolder(params) }
 
     override suspend fun listAgentsForFolder(folderId: FolderId): List<String> =
         sessionManager.withCurrentSession { it.folderRepository.listAgentsForFolder(folderId) }

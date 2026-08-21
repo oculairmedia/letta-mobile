@@ -10,6 +10,7 @@ import com.letta.mobile.data.model.EmbeddingModel
 import com.letta.mobile.data.model.FileMetadata
 import com.letta.mobile.data.model.Folder
 import com.letta.mobile.data.model.FolderCreateParams
+import com.letta.mobile.data.model.FolderFileUploadParams
 import com.letta.mobile.data.model.FolderId
 import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.Group
@@ -203,14 +204,8 @@ internal class IrohFolderRepository(
     override suspend fun deleteFolder(folderId: FolderId) =
         unsupported("folder.delete(${folderId.value})")
 
-    override suspend fun uploadFileToFolder(
-        folderId: FolderId,
-        fileName: String,
-        fileBytes: ByteArray,
-        duplicateHandling: String?,
-        customName: String?,
-        contentType: ContentType,
-    ): FileMetadata = unsupported("folder.uploadFile(${folderId.value})")
+    override suspend fun uploadFileToFolder(params: FolderFileUploadParams): FileMetadata =
+        unsupported("folder.uploadFile(${params.folderId.value})")
 
     override suspend fun listAgentsForFolder(folderId: FolderId): List<String> =
         unsupported("folder.listAgents(${folderId.value})")
