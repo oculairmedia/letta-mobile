@@ -381,15 +381,15 @@ internal class DesktopTouchPanVelocity(
         lastMillisY = atMillis
     }
 
-    fun record(pixels: Float, atMillis: Long, horizontal: Boolean) {
-        val last = if (horizontal) lastMillisX else lastMillisY
-        val elapsed = (atMillis - last).coerceAtLeast(1L)
-        val instant = (pixels / elapsed).coerceIn(-maxPxPerMs, maxPxPerMs)
-        if (horizontal) {
-            lastMillisX = atMillis
+    fun record(sample: TouchPanSample) {
+        val last = if (sample.horizontal) lastMillisX else lastMillisY
+        val elapsed = (sample.atMillis - last).coerceAtLeast(1L)
+        val instant = (sample.pixels / elapsed).coerceIn(-maxPxPerMs, maxPxPerMs)
+        if (sample.horizontal) {
+            lastMillisX = sample.atMillis
             velocityX = velocityX * (1f - smoothing) + instant * smoothing
         } else {
-            lastMillisY = atMillis
+            lastMillisY = sample.atMillis
             velocityY = velocityY * (1f - smoothing) + instant * smoothing
         }
     }
@@ -405,6 +405,16 @@ internal class DesktopTouchPanVelocity(
             TouchScrollDelta(dx = 0f, dy = velocityY)
         }
 }
+
+/**
+ * One sample of an in-flight Windows touch pan: how far the content should
+ * travel, when the sample landed, and which axis it belongs to.
+ */
+internal data class TouchPanSample(
+    val pixels: Float,
+    val atMillis: Long,
+    val horizontal: Boolean,
+)
 
 /** Beyond this a "swipe" is sensor noise, not a gesture worth coasting on. */
 internal const val MAX_PAN_VELOCITY_PX_PER_MS = 6f

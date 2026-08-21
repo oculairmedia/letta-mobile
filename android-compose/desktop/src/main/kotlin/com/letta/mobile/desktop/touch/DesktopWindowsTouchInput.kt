@@ -240,7 +240,7 @@ internal object DesktopWindowsTouchInput {
                 }
             }
 
-            panVelocity.record(pixels, event.getWhen(), horizontal)
+            panVelocity.record(TouchPanSample(pixels, event.getWhen(), horizontal))
             dispatchScroll(component, event, panDelta(pixels, horizontal))
             return true
         }
