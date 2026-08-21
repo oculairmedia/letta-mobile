@@ -11,6 +11,7 @@ import com.letta.mobile.data.model.ProjectSyncTriggerRequest
 import com.letta.mobile.data.model.ProjectSyncTriggerResponse
 import com.letta.mobile.data.model.ProjectSummary
 import com.letta.mobile.data.repository.api.ISettingsRepository
+import com.letta.mobile.data.repository.api.ProjectIrohSource
 import com.letta.mobile.data.repository.iroh.AdminRpcCall
 import com.letta.mobile.data.repository.iroh.AdminRpcMethod
 import com.letta.mobile.data.repository.iroh.AdminRpcPath
@@ -41,8 +42,8 @@ open class IrohAdminRpcProjectSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
+) : ProjectIrohSource {
+    override fun shouldUseIroh(): Boolean = settingsRepository.activeBackendIsIroh()
 
     suspend fun probeAvailability(): Boolean = try {
         refreshProjects(ProjectListLimit(1))
@@ -53,6 +54,8 @@ open class IrohAdminRpcProjectSource(
         false
     }
 
+    override suspend fun refreshProjects(): ProjectCatalog = refreshProjects(limit = null)
+
     open suspend fun refreshProjects(limit: ProjectListLimit? = null): ProjectCatalog {
         val path = ProjectRpcPaths.list(limit)
         val body = ProjectRpcBodies.listLimit(limit)
@@ -61,12 +64,17 @@ open class IrohAdminRpcProjectSource(
         return json.decodeFromJsonElement(ProjectCatalog.serializer(), result)
     }
 
+    override suspend fun getProject(identifier: String): ProjectSummary = getProject(ProjectId(identifier))
+
     suspend fun getProject(projectId: ProjectId): ProjectSummary {
         val project = ProjectRpcRef(projectId)
         val result = rpc(projectRpc(ProjectRpcMethods.Get, project.apiPath(), project.idBody()))
             ?: error("Iroh admin_rpc project.get returned no result")
         return json.decodeFromJsonElement(ProjectDetailResponse.serializer(), result).project
     }
+
+    override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus =
+        getBeadsRemoteStatus(ProjectId(identifier))
 
     suspend fun getBeadsRemoteStatus(projectId: ProjectId): BeadsRemoteStatus {
         val project = ProjectRpcRef(projectId)
@@ -79,6 +87,9 @@ open class IrohAdminRpcProjectSource(
         ) ?: error("Iroh admin_rpc project.beadsRemoteStatus returned no result")
         return json.decodeFromJsonElement(BeadsRemoteStatus.serializer(), result)
     }
+
+    override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse =
+        provisionBeadsRemote(ProjectId(identifier), push)
 
     suspend fun provisionBeadsRemote(
         projectId: ProjectId,
@@ -99,6 +110,9 @@ open class IrohAdminRpcProjectSource(
         return json.decodeFromJsonElement(BeadsRemoteProvisionResponse.serializer(), result)
     }
 
+    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse =
+        triggerSync(ProjectId(identifier))
+
     suspend fun triggerSync(projectId: ProjectId): ProjectSyncTriggerResponse {
         val body = json.encodeToString(
             ProjectSyncTriggerRequest.serializer(),
@@ -109,6 +123,18 @@ open class IrohAdminRpcProjectSource(
         ) ?: error("Iroh admin_rpc project.triggerSync returned no result")
         return json.decodeFromJsonElement(ProjectSyncTriggerResponse.serializer(), result)
     }
+
+    override suspend fun createProject(
+        name: String?,
+        filesystemPath: String,
+        gitUrl: String?,
+    ): ProjectSummary = createProject(
+        ProjectCreateRpcParams(
+            name = name?.let(::ProjectDisplayName),
+            filesystemPath = ProjectFilesystemPath(filesystemPath),
+            gitUrl = gitUrl?.let(::ProjectGitUrl),
+        ),
+    )
 
     suspend fun createProject(params: ProjectCreateRpcParams): ProjectSummary {
         val body = json.encodeToString(
@@ -124,6 +150,18 @@ open class IrohAdminRpcProjectSource(
         ) ?: error("Iroh admin_rpc project.create returned no result")
         return json.decodeFromJsonElement(ProjectMutationResponse.serializer(), result).project
     }
+
+    override suspend fun updateProject(
+        identifier: String,
+        filesystemPath: String?,
+        gitUrl: String?,
+    ): ProjectSummary = updateProject(
+        ProjectUpdateRpcParams(
+            projectId = ProjectId(identifier),
+            filesystemPath = filesystemPath?.let(::ProjectFilesystemPath),
+            gitUrl = gitUrl?.let(::ProjectGitUrl),
+        ),
+    )
 
     suspend fun updateProject(params: ProjectUpdateRpcParams): ProjectSummary {
         val body = json.encodeToString(
@@ -142,6 +180,8 @@ open class IrohAdminRpcProjectSource(
         )
     }
 
+    override suspend fun archiveProject(identifier: String): ProjectSummary = archiveProject(ProjectId(identifier))
+
     suspend fun archiveProject(projectId: ProjectId): ProjectSummary {
         val body = json.encodeToString(
             ProjectUpdateRequest.serializer(),
@@ -155,6 +195,8 @@ open class IrohAdminRpcProjectSource(
             ),
         )
     }
+
+    override suspend fun deleteProject(identifier: String) = deleteProject(ProjectId(identifier))
 
     suspend fun deleteProject(projectId: ProjectId) {
         val project = ProjectRpcRef(projectId)
