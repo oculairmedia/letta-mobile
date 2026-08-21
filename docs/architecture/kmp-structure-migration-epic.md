@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–3c merged; Phase 4a–4b on `refactor/kmp-structure-phase-4`)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b conversations + Phase 6a entrypoint docs next)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -282,7 +282,9 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **Suggested slice PRs:** agents → conversations → tools → schedules → memory blocks.
 
-**5a (agents — in progress):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+**5a (agents — merged #1263):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+
+**5b (conversations — next):** same pattern for agent-scoped `ConversationRepository` (`CachedConversationRepository` + Room/Iroh/HTTP seams). `AllConversationsRepository` (paging) may follow as 5b.2 if the first PR is already large.
 
 ### Acceptance (per slice)
 
@@ -318,12 +320,12 @@ web/      → apps/web/
 
 ### Acceptance
 
-- [ ] One obvious runnable entry per platform in docs
-- [ ] CI/release scripts updated if paths move
+- [x] One obvious runnable entry per platform in docs ([kmp-phase-6-entrypoints.md](kmp-phase-6-entrypoints.md) — Phase 6a)
+- [ ] CI/release scripts updated if paths move (Option B only)
 
 ### Risk
 
-Medium for Option B; low for Option A.
+Medium for Option B; low for Option A / 6a docs.
 
 ---
 
