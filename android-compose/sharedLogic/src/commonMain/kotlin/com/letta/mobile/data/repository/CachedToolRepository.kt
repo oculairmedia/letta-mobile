@@ -47,13 +47,9 @@ open class CachedToolRepository(
     }
 
     private suspend fun refreshToolsLocked() {
-        val irohSource = irohToolSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            _tools.update { irohSource.listTools() }
-            lastRefreshAtMillis = nowMillis()
-            return
+        _tools.update {
+            activeIrohSource()?.listTools() ?: remote.listTools()
         }
-        _tools.update { remote.listTools() }
         lastRefreshAtMillis = nowMillis()
     }
 
@@ -72,30 +68,71 @@ open class CachedToolRepository(
     }
 
     override suspend fun attachTool(agentId: AgentId, toolId: ToolId) {
-        val irohSource = irohToolSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.attachTool(agentId.value, toolId.value)
-        } else {
-            remote.attachTool(agentId.value, toolId.value)
-        }
-        val tool = _tools.value.find { it.id == toolId }
-        if (tool != null) {
-            _toolsByAgent.update { current ->
-                current.toMutableMap().apply {
-                    val existing = get(agentId.value) ?: emptyList()
-                    put(agentId.value, existing + tool)
-                }
-            }
+        viaActiveSource(
+            iroh = { it.attachTool(agentId.value, toolId.value) },
+            remote = { remote.attachTool(agentId.value, toolId.value) },
+        )
+        _tools.value.find { it.id == toolId }?.let { tool ->
+            addToolToAgentCache(agentId, tool)
         }
     }
 
     override suspend fun detachTool(agentId: AgentId, toolId: ToolId) {
-        val irohSource = irohToolSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.detachTool(agentId.value, toolId.value)
-        } else {
-            remote.detachTool(agentId.value, toolId.value)
+        viaActiveSource(
+            iroh = { it.detachTool(agentId.value, toolId.value) },
+            remote = { remote.detachTool(agentId.value, toolId.value) },
+        )
+        removeToolFromAgentCache(agentId, toolId)
+    }
+
+    override suspend fun upsertTool(params: ToolCreateParams): Tool {
+        val tool = viaActiveSource(
+            iroh = { it.createTool(params) },
+            remote = { remote.upsertTool(params) },
+        )
+        upsertToolInGlobalList(tool)
+        return tool
+    }
+
+    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
+        val tool = viaActiveSource(
+            iroh = { it.updateTool(toolId.value, params) },
+            remote = { remote.updateTool(toolId.value, params) },
+        )
+        replaceToolInGlobalList(tool)
+        replaceToolInAgentLists(tool)
+        return tool
+    }
+
+    override suspend fun deleteTool(toolId: ToolId) {
+        viaActiveSource(
+            iroh = { it.deleteTool(toolId.value) },
+            remote = { remote.deleteTool(toolId.value) },
+        )
+        removeToolFromAllCaches(toolId)
+    }
+
+    private fun activeIrohSource(): ToolIrohSource? =
+        irohToolSource?.takeIf { it.shouldUseIroh() }
+
+    private suspend fun <T> viaActiveSource(
+        iroh: suspend (ToolIrohSource) -> T,
+        remote: suspend () -> T,
+    ): T {
+        val source = activeIrohSource()
+        return if (source != null) iroh(source) else remote()
+    }
+
+    private fun addToolToAgentCache(agentId: AgentId, tool: Tool) {
+        _toolsByAgent.update { current ->
+            current.toMutableMap().apply {
+                val existing = get(agentId.value) ?: emptyList()
+                put(agentId.value, existing + tool)
+            }
         }
+    }
+
+    private fun removeToolFromAgentCache(agentId: AgentId, toolId: ToolId) {
         _toolsByAgent.update { current ->
             current.toMutableMap().apply {
                 val existing = get(agentId.value) ?: emptyList()
@@ -104,45 +141,28 @@ open class CachedToolRepository(
         }
     }
 
-    override suspend fun upsertTool(params: ToolCreateParams): Tool {
-        val irohSource = irohToolSource
-        val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.createTool(params)
-        } else {
-            remote.upsertTool(params)
-        }
+    private fun upsertToolInGlobalList(tool: Tool) {
         _tools.update { current ->
             val index = current.indexOfFirst { it.id == tool.id }
             if (index >= 0) current.toMutableList().apply { this[index] = tool } else current + tool
         }
-        return tool
     }
 
-    override suspend fun updateTool(toolId: ToolId, params: ToolUpdateParams): Tool {
-        val irohSource = irohToolSource
-        val tool = if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.updateTool(toolId.value, params)
-        } else {
-            remote.updateTool(toolId.value, params)
-        }
+    private fun replaceToolInGlobalList(tool: Tool) {
         _tools.update { current ->
             current.map { existing -> if (existing.id == tool.id) tool else existing }
         }
+    }
+
+    private fun replaceToolInAgentLists(tool: Tool) {
         _toolsByAgent.update { current ->
             current.mapValues { (_, tools) ->
                 tools.map { existing -> if (existing.id == tool.id) tool else existing }
             }
         }
-        return tool
     }
 
-    override suspend fun deleteTool(toolId: ToolId) {
-        val irohSource = irohToolSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deleteTool(toolId.value)
-        } else {
-            remote.deleteTool(toolId.value)
-        }
+    private fun removeToolFromAllCaches(toolId: ToolId) {
         _tools.update { current -> current.filterNot { it.id == toolId } }
         _toolsByAgent.update { current ->
             current.mapValues { (_, tools) -> tools.filterNot { it.id == toolId } }
