@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.chat.runtime.ChatGateway
+import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
@@ -18,8 +19,11 @@ class MessageApiChatGateway(
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
         translateConversationApiErrors {
             conversationApi.listConversations(
+                agentId = null as AgentId?,
                 limit = limit,
+                after = null,
                 archiveStatus = archiveStatus,
+                summarySearch = null,
                 order = "desc",
                 orderBy = "last_message_at",
             )

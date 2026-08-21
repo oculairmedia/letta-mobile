@@ -93,7 +93,15 @@ open class ConversationRepository(
         val conversations = if (irohSource?.shouldUseIroh() == true) {
             irohSource.listConversations(agentId = agentId)
         } else {
-            conversationApi.listConversations(agentId = agentId)
+            conversationApi.listConversations(
+                agentId = agentId,
+                limit = null,
+                after = null,
+                archiveStatus = null,
+                summarySearch = null,
+                order = null,
+                orderBy = null,
+            )
         }
         val refreshedAt = System.currentTimeMillis()
         writeAgentConversations(agentId, conversations, refreshedAt)

@@ -1,6 +1,7 @@
 package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.*
+import com.letta.mobile.data.repository.api.ConversationRemoteSource
 import io.ktor.client.call.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -11,15 +12,15 @@ import javax.inject.Singleton
 @Singleton
 open class ConversationApi @Inject constructor(
     private val apiClient: LettaApiClient
-) {
-    open suspend fun listConversations(
-        agentId: AgentId? = null,
-        limit: Int? = null,
-        after: String? = null,
-        archiveStatus: String? = null,
-        summarySearch: String? = null,
-        order: String? = null,
-        orderBy: String? = null,
+) : ConversationRemoteSource {
+    open override suspend fun listConversations(
+        agentId: AgentId?,
+        limit: Int?,
+        after: String?,
+        archiveStatus: String?,
+        summarySearch: String?,
+        order: String?,
+        orderBy: String?,
     ): List<Conversation> {
         val (client, baseUrl) = apiClient.session()
 

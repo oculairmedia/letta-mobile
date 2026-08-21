@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5o + Phase 6a in flight)  
+**Status:** in progress (Phase 0–4c + Phase 5a–5o merged; Phase 5p / 5b.2 + Phase 6a in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -310,7 +310,11 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5n (projects / project work — #1276):** `CachedProjectRepository` + `ProjectRemoteSource` / `ProjectIrohSource` (`IrohAdminRpcProjectSource`); `CachedProjectWorkRepository` + `ProjectWorkRemoteSource`; Android thin binders. Platform-neutral git URL credential stripping (regex) and freshness timestamps (`kotlinx.datetime`); idempotency keys use `kotlin.uuid.Uuid` (`kmp-` prefix). `IrohAdminRpcProjectSource` stays in `core:android-data` for this slice.
 
-**5o (bug reports / slash commands / vibesync — this PR):** `CachedBugReportRepository` + `BugReportLocalStore` (`RoomBugReportLocalStore`); `CachedSlashCommandRepository` + `SlashCommandRemoteSource` / `SlashCommandIrohSource` (`SlashCommandApi`, `IrohAdminRpcSlashCommandSource` with platform-supplied `deviceId`/`clientVersion`); `CachedVibesyncEventStreamRepository` + `VibesyncEventStreamSource` / `VibesyncEventStreamLogger` (`LettaHttpVibesyncEventStreamSource`, `AndroidVibesyncEventStreamLogger`). HTTP/Iroh routing, SSE loop, and `routeRawEvent` live in sharedLogic; Room/HTTP/Iroh connect bindings stay in `core:android-data`.
+**5o (bug reports / slash commands / vibesync — merged #1278):** `CachedBugReportRepository` + `BugReportLocalStore` (`RoomBugReportLocalStore`); `CachedSlashCommandRepository` + `SlashCommandRemoteSource` / `SlashCommandIrohSource` (`SlashCommandApi`, `IrohAdminRpcSlashCommandSource` with platform-supplied `deviceId`/`clientVersion`); `CachedVibesyncEventStreamRepository` + `VibesyncEventStreamSource` / `VibesyncEventStreamLogger` (`LettaHttpVibesyncEventStreamSource`, `AndroidVibesyncEventStreamLogger`). HTTP/Iroh routing, SSE loop, and `routeRawEvent` live in sharedLogic; Room/HTTP/Iroh connect bindings stay in `core:android-data`.
+
+**5p (messages — this PR):** `CachedMessageRepository` + `MessageRemoteSource` / `MessageIrohTimelineSource` (`MessageApi`, `IrohAdminRpcMessageTimelineSource`, existing `IrohAdminRpcApprovalSource`); fetch / older-pages / batches / approval / inspector / reset orchestration in `sharedLogic/jvmAndAndroid`; `getMessagesPaged` stays in Android `MessageRepository` binder (`MessagePagingSource`). `ApiToDomainMessageMapper` moved to sharedLogic for platform-neutral `toAppMessages()`.
+
+**5b.2 (all conversations list — this PR):** `CachedAllConversationsRepository` + `ConversationRemoteSource` / `AllConversationsLocalCache` (`ConversationApi`, `RoomAllConversationsLocalCache`, existing `LocalRuntimeConversationSource` + `IrohAdminRpcConversationListSource`); refresh/cache/hasMore/cursor/optimistic updates in sharedLogic with `kotlin.time.Clock` + `Telemetry`; `getConversationsPaged` stays in Android `AllConversationsRepository` binder (`ConversationPagingSource`).
 
 ### Acceptance (per slice)
 

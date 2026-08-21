@@ -1,6 +1,7 @@
 package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.*
+import com.letta.mobile.data.repository.api.MessageRemoteSource
 import io.ktor.client.call.*
 import io.ktor.client.plugins.HttpTimeoutConfig
 import io.ktor.client.plugins.timeout
@@ -24,7 +25,7 @@ import javax.inject.Singleton
 @Singleton
 open class MessageApi @Inject constructor(
     private val apiClient: LettaApiClient
-) {
+) : MessageRemoteSource {
     private val json = Json { ignoreUnknownKeys = true }
 
     companion object {
@@ -101,10 +102,10 @@ open class MessageApi @Inject constructor(
      * @param beforeMessageId Fetch messages before this message ID (for pagination)
      * @return List of messages in chronological order (oldest first), limited to messageLimit
      */
-    open suspend fun fetchRecentMessages(
+    open override suspend fun fetchRecentMessages(
         conversationId: ConversationId,
-        messageLimit: Int = 20,
-        beforeMessageId: String? = null,
+        messageLimit: Int,
+        beforeMessageId: String?,
     ): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
@@ -153,7 +154,7 @@ open class MessageApi @Inject constructor(
         beforeMessageId: String? = null,
     ): List<LettaMessage> = fetchRecentMessages(ConversationId(conversationId), messageLimit, beforeMessageId)
 
-    open suspend fun sendMessage(agentId: AgentId, request: MessageCreateRequest): LettaResponse {
+    open override suspend fun sendMessage(agentId: AgentId, request: MessageCreateRequest): LettaResponse {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/${agentId.value}/messages") {
@@ -279,13 +280,13 @@ open class MessageApi @Inject constructor(
 
 
     open suspend fun streamConversation(conversationId: String): ByteReadChannel = streamConversation(ConversationId(conversationId))
-    open suspend fun listMessages(
+    open override suspend fun listMessages(
         agentId: AgentId,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-        conversationId: ConversationId? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+        conversationId: ConversationId?,
     ): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
@@ -312,11 +313,11 @@ open class MessageApi @Inject constructor(
         conversationId: String? = null,
     ): List<LettaMessage> = listMessages(AgentId(agentId), limit, before, after, order, conversationId?.let(::ConversationId))
 
-    open suspend fun listConversationMessages(
+    open override suspend fun listConversationMessages(
         conversationId: ConversationId,
-        limit: Int? = null,
-        after: String? = null,
-        order: String? = null,
+        limit: Int?,
+        after: String?,
+        order: String?,
     ): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
@@ -339,7 +340,7 @@ open class MessageApi @Inject constructor(
         order: String? = null,
     ): List<LettaMessage> = listConversationMessages(ConversationId(conversationId), limit, after, order)
 
-    open suspend fun resetMessages(agentId: AgentId) {
+    open override suspend fun resetMessages(agentId: AgentId) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/reset-messages") {
@@ -352,7 +353,7 @@ open class MessageApi @Inject constructor(
 
     open suspend fun resetMessages(agentId: String) = resetMessages(AgentId(agentId))
 
-    open suspend fun cancelMessage(agentId: AgentId, runIds: List<String>? = null): Map<String, String> {
+    open override suspend fun cancelMessage(agentId: AgentId, runIds: List<String>?): Map<String, String> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/${agentId.value}/messages/cancel") {
@@ -368,7 +369,7 @@ open class MessageApi @Inject constructor(
     open suspend fun cancelMessage(agentId: String, runIds: List<String>? = null): Map<String, String> =
         cancelMessage(AgentId(agentId), runIds)
 
-    open suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
+    open override suspend fun searchMessages(request: MessageSearchRequest): List<MessageSearchResult> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/messages/search") {
@@ -415,7 +416,7 @@ open class MessageApi @Inject constructor(
             ?: (this["embedded_text"] as? JsonPrimitive)?.contentOrNull
     }
 
-    open suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
+    open override suspend fun createBatch(request: CreateBatchMessagesRequest): Job {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/messages/batches") {
@@ -428,7 +429,7 @@ open class MessageApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveBatch(batchId: String): Job {
+    open override suspend fun retrieveBatch(batchId: String): Job {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/messages/batches/$batchId")
@@ -438,11 +439,11 @@ open class MessageApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listBatches(
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
+    open override suspend fun listBatches(
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
     ): List<Job> {
         val (client, baseUrl) = apiClient.session()
 
@@ -458,13 +459,13 @@ open class MessageApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listBatchMessages(
+    open override suspend fun listBatchMessages(
         batchId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-        agentId: String? = null,
+        limit: Int?,
+        before: String?,
+        after: String?,
+        order: String?,
+        agentId: String?,
     ): BatchMessagesResponse {
         val (client, baseUrl) = apiClient.session()
 
@@ -481,7 +482,7 @@ open class MessageApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun cancelBatch(batchId: String) {
+    open override suspend fun cancelBatch(batchId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/messages/batches/$batchId/cancel")

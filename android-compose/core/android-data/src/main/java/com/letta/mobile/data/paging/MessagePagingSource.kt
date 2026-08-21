@@ -30,6 +30,7 @@ class MessagePagingSource(
                     limit = params.loadSize,
                     before = null,
                     after = afterCursor,
+                    order = null,
                     conversationId = conversationId,
                 )
             } else {
