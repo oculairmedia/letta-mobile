@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5n + Phase 6a in flight)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5o + Phase 6a in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -308,7 +308,9 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **5m (steps — #1276):** `CachedStepRepository` + `StepRemoteSource`; Android thin binder.
 
-**5n (projects / project work — this PR):** `CachedProjectRepository` + `ProjectRemoteSource` / `ProjectIrohSource` (`IrohAdminRpcProjectSource`); `CachedProjectWorkRepository` + `ProjectWorkRemoteSource`; Android thin binders. Platform-neutral git URL credential stripping (regex) and freshness timestamps (`kotlinx.datetime`); idempotency keys use `kotlin.uuid.Uuid` (`kmp-` prefix). `IrohAdminRpcProjectSource` stays in `core:android-data` for this slice.
+**5n (projects / project work — #1276):** `CachedProjectRepository` + `ProjectRemoteSource` / `ProjectIrohSource` (`IrohAdminRpcProjectSource`); `CachedProjectWorkRepository` + `ProjectWorkRemoteSource`; Android thin binders. Platform-neutral git URL credential stripping (regex) and freshness timestamps (`kotlinx.datetime`); idempotency keys use `kotlin.uuid.Uuid` (`kmp-` prefix). `IrohAdminRpcProjectSource` stays in `core:android-data` for this slice.
+
+**5o (bug reports / slash commands / vibesync — this PR):** `CachedBugReportRepository` + `BugReportLocalStore` (`RoomBugReportLocalStore`); `CachedSlashCommandRepository` + `SlashCommandRemoteSource` / `SlashCommandIrohSource` (`SlashCommandApi`, `IrohAdminRpcSlashCommandSource` with platform-supplied `deviceId`/`clientVersion`); `CachedVibesyncEventStreamRepository` + `VibesyncEventStreamSource` / `VibesyncEventStreamLogger` (`LettaHttpVibesyncEventStreamSource`, `AndroidVibesyncEventStreamLogger`). HTTP/Iroh routing, SSE loop, and `routeRawEvent` live in sharedLogic; Room/HTTP/Iroh connect bindings stay in `core:android-data`.
 
 ### Acceptance (per slice)
 

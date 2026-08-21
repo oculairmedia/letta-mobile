@@ -37,6 +37,8 @@ import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
+import com.letta.mobile.data.repository.AndroidVibesyncEventStreamLogger
+import com.letta.mobile.data.repository.LettaHttpVibesyncEventStreamSource
 import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
 import com.letta.mobile.data.repository.IrohAdminRpcRunSource
 import com.letta.mobile.data.repository.IrohAdminRpcToolSource
@@ -159,8 +161,9 @@ class SessionGraphAssembler @Inject constructor(
             ),
             toolRepository = adminRepositories.tool,
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(
-                apiClient = lettaApiClient,
+                streamSource = LettaHttpVibesyncEventStreamSource(lettaApiClient),
                 scope = request.scope,
+                logger = AndroidVibesyncEventStreamLogger(),
             ),
         )
     }
