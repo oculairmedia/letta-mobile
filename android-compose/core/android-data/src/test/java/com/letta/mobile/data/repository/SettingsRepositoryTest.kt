@@ -181,9 +181,9 @@ class SettingsRepositoryTest {
 
     @Test
     fun `active backend change clears backend-scoped caches before active config update`() = runTest {
-        lateinit var scopedRepository: SettingsRepository
+        lateinit var scopedRepository: CachedSettingsRepository
         val activeIdsAtClear = mutableListOf<String?>()
-        scopedRepository = SettingsRepository(
+        scopedRepository = SettingsRepository.forTests(
             dataStore = createTestPreferencesDataStore(),
             secureSettingsStore = InMemorySecureSettingsStore(),
             clearBackendScopedCaches = {
