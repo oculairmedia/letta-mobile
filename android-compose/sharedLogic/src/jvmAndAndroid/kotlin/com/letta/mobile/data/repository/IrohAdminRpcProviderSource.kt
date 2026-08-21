@@ -21,11 +21,11 @@ class IrohAdminRpcProviderSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.ProviderIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listProviders(): List<Provider> {
+    override suspend fun listProviders(): List<Provider> {
         val response = channelTransport.adminRpc(
             method = "provider.list",
             path = "/v1/providers",
