@@ -2,6 +2,7 @@ package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.GroupCreateParams
+import com.letta.mobile.data.model.GroupListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.MessageCreateRequest
 import io.ktor.client.HttpClient
@@ -45,7 +46,7 @@ class GroupApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() {
         var url: String? = null
         val api = createApi { req -> url = req.url.toString(); respond("[]", HttpStatusCode.OK, jsonHeaders) }
 
-        api.listGroups(managerType = "round_robin")
+        api.listGroups(GroupListParams(managerType = "round_robin"))
 
         assertTrue(url!!.contains("/v1/groups/"))
         assertTrue(url!!.contains("manager_type=round_robin"))

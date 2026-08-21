@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityId
 import com.letta.mobile.data.model.IdentityProperty
+import com.letta.mobile.data.model.IdentityRelatedListParams
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.data.model.IdentityUpsertParams
 import com.letta.mobile.data.repository.api.IIdentityRepository
@@ -84,38 +85,40 @@ open class CachedIdentityRepository(
     }
 
     override suspend fun listAgentsForIdentity(identityId: IdentityId): List<Agent> {
-        return exhaustCursorPages(
-            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
-            maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
-            fetch = { limit, after ->
-                remote.listAgentsForIdentity(
-                    identityId = identityId.value,
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
-                )
-            },
-            extractCursor = { agent -> agent.id.value },
-            dedupKey = { agent -> agent.id.value },
+        return exhaustRelated(
+            identityId = identityId,
+            fetchPage = { params -> remote.listAgentsForIdentity(params) },
+            cursor = { agent -> agent.id.value },
         )
     }
 
     override suspend fun listBlocksForIdentity(identityId: IdentityId): List<Block> {
+        return exhaustRelated(
+            identityId = identityId,
+            fetchPage = { params -> remote.listBlocksForIdentity(params) },
+            cursor = { block -> block.id.value },
+        )
+    }
+
+    private suspend fun <T> exhaustRelated(
+        identityId: IdentityId,
+        fetchPage: suspend (IdentityRelatedListParams) -> List<T>,
+        cursor: (T) -> String,
+    ): List<T> {
         return exhaustCursorPages(
             pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
-                remote.listBlocksForIdentity(
-                    identityId = identityId.value,
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
+                fetchPage(
+                    IdentityRelatedListParams(
+                        identityId = identityId.value,
+                        limit = limit,
+                        after = after,
+                    ),
                 )
             },
-            extractCursor = { block -> block.id.value },
-            dedupKey = { block -> block.id.value },
+            extractCursor = cursor,
+            dedupKey = cursor,
         )
     }
 

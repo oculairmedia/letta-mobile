@@ -2,6 +2,8 @@ package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
+import com.letta.mobile.data.model.GroupListParams
+import com.letta.mobile.data.model.GroupMessagesListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
@@ -25,25 +27,17 @@ import kotlinx.serialization.json.JsonElement
 open class GroupApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.GroupRemoteSource {
-    open override suspend fun listGroups(
-        managerType: String?,
-        before: String?,
-        after: String?,
-        limit: Int?,
-        order: String?,
-        projectId: String?,
-        showHiddenGroups: Boolean?,
-    ): List<Group> {
+    open override suspend fun listGroups(params: GroupListParams): List<Group> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/") {
-            parameter("manager_type", managerType)
-            parameter("before", before)
-            parameter("after", after)
-            parameter("limit", limit)
-            parameter("order", order)
-            parameter("project_id", projectId)
-            parameter("show_hidden_groups", showHiddenGroups)
+            parameter("manager_type", params.managerType)
+            parameter("before", params.before)
+            parameter("after", params.after)
+            parameter("limit", params.limit)
+            parameter("order", params.order)
+            parameter("project_id", params.projectId)
+            parameter("show_hidden_groups", params.showHiddenGroups)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -145,20 +139,14 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listGroupMessages(
-        groupId: String,
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
+    open override suspend fun listGroupMessages(params: GroupMessagesListParams): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/groups/$groupId/messages") {
-            parameter("limit", limit)
-            parameter("before", before)
-            parameter("after", after)
-            parameter("order", order)
+        val response = client.get("$baseUrl/v1/groups/${params.groupId}/messages") {
+            parameter("limit", params.limit)
+            parameter("before", params.before)
+            parameter("after", params.after)
+            parameter("order", params.order)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())

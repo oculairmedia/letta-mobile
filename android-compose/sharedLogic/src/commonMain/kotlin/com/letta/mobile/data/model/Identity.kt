@@ -55,3 +55,12 @@ data class IdentityUpdateParams(
     @SerialName("block_ids") val blockIds: List<BlockId>? = null,
     val properties: List<IdentityProperty>? = null,
 )
+
+/** Cursor pagination for identity-linked agents or blocks. */
+data class IdentityRelatedListParams(
+    val identityId: String,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+)

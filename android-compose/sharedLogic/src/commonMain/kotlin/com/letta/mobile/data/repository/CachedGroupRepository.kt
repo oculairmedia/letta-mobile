@@ -3,6 +3,9 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupId
+import com.letta.mobile.data.model.GroupIrohListParams
+import com.letta.mobile.data.model.GroupListParams
+import com.letta.mobile.data.model.GroupMessagesListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
@@ -31,7 +34,13 @@ open class CachedGroupRepository(
     override suspend fun refreshGroups(managerType: String?, projectId: ProjectId?, showHiddenGroups: Boolean?) {
         val irohSource = irohGroupSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            _groups.value = irohSource.listGroups(managerType, projectId?.value, showHiddenGroups)
+            _groups.value = irohSource.listGroups(
+                GroupIrohListParams(
+                    managerType = managerType,
+                    projectId = projectId?.value,
+                    showHiddenGroups = showHiddenGroups,
+                ),
+            )
             return
         }
         _groups.value = exhaustCursorPages(
@@ -39,13 +48,13 @@ open class CachedGroupRepository(
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
                 remote.listGroups(
-                    managerType = managerType,
-                    before = null,
-                    after = after,
-                    limit = limit,
-                    order = null,
-                    projectId = projectId?.value,
-                    showHiddenGroups = showHiddenGroups,
+                    GroupListParams(
+                        managerType = managerType,
+                        after = after,
+                        limit = limit,
+                        projectId = projectId?.value,
+                        showHiddenGroups = showHiddenGroups,
+                    ),
                 )
             },
             extractCursor = { group -> group.id.value },
@@ -89,11 +98,11 @@ open class CachedGroupRepository(
             maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
             fetch = { limit, after ->
                 remote.listGroupMessages(
-                    groupId = groupId.value,
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
+                    GroupMessagesListParams(
+                        groupId = groupId.value,
+                        limit = limit,
+                        after = after,
+                    ),
                 )
             },
             extractCursor = { message -> message.id },
