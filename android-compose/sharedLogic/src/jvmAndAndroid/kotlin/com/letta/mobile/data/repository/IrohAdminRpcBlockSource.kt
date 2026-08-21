@@ -34,7 +34,7 @@ class IrohAdminRpcBlockSource private constructor(
         coerceInputValues = true
     },
     private val agentDirectoryProvider: (() -> IrohAdminRpcAgentDirectory)? = null,
-) {
+) : com.letta.mobile.data.repository.api.BlockIrohSource {
     constructor(
         channelTransport: IChannelTransport,
         settingsRepository: ISettingsRepository,
@@ -58,10 +58,10 @@ class IrohAdminRpcBlockSource private constructor(
 
     private fun channelTransport(): IChannelTransport = channelTransportProvider()
 
-    fun shouldUseIroh(): Boolean =
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun retrieveBlock(blockId: String): Block {
+    override suspend fun retrieveBlock(blockId: String): Block {
         val params = buildJsonObject { put("block_id", blockId) }
         val response = channelTransport().adminRpc(
             method = "block.get",
@@ -73,11 +73,11 @@ class IrohAdminRpcBlockSource private constructor(
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
 
-    suspend fun updateGlobalBlock(
+    override suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,
-        clearDescription: Boolean = false,
-        clearLimit: Boolean = false,
+        clearDescription: Boolean,
+        clearLimit: Boolean,
     ): Block {
         val requestBody = buildJsonObject {
             put("block_id", blockId)
@@ -101,7 +101,7 @@ class IrohAdminRpcBlockSource private constructor(
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
 
-    suspend fun createBlock(params: BlockCreateParams): Block {
+    override suspend fun createBlock(params: BlockCreateParams): Block {
         val response = channelTransport().adminRpc(
             method = "block.create",
             path = "/v1/blocks",
@@ -112,7 +112,7 @@ class IrohAdminRpcBlockSource private constructor(
         return json.decodeFromJsonElement(Block.serializer(), result)
     }
 
-    suspend fun deleteBlock(blockId: String) {
+    override suspend fun deleteBlock(blockId: String) {
         val params = buildJsonObject { put("block_id", blockId) }
         val response = channelTransport().adminRpc(
             method = "block.delete",
@@ -132,7 +132,7 @@ class IrohAdminRpcBlockSource private constructor(
      * only when the server answered with the legacy bare array — in which case the
      * array length IS the exact total, because a bare array means "full set".
      */
-    suspend fun countBlocks(): Int {
+    override suspend fun countBlocks(): Int {
         val first = fetchPage(offset = 0, limit = 1, label = null, isTemplate = null)
         first.total?.let { return it }
         return listAllBlocks().size
@@ -152,7 +152,7 @@ class IrohAdminRpcBlockSource private constructor(
      * heuristic; the heuristic only applies to a legacy bare-array response, where
      * a bare array already means "this is the full set".
      */
-    suspend fun listAllBlocks(label: String? = null, isTemplate: Boolean? = null): List<Block> {
+    override suspend fun listAllBlocks(label: String?, isTemplate: Boolean?): List<Block> {
         val merged = mutableListOf<Block>()
         val seenIds = HashSet<String>()
         var offset = 0
@@ -226,7 +226,7 @@ class IrohAdminRpcBlockSource private constructor(
         val total: Int?,
         val hasMore: Boolean?,
     )
-    suspend fun attachBlock(agentId: String, blockId: String) {
+    override suspend fun attachBlock(agentId: String, blockId: String) {
         val response = channelTransport().adminRpc(
             method = "block.attach",
             path = "/v1/agents/$agentId/core-memory/blocks/attach/$blockId",
@@ -238,7 +238,7 @@ class IrohAdminRpcBlockSource private constructor(
         if (!response.success) error(response.error ?: "Iroh admin_rpc block.attach failed")
     }
 
-    suspend fun detachBlock(agentId: String, blockId: String) {
+    override suspend fun detachBlock(agentId: String, blockId: String) {
         val response = channelTransport().adminRpc(
             method = "block.detach",
             path = "/v1/agents/$agentId/core-memory/blocks/detach/$blockId",
@@ -257,10 +257,10 @@ class IrohAdminRpcBlockSource private constructor(
      * synthesised id. This is NOT a client-side filter over the global
      * [listAllBlocks] union — the server returns only the requested agent's rows.
      */
-    suspend fun listAgentBlocks(agentId: String): List<Block> =
+    override suspend fun listAgentBlocks(agentId: String): List<Block> =
         agentDirectory.listAgentBlocks(AgentId(agentId))
 
-    suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
+    override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         val body = buildJsonObject {
             put("agent_id", agentId)
             put("label", blockLabel)
