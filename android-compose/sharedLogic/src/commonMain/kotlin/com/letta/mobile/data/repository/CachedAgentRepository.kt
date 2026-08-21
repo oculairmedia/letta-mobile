@@ -74,7 +74,14 @@ open class CachedAgentRepository(
                 val cache = localCache?.invoke() ?: return@launch
                 val cached = cache.getAllOnce()
                 if (cached.isNotEmpty()) {
-                    _agents.value = cached
+                    // Do not overwrite a refresh that completed while getAllOnce
+                    // was suspended — that would publish a stale roster while
+                    // lastRefreshAtMillis still looks fresh.
+                    refreshMutex.withLock {
+                        if (_agents.value.isEmpty()) {
+                            _agents.value = cached
+                        }
+                    }
                 }
             } catch (cancelled: CancellationException) {
                 throw cancelled
