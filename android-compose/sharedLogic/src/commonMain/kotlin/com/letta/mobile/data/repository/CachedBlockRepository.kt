@@ -2,7 +2,10 @@ package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockAgentsListParams
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.BlockIrohSource
 import com.letta.mobile.data.repository.api.BlockRemoteSource
@@ -23,21 +26,17 @@ open class CachedBlockRepository(
 ) : IBlockRepository, BackendScopedCache {
     override suspend fun clearForBackendSwitch() = Unit
 
-    override suspend fun getBlocks(agentId: String): List<Block> {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.listAgentBlocks(agentId)
-        }
-        return remote.listBlocks(agentId)
-    }
+    override suspend fun getBlocks(agentId: String): List<Block> =
+        withIrohOrRemote(
+            iroh = { it.listAgentBlocks(agentId) },
+            http = { remote.listBlocks(agentId) },
+        )
 
-    override suspend fun retrieveBlock(blockId: String): Block {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.retrieveBlock(blockId)
-        }
-        return remote.retrieveBlock(blockId)
-    }
+    override suspend fun retrieveBlock(blockId: String): Block =
+        withIrohOrRemote(
+            iroh = { it.retrieveBlock(blockId) },
+            http = { remote.retrieveBlock(blockId) },
+        )
 
     /**
      * In iroh:// mode the HTTP admin route is hard-failed at the LettaApiClient
@@ -45,84 +44,85 @@ open class CachedBlockRepository(
      * envelope carries an authoritative `total`, which is a truthful exact count —
      * unlike inferring one from however many rows a pager managed to accumulate.
      */
-    override suspend fun countBlocks(): Int {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.countBlocks()
-        }
-        return remote.countBlocks()
-    }
+    override suspend fun countBlocks(): Int =
+        withIrohOrRemote(
+            iroh = { it.countBlocks() },
+            http = { remote.countBlocks() },
+        )
 
-    override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.updateAgentBlock(agentId, blockLabel, params)
-        }
-        return remote.updateAgentBlock(agentId, blockLabel, params)
-    }
+    override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block =
+        withIrohOrRemote(
+            iroh = { it.updateAgentBlock(agentId, blockLabel, params) },
+            http = { remote.updateAgentBlock(agentId, blockLabel, params) },
+        )
 
     override suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,
         clearDescription: Boolean,
         clearLimit: Boolean,
-    ): Block {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.updateGlobalBlock(blockId, params, clearDescription, clearLimit)
-        }
-        return remote.updateGlobalBlock(blockId, params, clearDescription, clearLimit)
-    }
+    ): Block =
+        withIrohOrRemote(
+            iroh = { it.updateGlobalBlock(blockId, params, clearDescription, clearLimit) },
+            http = { remote.updateGlobalBlock(blockId, params, clearDescription, clearLimit) },
+        )
 
-    override suspend fun createBlock(params: BlockCreateParams): Block {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.createBlock(params)
-        }
-        return remote.createBlock(params)
-    }
+    override suspend fun createBlock(params: BlockCreateParams): Block =
+        withIrohOrRemote(
+            iroh = { it.createBlock(params) },
+            http = { remote.createBlock(params) },
+        )
 
     override suspend fun deleteBlock(blockId: String) {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.deleteBlock(blockId)
-            return
-        }
-        remote.deleteBlock(blockId)
+        withIrohOrRemote(
+            iroh = {
+                it.deleteBlock(blockId)
+                Unit
+            },
+            http = {
+                remote.deleteBlock(blockId)
+                Unit
+            },
+        )
     }
 
     override suspend fun attachBlock(agentId: String, blockId: String) {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.attachBlock(agentId, blockId)
-            return
-        }
-        remote.attachBlock(agentId, blockId)
+        withIrohOrRemote(
+            iroh = {
+                it.attachBlock(agentId, blockId)
+                Unit
+            },
+            http = {
+                remote.attachBlock(agentId, blockId)
+                Unit
+            },
+        )
     }
 
     override suspend fun detachBlock(agentId: String, blockId: String) {
-        val irohSource = irohBlockSource
-        if (irohSource != null && irohSource.shouldUseIroh()) {
-            irohSource.detachBlock(agentId, blockId)
-            return
-        }
-        remote.detachBlock(agentId, blockId)
+        withIrohOrRemote(
+            iroh = {
+                it.detachBlock(agentId, blockId)
+                Unit
+            },
+            http = {
+                remote.detachBlock(agentId, blockId)
+                Unit
+            },
+        )
     }
 
-    override suspend fun listAllBlocks(label: String?, isTemplate: Boolean?): List<Block> {
+    override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
         val irohSource = irohBlockSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
-            return irohSource.listAllBlocks(label, isTemplate)
+            return irohSource.listAllBlocks(params)
         }
         return exhaustPages(
             pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, offset ->
                 remote.listAllBlocks(
-                    label = label,
-                    isTemplate = isTemplate,
-                    limit = limit,
-                    offset = offset,
+                    params.copy(limit = limit, offset = offset),
                 )
             },
             dedupKey = { block -> block.id.value },
@@ -130,16 +130,13 @@ open class CachedBlockRepository(
     }
 
     override suspend fun listAgentsForBlock(blockId: String): List<Agent> {
+        val query = BlockAgentsListParams(blockId = BlockId(blockId))
         return exhaustCursorPages(
             pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
                 remote.listAgentsForBlock(
-                    blockId = blockId,
-                    limit = limit,
-                    before = null,
-                    after = after,
-                    order = null,
+                    query.copy(limit = limit, after = after),
                 )
             },
             extractCursor = { agent -> agent.id.value },
@@ -153,5 +150,16 @@ open class CachedBlockRepository(
 
     override suspend fun detachIdentityFromBlock(blockId: String, identityId: String): Block {
         return remote.detachIdentityFromBlock(blockId, identityId)
+    }
+
+    private suspend inline fun <T> withIrohOrRemote(
+        iroh: suspend (BlockIrohSource) -> T,
+        http: suspend () -> T,
+    ): T {
+        val irohSource = irohBlockSource
+        if (irohSource != null && irohSource.shouldUseIroh()) {
+            return iroh(irohSource)
+        }
+        return http()
     }
 }

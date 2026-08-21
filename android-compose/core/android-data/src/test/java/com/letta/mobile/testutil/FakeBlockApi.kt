@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.ApiException
 import com.letta.mobile.data.api.BlockApi
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import io.mockk.mockk
 
@@ -81,17 +82,12 @@ class FakeBlockApi : BlockApi(mockk(relaxed = true)) {
         return blocks[agentId]?.toList() ?: emptyList()
     }
 
-    override suspend fun listAllBlocks(
-        label: String?,
-        isTemplate: Boolean?,
-        limit: Int?,
-        offset: Int?,
-    ): List<Block> {
+    override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
         calls.add("listAllBlocks")
         if (shouldFail) throw ApiException(500, "Server error")
         return allBlocks.filter { block ->
-            (label == null || block.label == label) &&
-            (isTemplate == null || block.isTemplate == isTemplate)
+            (params.label == null || block.label == params.label) &&
+            (params.isTemplate == null || block.isTemplate == params.isTemplate)
         }
     }
 }

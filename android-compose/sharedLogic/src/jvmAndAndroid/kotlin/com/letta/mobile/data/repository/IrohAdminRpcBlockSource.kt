@@ -3,6 +3,7 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
@@ -133,7 +134,7 @@ class IrohAdminRpcBlockSource private constructor(
      * array length IS the exact total, because a bare array means "full set".
      */
     override suspend fun countBlocks(): Int {
-        val first = fetchPage(offset = 0, limit = 1, label = null, isTemplate = null)
+        val first = fetchPage(BlockListParams(offset = 0, limit = 1))
         first.total?.let { return it }
         return listAllBlocks().size
     }
@@ -152,12 +153,17 @@ class IrohAdminRpcBlockSource private constructor(
      * heuristic; the heuristic only applies to a legacy bare-array response, where
      * a bare array already means "this is the full set".
      */
-    override suspend fun listAllBlocks(label: String?, isTemplate: Boolean?): List<Block> {
+    override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
         val merged = mutableListOf<Block>()
         val seenIds = HashSet<String>()
         var offset = 0
         repeat(MAX_BLOCK_LIST_PAGES) {
-            val page = fetchPage(offset, BLOCK_LIST_PAGE_SIZE, label, isTemplate)
+            val page = fetchPage(
+                params.copy(
+                    offset = offset,
+                    limit = BLOCK_LIST_PAGE_SIZE,
+                ),
+            )
             val fresh = page.blocks.filter { block -> seenIds.add(block.id.value) }
             merged += fresh
             if (!shouldContinueAfter(page, fresh)) return merged
@@ -181,22 +187,19 @@ class IrohAdminRpcBlockSource private constructor(
         return page.hasMore ?: (page.blocks.size >= BLOCK_LIST_PAGE_SIZE)
     }
 
-    private suspend fun fetchPage(
-        offset: Int,
-        limit: Int,
-        label: String?,
-        isTemplate: Boolean?,
-    ): BlockPage {
-        val params = buildJsonObject {
-            label?.let { put("label", it) }
-            isTemplate?.let { put("is_template", it) }
+    private suspend fun fetchPage(params: BlockListParams): BlockPage {
+        val offset = params.offset ?: 0
+        val limit = params.limit ?: BLOCK_LIST_PAGE_SIZE
+        val requestParams = buildJsonObject {
+            params.label?.let { put("label", it) }
+            params.isTemplate?.let { put("is_template", it) }
             put("limit", limit.toString())
             put("offset", offset.toString())
         }
         val response = channelTransport().adminRpc(
             method = "block.list",
             path = "/v1/blocks?limit=$limit&offset=$offset",
-            body = params.toString(),
+            body = requestParams.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc block.list failed")
         val result = response.result ?: return BlockPage(emptyList(), total = null, hasMore = false)

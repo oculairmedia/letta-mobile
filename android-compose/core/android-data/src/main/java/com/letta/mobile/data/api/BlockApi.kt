@@ -137,19 +137,14 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listAllBlocks(
-        label: String?,
-        isTemplate: Boolean?,
-        limit: Int?,
-        offset: Int?,
-    ): List<Block> {
+    open override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/blocks") {
-            parameter("label", label)
-            parameter("is_template", isTemplate)
-            parameter("limit", limit)
-            parameter("offset", offset)
+            parameter("label", params.label)
+            parameter("is_template", params.isTemplate)
+            parameter("limit", params.limit)
+            parameter("offset", params.offset)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -157,20 +152,14 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listAgentsForBlock(
-        blockId: String,
-        limit: Int?,
-        before: String?,
-        after: String?,
-        order: String?,
-    ): List<Agent> {
+    open override suspend fun listAgentsForBlock(params: BlockAgentsListParams): List<Agent> {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/blocks/$blockId/agents") {
-            parameter("limit", limit)
-            parameter("before", before)
-            parameter("after", after)
-            parameter("order", order)
+        val response = client.get("$baseUrl/v1/blocks/${params.blockId.value}/agents") {
+            parameter("limit", params.limit)
+            parameter("before", params.before)
+            parameter("after", params.after)
+            parameter("order", params.order)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())

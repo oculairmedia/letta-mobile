@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.repository.api.IBlockRepository
@@ -59,8 +60,7 @@ class BlockLibraryViewModel @Inject constructor(
             _uiState.value = UiState.Loading
             try {
                 val blocks = blockRepository.listAllBlocks(
-                    label = filterLabel,
-                    isTemplate = filterTemplate,
+                    BlockListParams(label = filterLabel, isTemplate = filterTemplate),
                 )
                 _uiState.value = UiState.Success(
                     BlockLibraryUiState(

@@ -2,7 +2,9 @@ package com.letta.mobile.data.repository.api
 
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockAgentsListParams
 import com.letta.mobile.data.model.BlockCreateParams
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 
 /**
@@ -27,20 +29,9 @@ interface BlockRemoteSource {
     suspend fun deleteBlock(blockId: String)
     suspend fun attachBlock(agentId: String, blockId: String)
     suspend fun detachBlock(agentId: String, blockId: String)
-    suspend fun listAllBlocks(
-        label: String? = null,
-        isTemplate: Boolean? = null,
-        limit: Int? = null,
-        offset: Int? = null,
-    ): List<Block>
+    suspend fun listAllBlocks(params: BlockListParams = BlockListParams()): List<Block>
 
-    suspend fun listAgentsForBlock(
-        blockId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-    ): List<Agent>
+    suspend fun listAgentsForBlock(params: BlockAgentsListParams): List<Agent>
 
     suspend fun attachIdentityToBlock(blockId: String, identityId: String): Block
     suspend fun detachIdentityFromBlock(blockId: String, identityId: String): Block
@@ -69,5 +60,5 @@ interface BlockIrohSource {
     suspend fun deleteBlock(blockId: String)
     suspend fun attachBlock(agentId: String, blockId: String)
     suspend fun detachBlock(agentId: String, blockId: String)
-    suspend fun listAllBlocks(label: String? = null, isTemplate: Boolean? = null): List<Block>
+    suspend fun listAllBlocks(params: BlockListParams = BlockListParams()): List<Block>
 }
