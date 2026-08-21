@@ -4,6 +4,8 @@ import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupId
+import com.letta.mobile.data.model.GroupListParams
+import com.letta.mobile.data.model.GroupMessagesListParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.testutil.TestMessageFactory
 import io.mockk.mockk
@@ -64,35 +66,21 @@ class GroupPaginationTest {
         val observedLimits = mutableListOf<Int?>()
         val observedAftersForMessages = mutableListOf<String?>()
 
-        override suspend fun listGroups(
-            managerType: String?,
-            before: String?,
-            after: String?,
-            limit: Int?,
-            order: String?,
-            projectId: String?,
-            showHiddenGroups: Boolean?,
-        ): List<Group> {
-            observedAfters += after
-            observedLimits += limit
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listGroups(params: GroupListParams): List<Group> {
+            observedAfters += params.after
+            observedLimits += params.limit
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 groups.indexOfFirst { it.id.value == id }.let { if (it < 0) groups.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(groups.size)
             return groups.subList(start, end)
         }
 
-        override suspend fun listGroupMessages(
-            groupId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> {
-            observedAftersForMessages += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listGroupMessages(params: GroupMessagesListParams): List<LettaMessage> {
+            observedAftersForMessages += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 messages.indexOfFirst { it.id == id }.let { if (it < 0) messages.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(messages.size)

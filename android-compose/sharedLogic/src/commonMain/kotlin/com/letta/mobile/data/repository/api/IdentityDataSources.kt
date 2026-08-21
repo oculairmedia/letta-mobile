@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
 import com.letta.mobile.data.model.IdentityProperty
+import com.letta.mobile.data.model.IdentityRelatedListParams
 import com.letta.mobile.data.model.IdentityUpdateParams
 import com.letta.mobile.data.model.IdentityUpsertParams
 
@@ -21,22 +22,8 @@ interface IdentityRemoteSource {
     suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity
     suspend fun deleteIdentity(identityId: String)
     suspend fun upsertIdentityProperties(identityId: String, properties: List<IdentityProperty>): Identity
-    suspend fun listAgentsForIdentity(
-        identityId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-    ): List<Agent>
-
-    suspend fun listBlocksForIdentity(
-        identityId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-    ): List<Block>
-
+    suspend fun listAgentsForIdentity(params: IdentityRelatedListParams): List<Agent>
+    suspend fun listBlocksForIdentity(params: IdentityRelatedListParams): List<Block>
     suspend fun attachIdentity(agentId: String, identityId: String)
     suspend fun detachIdentity(agentId: String, identityId: String)
 }

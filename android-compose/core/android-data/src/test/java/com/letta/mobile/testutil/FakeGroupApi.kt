@@ -5,6 +5,8 @@ import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupId
+import com.letta.mobile.data.model.GroupListParams
+import com.letta.mobile.data.model.GroupMessagesListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
@@ -20,10 +22,10 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
     var shouldFail = false
     val calls = mutableListOf<String>()
 
-    override suspend fun listGroups(managerType: String?, before: String?, after: String?, limit: Int?, order: String?, projectId: String?, showHiddenGroups: Boolean?): List<Group> {
+    override suspend fun listGroups(params: GroupListParams): List<Group> {
         calls.add("listGroups")
         if (shouldFail) throw ApiException(500, "Server error")
-        return groups.filter { managerType == null || it.managerType == managerType }
+        return groups.filter { params.managerType == null || it.managerType == params.managerType }
     }
 
     override suspend fun countGroups(): Int {
@@ -80,8 +82,8 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
         return TestMessageFactory.userMessage(id = messageId, content = "updated")
     }
 
-    override suspend fun listGroupMessages(groupId: String, limit: Int?, before: String?, after: String?, order: String?): List<LettaMessage> {
-        calls.add("listGroupMessages:$groupId")
+    override suspend fun listGroupMessages(params: GroupMessagesListParams): List<LettaMessage> {
+        calls.add("listGroupMessages:${params.groupId}")
         if (shouldFail) throw ApiException(500, "Server error")
         return listOf(TestMessageFactory.userMessage(id = "message-1", content = "hello"))
     }

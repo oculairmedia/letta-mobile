@@ -16,6 +16,7 @@ import com.letta.mobile.data.model.FolderUpdateParams
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupId
+import com.letta.mobile.data.model.GroupIrohListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityCreateParams
@@ -231,7 +232,13 @@ internal class IrohGroupRepository(
         projectId: ProjectId?,
         showHiddenGroups: Boolean?,
     ) {
-        _groups.value = source.listGroups(managerType, projectId?.value, showHiddenGroups)
+        _groups.value = source.listGroups(
+            GroupIrohListParams(
+                managerType = managerType,
+                projectId = projectId?.value,
+                showHiddenGroups = showHiddenGroups,
+            ),
+        )
     }
 
     override suspend fun countGroups(): Int = unsupported("group.count")

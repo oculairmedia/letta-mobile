@@ -5,6 +5,7 @@ import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupId
 import com.letta.mobile.data.api.IrohAdminApiUnavailableException
+import com.letta.mobile.data.model.GroupListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -47,7 +48,7 @@ class GroupRepositoryTest {
             )
         )
         val apiThatThrows = object : FakeGroupApi() {
-            override suspend fun listGroups(managerType: String?, before: String?, after: String?, limit: Int?, order: String?, projectId: String?, showHiddenGroups: Boolean?): List<Group> {
+            override suspend fun listGroups(params: GroupListParams): List<Group> {
                 throw IrohAdminApiUnavailableException("Raw HTTP forbidden in iroh:// mode")
             }
         }
@@ -74,7 +75,7 @@ class GroupRepositoryTest {
         }
         val irohSource = IrohAdminRpcGroupSource(transport, settings)
         val apiThatThrows = object : FakeGroupApi() {
-            override suspend fun listGroups(managerType: String?, before: String?, after: String?, limit: Int?, order: String?, projectId: String?, showHiddenGroups: Boolean?): List<Group> {
+            override suspend fun listGroups(params: GroupListParams): List<Group> {
                 throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
             }
         }
