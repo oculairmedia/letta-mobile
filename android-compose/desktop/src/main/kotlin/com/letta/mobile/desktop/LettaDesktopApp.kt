@@ -109,6 +109,10 @@ internal fun LettaDesktopApp(
     val activeConfig = bootstrap.activeConfig
     val bootstrapState = bootstrap.bootstrapState
     val applyConfig = bootstrap.applyConfig
+    // Transport publish rebuilds the graph without going through applyConfig;
+    // observe currentGraph so libraries / subagent registry track the live id.
+    val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
+    val sessionGraphId = sessionGraph.id
     // Collapsible capability/history sidebar (Memory/Schedules/Channels/
     // Skills/New chat/conversation history) — letta-mobile-o5m90. Distinct
     // from railExpanded above: that toggles the far-left agent rail between
@@ -146,6 +150,12 @@ internal fun LettaDesktopApp(
     SideEffect {
         bootstrap.irohAgentDirectorySlot.value = irohAgentDirectory
     }
+    rememberAndPublishGraphChannelTransport(
+        activeConfig = activeConfig,
+        irohTransport = irohTransport,
+        chatScope = chatScope,
+        publish = bootstrap.publishChannelTransport,
+    )
     val chatController = rememberDesktopChatController(
         DesktopChatControllerBindings(
             runtime = DesktopChatRuntime(
@@ -190,6 +200,8 @@ internal fun LettaDesktopApp(
             irohMode = irohMode,
             parentScope = subagentParentScope(chatState.selectedConversation?.agentId, chatState.selectedConversationId),
             irohTransport = irohTransport,
+            graphSubagentRepository = sessionGraph.subagentRepository
+                as? com.letta.mobile.data.repository.SubagentRepository,
         ),
         chatScope = chatScope,
     )
@@ -199,7 +211,7 @@ internal fun LettaDesktopApp(
     // Work | Play presentation lens over the same agents/memory/conversations.
     var workPlayMode by remember { mutableStateOf(WorkPlayMode.Work) }
     val libraries = rememberDesktopLibraryControllers(
-        sessionGraphId = bootstrapState.sessionGraphId,
+        sessionGraphId = sessionGraphId,
         sessionGraphProvider = dataBindings.sessionGraphProvider,
         chatScope = chatScope,
     )
@@ -312,7 +324,6 @@ internal fun LettaDesktopApp(
 
     // Same-named agents are stacked in the rail, and the sidebar lists the
     // whole stack's conversations together (see [buildRailAgents]).
-    val sessionGraph by dataBindings.sessionGraphProvider.currentGraph.collectAsState()
     val rosterAgents by sessionGraph.agentRepository.agents.collectAsState()
     fun dispatchA2uiAction(action: com.letta.mobile.data.a2ui.A2uiAction) {
         val resolvedAction = if (action.conversationId.isNullOrBlank()) {

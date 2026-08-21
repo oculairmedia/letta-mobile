@@ -8,6 +8,8 @@ import com.letta.mobile.data.health.ServerHealthState
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.repository.iroh.IrohAdminRpcAgentDirectory
 import com.letta.mobile.data.storage.SecureSettingsStore
+import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.NoOpChannelTransport
 import java.io.InputStream
 import java.io.OutputStream
 import java.nio.file.Files
@@ -309,10 +311,14 @@ fun createDefaultDesktopDataBindings(
     secureSettingsStore: SecureSettingsStore = DesktopFileSecureSettingsStore(),
     configProvider: () -> LettaConfig? = { null },
     irohAgentDirectoryProvider: () -> IrohAdminRpcAgentDirectory? = { null },
+    channelTransportProvider: () -> IChannelTransport? = { null },
 ): DesktopDataBindings {
     val graphFactory = DesktopSessionGraphFactory(
         configProvider = configProvider,
-        repositoryAdaptersFactory = { config -> DesktopRepositoryAdapters(config, irohAgentDirectoryProvider) },
+        channelTransportFactory = {
+            channelTransportProvider() ?: NoOpChannelTransport()
+        },
+        irohAgentDirectoryProvider = irohAgentDirectoryProvider,
     )
     return DesktopDataBindings(
         secureSettingsStore = secureSettingsStore,

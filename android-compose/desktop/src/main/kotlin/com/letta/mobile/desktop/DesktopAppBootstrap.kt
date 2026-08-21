@@ -30,13 +30,16 @@ import com.letta.mobile.desktop.memory.DesktopMemoryController
 import com.letta.mobile.desktop.runtime.DesktopLocalBackendDirectorySettings
 import com.letta.mobile.desktop.schedules.DesktopScheduleLibraryController
 import com.letta.mobile.desktop.tools.DesktopToolLibraryController
+import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
  * Config store, session graph bindings, and bootstrap state for the desktop shell.
- * [irohAgentDirectorySlot] is updated from [LettaDesktopApp] via SideEffect once
- * the iroh transport-derived directory is available.
+ * [irohAgentDirectorySlot] / [channelTransportSlot] are updated from
+ * [LettaDesktopApp] once the live Iroh/WS transport is available; a transport
+ * change rebuilds the session graph so Cron/SelfTodo/Subagent and Iroh admin
+ * reads bind to the real channel.
  */
 internal data class DesktopConfigBootstrap(
     val secureSettingsStore: com.letta.mobile.data.storage.SecureSettingsStore,
@@ -45,6 +48,8 @@ internal data class DesktopConfigBootstrap(
     val bootstrapState: DesktopBootstrapState,
     val applyConfig: (LettaConfig) -> Unit,
     val irohAgentDirectorySlot: MutableState<IrohAdminRpcAgentDirectory?>,
+    val channelTransportSlot: MutableState<IChannelTransport?>,
+    val publishChannelTransport: (IChannelTransport?) -> Unit,
 )
 
 @Composable
@@ -66,11 +71,13 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
     val configStore = remember(secureSettingsStore) { DesktopLettaConfigStore(secureSettingsStore) }
     var activeConfig by remember { mutableStateOf(configStore.load()) }
     val irohAgentDirectorySlot = remember { mutableStateOf<IrohAdminRpcAgentDirectory?>(null) }
+    val channelTransportSlot = remember { mutableStateOf<IChannelTransport?>(null) }
     val dataBindings = remember(configStore) {
         createDefaultDesktopDataBindings(
             secureSettingsStore = secureSettingsStore,
             configProvider = { activeConfig },
             irohAgentDirectoryProvider = { irohAgentDirectorySlot.value },
+            channelTransportProvider = { channelTransportSlot.value },
         )
     }
     var bootstrapState by remember(dataBindings) {
@@ -84,6 +91,15 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
             bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
         }
     }
+    val publishChannelTransport: (IChannelTransport?) -> Unit = remember(dataBindings, activeConfig) {
+        { transport ->
+            if (channelTransportSlot.value !== transport) {
+                channelTransportSlot.value = transport
+                dataBindings.sessionGraphProvider.rebuild()
+                bootstrapState = defaultDesktopBootstrapState(dataBindings, activeConfig)
+            }
+        }
+    }
     return DesktopConfigBootstrap(
         secureSettingsStore = secureSettingsStore,
         dataBindings = dataBindings,
@@ -91,6 +107,8 @@ internal fun rememberDesktopConfigBootstrap(): DesktopConfigBootstrap {
         bootstrapState = bootstrapState,
         applyConfig = applyConfig,
         irohAgentDirectorySlot = irohAgentDirectorySlot,
+        channelTransportSlot = channelTransportSlot,
+        publishChannelTransport = publishChannelTransport,
     )
 }
 

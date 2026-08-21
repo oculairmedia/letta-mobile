@@ -8,9 +8,9 @@ import com.letta.mobile.data.model.AgentsMdRefreshSummary
 import com.letta.mobile.data.model.VibesyncHealthResponse
 import com.letta.mobile.data.model.VibesyncStatsResponse
 import com.letta.mobile.ui.common.UiState
+import com.letta.mobile.util.runCatchingCancellable
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -70,13 +70,5 @@ class VibesyncDebugViewModel @Inject constructor(
     private inline fun updateSuccess(transform: (VibesyncDebugUiState) -> VibesyncDebugUiState) {
         val current = (_uiState.value as? UiState.Success)?.data ?: return
         _uiState.value = UiState.Success(transform(current))
-    }
-
-    private suspend inline fun <T> runCatchingCancellable(crossinline block: suspend () -> T): Result<T> = try {
-        Result.success(block())
-    } catch (e: CancellationException) {
-        throw e
-    } catch (t: Throwable) {
-        Result.failure(t)
     }
 }

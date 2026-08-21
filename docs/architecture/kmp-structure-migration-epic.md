@@ -243,12 +243,17 @@ Medium — Gradle source-set surgery.
 - **4a:** shared `DefaultSessionRepositoryGraphProvider` — Android `SessionManager` and desktop `DesktopSessionGraphProvider` extend it.
 - **4b (this PR):** shared session backend selection + remote descriptor + connection key; Android transport factory is mode-first (LOCAL wins over leftover `iroh://`); both hosts call the same helpers.
 - **4c:** shrink desktop “unavailable repository” stubs where sharedLogic already has HTTP/Iroh/App Server impls.
+  - CronRepository + SelfTodoRepository moved to `sharedLogic/commonMain` and bound on desktop.
+  - Iroh admin_rpc *Source clients live in `sharedLogic/jvmAndAndroid`; thin `IrohAdminReadRepositories` binders feed desktop Iroh mode.
+  - Desktop drops `DesktopIroh{Agent,Schedule,Tool}Repository` wrappers (uses shared `Iroh*` directly).
+  - Desktop session graph takes a live `channelTransport` slot (Iroh QUIC or HTTP WS side-channel) so Subagent/Cron/SelfTodo share the connected transport.
+  - Still stubs (Phase 5): conversation list, project, projectWork, step, vibesync; HTTP-mode admin reads beyond agent/block/schedule/tool.
 
 ### Acceptance
 
 - [x] Android and Desktop obtain graphs through the same shared *provider* contract (`DefaultSessionRepositoryGraphProvider`)
 - [x] Platform-neutral assembly *selection* lives in sharedLogic (descriptor + binding + connection key)
-- [ ] Desktop “unavailable repository” surface shrinks for iroh/App Server paths
+- [x] Desktop “unavailable repository” surface shrinks for iroh/App Server paths (Cron/SelfTodo/Subagent + Iroh admin reads; HTTP admin reads beyond agent/block/schedule/tool remain Phase 5)
 - [x] Session/backend switch tests green on both hosts (shared commonTest + existing host tests)
 
 ### Risk
