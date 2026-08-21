@@ -24,7 +24,9 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.ServerFrame
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -74,6 +76,8 @@ open class CachedAgentRepository(
                 if (cached.isNotEmpty()) {
                     _agents.value = cached
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (e: Exception) {
                 Telemetry.event("CachedAgentRepository", "Failed to load cached agents", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
             }
@@ -238,7 +242,7 @@ open class CachedAgentRepository(
     private suspend fun fetchAgentsWithoutOffsetFallback(
         onProgress: suspend (List<Agent>) -> Unit,
     ): List<Agent> {
-        val fallbackLimit = runCatching { remote.countAgents() }
+        val fallbackLimit = runCatchingCancellable { remote.countAgents() }
             .getOrDefault(FALLBACK_FULL_FETCH_LIMIT)
             .coerceAtLeast(CACHE_REFRESH_PAGE_SIZE)
         val fullList = remote.listAgents(limit = fallbackLimit, offset = null)
@@ -290,12 +294,10 @@ open class CachedAgentRepository(
         // freshness marker from ONE synchronized snapshot so a concurrent
         // refreshAgents() cannot race us into emitting a pre-refresh cached
         // value the user no longer has.
-        val snapshot = refreshMutex.withLock {
-            val cached = _agents.value.find { it.id == id }
-            cached to nowMillis()
+        val (cached, snapshotAgeMs) = refreshMutex.withLock {
+            val hit = _agents.value.find { it.id == id }
+            hit to (nowMillis() - lastRefreshAtMillis)
         }
-        val cached = snapshot.first
-        val snapshotAgeMs = snapshot.second - lastRefreshAtMillis
         if (cached != null) {
             emit(cached)
         }
@@ -329,12 +331,12 @@ open class CachedAgentRepository(
             remote.getAgent(id)
         }
 
-    private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatching {
+    private suspend fun refreshAgent(agentId: AgentId): Result<Agent> = runCatchingCancellable {
         val fresh = fetchAgentRemote(agentId)
         updateAgentInCache(fresh)
         // Persist the transport-driven refresh to the Room cache so a pushed
         // agent_updated change survives an app restart (CodeRabbit #517).
-        runCatching { localCache?.invoke()?.upsert(fresh) }
+        runCatchingCancellable { localCache?.invoke()?.upsert(fresh) }
             .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated cache persist failed for ${agentId.value}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
         fresh
     }
@@ -347,7 +349,7 @@ open class CachedAgentRepository(
                 _agents.update { current -> current.filterNot { it.id == agentId } }
                 // Targeted single-agent delete — not a broad deleteExcept that
                 // could race with a stale in-memory list (CodeRabbit #517).
-                runCatching { localCache?.invoke()?.deleteById(agentId.value) }
+                runCatchingCancellable { localCache?.invoke()?.deleteById(agentId.value) }
                     .onFailure { e -> Telemetry.event("CachedAgentRepository", "agent_updated delete cache update failed for ${frame.agentId}", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN) }
                 return@collect
             }
@@ -372,7 +374,7 @@ open class CachedAgentRepository(
                 // `agent-local-*` subagents) the per-agent loop serialized
                 // ~5s of sequential requests on every reconnect
                 // (letta-mobile-vcmin).
-                runCatching { refreshAgents() }
+                runCatchingCancellable { refreshAgents() }
                     .onFailure { e -> Telemetry.event("CachedAgentRepository", "reconnect agent refresh failed", "detail" to e.message, level = Telemetry.Level.WARN) }
             }
             wasConnected = nowConnected
@@ -488,7 +490,9 @@ open class CachedAgentRepository(
         }
         _agents.update { current -> current.filterNot { it.id == id } }
         try {
-            localCache?.invoke()?.deleteExcept(_agents.value.map { it.id.value })
+            localCache?.invoke()?.deleteById(id.value)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Telemetry.event("CachedAgentRepository", "Failed to update cached agents after delete", "error" to (e.message ?: e.toString()), level = Telemetry.Level.WARN)
         }
