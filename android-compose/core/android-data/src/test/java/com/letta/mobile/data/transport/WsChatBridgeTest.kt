@@ -1,6 +1,7 @@
 package com.letta.mobile.data.transport
 
 import com.letta.mobile.data.model.AssistantMessage
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.testutil.FakeChannelTransport
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
@@ -70,6 +71,25 @@ class WsChatBridgeTest {
             WsConnectionState.Connected(a2uiEnabled = false, catalog = null),
             connected.await(),
         )
+    }
+
+    @Test
+    fun `turn done maps known and unknown wire statuses`() = runTest {
+        val transport = FakeChannelTransport()
+        val bridge = WsChatBridge(transport)
+        val completed = async { bridge.events.first { it is WsTimelineEvent.TurnDone } as WsTimelineEvent.TurnDone }
+        runCurrent()
+        transport.frameEvents.emit(
+            TransportFrameEvent(ServerFrame.TurnDone(id = "id", ts = "ts", turnId = "turn", runId = "run", status = "completed")),
+        )
+        assertEquals(BridgeTurnStatus.Completed, completed.await().status)
+
+        val unknown = async { bridge.events.first { it is WsTimelineEvent.TurnDone } as WsTimelineEvent.TurnDone }
+        runCurrent()
+        transport.frameEvents.emit(
+            TransportFrameEvent(ServerFrame.TurnDone(id = "id", ts = "ts", turnId = "turn", runId = "run", status = "future_status")),
+        )
+        assertEquals(BridgeTurnStatus.Unknown("future_status"), unknown.await().status)
     }
 
     @Test

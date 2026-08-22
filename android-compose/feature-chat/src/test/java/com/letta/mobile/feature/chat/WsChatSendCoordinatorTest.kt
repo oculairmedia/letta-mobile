@@ -15,6 +15,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.runtime.BackendCapabilities
@@ -293,7 +294,7 @@ class WsChatSendCoordinatorTest {
         assertEquals("conv-1", timelineRepository.externalLocals.single().conversationId)
         assertEquals("hello", timelineRepository.externalLocals.single().content)
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         verify(exactly = 2) {
@@ -510,7 +511,7 @@ class WsChatSendCoordinatorTest {
 
         var cancellationPropagated = false
         try {
-            coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         } catch (_: CancellationException) {
             cancellationPropagated = true
         }
@@ -539,7 +540,7 @@ class WsChatSendCoordinatorTest {
         coordinator.send("one").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", "agent-1", "conv-1", "iroh-run-1"))
         coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "msg-1", contentRaw = JsonPrimitive("I"), runId = "run-app")))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "iroh-run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "iroh-run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         val cleanup = timelineRepository.abandonedFragmentCleanups.single()
@@ -577,7 +578,7 @@ class WsChatSendCoordinatorTest {
 
         verify(exactly = 1) { wsChatBridge.cancel("conv-a") }
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = "cancelled"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Cancelled))
         advanceUntilIdle()
 
         verify(exactly = 1) {
@@ -627,7 +628,7 @@ class WsChatSendCoordinatorTest {
         assertTrue(timelineRepository.failedLocals.isEmpty())
 
         activeConversation = "conv-a"
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-a", runId = "run-a", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         verify(exactly = 2) {
@@ -770,7 +771,7 @@ class WsChatSendCoordinatorTest {
                 cachedInputTokens = 0L, reasoningTokens = 0L,
             )
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted(turnId = "turn-2", agentId = "agent-1", conversationId = "conv-default-agent-1", runId = "run-2"))
         coordinator.handleEvent(
             WsTimelineEvent.UsageStatistics(
@@ -969,7 +970,7 @@ class WsChatSendCoordinatorTest {
             WsTimelineEvent.TurnDone(
                 turnId = "turn-1",
                 runId = "run-1",
-                status = "failed",
+                status = BridgeTurnStatus.Failed,
             )
         )
         runCurrent()
@@ -1016,7 +1017,7 @@ class WsChatSendCoordinatorTest {
             clientVersionProvider = clientVersionProvider,
         )
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)
@@ -1044,7 +1045,7 @@ class WsChatSendCoordinatorTest {
         )
 
         coordinator.handleEvent(WsTimelineEvent.StopReason(turnId = "turn-1", runId = "run-1", stopReason = "error"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         assertEquals(
@@ -1074,7 +1075,7 @@ class WsChatSendCoordinatorTest {
             clientVersionProvider = clientVersionProvider,
         )
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "cancelled"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Cancelled))
         advanceUntilIdle()
 
         assertEquals(null, uiState.value.error)
@@ -1102,7 +1103,7 @@ class WsChatSendCoordinatorTest {
         )
 
         coordinator.send("hello").join()
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "completed", lossy = false))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed, lossy = false))
         advanceUntilIdle()
 
         assertTrue(timelineRepository.reconciledSends.isEmpty())
@@ -1130,7 +1131,7 @@ class WsChatSendCoordinatorTest {
         coordinator.send("hello").join()
         coordinator.handleEvent(
             WsTimelineEvent.TurnDone(
-                turnId = "turn-1", runId = "run-1", status = "completed",
+                turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Completed,
                 lossy = true, dropCount = 3L,
             )
         )
@@ -1266,7 +1267,7 @@ class WsChatSendCoordinatorTest {
                 runId = "run-replay",
             )
         )
-        events.emit(WsTimelineEvent.TurnDone(turnId = "turn-replay", runId = "run-replay", status = "completed"))
+        events.emit(WsTimelineEvent.TurnDone(turnId = "turn-replay", runId = "run-replay", status = BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         assertEquals(false, uiState.value.isStreaming)
@@ -1295,7 +1296,7 @@ class WsChatSendCoordinatorTest {
 
         coordinator.send("hello").join()
         val local = timelineRepository.externalLocals.single()
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(
@@ -1341,7 +1342,7 @@ class WsChatSendCoordinatorTest {
         assertEquals(true, uiState.value.isStreaming)
         assertEquals(null, uiState.value.error)
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals("Worker died", uiState.value.error)
@@ -1391,7 +1392,7 @@ class WsChatSendCoordinatorTest {
         )
         assertNull(uiState.value.error)
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone(turnId = "turn-1", runId = "run-1", status = BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(TurnFailureNotices.GENERIC_MESSAGE, uiState.value.error)

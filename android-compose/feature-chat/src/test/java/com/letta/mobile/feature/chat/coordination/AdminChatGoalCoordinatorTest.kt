@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat.coordination
 
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.GoalStatus
+import com.letta.mobile.data.model.GoalStatusState
 import com.letta.mobile.data.model.GoalStatusResponse
 import com.letta.mobile.data.repository.api.ISlashCommandRepository
 import com.letta.mobile.data.transport.WsChatBridge
@@ -70,7 +71,7 @@ class AdminChatGoalCoordinatorTest {
             Result.success(
                 GoalStatusResponse(
                     conversationId = "conversation-1",
-                    goal = GoalStatus(objective = "Stale goal", status = "active"),
+                    goal = GoalStatus(objective = "Stale goal", status = GoalStatusState.Active),
                 ),
             ),
         )
@@ -94,7 +95,7 @@ class AdminChatGoalCoordinatorTest {
         coEvery { repository.getGoalStatus("agent-1") } returns Result.success(
             GoalStatusResponse(
                 conversationId = "conversation-2",
-                goal = GoalStatus(objective = "Other conversation's goal", status = "active"),
+                goal = GoalStatus(objective = "Other conversation's goal", status = GoalStatusState.Active),
             ),
         )
         val bridge = mockk<WsChatBridge>()
@@ -134,7 +135,7 @@ class AdminChatGoalCoordinatorTest {
         coEvery { repository.getGoalStatus("agent-1") } returns Result.success(
             GoalStatusResponse(
                 conversationId = "",
-                goal = GoalStatus(objective = "Legacy goal", status = "active"),
+                goal = GoalStatus(objective = "Legacy goal", status = GoalStatusState.Active),
             ),
         )
         val bridge = mockk<WsChatBridge>()

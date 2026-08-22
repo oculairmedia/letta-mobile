@@ -1,6 +1,7 @@
 package com.letta.mobile.data.runtime
 
 import com.letta.mobile.data.model.AgentId
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.ApprovalResult
@@ -338,12 +339,11 @@ private fun ApprovalResult.toApprovalResolvedPayload(
     )
 }
 
-private fun String.toRuntimeRunStatus(): RuntimeRunStatus = when (lowercase()) {
-    "completed", "complete", "success", "succeeded" -> RuntimeRunStatus.Completed
-    "cancelled", "canceled" -> RuntimeRunStatus.Cancelled
-    "failed", "error" -> RuntimeRunStatus.Failed
-    "started" -> RuntimeRunStatus.Started
-    else -> RuntimeRunStatus.Running
+private fun BridgeTurnStatus.toRuntimeRunStatus(): RuntimeRunStatus = when (this) {
+    BridgeTurnStatus.Completed -> RuntimeRunStatus.Completed
+    BridgeTurnStatus.Cancelled -> RuntimeRunStatus.Cancelled
+    BridgeTurnStatus.Failed -> RuntimeRunStatus.Failed
+    is BridgeTurnStatus.Unknown -> RuntimeRunStatus.Running
 }
 
 private fun String.toToolExecutionStatus(isErr: Boolean?): ToolExecutionStatus = when (lowercase()) {

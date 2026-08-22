@@ -19,6 +19,7 @@ import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import com.letta.mobile.util.Telemetry
@@ -893,7 +894,7 @@ class ChatSendCoordinator(
                 if (state != null && (state.otid != null || ui.isStreaming())) {
                     finishActiveTurn(
                         state = state,
-                        status = event.status,
+                        status = BridgeTurnStatus.fromWire(event.status),
                         runId = event.runId,
                         turnId = state.turnId.orEmpty(),
                         lossy = false,
@@ -939,7 +940,7 @@ class ChatSendCoordinator(
             !owner.identity.acceptsTerminal(event.turnId)
         if (stale) {
             if (owner == null) reportUnmatchedFrame(event, event.turnId, event.runId)
-            if (event.status == "failed" || event.status == "cancelled") {
+            if (event.status is BridgeTurnStatus.Failed || event.status is BridgeTurnStatus.Cancelled) {
                 val conversationId = (owner ?: fallbackState())?.conversationId
                     ?: lastActiveConversationId
                     ?: defaultShimConversationId(agentId)
@@ -1061,7 +1062,7 @@ class ChatSendCoordinator(
         }
         finishActiveTurn(
             state = state,
-            status = "completed",
+            status = BridgeTurnStatus.Completed,
             runId = event.runId,
             turnId = event.turnId,
             lossy = false,
@@ -1070,7 +1071,7 @@ class ChatSendCoordinator(
             recordEvent = WsTimelineEvent.TurnDone(
                 turnId = event.turnId,
                 runId = event.runId,
-                status = "completed",
+                status = BridgeTurnStatus.Completed,
             ),
         )
     }
@@ -1454,7 +1455,7 @@ class ChatSendCoordinator(
 
     private suspend fun finishActiveTurn(
         state: ConversationTurnState,
-        status: String,
+        status: BridgeTurnStatus,
         runId: String,
         turnId: String,
         lossy: Boolean,
@@ -1471,7 +1472,7 @@ class ChatSendCoordinator(
         // failure and must not be painted like a dead turn.
         val mainReplyCompleted = state.deliveredAssistantContent &&
             TurnFailureNotices.isCompletedMainReplyStopReason(state.stopReason)
-        val failureNotice = if (status == "failed") {
+        val failureNotice = if (status is BridgeTurnStatus.Failed) {
             TurnFailureNotices.forFailedTerminal(
                 reason = state.bufferedErrorMessage,
                 deliveredAssistantContent = state.deliveredAssistantContent,
@@ -1485,7 +1486,7 @@ class ChatSendCoordinator(
         // Skip abandoned-fragment cleanup for delivered-then-failed turns: a
         // legitimate short reply (e.g. "OK") must not be purged before we
         // classify the failure as aux-only.
-        if (status == "cancelled" || (status == "failed" && deadTurn)) {
+        if (status is BridgeTurnStatus.Cancelled || (status is BridgeTurnStatus.Failed && deadTurn)) {
             cleanupAbandonedAssistantFragmentsSafely(
                 conversationId = conversationId,
                 runId = runId,
@@ -1513,7 +1514,7 @@ class ChatSendCoordinator(
                 )
             }
         }
-        if (status == "failed" && failureNotice == null) {
+        if (status is BridgeTurnStatus.Failed && failureNotice == null) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnDone.failedAfterDelivery",
                 "turnId" to turnId,
@@ -1535,18 +1536,18 @@ class ChatSendCoordinator(
         }
         val stopReasonError = state.stopReason.equals("error", ignoreCase = true)
         val nextError = when (status) {
-            "completed" -> state.bufferedErrorMessage
+            BridgeTurnStatus.Completed -> state.bufferedErrorMessage
                 ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else ui.currentError()
-            "cancelled" -> ui.currentError()
+            BridgeTurnStatus.Cancelled -> ui.currentError()
             // Delivered-then-failed keeps whatever error state was already on
             // screen (normally none) — the user got their answer.
-            "failed" -> if (deadTurn) {
+            BridgeTurnStatus.Failed -> if (deadTurn) {
                 state.bufferedErrorMessage ?: failureNotice.message
             } else {
                 ui.currentError()
             }
-            else -> state.bufferedErrorMessage
-                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly ($status)"
+            is BridgeTurnStatus.Unknown -> state.bufferedErrorMessage
+                ?: if (stopReasonError) BARE_STOP_REASON_ERROR_MESSAGE else "Turn ended unexpectedly (${status.raw})"
         }
         // Finding 1: only the VISIBLE conversation's terminal may clear presence
         // or paint an error. A background conversation settles its own timeline
@@ -1577,7 +1578,7 @@ class ChatSendCoordinator(
         // still-dangling card (whose sweep this turn's own turnStarted()
         // cancelled) needs exactly this unconditional reschedule or it would
         // never resolve.
-        runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status == "completed") }
+        runCatching { timelineRepository.turnEnded(agentId, conversationId, clean = status is BridgeTurnStatus.Completed) }
         state.reachedTerminal = true
         clearActiveTurnState(state, reason = "turnFinished")
         timelineRepository.clearExternalTransportActive(conversationId)
