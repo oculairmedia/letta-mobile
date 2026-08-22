@@ -61,6 +61,7 @@ internal fun RunBlock(
     activeApprovalRequestId: String? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     chatMode: String = "interactive",
+    showCompletedDisclosure: Boolean = true,
     renderRow: @Composable (
         message: UiMessage,
         position: GroupPosition,
@@ -112,13 +113,15 @@ internal fun RunBlock(
         modifier = modifier
             .fillMaxWidth(),
     ) {
-        RunActivityDisclosure(
-            activity = activity,
-            collapsed = effectiveCollapsed,
-            collapsible = collapsible,
-            onToggleCollapsed = toggleCollapsed,
-            chatMode = chatMode,
-        )
+        if (activity.isActive || showCompletedDisclosure) {
+            RunActivityDisclosure(
+                activity = activity,
+                collapsed = effectiveCollapsed,
+                collapsible = collapsible,
+                onToggleCollapsed = toggleCollapsed,
+                chatMode = chatMode,
+            )
+        }
 
         // Keep the historical one-step geometry: the disclosure is additive,
         // but a single message still has no degenerate gutter or connector.
