@@ -94,12 +94,12 @@ internal fun RunBlock(
     val effectiveCollapsed = when {
         !collapsible -> false
         activity.isActive -> false
-        showCompletedDisclosure -> !userExpandedOverride
-        chatMode == "simple" -> !userExpandedOverride
+        showCompletedDisclosure && collapsed -> !userExpandedOverride
+        chatMode == "simple" && collapsed -> !userExpandedOverride
         else -> collapsed
     }
     val toggleCollapsed: () -> Unit = {
-        if (chatMode == "simple" || showCompletedDisclosure) {
+        if ((chatMode == "simple" || showCompletedDisclosure) && collapsed) {
             userExpandedOverride = !userExpandedOverride
         } else {
             onToggleCollapsed()
