@@ -10,22 +10,20 @@ import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 
 /** Phase 5k: platform-neutral cached passage / archival-memory repository. */
 open class CachedPassageRepository(
     private val remote: PassageRemoteSource,
     private val irohPassageSource: PassageIrohSource? = null,
 ) : IPassageRepository, BackendScopedCache {
-    private val cacheLock = Any()
     private val _passages = MutableStateFlow<Map<String, List<Passage>>>(emptyMap())
     private val passageFlowsByAgent = mutableMapOf<String, MutableStateFlow<List<Passage>>>()
 
     override fun getPassages(agentId: String): StateFlow<List<Passage>> {
-        return synchronized(cacheLock) {
-            passageFlowsByAgent
-                .getOrPut(agentId) { MutableStateFlow(_passages.value[agentId].orEmpty()) }
-                .asStateFlow()
-        }
+        return passageFlowsByAgent
+            .getOrPut(agentId) { MutableStateFlow(_passages.value[agentId].orEmpty()) }
+            .asStateFlow()
     }
 
     override suspend fun refreshPassages(agentId: String) {
@@ -39,11 +37,9 @@ open class CachedPassageRepository(
     }
 
     override suspend fun clearForBackendSwitch() {
-        synchronized(cacheLock) {
-            _passages.value = emptyMap()
-            passageFlowsByAgent.values.forEach { it.value = emptyList() }
-            passageFlowsByAgent.clear()
-        }
+        _passages.value = emptyMap()
+        passageFlowsByAgent.values.forEach { it.value = emptyList() }
+        passageFlowsByAgent.clear()
     }
 
     override suspend fun createPassage(agentId: String, text: String): Passage {
@@ -81,9 +77,7 @@ open class CachedPassageRepository(
     }
 
     private fun replaceCachedPassages(agentId: String, passages: List<Passage>) {
-        synchronized(cacheLock) {
-            _passages.value += (agentId to passages)
-            passageFlowsByAgent[agentId]?.value = passages
-        }
+        _passages.update { current -> current + (agentId to passages) }
+        passageFlowsByAgent[agentId]?.value = passages
     }
 }

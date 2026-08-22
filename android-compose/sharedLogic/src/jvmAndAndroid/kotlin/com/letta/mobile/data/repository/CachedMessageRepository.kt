@@ -17,7 +17,13 @@ import com.letta.mobile.data.repository.api.OlderMessagesPage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.json.Json
 
-/** Phase 5p: platform-neutral cached message repository. Paging stays in the Android binder. */
+/**
+ * Phase 5p platform-neutral stateless message helper. Paging stays in the Android binder.
+ *
+ * This is **not** the chat timeline source of truth; [TimelineRepository] owns live chat
+ * state, streaming sends, optimistic writes, and reconciliation. Do not reintroduce those
+ * responsibilities here.
+ */
 open class CachedMessageRepository(
     private val remote: MessageRemoteSource,
     private val irohTimelineSource: MessageIrohTimelineSource? = null,
