@@ -153,7 +153,18 @@ object RuntimeEventServerFrameMapper {
             }
             listOfNotNull(failure, turnDone(context, "failed"))
         }
-        RuntimeRunStatus.Cancelled -> listOf(turnDone(context, "cancelled"))
+        RuntimeRunStatus.Cancelled -> listOf(
+            ServerFrame.Error(
+                id = "turn_cancelled-${UUID.randomUUID()}",
+                ts = nowIso(),
+                code = TurnFailureNotices.CANCELLED_KIND,
+                message = TurnFailureNotices.CANCELLED_MESSAGE,
+                conversationId = context.conversationId,
+                turnId = context.turnId,
+                runId = context.runId,
+            ),
+            turnDone(context, "cancelled"),
+        )
         RuntimeRunStatus.Started, RuntimeRunStatus.Running -> emptyList()
     }
 
