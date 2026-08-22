@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.ToolId
 import com.letta.mobile.data.repository.api.IMcpServerRepository
 import com.letta.mobile.data.repository.api.McpServerIrohSource
 import com.letta.mobile.data.repository.api.McpServerRemoteSource
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,15 +46,15 @@ open class CachedMcpServerRepository(
     }
 
     override suspend fun refreshServerTools(serverId: McpServerId) {
+        if (inIrohMode()) irohUnsupported("mcp.refreshServerTools(${serverId.value})")
         val tools = remote.listMcpServerTools(serverId.value)
-        _toolsByServer.update { current ->
-            current.toMutableMap().apply { put(serverId, tools) }
-        }
+        replaceServerTools(serverId, tools)
     }
 
     override suspend fun resyncServerTools(serverId: McpServerId): McpServerResyncResult {
+        if (inIrohMode()) irohUnsupported("mcp.resyncServerTools(${serverId.value})")
         val result = remote.refreshMcpServerTools(serverId.value)
-        refreshServerTools(serverId)
+        runCatchingCancellable { refreshServerTools(serverId) }
         return result
     }
 
@@ -62,37 +63,65 @@ open class CachedMcpServerRepository(
         toolId: ToolId,
         params: McpToolExecuteParams,
     ): McpToolExecutionResult {
+        if (inIrohMode()) irohUnsupported("mcp.runServerTool(${serverId.value}, ${toolId.value})")
         return remote.runMcpServerTool(serverId.value, toolId.value, params)
     }
 
     override suspend fun fetchAllMcpTools(): List<Tool> {
+        if (inIrohMode()) {
+            refreshServers()
+            return emptyList()
+        }
         refreshServers()
         return _servers.value.flatMap { server ->
-            try {
+            runCatchingCancellable {
                 remote.listMcpServerTools(server.id.value)
-            } catch (_: Exception) {
-                emptyList()
-            }
+            }.getOrElse { emptyList() }
         }
     }
 
     override suspend fun createServer(params: McpServerCreateParams): McpServer {
+        if (inIrohMode()) irohUnsupported("mcp.createServer")
         val server = remote.createMcpServer(params)
-        refreshServers()
+        upsertServer(server)
         return server
     }
 
     override suspend fun updateServer(id: McpServerId, params: McpServerUpdateParams): McpServer {
+        if (inIrohMode()) irohUnsupported("mcp.updateServer(${id.value})")
         val server = remote.updateMcpServer(id.value, params)
-        refreshServers()
+        upsertServer(server)
         return server
     }
 
     override suspend fun deleteServer(id: McpServerId) {
+        if (inIrohMode()) irohUnsupported("mcp.deleteServer(${id.value})")
         remote.deleteMcpServer(id.value)
-        refreshServers()
+        _servers.update { current -> current.filterNot { it.id == id } }
         _toolsByServer.update { current ->
             current.toMutableMap().apply { remove(id) }
+        }
+    }
+
+    private fun inIrohMode(): Boolean = irohMcpSource?.shouldUseIroh() == true
+
+    private fun irohUnsupported(operation: String): Nothing =
+        throw UnsupportedOperationException("Iroh admin_rpc does not support $operation yet")
+
+    private fun upsertServer(server: McpServer) {
+        _servers.update { current ->
+            val index = current.indexOfFirst { it.id == server.id }
+            if (index >= 0) {
+                current.toMutableList().apply { this[index] = server }
+            } else {
+                current + server
+            }
+        }
+    }
+
+    private fun replaceServerTools(serverId: McpServerId, tools: List<Tool>) {
+        _toolsByServer.update { current ->
+            current.toMutableMap().apply { put(serverId, tools) }
         }
     }
 }
