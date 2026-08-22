@@ -23,6 +23,7 @@ import com.letta.mobile.data.channel.NotificationCandidatePhase
 import com.letta.mobile.data.channel.NotificationCandidateSource
 import com.letta.mobile.data.channel.NotificationDeliveryCandidate
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.repository.api.IAgentRepository
 import com.letta.mobile.data.timeline.IngestedMessageListener
 import com.letta.mobile.data.timeline.TimelineRepository
@@ -314,9 +315,11 @@ class ChatPushService : Service() {
                     "activeLoopCountBefore" to timelineRepository.cachedLoopCount(),
                 )
                 val recentConversations = conversationApi.listConversations(
-                    limit = MAX_BACKGROUND_PERSISTENT_STREAMS,
-                    order = "desc",
-                    orderBy = "last_message_at",
+                    ConversationListParams(
+                        limit = MAX_BACKGROUND_PERSISTENT_STREAMS,
+                        order = "desc",
+                        orderBy = "last_message_at",
+                    ),
                 )
                 val warmupConversationIds = buildList {
                     currentConversationId?.let { add(it) }

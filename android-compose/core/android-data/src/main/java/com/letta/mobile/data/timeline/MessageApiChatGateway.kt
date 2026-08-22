@@ -5,6 +5,7 @@ import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.api.MessageApi
 import com.letta.mobile.data.chat.runtime.ChatGateway
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ConversationListParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import kotlinx.coroutines.flow.Flow
@@ -18,10 +19,12 @@ class MessageApiChatGateway(
     override suspend fun listConversations(limit: Int, archiveStatus: String?): List<Conversation> =
         translateConversationApiErrors {
             conversationApi.listConversations(
-                limit = limit,
-                archiveStatus = archiveStatus,
-                order = "desc",
-                orderBy = "last_message_at",
+                ConversationListParams(
+                    limit = limit,
+                    archiveStatus = archiveStatus,
+                    order = "desc",
+                    orderBy = "last_message_at",
+                ),
             )
         }
 
