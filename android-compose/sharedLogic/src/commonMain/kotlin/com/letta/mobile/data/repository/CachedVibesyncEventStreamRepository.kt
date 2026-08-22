@@ -11,6 +11,7 @@ import com.letta.mobile.data.stream.SseParser
 import kotlinx.atomicfu.atomic
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -70,6 +71,8 @@ open class CachedVibesyncEventStreamRepository(
             } catch (_: VibesyncStreamEndpointUnavailableException) {
                 logger.info("vibesync event stream not available on this backend; not retrying")
                 return
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (error: Throwable) {
                 logger.info("vibesync event stream unavailable", error)
             }
