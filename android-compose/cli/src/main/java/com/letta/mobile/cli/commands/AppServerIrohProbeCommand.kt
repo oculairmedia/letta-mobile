@@ -10,6 +10,7 @@ import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.long
 import com.letta.mobile.cli.probe.WrapperProcessScan
 import com.letta.mobile.cli.probe.WrapperScanMode
+import com.letta.mobile.data.transport.appserver.AppServerPermissionMode
 import com.letta.mobile.data.transport.iroh.IrohProbeAssertions
 import com.letta.mobile.data.transport.iroh.IrohProbeSummary
 import com.letta.mobile.data.transport.iroh.IrohProbeTurnMetrics
@@ -45,6 +46,10 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         help = "Probe conversation id. Defaults to probe-conv-<epoch>.",
     )
     private val message by option("--message", help = "Probe user message text.").default("probe ping")
+    private val permissionMode by option(
+        "--permission-mode",
+        help = "runtime_start permission mode: standard, acceptEdits, strict, or unrestricted.",
+    ).default("standard")
     private val seedMessages by option(
         "--messages",
         help = "hydrate-heavy: number of messages to seed via the admin base.",
@@ -121,7 +126,7 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         val options = IrohProbeOptions(
             token, adminBaseUrl, agentId, message, seedMessages, payloadBytes, hydrateBudgetMs,
             secondTurnDelayMs, idleMs, timeoutMs, strictRedialDedupe, wrapperRestartCmd, dumpFramesPath,
-            wrapperUnit, wrapperPid, scanMode, wrapperScanNotApplicable,
+            wrapperUnit, wrapperPid, scanMode, wrapperScanNotApplicable, resolvePermissionMode(),
         )
         val fixture = ProbeSessionFixture(options)
         val admin = ProbeAdminClient(adminBaseUrl)
@@ -170,6 +175,12 @@ internal class AppServerIrohProbeCommand : CliktCommand(name = "app-server-iroh-
         if (seedMessages <= 0) throw UsageError("--messages must be > 0")
         if (payloadBytes <= 0) throw UsageError("--payload-bytes must be > 0")
     }
+
+    private fun resolvePermissionMode(): AppServerPermissionMode =
+        AppServerPermissionMode.fromWireValue(permissionMode)
+            ?: throw UsageError(
+                "--permission-mode must be one of standard, acceptEdits, strict, unrestricted",
+            )
 
     private fun printHumanSummary(summary: IrohProbeSummary, conversationId: String) {
         println("[iroh-probe] conversation=$conversationId ok=${summary.ok}")
