@@ -43,8 +43,8 @@ open class CachedProviderRepository(
                     providerType = providerType,
                 )
             },
-            extractCursor = { provider -> provider.id?.value ?: "" },
-            dedupKey = { provider -> provider.id?.value ?: "" },
+            extractCursor = ::providerPaginationKey,
+            dedupKey = ::providerPaginationKey,
         )
     }
 
@@ -87,5 +87,13 @@ open class CachedProviderRepository(
                 current + provider
             }
         }
+    }
+
+    private fun providerPaginationKey(provider: Provider): String {
+        val id = provider.id?.value
+        require(!id.isNullOrBlank()) {
+            "listProviders returned provider without id (name=${provider.name})"
+        }
+        return id
     }
 }
