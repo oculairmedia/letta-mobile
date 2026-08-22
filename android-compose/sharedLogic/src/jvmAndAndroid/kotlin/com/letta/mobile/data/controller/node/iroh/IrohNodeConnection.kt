@@ -711,26 +711,22 @@ class IrohNodeConnection(
         val agentId = obj["agent_id"]?.jsonPrimitive?.content
         val conversationId = obj["conversation_id"]?.jsonPrimitive?.content
         val cwd = obj["cwd"]?.jsonPrimitive?.contentOrNull
-        val mode = obj["mode"]?.jsonPrimitive?.contentOrNull?.let { name ->
-            when (name.lowercase()) {
-                "standard" -> AppServerPermissionMode.Standard
-                "acceptedits" -> AppServerPermissionMode.AcceptEdits
-                "memory" -> AppServerPermissionMode.Memory
-                else -> AppServerPermissionMode.Unrestricted
-            }
-        } ?: AppServerPermissionMode.Unrestricted
+        val modeName = obj["mode"]?.jsonPrimitive?.contentOrNull
+        val mode = modeName?.let(AppServerPermissionMode::fromWireValue)
 
         return if (requestId == null) {
             """{"type":"runtime_start_response","success":false,"error":"request_id is required"}"""
         } else if (agentId == null || conversationId == null) {
             """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"agent_id and conversation_id are required"}"""
+        } else if (modeName != null && mode == null) {
+            """{"type":"runtime_start_response","request_id":"$requestId","success":false,"error":"unsupported permission mode"}"""
         } else {
             try {
                 val runtime = controller.startRuntime(
                     agentId = AgentId(agentId),
                     conversationId = ConversationId(conversationId),
                     cwd = cwd,
-                    mode = mode,
+                    mode = mode ?: AppServerPermissionMode.Unrestricted,
                     recoverApprovals = false,
                     forceDeviceStatus = false,
                 )
