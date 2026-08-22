@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5l + Phase 6a in flight)  
+**Status:** in progress (Phase 0–4c + Phase 5a merged; Phase 5b–5l + Phase 6a in flight)
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
