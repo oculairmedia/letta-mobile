@@ -77,7 +77,7 @@ class ArchivePaginationTest {
         override suspend fun listAgentsForArchive(params: ArchiveAgentsListParams): List<Agent> {
             observedAftersForAgents += params.after
             val pageSize = params.limit ?: 50
-            val start = after?.let { id ->
+            val start = params.after?.let { id ->
                 agents.indexOfFirst { it.id.value == id }.let { if (it < 0) agents.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(agents.size)
