@@ -67,48 +67,21 @@ class TimelineRecentMessagesReconciler(
         val timer = Telemetry.startTimer("TimelineSync", telemetryName)
         var appended: Int
         try {
-            if (streamSubscriberActive.value && !allowWhileStreamActive) {
-                Telemetry.event(
-                    "TimelineSync", "$telemetryName.skipped",
-                    "conversationId" to conversationId,
-                    *telemetryAttrs,
-                    "reason" to "streamSubscriberActive",
-                )
-                timer.stop(
-                    *telemetryAttrs,
-                    "serverCount" to 0,
-                    "appended" to 0,
-                    "skipped" to true,
-                    "skipReason" to "streamSubscriberActive",
-                )
-                return 0
-            }
             // A forced reconcile (post-send retries, redial recovery) is the one
-            // path that bypasses the streamSubscriberActive skip above, so it's
-            // also the only path that can pile up admin_rpc traffic while the
-            // live stream is otherwise healthy. Debounce just this path: once a
+            // path that bypasses the streamSubscriberActive skip, so it's also
+            // the only path that can pile up admin_rpc traffic while the live
+            // stream is otherwise healthy. Debounce just that path: once a
             // forced reconcile has actually run, further forced calls within
             // minForcedReconcileIntervalMs are redundant — the stream is active
             // and the prior reconcile just resynced it.
-            val now = nowMillis()
-            val sinceLastForced = lastForcedReconcileCompletedAtMs?.let { now - it }
-            if (streamSubscriberActive.value && allowWhileStreamActive &&
-                sinceLastForced != null && sinceLastForced < minForcedReconcileIntervalMs
-            ) {
-                Telemetry.event(
-                    "TimelineSync", "$telemetryName.skipped",
-                    "conversationId" to conversationId,
-                    *telemetryAttrs,
-                    "reason" to "forcedReconcileDebounced",
-                )
-                timer.stop(
-                    *telemetryAttrs,
-                    "serverCount" to 0,
-                    "appended" to 0,
-                    "skipped" to true,
-                    "skipReason" to "forcedReconcileDebounced",
-                )
-                return 0
+            val isForcedWhileActive = streamSubscriberActive.value && allowWhileStreamActive
+            val skipReason = when {
+                streamSubscriberActive.value && !allowWhileStreamActive -> "streamSubscriberActive"
+                isForcedWhileActive && isWithinForcedReconcileDebounceWindow() -> "forcedReconcileDebounced"
+                else -> null
+            }
+            if (skipReason != null) {
+                return skipReconcile(timer, telemetryName, telemetryAttrs, skipReason)
             }
             val serverMessages = messageApi.listConversationMessages(
                 conversationId = conversationId,
@@ -125,8 +98,14 @@ class TimelineRecentMessagesReconciler(
                 )
             )
             appended = ack.await()
-            if (streamSubscriberActive.value && allowWhileStreamActive) {
-                lastForcedReconcileCompletedAtMs = now
+            // Stamped with a FRESH clock read taken after the round trip
+            // completes, not the timestamp from before it started — a reconcile
+            // slower than the debounce window must still get its own full
+            // window from actual completion, or the very next forced call would
+            // see an already-expired window and the debounce would be a no-op
+            // for exactly the slow calls it matters most for.
+            if (isForcedWhileActive) {
+                lastForcedReconcileCompletedAtMs = nowMillis()
             }
             timer.stop(
                 *telemetryAttrs,
@@ -139,6 +118,33 @@ class TimelineRecentMessagesReconciler(
             timer.stopError(t, *telemetryAttrs)
             throw t
         }
+    }
+
+    private fun isWithinForcedReconcileDebounceWindow(): Boolean {
+        val sinceLastForced = lastForcedReconcileCompletedAtMs?.let { nowMillis() - it } ?: return false
+        return sinceLastForced < minForcedReconcileIntervalMs
+    }
+
+    private fun skipReconcile(
+        timer: Telemetry.Timer,
+        telemetryName: String,
+        telemetryAttrs: Array<Pair<String, Any?>>,
+        reason: String,
+    ): Int {
+        Telemetry.event(
+            "TimelineSync", "$telemetryName.skipped",
+            "conversationId" to conversationId,
+            *telemetryAttrs,
+            "reason" to reason,
+        )
+        timer.stop(
+            *telemetryAttrs,
+            "serverCount" to 0,
+            "appended" to 0,
+            "skipped" to true,
+            "skipReason" to reason,
+        )
+        return 0
     }
 
     suspend fun applyRecentMessagesSnapshot(

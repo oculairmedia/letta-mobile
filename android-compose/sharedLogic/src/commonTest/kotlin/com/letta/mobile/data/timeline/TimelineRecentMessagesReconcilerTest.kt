@@ -91,6 +91,44 @@ class TimelineRecentMessagesReconcilerTest {
     }
 
     @Test
+    fun forcedReconcileSlowerThanTheDebounceWindowStillDebouncesTheNextCall() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 0L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(true),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+            minForcedReconcileIntervalMs = 4_000L,
+        )
+        // Simulate a reconcile round trip that itself takes longer than the
+        // debounce window (5s network call vs a 4s window).
+        transport.onListEntered = { now += 5_000L }
+
+        reconciler.reconcileRecentMessages("post-send-750", forceRefresh = true)
+        // No additional time has passed since the slow call completed.
+        reconciler.reconcileRecentMessages("post-send-2500", forceRefresh = true)
+
+        // The debounce timestamp must be stamped with the clock AFTER the round
+        // trip completes, not before it started — otherwise a reconcile slower
+        // than the window makes the debounce a no-op for exactly the calls it
+        // matters most for (letta-mobile fix/debounce-forced-reconcile review).
+        assertEquals(1, transport.listCalls)
+    }
+
+    @Test
     fun forcedReconcileStillRunsWhenStreamIsNotActive() = runTest(UnconfinedTestDispatcher()) {
         val transport = RecordingTimelineTransport()
         var now = 0L
