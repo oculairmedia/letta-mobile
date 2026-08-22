@@ -9,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import com.letta.mobile.data.chat.projection.ChatRenderItem
+import com.letta.mobile.data.chat.projection.backfillMissingAssistantRunIds
 import com.letta.mobile.data.chat.projection.deduplicateRenderKeys
 import com.letta.mobile.data.chat.projection.groupMessagesForRender
 import com.letta.mobile.data.chat.projection.runKey
@@ -23,6 +24,33 @@ import com.letta.mobile.feature.chat.screen.compactRunToolCallSteps
  * letta-mobile-m772.2
  */
 class MessageGroupingTest {
+    @Test
+    fun `missing tool run ids inherit the single assistant run between user turns`() {
+        val messages = listOf(
+            UiMessage(id = "user", role = "user", content = "user", timestamp = "2026-04-19T12:00:00Z"),
+            assistant("thought", runId = "run-1"),
+            assistantToolCall("tool-1", command = "one").copy(runId = null),
+            assistantToolCall("tool-2", command = "two").copy(runId = null),
+            assistant("answer", runId = "run-1"),
+        )
+
+        val repaired = backfillMissingAssistantRunIds(messages)
+
+        assertEquals(listOf(null, "run-1", "run-1", "run-1", "run-1"), repaired.map { it.runId })
+    }
+
+    @Test
+    fun `ambiguous assistant segment does not guess missing run ids`() {
+        val messages = listOf(
+            assistant("thought", runId = "run-1"),
+            assistantToolCall("tool", command = "ambiguous").copy(runId = null),
+            assistant("answer", runId = "run-2"),
+        )
+
+        val repaired = backfillMissingAssistantRunIds(messages)
+
+        assertEquals(null, repaired[1].runId)
+    }
 
     @Test
     fun `empty input returns empty output`() {

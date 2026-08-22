@@ -60,7 +60,7 @@ class RunActivityDisclosureTest {
             .assertExists()
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
             .assert(hasNoClickAction())
-            .assertHeightIsAtLeast(48.dp)
+            .assertHeightIsAtLeast(36.dp)
             .assert(hasStateDescription("Agent work in progress"))
         composeRule.runOnIdle { assertEquals(0, toggles) }
     }

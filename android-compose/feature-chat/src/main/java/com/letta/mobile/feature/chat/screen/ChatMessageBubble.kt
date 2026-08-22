@@ -205,7 +205,7 @@ internal fun MessageBubbleSurface(
     onGeneratedUiMessage: ((String) -> Unit)? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
-    showTimestamp: Boolean = true,
+    showTimestamp: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String = "",
     // letta-mobile-1k3ge restore: tap an attached image to open the fullscreen

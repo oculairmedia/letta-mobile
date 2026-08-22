@@ -86,7 +86,7 @@ internal fun ChatMessageItem(
     rerunEnabled: Boolean = true,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
-    showTimestamp: Boolean = true,
+    showTimestamp: Boolean = false,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {

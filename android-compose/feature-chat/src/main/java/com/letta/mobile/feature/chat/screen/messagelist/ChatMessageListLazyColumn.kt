@@ -158,6 +158,7 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
                     chatDimens = params.chatDimens,
                     chatShapes = params.chatShapes,
                     isStreamingRenderItem = isStreamingRenderItem,
+                    showTimestamp = params.index == 0,
                 ),
             )
         }
@@ -168,10 +169,13 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
 private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyParams) {
     when (val renderItem = params.renderItem) {
         is ChatRenderItem.Single -> ChatMessageListRenderSingleItem(
-            renderItem = renderItem,
-            context = params.context,
-            chatDimens = params.chatDimens,
-            isStreamingRenderItem = params.isStreamingRenderItem,
+            params = ChatMessageListRenderSingleItemParams(
+                renderItem = renderItem,
+                context = params.context,
+                chatDimens = params.chatDimens,
+                isStreamingRenderItem = params.isStreamingRenderItem,
+                showTimestamp = params.showTimestamp,
+            ),
         )
         is ChatRenderItem.SkillEnvelopeChip -> {
             SkillEnvelopeChip(
@@ -191,18 +195,16 @@ private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyP
                 chatDimens = params.chatDimens,
                 chatShapes = params.chatShapes,
                 isStreamingRenderItem = params.isStreamingRenderItem,
+                showTimestamp = params.showTimestamp,
             ),
         )
     }
 }
 
 @Composable
-private fun ChatMessageListRenderSingleItem(
-    renderItem: ChatRenderItem.Single,
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    isStreamingRenderItem: Boolean,
-) {
+private fun ChatMessageListRenderSingleItem(params: ChatMessageListRenderSingleItemParams) {
+    val renderItem = params.renderItem
+    val context = params.context
     val msg = renderItem.message
     val stableKey = renderItem.stableRunKey
     if (stableKey != null) {
@@ -213,18 +215,20 @@ private fun ChatMessageListRenderSingleItem(
             onToggleCollapsed = {
                 context.callbacks.onToggleRunCollapsed(runId)
             },
-            modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
-            isStreaming = isStreamingRenderItem,
+            modifier = Modifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
+            isStreaming = params.isStreamingRenderItem,
             activeApprovalRequestId = context.itemState.activeApprovalRequestId,
             onApprovalDecision = context.callbacks.onSubmitApproval,
             chatMode = context.chatMode,
+            showCompletedDisclosure = params.showTimestamp,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
                 params = RenderChatMessageRowParams(
                     message = message,
                     position = position,
                     context = context,
-                    isStreamingRenderItem = isStreamingRenderItem,
+                    isStreamingRenderItem = params.isStreamingRenderItem,
+                    showTimestamp = params.showTimestamp,
                 ),
                 modifier = rowModifier,
             )
@@ -236,7 +240,8 @@ private fun ChatMessageListRenderSingleItem(
             message = msg,
             position = renderItem.groupPosition,
             context = context,
-            isStreamingRenderItem = isStreamingRenderItem,
+            isStreamingRenderItem = params.isStreamingRenderItem,
+            showTimestamp = params.showTimestamp,
         ),
     )
 }
@@ -265,6 +270,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
         activeApprovalRequestId = context.itemState.activeApprovalRequestId,
         onApprovalDecision = context.callbacks.onSubmitApproval,
         chatMode = context.chatMode,
+        showCompletedDisclosure = params.showTimestamp,
     ) { message, position, rowModifier ->
         RenderChatMessageRow(
             params = RenderChatMessageRowParams(
@@ -272,7 +278,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
                 position = position,
                 context = context,
                 isStreamingRenderItem = params.isStreamingRenderItem,
-                showTimestamp = false,
+                showTimestamp = params.showTimestamp && message.id == renderItem.messages.last().first.id,
             ),
             modifier = rowModifier,
         )
@@ -284,7 +290,7 @@ private data class RenderChatMessageRowParams(
     val position: com.letta.mobile.ui.common.GroupPosition,
     val context: ChatMessageListLazyContext,
     val isStreamingRenderItem: Boolean,
-    val showTimestamp: Boolean = true,
+    val showTimestamp: Boolean = false,
 )
 
 @Composable
@@ -300,11 +306,11 @@ private fun RenderChatMessageRow(
         isStreaming = params.isStreamingRenderItem && message.id == context.newestMessageId,
         rerunEnabled = !context.itemState.isStreaming,
         approvalInFlight = context.itemState.activeApprovalRequestId == message.approvalRequest?.requestId,
+        showTimestamp = params.showTimestamp,
         chatMode = context.chatMode,
         highlightedMessageId = context.highlightedMessageId,
         callbacks = context.callbacks,
         reasoningCollapsed = message.id !in context.itemState.expandedReasoningMessageIds,
-        showTimestamp = params.showTimestamp,
         onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(message.id) },
         modifier = modifier,
     )

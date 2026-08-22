@@ -19,6 +19,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -64,6 +65,9 @@ internal fun MeasuredChatRenderItem(
     // recording the height on the first render is one Map.put — the
     // savings on subsequent renders are the avoidance of re-measurement.
     val hasMeasuredOnce = remember(signature) { mutableStateOf(false) }
+    // Expansion/collapse changes the signature. The old signature may carry
+    // a much taller cached minimum; never let that floor survive into the new
+    // visual state or a collapsed thought/run cannot shrink.
     val cachedHeightPx = if (hasMeasuredOnce.value) geometryState.heightFor(signature) else null
     val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
         val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }
@@ -97,11 +101,11 @@ internal fun RenderChatMessage(
     isStreaming: Boolean,
     rerunEnabled: Boolean,
     approvalInFlight: Boolean,
+    showTimestamp: Boolean = false,
     chatMode: String,
     highlightedMessageId: String?,
     callbacks: ChatMessageRenderCallbacks,
     reasoningCollapsed: Boolean = false,
-    showTimestamp: Boolean = true,
     onToggleReasoning: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {

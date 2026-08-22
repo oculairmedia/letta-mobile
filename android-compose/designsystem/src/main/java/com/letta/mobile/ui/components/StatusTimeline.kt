@@ -48,6 +48,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.ui.icons.LettaIcons
+import com.letta.mobile.ui.icons.LettaIconSizing
 import com.letta.mobile.ui.motion.ChatMotionPolicy
 import com.letta.mobile.ui.motion.rememberChatMotionPolicy
 import com.letta.mobile.ui.theme.LettaTheme
@@ -347,7 +348,9 @@ fun CollapsibleStatusRow(
                 Icon(
                     imageVector = LettaIcons.ExpandMore,
                     contentDescription = null,
-                    modifier = Modifier.rotate(chevronRotation),
+                    modifier = Modifier
+                        .size(LettaIconSizing.Inline)
+                        .rotate(chevronRotation),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
