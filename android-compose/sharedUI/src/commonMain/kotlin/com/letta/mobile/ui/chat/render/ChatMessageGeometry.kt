@@ -48,6 +48,13 @@ class ChatMessageGeometryState(
     // entries — access-order promotion defeated per-frame dedup on recycled
     // slots. Evict oldest-by-insertion when full.
     private val exactHeights = linkedMapOf<ChatRenderItemGeometrySignature, Int>()
+    // letta-mobile-cache-probe: counters for the GeometryCache telemetry events.
+    // Total call counts (write + read) without per-call overhead; sampled
+    // events (1/16 of writes, every read) keep the log noise low while
+    // preserving the hit/miss ratio.
+    private var recordMeasurementsTotal: Long = 0
+    private var readsTotal: Long = 0
+    private var readsHits: Long = 0
 
     /**
      * Records a measured height for [signature]. Skips the write when the
@@ -65,13 +72,35 @@ class ChatMessageGeometryState(
         heightPx: Int,
     ) {
         val safeHeight = heightPx.coerceAtLeast(0)
-        if (exactHeights[signature] == safeHeight) return
+        if (exactHeights[signature] == safeHeight) {
+            // letta-mobile-cache-probe: dedup-write path. Same signature + same
+            // height = the producer is re-emitting (per-frame onSizeChanged).
+            // Sampled (1/16) to avoid telemetry being itself the bottleneck.
+            if (recordMeasurementsTotal and 0xFL == 0L) {
+                com.letta.mobile.util.Telemetry.event(
+                    "GeometryCache", "write.dedup",
+                    "renderKey" to signature.bucket.renderKey,
+                    "size" to exactHeights.size,
+                )
+            }
+            recordMeasurementsTotal++
+            return
+        }
         val isNew = signature !in exactHeights
         exactHeights[signature] = safeHeight
         if (isNew) {
             while (exactHeights.size > maxEntries) {
                 exactHeights.remove(exactHeights.keys.first())
             }
+        }
+        recordMeasurementsTotal++
+        if (recordMeasurementsTotal and 0xFL == 0L) {
+            com.letta.mobile.util.Telemetry.event(
+                "GeometryCache", "write.insert",
+                "renderKey" to signature.bucket.renderKey,
+                "isNew" to isNew,
+                "size" to exactHeights.size,
+            )
         }
     }
 
@@ -98,8 +127,24 @@ class ChatMessageGeometryState(
      * surviving entries still hold their previously-recorded height. Not part
      * of the supported runtime API; do not call from production code.
      */
-    fun heightFor(signature: ChatRenderItemGeometrySignature): Int? =
-        exactHeights[signature]
+    fun heightFor(signature: ChatRenderItemGeometrySignature): Int? {
+        val cached = exactHeights[signature]
+        readsTotal++
+        val isHit = cached != null
+        if (isHit) readsHits++
+        // letta-mobile-cache-probe: full event (no sampling) on reads because
+        // production read traffic is the question we're trying to answer.
+        // If readsTotal goes up over time while readsHits stays at zero, the
+        // cache is write-only and the re-measurement cost is fully paid.
+        com.letta.mobile.util.Telemetry.event(
+            "GeometryCache", "read",
+            "renderKey" to signature.bucket.renderKey,
+            "hit" to isHit,
+            "readsTotal" to readsTotal,
+            "readsHits" to readsHits,
+        )
+        return cached
+    }
 }
 
 fun ChatRenderItem.chatGeometrySignature(
