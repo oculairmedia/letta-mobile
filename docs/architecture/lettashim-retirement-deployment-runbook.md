@@ -983,11 +983,22 @@ staging tests.
 ### 4. Restart only the wrapper
 
 ```bash
+WRAPPER_LOG_OFFSET="$(stat -c %s /var/log/meridian-iroh-wrapper.log)"
 systemctl restart meridian-iroh-wrapper.service
 systemctl is-active meridian-iroh-wrapper.service
 systemctl show meridian-iroh-wrapper.service \
   -p MainPID -p ActiveEnterTimestamp -p NRestarts
+IROH_WRAPPER_READY_START_OFFSET="$WRAPPER_LOG_OFFSET" \
+  bash scripts/deploy/verify-iroh-wrapper-ready.sh
 ```
+
+`systemctl is-active` proves only that the JVM process exists. The readiness
+verifier reads only the post-restart log window captured immediately before
+the restart, pins the wrapper PID, and waits up to 130 seconds (the production
+request budget plus margin) for
+`Telemetry/AppServerReconnect: generation.ready`. It fails if the process is
+replaced, recovery gives up, or the deadline expires; a historical ready line
+from the prior release cannot satisfy it.
 
 Re-read the App Server PID:
 
