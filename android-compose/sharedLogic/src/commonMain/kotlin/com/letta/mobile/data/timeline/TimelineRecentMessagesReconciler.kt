@@ -23,10 +23,13 @@ class TimelineRecentMessagesReconciler(
     private val streamSubscriberActive: StateFlow<Boolean>,
     private val writeMutex: Mutex,
     private val applyReturnsAndResponsesFromSnapshot: (List<LettaMessage>) -> Unit,
+    private val nowMillis: () -> Long = { timelineCurrentTimeMillis() },
+    private val minForcedReconcileIntervalMs: Long = DEFAULT_MIN_FORCED_RECONCILE_INTERVAL_MS,
 ) {
     val seenRunIds = TimelineSeenRunTracker()
     private val reconcileFlightMutex = Mutex()
     private var inFlightRecentReconcile: Deferred<Int>? = null
+    private var lastForcedReconcileCompletedAtMs: Long? = null
 
     suspend fun reconcileRecentMessages(
         reason: String,
@@ -80,6 +83,33 @@ class TimelineRecentMessagesReconciler(
                 )
                 return 0
             }
+            // A forced reconcile (post-send retries, redial recovery) is the one
+            // path that bypasses the streamSubscriberActive skip above, so it's
+            // also the only path that can pile up admin_rpc traffic while the
+            // live stream is otherwise healthy. Debounce just this path: once a
+            // forced reconcile has actually run, further forced calls within
+            // minForcedReconcileIntervalMs are redundant — the stream is active
+            // and the prior reconcile just resynced it.
+            val now = nowMillis()
+            val sinceLastForced = lastForcedReconcileCompletedAtMs?.let { now - it }
+            if (streamSubscriberActive.value && allowWhileStreamActive &&
+                sinceLastForced != null && sinceLastForced < minForcedReconcileIntervalMs
+            ) {
+                Telemetry.event(
+                    "TimelineSync", "$telemetryName.skipped",
+                    "conversationId" to conversationId,
+                    *telemetryAttrs,
+                    "reason" to "forcedReconcileDebounced",
+                )
+                timer.stop(
+                    *telemetryAttrs,
+                    "serverCount" to 0,
+                    "appended" to 0,
+                    "skipped" to true,
+                    "skipReason" to "forcedReconcileDebounced",
+                )
+                return 0
+            }
             val serverMessages = messageApi.listConversationMessages(
                 conversationId = conversationId,
                 limit = RECONCILE_LIMIT,
@@ -95,6 +125,9 @@ class TimelineRecentMessagesReconciler(
                 )
             )
             appended = ack.await()
+            if (streamSubscriberActive.value && allowWhileStreamActive) {
+                lastForcedReconcileCompletedAtMs = now
+            }
             timer.stop(
                 *telemetryAttrs,
                 "serverCount" to serverMessages.size,
@@ -140,5 +173,6 @@ class TimelineRecentMessagesReconciler(
 
     companion object {
         private const val RECONCILE_LIMIT = 250
+        const val DEFAULT_MIN_FORCED_RECONCILE_INTERVAL_MS = 4_000L
     }
 }
