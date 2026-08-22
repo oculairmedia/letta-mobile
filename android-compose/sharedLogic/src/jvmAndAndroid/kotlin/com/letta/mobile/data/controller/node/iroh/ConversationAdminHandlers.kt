@@ -12,8 +12,25 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
 object ConversationAdminHandlers {
-    /** Newest-window page size for single-message projection. */
-    internal const val MESSAGE_GET_PAGE_LIMIT = 500
+    /**
+     * Newest-window page size for single-message projection.
+     *
+     * letta-mobile-leebr: walkMessagePages asks the real App Server for this
+     * many RAW, unprojected messages per page over the wrapper's own WS link
+     * to it (AppServerWebSocketLimits.MAX_FRAME_BYTES = 16 MiB, no chunking).
+     * message.list's size guards (MessageListPageGuard, MessageListWireProjection)
+     * only run on what the wrapper serves onward — they can't protect this
+     * inbound hop. A page of large tool-return bodies can itself exceed 16 MiB
+     * in one WS frame from the App Server, which kills that ENTIRE shared
+     * connection (not just this request) until it reconnects — every other
+     * admin_rpc route sharing it (agent_list, conversation_list, list_models,
+     * running turns) breaks simultaneously. Worse, message.get always walks
+     * from the newest page, so a message living on an oversized page kills the
+     * connection again on every future lookup of it — not a one-off blip.
+     * 500 was excessive for what's just a "find one message by id" scan;
+     * shrinking it lowers the odds any single page crosses that ceiling.
+     */
+    internal const val MESSAGE_GET_PAGE_LIMIT = 100
 
     /** Max pages walked oldest-ward for message.get / tool_return.get. */
     internal const val MESSAGE_GET_MAX_PAGES = 20
