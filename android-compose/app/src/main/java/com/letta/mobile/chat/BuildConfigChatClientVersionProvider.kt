@@ -1,6 +1,6 @@
 package com.letta.mobile.chat
 
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.feature.chat.coordination.ChatClientVersionProvider
 import javax.inject.Inject
 

@@ -5,7 +5,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 
 internal object ProfileTarget {
-    private const val DEFAULT_PACKAGE_NAME = "com.letta.mobile.benchmark"
+    private const val DEFAULT_PACKAGE_NAME = "ca.oculair.meridian.benchmark"
     private const val TARGET_PACKAGE_ARG = "androidx.benchmark.targetPackageName"
     private const val AUTOMATION_PAYLOAD_ARG = "automationConfigPayloadBase64"
     private const val AUTOMATION_PAYLOAD_EXTRA = "com.letta.mobile.extra.AUTOMATION_CONFIG_PAYLOAD_BASE64"

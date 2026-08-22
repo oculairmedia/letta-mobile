@@ -3,7 +3,7 @@ package com.letta.mobile.crash
 import android.content.Context
 import android.util.Log
 import androidx.startup.Initializer
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import io.sentry.android.core.SentryAndroid
 
 /**

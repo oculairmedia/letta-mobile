@@ -42,7 +42,7 @@ import androidx.compose.ui.tooling.preview.PreviewLightDark
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.Archive
 import com.letta.mobile.data.model.EmbeddingConfig

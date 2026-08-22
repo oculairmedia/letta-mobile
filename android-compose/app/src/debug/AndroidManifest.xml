@@ -6,7 +6,7 @@
         <!-- Debug/self-test hooks for ADB validation. These components live only
              in the debug source set and are not packaged in release builds. -->
         <receiver
-            android:name=".runtime.sensors.DeviceSensorSelfTestReceiver"
+            android:name="com.letta.mobile.runtime.sensors.DeviceSensorSelfTestReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -15,7 +15,7 @@
         </receiver>
 
         <receiver
-            android:name=".runtime.mobileactions.MobileIntentActionsSelfTestReceiver"
+            android:name="com.letta.mobile.runtime.mobileactions.MobileIntentActionsSelfTestReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -24,29 +24,29 @@
         </receiver>
 
         <receiver
-            android:name=".runtime.local.LiteRtSelfTestReceiver"
+            android:name="com.letta.mobile.runtime.local.LiteRtSelfTestReceiver"
             android:enabled="true"
             android:exported="true" />
 
         <receiver
-            android:name=".runtime.local.LocalContextClearReceiver"
+            android:name="com.letta.mobile.runtime.local.LocalContextClearReceiver"
             android:enabled="true"
             android:exported="true" />
 
         <service
-            android:name=".runtime.sensors.DeviceSensorSelfTestService"
+            android:name="com.letta.mobile.runtime.sensors.DeviceSensorSelfTestService"
             android:enabled="true"
             android:exported="true" />
 
         <activity
-            android:name=".runtime.sensors.DeviceSensorSelfTestActivity"
+            android:name="com.letta.mobile.runtime.sensors.DeviceSensorSelfTestActivity"
             android:enabled="true"
             android:exported="true"
             android:noHistory="true"
             android:theme="@style/Theme.LettaMobile.Starting" />
 
         <activity
-            android:name=".runtime.actions.DeviceActionCommandActivity"
+            android:name="com.letta.mobile.runtime.actions.DeviceActionCommandActivity"
             android:enabled="true"
             android:exported="true"
             android:noHistory="true"

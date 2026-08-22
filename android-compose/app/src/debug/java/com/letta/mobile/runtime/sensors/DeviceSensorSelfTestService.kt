@@ -4,7 +4,7 @@ import android.app.Service
 import android.content.Intent
 import android.os.IBinder
 import android.util.Log
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import java.io.File
 import kotlinx.coroutines.runBlocking
 

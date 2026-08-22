@@ -1377,11 +1377,13 @@ tasks.named("check") {
 }
 
 android {
-    namespace = "com.letta.mobile"
+    // Play identity freeze (letta-mobile-h0b1h.1): store package is Meridian.
+    // Kotlin source packages remain com.letta.mobile; R/BuildConfig follow this namespace.
+    namespace = "ca.oculair.meridian"
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.letta.mobile"
+        applicationId = "ca.oculair.meridian"
         minSdk = 26
         targetSdk = 36
         versionCode = computedVersionCode

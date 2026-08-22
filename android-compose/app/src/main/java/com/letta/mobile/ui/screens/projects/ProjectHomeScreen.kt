@@ -56,7 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.model.BeadsRemoteStatus
 import com.letta.mobile.data.model.PmAgentMetadata
 import com.letta.mobile.data.model.ProjectSummary

@@ -3,8 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
-APP_PACKAGE="${APP_PACKAGE:-com.letta.mobile}"
-APP_COMPONENT="${APP_COMPONENT:-com.letta.mobile/.MainActivity}"
+APP_PACKAGE="${APP_PACKAGE:-ca.oculair.meridian}"
+APP_COMPONENT="${APP_COMPONENT:-ca.oculair.meridian/com.letta.mobile.MainActivity}"
 ANDROID_SERIAL="${ANDROID_SERIAL:-}"
 AUTOMATION_CONFIG_ID="${AUTOMATION_CONFIG_ID:-automation-auth}"
 AUTOMATION_MODE="${AUTOMATION_MODE:-}"

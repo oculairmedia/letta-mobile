@@ -3,7 +3,7 @@ package com.letta.mobile.runtime.sensors
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 
 /**
  * Dev-only no-display Activity for ADB validation of Stage 1→2 without user
