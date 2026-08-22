@@ -105,6 +105,7 @@ internal fun RunBlock(
             onToggleCollapsed()
         }
     }
+    val latestCompletedDisclosure = !activity.isActive && showCompletedDisclosure
 
     // Keep the run container height static from Compose's perspective. Lazy
     // timeline recycling and manual tool-output expansion must not replay run
@@ -138,7 +139,11 @@ internal fun RunBlock(
             return@Column
         }
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (latestCompletedDisclosure) Modifier.offset(y = (-20).dp) else Modifier),
+        ) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its
             // height tracks the rendered messages exactly.
