@@ -59,8 +59,8 @@ internal fun RunActivityDisclosure(
     // Simple mode uses more compact rendering: smaller padding, smaller fonts,
     // and no minimum height constraint to reduce visual prominence.
     val horizontalPadding = if (isSimpleMode) 2.dp else 4.dp
-    val verticalPadding = if (isSimpleMode) 4.dp else 6.dp
-    val minHeight = if (isSimpleMode) 36.dp else 48.dp
+    val verticalPadding = if (isSimpleMode) 2.dp else 4.dp
+    val minHeight = if (isSimpleMode) 28.dp else 36.dp
     val iconSize = if (isSimpleMode) 14.dp else 16.dp
     val textStyle = if (isSimpleMode) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium
     val spacing = if (isSimpleMode) 4.dp else 6.dp
