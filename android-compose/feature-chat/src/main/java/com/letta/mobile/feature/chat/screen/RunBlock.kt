@@ -3,18 +3,11 @@ package com.letta.mobile.feature.chat.screen
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
@@ -22,13 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.UiApprovalRequest
 import com.letta.mobile.data.model.UiMessage
@@ -38,61 +25,10 @@ import com.letta.mobile.ui.components.rememberReducedMotionEnabled
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import androidx.compose.ui.tooling.preview.PreviewLightDark
 import com.letta.mobile.ui.theme.LettaChatTheme
-import com.letta.mobile.data.chat.projection.StepDotIcon
-import com.letta.mobile.ui.chat.render.runStepDotColor
-import com.letta.mobile.data.chat.projection.runStepDotIcon
-
-/**
- * Width of the timeline gutter on the left of a run block. Sized to fit a
- * dot icon plus a small breathing margin; the vertical line passes through
- * the centre of the gutter.
- */
-private val RunGutterWidth = 12.dp
-
-/**
- * letta-mobile-2huuc: gutter width for tool-card step rows. Sized just wider
- * than the dot so tool cards inside a RunBlock render flush-left of the
- * canvas (matching their standalone counterparts), with only the dot and
- * connector line eating into the left edge.
- */
-internal val ToolCallRunGutterWidth = 6.dp
-
-/** Diameter of the per-step indicator dot painted in the gutter. */
-private val StepDotSize = 3.dp
-
-/** Stroke width of the run identity rule drawn through the step dots. */
-private val RunIdentityLineWidth = 1.dp
-
-/** Dot pattern for the run identity rule so it reads as a guide, not a border. */
-private val RunIdentityDotLength = 1.dp
-private val RunIdentityDotGap = 4.dp
-
-/** Center offset for step dots on regular assistant/reasoning rows. */
-private val DefaultStepDotCenterY = 17.dp
-
-/**
- * Tool-call rows render directly as a tool card, whose first meaningful text
- * row sits lower than plain assistant/reasoning content. Anchor the bead to
- * that card header instead of the generic text row.
- */
-private val ToolCallStepDotCenterY = 25.5f.dp
-
-/**
- * Compact grouped tool-call cards render directly in the run row instead of
- * through the normal chat-message wrapper, so their first text line sits much
- * closer to the top. Keep this dot on that first-line midline.
- */
-internal val CompactToolCallGroupStepDotCenterY = 18.dp
-
-internal object RunBlockTestTags {
-    fun dot(stepKey: String) = "run-dot-$stepKey"
-}
 
 /**
  * Renders a contiguous run of assistant messages sharing a `runId` as a
- * single grouped block with a timeline gutter on the left. The gutter holds
- * one [StepDotIcon]-classified dot per message and a vertical line that
- * connects them.
+ * single grouped block under one run disclosure.
  *
  * Collapsing the run hides every step except the last one. The last step
  * stays visible so the user can see the run's final outcome at a glance and
@@ -125,6 +61,7 @@ internal fun RunBlock(
     activeApprovalRequestId: String? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     chatMode: String = "interactive",
+    showCompletedDisclosure: Boolean = true,
     renderRow: @Composable (
         message: UiMessage,
         position: GroupPosition,
@@ -157,18 +94,18 @@ internal fun RunBlock(
     val effectiveCollapsed = when {
         !collapsible -> false
         activity.isActive -> false
-        chatMode == "simple" -> !userExpandedOverride
+        showCompletedDisclosure && collapsed -> !userExpandedOverride
+        chatMode == "simple" && collapsed -> !userExpandedOverride
         else -> collapsed
     }
     val toggleCollapsed: () -> Unit = {
-        if (chatMode == "simple") {
+        if ((chatMode == "simple" || showCompletedDisclosure) && collapsed) {
             userExpandedOverride = !userExpandedOverride
         } else {
             onToggleCollapsed()
         }
     }
-
-    val runIdentityColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.24f)
+    val latestCompletedDisclosure = !activity.isActive && showCompletedDisclosure
 
     // Keep the run container height static from Compose's perspective. Lazy
     // timeline recycling and manual tool-output expansion must not replay run
@@ -178,13 +115,15 @@ internal fun RunBlock(
         modifier = modifier
             .fillMaxWidth(),
     ) {
-        RunActivityDisclosure(
-            activity = activity,
-            collapsed = effectiveCollapsed,
-            collapsible = collapsible,
-            onToggleCollapsed = toggleCollapsed,
-            chatMode = chatMode,
-        )
+        if (activity.isActive || showCompletedDisclosure) {
+            RunActivityDisclosure(
+                activity = activity,
+                collapsed = effectiveCollapsed,
+                collapsible = collapsible,
+                onToggleCollapsed = toggleCollapsed,
+                chatMode = chatMode,
+            )
+        }
 
         // Keep the historical one-step geometry: the disclosure is additive,
         // but a single message still has no degenerate gutter or connector.
@@ -200,7 +139,11 @@ internal fun RunBlock(
             return@Column
         }
 
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (latestCompletedDisclosure) Modifier.offset(y = (-20).dp) else Modifier),
+        ) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its
             // height tracks the rendered messages exactly.
@@ -260,23 +203,15 @@ internal fun RunBlock(
                                     idx == visibleSteps.lastIndex -> GroupPosition.Last
                                     else -> GroupPosition.Middle
                                 }
-                                val drawLineAbove = idx > 0
-                                val drawLineBelow = idx < visibleSteps.lastIndex
                                 when (step) {
                                     is RunTimelineStep.Message -> RunMessageStepRow(
                                         message = step.message,
                                         position = position,
-                                        runIdentityColor = runIdentityColor,
-                                        drawLineAbove = drawLineAbove,
-                                        drawLineBelow = drawLineBelow,
                                         renderRow = renderRow,
                                     )
 
                                     is RunTimelineStep.ToolCallGroup -> ProjectedToolTimelineGroupStepRow(
                                         step = step,
-                                        runIdentityColor = runIdentityColor,
-                                        drawLineAbove = drawLineAbove,
-                                        drawLineBelow = drawLineBelow,
                                         animateRows = isStreaming,
                                         activeApprovalRequestId = activeApprovalRequestId,
                                         onApprovalDecision = onApprovalDecision,
@@ -408,120 +343,13 @@ private fun selectCollapsedPreview(messages: List<UiMessage>): UiMessage {
 private fun RunMessageStepRow(
     message: UiMessage,
     position: GroupPosition,
-    runIdentityColor: androidx.compose.ui.graphics.Color,
-    drawLineAbove: Boolean,
-    drawLineBelow: Boolean,
     renderRow: @Composable (
         message: UiMessage,
         position: GroupPosition,
         rowModifier: Modifier,
     ) -> Unit,
 ) {
-    val dotColor = message.runStepDotColor()
-    val icon = remember(message.id, message.role, message.isReasoning, message.toolCalls, message.approvalRequest) {
-        message.runStepDotIcon()
-    }
-    RunStepRow(
-        stepKey = message.id,
-        dotColor = dotColor,
-        stepDotCenterY = message.runStepDotCenterY(),
-        runIdentityColor = runIdentityColor,
-        drawLineAbove = drawLineAbove,
-        drawLineBelow = drawLineBelow,
-    ) { rowModifier ->
-        // Touch the icon classification value so the IDE/compiler sees the
-        // dependency chain (and so a future visual upgrade can swap the dot
-        // for an actual icon trivially).
-        @Suppress("UNUSED_EXPRESSION") icon
-        // letta-mobile-2huuc: drop the 6.dp left padding inside RunMessageStepRow.
-        // The 12.dp RunGutterWidth gutter already aligns content with the dot
-        // axis; the extra 6.dp pushed tool cards inside runs further right than
-        // standalone tool cards outside runs, with no design rationale.
-        renderRow(message, position, rowModifier)
-    }
-}
-
-@Composable
-internal fun RunStepRow(
-    stepKey: String,
-    dotColor: androidx.compose.ui.graphics.Color,
-    stepDotCenterY: androidx.compose.ui.unit.Dp,
-    runIdentityColor: androidx.compose.ui.graphics.Color,
-    drawLineAbove: Boolean,
-    drawLineBelow: Boolean,
-    gutterWidth: androidx.compose.ui.unit.Dp = RunGutterWidth,
-    content: @Composable (Modifier) -> Unit,
-) {
-    val stepDotTopPadding = stepDotCenterY - (StepDotSize / 2f)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .drawWithContent {
-                drawContent()
-
-                val cx = gutterWidth.toPx() / 2f
-                val dotCenterY = stepDotCenterY.toPx()
-                val stroke = RunIdentityLineWidth.toPx()
-                val dotPattern = PathEffect.dashPathEffect(
-                    floatArrayOf(RunIdentityDotLength.toPx(), RunIdentityDotGap.toPx()),
-                )
-                if (drawLineAbove) {
-                    drawLine(
-                        color = runIdentityColor,
-                        start = Offset(cx, 0f),
-                        end = Offset(cx, dotCenterY),
-                        strokeWidth = stroke,
-                        cap = StrokeCap.Round,
-                        pathEffect = dotPattern,
-                    )
-                }
-                if (drawLineBelow) {
-                    drawLine(
-                        color = runIdentityColor,
-                        start = Offset(cx, dotCenterY),
-                        end = Offset(cx, size.height),
-                        strokeWidth = stroke,
-                        cap = StrokeCap.Round,
-                        pathEffect = dotPattern,
-                    )
-                }
-            },
-        verticalAlignment = Alignment.Top,
-    ) {
-        // Gutter column: a fixed-width box that draws the connector lines
-        // and the dot. We keep this layout-stable so successive rows align
-        // pixel-perfect (letta-mobile-m772.9: dots centred on the gutter axis,
-        // lines on the same axis so there's no horizontal jitter).
-        //
-        // letta-mobile-2huuc: gutter width is now parameterised. Tool-card
-        // rows pass a narrower gutter (just wider than the dot) so the card
-        // body sits flush-left of the canvas, matching standalone tool cards
-        // outside the run.
-        Box(
-            modifier = Modifier
-                .width(gutterWidth),
-            contentAlignment = Alignment.TopCenter,
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(modifier = Modifier.height(stepDotTopPadding))
-                Box(
-                    modifier = Modifier
-                        .size(StepDotSize)
-                        .testTag(RunBlockTestTags.dot(stepKey))
-                        .background(dotColor, CircleShape),
-                )
-            }
-        }
-
-        // Right-hand bubble. Caller decides padding inside the row; we just
-        // hand them a Modifier that fills the remaining width.
-        content(Modifier.fillMaxWidth())
-    }
-}
-
-private fun UiMessage.runStepDotCenterY() = when {
-    !toolCalls.isNullOrEmpty() -> ToolCallStepDotCenterY
-    else -> DefaultStepDotCenterY
+    renderRow(message, position, Modifier.fillMaxWidth())
 }
 
 // region Previews

@@ -55,10 +55,12 @@ fun buildChatRenderModel(
     }
     val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
 
-    val visibleMessages = attachLatencyMetadata(
+    val visibleMessages = backfillMissingAssistantRunIds(
+        attachLatencyMetadata(
         filterMessagesForMode(
             messages = afterReasoningDedup,
             mode = mode,
+        )
         )
     )
 
@@ -84,6 +86,40 @@ fun buildChatRenderModel(
     )
 }
 
+/**
+ * Replayed tool frames can omit run_id even though the surrounding reasoning
+ * and final response carry it. Keep each assistant segment between user turns
+ * under one run so completion can collapse the entire tool sequence.
+ */
+fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
+    if (messages.none { it.role == "assistant" && it.runId.isNullOrBlank() }) return messages
+    val result = messages.toMutableList()
+    var segmentStart = 0
+    while (segmentStart < result.size) {
+        while (segmentStart < result.size && result[segmentStart].role == "user") segmentStart++
+        if (segmentStart >= result.size) break
+        var segmentEnd = segmentStart
+        while (segmentEnd < result.size && result[segmentEnd].role != "user") segmentEnd++
+        val runIds = result.subList(segmentStart, segmentEnd)
+            .asSequence()
+            .filter { it.role == "assistant" }
+            .mapNotNull { it.runId?.takeIf(String::isNotBlank) }
+            .distinct()
+            .toList()
+        if (runIds.size == 1) {
+            val runId = runIds.single()
+            for (index in segmentStart until segmentEnd) {
+                val message = result[index]
+                if (message.role == "assistant" && message.runId.isNullOrBlank()) {
+                    result[index] = message.copy(runId = runId)
+                }
+            }
+        }
+        segmentStart = segmentEnd
+    }
+    return result
+}
+
 class IncrementalChatRenderItemsCache {
     var fullBuildCount: Int = 0
         private set
@@ -107,19 +143,20 @@ class IncrementalChatRenderItemsCache {
         // buildChatRenderModel so foreign-agent messages are scoped out.
         activeAgentId: String? = null,
     ): List<ChatRenderItem> {
-        if (messages.isEmpty()) {
+        val normalizedMessages = backfillMissingAssistantRunIds(messages)
+        if (normalizedMessages.isEmpty()) {
             cachedMode = mode
-            previousMessages = messages
+            previousMessages = normalizedMessages
             previousTailStartIndex = 0
             committedRenderItems = emptyList()
             previousResultByKey = emptyMap()
             return emptyList()
         }
 
-        val tailStartIndex = activeTailStartIndex(messages)
-        if (canReuseCommittedHistory(messages, mode, change, tailStartIndex)) {
+        val tailStartIndex = activeTailStartIndex(normalizedMessages)
+        if (canReuseCommittedHistory(normalizedMessages, mode, change, tailStartIndex)) {
             val tailRenderItems = buildChatRenderModel(
-                messages = messages.subList(tailStartIndex, messages.size),
+                messages = normalizedMessages.subList(tailStartIndex, normalizedMessages.size),
                 mode = mode,
                 activeAgentId = activeAgentId,
             ).renderItems
@@ -153,14 +190,14 @@ class IncrementalChatRenderItemsCache {
             // streaming tail whose text grew) gets a new instance.
             val next = reuseUnchangedInstances(rebuilt)
             cachedMode = mode
-            previousMessages = messages
+            previousMessages = normalizedMessages
             previousTailStartIndex = tailStartIndex
             previousResultByKey = next.associateBy { it.key }
             incrementalBuildCount++
             return next
         }
 
-        return rebuildFull(messages, mode, tailStartIndex, activeAgentId = activeAgentId)
+        return rebuildFull(normalizedMessages, mode, tailStartIndex, activeAgentId = activeAgentId)
     }
 
     private fun canReuseCommittedHistory(

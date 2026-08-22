@@ -18,7 +18,6 @@ import com.letta.mobile.data.chat.projection.ToolTimelineCall
 import com.letta.mobile.data.chat.projection.ToolTimelineGroup
 import com.letta.mobile.data.chat.projection.ToolTimelineProjector
 import com.letta.mobile.data.chat.projection.ToolTimelineState
-import com.letta.mobile.data.chat.projection.aggregateState
 import com.letta.mobile.data.chat.projection.projectToolTimelineGroupFromCalls
 import com.letta.mobile.data.chat.projection.toWireStatus
 import com.letta.mobile.data.model.UiApprovalRequest
@@ -76,9 +75,6 @@ enum class ExpansionProvenance {
 @Composable
 internal fun ProjectedToolTimelineGroupStepRow(
     step: RunTimelineStep.ToolCallGroup,
-    runIdentityColor: Color,
-    drawLineAbove: Boolean,
-    drawLineBelow: Boolean,
     animateRows: Boolean,
     activeApprovalRequestId: String?,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)?,
@@ -95,40 +91,15 @@ internal fun ProjectedToolTimelineGroupStepRow(
         }
     }
 
-    // Aggregate across EVERY group, not just the first. A compacted step can hold several
-    // message-backed groups; taking groups.first() meant an earlier succeeded group hid a
-    // later running / awaiting-approval / failed one behind the normal primary dot.
-    val overallState = groups.aggregateState()
-    val dotColor = when (overallState) {
-        ToolTimelineState.AwaitingApproval -> MaterialTheme.colorScheme.secondary
-        ToolTimelineState.Failed, ToolTimelineState.Rejected -> MaterialTheme.colorScheme.error
-        ToolTimelineState.Warning -> MaterialTheme.customColors.warningTextColor
-        else -> MaterialTheme.colorScheme.primary
-    }
-
-    RunStepRow(
-        stepKey = step.key,
-        dotColor = dotColor,
-        stepDotCenterY = CompactToolCallGroupStepDotCenterY,
-        runIdentityColor = runIdentityColor,
-        drawLineAbove = drawLineAbove,
-        drawLineBelow = drawLineBelow,
-        // letta-mobile-2huuc: tool cards inside a RunBlock render with a
-        // narrower gutter so the card body sits flush-left of the canvas,
-        // matching the standalone tool cards outside the run. The dot and
-        // connector line still mark the run visually.
-        gutterWidth = ToolCallRunGutterWidth,
-    ) { rowModifier ->
-        ProjectedToolTimelineGroupCard(
-            groups = groups,
-            approvalRequests = step.approvalRequests,
-            activeApprovalRequestId = activeApprovalRequestId,
-            onApprovalDecision = onApprovalDecision,
-            modifier = rowModifier.then(modifier),
-            animateRows = animateRows,
-            onAttachmentImageTap = onAttachmentImageTap,
-        )
-    }
+    ProjectedToolTimelineGroupCard(
+        groups = groups,
+        approvalRequests = step.approvalRequests,
+        activeApprovalRequestId = activeApprovalRequestId,
+        onApprovalDecision = onApprovalDecision,
+        modifier = Modifier.fillMaxWidth().then(modifier),
+        animateRows = animateRows,
+        onAttachmentImageTap = onAttachmentImageTap,
+    )
 }
 
 /**

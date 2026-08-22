@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
 import com.letta.mobile.data.model.AppTheme
@@ -16,16 +17,14 @@ import com.letta.mobile.data.model.ThemePreset
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.theme.LettaChatTheme
 import com.letta.mobile.ui.theme.LettaTheme
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Assert.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import com.letta.mobile.feature.chat.screen.RunBlock
-import com.letta.mobile.feature.chat.screen.RunBlockTestTags
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], manifest = Config.NONE)
@@ -71,7 +70,7 @@ class RunBlockStreamingTest {
     }
 
     @Test
-    fun dotsKeepStablePositionsWhenStreamingStepAppendsAndSettles() {
+    fun runRowsStayStableWithoutGutterIconsWhenStreamingStepAppendsAndSettles() {
         val firstFrameMessages = listOf(
             message(id = "reasoning-1", content = "Looking at the run", isReasoning = true),
             message(id = "assistant-1", content = "Initial answer"),
@@ -109,8 +108,8 @@ class RunBlockStreamingTest {
         }
 
         composeRule.waitForIdle()
-        val firstFrameTops = dotTops("reasoning-1", "assistant-1")
-        assertPositiveAndStrictlyIncreasing(firstFrameTops)
+        assertTrue(composeRule.onAllNodesWithTag("run-dot-reasoning-1").fetchSemanticsNodes().isEmpty())
+        assertTrue(composeRule.onAllNodesWithTag("run-dot-assistant-1").fetchSemanticsNodes().isEmpty())
         val firstFrameCompositions = rowCompositionCounts.toMap()
 
         composeRule.runOnIdle {
@@ -122,10 +121,7 @@ class RunBlockStreamingTest {
         }
         composeRule.waitForIdle()
 
-        val streamingTops = dotTops("reasoning-1", "assistant-1", "assistant-2")
-        assertPositiveAndStrictlyIncreasing(streamingTops)
-        assertNearlyEquals(firstFrameTops[0], streamingTops[0])
-        assertNearlyEquals(firstFrameTops[1], streamingTops[1])
+        assertTrue(composeRule.onAllNodesWithTag("run-dot-assistant-2").fetchSemanticsNodes().isEmpty())
         val streamingCompositions = rowCompositionCounts.toMap()
         assertRecompositionsBounded(
             before = firstFrameCompositions,
@@ -143,41 +139,12 @@ class RunBlockStreamingTest {
         }
         composeRule.waitForIdle()
 
-        val settledTops = dotTops("reasoning-1", "assistant-1", "assistant-2")
-        assertPositiveAndStrictlyIncreasing(settledTops)
-        streamingTops.zip(settledTops).forEach { (streaming, settled) ->
-            assertNearlyEquals(streaming, settled)
-        }
         assertRecompositionsBounded(
             before = streamingCompositions,
             after = rowCompositionCounts.toMap(),
             stage = "streaming settle",
             ids = arrayOf("reasoning-1", "assistant-1", "assistant-2"),
         )
-    }
-
-    private fun dotTops(vararg ids: String): List<Float> =
-        ids.map { id ->
-            composeRule.onNodeWithTag(RunBlockTestTags.dot(id))
-                .fetchSemanticsNode()
-                .boundsInRoot
-                .top
-        }
-
-    private fun assertPositiveAndStrictlyIncreasing(tops: List<Float>) {
-        tops.forEach { top ->
-            assertTrue("Expected dot top to be below the root origin, got $top", top > 0f)
-        }
-        tops.zipWithNext().forEach { (previous, next) ->
-            assertTrue("Expected dot positions to increase, got $tops", next > previous)
-        }
-    }
-
-    private fun assertNearlyEquals(
-        expected: Float,
-        actual: Float,
-    ) {
-        assertEquals(expected, actual, 0.5f)
     }
 
     private fun assertRecompositionsBounded(
