@@ -158,6 +158,7 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
                     chatDimens = params.chatDimens,
                     chatShapes = params.chatShapes,
                     isStreamingRenderItem = isStreamingRenderItem,
+                    showTimestamp = params.index == 0,
                 ),
             )
         }
@@ -172,6 +173,7 @@ private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyP
             context = params.context,
             chatDimens = params.chatDimens,
             isStreamingRenderItem = params.isStreamingRenderItem,
+            showTimestamp = params.showTimestamp,
         )
         is ChatRenderItem.SkillEnvelopeChip -> {
             SkillEnvelopeChip(
@@ -191,6 +193,7 @@ private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyP
                 chatDimens = params.chatDimens,
                 chatShapes = params.chatShapes,
                 isStreamingRenderItem = params.isStreamingRenderItem,
+                showTimestamp = params.showTimestamp,
             ),
         )
     }
@@ -202,6 +205,7 @@ private fun ChatMessageListRenderSingleItem(
     context: ChatMessageListLazyContext,
     chatDimens: ChatDimens,
     isStreamingRenderItem: Boolean,
+    showTimestamp: Boolean,
 ) {
     val msg = renderItem.message
     val stableKey = renderItem.stableRunKey
@@ -225,6 +229,7 @@ private fun ChatMessageListRenderSingleItem(
                     position = position,
                     context = context,
                     isStreamingRenderItem = isStreamingRenderItem,
+                    showTimestamp = showTimestamp,
                 ),
                 modifier = rowModifier,
             )
@@ -237,6 +242,7 @@ private fun ChatMessageListRenderSingleItem(
             position = renderItem.groupPosition,
             context = context,
             isStreamingRenderItem = isStreamingRenderItem,
+            showTimestamp = showTimestamp,
         ),
     )
 }
@@ -272,6 +278,7 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
                 position = position,
                 context = context,
                 isStreamingRenderItem = params.isStreamingRenderItem,
+                showTimestamp = params.showTimestamp && message.id == renderItem.messages.last().first.id,
             ),
             modifier = rowModifier,
         )
@@ -283,6 +290,7 @@ private data class RenderChatMessageRowParams(
     val position: com.letta.mobile.ui.common.GroupPosition,
     val context: ChatMessageListLazyContext,
     val isStreamingRenderItem: Boolean,
+    val showTimestamp: Boolean = false,
 )
 
 @Composable
@@ -298,6 +306,7 @@ private fun RenderChatMessageRow(
         isStreaming = params.isStreamingRenderItem && message.id == context.newestMessageId,
         rerunEnabled = !context.itemState.isStreaming,
         approvalInFlight = context.itemState.activeApprovalRequestId == message.approvalRequest?.requestId,
+        showTimestamp = params.showTimestamp,
         chatMode = context.chatMode,
         highlightedMessageId = context.highlightedMessageId,
         callbacks = context.callbacks,

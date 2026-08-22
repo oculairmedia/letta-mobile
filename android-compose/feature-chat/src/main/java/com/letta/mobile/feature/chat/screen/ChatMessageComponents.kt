@@ -86,6 +86,7 @@ internal fun ChatMessageItem(
     rerunEnabled: Boolean = true,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
+    showTimestamp: Boolean = false,
     onAttachmentImageTap: ((List<UiImageAttachment>, Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -210,6 +211,7 @@ internal fun ChatMessageItem(
                 onGeneratedUiMessage = onGeneratedUiMessage,
                 onApprovalDecision = onApprovalDecision,
                 approvalInFlight = approvalInFlight,
+                showTimestamp = showTimestamp,
                 onLongClick = onLongClick,
                 longClickLabel = actionsAccessibilityLabel,
                 onAttachmentImageTap = onAttachmentImageTap,

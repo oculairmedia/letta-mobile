@@ -35,6 +35,7 @@ import com.letta.mobile.feature.chat.render.resolveRenderer
 import com.letta.mobile.ui.common.GroupPosition
 import com.letta.mobile.ui.chat.render.bubbleStyle
 import com.letta.mobile.ui.chat.render.chatLongPressTimeoutMillis
+import com.letta.mobile.ui.components.DeliveryTimeText
 import com.letta.mobile.ui.components.MessageBubbleShape
 import com.letta.mobile.ui.preview.LettaPreviewFrame
 import com.letta.mobile.ui.theme.LettaChatTheme
@@ -204,6 +205,7 @@ internal fun MessageBubbleSurface(
     onGeneratedUiMessage: ((String) -> Unit)? = null,
     onApprovalDecision: ((String, List<String>, Boolean, String?) -> Unit)? = null,
     approvalInFlight: Boolean = false,
+    showTimestamp: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     longClickLabel: String = "",
     // letta-mobile-1k3ge restore: tap an attached image to open the fullscreen
@@ -368,6 +370,12 @@ internal fun MessageBubbleSurface(
                     approval = approvalRequest,
                     isSubmitting = approvalInFlight,
                     onDecision = onApprovalDecision,
+                )
+            }
+            if (showTimestamp && !isLastAssistant && message.role == "assistant" && !message.isReasoning) {
+                DeliveryTimeText(
+                    timestamp = message.timestamp,
+                    modifier = Modifier.padding(top = LettaSpacing.XXXS),
                 )
             }
         }

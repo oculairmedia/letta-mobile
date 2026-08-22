@@ -104,6 +104,7 @@ internal fun RenderChatMessage(
     isStreaming: Boolean,
     rerunEnabled: Boolean,
     approvalInFlight: Boolean,
+    showTimestamp: Boolean = false,
     chatMode: String,
     highlightedMessageId: String?,
     callbacks: ChatMessageRenderCallbacks,
@@ -144,6 +145,7 @@ internal fun RenderChatMessage(
                 callbacks.onSubmitApproval(requestId, toolCallIds, approve, reason)
             },
             approvalInFlight = approvalInFlight,
+            showTimestamp = showTimestamp,
             onAttachmentImageTap = callbacks.onAttachmentImageTap,
             modifier = modifier.then(highlightModifier).padding(top = spacingBelow, bottom = spacingAbove),
         )
