@@ -272,7 +272,6 @@ private fun ChatMessageListRenderRunBlockItem(params: ChatMessageListRenderRunBl
                 position = position,
                 context = context,
                 isStreamingRenderItem = params.isStreamingRenderItem,
-                showTimestamp = false,
             ),
             modifier = rowModifier,
         )
@@ -284,7 +283,6 @@ private data class RenderChatMessageRowParams(
     val position: com.letta.mobile.ui.common.GroupPosition,
     val context: ChatMessageListLazyContext,
     val isStreamingRenderItem: Boolean,
-    val showTimestamp: Boolean = true,
 )
 
 @Composable
@@ -304,7 +302,6 @@ private fun RenderChatMessageRow(
         highlightedMessageId = context.highlightedMessageId,
         callbacks = context.callbacks,
         reasoningCollapsed = message.id !in context.itemState.expandedReasoningMessageIds,
-        showTimestamp = params.showTimestamp,
         onToggleReasoning = { context.callbacks.onToggleReasoningExpanded(message.id) },
         modifier = modifier,
     )
