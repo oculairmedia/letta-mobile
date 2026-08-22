@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–4c + Phase 5a–5p merged; Phase 5q / 5b.2 + Phase 6a in flight)  
+**Status:** in progress (Phase 0–5q merged; Phase 6a entrypoint docs accepted)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -352,12 +352,12 @@ web/      → apps/web/
 
 ### Acceptance
 
-- [ ] One obvious runnable entry per platform in docs
-- [ ] CI/release scripts updated if paths move
+- [x] One obvious runnable entry per platform in docs ([kmp-phase-6-entrypoints.md](kmp-phase-6-entrypoints.md) — Phase 6a)
+- [ ] CI/release scripts updated if paths move (Option B only)
 
 ### Risk
 
-Medium for Option B; low for Option A.
+Medium for Option B; low for Option A / 6a docs.
 
 ---
 

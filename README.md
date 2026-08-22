@@ -42,6 +42,17 @@ The cardinal rule: **feature logic lives in `sharedLogic/commonMain`; platform m
 Any behavior duplicated across `app/` and `desktop/` is drift — the `shared-multiplatform` required
 CI check (`sharedLogic:allTests` + `desktop:test`) backstops this.
 
+## Runnable entry points
+
+| Platform | Command (from `android-compose/`) |
+|---|---|
+| Android | `./gradlew :app:assembleDebug` |
+| Compose Desktop | `./gradlew :desktop:run` |
+| Browser WASM | `./gradlew :web:wasmJsBrowserDevelopmentRun` (CI job `web-wasm`) |
+| CLI / probes | `./gradlew :cli:run`; App Server contract probes via `:appserver-cli` (see [`kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md)) |
+
+Full notes: [`docs/architecture/kmp-phase-6-entrypoints.md`](docs/architecture/kmp-phase-6-entrypoints.md).
+
 ## Quick start
 
 ```bash
