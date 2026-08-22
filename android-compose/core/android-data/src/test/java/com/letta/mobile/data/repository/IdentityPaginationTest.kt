@@ -7,6 +7,7 @@ import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockId
 import com.letta.mobile.data.model.Identity
 import com.letta.mobile.data.model.IdentityId
+import com.letta.mobile.data.model.IdentityRelatedListParams
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -55,32 +56,20 @@ class IdentityPaginationTest {
         val observedAftersForAgents = mutableListOf<String?>()
         val observedAftersForBlocks = mutableListOf<String?>()
 
-        override suspend fun listAgentsForIdentity(
-            identityId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<Agent> {
-            observedAftersForAgents += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listAgentsForIdentity(params: IdentityRelatedListParams): List<Agent> {
+            observedAftersForAgents += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 agents.indexOfFirst { it.id.value == id }.let { if (it < 0) agents.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(agents.size)
             return agents.subList(start, end)
         }
 
-        override suspend fun listBlocksForIdentity(
-            identityId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<Block> {
-            observedAftersForBlocks += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listBlocksForIdentity(params: IdentityRelatedListParams): List<Block> {
+            observedAftersForBlocks += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 blocks.indexOfFirst { it.id.value == id }.let { if (it < 0) blocks.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(blocks.size)

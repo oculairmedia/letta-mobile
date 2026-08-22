@@ -154,7 +154,7 @@ private fun ApprovalResponseMessage.toApprovalResponseInspector(
                         approval.toolReturn,
                         approval.approve?.toString(),
                         approval.reason,
-                    ).joinToString(" • ")
+                    ).joinToString(" • "),
                 )
             }
             senderId?.let { add("Sender ID" to it) }

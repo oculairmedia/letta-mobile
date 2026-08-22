@@ -28,3 +28,22 @@ data class ArchiveUpdateParams(
     val name: String? = null,
     val description: String? = null,
 )
+
+/** Cursor + filter params for `GET /v1/archives`. */
+data class ArchiveListParams(
+    val before: String? = null,
+    val after: String? = null,
+    val limit: Int? = null,
+    val order: String? = null,
+    val name: String? = null,
+    val agentId: String? = null,
+)
+
+/** Cursor pagination for `GET /v1/archives/{archive_id}/agents`. */
+data class ArchiveAgentsListParams(
+    val archiveId: String,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+)

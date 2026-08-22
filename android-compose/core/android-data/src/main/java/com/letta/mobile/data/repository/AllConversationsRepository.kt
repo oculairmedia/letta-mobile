@@ -1,53 +1,48 @@
 package com.letta.mobile.data.repository
 
-import android.util.Log
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import com.letta.mobile.data.api.ConversationApi
 import com.letta.mobile.data.local.ConversationDao
-import com.letta.mobile.data.local.ConversationEntity
+import com.letta.mobile.data.local.RoomAllConversationsLocalCache
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Conversation
-import com.letta.mobile.data.model.ConversationCountEstimate
-import com.letta.mobile.data.model.ConversationId
 import com.letta.mobile.data.paging.ConversationPagingSource
-import com.letta.mobile.data.model.AgentRuntimeBinding
-import com.letta.mobile.data.repository.api.IAllConversationsRepository
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.repository.api.LocalRuntimeConversationSource
-import com.letta.mobile.data.session.BackendScopedCache
+import dagger.Lazy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
-import dagger.Lazy
 
 internal fun defaultAllConversationsScope(): CoroutineScope =
     CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-// letta-mobile-g2ff0: conversationDao is dagger.Lazy<ConversationDao> so Room
-// init happens lazily on the first dao.get() (inside the init {} launch),
-// not on the main thread during Hilt graph resolution. Nullable stays —
-// callers without a DAO (tests, previews) pass null and skip the cache-load
-// branch. (dagger.Lazy, not javax.inject.Provider — Hilt's KSP processor
-// rejects @Provides methods returning framework types like Provider.)
+/**
+ * Android binding for [CachedAllConversationsRepository]: Room cache + HTTP [ConversationApi]
+ * + optional Iroh / local-runtime sources.
+ *
+ * Phase 5b.2 — refresh/cache/hasMore/cursor logic lives in sharedLogic;
+ * [getConversationsPaged] stays here because [ConversationPagingSource] is Android-bound.
+ */
 open class AllConversationsRepository(
     private val conversationApi: ConversationApi,
-    private val conversationDao: Lazy<ConversationDao>? = null,
-    private val repositoryScope: CoroutineScope,
-    private val localConversationSource: LocalRuntimeConversationSource? = null,
-    private val settingsRepository: ISettingsRepository? = null,
-    private val irohConversationListSource: IrohAdminRpcConversationListSource? = null,
-) : IAllConversationsRepository, BackendScopedCache {
+    conversationDao: Lazy<ConversationDao>? = null,
+    repositoryScope: CoroutineScope,
+    localConversationSource: LocalRuntimeConversationSource? = null,
+    settingsRepository: ISettingsRepository? = null,
+    irohConversationListSource: IrohAdminRpcConversationListSource? = null,
+) : CachedAllConversationsRepository(
+    remote = conversationApi,
+    localCache = conversationDao?.let { dao -> { RoomAllConversationsLocalCache(dao.get()) } },
+    repositoryScope = repositoryScope,
+    localConversationSource = localConversationSource,
+    settingsRepository = settingsRepository,
+    irohConversationListSource = irohConversationListSource,
+) {
     /** Hilt-friendly constructor — uses [defaultAllConversationsScope]. */
     @Inject
     constructor(
@@ -56,42 +51,22 @@ open class AllConversationsRepository(
         localConversationSource: LocalRuntimeConversationSource,
         settingsRepository: ISettingsRepository,
     ) : this(
-        conversationApi,
-        conversationDao,
-        defaultAllConversationsScope(),
-        localConversationSource,
-        settingsRepository,
+        conversationApi = conversationApi,
+        conversationDao = conversationDao,
+        repositoryScope = defaultAllConversationsScope(),
+        localConversationSource = localConversationSource,
+        settingsRepository = settingsRepository,
     )
 
     /** Remote-only convenience constructor (tests, previews). */
     constructor(
         conversationApi: ConversationApi,
         conversationDao: Lazy<ConversationDao>? = null,
-    ) : this(conversationApi, conversationDao, defaultAllConversationsScope())
-
-    private val _conversations = MutableStateFlow<List<Conversation>>(emptyList())
-    override val conversations: StateFlow<List<Conversation>> = _conversations.asStateFlow()
-
-    private val _hasMore = MutableStateFlow(true)
-    override val hasMore: StateFlow<Boolean> = _hasMore.asStateFlow()
-
-    private val refreshMutex = Mutex()
-    private var currentCursor: String? = null
-    private var lastRefreshAtMillis: Long = 0L
-    private var hasLoadedAtLeastOnce: Boolean = false
-
-    init {
-        repositoryScope.launch {
-            try {
-                val cached = conversationDao?.get()?.getAllOnce()?.map { it.toConversation() }.orEmpty()
-                if (cached.isNotEmpty()) {
-                    _conversations.value = cached
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to load cached conversations", e)
-            }
-        }
-    }
+    ) : this(
+        conversationApi = conversationApi,
+        conversationDao = conversationDao,
+        repositoryScope = defaultAllConversationsScope(),
+    )
 
     internal fun createConversationsPagingSource(
         agentId: AgentId?,
@@ -104,16 +79,16 @@ open class AllConversationsRepository(
         summarySearch = summarySearch,
         order = "desc",
         orderBy = "last_message_at",
-        pageLoader = irohConversationListSource?.takeIf { it.shouldUseIroh() }?.let { source ->
+        pageLoader = irohPageLoaderOrNull()?.let { loader ->
             { pageAgentId, limit, after, pageArchiveStatus, pageSummarySearch, order, orderBy ->
-                source.listConversations(
-                    agentId = pageAgentId,
-                    limit = limit,
-                    after = after,
-                    archiveStatus = pageArchiveStatus,
-                    summarySearch = pageSummarySearch,
-                    order = order,
-                    orderBy = orderBy,
+                loader(
+                    pageAgentId,
+                    limit,
+                    after,
+                    pageArchiveStatus,
+                    pageSummarySearch,
+                    order,
+                    orderBy,
                 )
             }
         },
@@ -134,162 +109,5 @@ open class AllConversationsRepository(
                 createConversationsPagingSource(agentId, archiveStatus, summarySearch)
             },
         ).flow
-    }
-
-    override suspend fun loadNextPage() = refreshMutex.withLock {
-        // M6 (data-efficiency-audit): serialize against [refresh] so
-        // concurrent refresh+loadNextPage calls can't race on
-        // `currentCursor` / `_conversations` / `_hasMore`. Held across the
-        // Room `cacheConversations` write to match the `refresh()` lock
-        // discipline; in-memory mutex, no Room-deadlock risk.
-        if (!_hasMore.value) return@withLock
-        val newConversations = fetchPage(after = currentCursor)
-        applyLoadedPage(newConversations)
-    }
-
-    override suspend fun refresh() = refreshMutex.withLock {
-        refreshLocked()
-    }
-
-    override suspend fun clearForBackendSwitch() {
-        refreshMutex.withLock {
-            currentCursor = null
-            lastRefreshAtMillis = 0L
-            hasLoadedAtLeastOnce = false
-            _conversations.value = emptyList()
-            _hasMore.value = true
-            // Propagate DAO failure. See AgentRepository.clearForBackendSwitch
-            // for the rationale; same invariant — stale cached conversations
-            // from the previous backend visible after switch is a cross-
-            // backend leak we'd rather surface than silently log.
-            conversationDao?.get()?.deleteAll()
-            conversationDao?.get()?.deleteAllRefreshStates()
-        }
-    }
-
-    private suspend fun refreshLocked() {
-        // Local-runtime mode: conversations live in the on-device letta.js
-        // store, not behind the remote API. Route here (not in ViewModels)
-        // so every screen reading [conversations] works uniformly.
-        val localSource = localConversationSource
-        if (localSource != null && AgentRuntimeBinding.isLocalRuntime(settingsRepository?.activeConfig?.value)) {
-            val local = localSource.listConversations()
-            Log.d(TAG, "refreshLocked: local source returned ${local.size} conversations")
-            _conversations.value = local
-            _hasMore.value = false
-            currentCursor = null
-            hasLoadedAtLeastOnce = true
-            lastRefreshAtMillis = System.currentTimeMillis()
-            return
-        }
-        val firstPage = fetchPage(after = null)
-        currentCursor = null
-        hasLoadedAtLeastOnce = false
-        _conversations.update { emptyList() }
-        _hasMore.update { true }
-        applyLoadedPage(firstPage)
-        lastRefreshAtMillis = System.currentTimeMillis()
-    }
-
-    override fun hasFreshConversations(maxAgeMs: Long): Boolean {
-        return hasLoadedAtLeastOnce && System.currentTimeMillis() - lastRefreshAtMillis <= maxAgeMs
-    }
-
-    override suspend fun refreshIfStale(maxAgeMs: Long): Boolean = refreshMutex.withLock {
-        if (hasFreshConversations(maxAgeMs)) return@withLock false
-        refreshLocked()
-        true
-    }
-
-    override fun handleOptimisticUpdate(conversation: Conversation) {
-        _conversations.update { current ->
-            val index = current.indexOfFirst { it.id == conversation.id }
-            if (index >= 0) {
-                current.toMutableList().apply { this[index] = conversation }
-            } else {
-                listOf(conversation) + current
-            }
-        }
-        repositoryScope.launch {
-            conversationDao?.get()?.upsert(ConversationEntity.fromConversation(conversation))
-        }
-    }
-
-    override fun handleOptimisticDelete(conversationId: ConversationId) {
-        _conversations.update { current -> current.filter { it.id != conversationId } }
-        repositoryScope.launch {
-            conversationDao?.get()?.delete(conversationId.value)
-        }
-    }
-
-    /**
-     * Lightweight loaded-page count estimate.
-     *
-     * Letta API doesn't have a /v1/conversations/count endpoint. Do not make a
-     * dedicated network request just to compute a dashboard count; refresh or
-     * page the list first, then display [ConversationCountEstimate.count] as an
-     * exact count when [ConversationCountEstimate.isApproximate] is false or as a
-     * lower bound (for example, "50+") when more pages are available.
-     */
-    override fun loadedCountEstimate(): ConversationCountEstimate? {
-        if (!hasLoadedAtLeastOnce && _conversations.value.isEmpty()) return null
-        return ConversationCountEstimate(
-            count = _conversations.value.size,
-            isApproximate = _hasMore.value,
-        )
-    }
-
-    /**
-     * Legacy compatibility shim. Prefer [loadedCountEstimate] so callers must
-     * decide how to display approximate/unknown counts. This method intentionally
-     * performs no network I/O.
-     */
-    @Deprecated("Use loadedCountEstimate() and render approximate/unknown states explicitly.")
-    override suspend fun countConversations(): Int {
-        return loadedCountEstimate()?.count ?: 0
-    }
-
-    companion object {
-        private const val PAGE_SIZE = 50
-        private const val TAG = "AllConversationsRepo"
-    }
-
-    private suspend fun fetchPage(after: String?): List<Conversation> {
-        val irohSource = irohConversationListSource
-        return if (irohSource?.shouldUseIroh() == true) {
-            irohSource.listConversations(
-                agentId = null,
-                limit = PAGE_SIZE,
-                after = after,
-                order = "desc",
-                orderBy = "last_message_at",
-            )
-        } else {
-            conversationApi.listConversations(
-                limit = PAGE_SIZE,
-                after = after,
-            )
-        }
-    }
-
-    private suspend fun applyLoadedPage(newConversations: List<Conversation>) {
-        hasLoadedAtLeastOnce = true
-        if (newConversations.isEmpty() || newConversations.size < PAGE_SIZE) {
-            _hasMore.update { false }
-        }
-
-        if (newConversations.isNotEmpty()) {
-            _conversations.update { current ->
-                val existingIds = current.map { it.id }.toSet()
-                val deduped = newConversations.filter { it.id !in existingIds }
-                current + deduped
-            }
-            cacheConversations(newConversations)
-            currentCursor = newConversations.last().id.value
-        }
-    }
-
-    private suspend fun cacheConversations(conversations: List<Conversation>) {
-        conversationDao?.get()?.upsertAll(conversations.map { ConversationEntity.fromConversation(it) })
     }
 }

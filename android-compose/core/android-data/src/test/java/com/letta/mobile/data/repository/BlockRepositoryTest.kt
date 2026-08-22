@@ -4,6 +4,7 @@ import com.letta.mobile.data.api.IrohAdminApiUnavailableException
 import com.letta.mobile.data.model.Block
 import com.letta.mobile.data.model.BlockCreateParams
 import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockListParams
 import com.letta.mobile.data.model.BlockUpdateParams
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.transport.appserver.AppServerInboundFrame
@@ -139,7 +140,7 @@ class BlockRepositoryTest {
     fun `listAllBlocks filters by label`() = runTest {
         fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Test persona"))
         fakeApi.allBlocks.add(Block(id = BlockId("b2"), label = "human", value = "Test human"))
-        val result = repository.listAllBlocks(label = "persona")
+        val result = repository.listAllBlocks(BlockListParams(label = "persona"))
         assertEquals(1, result.size)
         assertEquals("persona", result[0].label)
     }
@@ -148,7 +149,7 @@ class BlockRepositoryTest {
     fun `listAllBlocks filters by isTemplate`() = runTest {
         fakeApi.allBlocks.add(Block(id = BlockId("b1"), label = "persona", value = "Template", isTemplate = true))
         fakeApi.allBlocks.add(Block(id = BlockId("b2"), label = "human", value = "Not template", isTemplate = false))
-        val result = repository.listAllBlocks(isTemplate = true)
+        val result = repository.listAllBlocks(BlockListParams(isTemplate = true))
         assertEquals(1, result.size)
         assertEquals(true, result[0].isTemplate)
     }
@@ -325,12 +326,7 @@ class BlockRepositoryTest {
         }
         val irohSource = IrohAdminRpcBlockSource(transport, settings)
         val apiThatThrows = object : FakeBlockApi() {
-            override suspend fun listAllBlocks(
-                label: String?,
-                isTemplate: Boolean?,
-                limit: Int?,
-                offset: Int?,
-            ): List<Block> {
+            override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
                 throw IrohAdminApiUnavailableException("Raw HTTP forbidden")
             }
         }

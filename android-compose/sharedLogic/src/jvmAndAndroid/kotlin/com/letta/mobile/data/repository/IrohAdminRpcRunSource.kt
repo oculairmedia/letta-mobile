@@ -27,8 +27,8 @@ class IrohAdminRpcRunSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.RunIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
     /**
@@ -40,7 +40,7 @@ class IrohAdminRpcRunSource(
      * `ascending` override, or an `orderBy` other than `created_at` — are
      * rejected loudly rather than silently dropped or ignored.
      */
-    suspend fun listRuns(params: RunListParams = RunListParams()): List<Run> {
+    override suspend fun listRuns(params: RunListParams): List<Run> {
         val agentId = resolveAgentId(params)
         val order = resolveOrder(params)
         require(params.orderBy == null || params.orderBy == "created_at") {
@@ -99,7 +99,7 @@ class IrohAdminRpcRunSource(
         return fromAscending
     }
 
-    suspend fun getRun(runId: String): Run {
+    override suspend fun getRun(runId: String): Run {
         val params = buildJsonObject { put("run_id", runId) }
         val response = channelTransport.adminRpc(
             method = "run.get",
@@ -111,7 +111,7 @@ class IrohAdminRpcRunSource(
         return json.decodeFromJsonElement(Run.serializer(), result)
     }
 
-    suspend fun getRunSteps(runId: String): List<Step> {
+    override suspend fun getRunSteps(runId: String): List<Step> {
         val params = buildJsonObject { put("run_id", runId) }
         val response = channelTransport.adminRpc(
             method = "step.list",

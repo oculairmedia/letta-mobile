@@ -14,7 +14,7 @@ import javax.inject.Singleton
 @Singleton
 open class BlockApi @Inject constructor(
     private val apiClient: LettaApiClient
-) {
+) : com.letta.mobile.data.repository.api.BlockRemoteSource {
     open suspend fun getBlock(agentId: String, blockLabel: String): Block {
         val (client, baseUrl) = apiClient.session()
 
@@ -25,7 +25,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveBlock(blockId: String): Block {
+    open override suspend fun retrieveBlock(blockId: String): Block {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/blocks/$blockId")
@@ -35,7 +35,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun countBlocks(): Int {
+    open override suspend fun countBlocks(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/blocks/count")
@@ -45,7 +45,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
+    open override suspend fun updateAgentBlock(agentId: String, blockLabel: String, params: BlockUpdateParams): Block {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/core-memory/blocks/$blockLabel") {
@@ -58,11 +58,11 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateGlobalBlock(
+    open override suspend fun updateGlobalBlock(
         blockId: String,
         params: BlockUpdateParams,
-        clearDescription: Boolean = false,
-        clearLimit: Boolean = false,
+        clearDescription: Boolean,
+        clearLimit: Boolean,
     ): Block {
         val (client, baseUrl) = apiClient.session()
         val requestBody = buildJsonObject {
@@ -87,7 +87,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createBlock(params: BlockCreateParams): Block {
+    open override suspend fun createBlock(params: BlockCreateParams): Block {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/blocks") {
@@ -100,7 +100,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteBlock(blockId: String) {
+    open override suspend fun deleteBlock(blockId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/blocks/$blockId")
@@ -109,7 +109,7 @@ open class BlockApi @Inject constructor(
         }
     }
 
-    open suspend fun attachBlock(agentId: String, blockId: String) {
+    open override suspend fun attachBlock(agentId: String, blockId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/core-memory/blocks/attach/$blockId")
@@ -118,7 +118,7 @@ open class BlockApi @Inject constructor(
         }
     }
 
-    open suspend fun detachBlock(agentId: String, blockId: String) {
+    open override suspend fun detachBlock(agentId: String, blockId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/core-memory/blocks/detach/$blockId")
@@ -127,7 +127,7 @@ open class BlockApi @Inject constructor(
         }
     }
 
-    open suspend fun listBlocks(agentId: String): List<Block> {
+    open override suspend fun listBlocks(agentId: String): List<Block> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/core-memory/blocks")
@@ -137,19 +137,14 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listAllBlocks(
-        label: String? = null,
-        isTemplate: Boolean? = null,
-        limit: Int? = null,
-        offset: Int? = null,
-    ): List<Block> {
+    open override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/blocks") {
-            parameter("label", label)
-            parameter("is_template", isTemplate)
-            parameter("limit", limit)
-            parameter("offset", offset)
+            parameter("label", params.label)
+            parameter("is_template", params.isTemplate)
+            parameter("limit", params.limit)
+            parameter("offset", params.offset)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -157,20 +152,14 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listAgentsForBlock(
-        blockId: String,
-        limit: Int? = null,
-        before: String? = null,
-        after: String? = null,
-        order: String? = null,
-    ): List<Agent> {
+    open override suspend fun listAgentsForBlock(params: BlockAgentsListParams): List<Agent> {
         val (client, baseUrl) = apiClient.session()
 
-        val response = client.get("$baseUrl/v1/blocks/$blockId/agents") {
-            parameter("limit", limit)
-            parameter("before", before)
-            parameter("after", after)
-            parameter("order", order)
+        val response = client.get("$baseUrl/v1/blocks/${params.blockId.value}/agents") {
+            parameter("limit", params.limit)
+            parameter("before", params.before)
+            parameter("after", params.after)
+            parameter("order", params.order)
         }
         if (response.status.value !in 200..299) {
             throw ApiException(response.status.value, response.bodyAsText())
@@ -178,7 +167,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun attachIdentityToBlock(blockId: String, identityId: String): Block {
+    open override suspend fun attachIdentityToBlock(blockId: String, identityId: String): Block {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/blocks/$blockId/identities/attach/$identityId")
@@ -188,7 +177,7 @@ open class BlockApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun detachIdentityFromBlock(blockId: String, identityId: String): Block {
+    open override suspend fun detachIdentityFromBlock(blockId: String, identityId: String): Block {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/blocks/$blockId/identities/detach/$identityId")

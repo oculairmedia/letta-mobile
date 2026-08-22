@@ -1,14 +1,16 @@
 package com.letta.mobile.data.repository
 
-import com.letta.mobile.data.api.MessageApi
-import com.letta.mobile.data.repository.api.OlderMessagesPage
 import com.letta.mobile.data.mapper.toAppMessages
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ConversationId
+import com.letta.mobile.data.repository.api.MessageIrohTimelineSource
+import com.letta.mobile.data.repository.api.MessageRemoteSource
+import com.letta.mobile.data.repository.api.OlderMessagesPage
+import com.letta.mobile.util.Telemetry
 
 internal data class MessageFetchParams(
-    val messageApi: MessageApi,
+    val remote: MessageRemoteSource,
     val agentId: AgentId,
     val conversationId: ConversationId,
     val targetMessageId: String?,
@@ -18,7 +20,7 @@ internal data class MessageFetchParams(
 )
 
 internal data class TargetedMessageFetchParams(
-    val messageApi: MessageApi,
+    val remote: MessageRemoteSource,
     val agentId: AgentId,
     val conversationId: ConversationId,
     val targetMessageId: String,
@@ -34,7 +36,7 @@ internal object MessageRepositoryFetch {
             } else {
                 fetchMessagesUntilTarget(
                     TargetedMessageFetchParams(
-                        messageApi = params.messageApi,
+                        remote = params.remote,
                         agentId = params.agentId,
                         conversationId = params.conversationId,
                         targetMessageId = params.targetMessageId,
@@ -44,7 +46,12 @@ internal object MessageRepositoryFetch {
                 )
             }
         } catch (e: Exception) {
-            android.util.Log.w("MessageRepository", "fetchMessages failed", e)
+            Telemetry.event(
+                "MessageRepository",
+                "fetchMessages failed",
+                "error" to (e.message ?: e.toString()),
+                level = Telemetry.Level.WARN,
+            )
             emptyList()
         }
     }
@@ -79,8 +86,8 @@ internal object MessageRepositoryFetch {
     }
 
     suspend fun fetchOlderMessages(
-        messageApi: MessageApi,
-        irohTimelineTransport: com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport?,
+        remote: MessageRemoteSource,
+        irohTimelineSource: MessageIrohTimelineSource?,
         agentId: AgentId,
         conversationId: ConversationId,
         beforeMessageId: String,
@@ -88,30 +95,24 @@ internal object MessageRepositoryFetch {
     ): List<AppMessage> {
         if (beforeMessageId.isBlank()) return emptyList()
 
-        if (irohTimelineTransport?.shouldUseIroh() == true) {
-            return irohTimelineTransport.listOlderConversationMessages(
+        if (irohTimelineSource?.shouldUseIroh() == true) {
+            return irohTimelineSource.listOlderConversationMessages(
                 conversationId = conversationId.value,
                 beforeMessageId = beforeMessageId,
                 limit = olderMessagesPageSize,
             ).toAppMessages()
         }
 
-        return messageApi.fetchRecentMessages(
+        return remote.fetchRecentMessages(
             conversationId = conversationId,
             messageLimit = olderMessagesPageSize,
             beforeMessageId = beforeMessageId,
         ).toAppMessages()
     }
 
-    /**
-     * letta-mobile-f0ixs: [fetchOlderMessages] that preserves the guard's continuation signal.
-     *
-     * Only the Iroh path can answer; the HTTP path reports null so the caller keeps its
-     * page-size heuristic and its behaviour is unchanged.
-     */
     suspend fun fetchOlderMessagesPage(
-        messageApi: MessageApi,
-        irohTimelineTransport: com.letta.mobile.data.timeline.IrohAdminRpcTimelineTransport?,
+        remote: MessageRemoteSource,
+        irohTimelineSource: MessageIrohTimelineSource?,
         agentId: AgentId,
         conversationId: ConversationId,
         beforeMessageId: String,
@@ -119,8 +120,8 @@ internal object MessageRepositoryFetch {
     ): OlderMessagesPage {
         if (beforeMessageId.isBlank()) return OlderMessagesPage(emptyList(), hasMore = null)
 
-        if (irohTimelineTransport?.shouldUseIroh() == true) {
-            val page = irohTimelineTransport.listOlderConversationMessagesPage(
+        if (irohTimelineSource?.shouldUseIroh() == true) {
+            val page = irohTimelineSource.listOlderConversationMessagesPage(
                 conversationId = conversationId.value,
                 beforeMessageId = beforeMessageId,
                 limit = olderMessagesPageSize,
@@ -131,7 +132,7 @@ internal object MessageRepositoryFetch {
             )
         }
 
-        val rawMessages = messageApi.fetchRecentMessages(
+        val rawMessages = remote.fetchRecentMessages(
             conversationId = conversationId,
             messageLimit = olderMessagesPageSize,
             beforeMessageId = beforeMessageId,
@@ -143,7 +144,7 @@ internal object MessageRepositoryFetch {
     }
 
     private suspend fun fetchRecentMessages(params: MessageFetchParams): List<AppMessage> =
-        params.messageApi.fetchRecentMessages(
+        params.remote.fetchRecentMessages(
             conversationId = params.conversationId,
             messageLimit = params.defaultFetchLimit,
             beforeMessageId = null,
@@ -153,7 +154,7 @@ internal object MessageRepositoryFetch {
         params: TargetedMessageFetchParams,
         after: String?,
     ): List<AppMessage> =
-        params.messageApi.listMessages(
+        params.remote.listMessages(
             agentId = params.agentId,
             limit = params.targetedFetchLimit,
             before = null,

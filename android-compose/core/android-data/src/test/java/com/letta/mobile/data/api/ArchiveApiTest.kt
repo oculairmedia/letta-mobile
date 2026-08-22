@@ -1,6 +1,7 @@
 package com.letta.mobile.data.api
 
 import com.letta.mobile.data.model.ArchiveCreateParams
+import com.letta.mobile.data.model.ArchiveListParams
 import com.letta.mobile.data.model.ArchiveUpdateParams
 import com.letta.mobile.data.model.EmbeddingConfig
 import io.ktor.client.HttpClient
@@ -44,7 +45,7 @@ class ArchiveApiTest : com.letta.mobile.testutil.TrackedMockClientTestSupport() 
         var url: String? = null
         val api = createApi { req -> url = req.url.toString(); respond("[]", HttpStatusCode.OK, jsonHeaders) }
 
-        api.listArchives(limit = 10, name = "Docs")
+        api.listArchives(ArchiveListParams(limit = 10, name = "Docs"))
 
         assertTrue(url!!.contains("/v1/archives/"))
         assertTrue(url!!.contains("limit=10"))

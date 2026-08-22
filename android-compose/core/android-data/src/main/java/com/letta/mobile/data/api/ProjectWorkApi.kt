@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.ProjectIssueListParams
 import com.letta.mobile.data.model.ProjectIssueListResponse
 import com.letta.mobile.data.model.ProjectIssueMutationResponse
 import com.letta.mobile.data.model.ProjectReadyWorkResponse
+import com.letta.mobile.data.repository.api.ProjectWorkRemoteSource
 import io.ktor.client.call.body
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -58,11 +59,11 @@ data class ProjectIssueReasonRequest(
 @Singleton
 open class ProjectWorkApi @Inject constructor(
     private val apiClient: LettaApiClient,
-) {
-    open suspend fun getReadyWork(
+) : ProjectWorkRemoteSource {
+    open override suspend fun getReadyWork(
         projectId: String,
-        limit: Int? = null,
-        cursor: String? = null,
+        limit: Int?,
+        cursor: String?,
     ): ProjectReadyWorkResponse {
         val (client, baseUrl) = session()
         val response = client.get("$baseUrl/api/projects/$projectId/ready-work") {
@@ -72,9 +73,9 @@ open class ProjectWorkApi @Inject constructor(
         return response.bodyOrThrow()
     }
 
-    open suspend fun listIssues(
+    open override suspend fun listIssues(
         projectId: String,
-        params: ProjectIssueListParams = ProjectIssueListParams(),
+        params: ProjectIssueListParams,
     ): ProjectIssueListResponse {
         val (client, baseUrl) = session()
         val response = client.get("$baseUrl/api/projects/$projectId/issues") {
@@ -92,7 +93,7 @@ open class ProjectWorkApi @Inject constructor(
         return response.bodyOrThrow()
     }
 
-    open suspend fun getIssueAnalytics(
+    open override suspend fun getIssueAnalytics(
         projectId: String,
         params: ProjectIssueAnalyticsParams,
     ): IssueAnalyticsResponse {
@@ -134,11 +135,22 @@ open class ProjectWorkApi @Inject constructor(
         }
     }
 
-    open suspend fun getIssue(issueId: String): ProjectIssueDetailResponse {
+    open override suspend fun getIssue(issueId: String): ProjectIssueDetailResponse {
         val (client, baseUrl) = session()
         val response = client.get("$baseUrl/api/issues/$issueId")
         return response.bodyOrThrow()
     }
+
+    open override suspend fun claimIssue(
+        issueId: String,
+        assignee: String,
+        ifMatch: String,
+        idempotencyKey: String,
+    ): ProjectIssueMutationResponse = claimIssue(
+        issueId = issueId,
+        request = ProjectIssueClaimRequest(assignee),
+        headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
+    )
 
     open suspend fun claimIssue(
         issueId: String,
@@ -150,6 +162,15 @@ open class ProjectWorkApi @Inject constructor(
         body = request,
     )
 
+    open override suspend fun unclaimIssue(
+        issueId: String,
+        ifMatch: String,
+        idempotencyKey: String,
+    ): ProjectIssueMutationResponse = unclaimIssue(
+        issueId = issueId,
+        headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
+    )
+
     open suspend fun unclaimIssue(
         issueId: String,
         headers: ProjectIssueMutationHeaders,
@@ -157,6 +178,17 @@ open class ProjectWorkApi @Inject constructor(
         path = "/api/issues/$issueId/unclaim",
         headers = headers,
         body = EmptyMutationRequest,
+    )
+
+    open override suspend fun updateIssueStatus(
+        issueId: String,
+        status: String,
+        ifMatch: String,
+        idempotencyKey: String,
+    ): ProjectIssueMutationResponse = updateIssueStatus(
+        issueId = issueId,
+        request = ProjectIssueStatusRequest(status),
+        headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
     open suspend fun updateIssueStatus(
@@ -173,6 +205,17 @@ open class ProjectWorkApi @Inject constructor(
         return response.bodyOrThrow()
     }
 
+    open override suspend fun addIssueNote(
+        issueId: String,
+        note: String,
+        ifMatch: String,
+        idempotencyKey: String,
+    ): ProjectIssueMutationResponse = addIssueNote(
+        issueId = issueId,
+        request = ProjectIssueNoteRequest(note),
+        headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
+    )
+
     open suspend fun addIssueNote(
         issueId: String,
         request: ProjectIssueNoteRequest,
@@ -183,6 +226,17 @@ open class ProjectWorkApi @Inject constructor(
         body = request,
     )
 
+    open override suspend fun closeIssue(
+        issueId: String,
+        reason: String,
+        ifMatch: String,
+        idempotencyKey: String,
+    ): ProjectIssueMutationResponse = closeIssue(
+        issueId = issueId,
+        request = ProjectIssueReasonRequest(reason),
+        headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
+    )
+
     open suspend fun closeIssue(
         issueId: String,
         request: ProjectIssueReasonRequest,
@@ -191,6 +245,17 @@ open class ProjectWorkApi @Inject constructor(
         path = "/api/issues/$issueId/close",
         headers = headers,
         body = request,
+    )
+
+    open override suspend fun reopenIssue(
+        issueId: String,
+        reason: String,
+        ifMatch: String,
+        idempotencyKey: String,
+    ): ProjectIssueMutationResponse = reopenIssue(
+        issueId = issueId,
+        request = ProjectIssueReasonRequest(reason),
+        headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
     open suspend fun reopenIssue(

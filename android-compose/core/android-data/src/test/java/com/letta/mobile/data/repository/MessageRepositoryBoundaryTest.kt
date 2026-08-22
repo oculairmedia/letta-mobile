@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Tag
 /**
  * Architecture guard for letta-mobile-u67jx.
  *
- * [MessageRepository] is a stateless HTTP helper. Live chat timeline state,
+ * [CachedMessageRepository] is a stateless HTTP helper. Live chat timeline state,
  * streaming sends, optimistic/local writes, and reconciliation belong to
  * `TimelineRepository`, so new message APIs should be reviewed deliberately.
  */
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Tag
 class MessageRepositoryBoundaryTest {
     @Test
     fun `MessageRepository exposes only reviewed stateless HTTP operations`() {
-        val source = repositorySource("MessageRepository.kt")
+        val source = repositorySource("CachedMessageRepository.kt")
         val actualMethods = source.publicOverrideSuspendFunctions() + source.publicOverrideFunctions()
 
         assertEquals(
@@ -73,7 +73,7 @@ class MessageRepositoryBoundaryTest {
 
     @Test
     fun `MessageRepository documentation names TimelineRepository as live chat owner`() {
-        val source = repositorySource("MessageRepository.kt")
+        val source = repositorySource("CachedMessageRepository.kt")
 
         assertTrue(source.contains("not** the chat timeline source of"))
         assertTrue(source.contains("TimelineRepository"))
@@ -82,10 +82,12 @@ class MessageRepositoryBoundaryTest {
 
     private fun repositorySource(relativePath: String): String {
         val root = repositoryRoot()
-        val path = if (relativePath.contains("IMessageRepository")) {
-            root.resolve("sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/IMessageRepository.kt")
-        } else {
-            root.resolve("core/android-data/src/main/java/com/letta/mobile/data/repository/MessageRepository.kt")
+        val path = when {
+            relativePath.contains("IMessageRepository") ->
+                root.resolve("sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/api/IMessageRepository.kt")
+            relativePath.contains("CachedMessageRepository") ->
+                root.resolve("sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/repository/CachedMessageRepository.kt")
+            else -> root.resolve("core/android-data/src/main/java/com/letta/mobile/data/repository/MessageRepository.kt")
         }
         return path.readText()
     }

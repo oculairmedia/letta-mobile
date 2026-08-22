@@ -45,3 +45,30 @@ data class GroupUpdateParams(
     @SerialName("shared_block_ids") val sharedBlockIds: List<BlockId>? = null,
     val hidden: Boolean? = null,
 )
+
+/** Cursor + filter params for `GET /v1/groups`. */
+data class GroupListParams(
+    val managerType: String? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val limit: Int? = null,
+    val order: String? = null,
+    val projectId: String? = null,
+    val showHiddenGroups: Boolean? = null,
+)
+
+/** Cursor pagination for group messages. */
+data class GroupMessagesListParams(
+    val groupId: String,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+)
+
+/** Iroh `group.list` filters (no cursor pagination on the admin_rpc path). */
+data class GroupIrohListParams(
+    val managerType: String? = null,
+    val projectId: String? = null,
+    val showHiddenGroups: Boolean? = null,
+)

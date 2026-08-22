@@ -5,6 +5,8 @@ import com.letta.mobile.data.api.GroupApi
 import com.letta.mobile.data.model.Group
 import com.letta.mobile.data.model.GroupCreateParams
 import com.letta.mobile.data.model.GroupId
+import com.letta.mobile.data.model.GroupListParams
+import com.letta.mobile.data.model.GroupMessagesListParams
 import com.letta.mobile.data.model.GroupUpdateParams
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.LettaResponse
@@ -20,10 +22,10 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
     var shouldFail = false
     val calls = mutableListOf<String>()
 
-    override suspend fun listGroups(managerType: String?, before: String?, after: String?, limit: Int?, order: String?, projectId: String?, showHiddenGroups: Boolean?): List<Group> {
+    override suspend fun listGroups(params: GroupListParams): List<Group> {
         calls.add("listGroups")
         if (shouldFail) throw ApiException(500, "Server error")
-        return groups.filter { managerType == null || it.managerType == managerType }
+        return groups.filter { params.managerType == null || it.managerType == params.managerType }
     }
 
     override suspend fun countGroups(): Int {
@@ -41,15 +43,7 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
     override suspend fun createGroup(params: GroupCreateParams): Group {
         calls.add("createGroup:${params.description}")
         if (shouldFail) throw ApiException(500, "Server error")
-        val group = Group(
-            id = GroupId("group-${groups.size + 1}"),
-            managerType = "round_robin",
-            agentIds = params.agentIds,
-            description = params.description,
-            projectId = params.projectId,
-            sharedBlockIds = params.sharedBlockIds ?: emptyList(),
-            hidden = params.hidden,
-        )
+        val group = Group(id = GroupId("group-${groups.size + 1}"), managerType = "round_robin", agentIds = params.agentIds, description = params.description, projectId = params.projectId, sharedBlockIds = params.sharedBlockIds ?: emptyList(), hidden = params.hidden)
         groups.add(group)
         return group
     }
@@ -59,13 +53,7 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
         if (shouldFail) throw ApiException(500, "Server error")
         val index = groups.indexOfFirst { it.id.value == groupId }
         if (index < 0) throw ApiException(404, "Not found")
-        val updated = groups[index].copy(
-            description = params.description ?: groups[index].description,
-            agentIds = params.agentIds ?: groups[index].agentIds,
-            projectId = params.projectId ?: groups[index].projectId,
-            sharedBlockIds = params.sharedBlockIds ?: groups[index].sharedBlockIds,
-            hidden = params.hidden ?: groups[index].hidden,
-        )
+        val updated = groups[index].copy(description = params.description ?: groups[index].description)
         groups[index] = updated
         return updated
     }
@@ -94,8 +82,8 @@ class FakeGroupApi : GroupApi(mockk(relaxed = true)) {
         return TestMessageFactory.userMessage(id = messageId, content = "updated")
     }
 
-    override suspend fun listGroupMessages(groupId: String, limit: Int?, before: String?, after: String?, order: String?): List<LettaMessage> {
-        calls.add("listGroupMessages:$groupId")
+    override suspend fun listGroupMessages(params: GroupMessagesListParams): List<LettaMessage> {
+        calls.add("listGroupMessages:${params.groupId}")
         if (shouldFail) throw ApiException(500, "Server error")
         return listOf(TestMessageFactory.userMessage(id = "message-1", content = "hello"))
     }

@@ -3,7 +3,11 @@ package com.letta.mobile.data.repository
 import com.letta.mobile.data.api.FolderApi
 import com.letta.mobile.data.model.FileMetadata
 import com.letta.mobile.data.model.Folder
+import com.letta.mobile.data.model.FolderAgentsListParams
+import com.letta.mobile.data.model.FolderFilesListParams
 import com.letta.mobile.data.model.FolderId
+import com.letta.mobile.data.model.FolderListParams
+import com.letta.mobile.data.model.FolderPassagesListParams
 import com.letta.mobile.data.model.Passage
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -89,66 +93,41 @@ class FolderPaginationTest {
         val observedAftersForPassages = mutableListOf<String?>()
         val observedAftersForFiles = mutableListOf<String?>()
 
-        override suspend fun listFolders(
-            before: String?,
-            after: String?,
-            limit: Int?,
-            order: String?,
-            name: String?,
-        ): List<Folder> {
-            observedAfters += after
-            observedLimits += limit
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listFolders(params: FolderListParams): List<Folder> {
+            observedAfters += params.after
+            observedLimits += params.limit
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 folders.indexOfFirst { it.id.value == id }.let { if (it < 0) folders.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(folders.size)
             return folders.subList(start, end)
         }
 
-        override suspend fun listAgentsForFolder(
-            folderId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<String> {
-            observedAftersForAgents += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listAgentsForFolder(params: FolderAgentsListParams): List<String> {
+            observedAftersForAgents += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 agents.indexOfFirst { it == id }.let { if (it < 0) agents.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(agents.size)
             return agents.subList(start, end)
         }
 
-        override suspend fun listFolderPassages(
-            folderId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<Passage> {
-            observedAftersForPassages += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listFolderPassages(params: FolderPassagesListParams): List<Passage> {
+            observedAftersForPassages += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 passages.indexOfFirst { it.id == id }.let { if (it < 0) passages.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(passages.size)
             return passages.subList(start, end)
         }
 
-        override suspend fun listFolderFiles(
-            folderId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-            includeContent: Boolean?,
-        ): List<FileMetadata> {
-            observedAftersForFiles += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listFolderFiles(params: FolderFilesListParams): List<FileMetadata> {
+            observedAftersForFiles += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 files.indexOfFirst { it.id == id }.let { if (it < 0) files.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(files.size)

@@ -23,11 +23,11 @@ class IrohAdminRpcFolderSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.FolderIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listFolders(name: String? = null): List<Folder> {
+    override suspend fun listFolders(name: String?): List<Folder> {
         val params = buildJsonObject {
             name?.let { put("name", it) }
         }

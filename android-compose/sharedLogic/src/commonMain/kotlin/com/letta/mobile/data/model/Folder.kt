@@ -1,5 +1,6 @@
 package com.letta.mobile.data.model
 
+import io.ktor.http.ContentType
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.serialization.SerialName
@@ -40,6 +41,53 @@ data class FolderUpdateParams(
     val instructions: String? = null,
     val metadata: Map<String, JsonElement>? = null,
     @SerialName("embedding_config") val embeddingConfig: EmbeddingConfig? = null,
+)
+
+/** Cursor pagination for `GET /v1/folders/`. */
+data class FolderListParams(
+    val before: String? = null,
+    val after: String? = null,
+    val limit: Int? = null,
+    val order: String? = null,
+    val name: String? = null,
+)
+
+/** Cursor pagination for folder-scoped agent lists. */
+data class FolderAgentsListParams(
+    val folderId: FolderId,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+)
+
+/** Cursor pagination for folder-scoped passage lists. */
+data class FolderPassagesListParams(
+    val folderId: FolderId,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+)
+
+/** Cursor pagination for folder-scoped file lists. */
+data class FolderFilesListParams(
+    val folderId: FolderId,
+    val limit: Int? = null,
+    val before: String? = null,
+    val after: String? = null,
+    val order: String? = null,
+    val includeContent: Boolean? = null,
+)
+
+/** Multipart upload payload for `POST /v1/folders/{folder_id}/upload`. */
+data class FolderFileUploadParams(
+    val folderId: FolderId,
+    val fileName: String,
+    val fileBytes: ByteArray,
+    val duplicateHandling: String? = null,
+    val customName: String? = null,
+    val contentType: ContentType = ContentType.Application.OctetStream,
 )
 
 @Serializable

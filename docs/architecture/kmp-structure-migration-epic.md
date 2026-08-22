@@ -1,6 +1,6 @@
 # Epic: KMP project structure migration
 
-**Status:** in progress (Phase 0–3c merged; Phase 4a–4b on `refactor/kmp-structure-phase-4`)  
+**Status:** in progress (Phase 0–4c + Phase 5a–5p merged; Phase 5q / 5b.2 + Phase 6a in flight)  
 **Priority:** P2  
 **Labels:** `kmp`, `architecture`, `migration`  
 **Related docs:**
@@ -282,7 +282,41 @@ Implement each repository **once** in `sharedLogic`; platform modules supply eng
 
 **Suggested slice PRs:** agents → conversations → tools → schedules → memory blocks.
 
-**5a (agents — in progress):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+**5a (agents — merged #1263):** `CachedAgentRepository` in `sharedLogic/commonMain` owns refresh/cache/Iroh/local-runtime routing; Android `AgentRepository` is a thin binder (`AgentApi` + `RoomAgentLocalCache` + `IrohAdminRpcAgentSource`). Interfaces: `AgentRemoteSource`, `AgentLocalCache`, `AgentIrohSource`.
+
+**5b (conversations — #1265):** `CachedConversationRepository` + Room/Iroh/HTTP seams. `AllConversationsRepository` (paging) deferred as **5b.2**.
+
+**5c (tools — #1267):** `CachedToolRepository` + `ToolRemoteSource` / `ToolIrohSource`; Android thin binder. Desktop `IrohToolRepository` unify deferred.
+
+**5d (schedules — #1268):** `CachedScheduleRepository` + `ScheduleRemoteSource`; Android thin binder. Desktop keeps `IrohScheduleRepository`.
+
+**5e (memory blocks — #1269):** `CachedBlockRepository` + `BlockRemoteSource` / `BlockIrohSource`; `PaginationHelpers` moved into `sharedLogic`. Desktop `IrohAgentBlockRepository` unify deferred.
+
+**5f (folders — #1270):** `CachedFolderRepository` + `FolderRemoteSource` / `FolderIrohSource`; Android thin binder. Desktop folder admin reads stay on existing Iroh path until unify.
+
+**5g (providers — #1271):** `CachedProviderRepository` + `ProviderRemoteSource` / `ProviderIrohSource`; Android thin binder.
+
+**5h (archives — #1272):** `CachedArchiveRepository` + `ArchiveRemoteSource` / `ArchiveIrohSource` (`IrohAdminRpcArchiveSource`); Android thin binder.
+
+**5i (groups — #1273):** `CachedGroupRepository` + `GroupRemoteSource` / `GroupIrohSource`.
+
+**5j (identities — #1273):** `CachedIdentityRepository` + `IdentityRemoteSource` / `IdentityIrohSource`.
+
+**5k (jobs / runs / passages — #1274):** `CachedJobRepository`, `CachedRunRepository`, `CachedPassageRepository` + matching remote/Iroh seams.
+
+**5l (models / MCP — #1275):** `CachedModelRepository` + `CachedMcpServerRepository` with remote/Iroh seams (local-runtime model source preserved).
+
+**5m (steps — #1276):** `CachedStepRepository` + `StepRemoteSource`; Android thin binder.
+
+**5n (projects / project work — #1276):** `CachedProjectRepository` + `ProjectRemoteSource` / `ProjectIrohSource` (`IrohAdminRpcProjectSource`); `CachedProjectWorkRepository` + `ProjectWorkRemoteSource`; Android thin binders. Platform-neutral git URL credential stripping (regex) and freshness timestamps (`kotlinx.datetime`); idempotency keys use `kotlin.uuid.Uuid` (`kmp-` prefix). `IrohAdminRpcProjectSource` stays in `core:android-data` for this slice.
+
+**5o (bug reports / slash commands / vibesync — merged #1278):** `CachedBugReportRepository` + `BugReportLocalStore` (`RoomBugReportLocalStore`); `CachedSlashCommandRepository` + `SlashCommandRemoteSource` / `SlashCommandIrohSource` (`SlashCommandApi`, `IrohAdminRpcSlashCommandSource` with platform-supplied `deviceId`/`clientVersion`); `CachedVibesyncEventStreamRepository` + `VibesyncEventStreamSource` / `VibesyncEventStreamLogger` (`LettaHttpVibesyncEventStreamSource`, `AndroidVibesyncEventStreamLogger`). HTTP/Iroh routing, SSE loop, and `routeRawEvent` live in sharedLogic; Room/HTTP/Iroh connect bindings stay in `core:android-data`.
+
+**5p (messages — merged #5p stack):** `CachedMessageRepository` + `MessageRemoteSource` / `MessageIrohTimelineSource` (`MessageApi`, `IrohAdminRpcMessageTimelineSource`, existing `IrohAdminRpcApprovalSource`); fetch / older-pages / batches / approval / inspector / reset orchestration in `sharedLogic/jvmAndAndroid`; `getMessagesPaged` stays in Android `MessageRepository` binder (`MessagePagingSource`). `ApiToDomainMessageMapper` moved to sharedLogic for platform-neutral `toAppMessages()`.
+
+**5b.2 (all conversations list — #5p stack):** `CachedAllConversationsRepository` + `ConversationRemoteSource` / `AllConversationsLocalCache` (`ConversationApi`, `RoomAllConversationsLocalCache`, existing `LocalRuntimeConversationSource` + `IrohAdminRpcConversationListSource`); refresh/cache/hasMore/cursor/optimistic updates in sharedLogic with `kotlin.time.Clock` + `Telemetry`; `getConversationsPaged` stays in Android `AllConversationsRepository` binder (`ConversationPagingSource`).
+
+**5q (settings — this PR):** `CachedSettingsRepository` + `SettingsPreferencesStore` / existing `SecureSettingsStore` (`DataStoreSettingsPreferencesStore`, encrypted prefs via `StorageModule`); config list/active routing, pinned-item unified order, theme/chat prefs, last-chat selection merge, and backend-switch cache orchestration in `sharedLogic/commonMain`. Android `SettingsRepository` is a thin binder supplying DataStore + `BuildConfig`/`Build.VERSION` defaults + `BackendSwitchInvalidator`. Desktop full settings parity deferred — still uses `ActiveConfigSettingsRepository` + `DesktopLettaConfigStore`; a properties-backed `SettingsPreferencesStore` adapter is the follow-up.
 
 ### Acceptance (per slice)
 

@@ -5,7 +5,9 @@ import com.letta.mobile.data.api.ArchiveApi
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Archive
+import com.letta.mobile.data.model.ArchiveAgentsListParams
 import com.letta.mobile.data.model.ArchiveCreateParams
+import com.letta.mobile.data.model.ArchiveListParams
 import com.letta.mobile.data.model.ArchiveUpdateParams
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -61,34 +63,21 @@ class ArchivePaginationTest {
         val observedLimits = mutableListOf<Int?>()
         val observedAftersForAgents = mutableListOf<String?>()
 
-        override suspend fun listArchives(
-            before: String?,
-            after: String?,
-            limit: Int?,
-            order: String?,
-            name: String?,
-            agentId: String?,
-        ): List<Archive> {
-            observedAfters += after
-            observedLimits += limit
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listArchives(params: ArchiveListParams): List<Archive> {
+            observedAfters += params.after
+            observedLimits += params.limit
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 archives.indexOfFirst { it.id == id }.let { if (it < 0) archives.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(archives.size)
             return archives.subList(start, end)
         }
 
-        override suspend fun listAgentsForArchive(
-            archiveId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<Agent> {
-            observedAftersForAgents += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listAgentsForArchive(params: ArchiveAgentsListParams): List<Agent> {
+            observedAftersForAgents += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 agents.indexOfFirst { it.id.value == id }.let { if (it < 0) agents.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(agents.size)

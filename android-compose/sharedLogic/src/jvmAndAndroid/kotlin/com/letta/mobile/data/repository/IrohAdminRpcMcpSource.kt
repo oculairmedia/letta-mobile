@@ -21,11 +21,11 @@ class IrohAdminRpcMcpSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.McpServerIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listMcpServers(): List<McpServer> {
+    override suspend fun listMcpServers(): List<McpServer> {
         val response = channelTransport.adminRpc(
             method = "mcp.list",
             path = "/v1/mcp/servers",

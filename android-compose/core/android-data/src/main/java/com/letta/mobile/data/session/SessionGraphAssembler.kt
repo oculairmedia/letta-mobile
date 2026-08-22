@@ -30,13 +30,15 @@ import com.letta.mobile.data.repository.CronRepository
 import com.letta.mobile.data.repository.FolderRepository
 import com.letta.mobile.data.repository.GroupRepository
 import com.letta.mobile.data.repository.IdentityRepository
-import com.letta.mobile.data.repository.IrohAdminRpcClient
+import com.letta.mobile.data.repository.IrohAdminRpcArchiveSource
 import com.letta.mobile.data.repository.IrohAdminRpcIdentitySource
 import com.letta.mobile.data.repository.IrohAdminRpcJobSource
 import com.letta.mobile.data.repository.IrohAdminRpcMcpSource
 import com.letta.mobile.data.repository.IrohAdminRpcModelSource
 import com.letta.mobile.data.repository.IrohAdminRpcPassageSource
 import com.letta.mobile.data.repository.IrohAdminRpcProjectSource
+import com.letta.mobile.data.repository.AndroidVibesyncEventStreamLogger
+import com.letta.mobile.data.repository.LettaHttpVibesyncEventStreamSource
 import com.letta.mobile.data.repository.IrohAdminRpcProviderSource
 import com.letta.mobile.data.repository.IrohAdminRpcRunSource
 import com.letta.mobile.data.repository.IrohAdminRpcToolSource
@@ -159,8 +161,9 @@ class SessionGraphAssembler @Inject constructor(
             ),
             toolRepository = adminRepositories.tool,
             vibesyncEventStreamRepository = VibesyncEventStreamRepository(
-                apiClient = lettaApiClient,
+                streamSource = LettaHttpVibesyncEventStreamSource(lettaApiClient),
                 scope = request.scope,
+                logger = AndroidVibesyncEventStreamLogger(),
             ),
         )
     }
@@ -231,8 +234,8 @@ class SessionGraphAssembler @Inject constructor(
         return CatalogAdminRepositories(
             archive = ArchiveRepository(
                 archiveApi = archiveApi,
-                irohAdminRpcClient = settings?.let {
-                    IrohAdminRpcClient(channelTransport = transport, settingsRepository = it)
+                irohArchiveSource = settings?.let {
+                    IrohAdminRpcArchiveSource(channelTransport = transport, settingsRepository = it)
                 },
             ),
             folder = FolderRepository(

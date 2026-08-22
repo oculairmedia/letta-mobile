@@ -1,6 +1,7 @@
 package com.letta.mobile.data.repository
 
 import com.letta.mobile.data.model.Group
+import com.letta.mobile.data.model.GroupIrohListParams
 import com.letta.mobile.data.repository.api.ISettingsRepository
 import com.letta.mobile.data.transport.api.IChannelTransport
 import kotlinx.serialization.builtins.ListSerializer
@@ -23,26 +24,22 @@ class IrohAdminRpcGroupSource(
         explicitNulls = false
         coerceInputValues = true
     },
-) {
-    fun shouldUseIroh(): Boolean =
+) : com.letta.mobile.data.repository.api.GroupIrohSource {
+    override fun shouldUseIroh(): Boolean =
         settingsRepository.activeBackendIsIroh()
 
-    suspend fun listGroups(
-        managerType: String? = null,
-        projectId: String? = null,
-        showHiddenGroups: Boolean? = null,
-    ): List<Group> {
-        val params = buildJsonObject {
-            managerType?.let { put("manager_type", it) }
-            projectId?.let { put("project_id", it) }
-            showHiddenGroups?.let { put("show_hidden_groups", it) }
+    override suspend fun listGroups(params: GroupIrohListParams): List<Group> {
+        val body = buildJsonObject {
+            params.managerType?.let { put("manager_type", it) }
+            params.projectId?.let { put("project_id", it) }
+            params.showHiddenGroups?.let { put("show_hidden_groups", it) }
         }
         val path = buildString {
             append("/v1/groups")
             val queryParts = listOfNotNull(
-                managerType?.let { "manager_type=$it" },
-                projectId?.let { "project_id=$it" },
-                showHiddenGroups?.let { "show_hidden_groups=$it" },
+                params.managerType?.let { "manager_type=$it" },
+                params.projectId?.let { "project_id=$it" },
+                params.showHiddenGroups?.let { "show_hidden_groups=$it" },
             )
             if (queryParts.isNotEmpty()) {
                 append(queryParts.joinToString("&", prefix = "?"))
@@ -51,7 +48,7 @@ class IrohAdminRpcGroupSource(
         val response = channelTransport.adminRpc(
             method = "group.list",
             path = path,
-            body = params.toString(),
+            body = body.toString(),
         )
         if (!response.success) error(response.error ?: "Iroh admin_rpc group.list failed")
         val result = response.result ?: return emptyList()

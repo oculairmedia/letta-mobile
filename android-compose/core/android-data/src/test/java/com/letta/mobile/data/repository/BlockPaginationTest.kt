@@ -4,7 +4,9 @@ import com.letta.mobile.data.api.BlockApi
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.Block
+import com.letta.mobile.data.model.BlockAgentsListParams
 import com.letta.mobile.data.model.BlockId
+import com.letta.mobile.data.model.BlockListParams
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
@@ -55,30 +57,19 @@ class BlockPaginationTest {
         val observedLimits = mutableListOf<Int?>()
         val observedAftersForAgents = mutableListOf<String?>()
 
-        override suspend fun listAllBlocks(
-            label: String?,
-            isTemplate: Boolean?,
-            limit: Int?,
-            offset: Int?,
-        ): List<Block> {
-            observedOffsets += offset
-            observedLimits += limit
-            val pageSize = limit ?: 50
-            val start = offset ?: 0
+        override suspend fun listAllBlocks(params: BlockListParams): List<Block> {
+            observedOffsets += params.offset
+            observedLimits += params.limit
+            val pageSize = params.limit ?: 50
+            val start = params.offset ?: 0
             val end = (start + pageSize).coerceAtMost(blocks.size)
             return blocks.subList(start, end)
         }
 
-        override suspend fun listAgentsForBlock(
-            blockId: String,
-            limit: Int?,
-            before: String?,
-            after: String?,
-            order: String?,
-        ): List<Agent> {
-            observedAftersForAgents += after
-            val pageSize = limit ?: 50
-            val start = after?.let { id ->
+        override suspend fun listAgentsForBlock(params: BlockAgentsListParams): List<Agent> {
+            observedAftersForAgents += params.after
+            val pageSize = params.limit ?: 50
+            val start = params.after?.let { id ->
                 agents.indexOfFirst { it.id.value == id }.let { if (it < 0) agents.size else it + 1 }
             } ?: 0
             val end = (start + pageSize).coerceAtMost(agents.size)

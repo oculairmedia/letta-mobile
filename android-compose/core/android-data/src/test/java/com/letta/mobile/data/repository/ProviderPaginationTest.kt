@@ -7,6 +7,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.jupiter.api.Tag
 
@@ -32,6 +33,39 @@ class ProviderPaginationTest {
         assertEquals(75, repo.providers.value.size)
         assertEquals(listOf(null, "provider-50"), api.observedAfters)
         assertEquals(listOf(50, 50), api.observedLimits)
+    }
+
+    @Test
+    fun `refreshProviders fails when API returns multiple providers without id`() = runTest {
+        val providers = listOf(
+            Provider(id = null, name = "Provider A", providerType = "openai"),
+            Provider(id = null, name = "Provider B", providerType = "openai"),
+        )
+        val api = PaginatingProviderApi(providers)
+        val repo = ProviderRepository(api)
+
+        val error = runCatching {
+            repo.refreshProviders(name = null, providerType = null)
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertEquals(1, api.observedAfters.size)
+    }
+
+    @Test
+    fun `refreshProviders fails when full page ends with null id`() = runTest {
+        val providers = (1..49).map {
+            Provider(id = ProviderId("provider-$it"), name = "Provider $it", providerType = "openai")
+        } + Provider(id = null, name = "Tail null", providerType = "openai")
+        val api = PaginatingProviderApi(providers)
+        val repo = ProviderRepository(api)
+
+        val error = runCatching {
+            repo.refreshProviders(name = null, providerType = null)
+        }.exceptionOrNull()
+
+        assertTrue(error is IllegalArgumentException)
+        assertEquals(1, api.observedAfters.size)
     }
 
     private class PaginatingProviderApi(
