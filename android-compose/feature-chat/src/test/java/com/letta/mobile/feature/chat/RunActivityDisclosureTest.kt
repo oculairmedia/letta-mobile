@@ -122,7 +122,7 @@ class RunActivityDisclosureTest {
         composeRule.onNodeWithText("2 tools").assertIsDisplayed()
         composeRule.onNodeWithText("1 failure").assertIsDisplayed()
         composeRule.onNodeWithTag(RunActivityDisclosureTestTags.Header)
-            .assertHeightIsAtLeast(36.dp)
+            .assertHeightIsAtLeast(48.dp)
             .assert(hasStateDescription("Agent work expanded"))
             .assertHasClickAction()
             .performClick()

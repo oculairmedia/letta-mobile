@@ -68,9 +68,6 @@ internal fun MeasuredChatRenderItem(
     // Expansion/collapse changes the signature. The old signature may carry
     // a much taller cached minimum; never let that floor survive into the new
     // visual state or a collapsed thought/run cannot shrink.
-    LaunchedEffect(signature) {
-        hasMeasuredOnce.value = false
-    }
     val cachedHeightPx = if (hasMeasuredOnce.value) geometryState.heightFor(signature) else null
     val heightModifier = if (cachedHeightPx != null && cachedHeightPx > 0) {
         val cachedHeightDp = with(LocalDensity.current) { cachedHeightPx.toDp() }

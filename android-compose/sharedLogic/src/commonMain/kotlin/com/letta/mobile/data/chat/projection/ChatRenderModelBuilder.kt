@@ -48,11 +48,7 @@ fun buildChatRenderModel(
     // or unscoped history.
     activeAgentId: String? = null,
 ): ChatRenderModel {
-    val agentScoped = if (activeAgentId == null) {
-        messages
-    } else {
-        messages.filter { it.agentId == null || it.agentId == activeAgentId }
-    }
+    val agentScoped = scopeMessagesToAgent(messages, activeAgentId)
     val afterReasoningDedup = dedupeReasoningAssistantEchoes(agentScoped)
 
     val visibleMessages = backfillMissingAssistantRunIds(
@@ -85,6 +81,9 @@ fun buildChatRenderModel(
         renderItems = renderItems,
     )
 }
+
+private fun scopeMessagesToAgent(messages: List<UiMessage>, activeAgentId: String?): List<UiMessage> =
+    if (activeAgentId == null) messages else messages.filter { it.agentId == null || it.agentId == activeAgentId }
 
 /**
  * Replayed tool frames can omit run_id even though the surrounding reasoning
@@ -164,7 +163,7 @@ class IncrementalChatRenderItemsCache {
         // buildChatRenderModel so foreign-agent messages are scoped out.
         activeAgentId: String? = null,
     ): List<ChatRenderItem> {
-        val normalizedMessages = backfillMissingAssistantRunIds(messages)
+        val normalizedMessages = backfillMissingAssistantRunIds(scopeMessagesToAgent(messages, activeAgentId))
         if (normalizedMessages.isEmpty()) {
             cachedMode = mode
             previousMessages = normalizedMessages
