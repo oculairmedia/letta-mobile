@@ -15,7 +15,8 @@ data class GoalStatusResponse(
 @Serializable
 data class GoalStatus(
     val objective: String = "",
-    val status: String = "",
+    @Serializable(with = GoalStatusStateSerializer::class)
+    val status: GoalStatusState = GoalStatusState.Unknown(""),
     val createdAt: String = "",
     val updatedAt: String = "",
     val activeStartedAt: String? = null,
@@ -23,3 +24,35 @@ data class GoalStatus(
     val tokensUsed: Long = 0,
     val tokenBudget: Long? = null,
 )
+
+sealed interface GoalStatusState {
+    val wireValue: String
+
+    data object Active : GoalStatusState { override val wireValue = "active" }
+    data object Completed : GoalStatusState { override val wireValue = "completed" }
+    data object Cancelled : GoalStatusState { override val wireValue = "cancelled" }
+    data class Unknown(val raw: String) : GoalStatusState { override val wireValue = raw }
+
+    companion object {
+        fun fromWire(value: String): GoalStatusState = when (value) {
+            Active.wireValue -> Active
+            Completed.wireValue -> Completed
+            Cancelled.wireValue -> Cancelled
+            else -> Unknown(value)
+        }
+    }
+}
+
+object GoalStatusStateSerializer : kotlinx.serialization.KSerializer<GoalStatusState> {
+    override val descriptor = kotlinx.serialization.descriptors.PrimitiveSerialDescriptor(
+        "GoalStatusState",
+        kotlinx.serialization.descriptors.PrimitiveKind.STRING,
+    )
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): GoalStatusState =
+        GoalStatusState.fromWire(decoder.decodeString())
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: GoalStatusState) {
+        encoder.encodeString(value.wireValue)
+    }
+}

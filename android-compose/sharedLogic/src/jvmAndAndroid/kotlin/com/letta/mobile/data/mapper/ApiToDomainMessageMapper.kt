@@ -2,6 +2,7 @@ package com.letta.mobile.data.mapper
 
 import com.letta.mobile.data.model.AppMessage
 import com.letta.mobile.data.model.ApprovalDecisionPayload
+import com.letta.mobile.data.model.ApprovalDecisionStatus
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalRequestPayload
 import com.letta.mobile.data.model.ApprovalResponseMessage
@@ -13,6 +14,7 @@ import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.ToolCallMessage
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.model.ToolReturnMessageStatus
 import com.letta.mobile.data.model.UserMessage
 import java.time.Instant
 
@@ -88,7 +90,12 @@ fun LettaMessage.mapToAppMessage(state: MessageMappingState): AppMessage? {
                 reason = reason,
                 approvals = approvals.orEmpty().mapNotNull { approval ->
                     val callId = approval.toolCallId?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-                    ApprovalDecisionPayload(callId, approval.approve, approval.status, approval.reason)
+                    ApprovalDecisionPayload(
+                        callId,
+                        approval.approve,
+                        ApprovalDecisionStatus.fromWire(approval.status),
+                        approval.reason,
+                    )
                 },
             ),
         )
@@ -144,7 +151,7 @@ private fun ToolReturnMessage.mapToolReturn(state: MessageMappingState): AppMess
         stepId = stepId,
         toolName = state.toolNameForCall(callId) ?: name,
         toolCallId = callId,
-        toolReturnStatus = toolReturn.status,
+        toolReturnStatus = ToolReturnMessageStatus.fromWire(toolReturn.status),
         attachments = attachments,
     )
 }

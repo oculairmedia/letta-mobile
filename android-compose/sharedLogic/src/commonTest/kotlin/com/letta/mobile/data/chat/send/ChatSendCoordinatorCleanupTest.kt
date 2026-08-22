@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
@@ -92,11 +93,11 @@ class ChatSendCoordinatorCleanupTest {
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-old", AGENT_ID, "conv-1", "run-old"))
             coordinator.send("second").join()
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-new", AGENT_ID, "conv-1", "run-new"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-new", "run-new", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-new", "run-new", BridgeTurnStatus.Completed))
             advanceUntilIdle()
 
             assertTrue(recorded.contains(WsTimelineEvent.TurnStarted("turn-new", AGENT_ID, "conv-1", "run-new")))
-            assertTrue(recorded.contains(WsTimelineEvent.TurnDone("turn-new", "run-new", "completed")))
+            assertTrue(recorded.contains(WsTimelineEvent.TurnDone("turn-new", "run-new", BridgeTurnStatus.Completed)))
             assertFalse(ui.isStreaming())
             assertFalse(ui.isAgentTyping())
         }
@@ -198,10 +199,10 @@ class ChatSendCoordinatorCleanupTest {
         coordinator.send("second").join()
         val active = timeline.externalLocals.last()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
-        assertEquals(listOf(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"), WsTimelineEvent.TurnDone("turn-1", "run-1", "failed")), recorded)
+        assertEquals(listOf(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"), WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed)), recorded)
         assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", active.otid)), timeline.failedLocals)
         // letta-mobile-br5g0: a reasonless dead turn now carries the generic
         // per-family copy instead of the bare "Turn failed".
@@ -225,7 +226,7 @@ class ChatSendCoordinatorCleanupTest {
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
 
         assertFailsWith<CancellationException> {
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         }
     }
 
@@ -237,7 +238,7 @@ class ChatSendCoordinatorCleanupTest {
         coordinator.send("hello").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "synthetic-turn-run"))
         coordinator.handleEvent(WsTimelineEvent.MessageDelta(AssistantMessage(id = "m1", contentRaw = JsonPrimitive("a"), runId = "run-real")))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "synthetic-turn-run", "cancelled"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "synthetic-turn-run", BridgeTurnStatus.Cancelled))
         advanceUntilIdle()
 
         assertEquals(
@@ -263,7 +264,7 @@ class ChatSendCoordinatorCleanupTest {
         // now the active turn. A late TurnDone for the OLD turn-1 arrives.
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         // The newer turn-2 must remain active and visually Thinking — the stale
@@ -288,7 +289,7 @@ class ChatSendCoordinatorCleanupTest {
 
         coordinator.send("first").join()
         coordinator.handleEvent(WsTimelineEvent.Error("busy", "Send rejected", "conv-1", "turn-failed", "run-failed"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-failed", "run-failed", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-failed", "run-failed", BridgeTurnStatus.Failed))
 
         assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", timeline.externalLocals.single().otid)), timeline.failedLocals)
         assertEquals("Send rejected", ui.currentError())
@@ -309,7 +310,7 @@ class ChatSendCoordinatorCleanupTest {
 
         coordinator.send("first").join()
         coordinator.handleEvent(WsTimelineEvent.Error("busy", "", "conv-1", null, null))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("", "", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("", "", BridgeTurnStatus.Failed))
 
         assertEquals(listOf(RecordingTimelineWriter.LocalMarker("conv-1", timeline.externalLocals.single().otid)), timeline.failedLocals)
         assertEquals("busy", ui.currentError())
@@ -333,13 +334,13 @@ class ChatSendCoordinatorCleanupTest {
         coordinator.handleEvent(WsTimelineEvent.SubscribeDone("run-1", lastSeq = 1L, status = "completed"))
         coordinator.send("second").join()
 
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
         assertTrue(ui.isStreaming())
         assertTrue(ui.isAgentTyping())
         assertEquals(1, timeline.clearedActiveConversations.size)
 
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", BridgeTurnStatus.Completed))
         assertFalse(ui.isStreaming())
         assertFalse(ui.isAgentTyping())
         assertEquals(2, timeline.clearedActiveConversations.size)
@@ -359,12 +360,12 @@ class ChatSendCoordinatorCleanupTest {
 
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-2", "run-2", BridgeTurnStatus.Completed))
             coordinator.send("third").join()
             val thirdLocal = timeline.externalLocals.single()
             val clearsBeforeDelayedTerminal = timeline.clearedActiveConversations.size
 
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
 
             assertTrue(ui.isStreaming())
             assertTrue(ui.isAgentTyping())
@@ -373,7 +374,7 @@ class ChatSendCoordinatorCleanupTest {
             assertTrue(timeline.failedLocals.none { it.otid == thirdLocal.otid })
 
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-3", AGENT_ID, "conv-1", "run-3"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-3", "run-3", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-3", "run-3", BridgeTurnStatus.Completed))
             assertFalse(ui.isStreaming())
             assertFalse(ui.isAgentTyping())
             assertTrue(timeline.sentLocals.any { it.otid == thirdLocal.otid })
@@ -389,7 +390,7 @@ class ChatSendCoordinatorCleanupTest {
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-2", AGENT_ID, "conv-1", "run-2"))
         // A late FAILED TurnDone for the old turn-1: old-run-scoped fragment
         // cleanup runs (scoped to run-1 only), but the newer turn stays active.
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertTrue(ui.isStreaming())
@@ -415,7 +416,7 @@ class ChatSendCoordinatorCleanupTest {
         val coordinator = coordinator(timeline = timeline, ui = ui, transport = FakeChannelTransport(mutableListOf(true)), activeConversationId = { "conv-1" })
 
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         // The matching terminal finishes the current turn: presence cleared.
@@ -475,7 +476,7 @@ class ChatSendCoordinatorCleanupTest {
                 runId = "run-1",
             ),
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
@@ -517,7 +518,7 @@ class ChatSendCoordinatorCleanupTest {
                 runId = "run-1",
             ),
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertTrue(timeline.ingestedMessages.filterIsInstance<ErrorMessage>().isEmpty())
@@ -549,7 +550,7 @@ class ChatSendCoordinatorCleanupTest {
                 runId = "run-1",
             ),
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
@@ -590,7 +591,7 @@ class ChatSendCoordinatorCleanupTest {
                 runId = "run-1",
             ),
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()
@@ -615,7 +616,7 @@ class ChatSendCoordinatorCleanupTest {
                 conversationId = "conv-1",
             ),
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         assertEquals(1, timeline.ingestedMessages.filterIsInstance<ErrorMessage>().size)
@@ -632,7 +633,7 @@ class ChatSendCoordinatorCleanupTest {
 
         coordinator.send("hello").join()
         coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "local-run-1"))
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-1", "failed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-1", "local-run-1", BridgeTurnStatus.Failed))
         advanceUntilIdle()
 
         val errorRow = timeline.ingestedMessages.filterIsInstance<ErrorMessage>().single()

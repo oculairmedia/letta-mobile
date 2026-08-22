@@ -1,5 +1,6 @@
 package com.letta.mobile.data.transport.iroh
 
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.ServerFrame
 import kotlinx.serialization.Serializable
 
@@ -216,9 +217,9 @@ object IrohProbeAssertions {
                         if (!turn.dialSucceeded) add("$prefix:dial_failed")
                         if (turn.timedOut) add("$prefix:timeout_missing_terminal")
                         if (turn.turnDoneCount != 1) add("$prefix:turn_done_count_${turn.turnDoneCount}")
-                        val status = turn.terminalStatus
-                        if (!turn.timedOut && status != "cancelled") {
-                            add("$prefix:cancel_terminal_status_${status ?: "missing"}")
+                        val status = turn.terminalStatus?.let(BridgeTurnStatus::fromWire)
+                        if (!turn.timedOut && status != BridgeTurnStatus.Cancelled) {
+                            add("$prefix:cancel_terminal_status_${status?.wireValue ?: "missing"}")
                         }
                         val terminalRunId = turn.terminalRunId
                         if (terminalRunId != null && terminalRunId.startsWith("cancelled-")) {

@@ -50,7 +50,7 @@ internal fun AppMessage.mapToolCall(
         name = name ?: "tool",
         arguments = content,
         result = returnContent,
-        status = matchedReturn?.toolReturnStatus,
+        status = matchedReturn?.toolReturnStatus?.wireValue,
         generatedImageAttachments = if (name == "generate_image") imageAttachments else emptyList(),
         executionTimeMs = matchedReturn?.let { Duration.between(date, it.date).toMillis().takeIf { value -> value >= 0L } },
         toolCallId = toolCallId,

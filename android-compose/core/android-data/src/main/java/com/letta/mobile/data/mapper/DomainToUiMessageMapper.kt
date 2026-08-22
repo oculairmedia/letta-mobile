@@ -180,7 +180,7 @@ internal fun AppMessage.mapToUiMessage(): UiMessage {
                 approved = response.approved,
                 reason = response.reason,
                 approvals = response.approvals.map {
-                    UiApprovalDecision(it.toolCallId, it.approved, it.status, it.reason)
+                    UiApprovalDecision(it.toolCallId, it.approved, it.status?.wireValue, it.reason)
                 },
             )
         },

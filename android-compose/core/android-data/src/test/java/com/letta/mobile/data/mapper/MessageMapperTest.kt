@@ -3,6 +3,8 @@ package com.letta.mobile.data.mapper
 import com.letta.mobile.data.model.ApprovalRequestMessage
 import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.ApprovalResult
+import com.letta.mobile.data.model.ApprovalDecisionStatus
+import com.letta.mobile.data.model.ToolReturnMessageStatus
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.MessageType
 import com.letta.mobile.data.model.ToolCall
@@ -21,6 +23,27 @@ import org.junit.jupiter.api.Tag
 
 @Tag("unit")
 class MessageMapperTest : WordSpec({
+    "message wire status mapping" should {
+        "map known and unknown tool and approval wire statuses" {
+            val messages = listOf(
+                com.letta.mobile.data.model.ToolReturnMessage("tool-success", toolCallId = "call", status = "success"),
+                com.letta.mobile.data.model.ToolReturnMessage("tool-future", toolCallId = "call", status = "future"),
+                ApprovalResponseMessage(
+                    id = "approval",
+                    approvals = listOf(
+                        ApprovalResult(toolCallId = "approved", status = "approved"),
+                        ApprovalResult(toolCallId = "future", status = "future"),
+                    ),
+                ),
+            ).toAppMessages()
+
+            messages[0].toolReturnStatus shouldBe ToolReturnMessageStatus.Success
+            messages[1].toolReturnStatus shouldBe ToolReturnMessageStatus.Unknown("future")
+            messages[2].approvalResponse!!.approvals[0].status shouldBe ApprovalDecisionStatus.Approved
+            messages[2].approvalResponse!!.approvals[1].status shouldBe ApprovalDecisionStatus.Unknown("future")
+        }
+    }
+
     "AppMessage.toUiMessage" should {
         "map user messages to role user" {
             val uiMsg = TestData.appMessage(messageType = MessageType.USER, content = "Hello").toUiMessage()

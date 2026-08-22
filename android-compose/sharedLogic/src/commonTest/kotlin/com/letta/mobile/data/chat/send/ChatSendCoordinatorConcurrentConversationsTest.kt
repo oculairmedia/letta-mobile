@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.send
 
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.a2ui.A2uiAction
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
@@ -219,8 +220,8 @@ class ChatSendCoordinatorConcurrentConversationsTest {
             val otidB = timeline.externalLocals.single { it.conversationId == CONV_B }.otid
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-b", AGENT_ID, CONV_B, "run-b"))
 
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", BridgeTurnStatus.Completed))
             advanceUntilIdle()
 
             // Both conversations settle, each under its OWN terminal and in order.
@@ -263,7 +264,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
 
             // A's turn starts and ends while B's send is still awaiting its TurnStarted.
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-a", AGENT_ID, CONV_A, "run-a"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
             advanceUntilIdle()
 
             assertEquals(listOf(CONV_A), timeline.clearedActiveConversations)
@@ -275,7 +276,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
 
             // B's identity survived, so B's own terminal still settles B.
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-b", AGENT_ID, CONV_B, "run-b"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", BridgeTurnStatus.Completed))
             advanceUntilIdle()
 
             assertEquals(listOf(CONV_A, CONV_B), timeline.clearedActiveConversations)
@@ -364,7 +365,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
                     runId = "run-a",
                 ),
             )
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "failed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Failed))
             advanceUntilIdle()
 
             // B is visible and still streaming; A's failure never touched its UI.
@@ -404,7 +405,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
             val otidB = timeline.externalLocals.single { it.conversationId == CONV_B }.otid
 
             // A's delayed terminal arrives. It belongs to A's history, not to B.
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
             advanceUntilIdle()
 
             assertTrue(timeline.sentLocals.none { it.otid == otidB }, "B must not be settled by A's terminal")
@@ -413,7 +414,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
 
             // B's own terminal still settles B.
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-b", AGENT_ID, CONV_B, "run-b"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-b", "run-b", BridgeTurnStatus.Completed))
             advanceUntilIdle()
             assertTrue(timeline.sentLocals.contains(RecordingTimelineWriter.LocalMarker(CONV_B, otidB)))
         }
@@ -438,12 +439,12 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         repeat(OVERFLOW_CONVERSATIONS) { index ->
             val conversationId = "conv-x$index"
             coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-x$index", AGENT_ID, conversationId, "run-x$index"))
-            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-x$index", "run-x$index", "completed"))
+            coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-x$index", "run-x$index", BridgeTurnStatus.Completed))
         }
         advanceUntilIdle()
 
         // A's live turn is still tracked, so A's own terminal still settles A.
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
         advanceUntilIdle()
 
         assertTrue(
@@ -493,7 +494,7 @@ class ChatSendCoordinatorConcurrentConversationsTest {
         )
 
         // ...and it must not have poisoned A's turn: A completes cleanly.
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", "completed"))
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-a", "run-a", BridgeTurnStatus.Completed))
         advanceUntilIdle()
         assertNull(ui.currentError())
         assertEquals(listOf<String?>(null), ui.turnsFinished)
