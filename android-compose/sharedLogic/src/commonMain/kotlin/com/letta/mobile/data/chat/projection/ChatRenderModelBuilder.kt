@@ -96,28 +96,49 @@ fun backfillMissingAssistantRunIds(messages: List<UiMessage>): List<UiMessage> {
     val result = messages.toMutableList()
     var segmentStart = 0
     while (segmentStart < result.size) {
-        while (segmentStart < result.size && result[segmentStart].role == "user") segmentStart++
+        segmentStart = nextAssistantSegmentStart(result, segmentStart)
         if (segmentStart >= result.size) break
-        var segmentEnd = segmentStart
-        while (segmentEnd < result.size && result[segmentEnd].role != "user") segmentEnd++
-        val runIds = result.subList(segmentStart, segmentEnd)
-            .asSequence()
-            .filter { it.role == "assistant" }
-            .mapNotNull { it.runId?.takeIf(String::isNotBlank) }
-            .distinct()
-            .toList()
-        if (runIds.size == 1) {
-            val runId = runIds.single()
-            for (index in segmentStart until segmentEnd) {
-                val message = result[index]
-                if (message.role == "assistant" && message.runId.isNullOrBlank()) {
-                    result[index] = message.copy(runId = runId)
-                }
-            }
-        }
+        val segmentEnd = nextUserMessageIndex(result, segmentStart)
+        backfillUnambiguousAssistantRun(result, segmentStart, segmentEnd)
         segmentStart = segmentEnd
     }
     return result
+}
+
+private fun nextAssistantSegmentStart(messages: List<UiMessage>, from: Int): Int {
+    var index = from
+    while (index < messages.size && messages[index].role == "user") index++
+    return index
+}
+
+private fun nextUserMessageIndex(messages: List<UiMessage>, from: Int): Int {
+    var index = from
+    while (index < messages.size && messages[index].role != "user") index++
+    return index
+}
+
+private fun backfillUnambiguousAssistantRun(
+    messages: MutableList<UiMessage>,
+    start: Int,
+    end: Int,
+) {
+    val runId = uniqueAssistantRunId(messages.subList(start, end)) ?: return
+    for (index in start until end) {
+        val message = messages[index]
+        if (message.role == "assistant" && message.runId.isNullOrBlank()) {
+            messages[index] = message.copy(runId = runId)
+        }
+    }
+}
+
+private fun uniqueAssistantRunId(segment: List<UiMessage>): String? {
+    val runIds = segment.asSequence()
+        .filter { it.role == "assistant" }
+        .mapNotNull { it.runId?.takeIf(String::isNotBlank) }
+        .distinct()
+        .take(2)
+        .toList()
+    return runIds.singleOrNull()
 }
 
 class IncrementalChatRenderItemsCache {

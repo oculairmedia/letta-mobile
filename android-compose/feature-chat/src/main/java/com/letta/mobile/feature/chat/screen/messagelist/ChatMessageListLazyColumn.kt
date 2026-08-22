@@ -169,11 +169,13 @@ private fun ChatMessageListRenderItem(params: ChatMessageListRenderItemParams) {
 private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyParams) {
     when (val renderItem = params.renderItem) {
         is ChatRenderItem.Single -> ChatMessageListRenderSingleItem(
-            renderItem = renderItem,
-            context = params.context,
-            chatDimens = params.chatDimens,
-            isStreamingRenderItem = params.isStreamingRenderItem,
-            showTimestamp = params.showTimestamp,
+            params = ChatMessageListRenderSingleItemParams(
+                renderItem = renderItem,
+                context = params.context,
+                chatDimens = params.chatDimens,
+                isStreamingRenderItem = params.isStreamingRenderItem,
+                showTimestamp = params.showTimestamp,
+            ),
         )
         is ChatRenderItem.SkillEnvelopeChip -> {
             SkillEnvelopeChip(
@@ -200,13 +202,9 @@ private fun ChatMessageListRenderItemBody(params: ChatMessageListRenderItemBodyP
 }
 
 @Composable
-private fun ChatMessageListRenderSingleItem(
-    renderItem: ChatRenderItem.Single,
-    context: ChatMessageListLazyContext,
-    chatDimens: ChatDimens,
-    isStreamingRenderItem: Boolean,
-    showTimestamp: Boolean,
-) {
+private fun ChatMessageListRenderSingleItem(params: ChatMessageListRenderSingleItemParams) {
+    val renderItem = params.renderItem
+    val context = params.context
     val msg = renderItem.message
     val stableKey = renderItem.stableRunKey
     if (stableKey != null) {
@@ -217,20 +215,20 @@ private fun ChatMessageListRenderSingleItem(
             onToggleCollapsed = {
                 context.callbacks.onToggleRunCollapsed(runId)
             },
-            modifier = Modifier.padding(top = chatDimens.ungroupedMessageSpacing),
-            isStreaming = isStreamingRenderItem,
+            modifier = Modifier.padding(top = params.chatDimens.ungroupedMessageSpacing),
+            isStreaming = params.isStreamingRenderItem,
             activeApprovalRequestId = context.itemState.activeApprovalRequestId,
             onApprovalDecision = context.callbacks.onSubmitApproval,
             chatMode = context.chatMode,
-            showCompletedDisclosure = showTimestamp,
+            showCompletedDisclosure = params.showTimestamp,
         ) { message, position, rowModifier ->
             RenderChatMessageRow(
                 params = RenderChatMessageRowParams(
                     message = message,
                     position = position,
                     context = context,
-                    isStreamingRenderItem = isStreamingRenderItem,
-                    showTimestamp = showTimestamp,
+                    isStreamingRenderItem = params.isStreamingRenderItem,
+                    showTimestamp = params.showTimestamp,
                 ),
                 modifier = rowModifier,
             )
@@ -242,8 +240,8 @@ private fun ChatMessageListRenderSingleItem(
             message = msg,
             position = renderItem.groupPosition,
             context = context,
-            isStreamingRenderItem = isStreamingRenderItem,
-            showTimestamp = showTimestamp,
+            isStreamingRenderItem = params.isStreamingRenderItem,
+            showTimestamp = params.showTimestamp,
         ),
     )
 }

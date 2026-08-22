@@ -111,6 +111,15 @@ internal data class ChatMessageListRenderItemBodyParams(
 )
 
 @Immutable
+internal data class ChatMessageListRenderSingleItemParams(
+    val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem.Single,
+    val context: ChatMessageListLazyContext,
+    val chatDimens: com.letta.mobile.ui.theme.ChatDimens,
+    val isStreamingRenderItem: Boolean,
+    val showTimestamp: Boolean,
+)
+
+@Immutable
 internal data class ChatMessageListRenderRunBlockItemParams(
     val renderItem: com.letta.mobile.data.chat.projection.ChatRenderItem.RunBlock,
     val context: ChatMessageListLazyContext,

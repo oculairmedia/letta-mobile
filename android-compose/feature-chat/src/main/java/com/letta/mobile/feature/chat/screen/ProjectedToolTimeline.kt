@@ -99,6 +99,8 @@ internal fun ProjectedToolTimelineGroupStepRow(
         modifier = Modifier.fillMaxWidth().then(modifier),
         animateRows = animateRows,
         onAttachmentImageTap = onAttachmentImageTap,
+        autoExpandDelayMs = autoExpandDelayMs,
+        stagedCollapseDelayMs = stagedCollapseDelayMs,
     )
 }
 
