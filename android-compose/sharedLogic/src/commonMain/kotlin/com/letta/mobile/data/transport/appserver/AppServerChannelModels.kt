@@ -51,11 +51,23 @@ enum class AppServerPermissionMode {
     @SerialName("acceptEdits")
     AcceptEdits,
 
-    @SerialName("memory")
-    Memory,
+    @SerialName("strict")
+    Strict,
 
     @SerialName("unrestricted")
     Unrestricted,
+
+    ;
+
+    companion object {
+        fun fromWireValue(value: String): AppServerPermissionMode? = when (value) {
+            "standard" -> Standard
+            "acceptEdits" -> AcceptEdits
+            "strict" -> Strict
+            "unrestricted" -> Unrestricted
+            else -> null
+        }
+    }
 }
 
 @Serializable
@@ -89,4 +101,3 @@ data class AppServerExternalToolsGroup(
     @SerialName("scope_id") val scopeId: String? = null,
     val tools: List<AppServerExternalToolDefinition>,
 )
-
