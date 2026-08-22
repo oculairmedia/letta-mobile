@@ -88,6 +88,19 @@ suspend fun <T> exhaustCursorPages(
     pageSize: Int = PaginationConstants.DEFAULT_PAGE_SIZE,
     maxPages: Int = PaginationConstants.BOUNDED_MAX_PAGES,
     fetch: suspend (limit: Int, after: String?) -> List<T>,
+    itemKey: (T) -> String,
+): List<T> = exhaustCursorPages(
+    pageSize = pageSize,
+    maxPages = maxPages,
+    fetch = fetch,
+    extractCursor = itemKey,
+    dedupKey = itemKey,
+)
+
+suspend fun <T> exhaustCursorPages(
+    pageSize: Int = PaginationConstants.DEFAULT_PAGE_SIZE,
+    maxPages: Int = PaginationConstants.BOUNDED_MAX_PAGES,
+    fetch: suspend (limit: Int, after: String?) -> List<T>,
     extractCursor: (T) -> String,
     dedupKey: (T) -> Any,
 ): List<T> {

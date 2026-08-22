@@ -39,15 +39,13 @@ open class CachedFolderRepository(
         }
         val filter = FolderListParams(name = name)
         _folders.value = exhaustCursorPages(
-            pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
             fetch = { limit, after ->
                 remote.listFolders(
                     filter.copy(limit = limit, after = after),
                 )
             },
-            extractCursor = { folder -> folder.id.value },
-            dedupKey = { folder -> folder.id.value },
+            itemKey = { folder -> folder.id.value },
         )
     }
 
@@ -82,54 +80,44 @@ open class CachedFolderRepository(
         return remote.uploadFileToFolder(params)
     }
 
-    override suspend fun listAgentsForFolder(folderId: FolderId): List<String> {
-        val query = FolderAgentsListParams(folderId = folderId)
-        return listFolderCursorPages(
+    override suspend fun listAgentsForFolder(folderId: FolderId): List<String> =
+        exhaustFolderChildPages(
             maxPages = PaginationConstants.DEFAULT_MAX_PAGES,
-            fetch = { limit, after ->
-                remote.listAgentsForFolder(query.copy(limit = limit, after = after))
+            fetchPage = { limit, after ->
+                remote.listAgentsForFolder(FolderAgentsListParams(folderId = folderId, limit = limit, after = after))
             },
             itemKey = { agentId -> agentId },
         )
-    }
 
-    override suspend fun listFolderPassages(folderId: FolderId): List<Passage> {
-        val query = FolderPassagesListParams(folderId = folderId)
-        return listFolderCursorPages(
+    override suspend fun listFolderPassages(folderId: FolderId): List<Passage> =
+        exhaustFolderChildPages(
             maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
-            fetch = { limit, after ->
-                remote.listFolderPassages(query.copy(limit = limit, after = after))
+            fetchPage = { limit, after ->
+                remote.listFolderPassages(FolderPassagesListParams(folderId = folderId, limit = limit, after = after))
             },
             itemKey = { passage -> passage.id },
         )
-    }
 
-    override suspend fun listFolderFiles(folderId: FolderId, includeContent: Boolean): List<FileMetadata> {
-        val query = FolderFilesListParams(folderId = folderId, includeContent = includeContent)
-        return listFolderCursorPages(
+    override suspend fun listFolderFiles(folderId: FolderId, includeContent: Boolean): List<FileMetadata> =
+        exhaustFolderChildPages(
             maxPages = PaginationConstants.BOUNDED_MAX_PAGES,
-            fetch = { limit, after ->
-                remote.listFolderFiles(query.copy(limit = limit, after = after))
+            fetchPage = { limit, after ->
+                remote.listFolderFiles(
+                    FolderFilesListParams(folderId = folderId, includeContent = includeContent, limit = limit, after = after),
+                )
             },
             itemKey = { file -> file.id },
         )
-    }
 
     override suspend fun deleteFileFromFolder(folderId: FolderId, fileId: String) {
         remote.deleteFileFromFolder(folderId.value, fileId)
     }
 
-    private suspend fun <T> listFolderCursorPages(
+    private suspend fun <T> exhaustFolderChildPages(
         maxPages: Int,
-        fetch: suspend (limit: Int, after: String?) -> List<T>,
+        fetchPage: suspend (limit: Int, after: String?) -> List<T>,
         itemKey: (T) -> String,
-    ): List<T> = exhaustCursorPages(
-        pageSize = PaginationConstants.DEFAULT_PAGE_SIZE,
-        maxPages = maxPages,
-        fetch = fetch,
-        extractCursor = itemKey,
-        dedupKey = itemKey,
-    )
+    ): List<T> = exhaustCursorPages(maxPages = maxPages, fetch = fetchPage, itemKey = itemKey)
 
     private fun upsertFolder(folder: Folder) {
         _folders.update { current ->
