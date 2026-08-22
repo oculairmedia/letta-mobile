@@ -1144,6 +1144,10 @@ class ChatSendCoordinator(
         setActiveConversationId(event.conversationId)
         startTimelineObserver(event.conversationId)
         if (ownsForegroundUi(event.conversationId)) {
+            // Replay metadata is carried through the production WS frame mapper
+            // so a remotely-started active turn gets the same visible presence
+            // as a local send. A replayed start is still active until its
+            // terminal frame arrives; suppressing it makes remote work invisible.
             ui.onTurnStarted(event.conversationId)
         } else {
             reportBackgroundUiSuppressed(event.conversationId, "onTurnStarted")
@@ -1201,7 +1205,7 @@ class ChatSendCoordinator(
     }
 
     private fun bridgeEventKey(event: WsTimelineEvent): String? = when (event) {
-        is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}"
+        is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}|${event.isReplay}"
         is WsTimelineEvent.MessageDelta -> {
             val conversationId = event.conversationId
                 ?: lastActiveConversationId
@@ -1471,17 +1475,17 @@ class ChatSendCoordinator(
         // failure and must not be painted like a dead turn.
         val mainReplyCompleted = state.deliveredAssistantContent &&
             TurnFailureNotices.isCompletedMainReplyStopReason(state.stopReason)
-        val failureNotice = if (status == "failed") {
-            TurnFailureNotices.forFailedTerminal(
+        val terminalNotice = when (status) {
+            "failed" -> TurnFailureNotices.forFailedTerminal(
                 reason = state.bufferedErrorMessage,
                 deliveredAssistantContent = state.deliveredAssistantContent,
                 mainReplyCompleted = mainReplyCompleted,
                 kindHint = state.bufferedErrorKind,
             )
-        } else {
-            null
+            "cancelled" -> TurnFailureNotices.forCancelledTerminal()
+            else -> null
         }
-        val deadTurn = failureNotice != null
+        val deadTurn = status == "failed" && terminalNotice != null
         // Skip abandoned-fragment cleanup for delivered-then-failed turns: a
         // legitimate short reply (e.g. "OK") must not be purged before we
         // classify the failure as aux-only.
@@ -1513,7 +1517,7 @@ class ChatSendCoordinator(
                 )
             }
         }
-        if (status == "failed" && failureNotice == null) {
+        if (status == "failed" && terminalNotice == null) {
             Telemetry.event(
                 "AdminChatVM", "ws.turnDone.failedAfterDelivery",
                 "turnId" to turnId,
@@ -1522,7 +1526,7 @@ class ChatSendCoordinator(
                 "reasonKind" to (state.bufferedErrorKind ?: terminalReasonKind(state.bufferedErrorMessage) ?: "<none>"),
             )
         }
-        failureNotice?.let { notice ->
+        terminalNotice?.let { notice ->
             appendTurnFailureNotice(conversationId, runId, turnId, notice)
         }
         state.otid?.let { otid ->
@@ -1541,7 +1545,7 @@ class ChatSendCoordinator(
             // Delivered-then-failed keeps whatever error state was already on
             // screen (normally none) — the user got their answer.
             "failed" -> if (deadTurn) {
-                state.bufferedErrorMessage ?: failureNotice.message
+                state.bufferedErrorMessage ?: terminalNotice.message
             } else {
                 ui.currentError()
             }
