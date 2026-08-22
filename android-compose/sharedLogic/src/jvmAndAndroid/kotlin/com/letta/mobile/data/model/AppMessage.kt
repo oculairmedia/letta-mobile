@@ -20,7 +20,7 @@ data class AppMessage(
     val localId: String? = null,
     val toolName: String? = null,
     val toolCallId: String? = null,
-    val toolReturnStatus: String? = null,
+    val toolReturnStatus: ToolReturnMessageStatus? = null,
     val generatedUi: GeneratedUiPayload? = null,
     val approvalRequest: ApprovalRequestPayload? = null,
     val approvalResponse: ApprovalResponsePayload? = null,
@@ -65,9 +65,47 @@ data class ApprovalResponsePayload(
     val approvals: List<ApprovalDecisionPayload> = emptyList(),
 )
 
+sealed interface ToolReturnMessageStatus {
+    val wireValue: String
+
+    data object Success : ToolReturnMessageStatus { override val wireValue = "success" }
+    data object Error : ToolReturnMessageStatus { override val wireValue = "error" }
+    data class Unknown(val raw: String) : ToolReturnMessageStatus { override val wireValue = raw }
+
+    companion object {
+        fun fromWire(value: String?): ToolReturnMessageStatus? = value?.let {
+            when (it) {
+                Success.wireValue -> Success
+                Error.wireValue -> Error
+                else -> Unknown(it)
+            }
+        }
+    }
+}
+
+sealed interface ApprovalDecisionStatus {
+    val wireValue: String
+
+    data object Approved : ApprovalDecisionStatus { override val wireValue = "approved" }
+    data object Rejected : ApprovalDecisionStatus { override val wireValue = "rejected" }
+    data object Pending : ApprovalDecisionStatus { override val wireValue = "pending" }
+    data class Unknown(val raw: String) : ApprovalDecisionStatus { override val wireValue = raw }
+
+    companion object {
+        fun fromWire(value: String?): ApprovalDecisionStatus? = value?.let {
+            when (it) {
+                Approved.wireValue -> Approved
+                Rejected.wireValue -> Rejected
+                Pending.wireValue -> Pending
+                else -> Unknown(it)
+            }
+        }
+    }
+}
+
 data class ApprovalDecisionPayload(
     val toolCallId: String,
     val approved: Boolean? = null,
-    val status: String? = null,
+    val status: ApprovalDecisionStatus? = null,
     val reason: String? = null,
 )

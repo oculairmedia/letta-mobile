@@ -31,7 +31,7 @@ internal fun AppMessage.mapUnmatchedToolReturn(
                     name = name,
                     arguments = "",
                     result = content.ifBlank { null },
-                    status = toolReturnStatus,
+                    status = toolReturnStatus?.wireValue,
                     generatedImageAttachments = imageAttachments,
                     toolCallId = toolCallId,
                     approvalDecision = toolCallId?.let { foldedApprovals[it]?.decision },

@@ -27,6 +27,7 @@ import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.TimelineStreamFrame
 import com.letta.mobile.data.timeline.TimelineTransportHttpException
 import com.letta.mobile.data.transport.WsChatBridge
+import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
 import com.letta.mobile.util.Telemetry
@@ -475,10 +476,13 @@ class IrohAdminRpcChatGateway(
         private suspend fun onTurnDone(event: WsTimelineEvent.TurnDone, emit: suspend (LettaMessage) -> Unit) {
             val ownedTurnId = turnId ?: return
             if (event.turnId != ownedTurnId.value) return
-            if (event.status == "failed") {
-                failTurn(emit, IrohFailureDetail("Iroh turn failed (turnId=${ownedTurnId.value})"))
-            } else {
-                terminal.complete(Unit)
+            when (event.status) {
+                BridgeTurnStatus.Failed ->
+                    failTurn(emit, IrohFailureDetail("Iroh turn failed (turnId=${ownedTurnId.value})"))
+                BridgeTurnStatus.Completed,
+                BridgeTurnStatus.Cancelled,
+                is BridgeTurnStatus.Unknown,
+                -> terminal.complete(Unit)
             }
         }
 

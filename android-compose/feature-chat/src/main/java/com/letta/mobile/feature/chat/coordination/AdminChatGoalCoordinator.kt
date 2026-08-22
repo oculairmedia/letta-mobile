@@ -134,7 +134,7 @@ internal class AdminChatGoalCoordinator(
 
     private fun GoalStatus.toUi() = GoalStatusUi(
         objective = objective,
-        status = status,
+        status = status.wireValue,
         activeTimeSeconds = activeTimeSeconds,
         tokensUsed = tokensUsed,
         tokenBudget = tokenBudget,
