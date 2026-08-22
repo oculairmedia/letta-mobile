@@ -54,6 +54,15 @@ class TurnFailureNoticesTest {
     }
 
     @Test
+    fun cancelledTerminalGetsExplicitTypedCopy() {
+        val notice = TurnFailureNotices.forCancelledTerminal()
+
+        assertEquals(TurnFailureNotices.CANCELLED_KIND, notice.kind)
+        assertEquals("Previous response cancelled.", notice.message)
+        assertFalse(notice.message.contains("failed", ignoreCase = true))
+    }
+
+    @Test
     fun eachFamilyGetsItsOwnCopy() {
         val reasons = listOf(
             "Model provider error: Provider finish_reason: content_filter",
@@ -122,6 +131,7 @@ class TurnFailureNoticesTest {
     @Test
     fun isKnownKindAcceptsOnlyClassifierFamilies() {
         assertTrue(TurnFailureNotices.isKnownKind("content_filter"))
+        assertTrue(TurnFailureNotices.isKnownKind(TurnFailureNotices.CANCELLED_KIND))
         assertTrue(TurnFailureNotices.isKnownKind("other"))
         assertFalse(TurnFailureNotices.isKnownKind("app_server_turn_failed"))
         assertFalse(TurnFailureNotices.isKnownKind("cursor_expired"))

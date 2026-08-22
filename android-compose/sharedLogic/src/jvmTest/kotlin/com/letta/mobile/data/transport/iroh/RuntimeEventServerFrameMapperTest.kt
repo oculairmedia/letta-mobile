@@ -78,8 +78,12 @@ class RuntimeEventServerFrameMapperTest {
             RuntimeEventPayload.RunLifecycleChanged(status = RuntimeRunStatus.Cancelled),
             context,
         )
-        val turnDone = assertIs<ServerFrame.TurnDone>(frames.single())
+        val error = assertIs<ServerFrame.Error>(frames[0])
+        assertEquals(TurnFailureNotices.CANCELLED_KIND, error.code)
+        assertEquals(TurnFailureNotices.CANCELLED_MESSAGE, error.message)
+        val turnDone = assertIs<ServerFrame.TurnDone>(frames[1])
         assertEquals("cancelled", turnDone.status)
+        assertEquals(2, frames.size)
     }
 
     @Test

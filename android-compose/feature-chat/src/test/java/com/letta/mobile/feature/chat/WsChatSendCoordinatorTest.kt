@@ -2,6 +2,7 @@ package com.letta.mobile.feature.chat
 import com.letta.mobile.ui.chat.render.*
 
 import com.letta.mobile.data.model.Conversation
+import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.ApprovalRequestMessage
@@ -1227,6 +1228,60 @@ class WsChatSendCoordinatorTest {
         } finally {
             coordinatorScope.cancel()
         }
+    }
+
+    @Test
+    fun `WS replayed remote start projects visible presence and cancellation copy`() = runTest {
+        val events = MutableSharedFlow<WsTimelineEvent>(extraBufferCapacity = 4)
+        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        val coordinator = WsChatSendCoordinator(
+            scope = backgroundScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = mockBridge(sendAccepted = true, eventFlow = events),
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-default-agent-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnStarted(
+                turnId = "turn-remote",
+                agentId = "agent-1",
+                conversationId = "conv-default-agent-1",
+                runId = "run-remote",
+                isReplay = true,
+            )
+        )
+        runCurrent()
+
+        assertTrue("replayed remote start must show run chrome", uiState.value.isStreaming)
+        assertTrue("replayed remote start must show thinking presence", uiState.value.isAgentTyping)
+
+        coordinator.handleEvent(
+            WsTimelineEvent.Error(
+                code = TurnFailureNotices.CANCELLED_KIND,
+                message = TurnFailureNotices.CANCELLED_MESSAGE,
+                conversationId = "conv-default-agent-1",
+                turnId = "turn-remote",
+                runId = "run-remote",
+            )
+        )
+        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-remote", "run-remote", "cancelled"))
+        advanceUntilIdle()
+
+        val cancellation = timelineRepository.ingestedMessages.single().message as ErrorMessage
+        assertEquals(TurnFailureNotices.CANCELLED_KIND, cancellation.code)
+        assertEquals(TurnFailureNotices.CANCELLED_MESSAGE, cancellation.text)
+        assertTrue(!cancellation.text.contains("failed", ignoreCase = true))
+        assertEquals(false, uiState.value.isStreaming)
+        assertEquals(false, uiState.value.isAgentTyping)
     }
 
     @Test
