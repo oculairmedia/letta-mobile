@@ -206,6 +206,7 @@ sealed interface WsTimelineEvent {
         // this is always non-null. Mobile can safely treat null upstream as a
         // shim regression.
         val runId: String,
+        val isReplay: Boolean = false,
     ) : WsTimelineEvent
 
     /**
@@ -336,7 +337,7 @@ private fun TransportFrameEvent.toTimelineEvent(): WsTimelineEvent? {
 }
 
 private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEvent? = when (this) {
-    is ServerFrame.TurnStarted,
+    is ServerFrame.TurnStarted -> turnStartedEvent(isReplay)
     is ServerFrame.TurnDone,
     is ServerFrame.StopReason,
     is ServerFrame.UsageStatistics,
@@ -382,14 +383,17 @@ private fun ServerFrame.toTimelineEvent(isReplay: Boolean = false): WsTimelineEv
     is ServerFrame.Unknown -> null
 }
 
-/** Turn-lifecycle bookends plus the bare stop/usage/subscribe envelopes. */
-private fun ServerFrame.turnLifecycleEvent(): WsTimelineEvent? = when (this) {
-    is ServerFrame.TurnStarted -> WsTimelineEvent.TurnStarted(
+private fun ServerFrame.TurnStarted.turnStartedEvent(isReplay: Boolean): WsTimelineEvent.TurnStarted =
+    WsTimelineEvent.TurnStarted(
         turnId = turnId,
         agentId = agentId,
         conversationId = conversationId,
         runId = runId,
+        isReplay = isReplay,
     )
+
+/** Turn-lifecycle bookends plus the bare stop/usage/subscribe envelopes. */
+private fun ServerFrame.turnLifecycleEvent(): WsTimelineEvent? = when (this) {
     is ServerFrame.TurnDone -> WsTimelineEvent.TurnDone(
         turnId = turnId,
         runId = runId,
