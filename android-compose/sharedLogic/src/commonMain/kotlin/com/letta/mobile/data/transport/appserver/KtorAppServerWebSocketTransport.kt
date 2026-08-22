@@ -215,7 +215,28 @@ class KtorAppServerWebSocketTransport(
 
     private companion object {
         const val FRAME_BUFFER_CAPACITY = 64
-        const val DELIVERY_QUEUE_CAPACITY = 256
+        /**
+         * letta-mobile-eo65k: 256 was an arbitrary round number, not derived from
+         * real traffic. Production wrapper logs show this capacity was exceeded 4
+         * times in 28h ("stream delivery queue exceeded its bounded capacity of
+         * 256 frames"), each one tearing down the WHOLE shared session — control
+         * delivery included — not just the burst that overflowed it.
+         *
+         * A suspend-based (block-instead-of-fail) queue was considered and
+         * rejected: [receiveAndDemuxFrames] reads both channels off ONE
+         * sequential loop against the shared socket, so a full stream queue
+         * blocking on send() would also stall control delivery right behind it —
+         * exactly the coupling
+         * [KtorAppServerWebSocketTransportLifecycleTest.streamBackpressureCannotBlockControlDeliveryOnTheSharedSocket]
+         * exists to rule out. Silently evicting frames was already rejected by
+         * the original design for the same correctness reason (frame loss can
+         * corrupt client state). Raising the capacity is the only change that
+         * reduces how often real bursts hit the ceiling without touching either
+         * of those tested invariants; it does not eliminate the ceiling, which is
+         * intentional — a queue with no bound at all trades a clear, recoverable
+         * failure for an unbounded memory leak under a truly stuck consumer.
+         */
+        const val DELIVERY_QUEUE_CAPACITY = 1_024
         const val DELIVERY_DRAIN_TIMEOUT_MILLIS = 1_000L
     }
 }
