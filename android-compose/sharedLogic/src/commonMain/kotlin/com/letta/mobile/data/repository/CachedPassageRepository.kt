@@ -6,6 +6,7 @@ import com.letta.mobile.data.repository.api.IPassageRepository
 import com.letta.mobile.data.repository.api.PassageIrohSource
 import com.letta.mobile.data.repository.api.PassageRemoteSource
 import com.letta.mobile.data.session.BackendScopedCache
+import com.letta.mobile.util.runCatchingCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,11 +50,12 @@ open class CachedPassageRepository(
         val irohSource = irohPassageSource
         if (irohSource != null && irohSource.shouldUseIroh()) {
             val passage = irohSource.createPassage(agentId, text)
-            replaceCachedPassages(agentId, _passages.value[agentId].orEmpty() + passage)
+            appendCachedPassage(agentId, passage)
             return passage
         }
         val passage = remote.createPassage(agentId, PassageCreateParams(text = text))
-        refreshPassages(agentId)
+        appendCachedPassage(agentId, passage)
+        runCatchingCancellable { refreshPassages(agentId) }
         return passage
     }
 
@@ -72,6 +74,10 @@ open class CachedPassageRepository(
 
     override suspend fun searchArchival(agentId: String, query: String): List<Passage> {
         return remote.searchArchival(agentId, query, limit = 50)
+    }
+
+    private fun appendCachedPassage(agentId: String, passage: Passage) {
+        replaceCachedPassages(agentId, _passages.value[agentId].orEmpty() + passage)
     }
 
     private fun replaceCachedPassages(agentId: String, passages: List<Passage>) {
