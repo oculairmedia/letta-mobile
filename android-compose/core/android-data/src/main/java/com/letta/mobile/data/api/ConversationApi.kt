@@ -40,7 +40,7 @@ open class ConversationApi @Inject constructor(
     }
 
     open suspend fun listConversations(
-        agentId: String?,
+        agentId: String? = null,
         limit: Int? = null,
         after: String? = null,
         archiveStatus: String? = null,

@@ -217,3 +217,7 @@ private fun AppMessage.mapStandaloneToolCalls(): List<UiToolCall>? = when (messa
     )
     else -> null
 }
+
+fun List<AppMessage>.toUiMessages(): List<UiMessage> = mapToUiMessages()
+
+fun AppMessage.toUiMessage(): UiMessage = mapToUiMessage()

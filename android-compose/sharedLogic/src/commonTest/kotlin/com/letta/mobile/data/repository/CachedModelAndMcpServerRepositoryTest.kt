@@ -81,7 +81,7 @@ class CachedMcpServerRepositoryTest {
     @Test
     fun fetchAllMcpToolsInIrohModeDoesNotCallRemote() = runTest {
         val remote = FakeMcpRemoteSource(shouldThrowIfCalled = true)
-        val irohSource = FakeMcpIrohSource(servers = listOf(server("server-1")))
+        val irohSource = FakeMcpIrohSource(servers = listOf(testMcpServer("server-1")))
         val repository = CachedMcpServerRepository(remote, irohSource)
 
         val tools = repository.fetchAllMcpTools()
@@ -122,16 +122,13 @@ class CachedMcpServerRepositoryTest {
         assertFailsWith<CancellationException> { repository.fetchAllMcpTools() }
     }
 
-    private fun server(id: String): McpServer =
-        McpServer(id = McpServerId(id), serverName = id, serverUrl = "https://example.com")
-
     private class FakeMcpRemoteSource(
         private val listToolsShouldFail: Boolean = false,
         private val shouldThrowIfCalled: Boolean = false,
         private val cancelOnListTools: Boolean = false,
     ) : McpServerRemoteSource {
         val calls = mutableListOf<String>()
-        private val servers = mutableListOf(server("server-1"))
+        private val servers = mutableListOf(testMcpServer("server-1"))
         private val toolsByServer = mutableMapOf<String, List<Tool>>(
             "server-1" to listOf(Tool(id = ToolId("tool-1"), name = "tool")),
         )
@@ -145,7 +142,7 @@ class CachedMcpServerRepositoryTest {
         override suspend fun createMcpServer(params: McpServerCreateParams): McpServer {
             if (shouldThrowIfCalled) error("remote must not be called")
             calls.add("createMcpServer")
-            val created = server("server-1")
+            val created = testMcpServer("server-1")
             servers += created
             return created
         }
@@ -153,7 +150,7 @@ class CachedMcpServerRepositoryTest {
         override suspend fun updateMcpServer(serverId: String, params: McpServerUpdateParams): McpServer {
             if (shouldThrowIfCalled) error("remote must not be called")
             calls.add("updateMcpServer")
-            return server(serverId)
+            return testMcpServer(serverId)
         }
 
         override suspend fun deleteMcpServer(serverId: String) {
@@ -195,6 +192,9 @@ class CachedMcpServerRepositoryTest {
         override suspend fun listMcpServers(): List<McpServer> = servers
     }
 }
+
+private fun testMcpServer(id: String): McpServer =
+    McpServer(id = McpServerId(id), serverName = id, serverUrl = "https://example.com")
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class CachedModelRepositoryTest {

@@ -459,6 +459,9 @@ open class MessageApi @Inject constructor(
         return response.body()
     }
 
+    open suspend fun listBatches(limit: Int? = null): List<Job> =
+        listBatches(limit = limit, before = null, after = null, order = null)
+
     open override suspend fun listBatchMessages(
         batchId: String,
         limit: Int?,
@@ -481,6 +484,18 @@ open class MessageApi @Inject constructor(
         }
         return response.body()
     }
+
+    open suspend fun listBatchMessages(
+        batchId: String,
+        agentId: String? = null,
+    ): BatchMessagesResponse = listBatchMessages(
+        batchId = batchId,
+        limit = null,
+        before = null,
+        after = null,
+        order = null,
+        agentId = agentId,
+    )
 
     open override suspend fun cancelBatch(batchId: String) {
         val (client, baseUrl) = apiClient.session()
