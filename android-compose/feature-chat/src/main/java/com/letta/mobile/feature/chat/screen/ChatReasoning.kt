@@ -18,9 +18,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
@@ -201,23 +199,9 @@ internal fun MessageReasoning(
             enter = ChatMotion.verticalEnter(slideDivisor = 4),
             exit = ChatMotion.verticalExit(slideDivisor = 4),
         ) {
-            val lineColor = if (isActive) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant
-            }
             Column(
                 modifier = Modifier
-                    .padding(top = 16.dp, start = 8.dp, bottom = 4.dp)
-                    .drawBehind {
-                        drawLine(
-                            color = lineColor,
-                            start = Offset(0f, 0f),
-                            end = Offset(0f, size.height),
-                            strokeWidth = 3.dp.toPx(),
-                        )
-                    }
-                    .padding(start = 14.dp),
+                    .padding(top = 16.dp, start = 8.dp, bottom = 4.dp),
             ) {
                 if (isActive) {
                     if (message.content.isBlank()) {
