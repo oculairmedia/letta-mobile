@@ -99,4 +99,64 @@ class MessageGetPagingTest {
         assertEquals("target", response.getValue("result").jsonObject.getValue("id").jsonPrimitive.content)
         assertEquals(listOf(null, "n3"), client.beforeCursors)
     }
+
+    private fun pageWithLargeToolReturn(id: String, bodyBytes: Int): JsonArray = buildJsonArray {
+        add(
+            buildJsonObject {
+                put("id", id)
+                put("message_type", "tool_return_message")
+                put("tool_return", "x".repeat(bodyBytes))
+            },
+        )
+    }
+
+    @Test
+    fun messageGetTruncatesLargeToolReturnLikeMessageListDoes() = runTest {
+        val bigBody = MessageListWireProjection.TOOL_RETURN_PROJECTION_THRESHOLD_BYTES + 1_000
+        val client = PagingClient(mapOf(null to pageWithLargeToolReturn("target", bigBody)))
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, tiers = NativeReadTiers(nativeClient = client))
+
+        val getResponse = Json.parseToJsonElement(
+            router.dispatch(
+                requestId = "get",
+                method = "message.get",
+                params = buildJsonObject {
+                    put("conversation_id", "conv-1")
+                    put("message_id", "target")
+                },
+            ),
+        ).jsonObject.getValue("result").jsonObject
+
+        assertTrue(
+            getResponse.getValue("tool_return_truncated").jsonPrimitive.boolean,
+            "message.get should truncate an oversized tool_return the same way message.list projection does",
+        )
+        val truncatedBody = getResponse.getValue("tool_return").jsonPrimitive.content
+        assertTrue(truncatedBody.length < bigBody, "truncated body must be smaller than the original")
+    }
+
+    @Test
+    fun toolReturnGetKeepsFullUntruncatedBody() = runTest {
+        val bigBody = MessageListWireProjection.TOOL_RETURN_PROJECTION_THRESHOLD_BYTES + 1_000
+        val client = PagingClient(mapOf(null to pageWithLargeToolReturn("target", bigBody)))
+        val router = AdminRpcRouter()
+        ConversationAdminHandlers.register(router, tiers = NativeReadTiers(nativeClient = client))
+
+        val pointerResponse = Json.parseToJsonElement(
+            router.dispatch(
+                requestId = "pointer",
+                method = "tool_return.get",
+                params = buildJsonObject {
+                    put("conversation_id", "conv-1")
+                    put("message_id", "target")
+                },
+            ),
+        ).jsonObject.getValue("result").jsonObject
+
+        // tool_return.get is the explicit "load the full output" pointer target
+        // that message.list's truncation stamp names; it must keep returning
+        // the untruncated body regardless of size.
+        assertEquals(bigBody, pointerResponse.getValue("tool_return").jsonPrimitive.content.length)
+    }
 }

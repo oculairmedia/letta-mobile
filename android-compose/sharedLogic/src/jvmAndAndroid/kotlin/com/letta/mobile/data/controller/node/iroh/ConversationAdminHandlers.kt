@@ -260,7 +260,7 @@ object ConversationAdminHandlers {
         messageId: String,
         op: NativeAdminOp,
     ): JsonElement {
-        return try {
+        val message = try {
             kotlinx.coroutines.withTimeout(messageGetBudgetMs()) {
                 walkMessagePages(nativeClient, conversationId, messageId, op)
             }
@@ -269,6 +269,15 @@ object ConversationAdminHandlers {
                 "deadline_exceeded: message $messageId lookup exceeded searchable window budget",
             )
         }
+        // message.get is a generic single-message lookup, not the "give me the
+        // full tool output" pointer target that message.list's truncation
+        // stamps point at — that's tool_return.get, which must keep returning
+        // the untruncated body by design. Without this, a message.get on a row
+        // with a large tool_return/tool_returns/stdout body can blow the 1MiB
+        // admin_rpc frame the same way an unprojected message.list page used
+        // to (letta-mobile-fe51r), so apply the same projection here.
+        if (op != NativeAdminOp.MessageGet || message !is JsonObject) return message
+        return MessageListWireProjection.projectMessage(message, conversationId) ?: message
     }
 
     private suspend fun walkMessagePages(
