@@ -13,7 +13,14 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 internal fun externalConversationDedupeKey(agentId: String?, conversationId: String): String =
-    "${agentId.orEmpty()}|$conversationId"
+    if (conversationId.isProvisionalConversationId()) {
+        "${agentId.orEmpty()}|$conversationId"
+    } else {
+        conversationId
+    }
+
+private fun String.isProvisionalConversationId(): Boolean =
+    this == "default" || startsWith("conv-default-")
 
 /**
  * Per-conversation [TimelineSyncLoop] registry.
@@ -611,8 +618,12 @@ open class TimelineRepository(
             Telemetry.event(
                 "TimelineRepo", "externalFrame.exactDuplicateDropped",
                 "conversationId" to conversationId,
+                "agentId" to agentId.orEmpty(),
+                "dedupeScope" to scopedConversationKey,
                 "messageId" to message.id,
                 "messageType" to message.messageType,
+                "runId" to message.runId.orEmpty(),
+                "stepId" to message.stepId.orEmpty(),
                 "seqId" to (message.seqId ?: -1),
                 "source" to source,
             )
