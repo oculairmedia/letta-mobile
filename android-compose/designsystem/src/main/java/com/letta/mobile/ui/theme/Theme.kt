@@ -1,5 +1,7 @@
 package com.letta.mobile.ui.theme
 
+import android.annotation.TargetApi
+import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
@@ -465,6 +467,10 @@ internal fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = wh
     ThemePreset.SPRING -> SpringThemeColors
 }
 
+@TargetApi(Build.VERSION_CODES.S)
+private fun dynamicColorSchemeForApi31(context: Context, useDarkTheme: Boolean): ColorScheme =
+    if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun LettaTheme(
@@ -483,7 +489,7 @@ fun LettaTheme(
 
     val presetColors = presetThemeColors(themePreset)
     val baseColorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dynamicColorSchemeForApi31(context, useDarkTheme)
     } else {
         if (useDarkTheme) presetColors.darkScheme else presetColors.lightScheme
     }
