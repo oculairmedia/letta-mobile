@@ -128,17 +128,18 @@ class ConversationsViewModel @Inject constructor(
             settingsRepository.activeConfigChanges.collect { refresh() }
         }
         val cachedAgents = agentRepository.agents.value
-        val cachedConversations = allConversationsRepository.conversations.value
         val initialAgents = displayAgents(cachedAgents)
-        val initialConversations = displayConversations(cachedConversations, initialAgents)
         if (initialAgents.isNotEmpty()) {
             agentNameCache = initialAgents.associate { it.id to it.name }.toMutableMap()
         }
-        if (initialConversations.isNotEmpty() || initialAgents.isNotEmpty()) {
+        // A recreated screen cannot know whether a cached conversation timestamp
+        // predates the chat activity that navigated here. Publishing those rows and
+        // then refreshing exposes a visible stale-order -> authoritative-order swap.
+        // Keep the cached roster for names, but let the initial refresh publish the
+        // first populated conversation snapshot atomically.
+        if (initialAgents.isNotEmpty()) {
             _uiState.value = _uiState.value.copy(
-                conversations = applyPinnedState(initialConversations.map { it.toDisplay() }).toImmutableList(),
                 agents = initialAgents.toImmutableList(),
-                isLoading = false,
             )
         }
         loadConversations()
