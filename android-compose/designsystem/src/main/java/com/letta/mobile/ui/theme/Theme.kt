@@ -482,13 +482,10 @@ fun LettaTheme(
     }
 
     val presetColors = presetThemeColors(themePreset)
-    val useDynamicColor = dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-
-    val baseColorScheme = when {
-        useDynamicColor && useDarkTheme -> dynamicDarkColorScheme(context)
-        useDynamicColor && !useDarkTheme -> dynamicLightColorScheme(context)
-        useDarkTheme -> presetColors.darkScheme
-        else -> presetColors.lightScheme
+    val baseColorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    } else {
+        if (useDarkTheme) presetColors.darkScheme else presetColors.lightScheme
     }
     val colorScheme = baseColorScheme.withLettaContrastBoost()
 
