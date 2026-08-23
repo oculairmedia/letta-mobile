@@ -35,45 +35,6 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.projectRunContent
 import com.letta.mobile.data.model.UiToolCall
 
-@Composable
-internal fun DesktopSkillEnvelopeChip(item: ChatRenderItem.SkillEnvelopeChip) {
-    // Desktop parity for the mobile skill-envelope chip: collapsed one-liner,
-    // click to expand the raw envelope (monospace). Mirrors PR #852 mobile UI.
-    var expanded by remember(item.messageId) { mutableStateOf(false) }
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { expanded = !expanded }
-            .padding(vertical = 4.dp),
-    ) {
-        Text(
-            text = skillEnvelopeLabel(item),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        if (expanded) {
-            Text(
-                text = item.rawContent,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
-                modifier = Modifier.padding(top = 4.dp),
-            )
-        }
-    }
-}
-
-@JvmInline
-internal value class SkillSlug(val value: String)
-
-@JvmInline
-internal value class SkillArgs(val value: String)
-
-private fun skillEnvelopeLabel(item: ChatRenderItem.SkillEnvelopeChip): String {
-    val slug = SkillSlug(item.slug)
-    val args = SkillArgs(item.args)
-    val suffix = args.value.takeIf { it.isNotBlank() }?.let { " — $it" }.orEmpty()
-    return "\uD83E\uDDE9 Skill: ${slug.value}$suffix"
-}
-
 @JvmInline
 internal value class StreamingMessageId(val value: String)
 

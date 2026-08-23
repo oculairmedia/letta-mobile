@@ -362,4 +362,21 @@ class ToolTimelineProjectionTest {
         val s3 = deriveToolCallSummary("blank_args", "")
         assertEquals("blank_args", s3)
     }
+
+    @Test
+    fun skillDisplayTargetUsesNormalToolTimelineSummaryWithoutDiscardingArguments() {
+        val call = projectToolTimelineCall(
+            UiToolCall(
+                name = "Skill",
+                arguments = """{"query":"weather"}""",
+                result = null,
+                displayTarget = "searxng",
+                toolCallId = "call-skill-1",
+            ),
+        )
+
+        assertEquals("Skill · searxng", call.summary)
+        assertEquals("""{"query":"weather"}""", call.arguments)
+        assertEquals("call:call-skill-1", call.key)
+    }
 }

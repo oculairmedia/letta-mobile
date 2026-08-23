@@ -2,15 +2,21 @@ package com.letta.mobile.data.chat.projection
 
 import com.letta.mobile.data.model.ToolCall
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.model.ToolCallMessage
+import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.MessageSource
 import com.letta.mobile.data.timeline.Role
+import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
+import com.letta.mobile.data.timeline.TimelineHydrationReducer
 import com.letta.mobile.data.timeline.TimelineMessageType
 import com.letta.mobile.data.timeline.ToolReturnTruncation
 import com.letta.mobile.data.timeline.parseTimelineInstant
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentMap
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
@@ -814,5 +820,310 @@ class TimelineEventToUiMessageTest {
         // and TimelineSyncReconcile key off of — so they collapse to a single
         // timeline row rather than appearing twice.
         assertEquals(live.otid, hydrated.otid)
+    }
+
+    // ---- letta-mobile-45e2k: skill tool-call argument projection ----------
+
+    @Test
+    fun `direct skill tool-call arguments project name Skill with preserved non-skill fields`() {
+        val args = """{"skill":"searxng","query":"weather","language":"en"}"""
+        val tc = ToolCall(id = "tc-skill-1", name = "Skill", arguments = args)
+        val ev = confirmed(TimelineMessageType.TOOL_CALL, toolCalls = listOf(tc))
+        val ui = timelineEventToUiMessage(ev)!!
+
+        val call = ui.toolCalls!!.single()
+        assertEquals("Skill", call.name)
+        assertEquals("tc-skill-1", call.toolCallId)
+        assertEquals("searxng", call.displayTarget)
+        // Remaining fields preserved as JSON, skill field stripped.
+        assertTrue(call.arguments.contains("\"query\""))
+        assertTrue(call.arguments.contains("weather"))
+        assertTrue(call.arguments.contains("\"language\""))
+        assertFalse(call.arguments.contains("\"skill\""))
+        // No raw escaped wrapper leaked into the projected arguments.
+        assertFalse(call.arguments.contains("\\\""))
+    }
+
+    @Test
+    fun `double-wrapped skill tool-call arguments project name Skill with preserved non-skill fields`() {
+        val inner = """{"skill":"ghost","tag":"updates"}"""
+        val args = JsonPrimitive(JsonPrimitive(inner).toString()).toString()
+        val tc = ToolCall(id = "tc-skill-2", name = "Skill", arguments = args)
+        val ev = confirmed(TimelineMessageType.TOOL_CALL, toolCalls = listOf(tc))
+        val ui = timelineEventToUiMessage(ev)!!
+
+        val call = ui.toolCalls!!.single()
+        assertEquals("Skill", call.name)
+        assertEquals("tc-skill-2", call.toolCallId)
+        assertEquals("ghost", call.displayTarget)
+        assertTrue(call.arguments.contains("\"tag\""))
+        assertTrue(call.arguments.contains("updates"))
+        assertFalse(call.arguments.contains("\"skill\""))
+        assertFalse(call.arguments.contains("\\\""))
+    }
+
+    @Test
+    fun `non-skill tool call falls back to original name and arguments`() {
+        val args = """{"command":"echo hi"}"""
+        val tc = ToolCall(id = "tc-normal", name = "Bash", arguments = args)
+        val ev = confirmed(TimelineMessageType.TOOL_CALL, toolCalls = listOf(tc))
+        val ui = timelineEventToUiMessage(ev)!!
+
+        val call = ui.toolCalls!!.single()
+        assertEquals("Bash", call.name)
+        assertEquals("tc-normal", call.toolCallId)
+        assertEquals(null, call.displayTarget)
+        assertEquals(args, call.arguments)
+    }
+
+    // ---- letta-mobile-45e2k: hydration-path skill tool-call characterization ----------
+
+    /** Minimal synthetic skill envelope that passes the 200-char + frontmatter detector. */
+    private fun skillEnvelope(slug: String): String = buildString {
+        append("<$slug>\n")
+        append("name: $slug\n")
+        append("description: A skill used for hydration-path rendering characterization tests.\n")
+        append("---\n\n")
+        append("## Usage\n\n")
+        append("This is test skill documentation with sufficient length to exceed the minimum envelope threshold.\n")
+        repeat(4) { append("Additional documentation content on line $it.\n") }
+        append("\nARGUMENTS: test-args\n")
+        append("</$slug>")
+    }
+
+    private fun hydrateSkillToolCall(
+        toolCallId: String,
+        toolName: String,
+        arguments: String,
+        runId: String,
+        serverMessageId: String = "msg-skill-hydrate",
+        returnBody: String = "tool output",
+        includeEnvelope: Boolean = true,
+    ): Pair<TimelineEvent.Confirmed, ChatRenderModel> {
+        val messages = mutableListOf<com.letta.mobile.data.model.LettaMessage>()
+        if (includeEnvelope) {
+            messages.add(
+                UserMessage(
+                    id = "env-hydrate-$toolCallId",
+                    contentRaw = JsonPrimitive(skillEnvelope(toolName.lowercase())),
+                    runId = runId,
+                    otid = "otid-env-hydrate-$toolCallId",
+                ),
+            )
+        }
+        messages.add(
+            ToolCallMessage(
+                id = serverMessageId,
+                runId = runId,
+                toolCall = ToolCall(id = toolCallId, name = toolName, arguments = arguments),
+                seqId = 1,
+                otid = "otid-skill-hydrate-$toolCallId",
+            ),
+        )
+        messages.add(
+            ToolReturnMessage(
+                id = "ret-skill-hydrate-$toolCallId",
+                toolCallId = toolCallId,
+                status = "success",
+                toolReturnRaw = JsonPrimitive(returnBody),
+                runId = runId,
+                seqId = 2,
+            ),
+        )
+
+        val conversationId = "conv-skill-hydrate-$toolCallId"
+        val hydrated = TimelineHydrationReducer.reduce(
+            conversationId = conversationId,
+            serverMessagesChronological = messages,
+            timelineBeforeFetch = Timeline(conversationId),
+            currentTimeline = Timeline(conversationId),
+            diskRecords = emptyList(),
+        )
+
+        val event = hydrated.timeline.events.single() as TimelineEvent.Confirmed
+        val ui = timelineEventToUiMessage(event)!!
+        val renderModel = buildChatRenderModel(listOf(ui), ChatDisplayMode.Interactive)
+        return event to renderModel
+    }
+
+    @Test
+    fun `hydrated skill tool call with direct arguments renders one normal tool call and drops envelope`() {
+        val toolCallId = "tc-hydrate-direct-1"
+        val args = """{"skill":"searxng","query":"weather","language":"en"}"""
+        val (event, renderModel) = hydrateSkillToolCall(
+            toolCallId = toolCallId,
+            toolName = "Skill",
+            arguments = args,
+            runId = "run-hydrate-skill-1",
+            returnBody = "Search results for weather",
+        )
+
+        // Exactly one visible event; synthetic envelope filtered by hydration.
+        assertEquals(1, renderModel.visibleMessages.size, "synthetic envelope must be filtered from hydrated visible messages")
+        assertEquals(1, renderModel.renderItems.size, "expected exactly one render item")
+
+        val ui = renderModel.visibleMessages.single()
+        assertEquals("assistant", ui.role, "tool call must project as assistant, not user envelope")
+        assertEquals(toolCallId, ui.toolCalls?.single()?.toolCallId)
+
+        val call = ui.toolCalls!!.single()
+        assertEquals("Skill", call.name, "skill tool call must normalize name to Skill")
+        assertEquals("searxng", call.displayTarget)
+        assertEquals("success", call.status)
+        assertEquals("Search results for weather", call.result)
+        assertEquals("", ui.content, "tool-call content must be suppressed when toolCalls are populated")
+
+        // No naked Skill({...}) or escaped wrapper leaked into visible content.
+        assertFalse(ui.content.contains("Skill("), "visible content must not contain naked skill wrapper")
+        assertFalse(ui.content.contains("\\\""), "visible content must not contain escaped quotes")
+
+        // Render item is a Single (not a duplicated row).
+        assertTrue(renderModel.renderItems.single() is ChatRenderItem.Single)
+    }
+
+    @Test
+    fun `hydrated skill tool call with double-wrapped arguments renders normal tool call`() {
+        val toolCallId = "tc-hydrate-double-1"
+        val inner = """{"skill":"ghost","tag":"updates"}"""
+        val args = JsonPrimitive(JsonPrimitive(inner).toString()).toString()
+        val (event, renderModel) = hydrateSkillToolCall(
+            toolCallId = toolCallId,
+            toolName = "Skill",
+            arguments = args,
+            runId = "run-hydrate-skill-2",
+            returnBody = "Blog updates fetched",
+        )
+
+        assertEquals(1, renderModel.visibleMessages.size)
+        assertEquals(1, renderModel.renderItems.size)
+
+        val ui = renderModel.visibleMessages.single()
+        assertEquals("assistant", ui.role)
+        assertEquals(toolCallId, ui.toolCalls?.single()?.toolCallId)
+
+        val call = ui.toolCalls!!.single()
+        assertEquals("Skill", call.name)
+        assertEquals("ghost", call.displayTarget)
+        assertEquals("success", call.status)
+        assertEquals("Blog updates fetched", call.result)
+        assertEquals("", ui.content)
+
+        // Normalized arguments should have skill field stripped, no escaped wrapper.
+        assertFalse(call.arguments.contains("\"skill\""))
+        assertFalse(call.arguments.contains("\\\""))
+        assertTrue(call.arguments.contains("\"tag\""))
+    }
+
+    @Test
+    fun `hydrated skill tool call without synthetic envelope still renders one tool call`() {
+        val toolCallId = "tc-hydrate-no-env-1"
+        val args = """{"skill":"asus-router","command":"status"}"""
+        val (event, renderModel) = hydrateSkillToolCall(
+            toolCallId = toolCallId,
+            toolName = "Skill",
+            arguments = args,
+            runId = "run-hydrate-skill-3",
+            returnBody = "CPU: 12%",
+            includeEnvelope = false,
+        )
+
+        assertEquals(1, renderModel.visibleMessages.size)
+        assertEquals(1, renderModel.renderItems.size)
+
+        val ui = renderModel.visibleMessages.single()
+        assertEquals("assistant", ui.role)
+        assertEquals(toolCallId, ui.toolCalls?.single()?.toolCallId)
+        assertEquals("Skill", ui.toolCalls!!.single().name)
+        assertEquals("success", ui.toolCalls!!.single().status)
+        assertEquals("CPU: 12%", ui.toolCalls!!.single().result)
+        assertEquals("", ui.content)
+    }
+
+    @Test
+    fun `live and hydrated skill tool-call projections match for UiToolCall identity name arguments result status`() {
+        val toolCallId = "tc-parity-1"
+        val args = """{"skill":"searxng","query":"weather","language":"en"}"""
+        val runId = "run-parity-skill"
+
+        // Live path: construct TimelineEvent.Confirmed directly (stream reducer shape).
+        val tc = ToolCall(id = toolCallId, name = "Skill", arguments = args)
+        val liveEvent = confirmed(
+            TimelineMessageType.TOOL_CALL,
+            content = "Skill($args)",
+            serverId = "msg-skill-parity-live",
+            toolCalls = listOf(tc),
+            toolReturnContent = "Search results for weather",
+            toolReturnIsError = false,
+        ).copy(runId = runId)
+
+        // Hydrated path: construct LettaMessage and run through TimelineHydrationReducer.
+        val messages = listOf(
+            ToolCallMessage(
+                id = "msg-skill-parity-live",
+                runId = runId,
+                toolCall = ToolCall(id = toolCallId, name = "Skill", arguments = args),
+                seqId = 1,
+                otid = "otid-skill-parity",
+            ),
+            ToolReturnMessage(
+                id = "ret-skill-parity",
+                toolCallId = toolCallId,
+                status = "success",
+                toolReturnRaw = JsonPrimitive("Search results for weather"),
+                runId = runId,
+                seqId = 2,
+            ),
+        )
+
+        val hydrated = TimelineHydrationReducer.reduce(
+            conversationId = "conv-skill-parity",
+            serverMessagesChronological = messages,
+            timelineBeforeFetch = Timeline("conv-skill-parity"),
+            currentTimeline = Timeline("conv-skill-parity"),
+            diskRecords = emptyList(),
+        )
+
+        val hydratedEvent = hydrated.timeline.events.single() as TimelineEvent.Confirmed
+        val liveUi = timelineEventToUiMessage(liveEvent)!!
+        val hydratedUi = timelineEventToUiMessage(hydratedEvent)!!
+
+        // Parity assertions for projected UiToolCall identity/name/arguments/result/status.
+        val liveCall = liveUi.toolCalls!!.single()
+        val hydratedCall = hydratedUi.toolCalls!!.single()
+        assertEquals(liveCall.toolCallId, hydratedCall.toolCallId, "toolCallId must match between live and hydrated")
+        assertEquals(liveCall.name, hydratedCall.name, "name must match between live and hydrated")
+        assertEquals(liveCall.arguments, hydratedCall.arguments, "arguments must match between live and hydrated")
+        assertEquals(liveCall.displayTarget, hydratedCall.displayTarget, "display target must match between live and hydrated")
+        assertEquals(liveCall.result, hydratedCall.result, "result must match between live and hydrated")
+        assertEquals(liveCall.status, hydratedCall.status, "status must match between live and hydrated")
+
+        // Both suppress tool-call content when toolCalls are populated.
+        assertEquals(liveUi.content, hydratedUi.content, "content must match between live and hydrated")
+        assertEquals("", liveUi.content, "live content must be suppressed")
+        assertEquals("", hydratedUi.content, "hydrated content must be suppressed")
+    }
+
+    @Test
+    fun `hydration does not duplicate tool-call row when synthetic envelope is present`() {
+        val toolCallId = "tc-hydrate-dedup-1"
+        val args = """{"skill":"searxng","query":"weather"}"""
+        val (event, renderModel) = hydrateSkillToolCall(
+            toolCallId = toolCallId,
+            toolName = "Skill",
+            arguments = args,
+            runId = "run-hydrate-skill-dedup",
+            returnBody = "Search results",
+        )
+
+        // The synthetic envelope is filtered; the tool call + return collapse to ONE event.
+        assertEquals(1, renderModel.visibleMessages.size, "must not duplicate row: envelope filtered, tool call + return merged")
+        assertEquals(1, renderModel.renderItems.size, "must produce exactly one render item")
+
+        val single = renderModel.renderItems.single() as? ChatRenderItem.Single
+        assertNotNull(single, "render item must be a Single")
+        assertEquals("assistant", single.message.role)
+        assertNotNull(single.message.toolCalls, "tool calls must be populated")
+        assertEquals(1, single.message.toolCalls!!.size)
+        assertEquals(toolCallId, single.message.toolCalls!!.single().toolCallId)
     }
 }
