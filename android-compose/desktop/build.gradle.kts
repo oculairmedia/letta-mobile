@@ -2,6 +2,7 @@ import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
 import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
+import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // WiX 4 still resolves installer sources through Win32 paths. Keep CI's
@@ -708,17 +709,17 @@ tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith
 afterEvaluate {
     tasks.named<JavaExec>("run") {
         dependsOn(extractDesktopJbr)
-        // Nucleus copies javaHome onto this JavaExec at configuration time.
-        // Gradle validates that executable exists before extractDesktopJbr can
-        // populate the JBR tree, so point at the current JVM for configuration
-        // and switch to JBR only after extract has run.
-        val fallbackJava = File(System.getProperty("java.home"), if (isWindowsHost) "bin/java.exe" else "bin/java")
-        executable(fallbackJava)
-        val jbrJava = desktopJbrHome.map { File(it.asFile, if (isWindowsHost) "bin/java.exe" else "bin/java") }
+        val jbrLauncher = javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(minimumRuntimeJdk))
+        }
+        javaLauncher.set(jbrLauncher)
         doFirst {
-            val resolved = jbrJava.get()
+            val resolved = desktopJbrHome.get().asFile.resolve(if (isWindowsHost) "bin/java.exe" else "bin/java")
+            val launcherExecutable = javaLauncher.get().executablePath.asFile
             check(resolved.isFile) { "JBR java missing at $resolved — extractDesktopJbr did not produce it." }
-            executable(resolved)
+            check(launcherExecutable == resolved) {
+                "Desktop run launcher resolved to $launcherExecutable instead of extracted JBR $resolved."
+            }
         }
     }
 }
