@@ -126,11 +126,11 @@ fi
 # must not fail this gate just because they change Kotlin outside the stack.
 # Workflow path-filter updates that keep required checks reporting are
 # allowed alongside stack changes (otherwise tooling-only PRs stay BLOCKED).
-# build-logic also owns generic Android convention/toolchain configuration.
-# Only its architecture implementation and fixtures activate this isolation
-# gate; otherwise ordinary cross-module Gradle maintenance is misclassified as
-# a code-intelligence stack change.
-stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/src/(main|test)/kotlin/com/letta/mobile/architecture/.*|android-compose/build-logic/src/test/resources/fixtures/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|tools/architecture_query/.*)$'
+# build-logic and architecture-tests also own generic Gradle/toolchain files.
+# Only architecture implementation, fixtures, and architecture-tests sources
+# activate this isolation gate; otherwise ordinary catalog/convention work is
+# misclassified as a code-intelligence stack change.
+stack_touch_pattern='^(\.github/workflows/architecture-graph\.yml|\.serena/.*|android-compose/architecture-tests/src/.*|android-compose/build-logic/src/(main|test)/kotlin/com/letta/mobile/architecture/.*|android-compose/build-logic/src/test/resources/fixtures/.*|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|tools/architecture_query/.*)$'
 stack_allowlist_pattern='^(\.github/workflows/.*|\.gitignore|\.serena/.*|android-compose/architecture-tests/.*|android-compose/build-logic/.*|android-compose/build\.gradle\.kts|android-compose/settings\.gradle\.kts|config/mcp/.*|config/scip-java/.*|docs/tooling/.*|scripts/mcp/.*|scripts/scip/.*|scripts/tests/tooling-smoke\.sh|tools/architecture_query/.*)$'
 if ! printf '%s\n' "$changed_files" | rg -q "$stack_touch_pattern"; then
   pass 'Code-intelligence stack changes stay within declared boundaries'
