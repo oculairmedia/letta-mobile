@@ -55,7 +55,12 @@ internal class ChatTimelineObserver(
     private val clearA2uiThinkingOnResponse: () -> Unit,
     private val isFollowingDuplicateInitialMessageInFlight: () -> Boolean,
     private val clearFollowingDuplicateInitialMessageInFlight: () -> Unit,
-    private val collapseCompletedRunsIfStreamingFinished: (previous: ChatUiState, next: ChatUiState) -> ChatUiState,
+    // letta-mobile-ah1ng: every projection publication below routes through
+    // this hook so terminal runs reconcile on EVERY publication — not only
+    // on the global previous.isStreaming && !next.isStreaming edge, which
+    // missed completed runs first seen via hydration/reconnect and
+    // presence/projection orderings.
+    private val reconcileCollapsedRunsOnProjection: (previous: ChatUiState, next: ChatUiState) -> ChatUiState,
     private val syncA2uiHistorySnapshot: (conversationId: String, messages: List<A2uiMessage>) -> Map<String, A2uiSurfaceState> =
         { _, _ -> emptyMap() },
     private val projectionDispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -162,7 +167,7 @@ internal class ChatTimelineObserver(
                             // stream Confirmed events; surface sync failure and
                             // clear stuck typing indicators.
                             val prevState = uiState.value
-                            uiState.value = collapseCompletedRunsIfStreamingFinished(
+                            uiState.value = reconcileCollapsedRunsOnProjection(
                                 prevState,
                                 prevState.copy(
                                     error = "Couldn't sync agent reply — pull to refresh",
@@ -255,7 +260,7 @@ internal class ChatTimelineObserver(
                                     reason = "presence_only",
                                 )
                             }
-                            uiState.value = collapseCompletedRunsIfStreamingFinished(
+                            uiState.value = reconcileCollapsedRunsOnProjection(
                                 prev,
                                 prev.copy(
                                     isStreaming = presentation.isStreaming,
@@ -320,7 +325,7 @@ internal class ChatTimelineObserver(
                             )
                         }
                     }
-                    uiState.value = collapseCompletedRunsIfStreamingFinished(
+                    uiState.value = reconcileCollapsedRunsOnProjection(
                         prev,
                         prev.copy(
                             messages = ui,
