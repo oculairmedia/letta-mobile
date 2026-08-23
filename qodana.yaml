@@ -15,6 +15,55 @@ include:
 # produce false-positive NewApi/SDK checks. Keep Android inspections scoped
 # to Android modules; CLI is a pure JVM tool.
 exclude:
+  # Gradle creates Kotlin DSL accessors while Qodana imports the model. They
+  # are generated build output, not repository source, and account for 3,339
+  # findings in the first post-repair inventory.
+  - name: All
+    paths:
+      - build-logic/build/generated-sources
+  # Qodana 2026.1 mis-propagates Kotlin's Nothing type through successful
+  # continuations after Elvis exits, inline-lambda returns, throws, and
+  # non-returning Flow.collect calls. Every reported location in these files
+  # was reviewed against source/tests; keep the inspection active elsewhere so
+  # new files and genuine unreachable code remain visible.
+  - name: KotlinUnreachableCode
+    paths:
+      - app/src/debug/java/com/letta/mobile/debug/AutomationAuthBootstrap.kt
+      - app/src/main/java/com/letta/mobile/channel/ChannelHeartbeatSync.kt
+      - app/src/main/java/com/letta/mobile/runtime/hardware/AndroidDeviceHardwareControlProvider.kt
+      - app/src/main/java/com/letta/mobile/runtime/local/AndroidLettaCodeRuntimeController.kt
+      - app/src/main/java/com/letta/mobile/runtime/local/AndroidNetworkBridge.kt
+      - app/src/main/java/com/letta/mobile/runtime/local/LettaCodeLocalBackendStore.kt
+      - app/src/main/java/com/letta/mobile/runtime/local/LiteRtLmOnDeviceChatCompletionEngine.kt
+      - app/src/main/java/com/letta/mobile/runtime/sensors/AndroidDeviceSensorSampler.kt
+      - app/src/main/java/com/letta/mobile/ui/navigation/AppNavGraph.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/conversations/ConversationCard.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/mcp/McpCards.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/pairing/PairingQrDecoder.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectHomeViewModel.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/projects/ProjectIssuesViewModel.kt
+      - app/src/main/java/com/letta/mobile/ui/screens/runs/RunMonitorViewModel.kt
+      - cli/src/main/java/com/letta/mobile/cli/commands/AppServerIrohProbeSession.kt
+      - cli/src/main/java/com/letta/mobile/cli/commands/AppServerServeCommand.kt
+      - cli/src/main/java/com/letta/mobile/cli/commands/AppServerServeIrohStubCommand.kt
+      - cli/src/main/java/com/letta/mobile/cli/runtime/CliImageAttachments.kt
+      - core/android-data/src/main/java/com/letta/mobile/data/transport/ChannelTransport.kt
+      - core/android-data/src/main/java/com/letta/mobile/util/RelativeTimeFormatter.kt
+      - core/testutil/src/main/java/com/letta/mobile/testutil/FakeMcpServerApi.kt
+      - core/testutil/src/main/java/com/letta/mobile/testutil/FakeToolApi.kt
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/coordination/ChatTimelineObserver.kt
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AgentScaffoldPickers.kt
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/AskUserQuestionCard.kt
+      - feature-chat/src/main/java/com/letta/mobile/feature/chat/screen/RunBlock.kt
+      - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAdminHandlers.kt
+      - sharedLogic/src/jvmAndAndroid/kotlin/com/letta/mobile/data/controller/node/iroh/ConversationAgentListHelper.kt
+  # Material HCT harmonization intentionally uses @RestrictTo APIs rather than
+  # reimplementing color math. Both files already carry source suppressions and
+  # focused tests; Qodana's Android model ignores those suppressions.
+  - name: AndroidLintRestrictedApi
+    paths:
+      - core/android-data/src/main/java/com/letta/mobile/util/ColorHarmonizer.kt
+      - designsystem/src/main/java/com/letta/mobile/ui/theme/HctColorHarmonizer.kt
   - name: AndroidLintNewApi
     paths:
       - cli

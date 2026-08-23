@@ -135,6 +135,10 @@ jobs:
                       # with an explicit sentinel, never an absolute/escaping path.
                       path = "(no-location)"
                   rows.append((rule, level, path, line))
+          # Android variants/source sets can emit the same SARIF result more
+          # than once. Inventory counts represent unique rule/location findings,
+          # not the number of model contexts that rediscovered each finding.
+          rows = list(dict.fromkeys(rows))
           # Flat: rule_id,level,file,line ONLY. No message/code text.
           with open(flat_path, "w", newline="") as f:
               w = csv.writer(f); w.writerow(["rule_id","level","file","line"])
