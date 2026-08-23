@@ -337,7 +337,8 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     private companion object {
         val TIMEOUT = 5.seconds
         const val STREAM_BURST_SIZE = 256
-        const val OVERFLOW_BURST_SIZE = 512
+        // Must exceed KtorAppServerWebSocketTransport's DELIVERY_QUEUE_CAPACITY (1_024).
+        const val OVERFLOW_BURST_SIZE = 2_048
         const val DRAIN_BURST_SIZE = 128
         const val AUTH_RESPONSE_FRAME =
             """{"type":"auth_response","request_id":"backpressure","success":true}"""
