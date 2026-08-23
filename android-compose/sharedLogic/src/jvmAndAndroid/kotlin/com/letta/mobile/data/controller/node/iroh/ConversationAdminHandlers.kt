@@ -247,6 +247,7 @@ object ConversationAdminHandlers {
             }
             MessageListPageGuard.bound(
                 MessageListWireProjection.projectMessageList(response, convId),
+                newestLast = param(params, AdminParamKey("order"))?.lowercase() != "desc",
             )
         }
         router.registerScoped("message.get") { params, context ->
