@@ -87,6 +87,25 @@ class TerminalSettlementFenceTest {
         assertEquals("stale_seq_but_superset", decision.reason)
     }
 
+    @Test
+    fun `fence preserves meaningful leading and trailing whitespace`() {
+        val missingIndent = evaluateTerminalSettlementFence(
+            "conv-9lgfu", "assistant-x",
+            lastDeltaSeqId = 5, terminalSeqId = 3,
+            accumulatedText = "    code()\n",
+            terminalText = "code()",
+        )
+        val exactFormatting = evaluateTerminalSettlementFence(
+            "conv-9lgfu", "assistant-x",
+            lastDeltaSeqId = 5, terminalSeqId = 3,
+            accumulatedText = "    code()\n",
+            terminalText = "prefix\n    code()\n",
+        )
+
+        assertTrue(missingIndent.blocked)
+        assertFalse(exactFormatting.blocked)
+    }
+
     // ---- reducer-level regression: the reported symptom --------------------
 
     private fun reduce(
@@ -145,6 +164,7 @@ class TerminalSettlementFenceTest {
 
         assertEquals(fullBody, row(tl, "assistant-x").content)
         assertEquals("run-real-9", row(tl, "assistant-x").runId, "id promotion must survive the fence")
+        assertEquals(5, row(tl, "assistant-x").seqId, "stale settlement must retain the newest sequence")
         assertTrue(
             Telemetry.snapshot().any {
                 it.tag == "TimelineSync" && it.name == "terminal.settlement.fence" &&

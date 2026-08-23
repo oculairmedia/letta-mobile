@@ -212,9 +212,16 @@ fun Timeline.mergeServerMessages(
                     canUseSnapshotMerge = true,
                     incomingIsForwardDelta = false,
                 )
-                timeline = timeline.replaceByServerId(confirmed.copy(content = folded.text))
+                timeline = timeline.replaceByServerId(
+                    confirmed.copy(
+                        content = folded.text,
+                        seqId = latestSeqId(existingByServerId.seqId, confirmed.seqId),
+                    ),
+                )
             } else {
-                timeline = timeline.replaceByServerId(confirmed)
+                timeline = timeline.replaceByServerId(
+                    confirmed.copy(seqId = latestSeqId(existingByServerId.seqId, confirmed.seqId)),
+                )
             }
             merged++
         } else if (existingByServerId == null) {

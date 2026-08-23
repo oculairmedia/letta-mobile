@@ -99,7 +99,7 @@ internal fun evaluateTerminalSettlementFence(
 }
 
 /**
- * True when [candidate] carries at least all of [accumulated] (trimmed
+ * True when [candidate] carries at least all of [accumulated] (exact
  * equality or containment). Blank accumulators are trivially superseded.
  * Deliberately byte-strict (no letters/digits normalization): anything the
  * strict check rejects falls into the conservative fold path, which still
@@ -107,9 +107,7 @@ internal fun evaluateTerminalSettlementFence(
  * keep-longer (the letta-mobile-k9y5d tradeoff), never to truncation.
  */
 private fun isContentSuperset(candidate: String, accumulated: String): Boolean {
-    val candidateTrimmed = candidate.trim()
-    val accumulatedTrimmed = accumulated.trim()
-    if (accumulatedTrimmed.isEmpty()) return true
-    if (candidateTrimmed.isEmpty()) return false
-    return candidateTrimmed == accumulatedTrimmed || candidateTrimmed.contains(accumulatedTrimmed)
+    if (accumulated.isEmpty()) return true
+    if (candidate.isEmpty()) return false
+    return candidate == accumulated || candidate.contains(accumulated)
 }
