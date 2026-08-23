@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -228,7 +229,14 @@ private fun ChatScreenStreamingHapticEffect(
     hapticsEnabled: Boolean,
     view: android.view.View,
 ) {
-    var streamingHapticActive by remember { mutableStateOf(false) }
+    // letta-mobile-m60rn: this flag must survive Activity recreation
+    // (rotation / fold / locale change). With plain `remember` every config
+    // change reset it to false while the ViewModel kept reporting an active
+    // stream, so each rotation re-fired the streamingStart cue. As a
+    // saveable value it is restored across recreation: an in-flight stream
+    // stays silent, and the terminal complete/fail cue still fires exactly
+    // once when the stream actually ends.
+    var streamingHapticActive by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(isStreaming, error, hapticsEnabled) {
         if (!hapticsEnabled) {
             streamingHapticActive = false

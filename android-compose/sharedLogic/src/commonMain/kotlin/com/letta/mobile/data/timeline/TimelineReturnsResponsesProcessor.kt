@@ -34,6 +34,10 @@ fun applyReturnsAndResponsesFromSnapshot(
         val firstCallId = matchingReturns.firstOrNull()?.first
         ev.copy(
             approvalDecided = byResponse || byReturn || ev.approvalDecided,
+            // letta-mobile-c49of: only an explicit decision echo labels the
+            // event; implicit completion (tool returns / approve=null) stays
+            // decided-but-unlabeled.
+            approvalDecision = ev.approvalOutcomeFromEvidence(evidence) ?: ev.approvalDecision,
             toolReturnContent = firstCallId?.let { fold.contentByCallId[it] }
                 ?: ev.toolReturnContent,
             toolReturnIsError = matchingReturn?.let { it.isErr == true || it.status == "error" }

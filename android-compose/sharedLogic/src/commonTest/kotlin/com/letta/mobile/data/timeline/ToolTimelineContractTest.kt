@@ -4,6 +4,7 @@ import com.letta.mobile.data.chat.projection.ChatRenderItem
 import com.letta.mobile.data.chat.projection.deduplicateRenderKeys
 import com.letta.mobile.data.chat.projection.groupMessagesForRender
 import com.letta.mobile.data.chat.projection.timelineEventToUiMessage
+import com.letta.mobile.data.model.ApprovalResponseMessage
 import com.letta.mobile.data.model.UiToolApprovalDecision
 import com.letta.mobile.ui.common.GroupPosition
 import kotlinx.collections.immutable.persistentMapOf
@@ -199,8 +200,67 @@ class ToolTimelineContractTest {
         assertTrue(ev.approvalDecided)
         assertNull(ui.approvalRequest)
 
-        // Note: Production TimelineEventToUiMessage projects `approvalDecided && approvalRequestId != null`
-        // as UiToolApprovalDecision.Approved. This documents actual current contract.
+        // letta-mobile-c49of: an explicit reject carries its outcome through
+        // the event AND projects as Rejected (previously mislabeled Approved).
+        assertEquals(ApprovalDecision.REJECTED, ev.approvalDecision)
+        assertEquals(UiToolApprovalDecision.Rejected, ui.toolCalls!!.single().approvalDecision)
+    }
+
+    @Test
+    fun hydratedRejectionProjectsRejected() {
+        // letta-mobile-c49of: same contract on the hydration path — a
+        // rejected approval reloaded from history must render Rejected.
+        val hydrationResult = TimelineHydrationReducer.reduce(
+            conversationId = ToolTimelineFixtures.TEST_CONVERSATION_ID,
+            serverMessagesChronological = listOf(
+                ToolTimelineFixtures.Rejection.requestFrame,
+                ToolTimelineFixtures.Rejection.responseFrame,
+            ),
+            timelineBeforeFetch = Timeline(ToolTimelineFixtures.TEST_CONVERSATION_ID),
+            currentTimeline = Timeline(ToolTimelineFixtures.TEST_CONVERSATION_ID),
+            diskRecords = emptyList(),
+        )
+        val ev = hydrationResult.timeline.events.single() as TimelineEvent.Confirmed
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertTrue(ev.approvalDecided)
+        assertEquals(ApprovalDecision.REJECTED, ev.approvalDecision)
+        assertEquals(UiToolApprovalDecision.Rejected, ui.toolCalls!!.single().approvalDecision)
+    }
+
+    @Test
+    fun autoApproveNullEchoStaysDecidedWithoutExplicitLabel() {
+        // letta-mobile-hga00/c49of: approve=null echo resolves the request
+        // but must NOT fabricate an explicit decision outcome; projection
+        // keeps the legacy decided-without-outcome rendering.
+        val requestFrame = ToolTimelineFixtures.ApprovalPendingApprovedRunningSuccess.requestFrame
+        val nullEcho = ApprovalResponseMessage(
+            id = "appr-resp-null",
+            approvalRequestId = "appr-req-1",
+            approve = null,
+            runId = ToolTimelineFixtures.TEST_RUN_ID,
+            seqId = 99,
+        )
+        val step1 = reduceStreamFrame(
+            TimelineReducerInput(
+                prev = Timeline(conversationId = ToolTimelineFixtures.TEST_CONVERSATION_ID),
+                frame = requestFrame,
+                pendingToolReturnsByCallId = persistentMapOf(),
+            )
+        )
+        val step2 = reduceStreamFrame(
+            TimelineReducerInput(
+                prev = step1.next,
+                frame = nullEcho,
+                pendingToolReturnsByCallId = step1.updatedPendingToolReturnsByCallId,
+            )
+        )
+        val ev = step2.next.events.single() as TimelineEvent.Confirmed
+        val ui = timelineEventToUiMessage(ev)!!
+
+        assertTrue(ev.approvalDecided)
+        assertNull(ev.approvalDecision)
+        assertNull(ui.approvalRequest)
         assertEquals(UiToolApprovalDecision.Approved, ui.toolCalls!!.single().approvalDecision)
     }
 
