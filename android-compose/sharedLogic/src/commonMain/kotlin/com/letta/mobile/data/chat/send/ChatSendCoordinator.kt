@@ -6,12 +6,7 @@ import com.letta.mobile.data.model.ErrorMessage
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
-import com.letta.mobile.data.model.ReasoningMessage
 import com.letta.mobile.data.model.isIrohBackend
-import com.letta.mobile.data.model.SystemMessage
-import com.letta.mobile.data.model.ToolCallMessage
-import com.letta.mobile.data.model.ToolReturnMessage
-import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
@@ -30,10 +25,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -110,22 +102,16 @@ class ChatSendCoordinator(
     private val preConversationMessageDeltas = ArrayDeque<WsTimelineEvent.MessageDelta>()
     private val pendingSendLock = SynchronizedObject()
     private val pendingSends = ArrayDeque<PendingWsSend>()
-    @Volatile private var pendingConversationBootstrapLocal: PendingWsSend? = null
-    private val seenBridgeEventLock = SynchronizedObject()
-    private val seenBridgeEventKeys = ArrayDeque<String>()
-    private val seenBridgeEventKeySet = mutableSetOf<String>()
-    private val liveIngestLock = SynchronizedObject()
-    private val lastLiveIngestByConversation = mutableMapOf<String, Long>()
-    private val runtimeEventRecords = Channel<ScopedRuntimeEvent>(Channel.UNLIMITED)
+    private val bridgeEventDeduplicator = BridgeEventDeduplicator()
+    private val postSendReconciler = PostSendReconciler(
+        scope = scope,
+        agentId = agentId,
+        timelineRepository = timelineRepository,
+        delaysMs = { postSendReconcileDelaysMs },
+    )
+    private val runtimeEventBatcher = RuntimeEventBatcher(scope, recordRuntimeEvents)
 
     init {
-        scope.launch {
-            try {
-                drainRuntimeEventRecords()
-            } finally {
-                runtimeEventRecords.cancel()
-            }
-        }
         scope.launch {
             wsChatBridge.events.collect { event -> handleEvent(event) }
         }
@@ -432,18 +418,6 @@ class ChatSendCoordinator(
             "attachments" to attachments.size,
             "activeConversationId" to targetConversationId,
         )
-        val config = activeConfig()
-        Telemetry.event(
-            "IrohTrace", "coordinator.config",
-            "hasConfig" to (config != null),
-            "mode" to config?.mode?.name,
-            "serverUrl" to backendUrlTelemetryDescriptor(config?.serverUrl),
-            "hasToken" to !config?.accessToken.isNullOrBlank(),
-        )
-        if (config == null) {
-            ui.onSendFailed("No active backend is configured")
-            return
-        }
         // Only the legacy admin-shim WS actually needs a bearer token. The Iroh
         // transport authenticates the paired peer by NodeID and ignores the
         // token entirely (IrohChannelTransport sends its auth frame even with a
@@ -452,10 +426,7 @@ class ChatSendCoordinator(
         // relaxing it here is the client half of retiring the bearer token
         // (d6e8g.9). Token-carrying devices are unaffected; this only stops the
         // client from self-rejecting a BLANK token on an iroh:// backend.
-        if (config.accessToken.isNullOrBlank() && !config.isIrohBackend()) {
-            ui.onSendFailed("Admin-shim WebSocket requires an API token")
-            return
-        }
+        val config = validatedActiveConfig() ?: return
         // lcp-dlj: multimodal sends now flow through content_parts. The
         // shim hard-caps the JSON-encoded payload at 10 MB; the client-
         // side downsample (≤ 4 images, ≤ 1568px longest side, ≤ 2 MB raw
@@ -468,7 +439,6 @@ class ChatSendCoordinator(
         // conversation_id. Pre-create fresh conversations through REST instead
         // of sending a blank placeholder and relying on shim-side minting.
         val currentConversationId = targetConversationId?.takeIf { it.isNotBlank() }
-        val startNewConversation = false
         val conversationId = when {
             currentConversationId != null -> currentConversationId
             else -> runCatching {
@@ -482,11 +452,9 @@ class ChatSendCoordinator(
         }
         stateFor(conversationId)
         reportCrossConversationSend(conversationId)
-        if (!startNewConversation) {
-            lastActiveConversationId = conversationId
-            setActiveConversationId(conversationId)
-            startTimelineObserver(conversationId)
-        }
+        lastActiveConversationId = conversationId
+        setActiveConversationId(conversationId)
+        startTimelineObserver(conversationId)
 
         Telemetry.event("IrohTrace", "coordinator.ensureConnected.begin", "conversationId" to conversationId)
         val connected = ensureConnected(config)
@@ -502,16 +470,10 @@ class ChatSendCoordinator(
             text = text,
             attachments = attachments,
             otid = otidGenerator(),
-            startNewConversation = startNewConversation,
         )
         Telemetry.event("IrohTrace", "coordinator.dispatch.begin", "conversationId" to conversationId, "otid" to pending.otid)
         val accepted = dispatchPendingSend(pending, appendOptimisticLocal = true)
         Telemetry.event("IrohTrace", "coordinator.dispatch.done", "conversationId" to conversationId, "otid" to pending.otid, "accepted" to accepted)
-        if (!accepted && startNewConversation) {
-            ui.onError("WebSocket is busy; wait for the current turn to finish")
-            timer.stop("accepted" to false, "reason" to "busy_start_new")
-            return
-        }
         if (!accepted && !enqueuePendingSend(pending)) {
             ui.onError("WebSocket send queue is full; wait for the current turn to finish")
             timer.stop("accepted" to false, "reason" to "busy")
@@ -524,6 +486,26 @@ class ChatSendCoordinator(
             "attachments" to attachments.size,
             "queued" to !accepted,
         )
+    }
+
+    private fun validatedActiveConfig(): LettaConfig? {
+        val config = activeConfig()
+        Telemetry.event(
+            "IrohTrace", "coordinator.config",
+            "hasConfig" to (config != null),
+            "mode" to config?.mode?.name,
+            "serverUrl" to backendUrlTelemetryDescriptor(config?.serverUrl),
+            "hasToken" to !config?.accessToken.isNullOrBlank(),
+        )
+        if (config == null) {
+            ui.onSendFailed("No active backend is configured")
+            return null
+        }
+        if (config.accessToken.isNullOrBlank() && !config.isIrohBackend()) {
+            ui.onSendFailed("Admin-shim WebSocket requires an API token")
+            return null
+        }
+        return config
     }
 
     fun cancel(): Boolean {
@@ -559,7 +541,7 @@ class ChatSendCoordinator(
                     text = pending.text,
                     otid = pending.otid,
                     attachments = pending.attachments,
-                    startNewConversation = pending.startNewConversation,
+                    startNewConversation = false,
                 )
             },
             onAccepted = {
@@ -578,62 +560,18 @@ class ChatSendCoordinator(
         if (!accepted) return false
 
         if (appendOptimisticLocal) {
-            if (pending.startNewConversation) {
-                pendingConversationBootstrapLocal = pending
-            } else {
-                timelineRepository.appendExternalTransportLocal(
-                    agentId = agentId,
-                    conversationId = pending.conversationId,
-                    content = pending.text,
-                    otid = pending.otid,
-                    attachments = pending.attachments,
-                )
-            }
+            timelineRepository.appendExternalTransportLocal(
+                agentId = agentId,
+                conversationId = pending.conversationId,
+                content = pending.text,
+                otid = pending.otid,
+                attachments = pending.attachments,
+            )
             clearComposerAfterSend()
         }
-        schedulePostSendReconcile(pending)
+        postSendReconciler.schedule(pending.conversationId, pending.otid)
         ui.onSendDispatched(pending.conversationId.takeIf { it.isNotBlank() })
         return true
-    }
-
-    private fun schedulePostSendReconcile(pending: PendingWsSend) {
-        val sentAtMillis = currentTimeMillis()
-        scope.launch {
-            for (delayMs in postSendReconcileDelaysMs) {
-                delay(delayMs.milliseconds)
-                if (hasLiveIngestSince(pending.conversationId, sentAtMillis)) {
-                    Telemetry.event(
-                        "AdminChatVM", "ws.postSendReconcile.skippedLiveStream",
-                        "conversationId" to pending.conversationId,
-                        "otid" to pending.otid,
-                        "delayMs" to delayMs,
-                    )
-                    continue
-                }
-                runCatching {
-                    timelineRepository.reconcileRecentMessages(
-                        agentId = agentId,
-                        conversationId = pending.conversationId,
-                        reason = "post-send-$delayMs",
-                        forceRefresh = true,
-                    )
-                }.onSuccess {
-                    Telemetry.event(
-                        "AdminChatVM", "ws.postSendReconcile.ok",
-                        "conversationId" to pending.conversationId,
-                        "otid" to pending.otid,
-                        "delayMs" to delayMs,
-                    )
-                }.onFailure { error ->
-                    Telemetry.error(
-                        "AdminChatVM", "ws.postSendReconcile.failed", error,
-                        "conversationId" to pending.conversationId,
-                        "otid" to pending.otid,
-                        "delayMs" to delayMs,
-                    )
-                }
-            }
-        }
     }
 
     private suspend fun enqueuePendingSend(pending: PendingWsSend): Boolean {
@@ -694,15 +632,11 @@ class ChatSendCoordinator(
     }
 
     private suspend fun clearPendingSends(reason: String) {
-        pendingConversationBootstrapLocal = null
         val dropped = removeAllPendingSends()
         markPendingSendsFailed(dropped, reason, conversationId = null)
     }
 
     private fun removePendingSends(conversationId: String): List<PendingWsSend> {
-        if (pendingConversationBootstrapLocal?.conversationId == conversationId) {
-            pendingConversationBootstrapLocal = null
-        }
         return synchronized(pendingSendLock) {
             val matching = mutableListOf<PendingWsSend>()
             val retained = ArrayDeque<PendingWsSend>()
@@ -807,7 +741,12 @@ class ChatSendCoordinator(
             "lastActiveConversationId" to lastActiveConversationId,
             "trackedConversations" to trackedConversationCount(),
         )
-        if (dropDuplicateBridgeEvent(event)) return
+        val fallbackConversationId = if (event is WsTimelineEvent.MessageDelta) {
+            event.conversationId ?: lastActiveConversationId ?: activeConversationId()
+        } else {
+            null
+        }
+        if (bridgeEventDeduplicator.isDuplicate(event, fallbackConversationId)) return
         when (event) {
             is WsTimelineEvent.TurnStarted -> handleTurnStarted(event)
             is WsTimelineEvent.MessageDelta -> {
@@ -823,7 +762,7 @@ class ChatSendCoordinator(
                     preConversationMessageDeltas.addLast(event)
                     return
                 }
-                enqueueRuntimeEvent(event, conversationId)
+                runtimeEventBatcher.enqueue(event, conversationId)
                 rememberActiveAssistantMessageRunId(
                     state = peekState(conversationId),
                     message = event.message,
@@ -832,7 +771,7 @@ class ChatSendCoordinator(
                 )
                 timelineRepository.ingestExternalTransportMessage(agentId, conversationId, event.message, source = "coordinator")
                 if (!event.isReplay) {
-                    rememberLiveIngest(conversationId)
+                    postSendReconciler.recordLiveIngest(conversationId)
                     // Finding 1: a background conversation's delta must not latch
                     // the visible screen's typing indicator — that IS the reported
                     // "B shows A's thinking indicator" symptom.
@@ -849,7 +788,7 @@ class ChatSendCoordinator(
                     reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
-                enqueueRuntimeEvent(event, state.conversationId)
+                runtimeEventBatcher.enqueue(event, state.conversationId)
                 if (ignoreForeignTurnStop(state, event)) return
                 recordStopReasonForTurn(state, event)
                 markTurnVisuallyComplete(state, reason = "stopReason")
@@ -860,7 +799,7 @@ class ChatSendCoordinator(
                     reportUnmatchedFrame(event, event.turnId, event.runId)
                     return
                 }
-                enqueueRuntimeEvent(event, state.conversationId)
+                runtimeEventBatcher.enqueue(event, state.conversationId)
                 // lcp-cv3 §end-of-turn ordering: usage_statistics is first-wins
                 // on the shim. Multi-step turns may produce per-step usage; the
                 // run-level record reflects the first. Drop subsequent ones.
@@ -920,7 +859,7 @@ class ChatSendCoordinator(
             is WsTimelineEvent.GoalsUpdated -> Unit
             is WsTimelineEvent.AgentUpdated -> Unit
             is WsTimelineEvent.UserActionOutcome ->
-                enqueueRuntimeEvent(event, event.conversationId ?: lastActiveConversationId)
+                runtimeEventBatcher.enqueue(event, event.conversationId ?: lastActiveConversationId)
         }
     }
 
@@ -990,7 +929,7 @@ class ChatSendCoordinator(
         // Still ignore a frame for a different TURN inside the same conversation
         // so a superseded turn cannot poison the live one.
         if (event.turnId != null && state.turnId != null && event.turnId != state.turnId) return
-        enqueueRuntimeEvent(event, state.conversationId)
+        runtimeEventBatcher.enqueue(event, state.conversationId)
         // lcp-axv: stash the error and wait for the immediately-following TurnDone
         // to flip the UI. Surfacing the error here would race with TurnDone and
         // could leave isStreaming / isAgentTyping stuck if TurnDone is delayed.
@@ -1141,7 +1080,7 @@ class ChatSendCoordinator(
         // supersedes whatever the previous turn's post-turn dangling-
         // tool-call sweep left pending.
         runCatching { timelineRepository.turnStarted(agentId, event.conversationId) }
-        enqueueRuntimeEvent(event, event.conversationId)
+        runtimeEventBatcher.enqueue(event, event.conversationId)
         setActiveConversationId(event.conversationId)
         startTimelineObserver(event.conversationId)
         if (ownsForegroundUi(event.conversationId)) {
@@ -1153,96 +1092,8 @@ class ChatSendCoordinator(
         } else {
             reportBackgroundUiSuppressed(event.conversationId, "onTurnStarted")
         }
-        pendingConversationBootstrapLocal?.let { pending ->
-            timelineRepository.appendExternalTransportLocal(
-                agentId = agentId,
-                conversationId = event.conversationId,
-                content = pending.text,
-                otid = pending.otid,
-                attachments = pending.attachments,
-            )
-            pendingConversationBootstrapLocal = null
-        }
         drainPreConversationMessages(event.conversationId)
     }
-
-    private fun dropDuplicateBridgeEvent(event: WsTimelineEvent): Boolean {
-        val key = bridgeEventKey(event) ?: return false
-        val isDuplicate = if (event is WsTimelineEvent.MessageDelta) {
-            synchronized(sharedMessageEventLock) {
-                if (key in sharedMessageEventKeySet) {
-                    true
-                } else {
-                    sharedMessageEventKeySet.add(key)
-                    sharedMessageEventKeys.addLast(key)
-                    while (sharedMessageEventKeys.size > MAX_SEEN_BRIDGE_EVENTS) {
-                        sharedMessageEventKeySet.remove(sharedMessageEventKeys.removeFirst())
-                    }
-                    false
-                }
-            }
-        } else {
-            synchronized(seenBridgeEventLock) {
-                if (key in seenBridgeEventKeySet) {
-                    true
-                } else {
-                    seenBridgeEventKeySet.add(key)
-                    seenBridgeEventKeys.addLast(key)
-                    while (seenBridgeEventKeys.size > MAX_SEEN_BRIDGE_EVENTS) {
-                        seenBridgeEventKeySet.remove(seenBridgeEventKeys.removeFirst())
-                    }
-                    false
-                }
-            }
-        }
-        if (isDuplicate) {
-            Telemetry.event(
-                "AdminChatVM", "ws.event.exactDuplicateDropped",
-                "eventType" to (event::class.simpleName ?: ""),
-                "keyHash" to key.hashCode().toString(),
-            )
-        }
-        return isDuplicate
-    }
-
-    private fun bridgeEventKey(event: WsTimelineEvent): String? = when (event) {
-        is WsTimelineEvent.TurnStarted -> "started|${event.conversationId}|${event.turnId}|${event.runId}|${event.isReplay}"
-        is WsTimelineEvent.MessageDelta -> {
-            val conversationId = event.conversationId
-                ?: lastActiveConversationId
-                ?: activeConversationId().orEmpty()
-            val message = event.message
-            "message|$conversationId|${message.id}|${message.messageType}|${message.runId.orEmpty()}|${messageContentForDedupe(message)}"
-        }
-        is WsTimelineEvent.StopReason -> "stop|${event.turnId}|${event.runId}|${event.stopReason}"
-        is WsTimelineEvent.UsageStatistics -> "usage|${event.turnId}|${event.runId}|${event.promptTokens}|${event.completionTokens}|${event.totalTokens}"
-        is WsTimelineEvent.TurnDone -> "done|${event.turnId}|${event.runId}|${event.status}|${event.lossy}|${event.dropCount}"
-        is WsTimelineEvent.Error -> "error|${event.conversationId.orEmpty()}|${event.turnId.orEmpty()}|${event.runId.orEmpty()}|${event.code}|${event.message}"
-        is WsTimelineEvent.UserActionOutcome -> "action|${event.frameId}|${event.actionId.orEmpty()}|${event.outcome}|${event.reason.orEmpty()}"
-        else -> null
-    }
-
-    private fun messageContentForDedupe(message: LettaMessage): String = when (message) {
-        is AssistantMessage -> message.content
-        is UserMessage -> message.content
-        is SystemMessage -> message.content
-        is ReasoningMessage -> message.reasoning
-        is ToolCallMessage -> message.effectiveToolCalls.joinToString(separator = "|") { it.effectiveId + ":" + (it.name ?: "") }
-        is ToolReturnMessage -> message.toolCallId.orEmpty() + ":" + message.toolReturn.funcResponse.orEmpty()
-        else -> message.date.orEmpty() + ":" + message.seqId.toString()
-    }
-
-    private fun rememberLiveIngest(conversationId: String) {
-        synchronized(liveIngestLock) {
-            lastLiveIngestByConversation[conversationId] = currentTimeMillis()
-        }
-    }
-
-    private fun hasLiveIngestSince(conversationId: String, sinceMillis: Long): Boolean = synchronized(liveIngestLock) {
-        (lastLiveIngestByConversation[conversationId] ?: Long.MIN_VALUE) >= sinceMillis
-    }
-
-    private fun currentTimeMillis(): Long = kotlin.time.Clock.System.now().toEpochMilliseconds()
 
     /**
      * letta-mobile-br5g0: renders a dead turn as a visible ERROR row in the
@@ -1500,7 +1351,7 @@ class ChatSendCoordinator(
             )
         }
         if (recordEvent != null) {
-            enqueueRuntimeEvent(recordEvent, conversationId)
+            runtimeEventBatcher.enqueue(recordEvent, conversationId)
         }
         if (lossy) {
             Telemetry.event(
@@ -1800,7 +1651,7 @@ class ChatSendCoordinator(
         val state = peekState(conversationId)
         while (true) {
             val delta = preConversationMessageDeltas.removeFirstOrNull() ?: return
-            enqueueRuntimeEvent(delta, conversationId)
+            runtimeEventBatcher.enqueue(delta, conversationId)
             rememberActiveAssistantMessageRunId(
                 state = state,
                 message = delta.message,
@@ -1811,52 +1662,9 @@ class ChatSendCoordinator(
         }
     }
 
-    private fun enqueueRuntimeEvent(event: WsTimelineEvent, conversationId: String?) {
-        val result = runtimeEventRecords.trySend(ScopedRuntimeEvent(event, conversationId))
-        if (result.isFailure) {
-            Telemetry.event(
-                "AdminChatVM", "runtimeEvent.enqueueRejected",
-                "eventType" to (event::class.simpleName ?: ""),
-                "conversationId" to (conversationId ?: ""),
-            )
-        }
-    }
-
-    private suspend fun drainRuntimeEventRecords() {
-        for (first in runtimeEventRecords) {
-            val batch = mutableListOf(first)
-            while (true) {
-                val next = runtimeEventRecords.tryReceive().getOrNull() ?: break
-                batch += next
-            }
-            persistRuntimeEventBatch(batch)
-        }
-    }
-
-    private suspend fun persistRuntimeEventBatch(records: List<ScopedRuntimeEvent>) {
-        currentCoroutineContext().ensureActive()
-        try {
-            recordRuntimeEvents(records)
-            currentCoroutineContext().ensureActive()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Throwable) {
-            Telemetry.error(
-                "AdminChatVM", "runtimeEvent.recordFailed", error,
-                "eventType" to (records.firstOrNull()?.event?.let { it::class.simpleName } ?: ""),
-                "conversationId" to (records.firstOrNull()?.conversationId ?: ""),
-                "batchSize" to records.size,
-            )
-        }
-    }
-
     internal companion object {
         private const val CONNECT_WAIT_MS = 1_500L
         private const val MAX_PENDING_SENDS = 10
-        private const val MAX_SEEN_BRIDGE_EVENTS = 512
-        private val sharedMessageEventLock = SynchronizedObject()
-        private val sharedMessageEventKeys = ArrayDeque<String>()
-        private val sharedMessageEventKeySet = mutableSetOf<String>()
         private const val MAX_ACTIVE_ASSISTANT_RUN_IDS = 8
         private const val MAX_SETTLED_RUN_IDS = 8
 
@@ -1877,12 +1685,6 @@ class ChatSendCoordinator(
         val text: String,
         val attachments: List<MessageContentPart.Image>,
         val otid: String,
-        val startNewConversation: Boolean = false,
     )
 
 }
-
-data class ScopedRuntimeEvent(
-    val event: WsTimelineEvent,
-    val conversationId: String?,
-)
