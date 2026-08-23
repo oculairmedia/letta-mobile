@@ -5,6 +5,7 @@ import kotlinx.atomicfu.locks.synchronized
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
@@ -42,7 +43,9 @@ internal class AppServerRequestRegistry(
      */
     fun startRouting(scope: CoroutineScope) {
         check(collectorJob == null) { "already routing" }
-        collectorJob = scope.launch { routeFrames() }
+        // Enter collect before returning so an immediate request/response cannot
+        // outrun this SharedFlow subscriber during client construction.
+        collectorJob = scope.launch(start = CoroutineStart.UNDISPATCHED) { routeFrames() }
     }
 
     private suspend fun routeFrames() {

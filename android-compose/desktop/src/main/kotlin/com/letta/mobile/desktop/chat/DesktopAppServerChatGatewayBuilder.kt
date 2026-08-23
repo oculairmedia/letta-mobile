@@ -26,7 +26,9 @@ import computer.iroh.RelayMode
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.withContext
 
 /**
@@ -69,14 +71,29 @@ class DesktopAppServerChatGatewayBuilder(
             buildWebSocketTransport(serverUrl, lettaConfig)
         }
 
-        val client = DefaultAppServerClient(transport)
-        val localClientLease = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-            DesktopLocalAppServerClientRegistry.shared.install(client)
-        } else {
-            null
-        }
+        val clientScope = CoroutineScope(
+            controllerScope.coroutineContext + SupervisorJob(controllerScope.coroutineContext[Job]),
+        )
+        val client = DefaultAppServerClient(transport, parentScope = clientScope)
+        var localClientLease: AutoCloseable? = null
         var eventRouter: AppServerRuntimeEventRouter? = null
         try {
+            if (transport is KtorAppServerWebSocketTransport) {
+                awaitDesktopAppServerReadiness(
+                    DesktopAppServerReadinessProbe(
+                        connectionState = transport.connectionState,
+                        client = client,
+                        expectation = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                            localDesktopAppServerExpectation
+                        } else {
+                            DesktopAppServerReadinessExpectation()
+                        },
+                    ),
+                )
+            }
+            if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                localClientLease = DesktopLocalAppServerClientRegistry.shared.install(client)
+            }
             // Iroh turns run on the wrapper; client-local preflight would be a
             // duplicate typed-command path (Android dial already uses None).
             eventRouter = AppServerRuntimeEventRouter()
@@ -106,11 +123,15 @@ class DesktopAppServerChatGatewayBuilder(
                 onClose = {
                     eventRouter.detach()
                     localClientLease?.close()
+                    client.failPendingRequests("Desktop App Server gateway closed")
+                    clientScope.cancel()
                 },
             )
         } catch (error: Throwable) {
             eventRouter?.detach()
             localClientLease?.close()
+            client.failPendingRequests("Desktop App Server gateway creation failed")
+            clientScope.cancel()
             transportResources.close()
             throw error
         }

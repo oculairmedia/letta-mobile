@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.JsonObject
@@ -298,6 +299,40 @@ class AppServerProtocolTest {
         assertEquals("user-1", frame.runtime?.actingUserId)
         assertEquals("true", frame.agent?.get("future")?.jsonObject?.get("ok")?.jsonPrimitive?.content)
         assertEquals(true, frame.created?.conversation)
+    }
+
+    @Test
+    fun decodesCanonicalTopLevelAppServerInfoResponse() {
+        val received = AppServerProtocol.decodeFrame(
+            rawJson = """
+                {
+                  "type": "app_server_info_response",
+                  "request_id": "info-1",
+                  "success": true,
+                  "backend": "local",
+                  "letta_code_version": "0.30.25",
+                  "protocol_version": 1,
+                  "capabilities": {
+                    "agent_management": true,
+                    "conversation_management": true,
+                    "memory_management": true,
+                    "runtime_start": true,
+                    "split_channels": false
+                  }
+                }
+            """.trimIndent(),
+            channel = AppServerChannel.Control,
+        )
+
+        val frame = assertIs<AppServerInboundFrame.AppServerInfoResponse>(received.frame)
+        val info = assertNotNull(frame.info)
+        assertEquals("info-1", frame.requestId)
+        assertEquals("0.30.25", info.lettaCodeVersion)
+        assertEquals(1, info.protocolVersion)
+        assertEquals("local", info.backend)
+        assertTrue(info.hasRuntimeStart)
+        assertFalse(info.splitChannels)
+        assertTrue(info.hasCapability("agent_management"))
     }
 
     @Test
