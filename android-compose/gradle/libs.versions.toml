@@ -2,6 +2,13 @@
 # Prefer adding new shared versions here; do not bulk-migrate existing
 # hardcoded coordinates in the same PR as a module move.
 [versions]
+# Android SDK constants — consume via libs.versions.compileSdk/minSdk/targetSdk.
+# Do not repeat raw SDK literals in module build.gradle.kts files.
+compileSdk = "37"
+targetSdk = "36"
+minSdk = "26"
+# AGP baseline-profile producer requires 28; keep this as the only minSdk exception.
+minSdkBaselineProfile = "28"
 paging = "3.5.0"
 konsist = "0.17.3"
 archunit = "1.4.2"

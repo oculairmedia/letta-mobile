@@ -4,10 +4,10 @@ plugins {
 
 android {
     namespace = "com.letta.mobile.core.testutil"
-    compileSdk = 36
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 26
+        minSdk = libs.versions.minSdk.get().toInt()
     }
 
     compileOptions {

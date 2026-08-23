@@ -45,8 +45,8 @@ tasks.withType<Test>().configureEach {
 kotlin {
     android {
         namespace = "com.letta.mobile.sharedlogic"
-        compileSdk = 37
-        minSdk = 26
+        compileSdk = libs.versions.compileSdk.get().toInt()
+        minSdk = libs.versions.minSdk.get().toInt()
 
         withHostTestBuilder {}
         compilerOptions {

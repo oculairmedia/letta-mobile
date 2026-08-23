@@ -11,8 +11,8 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
     ?.takeIf(String::isNotBlank)
     ?.let { layout.buildDirectory.set(file(it)) }
 
-// This repo does not yet use a Gradle version catalog. Keep desktop-only
-// versions named here until dependency versions are centralized project-wide.
+// Desktop-only library versions stay named here until the project catalog
+// grows beyond the Android SDK constants in gradle/libs.versions.toml.
 //
 // WARNING — the Compose versions below are FLOORS, not the versions that ship.
 // The runtime classpath resolves the whole `org.jetbrains.compose` atomic group
@@ -712,9 +712,17 @@ tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith
 afterEvaluate {
     tasks.named<JavaExec>("run") {
         dependsOn(extractDesktopJbr)
-        val javaExe = desktopJbrHome.map { File(it.asFile, "bin/java.exe") }
+        // Nucleus copies javaHome onto this JavaExec at configuration time.
+        // Gradle validates that executable exists before extractDesktopJbr can
+        // populate the JBR tree, so point at the current JVM for configuration
+        // and switch to JBR only after extract has run.
+        val fallbackJava = File(System.getProperty("java.home"), if (isWindowsHost) "bin/java.exe" else "bin/java")
+        executable(fallbackJava)
+        val jbrJava = desktopJbrHome.map { File(it.asFile, if (isWindowsHost) "bin/java.exe" else "bin/java") }
         doFirst {
-            setExecutable(javaExe.get())
+            val resolved = jbrJava.get()
+            check(resolved.isFile) { "JBR java missing at $resolved — extractDesktopJbr did not produce it." }
+            executable(resolved)
         }
     }
 }

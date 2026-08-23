@@ -45,11 +45,17 @@ Do not assume changes to one path automatically belong in the other.
 
 ## Prerequisites
 
-- Android Studio with Android SDK Platform 36 and Build-Tools 36 installed
-- A full JDK 26 for CI parity. Gradle 9.4.1 can run on JDK 17-26, so Android
+- Android Studio with Android SDK Platform 37 and Build-Tools 36+ installed
+- A full JDK 26 for CI parity. Gradle 9.6.1 can run on JDK 17-26, so Android
   Studio's bundled JBR is still acceptable for local builds when it is within
   that range.
 - `local.properties` pointing at your Android SDK
+
+`compileSdk`, `targetSdk`, and `minSdk` are defined in
+`gradle/libs.versions.toml`. Module build files must consume those catalog
+entries instead of repeating raw SDK literals. `:baselineprofile` is the only
+documented exception: AGP's baseline-profile producer requires
+`minSdkBaselineProfile` (28).
 
 ## Local setup
 
