@@ -5,6 +5,7 @@ import com.letta.mobile.data.session.BackendScopedCache
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.util.Telemetry
 import kotlin.concurrent.Volatile
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
@@ -140,40 +141,94 @@ open class TimelineRepository(
                 "hydrated" to cached.hasHydratedSuccessfully,
             )
             if (!cached.hasHydratedSuccessfully) {
-                runCatching {
-                    withContext(timelineIoDispatcher) {
-                        cached.hydrate()
-                    }
-                }.onFailure { t ->
-                    Telemetry.error(
-                        "TimelineRepo", "hydrate.retryFailed", t,
-                        "agentId" to agentId.orEmpty(),
-                        "conversationId" to conversationId,
-                    )
-                    runCatching { cached.emitHydrateFailed(t.message ?: "unknown") }
-                }
+                hydrateSingleFlight(cached, key)
             }
             return cached
         }
         val loop = getOrCreateLoopWithoutHydrate(key)
         // Hydrate OUTSIDE the mutex so parallel callers don't block each other.
-        // If two callers race on the same conversationId, the second will find
-        // the loop in the map and short-circuit at the fast path — hydrate
-        // still only runs once per conv (first caller wins). The TimelineSync
-        // writeMutex inside hydrate() prevents concurrent state mutation.
-        runCatching {
+        // letta-mobile-oznnh: concurrent same-conversation callers now JOIN the
+        // in-flight hydration instead of starting a duplicate one — the loop
+        // is visible in the map before first hydration completes, so the old
+        // fast-path retry raced with the first caller's still-running hydrate.
+        hydrateSingleFlight(loop, key)
+        return loop
+    }
+
+    /**
+     * letta-mobile-oznnh: single-flight hydrate per conversation.
+     *
+     * The first caller for a conversation claims the flight and runs
+     * [TimelineSyncLoop.hydrate]; concurrent callers for the SAME conversation
+     * await that in-flight hydrate and share its outcome. Different
+     * conversations get independent flights (keyed by conversationId, which is
+     * also how alias resolution collapses loop identity). On failure the
+     * flight is removed so a later caller can retry; joiners surface the same
+     * failure to their own runCatching boundary without double-emitting the
+     * hydrate-failed event (the owner emits once).
+     */
+    private val hydrateFlightsMutex = Mutex()
+
+    /** conversationId -> in-flight hydration completion. Guarded by [hydrateFlightsMutex]. */
+    private val hydrateFlights = LinkedHashMap<String, CompletableDeferred<Unit>>()
+
+    private suspend fun hydrateSingleFlight(loop: TimelineSyncLoop, key: TimelineCacheKey) {
+        val created = CompletableDeferred<Unit>()
+        val joined = hydrateFlightsMutex.withLock {
+            val existing = hydrateFlights[key.conversationId]
+            if (existing != null) {
+                existing
+            } else {
+                hydrateFlights[key.conversationId] = created
+                null
+            }
+        }
+        if (joined != null) {
+            Telemetry.event(
+                "TimelineRepo", "hydrate.joined",
+                "agentId" to key.agentId.orEmpty(),
+                "conversationId" to key.conversationId,
+            )
+            // Joiner swallows the shared outcome: the OWNER already emitted
+            // HydrateFailed on the loop's event queue on failure — re-emitting
+            // here would deliver duplicate events for one hydration attempt.
+            runCatching { joined.await() }
+                .onFailure { t ->
+                    Telemetry.error(
+                        "TimelineRepo", "hydrate.joinedFailed", t,
+                        "agentId" to key.agentId.orEmpty(),
+                        "conversationId" to key.conversationId,
+                    )
+                }
+            return
+        }
+        try {
             withContext(timelineIoDispatcher) {
                 loop.hydrate()
             }
-        }.onFailure { t ->
+            created.complete(Unit)
+        } catch (t: Throwable) {
+            // Remove the flight BEFORE completing so a waiter that retries
+            // immediately isn't blocked by the dead flight.
+            hydrateFlightsMutex.withLock {
+                if (hydrateFlights[key.conversationId] === created) {
+                    hydrateFlights.remove(key.conversationId)
+                }
+            }
+            created.completeExceptionally(t)
             Telemetry.error(
                 "TimelineRepo", "hydrate.failed", t,
-                "agentId" to agentId.orEmpty(),
-                "conversationId" to conversationId,
+                "agentId" to key.agentId.orEmpty(),
+                "conversationId" to key.conversationId,
             )
             runCatching { loop.emitHydrateFailed(t.message ?: "unknown") }
+        } finally {
+            hydrateFlightsMutex.withLock {
+                if (hydrateFlights[key.conversationId] === created) {
+                    hydrateFlights.remove(key.conversationId)
+                }
+            }
         }
-        return loop
     }
 
     private suspend fun getOrCreateLoopWithoutHydrate(key: TimelineCacheKey): TimelineSyncLoop =

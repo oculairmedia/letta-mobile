@@ -1,0 +1,191 @@
+package com.letta.mobile.data.timeline
+
+import com.letta.mobile.data.model.LettaMessage
+import com.letta.mobile.data.model.MessageCreateRequest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
+import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
+
+/**
+ * letta-mobile-oznnh: TimelineRepository hydration must be single-flight per
+ * conversation.
+ *
+ * The loop becomes visible in the registry BEFORE its first hydration
+ * completes, so a concurrent same-conversation caller used to hit the fast
+ * path with hasHydratedSuccessfully=false and start a DUPLICATE hydrate.
+ * These tests prove concurrent callers now join one in-flight hydration,
+ * different conversations stay independent, and failure permits retry.
+ *
+ * Uses runTest as a shell around a fully REAL-dispatcher scenario
+ * (withContext(Dispatchers.Default)): the barriers are cross-thread
+ * CompletableDeferreds and withTimeout must measure REAL time. Inside the
+ * test scheduler, virtual time fast-forwards any timeout parked on a
+ * real-thread signal; wasmJs additionally has no runBlocking, so this
+ * wrapper is the only portable way to get real-time coordination.
+ */
+class TimelineRepositorySingleFlightHydrationTest {
+
+    /** Hydration blocks until the test releases the gate — holds the flight open. */
+    private class GatedHydrationTransport : TimelineTransport {
+        val listCalls = atomic(0)
+
+        /** Completed when the first list call STARTS (owner claimed the flight). */
+        val firstListStarted = CompletableDeferred<Unit>()
+        private val release = CompletableDeferred<Unit>()
+
+        fun releaseGate() {
+            release.complete(Unit)
+        }
+
+        override suspend fun sendConversationMessage(
+            conversationId: String,
+            request: MessageCreateRequest,
+        ): Flow<LettaMessage> = emptyFlow()
+
+        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
+            emptyFlow()
+
+        override suspend fun listConversationMessages(
+            conversationId: String,
+            limit: Int?,
+            after: String?,
+            order: String?,
+        ): List<LettaMessage> {
+            if (listCalls.incrementAndGet() == 1) firstListStarted.complete(Unit)
+            release.await()
+            return emptyList()
+        }
+
+        override suspend fun listAgentMessages(
+            agentId: String,
+            limit: Int?,
+            order: String?,
+            conversationId: String?,
+        ): List<LettaMessage> = emptyList()
+    }
+
+    private class FailingOnceTransport : TimelineTransport {
+        val listCalls = atomic(0)
+
+        override suspend fun sendConversationMessage(
+            conversationId: String,
+            request: MessageCreateRequest,
+        ): Flow<LettaMessage> = emptyFlow()
+
+        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
+            emptyFlow()
+
+        override suspend fun listConversationMessages(
+            conversationId: String,
+            limit: Int?,
+            after: String?,
+            order: String?,
+        ): List<LettaMessage> {
+            if (listCalls.incrementAndGet() == 1) throw RuntimeException("hydration boom")
+            return emptyList()
+        }
+
+        override suspend fun listAgentMessages(
+            agentId: String,
+            limit: Int?,
+            order: String?,
+            conversationId: String?,
+        ): List<LettaMessage> = emptyList()
+    }
+
+    @Test
+    fun concurrent_same_conversation_callers_join_one_hydration() = runTest {
+        withContext(Dispatchers.Default) {
+            val transport = GatedHydrationTransport()
+            val repo = TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+            try {
+                // Caller A runs eagerly (Unconfined) until hydrate hops to the
+                // IO dispatcher; by then it has REGISTERED the single flight
+                // for conv-sf-1. Callers B..D then observe the un-hydrated
+                // cached loop and must JOIN that flight (B/C same agent key,
+                // D aliased via agentId).
+                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-1") }
+                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-1") }
+                val callerC = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-1") }
+                val callerD = async(Dispatchers.Unconfined) {
+                    repo.getOrCreate(agentId = "agent-x", conversationId = "conv-sf-1")
+                }
+
+                // Deterministic barrier: wait until the owner's hydrate is
+                // actually executing upstream (all callers already launched
+                // eagerly), THEN release.
+                withTimeout(10_000) { transport.firstListStarted.await() }
+                transport.releaseGate()
+
+                val loopA = callerA.await()
+                val loopB = callerB.await()
+                val loopC = callerC.await()
+                val loopD = callerD.await()
+
+                // Exactly ONE hydration API call for four concurrent callers.
+                assertEquals(1, transport.listCalls.value)
+                assertTrue(loopA.hasHydratedSuccessfully)
+                assertSame(loopA, loopB)
+                assertSame(loopA, loopC)
+                assertSame(loopA, loopD)
+            } finally {
+                repo.clearAll()
+            }
+        }
+    }
+
+    @Test
+    fun different_conversations_get_independent_flights() = runTest {
+        withContext(Dispatchers.Default) {
+            val transport = GatedHydrationTransport()
+            val repo = TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+            try {
+                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-a") }
+                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-b") }
+
+                // Both conversations hydrate concurrently behind the shared
+                // gate; whichever claims first signals, both finish on release.
+                withTimeout(10_000) { transport.firstListStarted.await() }
+                transport.releaseGate()
+
+                callerA.await()
+                callerB.await()
+
+                // Independent conversations each perform their own hydration.
+                assertEquals(2, transport.listCalls.value)
+            } finally {
+                repo.clearAll()
+            }
+        }
+    }
+
+    @Test
+    fun hydration_failure_permits_later_retry() = runTest {
+        withContext(Dispatchers.Default) {
+            val transport = FailingOnceTransport()
+            val repo = TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+            try {
+                val loop1 = repo.getOrCreate("conv-sf-fail")
+                assertFalse(loop1.hasHydratedSuccessfully)
+
+                // The failed flight was removed — this caller starts a fresh hydrate.
+                val loop2 = repo.getOrCreate("conv-sf-fail")
+                assertTrue(loop2.hasHydratedSuccessfully)
+                assertEquals(2, transport.listCalls.value)
+            } finally {
+                repo.clearAll()
+            }
+        }
+    }
+}
