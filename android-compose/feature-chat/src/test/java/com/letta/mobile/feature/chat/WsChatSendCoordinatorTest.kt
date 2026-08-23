@@ -1153,40 +1153,11 @@ class WsChatSendCoordinatorTest {
 
     @Test
     fun `redial during active turn reconciles and settles without resend`() = runTest {
-        val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
-        val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
-        val timelineRepository = FakeTimelineExternalTransportWriter().apply {
-            recentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
-        }
-        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
-        // This test is the only one in the suite that needs the
-        // coordinator's OWN background collector on
-        // wsChatBridge.redialWhileTurnActive to actually run (every other
-        // test drives state via coordinator.handleEvent(...) directly,
-        // bypassing the collector). TestScope.backgroundScope does not
-        // reliably get pumped by advanceUntilIdle() for this collect-based
-        // path in this coroutines-test setup, so use a plain structured
-        // child scope instead — cancelled explicitly at the end of the test
-        // so runTest doesn't fail on the still-running collector job.
-        val coordinatorScope = CoroutineScope(coroutineContext + Job())
-        val coordinator = WsChatSendCoordinator(
-            scope = coordinatorScope,
-            agentId = "agent-1",
-            activeConfig = settingsRepository(),
-            wsChatBridge = wsChatBridge,
-            timelineRepository = timelineRepository,
-            conversationRepository = stubConversationRepository(),
-            uiState = uiState,
-            clearComposerAfterSend = {},
-            activeConversationId = { "conv-default-agent-1" },
-            setActiveConversationId = {},
-            startTimelineObserver = {},
-            clientVersionProvider = clientVersionProvider,
-        )
+        val fixture = redialRecoveryFixture()
 
         try {
-            coordinator.send("hello").join()
-            coordinator.handleEvent(
+            fixture.coordinator.send("hello").join()
+            fixture.coordinator.handleEvent(
                 WsTimelineEvent.TurnStarted(
                     turnId = "turn-redial",
                     agentId = "agent-1",
@@ -1196,7 +1167,7 @@ class WsChatSendCoordinatorTest {
             )
             advanceUntilIdle()
 
-            redials.emit(
+            fixture.redials.emit(
                 RedialWhileTurnActive(
                     agentId = "agent-1",
                     conversationId = "conv-default-agent-1",
@@ -1213,7 +1184,7 @@ class WsChatSendCoordinatorTest {
             // occurred rather than an exact list (see post-send reconcile
             // scheduling elsewhere in ChatSendCoordinator).
             assertTrue(
-                timelineRepository.recentReconciles.contains(
+                fixture.timelineRepository.recentReconciles.contains(
                     FakeTimelineExternalTransportWriter.RecentReconcile(
                         agentId = "agent-1",
                         conversationId = "conv-default-agent-1",
@@ -1224,10 +1195,10 @@ class WsChatSendCoordinatorTest {
                     ),
                 ),
             )
-            assertEquals(false, uiState.value.isStreaming)
-            assertEquals(false, uiState.value.isAgentTyping)
+            assertEquals(false, fixture.uiState.value.isStreaming)
+            assertEquals(false, fixture.uiState.value.isAgentTyping)
             verify(exactly = 1) {
-                wsChatBridge.send(
+                fixture.wsChatBridge.send(
                     agentId = "agent-1",
                     conversationId = "conv-default-agent-1",
                     text = "hello",
@@ -1237,7 +1208,7 @@ class WsChatSendCoordinatorTest {
                 )
             }
         } finally {
-            coordinatorScope.cancel()
+            fixture.coordinatorScope.cancel()
         }
     }
 
@@ -1511,6 +1482,49 @@ class WsChatSendCoordinatorTest {
             lastMessageAt = "1970-01-01T00:00:00Z",
         )
     }
+
+    private fun kotlinx.coroutines.test.TestScope.redialRecoveryFixture(): RedialRecoveryFixture {
+        val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
+        val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
+        val timelineRepository = FakeTimelineExternalTransportWriter().apply {
+            recentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
+        }
+        val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
+        // This path must exercise the coordinator's own redial collector. A structured
+        // child scope is deterministic here and is explicitly cancelled by the test.
+        val coordinatorScope = CoroutineScope(coroutineContext + Job())
+        val coordinator = WsChatSendCoordinator(
+            scope = coordinatorScope,
+            agentId = "agent-1",
+            activeConfig = settingsRepository(),
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            conversationRepository = stubConversationRepository(),
+            uiState = uiState,
+            clearComposerAfterSend = {},
+            activeConversationId = { "conv-default-agent-1" },
+            setActiveConversationId = {},
+            startTimelineObserver = {},
+            clientVersionProvider = clientVersionProvider,
+        )
+        return RedialRecoveryFixture(
+            redials = redials,
+            wsChatBridge = wsChatBridge,
+            timelineRepository = timelineRepository,
+            uiState = uiState,
+            coordinatorScope = coordinatorScope,
+            coordinator = coordinator,
+        )
+    }
+
+    private data class RedialRecoveryFixture(
+        val redials: MutableSharedFlow<RedialWhileTurnActive>,
+        val wsChatBridge: WsChatBridge,
+        val timelineRepository: FakeTimelineExternalTransportWriter,
+        val uiState: MutableStateFlow<ChatUiState>,
+        val coordinatorScope: CoroutineScope,
+        val coordinator: WsChatSendCoordinator,
+    )
 
     private fun mockBridge(
         sendAccepted: Boolean,
