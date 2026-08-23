@@ -32,8 +32,8 @@ object ConversationAdminHandlers {
      */
     internal const val MESSAGE_GET_PAGE_LIMIT = 100
 
-    /** Max pages walked oldest-ward for message.get / tool_return.get. */
-    internal const val MESSAGE_GET_MAX_PAGES = 20
+    /** Preserve the pre-page-shrink searchable window while keeping each frame small. */
+    internal const val MESSAGE_GET_MAX_SEARCHABLE_MESSAGES = 10_000
 
     /**
      * Wall-clock budget for the whole multi-page walk. Per-page NativeAdmin
@@ -265,7 +265,7 @@ object ConversationAdminHandlers {
 
     /**
      * Phase 2: project a single message from conversation_messages_list.
-     * Walks newest-first pages (up to [MESSAGE_GET_MAX_PAGES] × [MESSAGE_GET_PAGE_LIMIT])
+     * Walks newest-first pages up to [MESSAGE_GET_MAX_SEARCHABLE_MESSAGES].
      * via the `before` cursor; missing ids fail closed (no shim).
      *
      * Each page uses its own [NativeAdmin.require] timeout, and the whole walk
@@ -305,7 +305,8 @@ object ConversationAdminHandlers {
     ): JsonElement {
         var before: String? = null
         val pageLimit = messageGetPageLimit()
-        repeat(MESSAGE_GET_MAX_PAGES) {
+        val maxPages = (MESSAGE_GET_MAX_SEARCHABLE_MESSAGES + pageLimit - 1) / pageLimit
+        repeat(maxPages) {
             val messages = NativeAdmin.require(nativeClient, op) { c ->
                 val native = c.conversationMessagesList(
                     AppServerCommand.ConversationMessagesList(
