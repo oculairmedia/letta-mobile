@@ -209,11 +209,37 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         val incomingIsForwardDelta = !snapshotReplacement &&
             (existing.seqId == null || confirmed.seqId == null || confirmed.seqId > existing.seqId)
         val textMerge = if (snapshotReplacement) {
-            StreamTextMergeResult(
-                text = newText.ifBlank { oldText },
-                branch = StreamTextMergeBranch.SNAPSHOT_CONFLICT,
-                garbleRisk = false,
+            // letta-mobile-9lgfu: terminal settlement fence. This branch used to
+            // overwrite the accumulated text unconditionally with the promoted
+            // real-final snapshot. When that snapshot carries a sequence OLDER
+            // than a content delta already folded into the row and its text is
+            // not a superset of what we hold, the overwrite REGRESSED the body
+            // (the reported "final words dropped" symptom). Fold conservatively
+            // instead — mergeStreamText with incomingIsForwardDelta=false only
+            // keeps-or-grows relative to the accumulator, and the id/run-id
+            // promotion below is unaffected (it keys off `confirmed`).
+            val fence = evaluateTerminalSettlementFence(
+                conversationId = conversationId,
+                serverId = confirmed.serverId,
+                lastDeltaSeqId = existing.seqId,
+                terminalSeqId = confirmed.seqId,
+                accumulatedText = oldText,
+                terminalText = newText,
             )
+            if (fence.blocked) {
+                mergeStreamText(
+                    existing = oldText,
+                    incoming = newText,
+                    canUseSnapshotMerge = true,
+                    incomingIsForwardDelta = false,
+                )
+            } else {
+                StreamTextMergeResult(
+                    text = newText.ifBlank { oldText },
+                    branch = StreamTextMergeBranch.SNAPSHOT_CONFLICT,
+                    garbleRisk = false,
+                )
+            }
         } else {
             mergeStreamText(
                 existing = oldText,
