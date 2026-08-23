@@ -5,11 +5,12 @@ plugins {
 
 android {
     namespace = "com.letta.mobile.baselineprofile"
-    compileSdk = 36
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 28
-        targetSdk = 36
+        // AGP baseline-profile producer requires API 28. Do not use minSdk.
+        minSdk = libs.versions.minSdkBaselineProfile.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

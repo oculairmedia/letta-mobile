@@ -1,7 +1,21 @@
-# Starter version catalog (KMP structure migration Phase 0).
-# Prefer adding new shared versions here; do not bulk-migrate existing
-# hardcoded coordinates in the same PR as a module move.
+# Shared versions for Android/KMP modules.
+# Add a family here, then delete the matching literals from module build files.
+# Do not bump versions in the same change that only relocates coordinates.
 [versions]
+# Android SDK constants — consume via libs.versions.compileSdk/minSdk/targetSdk.
+compileSdk = "37"
+targetSdk = "36"
+minSdk = "26"
+# AGP baseline-profile producer requires 28; keep this as the only minSdk exception.
+minSdkBaselineProfile = "28"
+
+agp = "9.3.1"
+kotlin = "2.4.10"
+ksp = "2.3.11"
+coroutines = "1.11.0"
+ktor = "3.5.0"
+hilt = "2.59.2"
+
 paging = "3.5.0"
 konsist = "0.17.3"
 archunit = "1.4.2"
@@ -14,3 +28,44 @@ konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 archunit = { module = "com.tngtech.archunit:archunit", version.ref = "archunit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
+
+android-gradle-plugin = { module = "com.android.tools.build:gradle", version.ref = "agp" }
+kotlin-gradle-plugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
+
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
+kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+
+ktor-http = { module = "io.ktor:ktor-http", version.ref = "ktor" }
+ktor-io = { module = "io.ktor:ktor-io", version.ref = "ktor" }
+ktor-websockets = { module = "io.ktor:ktor-websockets", version.ref = "ktor" }
+ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
+ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
+ktor-client-js = { module = "io.ktor:ktor-client-js", version.ref = "ktor" }
+ktor-client-websockets = { module = "io.ktor:ktor-client-websockets", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-client-logging = { module = "io.ktor:ktor-client-logging", version.ref = "ktor" }
+ktor-client-auth = { module = "io.ktor:ktor-client-auth", version.ref = "ktor" }
+ktor-client-mock = { module = "io.ktor:ktor-client-mock", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
+ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+ktor-server-cio = { module = "io.ktor:ktor-server-cio", version.ref = "ktor" }
+ktor-server-websockets = { module = "io.ktor:ktor-server-websockets", version.ref = "ktor" }
+
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
+hilt-android-testing = { module = "com.google.dagger:hilt-android-testing", version.ref = "hilt" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+android-kmp-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

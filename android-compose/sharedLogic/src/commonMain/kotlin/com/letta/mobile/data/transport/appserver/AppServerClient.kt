@@ -2,6 +2,7 @@ package com.letta.mobile.data.transport.appserver
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -199,7 +200,7 @@ class DefaultAppServerClient(
         // the caller is responsible for starting the registry.
         parentScope?.let {
             registry.startRouting(it)
-            it.launch {
+            it.launch(start = CoroutineStart.UNDISPATCHED) {
                 // Fail pending requests only on a genuine connected -> disconnected
                 // transition. The transport StateFlow starts Disconnected(false),
                 // so the previous `dropWhile { it }` dropped nothing and fired
@@ -212,6 +213,11 @@ class DefaultAppServerClient(
                 registry.failAll(CancellationException("transport disconnected"))
             }
         }
+    }
+
+    /** Fails request waiters before the owner cancels this client's routing scope. */
+    fun failPendingRequests(reason: String) {
+        registry.failAll(CancellationException(reason))
     }
 
     override suspend fun auth(command: AppServerCommand.Auth): AppServerInboundFrame.AuthResponse =

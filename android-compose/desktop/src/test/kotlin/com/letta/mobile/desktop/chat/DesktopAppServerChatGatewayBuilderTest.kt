@@ -1,6 +1,7 @@
 package com.letta.mobile.desktop.chat
 
 import com.letta.mobile.data.controller.fanout.AppServerRuntimeEventRouter
+import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.data.runtime.AppServerTurnEngine
 import com.letta.mobile.data.transport.appserver.AppServerChannel
 import com.letta.mobile.data.transport.appserver.AppServerClient
@@ -16,21 +17,42 @@ import com.letta.mobile.runtime.ConversationId
 import com.letta.mobile.runtime.RuntimeId
 import com.letta.mobile.runtime.TurnCommand
 import com.letta.mobile.runtime.TurnInput
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.nio.ByteBuffer
+import java.security.MessageDigest
+import java.util.Base64
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Covers the iroh auth/capability handshake [authenticateDesktopIrohAppServer]
@@ -38,6 +60,100 @@ import kotlinx.serialization.json.put
  * connection (finding 6: factory auth wiring).
  */
 class DesktopAppServerChatGatewayBuilderTest {
+
+    @Test
+    fun websocketGatewayIsNotPublishedUntilAppServerInfoCompletes() = runBlocking {
+        RawAppServerWebSocket().use { server ->
+            val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val buildScope = CoroutineScope(coroutineContext + SupervisorJob())
+            val build = buildScope.async {
+                DesktopAppServerChatGatewayBuilder(controllerScope = controllerScope).create(
+                    lettaConfig = localConfig(),
+                    appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = server.url),
+                )
+            }
+
+            try {
+                val requestId = server.awaitAppServerInfoRequestId()
+                assertFalse(build.isCompleted, "gateway was published before app_server_info completed")
+
+                server.sendAppServerInfo(AppServerInfoReply(requestId = requestId))
+                val gateway = withTimeout(5.seconds) { build.await() }
+                (gateway as AutoCloseable).close()
+                server.awaitPeerClose()
+            } finally {
+                build.cancel()
+                buildScope.cancel()
+                controllerScope.cancel()
+            }
+        }
+    }
+
+    @Test
+    fun failedAppServerInfoRejectsGatewayAndClosesWebSocketResources() = runBlocking {
+        RawAppServerWebSocket().use { server ->
+            val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val buildScope = CoroutineScope(coroutineContext + SupervisorJob())
+            val build = buildScope.async {
+                DesktopAppServerChatGatewayBuilder(controllerScope = controllerScope).create(
+                    lettaConfig = localConfig(),
+                    appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = server.url),
+                )
+            }
+
+            try {
+                val requestId = server.awaitAppServerInfoRequestId()
+                server.sendAppServerInfo(
+                    AppServerInfoReply(
+                        requestId = requestId,
+                        success = false,
+                        protocolVersion = null,
+                        runtimeStart = false,
+                        error = "unsupported command",
+                    ),
+                )
+
+                assertFailsWith<IllegalStateException> { withTimeout(5.seconds) { build.await() } }
+                server.awaitPeerClose()
+            } finally {
+                build.cancel()
+                buildScope.cancel()
+                controllerScope.cancel()
+            }
+        }
+    }
+
+    @Test
+    fun incompatibleAppServerInfoRejectsGatewayAndClosesWebSocketResources() = runBlocking {
+        RawAppServerWebSocket().use { server ->
+            val controllerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+            val buildScope = CoroutineScope(coroutineContext + SupervisorJob())
+            val build = buildScope.async {
+                DesktopAppServerChatGatewayBuilder(controllerScope = controllerScope).create(
+                    lettaConfig = localConfig(),
+                    appServerConfig = DesktopAppServerRuntimeConfig(enabled = true, serverUrl = server.url),
+                )
+            }
+
+            try {
+                val requestId = server.awaitAppServerInfoRequestId()
+                server.sendAppServerInfo(AppServerInfoReply(requestId = requestId, runtimeStart = false))
+
+                assertFailsWith<IllegalStateException> { withTimeout(5.seconds) { build.await() } }
+                server.awaitPeerClose()
+            } finally {
+                build.cancel()
+                buildScope.cancel()
+                controllerScope.cancel()
+            }
+        }
+    }
+
+    private fun localConfig() = LettaConfig(
+        id = "desktop-handshake-test",
+        mode = LettaConfig.Mode.LOCAL,
+        serverUrl = "local://bundled",
+    )
 
     @Test
     fun auth_advertisesFramePartCapabilityAndToken() = runTest {
@@ -260,5 +376,192 @@ class DesktopAppServerChatGatewayBuilderTest {
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) =
             TODO("not needed for auth handshake tests")
+    }
+}
+
+/**
+ * Minimal dependency-free WebSocket peer for exercising the production CIO
+ * transport. It intentionally exposes the info response as a test-controlled
+ * barrier so returning a gateway on socket-open alone is observable.
+ */
+private data class AppServerInfoReply(
+    val requestId: String,
+    val success: Boolean = true,
+    val protocolVersion: Int? = 1,
+    val runtimeStart: Boolean = true,
+    val error: String? = null,
+)
+
+private class RawAppServerWebSocket : AutoCloseable {
+    private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    @Volatile
+    private var acceptedSocket: Socket? = null
+    private val inputReady = CompletableDeferred<BufferedInputStream>()
+    private val outputReady = CompletableDeferred<BufferedOutputStream>()
+
+    val url: String = "ws://127.0.0.1:${server.localPort}"
+
+    init {
+        scope.async {
+            val socket = server.accept()
+            socket.tcpNoDelay = true
+            socket.soTimeout = 5_000
+            acceptedSocket = socket
+            val input = BufferedInputStream(socket.getInputStream())
+            val output = BufferedOutputStream(socket.getOutputStream())
+            val headers = readHttpHeaders(input)
+            val key = headers.lineSequence()
+                .first { it.startsWith("Sec-WebSocket-Key:", ignoreCase = true) }
+                .substringAfter(':')
+                .trim()
+            val accept = Base64.getEncoder().encodeToString(
+                MessageDigest.getInstance("SHA-1").digest((key + WEB_SOCKET_GUID).toByteArray()),
+            )
+            output.write(
+                ("HTTP/1.1 101 Switching Protocols\r\n" +
+                    "Upgrade: websocket\r\n" +
+                    "Connection: Upgrade\r\n" +
+                    "Sec-WebSocket-Accept: $accept\r\n\r\n").toByteArray(),
+            )
+            output.flush()
+            inputReady.complete(input)
+            outputReady.complete(output)
+        }
+    }
+
+    suspend fun awaitAppServerInfoRequestId(): String {
+        val frame = withTimeout(5.seconds) { readNextText(inputReady.await()) }
+        val payload = Json.parseToJsonElement(frame).jsonObject
+        assertEquals("app_server_info", payload["type"]?.jsonPrimitive?.content)
+        return payload.getValue("request_id").jsonPrimitive.content
+    }
+
+    suspend fun sendAppServerInfo(reply: AppServerInfoReply) {
+        val response = buildJsonObject {
+            put("type", "app_server_info_response")
+            put("request_id", reply.requestId)
+            put("success", reply.success)
+            reply.error?.let { put("error", it) }
+            if (reply.protocolVersion != null) {
+                put("letta_code_version", "0.29.12")
+                put("protocol_version", reply.protocolVersion)
+                put("backend", "local")
+                put(
+                    "capabilities",
+                    buildJsonObject {
+                        put("runtime_start", reply.runtimeStart)
+                        put("split_channels", false)
+                        put("agent_management", true)
+                        put("conversation_management", true)
+                        put("memory_management", true)
+                    },
+                )
+            }
+        }.toString()
+        writeServerText(outputReady.await(), response)
+    }
+
+    suspend fun awaitPeerClose() {
+        val input = inputReady.await()
+        withTimeout(5.seconds) {
+            while (true) {
+                val opcode = readFrame(input)?.first ?: return@withTimeout
+                if (opcode == CLOSE_OPCODE) return@withTimeout
+            }
+        }
+    }
+
+    override fun close() {
+        runCatching { acceptedSocket?.close() }
+        runCatching { server.close() }
+        scope.cancel()
+    }
+
+    private fun readHttpHeaders(input: BufferedInputStream): String {
+        val bytes = ArrayList<Byte>()
+        var matched = 0
+        val terminator = byteArrayOf(13, 10, 13, 10)
+        while (matched < terminator.size) {
+            val value = input.read()
+            check(value >= 0) { "socket closed during WebSocket upgrade" }
+            val byte = value.toByte()
+            bytes += byte
+            matched = if (byte == terminator[matched]) matched + 1 else if (byte == terminator[0]) 1 else 0
+        }
+        return bytes.toByteArray().decodeToString()
+    }
+
+    private fun readNextText(input: BufferedInputStream): String {
+        while (true) {
+            val (opcode, payload) = readFrame(input) ?: error("socket closed before app_server_info")
+            if (opcode == TEXT_OPCODE) return payload.decodeToString()
+            if (opcode == CLOSE_OPCODE) error("socket closed before app_server_info")
+        }
+    }
+
+    private fun readFrame(input: BufferedInputStream): Pair<Int, ByteArray>? {
+        val first = input.read()
+        if (first < 0) return null
+        val second = input.read()
+        if (second < 0) return null
+        val opcode = first and 0x0f
+        val masked = second and 0x80 != 0
+        val length = when (val shortLength = second and 0x7f) {
+            126 -> readUnsignedShort(input).toLong()
+            127 -> readLong(input)
+            else -> shortLength.toLong()
+        }
+        require(length <= Int.MAX_VALUE) { "test peer received an oversized frame" }
+        val mask = if (masked) input.readExactly(4) else null
+        val payload = input.readExactly(length.toInt())
+        if (mask != null) payload.indices.forEach { payload[it] = (payload[it].toInt() xor mask[it % 4].toInt()).toByte() }
+        return opcode to payload
+    }
+
+    private fun writeServerText(output: BufferedOutputStream, text: String) {
+        val payload = text.toByteArray()
+        synchronized(output) {
+            output.write(0x80 or TEXT_OPCODE)
+            when {
+                payload.size < 126 -> output.write(payload.size)
+                payload.size <= 0xffff -> {
+                    output.write(126)
+                    output.write((payload.size ushr 8) and 0xff)
+                    output.write(payload.size and 0xff)
+                }
+                else -> {
+                    output.write(127)
+                    output.write(ByteBuffer.allocate(Long.SIZE_BYTES).putLong(payload.size.toLong()).array())
+                }
+            }
+            output.write(payload)
+            output.flush()
+        }
+    }
+
+    private fun readUnsignedShort(input: BufferedInputStream): Int =
+        (input.readRequired() shl 8) or input.readRequired()
+
+    private fun readLong(input: BufferedInputStream): Long =
+        ByteBuffer.wrap(input.readExactly(Long.SIZE_BYTES)).long
+
+    private fun BufferedInputStream.readRequired(): Int =
+        read().also { check(it >= 0) { "unexpected WebSocket EOF" } }
+
+    private fun BufferedInputStream.readExactly(size: Int): ByteArray = ByteArray(size).also { bytes ->
+        var offset = 0
+        while (offset < size) {
+            val count = read(bytes, offset, size - offset)
+            check(count >= 0) { "unexpected WebSocket EOF" }
+            offset += count
+        }
+    }
+
+    private companion object {
+        const val WEB_SOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        const val TEXT_OPCODE = 1
+        const val CLOSE_OPCODE = 8
     }
 }

@@ -285,10 +285,7 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
             // and only emit `UiApprovalRequest` while still pending.
             val uiToolCalls: List<UiToolCall>? =
                 if (ev.toolCalls.isNotEmpty()) {
-                    val chip: UiToolApprovalDecision? =
-                        if (ev.approvalDecided && ev.approvalRequestId != null) {
-                            UiToolApprovalDecision.Approved
-                        } else null
+                    val chip: UiToolApprovalDecision? = ev.approvalChip()
                     ev.toolCalls.mapIndexed { index, tc ->
                         val callId = tc.effectiveId.takeIf { it.isNotBlank() }
                         val result = callId?.let { ev.toolReturnContentByCallId[it] }
@@ -421,3 +418,19 @@ private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: Stri
     } else {
         null
     }
+
+/**
+ * letta-mobile-c49of: approval chip for a TOOL_CALL event. An explicit
+ * decision (ApprovalDecision) always wins; REJECTED projects to Rejected so
+ * a rejected call no longer renders as Approved. A decided event with no
+ * explicit outcome (tool-return completion or the approve=null auto-approval
+ * echo) keeps the pre-c49of rendering: Approved.
+ */
+private fun TimelineEvent.Confirmed.approvalChip(): UiToolApprovalDecision? = when {
+    approvalDecision == com.letta.mobile.data.timeline.ApprovalDecision.REJECTED ->
+        UiToolApprovalDecision.Rejected
+    approvalDecision == com.letta.mobile.data.timeline.ApprovalDecision.APPROVED ->
+        UiToolApprovalDecision.Approved
+    approvalDecided && approvalRequestId != null -> UiToolApprovalDecision.Approved
+    else -> null
+}

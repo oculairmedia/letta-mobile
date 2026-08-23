@@ -178,9 +178,8 @@ jobs:
         # Output:
         #   D:\l\compose\binaries\main\exe\*.exe
         #   D:\l\compose\binaries\main\msi\*.msi
-        # Keep release packaging aligned with desktop CI: the bundled-runtime
-        # Exec tasks are deliberately outside Gradle's configuration cache.
-        run: ./gradlew --no-daemon --no-configuration-cache :desktop:packageDistributionForCurrentOS
+        # Same packaging configuration-cache hole as desktop.yml.
+        run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload desktop installers
         uses: actions/upload-artifact@v4

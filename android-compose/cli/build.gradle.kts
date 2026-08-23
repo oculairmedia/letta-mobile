@@ -1,20 +1,10 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
     namespace = "com.letta.mobile.cli"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 
     testOptions {
         unitTests {
@@ -54,20 +44,20 @@ dependencies {
     implementation(project(":iroh-wrapper-cli"))
 
     implementation("com.github.ajalt.clikt:clikt:5.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
     implementation("com.squareup.okhttp3:okhttp:5.3.2")
-    implementation("io.ktor:ktor-client-core:3.5.0")
-    implementation("io.ktor:ktor-client-okhttp:3.5.0")
-    implementation("io.ktor:ktor-client-websockets:3.5.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.websockets)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.20.2")
     implementation("computer.iroh:iroh:1.1.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation(libs.kotlinx.coroutines.test)
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 

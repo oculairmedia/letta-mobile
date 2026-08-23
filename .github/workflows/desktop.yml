@@ -34,6 +34,9 @@ concurrency:
   group: desktop-installer-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   windows-installer:
     runs-on: windows-latest
@@ -94,11 +97,10 @@ jobs:
         # follow-up. Output:
         #   D:\l\compose\binaries\main\exe\*.exe
         #   D:\l\compose\binaries\main\msi\*.msi
-        # Runtime download/install Exec tasks intentionally perform external
-        # process work and are not configuration-cache serializable. Packaging
-        # already produces its own incremental outputs, so disable the cache
-        # rather than failing after EXE/MSI generation has completed.
-        run: ./gradlew --no-daemon --no-configuration-cache :desktop:packageDistributionForCurrentOS
+        # Packaging still captures Gradle script objects (Nucleus jpackage tasks
+        # plus JBR verify actions). :desktop:run is configuration-cache safe;
+        # this entry point is not, so keep the cache off here only.
+        run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4

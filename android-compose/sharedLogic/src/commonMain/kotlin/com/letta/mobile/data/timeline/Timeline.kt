@@ -111,6 +111,12 @@ sealed class TimelineEvent {
         // this, every tool call still showed approve/reject buttons even after
         // the server had already auto-approved them.
         val approvalDecided: Boolean = false,
+        // letta-mobile-c49of: explicit user decision when one was actually
+        // observed (approve=true/false on an ApprovalResponseMessage). Null
+        // means the request was resolved without an explicit decision —
+        // tool-return completion or the approve=null auto-approval echo —
+        // and the UI keeps its legacy decided-without-label rendering.
+        val approvalDecision: ApprovalDecision? = null,
         // Attached ToolReturnMessage output body, if one has been observed for
         // any of this event's tool calls. letta-mobile-mge5.19: previously
         // tool_return_messages rendered as their own separate bubble, making
@@ -131,6 +137,15 @@ sealed class TimelineEvent {
 }
 
 enum class Role { USER, ASSISTANT, SYSTEM }
+
+/**
+ * letta-mobile-c49of: explicit outcome of an approval request, observed from
+ * an ApprovalResponseMessage carrying approve=true/false. Kept separate from
+ * [approvalDecided] because a request can be resolved without a decision
+ * (tool-return completion, approve=null auto-approval echo) — those stay
+ * decided-but-unlabeled.
+ */
+enum class ApprovalDecision { APPROVED, REJECTED }
 
 enum class DeliveryState { SENDING, SENT, FAILED }
 
