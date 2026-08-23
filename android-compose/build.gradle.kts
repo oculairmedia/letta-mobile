@@ -5,11 +5,11 @@ plugins {
     id("com.letta.mobile.architecture-graph")
     id("com.autonomousapps.dependency-analysis") version "3.5.1" apply false
     id("org.jetbrains.kotlinx.kover") version "0.9.8"
-    id("com.android.application") version "9.3.1" apply false
-    id("com.android.library") version "9.3.1" apply false
-    id("com.android.kotlin.multiplatform.library") version "9.3.1" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.4.10" apply false
-    id("org.jetbrains.kotlin.multiplatform") version "2.4.10" apply false
+    alias(libs.plugins.android.application) apply false
+    alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.android.kmp.library) apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.kotlin.multiplatform) apply false
     // Keep the project plugin on 1.10.0 for the shared macOS x64 target, which
     // Compose 1.11 no longer publishes. Nucleus upgrades only the desktop
     // runtime to 1.11.1; DesktopJewelTheme bridges Jewel's older text-menu ABI.
@@ -17,12 +17,12 @@ plugins {
     id("dev.nucleusframework") version "2.1.5" apply false
     id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
     id("io.github.takahirom.roborazzi") version "1.63.0" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.10" apply false
-    id("com.google.dagger.hilt.android") version "2.59.2" apply false
-    id("com.google.devtools.ksp") version "2.3.11" apply false
+    alias(libs.plugins.kotlin.compose) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    alias(libs.plugins.hilt.android) apply false
+    alias(libs.plugins.ksp) apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
-    id("org.jetbrains.kotlin.plugin.allopen") version "2.4.10" apply false
+    alias(libs.plugins.kotlin.allopen) apply false
     id("com.mikepenz.aboutlibraries.plugin.android") version "14.2.1" apply false
     id("io.sentry.android.gradle") version "6.8.1" apply false
     id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
@@ -66,7 +66,7 @@ if (providers.gradleProperty("dependencyAnalysisAdvisory").orNull == "true") {
 subprojects {
     configurations.configureEach {
         resolutionStrategy {
-            force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10")
+            force("org.jetbrains.kotlin:kotlin-metadata-jvm:${libs.versions.kotlin.get()}")
         }
     }
 
@@ -88,7 +88,7 @@ subprojects {
     }
 }
 
-val advisoryDetekt by tasks.registering {
+val advisoryDetekt = tasks.register("advisoryDetekt") {
     description = "Run configured Detekt checks and emit SARIF/XML/HTML reports without blocking by default."
     group = "verification"
 }

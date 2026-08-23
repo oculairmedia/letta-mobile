@@ -20,6 +20,9 @@ concurrency:
   group: android-perf-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   perf-gate:
     name: perf-gate
@@ -107,7 +110,7 @@ jobs:
           working-directory: android-compose
           script: |
             rm -rf "$PERF_SUMMARY_DIR"; mkdir -p "$PERF_SUMMARY_DIR/attempt-1"
-            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
+            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
       - name: Check perf baselines (attempt 1)
         if: steps.classify.outputs.run_benchmark == 'true'
@@ -148,7 +151,7 @@ jobs:
           working-directory: android-compose
           script: |
             rm -rf "$PERF_OUTPUT_DIR" "$PERF_REPORT_DIR"; mkdir -p "$PERF_SUMMARY_DIR/attempt-2"
-            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew --no-daemon :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
+            FILTER=$(printf '%s\n' "$PERF_BENCHMARK_FILTER" | awk 'NF { printf "%s,", $0 } END { print "" }' | sed 's/,$//'); ./gradlew :macrobenchmark:connectedBenchmarkAndroidTest -Pandroid.testInstrumentationRunnerArguments.class="$FILTER"
 
       - name: Check perf baselines after retry (attempt 2)
         if: steps.classify.outputs.run_benchmark == 'true' && steps.check_perf_attempt_1.outputs.retry == 'true'
