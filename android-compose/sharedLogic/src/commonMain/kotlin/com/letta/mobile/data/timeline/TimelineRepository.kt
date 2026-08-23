@@ -29,6 +29,7 @@ open class TimelineRepository(
     private val timelineTransport: TimelineTransport,
     private val pendingLocalStore: PendingLocalStore,
     private val conversationCursorStore: ConversationCursorStore,
+    private val startLoopStreamSubscribers: Boolean = true,
 ) : TimelineExternalTransportWriter, BackendScopedCache {
     constructor(
         timelineTransport: TimelineTransport,
@@ -253,6 +254,7 @@ open class TimelineRepository(
                 ingestedListenerProvider = { ingestedListener },
                 pendingLocalStore = pendingLocalStore,
                 conversationCursorStore = conversationCursorStore,
+                startStreamSubscriber = startLoopStreamSubscribers,
             )
             loops[key] = created
             evictEldestLoopsIfNeededLocked()

@@ -85,7 +85,17 @@ class TimelineRepositorySingleFlightHydrationTest {
     }
 
     private fun newRepo(transport: TimelineTransport): TimelineRepository =
-        TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+        // Stream subscribers OFF: they emit async Telemetry stragglers from
+        // the IO dispatcher after the test returns, which pollutes sibling
+        // tests that assert exact Telemetry snapshot counts
+        // (TimelineStateDumpTest counts exactly 1 event). The single-flight
+        // behavior under test doesn't involve the stream path.
+        TimelineRepository(
+            transport,
+            NoOpPendingLocalStore,
+            NoOpConversationCursorStore,
+            startLoopStreamSubscribers = false,
+        )
 
     @Test
     fun concurrent_same_conversation_callers_join_one_hydration() = runTest {
