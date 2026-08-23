@@ -132,26 +132,28 @@ class IrohExternalTransportDuplicateIngestTest {
         loop.close()
     }
 
-    private object EmptyTimelineTransport : TimelineTransport {
-        override suspend fun sendConversationMessage(
-            conversationId: String,
-            request: MessageCreateRequest,
-        ): Flow<LettaMessage> = emptyFlow()
+}
 
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
+/** Shared no-op transport for tests that exercise only one transport surface. */
+internal object EmptyTimelineTransport : TimelineTransport {
+    override suspend fun sendConversationMessage(
+        conversationId: String,
+        request: MessageCreateRequest,
+    ): Flow<LettaMessage> = emptyFlow()
 
-        override suspend fun listConversationMessages(
-            conversationId: String,
-            limit: Int?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> = emptyList()
+    override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
 
-        override suspend fun listAgentMessages(
-            agentId: String,
-            limit: Int?,
-            order: String?,
-            conversationId: String?,
-        ): List<LettaMessage> = emptyList()
-    }
+    override suspend fun listConversationMessages(
+        conversationId: String,
+        limit: Int?,
+        after: String?,
+        order: String?,
+    ): List<LettaMessage> = emptyList()
+
+    override suspend fun listAgentMessages(
+        agentId: String,
+        limit: Int?,
+        order: String?,
+        conversationId: String?,
+    ): List<LettaMessage> = emptyList()
 }

@@ -1,7 +1,6 @@
 package com.letta.mobile.data.timeline
 
 import com.letta.mobile.data.model.LettaMessage
-import com.letta.mobile.data.model.MessageCreateRequest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,8 +10,6 @@ import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -49,7 +46,7 @@ class TimelineRepositorySingleFlightHydrationTest {
     private class FakeHydrationTransport(
         private val failFirstCall: Boolean = false,
         private val gated: Boolean = false,
-    ) : TimelineTransport {
+    ) : TimelineTransport by EmptyTimelineTransport {
         val listCalls = atomic(0)
 
         /** Completed when the first list call STARTS (owner claimed the flight). */
@@ -60,14 +57,6 @@ class TimelineRepositorySingleFlightHydrationTest {
         fun releaseGate() {
             release.complete(Unit)
         }
-
-        override suspend fun sendConversationMessage(
-            conversationId: String,
-            request: MessageCreateRequest,
-        ): Flow<LettaMessage> = emptyFlow()
-
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-            emptyFlow()
 
         override suspend fun listConversationMessages(
             conversationId: String,
@@ -83,12 +72,6 @@ class TimelineRepositorySingleFlightHydrationTest {
             return emptyList()
         }
 
-        override suspend fun listAgentMessages(
-            agentId: String,
-            limit: Int?,
-            order: String?,
-            conversationId: String?,
-        ): List<LettaMessage> = emptyList()
     }
 
     private fun newRepo(transport: TimelineTransport): TimelineRepository =
