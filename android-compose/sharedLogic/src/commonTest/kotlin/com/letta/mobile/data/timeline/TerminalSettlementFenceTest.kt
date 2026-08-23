@@ -4,6 +4,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentMapOf
 import kotlinx.serialization.json.JsonPrimitive
+import kotlin.jvm.JvmInline
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
