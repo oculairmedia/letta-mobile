@@ -12,6 +12,7 @@ import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
 import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -20,6 +21,8 @@ import com.letta.mobile.data.transport.TransportFrameEvent
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.IChannelTransport
+import com.letta.mobile.data.transport.api.RedialAwareChannelTransport
+import com.letta.mobile.data.transport.api.RedialWhileTurnActive
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -114,6 +117,43 @@ class ChatSendCoordinatorCleanupTest {
 
             assertEquals(0, ui.visualCompletions)
         }
+    @Test
+    fun redialRecoveryFinalizesOnlyAfterAppliedAuthoritativeReconcile() = runTest(UnconfinedTestDispatcher()) {
+        val timeline = RecordingTimelineWriter()
+        val ui = RecordingUiSink()
+        val transport = RedialChannelTransport(mutableListOf(true))
+        val recorded = mutableListOf<WsTimelineEvent>()
+        val coordinator = coordinator(
+            timeline = timeline,
+            ui = ui,
+            transport = transport,
+            recordRuntimeEvent = { event, _ -> recorded += event },
+        )
+
+        coordinator.send("hello").join()
+        coordinator.handleEvent(WsTimelineEvent.TurnStarted("turn-1", AGENT_ID, "conv-1", "run-1"))
+        timeline.reconcileOutcome = RecentMessagesReconcileOutcome.Skipped("forcedReconcileDebounced")
+        transport.emitRedial()
+        advanceUntilIdle()
+
+        assertTrue(recorded.none { it is WsTimelineEvent.TurnDone && it.status == BridgeTurnStatus.Completed })
+        assertTrue(ui.isStreaming())
+
+        timeline.reconcileOutcome = RecentMessagesReconcileOutcome.Failed(IllegalStateException("fetch failed"))
+        transport.emitRedial()
+        advanceUntilIdle()
+
+        assertTrue(recorded.none { it is WsTimelineEvent.TurnDone && it.status == BridgeTurnStatus.Completed })
+        assertTrue(ui.isStreaming())
+
+        timeline.reconcileOutcome = RecentMessagesReconcileOutcome.Applied(1)
+        transport.emitRedial()
+        advanceUntilIdle()
+
+        assertTrue(recorded.any { it is WsTimelineEvent.TurnDone && it.status == BridgeTurnStatus.Completed })
+        assertFalse(ui.isStreaming())
+    }
+
     @Test
     fun transientDisconnectDoesNotCleanupFailOrFinalizeActiveTurn() = runTest(UnconfinedTestDispatcher()) {
         val timeline = RecordingTimelineWriter()
@@ -690,6 +730,7 @@ class ChatSendCoordinatorCleanupTest {
     }
 
     private class RecordingTimelineWriter(private val cleanupFailure: Throwable? = null) : TimelineExternalTransportWriter {
+        var reconcileOutcome: RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
         val externalLocals = mutableListOf<ExternalLocal>()
         val ingestedMessages = mutableListOf<LettaMessage>()
         val sentLocals = mutableListOf<LocalMarker>()
@@ -712,7 +753,7 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun clearExternalTransportActive(conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) { clearedActiveConversations += conversationId }
         override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int { cleanupFailure?.let { throw it }; cleanupTails += CleanupTail(agentId, conversationId, runId, turnId, candidateRunIds); return 0 }
-        override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int { reconciles += Reconcile(conversationId, reason, forceRefresh); return 0 }
+        override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean, connectionGeneration: Long): RecentMessagesReconcileOutcome { reconciles += Reconcile(conversationId, reason, forceRefresh); return reconcileOutcome }
         data class ExternalLocal(val conversationId: String, val content: String, val otid: String)
         data class LocalMarker(val conversationId: String, val otid: String)
         data class CleanupTail(val agentId: String?, val conversationId: String, val activeRunId: String?, val activeTurnId: String?, val candidateRunIds: Set<String>)
@@ -726,7 +767,7 @@ class ChatSendCoordinatorCleanupTest {
      * [activeChatTurn] stays as the "every conversation is busy" shorthand the
      * older single-conversation tests use.
      */
-    private class FakeChannelTransport(
+    private open class FakeChannelTransport(
         val sendResults: MutableList<Boolean>,
         var activeChatTurn: Boolean = false,
         val activeChatTurnConversations: MutableSet<String> = mutableSetOf(),
@@ -754,6 +795,16 @@ class ChatSendCoordinatorCleanupTest {
         override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long) = error("unused")
         override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long) = error("unused")
         override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long) = error("unused")
+    }
+
+    private class RedialChannelTransport(sendResults: MutableList<Boolean>) :
+        FakeChannelTransport(sendResults), RedialAwareChannelTransport {
+        private val _redialWhileTurnActive = MutableSharedFlow<RedialWhileTurnActive>()
+        override val redialWhileTurnActive = _redialWhileTurnActive
+
+        suspend fun emitRedial() {
+            _redialWhileTurnActive.emit(RedialWhileTurnActive(AGENT_ID, "conv-1", "turn-1", "run-1", connectionGeneration = 2L))
+        }
     }
 
     private class FakeConversationRepository : IConversationRepository {

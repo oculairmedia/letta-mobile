@@ -6,6 +6,7 @@ import com.letta.mobile.data.model.ToolReturnMessage
 import com.letta.mobile.data.timeline.DeliveryState
 import com.letta.mobile.data.timeline.HydratedTimelineResult
 import com.letta.mobile.data.timeline.MessageSource
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.Role
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineEvent
@@ -263,7 +264,8 @@ class HeadlessTimelineStore(
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
-    ): Int = 0
+        connectionGeneration: Long,
+    ): RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
 
     private fun timelineLocked(conversationId: String): Timeline =
         timelines.getOrPut(conversationId) { Timeline(conversationId = conversationId) }

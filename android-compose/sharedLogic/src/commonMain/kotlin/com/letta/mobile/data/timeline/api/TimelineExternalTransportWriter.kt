@@ -2,6 +2,7 @@ package com.letta.mobile.data.timeline.api
 
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 
 /**
  * Narrow timeline surface for the admin-shim WebSocket transport path.
@@ -60,7 +61,13 @@ interface TimelineExternalTransportWriter {
 
     suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String> = emptySet()): Int
 
-    suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean = false): Int
+    suspend fun reconcileRecentMessages(
+        agentId: String?,
+        conversationId: String,
+        reason: String,
+        forceRefresh: Boolean = false,
+        connectionGeneration: Long = 0L,
+    ): RecentMessagesReconcileOutcome
 
     /**
      * letta-mobile-dangling-tool: signals that a turn started on

@@ -3,6 +3,8 @@ package com.letta.mobile.data.timeline
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageCreateRequest
 import com.letta.mobile.data.model.UserMessage
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Applied
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome.Skipped
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
@@ -78,15 +80,47 @@ class TimelineRecentMessagesReconcilerTest {
             minForcedReconcileIntervalMs = 4_000L,
         )
 
-        reconciler.reconcileRecentMessages("post-send-750", forceRefresh = true)
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("post-send-750", forceRefresh = true))
         now += 2_500L
-        reconciler.reconcileRecentMessages("post-send-2500", forceRefresh = true)
+        assertEquals(Skipped("forcedReconcileDebounced"), reconciler.reconcileRecentMessages("post-send-2500", forceRefresh = true))
         now += 3_500L
-        reconciler.reconcileRecentMessages("post-send-6000", forceRefresh = true)
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("post-send-6000", forceRefresh = true))
 
         // Only the first and third calls fall outside the 4s debounce window from
         // the previous completed forced reconcile; the middle one (2.5s later) is
         // redundant while the stream is already active and gets skipped.
+        assertEquals(2, transport.listCalls)
+    }
+
+    @Test
+    fun newConnectionGenerationBypassesPriorForcedReconcileDebounce() = runTest(UnconfinedTestDispatcher()) {
+        val transport = RecordingTimelineTransport()
+        var now = 0L
+        val reconciler = TimelineRecentMessagesReconciler(
+            conversationId = "conv-1",
+            messageApi = transport,
+            eventQueue = Channel<TimelineGatewayEvent>(Channel.UNLIMITED).also { queue ->
+                backgroundScope.launch {
+                    for (event in queue) {
+                        if (event is TimelineGatewayEvent.RecentMessagesSnapshot) {
+                            event.ack.complete(event.serverMessages.size)
+                        }
+                    }
+                }
+            },
+            state = MutableStateFlow(Timeline("conv-1")),
+            streamSubscriberActive = MutableStateFlow(true),
+            writeMutex = Mutex(),
+            applyReturnsAndResponsesFromSnapshot = {},
+            nowMillis = { now },
+            minForcedReconcileIntervalMs = 4_000L,
+        )
+
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("post-send", forceRefresh = true, connectionGeneration = 1L))
+        now += 1_000L
+        assertEquals(Applied(1), reconciler.reconcileRecentMessages("redial-recovery", forceRefresh = true, connectionGeneration = 2L))
+        assertEquals(Skipped("forcedReconcileDebounced"), reconciler.reconcileRecentMessages("duplicate", forceRefresh = true, connectionGeneration = 2L))
+
         assertEquals(2, transport.listCalls)
     }
 

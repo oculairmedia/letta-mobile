@@ -123,7 +123,13 @@ class TimelineSyncLoop(
         state = _state,
         writeMutex = writeMutex,
         scope = loopScope,
-        reconcile = ::reconcileRecentMessages,
+        reconcile = { reason, forceRefresh ->
+            when (val outcome = reconcileRecentMessages(reason, forceRefresh)) {
+                is RecentMessagesReconcileOutcome.Applied -> outcome.appended
+                is RecentMessagesReconcileOutcome.Skipped -> 0
+                is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
+            }
+        },
     )
 
     /** True while a turn is believed active for this conversation. Toggled by [turnStarted]/[turnEnded]. */
@@ -431,12 +437,20 @@ class TimelineSyncLoop(
 
     suspend fun reconcileForExternalRun(runId: String) {
         reconcileForExternalRun(runId) { name, attrs, allowWhileActive ->
-            recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)
+            when (val outcome = recentMessagesReconciler.reconcileRecentMessagesFromServer(name, attrs, allowWhileActive)) {
+                is RecentMessagesReconcileOutcome.Applied -> outcome.appended
+                is RecentMessagesReconcileOutcome.Skipped -> 0
+                is RecentMessagesReconcileOutcome.Failed -> throw outcome.cause
+            }
         }
     }
 
-    suspend fun reconcileRecentMessages(reason: String, forceRefresh: Boolean = false): Int {
-        return recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh)
+    suspend fun reconcileRecentMessages(
+        reason: String,
+        forceRefresh: Boolean = false,
+        connectionGeneration: Long = 0L,
+    ): RecentMessagesReconcileOutcome {
+        return recentMessagesReconciler.reconcileRecentMessages(reason, forceRefresh, connectionGeneration)
     }
 
     suspend fun markExternalTransportLocalSent(otid: String) {
