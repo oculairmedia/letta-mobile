@@ -36,6 +36,11 @@ import kotlinx.coroutines.withTimeout
  */
 class TimelineRepositorySingleFlightHydrationTest {
 
+    private data class HydrationTarget(
+        val conversationId: String,
+        val agentId: String? = null,
+    )
+
     /**
      * One configurable fake covers every scenario: [failFirstCall] makes the
      * first hydration attempt throw; when gated, list calls park on
@@ -99,6 +104,9 @@ class TimelineRepositorySingleFlightHydrationTest {
             startLoopStreamSubscribers = false,
         )
 
+    private suspend fun TimelineRepository.getOrCreate(target: HydrationTarget): TimelineSyncLoop =
+        getOrCreate(target.agentId, target.conversationId)
+
     @Test
     fun concurrent_same_conversation_callers_join_one_hydration() = runTest {
         withContext(Dispatchers.Default) {
@@ -110,12 +118,11 @@ class TimelineRepositorySingleFlightHydrationTest {
                 // for conv-sf-1. Callers B..D then observe the un-hydrated
                 // cached loop and must JOIN that flight (B/C same agent key,
                 // D aliased via agentId).
-                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-1") }
-                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-1") }
-                val callerC = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-1") }
-                val callerD = async(Dispatchers.Unconfined) {
-                    repo.getOrCreate(agentId = "agent-x", conversationId = "conv-sf-1")
-                }
+                val target = HydrationTarget("conv-sf-1")
+                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
+                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
+                val callerC = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
+                val callerD = async(Dispatchers.Unconfined) { repo.getOrCreate(target.copy(agentId = "agent-x")) }
 
                 // Deterministic barrier: wait until the owner's hydrate is
                 // actually executing upstream (all callers already launched
@@ -146,12 +153,9 @@ class TimelineRepositorySingleFlightHydrationTest {
             val transport = FakeHydrationTransport(gated = true)
             val repo = newRepo(transport)
             try {
-                val callerA = async(Dispatchers.Unconfined) {
-                    repo.getOrCreate(agentId = "agent-a", conversationId = "conv-scoped")
-                }
-                val callerB = async(Dispatchers.Unconfined) {
-                    repo.getOrCreate(agentId = "agent-b", conversationId = "conv-scoped")
-                }
+                val target = HydrationTarget("conv-scoped")
+                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate(target.copy(agentId = "agent-a")) }
+                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate(target.copy(agentId = "agent-b")) }
 
                 withTimeout(10_000) {
                     transport.firstListStarted.await()
@@ -177,11 +181,12 @@ class TimelineRepositorySingleFlightHydrationTest {
             val transport = FakeHydrationTransport(gated = true)
             val repo = newRepo(transport)
             try {
-                val original = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-clear") }
+                val target = HydrationTarget("conv-clear")
+                val original = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
                 withTimeout(10_000) { transport.firstListStarted.await() }
 
                 repo.clear("conv-clear")
-                val replacement = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-clear") }
+                val replacement = async(Dispatchers.Unconfined) { repo.getOrCreate(target) }
                 withTimeout(10_000) { transport.secondListStarted.await() }
                 transport.releaseGate()
 
@@ -202,8 +207,8 @@ class TimelineRepositorySingleFlightHydrationTest {
             val transport = FakeHydrationTransport(gated = true)
             val repo = newRepo(transport)
             try {
-                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-a") }
-                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-b") }
+                val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate(HydrationTarget("conv-sf-a")) }
+                val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate(HydrationTarget("conv-sf-b")) }
 
                 // Both conversations hydrate concurrently behind the shared
                 // gate; whichever claims first signals, both finish on release.
@@ -230,11 +235,12 @@ class TimelineRepositorySingleFlightHydrationTest {
             val transport = FakeHydrationTransport(failFirstCall = true)
             val repo = newRepo(transport)
             try {
-                val loop1 = repo.getOrCreate("conv-sf-fail")
+                val target = HydrationTarget("conv-sf-fail")
+                val loop1 = repo.getOrCreate(target)
                 assertFalse(loop1.hasHydratedSuccessfully)
 
                 // The failed flight was removed — this caller starts a fresh hydrate.
-                val loop2 = repo.getOrCreate("conv-sf-fail")
+                val loop2 = repo.getOrCreate(target)
                 assertTrue(loop2.hasHydratedSuccessfully)
                 assertEquals(2, transport.listCalls.value)
             } finally {
