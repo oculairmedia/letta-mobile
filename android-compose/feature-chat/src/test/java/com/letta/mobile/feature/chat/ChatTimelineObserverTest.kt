@@ -17,6 +17,7 @@ import com.letta.mobile.data.timeline.TimelineRepository
 import com.letta.mobile.data.timeline.TimelineSyncEvent
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.util.Telemetry
+import androidx.lifecycle.SavedStateHandle
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -41,6 +42,7 @@ import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import com.letta.mobile.feature.chat.coordination.ChatRunExpansionState
 import com.letta.mobile.feature.chat.coordination.ChatTimelineObserver
 import com.letta.mobile.data.chat.projection.ChatMessageListChange
 
@@ -672,6 +674,102 @@ class ChatTimelineObserverTest {
         assertEquals("frame-1", harness.uiState.value.messages.first().id)
     }
 
+    // region letta-mobile-ah1ng: terminal-run collapse reconciliation through
+    // the REAL observer→ChatRunExpansionState production path (the harness no
+    // longer injects a no-op collapse callback).
+
+    @Test
+    fun `completed run first seen via hydration defaults collapsed`() = runTest {
+        val harness = Harness(backgroundScope)
+        harness.seedTimeline(
+            "conv-1",
+            listOf(
+                confirmed("h-10", "hi"),
+                confirmed("h-20", "settled long ago", TimelineMessageType.ASSISTANT, runId = "run-hist"),
+            ),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        assertEquals(listOf("h-10", "h-20"), harness.uiState.value.messages.map { it.id })
+        // No isStreaming edge ever fired here; per-run terminal reconciliation
+        // must still fold the completed run.
+        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-hist"))
+    }
+
+    @Test
+    fun `live terminal transition collapses run once presence clears`() = runTest {
+        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
+        val flow = harness.seedTimeline(
+            "conv-1",
+            listOf(
+                confirmed("t-10", "go"),
+                confirmed("t-20", "partial answer", TimelineMessageType.ASSISTANT, runId = "run-live"),
+            ),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        assertTrue(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-live"))
+
+        // Presence clears via a presence-only (deduped projection) tick — the
+        // publication must still route through terminal reconciliation.
+        harness.activeReplyStreams.value = emptySet()
+        flow.value = flow.value.copy(liveCursor = "presence-bump")
+        runCurrent()
+
+        assertFalse(harness.uiState.value.isStreaming)
+        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-live"))
+    }
+
+    @Test
+    fun `terminal run collapses even when a newer turn starts before presence clears`() = runTest {
+        // Ordering regression: run-1's terminal projection landed while the
+        // streaming edge was consumed by a later turn. The old newest-run-only,
+        // edge-gated selection left run-1 expanded forever.
+        val harness = Harness(backgroundScope, activeReplyConversationIds = setOf("conv-1"))
+        val flow = harness.seedTimeline(
+            "conv-1",
+            listOf(
+                confirmed("d-10", "first question"),
+                confirmed("d-20", "answer one", TimelineMessageType.ASSISTANT, runId = "run-1"),
+            ),
+        )
+
+        harness.observer.start("conv-1")
+        runCurrent()
+
+        assertTrue(harness.uiState.value.isStreaming)
+        assertFalse(harness.uiState.value.collapsedRunIds.contains("run-1"))
+
+        // A second turn starts before presence ever drops.
+        flow.value = Timeline(
+            "conv-1",
+            events = persistentListOf(
+                confirmed("d-10", "first question"),
+                confirmed("d-20", "answer one", TimelineMessageType.ASSISTANT, runId = "run-1"),
+                confirmed("d-30", "second question"),
+                confirmed("d-40", "working", TimelineMessageType.ASSISTANT, runId = "run-2"),
+            ),
+        )
+        runCurrent()
+
+        assertTrue(harness.uiState.value.collapsedRunIds.contains("run-1"))
+        assertFalse("active newest run stays open", harness.uiState.value.collapsedRunIds.contains("run-2"))
+
+        // Presence finally clears; run-2 settles as well and prior runs stay folded.
+        harness.activeReplyStreams.value = emptySet()
+        flow.value = flow.value.copy(liveCursor = "settle-bump")
+        runCurrent()
+
+        assertTrue(harness.uiState.value.collapsedRunIds.containsAll(setOf("run-1", "run-2")))
+    }
+
+    // endregion
+
     private class Harness(
         scope: CoroutineScope,
         activeReplyConversationIds: Set<String> = emptySet(),
@@ -686,6 +784,12 @@ class ChatTimelineObserverTest {
         val currentConversationTracker = CurrentConversationTracker()
         val activeReplyStreams = MutableStateFlow(activeReplyConversationIds)
         val uiState = MutableStateFlow(ChatUiState(messages = persistentListOf()))
+        // letta-mobile-ah1ng: the harness routes publications through a REAL
+        // ChatRunExpansionState exactly like AdminChatViewModel does. The old
+        // `{ _, next -> next }` stub made every collapse regression invisible
+        // at this layer.
+        val savedStateHandle = SavedStateHandle()
+        private val runExpansionState = ChatRunExpansionState(savedStateHandle, uiState)
         val timelineFlows = mutableMapOf<TimelineHarnessKey, MutableStateFlow<Timeline>>()
         private val syncEvents = MutableSharedFlow<TimelineSyncEvent>(extraBufferCapacity = 16)
         private val loop: TimelineSyncLoop = mockk {
@@ -702,7 +806,8 @@ class ChatTimelineObserverTest {
             clearA2uiThinkingOnResponse = clearA2uiThinkingOnResponse,
             isFollowingDuplicateInitialMessageInFlight = isFollowingDuplicateInitialMessageInFlight,
             clearFollowingDuplicateInitialMessageInFlight = clearFollowingDuplicateInitialMessageInFlight,
-            collapseCompletedRunsIfStreamingFinished = { _, next -> next },
+            reconcileCollapsedRunsOnProjection =
+                { previous, next -> runExpansionState.reconcileCollapsedRunsOnProjection(previous, next) },
             syncA2uiHistorySnapshot = syncA2uiHistorySnapshot,
             projectionDispatcher = scope.coroutineContext[ContinuationInterceptor] as? CoroutineDispatcher
                 ?: Dispatchers.Default,
@@ -765,6 +870,7 @@ class ChatTimelineObserverTest {
         id: String,
         content: String,
         messageType: TimelineMessageType = TimelineMessageType.USER,
+        runId: String? = null,
     ) = TimelineEvent.Confirmed(
         position = id.substringAfterLast('-').toDoubleOrNull() ?: 1.0,
         otid = "otid-$id",
@@ -772,7 +878,7 @@ class ChatTimelineObserverTest {
         content = content,
         messageType = messageType,
         date = Instant.parse("2026-05-10T00:00:00Z"),
-        runId = null,
+        runId = runId,
         stepId = null,
         source = MessageSource.LETTA_SERVER,
     )
