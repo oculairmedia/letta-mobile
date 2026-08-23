@@ -91,6 +91,41 @@ App Server does not need restarting. `JAVA_OPTS` in `iroh-wrapper.env.example`
 takes effect on the wrapper's next restart; to arm the running process without
 one, use the `jcmd VM.log` command documented in that file.
 
+## Two triggers, one signature
+
+Both observed stalls produced an identical probe result — and they had different
+causes. **The probe alone cannot tell them apart**, which is why the watchdog now
+records App Server RSS on every sample:
+
+| | load | swap-in | App Server RSS | cause |
+|---|---|---|---|---|
+| 15:50:48 | 30.64 | `si=4540` | 227MB | host memory pressure; blocked faulting its own pages in |
+| 17:45:23 | 3.87 | `si=8` | **2700MB** | V8 full GCs crowding the 4.05GB default heap ceiling |
+
+The units in this directory address the **first** trigger only. The second needs
+a manual edit to `/etc/meridian/appserver.env` (there is no template for it in
+this repo — it holds provider credentials):
+
+```
+NODE_OPTIONS=--import=file://…/letta-code-patch-register.mjs --max-old-space-size=8192
+```
+
+That takes the same live set from 67% to ~34% of the ceiling, so full GCs become
+far rarer. Individual pause length scales with the live set and is **unchanged** —
+this buys headroom, it does not fix the cause.
+
+The cause is upstream: `loadConversationMessages` (`letta.js:129917`) reads
+transcripts with the **unbounded** `readJsonlFile` (whole file + `JSON.parse` per
+line, then five more full passes) and caches the result in
+`localMessagesByConversationKey`, which is only ever evicted in `deleteAgent`. A
+bounded `readJsonlFileSuffix` exists and is used by its neighbours at `129809`
+and `129887` — but not here. One 203MB / 47,949-row transcript dominates this
+store; the next largest is 28MB and all 2224 together total just 0.7GB.
+
+Deliberately **not** adding `--trace-gc`: it logs every scavenge and would drown
+the `[Listen V2]` lines in the same log. The RSS column is what actually
+distinguishes the two modes.
+
 ## Reading the output
 
 - `/var/log/meridian-probe-latency.log` — round-trip time series. **Healthy
