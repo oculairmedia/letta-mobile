@@ -9,8 +9,8 @@ plugins {
 kotlin {
     android {
         namespace = "com.letta.mobile.core.ids"
-        compileSdk = 36
-        minSdk = 26
+        compileSdk = libs.versions.compileSdk.get().toInt()
+        minSdk = libs.versions.minSdk.get().toInt()
 
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)

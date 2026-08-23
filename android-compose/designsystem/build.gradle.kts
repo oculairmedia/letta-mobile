@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
     id("app.cash.paparazzi")
     id("org.jetbrains.kotlin.plugin.compose")
     id("io.gitlab.arturbosch.detekt")
@@ -22,16 +22,6 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.designsystem"
-    compileSdk = 37
-
-    defaultConfig {
-        minSdk = 26
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 
     buildFeatures {
         compose = true

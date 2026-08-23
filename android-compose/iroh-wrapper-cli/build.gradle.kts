@@ -72,13 +72,13 @@ dependencies {
     api(project(":sharedLogic"))
 
     api("com.github.ajalt.clikt:clikt:5.1.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation(libs.kotlinx.coroutines.core)
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("io.ktor:ktor-client-core:3.5.0")
-    implementation("io.ktor:ktor-client-cio:3.5.0")
-    implementation("io.ktor:ktor-client-websockets:3.5.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.websockets)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
     // letta-mobile-bn008.6: the a2a wiring binds a SECOND Endpoint directly
     // (so we can add `/letta/a2a/0` alongside the app-server ALPN). Mirrors
     // sharedLogic's `implementation` of the same artifact — `implementation`
@@ -97,7 +97,7 @@ dependencies {
     implementation("computer.iroh:iroh:1.1.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation(libs.kotlinx.coroutines.test)
     // letta-mobile-gw0h1: jvmTest round-trips the QR encoder through
     // ZXing's reader + BufferedImageLuminanceSource to prove the CLI's
     // PNG renderer produces a scannable image. The `core` jar comes
