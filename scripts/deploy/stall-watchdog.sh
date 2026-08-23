@@ -92,12 +92,12 @@ while true; do
   ts=$(date -Is)
 
   # Record the App Server's RSS on every sample. Two stalls on 2026-08-23 showed
-  # the SAME probe signature (connect ok, upgrade=-1) from two DIFFERENT causes,
-  # and only RSS told them apart:
-  #   15:50 load 30.64, si=4540 swap-in, node RSS  227MB -> host memory pressure
-  #   17:45 load  3.87, si=8    no swap,  node RSS 2700MB -> V8 GC near the
-  #                                                          4.05GB heap ceiling
-  # Without this column the next stall is ambiguous again.
+  # the SAME probe signature (connect ok, upgrade=-1) under different pressure:
+  #   15:50 load 30.64, si=4540, node RSS  227MB -> acute host swap/reclaim
+  #   17:45 load  3.87, si=8,    node RSS 2700MB -> low swap activity; separate
+  #                                                  V8 heap/GC investigation
+  # RSS is only a triage signal, not V8 heap occupancy. Diagnose with vmstat plus
+  # heap/GC evidence rather than assigning a cause from this column alone.
   as_pid=$(appserver_pid)
   as_rss=""
   if [[ -n "$as_pid" && "$as_pid" != "0" && -r "/proc/$as_pid/status" ]]; then

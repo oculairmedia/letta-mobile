@@ -7,9 +7,9 @@
 #   kotlin compiler -Xmx2g   RSS 1.00GB
 # android-compose/gradle.properties configures 4g + 4g, so a single build can put
 # ~8GB of heap in the production service's cgroup. That hurts twice:
-#   1. It drives a busy 48GB host into swap. The 15:50:48 capture showed the App
-#      Server blocked faulting its own pages back in (connect=3ms, upgrade never
-#      ran for >10s) while CPU sat 70-83% idle -- a stall, not a busy loop.
+#   1. It drives a busy 48GB host into swap. The 15:50:48 capture combined high
+#      swap-in (si=4540), connect=3ms/upgrade timeout, and 70-83% idle CPU --
+#      evidence of acute host reclaim/page-in pressure, not a Node busy loop.
 #   2. meridian-appserver uses KillMode=control-group, so restarting the App
 #      Server REAPS in-flight builds (confirmed during the 16:28 restart).
 #
