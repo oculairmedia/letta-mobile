@@ -16,9 +16,10 @@ import kotlinx.coroutines.launch
  *
  * Upstream ≥ 0.29.7 exposes one bidirectional WebSocket per client. The shared
  * transport demuxes inbound frames into control vs stream flows by message type.
- * Use one direct client/transport as the session owner for a runtime process;
- * multi-client remote access needs an external fanout/arbitration layer instead
- * of several clients writing to the same process.
+ * App Server permits multiple independent clients, but runtime-scoped writes,
+ * approvals, tools, and channel ingress must remain on their owning connection.
+ * Use [DualLaneAppServerClient] when bulk management reads need a separate
+ * failure domain from the connection that owns live runtimes.
  */
 interface AppServerClient {
     val events: Flow<AppServerReceivedFrame>

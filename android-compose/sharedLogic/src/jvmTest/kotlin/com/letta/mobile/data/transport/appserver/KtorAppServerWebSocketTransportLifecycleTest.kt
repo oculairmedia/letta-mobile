@@ -98,6 +98,28 @@ class KtorAppServerWebSocketTransportLifecycleTest {
     }
 
     @Test
+    fun closingManagementSocketLeavesIndependentRuntimeSocketReady() = runBlocking {
+        val received = Channel<String>(Channel.UNLIMITED)
+        val port = startServer {
+            for (frame in incoming) {
+                if (frame is Frame.Text) received.send(frame.readText())
+            }
+        }
+        val runtime = transport(port)
+        val management = transport(port)
+
+        withTimeout(TIMEOUT) { runtime.connectionState.first { it == AppServerConnectionState.Ready } }
+        withTimeout(TIMEOUT) { management.connectionState.first { it == AppServerConnectionState.Ready } }
+
+        management.close()
+        runtime.sendControl(AppServerCommand.Auth(requestId = "runtime-still-ready", token = ""))
+
+        assertEquals(AppServerConnectionState.Ready, runtime.connectionState.value)
+        assertTrue(withTimeout(TIMEOUT) { received.receive() }.contains("runtime-still-ready"))
+        runtime.close()
+    }
+
+    @Test
     fun malformedFrameIsToleratedWithoutTearingDownAReadyGeneration() = runBlocking {
         val port = startServer {
             sendRepeating("this-is-not-json")
