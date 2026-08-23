@@ -3,7 +3,7 @@
 ####################################################################################################################
 
 version: "1.0"
-# This is an Android/Compose Gradle 9.4 / AGP 9.2 build. Qodana 2026.1's
+# This is an Android/Compose Gradle 9.6.1 / AGP 9.3.1 build. Qodana 2026.1's
 # Android linter contains the matching Android project-model support.
 linter: qodana-android
 profile:
