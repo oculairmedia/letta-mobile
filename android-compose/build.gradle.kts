@@ -8,8 +8,8 @@ plugins {
     id("com.android.application") version "9.3.1" apply false
     id("com.android.library") version "9.3.1" apply false
     id("com.android.kotlin.multiplatform.library") version "9.3.1" apply false
-    id("org.jetbrains.kotlin.jvm") version "2.4.0" apply false
-    id("org.jetbrains.kotlin.multiplatform") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.jvm") version "2.4.10" apply false
+    id("org.jetbrains.kotlin.multiplatform") version "2.4.10" apply false
     // Keep the project plugin on 1.10.0 for the shared macOS x64 target, which
     // Compose 1.11 no longer publishes. Nucleus upgrades only the desktop
     // runtime to 1.11.1; DesktopJewelTheme bridges Jewel's older text-menu ABI.
@@ -17,12 +17,12 @@ plugins {
     id("dev.nucleusframework") version "2.1.5" apply false
     id("app.cash.paparazzi") version "2.0.0-alpha05" apply false
     id("io.github.takahirom.roborazzi") version "1.63.0" apply false
-    id("org.jetbrains.kotlin.plugin.compose") version "2.4.0" apply false
-    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.0" apply false
+    id("org.jetbrains.kotlin.plugin.compose") version "2.4.10" apply false
+    id("org.jetbrains.kotlin.plugin.serialization") version "2.4.10" apply false
     id("com.google.dagger.hilt.android") version "2.59.2" apply false
     id("com.google.devtools.ksp") version "2.3.11" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
-    id("org.jetbrains.kotlin.plugin.allopen") version "2.3.20" apply false
+    id("org.jetbrains.kotlin.plugin.allopen") version "2.4.10" apply false
     id("com.mikepenz.aboutlibraries.plugin.android") version "14.2.1" apply false
     id("io.sentry.android.gradle") version "6.8.1" apply false
     id("androidx.baselineprofile") version "1.5.0-alpha06" apply false
@@ -54,10 +54,10 @@ if (providers.gradleProperty("dependencyAnalysisAdvisory").orNull == "true") {
 }
 
 // ---------------------------------------------------------------------------
-// Kotlin 2.4.0 + Dagger/Hilt metadata compatibility (letta-mobile, 2026-06-24)
+// Kotlin 2.4.x + Dagger/Hilt metadata compatibility (letta-mobile, 2026-06-24)
 // ---------------------------------------------------------------------------
 // Dagger/Hilt 2.59.2 bundles a kotlin-metadata-jvm that only understands
-// Kotlin Metadata version <= 2.3.0, so on Kotlin 2.4.0 the Hilt annotation
+// Kotlin Metadata version <= 2.3.0, so on Kotlin 2.4.x the Hilt annotation
 // processor fails: "Provided Metadata instance has version 2.4.0, while
 // maximum supported version is 2.3.0." This is upstream Dagger lag (issue
 // google/dagger#5190 / #5180). The maintainer-endorsed workaround is to force
@@ -66,7 +66,7 @@ if (providers.gradleProperty("dependencyAnalysisAdvisory").orNull == "true") {
 subprojects {
     configurations.configureEach {
         resolutionStrategy {
-            force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
+            force("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.10")
         }
     }
 
