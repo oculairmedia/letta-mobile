@@ -27,10 +27,27 @@ import kotlin.test.assertTrue
  */
 class TerminalSettlementFenceTest {
 
-    private enum class FrameKind(val runId: String, val carriesOtid: Boolean) {
-        LIVE(LIVE_RUN_ID, true),
-        TERMINAL(TERMINAL_RUN_ID, true),
-        RECONCILED(TERMINAL_RUN_ID, false),
+    @JvmInline
+    private value class TestMessageId(val value: String)
+
+    @JvmInline
+    private value class TestContent(val value: String)
+
+    @JvmInline
+    private value class TestSequence(val value: Int)
+
+    private data class TailCase(val head: TestContent, val tail: TestContent)
+
+    private enum class FrameKind {
+        LIVE,
+        TERMINAL,
+        RECONCILED;
+
+        val runId: String
+            get() = if (this == LIVE) LIVE_RUN_ID else TERMINAL_RUN_ID
+
+        val carriesOtid: Boolean
+            get() = this != RECONCILED
     }
 
     private companion object {
@@ -44,33 +61,47 @@ class TerminalSettlementFenceTest {
         Telemetry.clear()
     }
 
-    private fun frame(kind: FrameKind, id: String, content: String, seqId: Int): AssistantMessage = AssistantMessage(
-        id = id,
-        contentRaw = JsonPrimitive(content),
+    private val String.id: TestMessageId get() = TestMessageId(this)
+    private val String.content: TestContent get() = TestContent(this)
+    private val Int.sequence: TestSequence get() = TestSequence(this)
+
+    private fun frame(
+        kind: FrameKind,
+        id: TestMessageId,
+        content: TestContent,
+        sequence: TestSequence,
+    ): AssistantMessage = AssistantMessage(
+        id = id.value,
+        contentRaw = JsonPrimitive(content.value),
         runId = kind.runId,
-        otid = if (kind.carriesOtid) "otid-$id" else null,
-        seqId = seqId,
+        otid = if (kind.carriesOtid) "otid-${id.value}" else null,
+        seqId = sequence.value,
     )
 
-    private fun liveFrame(id: String, content: String, seqId: Int) = frame(FrameKind.LIVE, id, content, seqId)
-    private fun terminalFrame(id: String, content: String, seqId: Int) = frame(FrameKind.TERMINAL, id, content, seqId)
-    private fun reconciledFrame(id: String, content: String, seqId: Int) =
-        frame(FrameKind.RECONCILED, id, content, seqId)
+    private fun liveFrame(id: TestMessageId, content: TestContent, sequence: TestSequence) =
+        frame(FrameKind.LIVE, id, content, sequence)
+
+    private fun terminalFrame(id: TestMessageId, content: TestContent, sequence: TestSequence) =
+        frame(FrameKind.TERMINAL, id, content, sequence)
+
+    private fun reconciledFrame(id: TestMessageId, content: TestContent, sequence: TestSequence) =
+        frame(FrameKind.RECONCILED, id, content, sequence)
 
     private fun evaluate(
-        accumulatedText: String,
-        terminalText: String,
-        accumulatedSeqId: Int? = 5,
-        terminalSeqId: Int? = 3,
+        accumulatedText: TestContent,
+        terminalText: TestContent,
+        accumulatedSeqId: TestSequence? = 5.sequence,
+        terminalSeqId: TestSequence? = 3.sequence,
     ): TerminalSettlementFenceDecision {
-        val accumulated = liveFrame("assistant-x", accumulatedText, accumulatedSeqId ?: 0)
+        val id = "assistant-x".id
+        val accumulated = liveFrame(id, accumulatedText, accumulatedSeqId ?: 0.sequence)
             .toTimelineEvent(position = 0.0) as TimelineEvent.Confirmed
-        val terminal = terminalFrame("assistant-x", terminalText, terminalSeqId ?: 0)
+        val terminal = terminalFrame(id, terminalText, terminalSeqId ?: 0.sequence)
             .toTimelineEvent(position = 0.0) as TimelineEvent.Confirmed
         return evaluateTerminalSettlementFence(
             conversationId = CONVERSATION_ID,
-            accumulated = accumulated.copy(seqId = accumulatedSeqId),
-            terminal = terminal.copy(seqId = terminalSeqId),
+            accumulated = accumulated.copy(seqId = accumulatedSeqId?.value),
+            terminal = terminal.copy(seqId = terminalSeqId?.value),
         )
     }
 
@@ -78,8 +109,8 @@ class TerminalSettlementFenceTest {
 
     @Test
     fun `fence passes when either sequence is absent`() {
-        val d1 = evaluate("abc", "a", accumulatedSeqId = null)
-        val d2 = evaluate("abc", "a", terminalSeqId = null)
+        val d1 = evaluate("abc".content, "a".content, accumulatedSeqId = null)
+        val d2 = evaluate("abc".content, "a".content, terminalSeqId = null)
         assertFalse(d1.blocked)
         assertFalse(d2.blocked)
         assertEquals("seq_absent", d1.reason)
@@ -87,30 +118,30 @@ class TerminalSettlementFenceTest {
 
     @Test
     fun `fence passes when terminal seq is forward or equal`() {
-        val newer = evaluate("abc", "xyz", terminalSeqId = 6)
-        val equal = evaluate("abc", "xyz", terminalSeqId = 5)
+        val newer = evaluate("abc".content, "xyz".content, terminalSeqId = 6.sequence)
+        val equal = evaluate("abc".content, "xyz".content, terminalSeqId = 5.sequence)
         assertFalse(newer.blocked)
         assertFalse(equal.blocked)
     }
 
     @Test
     fun `fence blocks stale non-superset terminal`() {
-        val decision = evaluate("waiting was the right call.", "waiting was the")
+        val decision = evaluate("waiting was the right call.".content, "waiting was the".content)
         assertTrue(decision.blocked)
         assertEquals("stale_terminal_not_superset", decision.reason)
     }
 
     @Test
     fun `fence allows stale terminal that is a content superset`() {
-        val decision = evaluate("waiting was the", "waiting was the right call.")
+        val decision = evaluate("waiting was the".content, "waiting was the right call.".content)
         assertFalse(decision.blocked)
         assertEquals("stale_seq_but_superset", decision.reason)
     }
 
     @Test
     fun `fence preserves meaningful leading and trailing whitespace`() {
-        val missingIndent = evaluate("    code()\n", "code()")
-        val exactFormatting = evaluate("    code()\n", "prefix\n    code()\n")
+        val missingIndent = evaluate("    code()\n".content, "code()".content)
+        val exactFormatting = evaluate("    code()\n".content, "prefix\n    code()\n".content)
 
         assertTrue(missingIndent.blocked)
         assertFalse(exactFormatting.blocked)
@@ -129,34 +160,35 @@ class TerminalSettlementFenceTest {
         )
     )
 
-    private fun row(timeline: Timeline, serverId: String): TimelineEvent.Confirmed =
+    private fun row(timeline: Timeline, serverId: TestMessageId): TimelineEvent.Confirmed =
         timeline.events.filterIsInstance<TimelineEvent.Confirmed>()
-            .single { it.serverId == serverId && it.messageType == TimelineMessageType.ASSISTANT }
+            .single { it.serverId == serverId.value && it.messageType == TimelineMessageType.ASSISTANT }
 
     @Test
     fun `stale real-final snapshot cannot truncate synthetic-live accumulator`() {
         // Live stream: synthetic-run row accumulates deltas under seq ids.
+        val messageId = "assistant-x".id
         val fullBody = "Filing it now and waiting was the right call."
         var tl = reduce(
-            frame = liveFrame("assistant-x", "Filing it now and waiting was the", seqId = 4),
+            frame = liveFrame(messageId, "Filing it now and waiting was the".content, 4.sequence),
         ).next
         tl = reduce(
             prev = tl,
-            frame = liveFrame("assistant-x", fullBody, seqId = 5),
+            frame = liveFrame(messageId, fullBody.content, 5.sequence),
         ).next
-        assertEquals(fullBody, row(tl, "assistant-x").content)
+        assertEquals(fullBody, row(tl, messageId).content)
 
         // Terminal settlement: real run id, but its snapshot is OLDER (seq 3)
         // and carries only the pre-final prefix. Must not shrink the body.
         Telemetry.clear()
         tl = reduce(
             prev = tl,
-            frame = terminalFrame("assistant-x", "Filing it now and waiting was the", seqId = 3),
+            frame = terminalFrame(messageId, "Filing it now and waiting was the".content, 3.sequence),
         ).next
 
-        assertEquals(fullBody, row(tl, "assistant-x").content)
-        assertEquals(TERMINAL_RUN_ID, row(tl, "assistant-x").runId, "id promotion must survive the fence")
-        assertEquals(5, row(tl, "assistant-x").seqId, "stale settlement must retain the newest sequence")
+        assertEquals(fullBody, row(tl, messageId).content)
+        assertEquals(TERMINAL_RUN_ID, row(tl, messageId).runId, "id promotion must survive the fence")
+        assertEquals(5, row(tl, messageId).seqId, "stale settlement must retain the newest sequence")
         assertTrue(
             Telemetry.snapshot().any {
                 it.tag == "TimelineSync" && it.name == "terminal.settlement.fence" &&
@@ -168,83 +200,84 @@ class TerminalSettlementFenceTest {
 
     @Test
     fun `final-delta-first and terminal-first schedules converge to same body`() {
+        val messageId = "assistant-cvg".id
         val fullBody = "Filing it now and waiting was the right call."
         val prefix = "Filing it now and waiting was the"
 
         // Schedule A: deltas first (seq 4 prefix, seq 5 tail), then stale terminal (seq 3).
         var a = reduce(
-            frame = liveFrame("assistant-cvg", prefix, seqId = 4),
+            frame = liveFrame(messageId, prefix.content, 4.sequence),
         ).next
         a = reduce(
             prev = a,
-            frame = liveFrame("assistant-cvg", " right call.", seqId = 5),
+            frame = liveFrame(messageId, " right call.".content, 5.sequence),
         ).next
         a = reduce(
             prev = a,
-            frame = terminalFrame("assistant-cvg", prefix, seqId = 3),
+            frame = terminalFrame(messageId, prefix.content, 3.sequence),
         ).next
 
         // Schedule B: terminal snapshot first (seq 3), then the two deltas.
         var b = reduce(
-            frame = terminalFrame("assistant-cvg", prefix, seqId = 3),
+            frame = terminalFrame(messageId, prefix.content, 3.sequence),
         ).next
         b = reduce(
             prev = b,
-            frame = terminalFrame("assistant-cvg", prefix + " right call.", seqId = 4),
+            frame = terminalFrame(messageId, (prefix + " right call.").content, 4.sequence),
         ).next
         b = reduce(
             prev = b,
-            frame = terminalFrame("assistant-cvg", " right call.", seqId = 5),
+            frame = terminalFrame(messageId, " right call.".content, 5.sequence),
         ).next
 
-        assertEquals(fullBody, row(a, "assistant-cvg").content)
-        assertEquals(fullBody, row(b, "assistant-cvg").content)
+        assertEquals(fullBody, row(a, messageId).content)
+        assertEquals(fullBody, row(b, messageId).content)
     }
 
     @Test
     fun `duplicate stale terminal delivery stays idempotent`() {
+        val messageId = "assistant-idem".id
         val fullBody = "done ✓"
         var tl = reduce(
-            frame = liveFrame("assistant-idem", "don", seqId = 4),
+            frame = liveFrame(messageId, "don".content, 4.sequence),
         ).next
         tl = reduce(
             prev = tl,
-            frame = liveFrame("assistant-idem", fullBody, seqId = 5),
+            frame = liveFrame(messageId, fullBody.content, 5.sequence),
         ).next
-        val staleTerminal = terminalFrame("assistant-idem", "don", seqId = 3)
+        val staleTerminal = terminalFrame(messageId, "don".content, 3.sequence)
         tl = reduce(prev = tl, frame = staleTerminal).next
         tl = reduce(prev = tl, frame = staleTerminal).next
-        assertEquals(fullBody, row(tl, "assistant-idem").content)
+        assertEquals(fullBody, row(tl, messageId).content)
     }
 
     // criterion 7 tails: no UTF-8 / code-point / delimiter boundary may be cut
     @Test
     fun `tail shapes survive stale terminal for 1char word emoji markdown newline`() {
-        data class Case(val label: String, val head: String, val tail: String)
-
+        val messageId = "assistant-tails".id
         val cases = listOf(
-            Case("one-char", "waiting was the right cal", "l."),
-            Case("final-word", "waiting was the ", "right."),
-            Case("emoji-multibyte", "status update ", "all good 🚀🔥"),
-            Case("markdown-delimiter", "summary follows\n\n", "**bold conclusion**"),
-            Case("newline-tail", "complete answer", "\n\nthanks"),
+            TailCase("waiting was the right cal".content, "l.".content),
+            TailCase("waiting was the ".content, "right.".content),
+            TailCase("status update ".content, "all good 🚀🔥".content),
+            TailCase("summary follows\n\n".content, "**bold conclusion**".content),
+            TailCase("complete answer".content, "\n\nthanks".content),
         )
         for (case in cases) {
-            val full = case.head + case.tail
+            val full = case.head.value + case.tail.value
             var tl = reduce(
-                frame = liveFrame("assistant-tails", case.head, seqId = 4),
+                frame = liveFrame(messageId, case.head, 4.sequence),
             ).next
             tl = reduce(
                 prev = tl,
-                frame = liveFrame("assistant-tails", full, seqId = 5),
+                frame = liveFrame(messageId, full.content, 5.sequence),
             ).next
             tl = reduce(
                 prev = tl,
-                frame = terminalFrame("assistant-tails", case.head, seqId = 3),
+                frame = terminalFrame(messageId, case.head, 3.sequence),
             ).next
             assertEquals(
-                full, row(tl, "assistant-tails").content,
-                "[${case.label}] stale terminal must not cut the ${case.label} tail",
+                full, row(tl, messageId).content,
+                "stale terminal must not cut the ${case.tail.value} tail",
             )
         }
     }
@@ -253,40 +286,42 @@ class TerminalSettlementFenceTest {
 
     @Test
     fun `mergeServerMessages stale collapse cannot regress synthetic live row`() {
+        val messageId = "assistant-rec".id
         val fullBody = "Filing it now and waiting was the right call."
         var tl = reduce(
-            frame = liveFrame("assistant-rec", "Filing it now and waiting was the", seqId = 4),
+            frame = liveFrame(messageId, "Filing it now and waiting was the".content, 4.sequence),
         ).next
         tl = reduce(
             prev = tl,
-            frame = liveFrame("assistant-rec", " right call.", seqId = 5),
+            frame = liveFrame(messageId, " right call.".content, 5.sequence),
         ).next
 
         val (mergedTl, _) = tl.mergeServerMessages(
             listOf(
                 // Reconciled finals carry their own (or no) otid; sharing the
                 // live otid would dedupe before settlement.
-                reconciledFrame("assistant-rec", "Filing it now and waiting was the", seqId = 3),
+                reconciledFrame(messageId, "Filing it now and waiting was the".content, 3.sequence),
             )
         )
         tl = mergedTl
 
-        assertEquals(fullBody, row(tl, "assistant-rec").content)
+        assertEquals(fullBody, row(tl, messageId).content)
     }
 
     @Test
     fun `mergeServerMessages stale superset final still replaces and grows`() {
+        val messageId = "assistant-grow".id
         var tl = reduce(
-            frame = liveFrame("assistant-grow", "partial view", seqId = 5),
+            frame = liveFrame(messageId, "partial view".content, 5.sequence),
         ).next
 
         val (grownTl, _) = tl.mergeServerMessages(
             listOf(
-                reconciledFrame("assistant-grow", "partial view of the complete answer", seqId = 3),
+                reconciledFrame(messageId, "partial view of the complete answer".content, 3.sequence),
             )
         )
         tl = grownTl
 
-        assertEquals("partial view of the complete answer", row(tl, "assistant-grow").content)
+        assertEquals("partial view of the complete answer", row(tl, messageId).content)
     }
 }
