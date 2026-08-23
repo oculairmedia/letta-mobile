@@ -100,6 +100,17 @@ class MessageGetPagingTest {
         assertEquals(listOf(null, "n3"), client.beforeCursors)
     }
 
+    @Test
+    fun smallerPagesPreserveTenThousandMessageSearchWindow() {
+        assertEquals(100, ConversationAdminHandlers.MESSAGE_GET_PAGE_LIMIT)
+        assertEquals(10_000, ConversationAdminHandlers.MESSAGE_GET_MAX_SEARCHABLE_MESSAGES)
+        assertEquals(
+            100,
+            ConversationAdminHandlers.MESSAGE_GET_MAX_SEARCHABLE_MESSAGES /
+                ConversationAdminHandlers.MESSAGE_GET_PAGE_LIMIT,
+        )
+    }
+
     private fun pageWithLargeToolReturn(id: String, bodyBytes: Int): JsonArray = buildJsonArray {
         add(
             buildJsonObject {
