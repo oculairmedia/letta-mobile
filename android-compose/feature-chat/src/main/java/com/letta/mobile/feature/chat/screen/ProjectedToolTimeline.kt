@@ -172,8 +172,8 @@ internal fun ProjectedToolTimelineGroupCard(
 ) {
     // Dropped the Card's background fill + outline border — chrome enough on its own.
     Column(
-        modifier = modifier.fillMaxWidth().padding(vertical = 2.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
         if (RenderDiagnostics.enabled()) {
             RenderDiagnostics.onVisibleGroups(
@@ -410,8 +410,8 @@ private fun ProjectedToolTimelineCallRow(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                        .padding(top = 2.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (call.state == ToolTimelineState.Running) {
                         LiveStatusText(

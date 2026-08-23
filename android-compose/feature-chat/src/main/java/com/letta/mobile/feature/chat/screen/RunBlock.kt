@@ -143,7 +143,7 @@ internal fun RunBlock(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .then(if (latestCompletedDisclosure) Modifier.offset(y = (-20).dp) else Modifier),
+                .then(if (latestCompletedDisclosure) Modifier.offset(y = (-22).dp) else Modifier),
         ) {
             // Timeline gutter â€” drawn behind the rows so the vertical rule
             // passes through every dot. Sized via the same Column so its
