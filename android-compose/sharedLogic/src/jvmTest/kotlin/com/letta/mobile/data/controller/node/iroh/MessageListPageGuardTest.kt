@@ -73,6 +73,47 @@ class MessageListPageGuardTest {
     }
 
     @Test
+    fun `descending handler page keeps newest rows when byte bounded`() = kotlinx.coroutines.test.runTest {
+        val page = buildJsonArray {
+            repeat(500) { index -> add(msg("m-%04d".format(index), bodyBytes = 10_000)) }
+        }
+        val client = object : com.letta.mobile.data.transport.appserver.AppServerClient {
+            override val events = kotlinx.coroutines.flow.emptyFlow<com.letta.mobile.data.transport.appserver.AppServerReceivedFrame>()
+            override suspend fun runtimeStart(command: com.letta.mobile.data.transport.appserver.AppServerCommand.RuntimeStart) = error("unused")
+            override suspend fun input(command: com.letta.mobile.data.transport.appserver.AppServerCommand.Input) = error("unused")
+            override suspend fun sync(command: com.letta.mobile.data.transport.appserver.AppServerCommand.Sync) = error("unused")
+            override suspend fun abort(command: com.letta.mobile.data.transport.appserver.AppServerCommand.AbortMessage) = error("unused")
+            override suspend fun adminRpc(command: com.letta.mobile.data.transport.appserver.AppServerCommand.AdminRpc) = error("unused")
+            override suspend fun sendExternalToolResponse(command: com.letta.mobile.data.transport.appserver.AppServerCommand.ExternalToolCallResponse) = error("unused")
+            override suspend fun conversationMessagesList(command: com.letta.mobile.data.transport.appserver.AppServerCommand.ConversationMessagesList) =
+                com.letta.mobile.data.transport.appserver.AppServerInboundFrame.ConversationMessagesListResponse(
+                    command.requestId,
+                    true,
+                    page,
+                )
+        }
+        val router = AdminRpcRouter().also {
+            ConversationAdminHandlers.register(it, NativeReadTiers(nativeClient = client))
+        }
+        val envelope = kotlinx.serialization.json.Json.parseToJsonElement(
+            router.dispatch(
+                requestId = "desc-page",
+                method = "message.list",
+                params = buildJsonObject {
+                    put("conversation_id", JsonPrimitive("conv-1"))
+                    put("order", JsonPrimitive("desc"))
+                },
+            ),
+        ).jsonObject
+        val result = envelope.getValue("result").jsonObject
+        val kept = result.getValue("messages").jsonArray.map { it.jsonObject.getValue("id").jsonPrimitive.content }
+
+        assertEquals("m-0000", kept.first(), "descending page must retain its newest row")
+        assertFalse("m-0499" in kept, "descending page must trim the oldest tail")
+        assertEquals(kept.last(), result.getValue("next_before").jsonPrimitive.content)
+    }
+
+    @Test
     fun smallConversationIsReturnedUnchanged() {
         val messages = buildJsonArray { repeat(5) { i -> add(msg("m-$i", bodyBytes = 100)) } }
         val bounded = MessageListPageGuard.bound(messages)
