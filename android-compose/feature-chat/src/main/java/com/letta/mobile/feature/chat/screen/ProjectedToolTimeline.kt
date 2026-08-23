@@ -30,7 +30,6 @@ import com.letta.mobile.ui.components.CollapsibleStatusRow
 import com.letta.mobile.ui.components.LiveStatusText
 import com.letta.mobile.ui.components.StatusTimeline
 import com.letta.mobile.ui.components.StatusTimelineItem
-import com.letta.mobile.ui.components.TimelineNode
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -173,7 +172,7 @@ internal fun ProjectedToolTimelineGroupCard(
 ) {
     // Dropped the Card's background fill + outline border — chrome enough on its own.
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp),
+        modifier = modifier.fillMaxWidth().padding(vertical = 2.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         if (RenderDiagnostics.enabled()) {
@@ -214,17 +213,6 @@ internal fun ProjectedToolTimelineGroupCard(
         }
     }
 }
-
-/**
- * letta-mobile-2huuc: shrunk status-node dimensions for tool timeline rows.
- * The default 24dp filled circle in a 32dp rail was a heavy visual cue that
- * drowned the tool-name + body. Desktop renders tool rows with a small
- * tinted glyph, not a filled circle. 16dp / 12dp / 20dp keeps the rail
- * visually quiet while still marking the run timeline.
- */
-private val ToolTimelineRailWidth = 20.dp
-private val ToolTimelineNodeSize = 16.dp
-private val ToolTimelineNodeIconSize = 12.dp
 
 /**
  * Renders a single [ToolTimelineCall] inside a [StatusTimelineItem].
@@ -273,57 +261,10 @@ private fun ProjectedToolTimelineCallRow(
         }
     }
 
-    val (nodeContainerColor, nodeContentColor, nodeIcon) = when (call.state) {
-        ToolTimelineState.AwaitingApproval -> Triple(
-            MaterialTheme.colorScheme.secondaryContainer,
-            MaterialTheme.colorScheme.onSecondaryContainer,
-            LettaIcons.Help,
-        )
-        ToolTimelineState.Running -> Triple(
-            MaterialTheme.colorScheme.tertiaryContainer,
-            MaterialTheme.colorScheme.onTertiaryContainer,
-            LettaIcons.Refresh,
-        )
-        ToolTimelineState.Succeeded -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
-            LettaIcons.Check,
-        )
-        ToolTimelineState.Warning -> Triple(
-            MaterialTheme.customColors.warningContainerColor,
-            MaterialTheme.customColors.warningTextColor,
-            LettaIcons.Warning,
-        )
-        ToolTimelineState.Failed -> Triple(
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
-            LettaIcons.Error,
-        )
-        ToolTimelineState.Rejected -> Triple(
-            MaterialTheme.colorScheme.errorContainer,
-            MaterialTheme.colorScheme.onErrorContainer,
-            LettaIcons.Close,
-        )
-    }
-
     StatusTimelineItem(
-        node = {
-            // letta-mobile-2huuc: shrink the tool-call status node so the
-            // checkmark icon no longer dominates the row. The 24dp filled
-            // circle was an overly-heavy visual cue — desktop uses a small
-            // tinted glyph instead. 16dp circle with a 12dp icon, anchored
-            // in a 20dp rail, keeps the row's left edge tidy.
-            TimelineNode(
-                containerColor = nodeContainerColor,
-                contentColor = nodeContentColor,
-                icon = nodeIcon,
-                size = ToolTimelineNodeSize,
-                iconSize = ToolTimelineNodeIconSize,
-            )
-        },
-        railWidth = ToolTimelineRailWidth,
-        showTopConnector = !isFirst,
-        showBottomConnector = !isLast,
+        railWidth = 0.dp,
+        showTopConnector = false,
+        showBottomConnector = false,
     ) {
         if (isSpecialCard) {
             // Special cards (image generation and subagent dispatches/notifications) fall back deliberately
