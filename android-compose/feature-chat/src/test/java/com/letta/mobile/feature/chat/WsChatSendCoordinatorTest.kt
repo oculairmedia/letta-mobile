@@ -16,6 +16,7 @@ import com.letta.mobile.data.transport.ChannelTransportState
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.WsConnectionState
 import com.letta.mobile.data.runtime.TurnFailureNotices
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.transport.BridgeTurnStatus
 import com.letta.mobile.data.transport.WsTimelineEvent
 import com.letta.mobile.data.transport.api.RedialWhileTurnActive
@@ -1154,7 +1155,9 @@ class WsChatSendCoordinatorTest {
     fun `redial during active turn reconciles and settles without resend`() = runTest {
         val redials = MutableSharedFlow<RedialWhileTurnActive>(extraBufferCapacity = 1)
         val wsChatBridge = mockBridge(sendAccepted = true, redialFlow = redials)
-        val timelineRepository = FakeTimelineExternalTransportWriter()
+        val timelineRepository = FakeTimelineExternalTransportWriter().apply {
+            recentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
+        }
         val uiState = MutableStateFlow(ChatUiState(agentName = "Agent"))
         // This test is the only one in the suite that needs the
         // coordinator's OWN background collector on
@@ -1199,6 +1202,7 @@ class WsChatSendCoordinatorTest {
                     conversationId = "conv-default-agent-1",
                     turnId = "turn-redial",
                     runId = "run-redial",
+                    connectionGeneration = 7L,
                 )
             )
             advanceUntilIdle()
@@ -1210,7 +1214,14 @@ class WsChatSendCoordinatorTest {
             // scheduling elsewhere in ChatSendCoordinator).
             assertTrue(
                 timelineRepository.recentReconciles.contains(
-                    FakeTimelineExternalTransportWriter.RecentReconcile("agent-1", "conv-default-agent-1", "redial-recovery", emptySet(), true),
+                    FakeTimelineExternalTransportWriter.RecentReconcile(
+                        agentId = "agent-1",
+                        conversationId = "conv-default-agent-1",
+                        reason = "redial-recovery",
+                        candidateRunIds = emptySet(),
+                        forceRefresh = true,
+                        connectionGeneration = 7L,
+                    ),
                 ),
             )
             assertEquals(false, uiState.value.isStreaming)
@@ -1273,7 +1284,9 @@ class WsChatSendCoordinatorTest {
                 runId = "run-remote",
             )
         )
-        coordinator.handleEvent(WsTimelineEvent.TurnDone("turn-remote", "run-remote", "cancelled"))
+        coordinator.handleEvent(
+            WsTimelineEvent.TurnDone("turn-remote", "run-remote", BridgeTurnStatus.Cancelled),
+        )
         advanceUntilIdle()
 
         val cancellation = timelineRepository.ingestedMessages.single().message as ErrorMessage

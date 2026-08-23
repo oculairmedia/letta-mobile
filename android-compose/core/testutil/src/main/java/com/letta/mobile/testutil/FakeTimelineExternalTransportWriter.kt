@@ -7,6 +7,8 @@ import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 
 /** Deterministic fake for the admin-shim WebSocket timeline write surface. */
 class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
+    var recentMessagesReconcileOutcome: RecentMessagesReconcileOutcome =
+        RecentMessagesReconcileOutcome.Skipped("fake")
     val externalLocals: MutableList<ExternalLocal> = mutableListOf()
     val ingestedMessages: MutableList<IngestedMessage> = mutableListOf()
     val sentLocals: MutableList<LocalMarker> = mutableListOf()
@@ -136,7 +138,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
             forceRefresh = forceRefresh,
             connectionGeneration = connectionGeneration,
         )
-        return RecentMessagesReconcileOutcome.Skipped("fake")
+        return recentMessagesReconcileOutcome
     }
 
     data class ExternalLocal(
