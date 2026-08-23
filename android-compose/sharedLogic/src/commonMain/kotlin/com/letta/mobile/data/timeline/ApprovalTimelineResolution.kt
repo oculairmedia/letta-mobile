@@ -43,6 +43,40 @@ internal fun TimelineEvent.Confirmed.hasExplicitApprovalResponse(evidence: Appro
 }
 
 /**
+ * letta-mobile-c49of: the explicit decision carried by this response echo,
+ * or null when it resolves nothing (approve=null auto-approval echo). When
+ * both the top-level flag and per-call results are present, REJECTED wins —
+ * a mixed echo must never render as "Approved".
+ */
+internal fun ApprovalResponseMessage.approvalOutcome(): ApprovalDecision? {
+    val explicit = listOfNotNull(approve) + approvals.orEmpty().mapNotNull { it.approve }
+    return when {
+        explicit.any { !it } -> ApprovalDecision.REJECTED
+        explicit.any { it } -> ApprovalDecision.APPROVED
+        else -> null
+    }
+}
+
+/**
+ * Explicit decision for this event from snapshot/reconcile evidence, or null
+ * when only implicit resolution (tool returns / approve=null echo) exists.
+ */
+internal fun TimelineEvent.Confirmed.approvalOutcomeFromEvidence(
+    evidence: ApprovalTimelineEvidence,
+): ApprovalDecision? {
+    val requestId = approvalRequestId?.takeIf(String::isNotBlank) ?: return null
+    val outcomes = evidence.responsesByRequestId[requestId]
+        .orEmpty()
+        .filter { it.runId.isCompatibleRun(runId) }
+        .mapNotNull(ApprovalResponseMessage::approvalOutcome)
+    return when {
+        outcomes.contains(ApprovalDecision.REJECTED) -> ApprovalDecision.REJECTED
+        outcomes.contains(ApprovalDecision.APPROVED) -> ApprovalDecision.APPROVED
+        else -> null
+    }
+}
+
+/**
  * True if ANY approval-response echo exists for this request on a
  * compatible run — including the approve=null echo the Letta server sends
  * for auto-approved (bypassPermissions) tool calls. Unlike
