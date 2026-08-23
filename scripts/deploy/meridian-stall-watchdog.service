@@ -1,0 +1,42 @@
+# Repository-owned systemd template — letta-mobile-jsfrn.
+# THIS FILE IS NOT THE LIVE UNIT. See scripts/deploy/README-stall-diagnostics.md
+# for the install commands, the incident it exists for, and how to read its output.
+
+[Unit]
+# Added 2026-08-23 after an incident where all three Iroh peers AND the loopback
+# App Server WS timed out simultaneously (~14:00) with no JVM-side evidence
+# retained, leaving the cause undiagnosable after the fact.
+#
+# Samples App Server WS round-trip latency and captures thread dumps + host state
+# when a sample is slow or fails. Observability only: it never restarts, signals,
+# or otherwise touches the services it watches.
+Description=Meridian stall watchdog (App Server latency sampling + stall evidence capture)
+After=meridian-appserver.service
+Wants=meridian-appserver.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/meridian/stall-watchdog.sh
+Restart=always
+RestartSec=15
+
+# A diagnostic must never become the outage. Hard caps well under anything the
+# watched services need, and no privileges beyond reading /proc + attaching jcmd.
+#
+# CPUQuota=25%, not 10%: at 10% the probe reported ~95ms against a true App
+# Server round trip of ~8ms, because node's own startup was being throttled. The
+# time series is supposed to measure the App Server, not the watchdog, so the
+# quota has to leave process startup unthrottled. 25% is still far below
+# anything that could starve the services under observation.
+CPUQuota=25%
+MemoryMax=256M
+Nice=10
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/var/log
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

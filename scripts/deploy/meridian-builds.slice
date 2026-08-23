@@ -1,0 +1,27 @@
+# Repository-owned systemd template — letta-mobile-jsfrn.
+# THIS FILE IS NOT THE LIVE UNIT. See scripts/deploy/README-stall-diagnostics.md
+# for the install commands, the incident it exists for, and how to read its output.
+
+[Unit]
+# letta-mobile-jsfrn (2026-08-23). Agent-spawned Gradle/Kotlin builds were running
+# INSIDE the production App Server cgroup (observed: gradle -Xmx4g RSS 1.09GB +
+# kotlin daemon RSS 1.00GB as children of meridian-appserver.service). Two ways
+# that hurts:
+#   1. android-compose/gradle.properties configures org.gradle.jvmargs=-Xmx4096m
+#      AND kotlin.daemon.jvmargs=-Xmx4096m -- up to 8GB of heap that can drive a
+#      busy 48GB host into swap and stall the App Server's event loop.
+#   2. meridian-appserver uses KillMode=control-group, so restarting the App
+#      Server REAPS in-flight builds (confirmed during the 16:28 restart).
+# Builds belong in their own accounting domain, not the production service's.
+Description=Meridian agent-spawned builds (isolated from the App Server cgroup)
+Before=slices.target
+
+[Slice]
+# MemoryHigh throttles and reclaims; MemoryMax is the backstop that kills a
+# genuine runaway. Deliberately NOT applied to the App Server, which must never
+# be the thing that gets squeezed. 8G covers the configured 4g+4g heaps.
+MemoryHigh=8G
+MemoryMax=12G
+# Builds are batch work: yield CPU to the production path under contention.
+CPUWeight=20
+IOWeight=20

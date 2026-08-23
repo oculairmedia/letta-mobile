@@ -1,0 +1,14 @@
+# Repository-owned systemd template — letta-mobile-jsfrn.
+# THIS FILE IS NOT THE LIVE UNIT. See scripts/deploy/README-stall-diagnostics.md
+# for the install commands, the incident it exists for, and how to read its output.
+
+[Unit]
+Description=Migrate agent-spawned build daemons out of the App Server cgroup
+Documentation=https://github.com/oculairmedia/letta-mobile
+After=meridian-appserver.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/meridian/adopt-builds.sh
+# Only privilege needed is writing cgroup.procs under /sys/fs/cgroup.
+NoNewPrivileges=true
