@@ -29,7 +29,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -99,6 +102,44 @@ class ConversationsViewModelTest {
         assertEquals("conv-2", conversations[1].conversation.id.value)
         assertEquals("conv-3", conversations[2].conversation.id.value)
         assertEquals("conv-1", conversations[3].conversation.id.value)
+    }
+
+    @Test
+    fun `recreated screen never publishes stale cached ordering before refreshed ordering`() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val oldMostRecent = TestData.conversation(
+            id = "old-most-recent",
+            agentId = "a1",
+            lastMessageAt = "2026-08-23T06:00:00Z",
+        )
+        val newlyMessaged = TestData.conversation(
+            id = "newly-messaged",
+            agentId = "a1",
+            lastMessageAt = "2026-08-23T05:00:00Z",
+        )
+        fakeAllRepo.setConversations(listOf(oldMostRecent, newlyMessaged))
+        fakeAllRepo.refreshFetchResult = listOf(
+            oldMostRecent,
+            newlyMessaged.copy(lastMessageAt = "2026-08-23T07:00:00Z"),
+        )
+
+        val populatedOrders = mutableListOf<List<String>>()
+        viewModel = newViewModel()
+        val collection = launch {
+            viewModel.uiState.collect { state ->
+                state.conversations.takeIf { it.isNotEmpty() }?.let { rows ->
+                    populatedOrders += rows.map { it.conversation.id.value }
+                }
+            }
+        }
+        advanceUntilIdle()
+        collection.cancel()
+
+        assertEquals(
+            listOf(listOf("newly-messaged", "old-most-recent")),
+            populatedOrders.distinct(),
+        )
     }
 
     @Test
@@ -447,6 +488,7 @@ class ConversationsViewModelTest {
         var fresh: Boolean = false
         var didRefresh: Boolean = false
         var refreshError: Throwable? = null
+        var refreshFetchResult: List<Conversation>? = null
 
         fun setConversations(list: List<Conversation>) { _conversations.value = list }
         override suspend fun refresh() { didRefresh = true }
@@ -454,6 +496,7 @@ class ConversationsViewModelTest {
             refreshError?.let { throw it }
             if (fresh) return false
             didRefresh = true
+            refreshFetchResult?.let { _conversations.value = it }
             return true
         }
         override fun handleOptimisticDelete(conversationId: ConversationId) {
