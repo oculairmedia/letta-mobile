@@ -418,18 +418,6 @@ class ChatSendCoordinator(
             "attachments" to attachments.size,
             "activeConversationId" to targetConversationId,
         )
-        val config = activeConfig()
-        Telemetry.event(
-            "IrohTrace", "coordinator.config",
-            "hasConfig" to (config != null),
-            "mode" to config?.mode?.name,
-            "serverUrl" to backendUrlTelemetryDescriptor(config?.serverUrl),
-            "hasToken" to !config?.accessToken.isNullOrBlank(),
-        )
-        if (config == null) {
-            ui.onSendFailed("No active backend is configured")
-            return
-        }
         // Only the legacy admin-shim WS actually needs a bearer token. The Iroh
         // transport authenticates the paired peer by NodeID and ignores the
         // token entirely (IrohChannelTransport sends its auth frame even with a
@@ -438,10 +426,7 @@ class ChatSendCoordinator(
         // relaxing it here is the client half of retiring the bearer token
         // (d6e8g.9). Token-carrying devices are unaffected; this only stops the
         // client from self-rejecting a BLANK token on an iroh:// backend.
-        if (config.accessToken.isNullOrBlank() && !config.isIrohBackend()) {
-            ui.onSendFailed("Admin-shim WebSocket requires an API token")
-            return
-        }
+        val config = validatedActiveConfig() ?: return
         // lcp-dlj: multimodal sends now flow through content_parts. The
         // shim hard-caps the JSON-encoded payload at 10 MB; the client-
         // side downsample (≤ 4 images, ≤ 1568px longest side, ≤ 2 MB raw
@@ -501,6 +486,26 @@ class ChatSendCoordinator(
             "attachments" to attachments.size,
             "queued" to !accepted,
         )
+    }
+
+    private fun validatedActiveConfig(): LettaConfig? {
+        val config = activeConfig()
+        Telemetry.event(
+            "IrohTrace", "coordinator.config",
+            "hasConfig" to (config != null),
+            "mode" to config?.mode?.name,
+            "serverUrl" to backendUrlTelemetryDescriptor(config?.serverUrl),
+            "hasToken" to !config?.accessToken.isNullOrBlank(),
+        )
+        if (config == null) {
+            ui.onSendFailed("No active backend is configured")
+            return null
+        }
+        if (config.accessToken.isNullOrBlank() && !config.isIrohBackend()) {
+            ui.onSendFailed("Admin-shim WebSocket requires an API token")
+            return null
+        }
+        return config
     }
 
     fun cancel(): Boolean {
