@@ -1826,7 +1826,7 @@ dependencies {
     // Hilt testing
     testImplementation(libs.hilt.android.testing)
     kspTest(libs.hilt.compiler)
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
+    testRuntimeOnly(libs.junit.vintage.engine)
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:core-ktx:1.7.0")

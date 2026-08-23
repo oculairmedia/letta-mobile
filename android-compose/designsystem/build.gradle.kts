@@ -107,11 +107,11 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("io.mockk:mockk:1.14.9")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
+    testImplementation(libs.junit.jupiter.api)
     testImplementation("org.robolectric:robolectric:4.16.1")
     testImplementation("androidx.compose.ui:ui-test-junit4")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
-    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:6.1.0")
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testRuntimeOnly(libs.junit.vintage.engine)
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }
 
