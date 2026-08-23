@@ -36,8 +36,15 @@ import kotlinx.coroutines.withTimeout
  */
 class TimelineRepositorySingleFlightHydrationTest {
 
-    /** Hydration blocks until the test releases the gate — holds the flight open. */
-    private class GatedHydrationTransport : TimelineTransport {
+    /**
+     * One configurable fake covers every scenario: [failFirstCall] makes the
+     * first hydration attempt throw; when gated, list calls park on
+     * [releaseGate] so the test holds the in-flight flight open.
+     */
+    private class FakeHydrationTransport(
+        private val failFirstCall: Boolean = false,
+        private val gated: Boolean = false,
+    ) : TimelineTransport {
         val listCalls = atomic(0)
 
         /** Completed when the first list call STARTS (owner claimed the flight). */
@@ -62,8 +69,10 @@ class TimelineRepositorySingleFlightHydrationTest {
             after: String?,
             order: String?,
         ): List<LettaMessage> {
-            if (listCalls.incrementAndGet() == 1) firstListStarted.complete(Unit)
-            release.await()
+            val callNumber = listCalls.incrementAndGet()
+            if (callNumber == 1) firstListStarted.complete(Unit)
+            if (failFirstCall && callNumber == 1) throw RuntimeException("hydration boom")
+            if (gated) release.await()
             return emptyList()
         }
 
@@ -75,40 +84,14 @@ class TimelineRepositorySingleFlightHydrationTest {
         ): List<LettaMessage> = emptyList()
     }
 
-    private class FailingOnceTransport : TimelineTransport {
-        val listCalls = atomic(0)
-
-        override suspend fun sendConversationMessage(
-            conversationId: String,
-            request: MessageCreateRequest,
-        ): Flow<LettaMessage> = emptyFlow()
-
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> =
-            emptyFlow()
-
-        override suspend fun listConversationMessages(
-            conversationId: String,
-            limit: Int?,
-            after: String?,
-            order: String?,
-        ): List<LettaMessage> {
-            if (listCalls.incrementAndGet() == 1) throw RuntimeException("hydration boom")
-            return emptyList()
-        }
-
-        override suspend fun listAgentMessages(
-            agentId: String,
-            limit: Int?,
-            order: String?,
-            conversationId: String?,
-        ): List<LettaMessage> = emptyList()
-    }
+    private fun newRepo(transport: TimelineTransport): TimelineRepository =
+        TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
 
     @Test
     fun concurrent_same_conversation_callers_join_one_hydration() = runTest {
         withContext(Dispatchers.Default) {
-            val transport = GatedHydrationTransport()
-            val repo = TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+            val transport = FakeHydrationTransport(gated = true)
+            val repo = newRepo(transport)
             try {
                 // Caller A runs eagerly (Unconfined) until hydrate hops to the
                 // IO dispatcher; by then it has REGISTERED the single flight
@@ -148,8 +131,8 @@ class TimelineRepositorySingleFlightHydrationTest {
     @Test
     fun different_conversations_get_independent_flights() = runTest {
         withContext(Dispatchers.Default) {
-            val transport = GatedHydrationTransport()
-            val repo = TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+            val transport = FakeHydrationTransport(gated = true)
+            val repo = newRepo(transport)
             try {
                 val callerA = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-a") }
                 val callerB = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-sf-b") }
@@ -173,8 +156,8 @@ class TimelineRepositorySingleFlightHydrationTest {
     @Test
     fun hydration_failure_permits_later_retry() = runTest {
         withContext(Dispatchers.Default) {
-            val transport = FailingOnceTransport()
-            val repo = TimelineRepository(transport, NoOpPendingLocalStore, NoOpConversationCursorStore)
+            val transport = FakeHydrationTransport(failFirstCall = true)
+            val repo = newRepo(transport)
             try {
                 val loop1 = repo.getOrCreate("conv-sf-fail")
                 assertFalse(loop1.hasHydratedSuccessfully)
