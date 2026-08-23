@@ -52,9 +52,6 @@ class WebWorkspaceController {
     var rootHandle: FileSystemDirectoryHandle? = null
         private set
 
-    val isWorkspaceOpen: Boolean
-        get() = rootHandle != null
-
     val workspaceName: String
         get() = rootHandle?.name ?: "No Workspace"
 
@@ -69,37 +66,7 @@ class WebWorkspaceController {
             false
         }
     }
-
-    suspend fun readFile(fileName: String): String? {
-        val handle = rootHandle ?: return null
-        return try {
-            val fileHandle = handle.getFileHandle(fileName).await()
-            val file = fileHandle.getFile().await()
-            file.text().await().toString()
-        } catch (t: Throwable) {
-            if (t is CancellationException) throw t
-            logger.error("Failed to read workspace file", t)
-            null
-        }
-    }
-
-    suspend fun writeFile(fileName: String, content: String): Boolean {
-        val handle = rootHandle ?: return false
-        return try {
-            val fileHandle = handle.getFileHandle(fileName, createFileOptions()).await()
-            val writable = fileHandle.createWritable().await()
-            writable.write(content).await()
-            writable.close().await()
-            true
-        } catch (t: Throwable) {
-            if (t is CancellationException) throw t
-            logger.error("Failed to write workspace file", t)
-            false
-        }
-    }
 }
 
 private fun promptDirectoryPicker(): Promise<FileSystemDirectoryHandle> =
     js("window.showDirectoryPicker()")
-
-private fun createFileOptions(): JsAny = js("({ create: true })")
