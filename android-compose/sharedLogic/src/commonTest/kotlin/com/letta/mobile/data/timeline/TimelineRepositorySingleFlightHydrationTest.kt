@@ -49,6 +49,7 @@ class TimelineRepositorySingleFlightHydrationTest {
 
         /** Completed when the first list call STARTS (owner claimed the flight). */
         val firstListStarted = CompletableDeferred<Unit>()
+        val secondListStarted = CompletableDeferred<Unit>()
         private val release = CompletableDeferred<Unit>()
 
         fun releaseGate() {
@@ -71,6 +72,7 @@ class TimelineRepositorySingleFlightHydrationTest {
         ): List<LettaMessage> {
             val callNumber = listCalls.incrementAndGet()
             if (callNumber == 1) firstListStarted.complete(Unit)
+            if (callNumber == 2) secondListStarted.complete(Unit)
             if (failFirstCall && callNumber == 1) throw RuntimeException("hydration boom")
             if (gated) release.await()
             return emptyList()
@@ -139,6 +141,62 @@ class TimelineRepositorySingleFlightHydrationTest {
     }
 
     @Test
+    fun same_conversation_with_conflicting_agents_hydrates_both_loops() = runTest {
+        withContext(Dispatchers.Default) {
+            val transport = FakeHydrationTransport(gated = true)
+            val repo = newRepo(transport)
+            try {
+                val callerA = async(Dispatchers.Unconfined) {
+                    repo.getOrCreate(agentId = "agent-a", conversationId = "conv-scoped")
+                }
+                val callerB = async(Dispatchers.Unconfined) {
+                    repo.getOrCreate(agentId = "agent-b", conversationId = "conv-scoped")
+                }
+
+                withTimeout(10_000) {
+                    transport.firstListStarted.await()
+                    transport.secondListStarted.await()
+                }
+                transport.releaseGate()
+
+                val loopA = callerA.await()
+                val loopB = callerB.await()
+                assertEquals(2, transport.listCalls.value)
+                assertTrue(loopA.hasHydratedSuccessfully)
+                assertTrue(loopB.hasHydratedSuccessfully)
+                assertFalse(loopA === loopB)
+            } finally {
+                repo.clearAll()
+            }
+        }
+    }
+
+    @Test
+    fun clear_during_hydration_does_not_bind_replacement_to_stale_flight() = runTest {
+        withContext(Dispatchers.Default) {
+            val transport = FakeHydrationTransport(gated = true)
+            val repo = newRepo(transport)
+            try {
+                val original = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-clear") }
+                withTimeout(10_000) { transport.firstListStarted.await() }
+
+                repo.clear("conv-clear")
+                val replacement = async(Dispatchers.Unconfined) { repo.getOrCreate("conv-clear") }
+                withTimeout(10_000) { transport.secondListStarted.await() }
+                transport.releaseGate()
+
+                val originalLoop = original.await()
+                val replacementLoop = replacement.await()
+                assertEquals(2, transport.listCalls.value)
+                assertTrue(replacementLoop.hasHydratedSuccessfully)
+                assertFalse(originalLoop === replacementLoop)
+            } finally {
+                repo.clearAll()
+            }
+        }
+    }
+
+    @Test
     fun different_conversations_get_independent_flights() = runTest {
         withContext(Dispatchers.Default) {
             val transport = FakeHydrationTransport(gated = true)
@@ -149,7 +207,10 @@ class TimelineRepositorySingleFlightHydrationTest {
 
                 // Both conversations hydrate concurrently behind the shared
                 // gate; whichever claims first signals, both finish on release.
-                withTimeout(10_000) { transport.firstListStarted.await() }
+                withTimeout(10_000) {
+                    transport.firstListStarted.await()
+                    transport.secondListStarted.await()
+                }
                 transport.releaseGate()
 
                 callerA.await()

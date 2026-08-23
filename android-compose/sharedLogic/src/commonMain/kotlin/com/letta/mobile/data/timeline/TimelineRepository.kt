@@ -9,6 +9,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -177,14 +178,19 @@ open class TimelineRepository(
      */
     private val hydrateFlightsMutex = Mutex()
 
-    /** conversationId -> in-flight hydration completion. Guarded by [hydrateFlightsMutex]. */
-    private val hydrateFlights = LinkedHashMap<String, CompletableDeferred<Unit>>()
+    private data class HydrateFlight(
+        val loop: TimelineSyncLoop,
+        val completion: CompletableDeferred<Unit>,
+    )
+
+    /** conversationId -> loop-owned in-flight hydration. Guarded by [hydrateFlightsMutex]. */
+    private val hydrateFlights = LinkedHashMap<String, HydrateFlight>()
 
     private suspend fun hydrateSingleFlight(loop: TimelineSyncLoop, key: TimelineCacheKey) {
-        val created = CompletableDeferred<Unit>()
+        val created = HydrateFlight(loop, CompletableDeferred())
         val joined = hydrateFlightsMutex.withLock {
             val existing = hydrateFlights[key.conversationId]
-            if (existing != null) {
+            if (existing?.loop === loop) {
                 existing
             } else {
                 hydrateFlights[key.conversationId] = created
@@ -200,7 +206,7 @@ open class TimelineRepository(
             // Joiner swallows the shared outcome: the OWNER already emitted
             // HydrateFailed on the loop's event queue on failure — re-emitting
             // here would deliver duplicate events for one hydration attempt.
-            runCatching { joined.await() }
+            runCatching { joined.completion.await() }
                 .onFailure { t ->
                     Telemetry.error(
                         "TimelineRepo", "hydrate.joinedFailed", t,
@@ -214,7 +220,7 @@ open class TimelineRepository(
             withContext(timelineIoDispatcher) {
                 loop.hydrate()
             }
-            created.complete(Unit)
+            created.completion.complete(Unit)
         } catch (t: Throwable) {
             // Remove the flight BEFORE completing so a waiter that retries
             // immediately isn't blocked by the dead flight.
@@ -223,7 +229,7 @@ open class TimelineRepository(
                     hydrateFlights.remove(key.conversationId)
                 }
             }
-            created.completeExceptionally(t)
+            created.completion.completeExceptionally(t)
             Telemetry.error(
                 "TimelineRepo", "hydrate.failed", t,
                 "agentId" to key.agentId.orEmpty(),
@@ -279,7 +285,10 @@ open class TimelineRepository(
 
     suspend fun clearAll() = loopsMutex.withLock {
         val count = loops.size
-        loops.values.forEach { it.close() }
+        loops.values.forEach { loop ->
+            removeHydrateFlight(loop)
+            loop.close()
+        }
         loops.clear()
         Telemetry.event("TimelineRepo", "clearAll", "clearedLoopCount" to count)
     }
@@ -617,6 +626,7 @@ open class TimelineRepository(
     suspend fun clear(conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(null, conversationId)
         (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
+            removeHydrateFlight(loop)
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
@@ -628,6 +638,7 @@ open class TimelineRepository(
     suspend fun clear(agentId: String?, conversationId: String) = loopsMutex.withLock {
         val key = TimelineCacheKey(agentId, conversationId)
         (loops.remove(key) ?: removeAliasedLoopLocked(key))?.let { loop ->
+            removeHydrateFlight(loop)
             loop.close()
             Telemetry.event(
                 "TimelineRepo", "loop.cleared",
@@ -641,6 +652,7 @@ open class TimelineRepository(
         while (loops.size > maxCachedLoops) {
             val eldestKey = loops.entries.firstOrNull()?.key ?: return
             loops.remove(eldestKey)?.let { loop ->
+                scope.launch { removeHydrateFlight(loop) }
                 loop.close()
                 Telemetry.event(
                     "TimelineRepo", "loop.evicted",
@@ -650,6 +662,13 @@ open class TimelineRepository(
                     "maxCachedLoops" to maxCachedLoops,
                 )
             }
+        }
+    }
+
+    private suspend fun removeHydrateFlight(loop: TimelineSyncLoop) {
+        hydrateFlightsMutex.withLock {
+            val entry = hydrateFlights.entries.firstOrNull { it.value.loop === loop } ?: return@withLock
+            hydrateFlights.remove(entry.key)?.completion?.cancel()
         }
     }
 
