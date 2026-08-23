@@ -10,7 +10,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class LettaHttpVibesyncEventStreamSource @Inject constructor(
+class LettaHttpVibesyncEventStreamSource @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : VibesyncEventStreamSource {
     override suspend fun openStream(): ByteReadChannel {

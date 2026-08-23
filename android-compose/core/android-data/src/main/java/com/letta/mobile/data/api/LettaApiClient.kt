@@ -47,7 +47,7 @@ class IrohAdminApiUnavailableException(serverUrl: String) : IllegalStateExceptio
 )
 
 @Singleton
-open class LettaApiClient @Inject constructor(
+class LettaApiClient @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val settingsRepository: ISettingsRepository
 ) {
@@ -65,9 +65,9 @@ open class LettaApiClient @Inject constructor(
     private var cachedBaseUrl: String? = null
     private var cachedToken: String? = null
 
-    open suspend fun getClient(): HttpClient = session().client
+    suspend fun getClient(): HttpClient = session().client
 
-    open suspend fun session(): ApiSession {
+    suspend fun session(): ApiSession {
         val adminConfig = resolveAdminApiConfig()
         val url = adminConfig?.serverUrl?.trim() ?: DEFAULT_ADMIN_API_URL
         val token = adminConfig?.accessToken?.trim()
@@ -90,7 +90,7 @@ open class LettaApiClient @Inject constructor(
         }
     }
 
-    open fun getBaseUrl(): String {
+    fun getBaseUrl(): String {
         return resolveAdminApiConfig()?.serverUrl ?: DEFAULT_ADMIN_API_URL
     }
 

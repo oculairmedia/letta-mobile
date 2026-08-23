@@ -24,47 +24,47 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class IdentityApi @Inject constructor(
+class IdentityApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.IdentityRemoteSource {
-    open override suspend fun listIdentities(): List<Identity> =
+    override suspend fun listIdentities(): List<Identity> =
         getJson("/v1/identities/")
 
-    open override suspend fun countIdentities(): Int =
+    override suspend fun countIdentities(): Int =
         getJson("/v1/identities/count")
 
-    open override suspend fun retrieveIdentity(identityId: String): Identity =
+    override suspend fun retrieveIdentity(identityId: String): Identity =
         getJson("/v1/identities/$identityId")
 
-    open override suspend fun createIdentity(params: IdentityCreateParams): Identity =
+    override suspend fun createIdentity(params: IdentityCreateParams): Identity =
         postJson("/v1/identities/", params)
 
-    open override suspend fun upsertIdentity(params: IdentityUpsertParams): Identity =
+    override suspend fun upsertIdentity(params: IdentityUpsertParams): Identity =
         putJson("/v1/identities/", params)
 
-    open override suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity =
+    override suspend fun updateIdentity(identityId: String, params: IdentityUpdateParams): Identity =
         patchJson("/v1/identities/$identityId", params)
 
-    open override suspend fun deleteIdentity(identityId: String) {
+    override suspend fun deleteIdentity(identityId: String) {
         ensureSuccess(delete("/v1/identities/$identityId"))
     }
 
-    open override suspend fun upsertIdentityProperties(
+    override suspend fun upsertIdentityProperties(
         identityId: String,
         properties: List<IdentityProperty>,
     ): Identity = putJson("/v1/identities/$identityId/properties", properties)
 
-    open override suspend fun listAgentsForIdentity(params: IdentityRelatedListParams): List<Agent> =
+    override suspend fun listAgentsForIdentity(params: IdentityRelatedListParams): List<Agent> =
         listRelated(params, "agents")
 
-    open override suspend fun listBlocksForIdentity(params: IdentityRelatedListParams): List<Block> =
+    override suspend fun listBlocksForIdentity(params: IdentityRelatedListParams): List<Block> =
         listRelated(params, "blocks")
 
-    open override suspend fun attachIdentity(agentId: String, identityId: String) {
+    override suspend fun attachIdentity(agentId: String, identityId: String) {
         ensureSuccess(patch("/v1/agents/$agentId/identities/attach/$identityId"))
     }
 
-    open override suspend fun detachIdentity(agentId: String, identityId: String) {
+    override suspend fun detachIdentity(agentId: String, identityId: String) {
         ensureSuccess(patch("/v1/agents/$agentId/identities/detach/$identityId"))
     }
 

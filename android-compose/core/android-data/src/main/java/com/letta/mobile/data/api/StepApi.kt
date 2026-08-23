@@ -18,10 +18,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class StepApi @Inject constructor(
+class StepApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
-    open suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> {
+    suspend fun listSteps(params: StepListParams = StepListParams()): List<Step> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/") {
@@ -46,7 +46,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveStep(stepId: String): Step {
+    suspend fun retrieveStep(stepId: String): Step {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId")
@@ -56,7 +56,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveStepMetrics(stepId: String): StepMetrics {
+    suspend fun retrieveStepMetrics(stepId: String): StepMetrics {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/metrics")
@@ -66,7 +66,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveStepTrace(stepId: String): ProviderTrace? {
+    suspend fun retrieveStepTrace(stepId: String): ProviderTrace? {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/steps/$stepId/trace")
@@ -76,7 +76,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listStepMessages(
+    suspend fun listStepMessages(
         stepId: String,
         before: String? = null,
         after: String? = null,
@@ -98,7 +98,7 @@ open class StepApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
+    suspend fun updateStepFeedback(stepId: String, params: StepFeedbackUpdateParams): Step {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/steps/$stepId/feedback") {

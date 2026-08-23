@@ -13,10 +13,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class JobApi @Inject constructor(
+class JobApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.JobRemoteSource {
-    open override suspend fun listJobs(params: JobListParams): List<Job> {
+    override suspend fun listJobs(params: JobListParams): List<Job> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/jobs/") {
@@ -35,7 +35,7 @@ open class JobApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveJob(jobId: String): Job {
+    override suspend fun retrieveJob(jobId: String): Job {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/jobs/$jobId")
@@ -45,7 +45,7 @@ open class JobApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun cancelJob(jobId: String): Job {
+    override suspend fun cancelJob(jobId: String): Job {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/jobs/$jobId/cancel")
@@ -55,7 +55,7 @@ open class JobApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun deleteJob(jobId: String): Job {
+    override suspend fun deleteJob(jobId: String): Job {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/jobs/$jobId")

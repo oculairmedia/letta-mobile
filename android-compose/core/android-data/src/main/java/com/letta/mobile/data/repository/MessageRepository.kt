@@ -20,7 +20,7 @@ import javax.inject.Singleton
  * [getMessagesPaged] stays here because [MessagePagingSource] is Android-bound.
  */
 @Singleton
-open class MessageRepository @Inject constructor(
+class MessageRepository @Inject constructor(
     private val messageApi: MessageApi,
     irohApprovalSource: IrohAdminRpcApprovalSource? = null,
     irohTimelineTransport: IrohAdminRpcTimelineTransport? = null,

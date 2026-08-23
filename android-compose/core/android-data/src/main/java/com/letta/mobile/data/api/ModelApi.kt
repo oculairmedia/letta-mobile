@@ -8,10 +8,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ModelApi @Inject constructor(
+class ModelApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) : com.letta.mobile.data.repository.api.ModelRemoteSource {
-    open override suspend fun listLlmModels(): List<LlmModel> {
+    override suspend fun listLlmModels(): List<LlmModel> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/models")
@@ -21,7 +21,7 @@ open class ModelApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listEmbeddingModels(): List<EmbeddingModel> {
+    override suspend fun listEmbeddingModels(): List<EmbeddingModel> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/models/embedding")

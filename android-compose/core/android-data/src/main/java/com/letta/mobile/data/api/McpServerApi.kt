@@ -9,10 +9,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class McpServerApi @Inject constructor(
+class McpServerApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) : com.letta.mobile.data.repository.api.McpServerRemoteSource {
-    open override suspend fun listMcpServers(
+    override suspend fun listMcpServers(
         limit: Int?,
         offset: Int?
     ): List<McpServer> {
@@ -28,7 +28,7 @@ open class McpServerApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun createMcpServer(params: McpServerCreateParams): McpServer {
+    override suspend fun createMcpServer(params: McpServerCreateParams): McpServer {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/mcp-servers") {
@@ -41,7 +41,7 @@ open class McpServerApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun updateMcpServer(serverId: String, params: McpServerUpdateParams): McpServer {
+    override suspend fun updateMcpServer(serverId: String, params: McpServerUpdateParams): McpServer {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/mcp-servers/$serverId") {
@@ -54,7 +54,7 @@ open class McpServerApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun deleteMcpServer(serverId: String) {
+    override suspend fun deleteMcpServer(serverId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/mcp-servers/$serverId")
@@ -63,7 +63,7 @@ open class McpServerApi @Inject constructor(
         }
     }
 
-    open override suspend fun listMcpServerTools(serverId: String): List<Tool> {
+    override suspend fun listMcpServerTools(serverId: String): List<Tool> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/mcp-servers/$serverId/tools")
@@ -73,7 +73,7 @@ open class McpServerApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun refreshMcpServerTools(serverId: String): McpServerResyncResult {
+    override suspend fun refreshMcpServerTools(serverId: String): McpServerResyncResult {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/mcp-servers/$serverId/refresh")
@@ -83,7 +83,7 @@ open class McpServerApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun runMcpServerTool(
+    override suspend fun runMcpServerTool(
         serverId: String,
         toolId: String,
         params: McpToolExecuteParams,

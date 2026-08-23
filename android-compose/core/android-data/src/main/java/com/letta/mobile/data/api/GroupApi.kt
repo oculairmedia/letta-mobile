@@ -24,10 +24,10 @@ import javax.inject.Singleton
 import kotlinx.serialization.json.JsonElement
 
 @Singleton
-open class GroupApi @Inject constructor(
+class GroupApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.GroupRemoteSource {
-    open override suspend fun listGroups(params: GroupListParams): List<Group> {
+    override suspend fun listGroups(params: GroupListParams): List<Group> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/") {
@@ -45,7 +45,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun countGroups(): Int {
+    override suspend fun countGroups(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/count")
@@ -55,7 +55,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveGroup(groupId: String): Group {
+    override suspend fun retrieveGroup(groupId: String): Group {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/$groupId")
@@ -65,7 +65,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun createGroup(params: GroupCreateParams): Group {
+    override suspend fun createGroup(params: GroupCreateParams): Group {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/groups/") {
@@ -78,7 +78,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group {
+    override suspend fun updateGroup(groupId: String, params: GroupUpdateParams): Group {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/groups/$groupId") {
@@ -91,7 +91,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun deleteGroup(groupId: String) {
+    override suspend fun deleteGroup(groupId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/groups/$groupId")
@@ -100,7 +100,7 @@ open class GroupApi @Inject constructor(
         }
     }
 
-    open override suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse {
+    override suspend fun sendGroupMessage(groupId: String, request: MessageCreateRequest): LettaResponse {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/groups/$groupId/messages") {
@@ -113,7 +113,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun sendGroupMessageStream(groupId: String, request: MessageCreateRequest): ByteReadChannel {
+    override suspend fun sendGroupMessageStream(groupId: String, request: MessageCreateRequest): ByteReadChannel {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/groups/$groupId/messages/stream") {
@@ -126,7 +126,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun updateGroupMessage(groupId: String, messageId: String, request: JsonElement): LettaMessage {
+    override suspend fun updateGroupMessage(groupId: String, messageId: String, request: JsonElement): LettaMessage {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/groups/$groupId/messages/$messageId") {
@@ -139,7 +139,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listGroupMessages(params: GroupMessagesListParams): List<LettaMessage> {
+    override suspend fun listGroupMessages(params: GroupMessagesListParams): List<LettaMessage> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/groups/${params.groupId}/messages") {
@@ -154,7 +154,7 @@ open class GroupApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun resetGroupMessages(groupId: String) {
+    override suspend fun resetGroupMessages(groupId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/groups/$groupId/reset-messages") {

@@ -17,10 +17,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ScheduleApi @Inject constructor(
+class ScheduleApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
-    open suspend fun listSchedules(
+    suspend fun listSchedules(
         agentId: String,
         limit: Int? = null,
         after: String? = null,
@@ -37,7 +37,7 @@ open class ScheduleApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun retrieveSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
+    suspend fun retrieveSchedule(agentId: String, scheduledMessageId: String): ScheduledMessage {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/$agentId/schedule/$scheduledMessageId")
@@ -47,7 +47,7 @@ open class ScheduleApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
+    suspend fun createSchedule(agentId: String, params: ScheduleCreateParams): ScheduledMessage {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/schedule") {
@@ -60,7 +60,7 @@ open class ScheduleApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
+    suspend fun deleteSchedule(agentId: String, scheduledMessageId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/$agentId/schedule/$scheduledMessageId")
@@ -76,7 +76,7 @@ open class ScheduleApi @Inject constructor(
      * 404s there). Parity with the desktop schedules surface, which reads
      * the same route via `CronApi`. Optionally scoped to [agentId].
      */
-    open suspend fun listCrons(agentId: String? = null): List<CronTask> {
+    suspend fun listCrons(agentId: String? = null): List<CronTask> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/crons")

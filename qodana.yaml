@@ -82,7 +82,6 @@ exclude:
   # `open` modality as redundant; keep inheritance working for fakes.
   - name: RedundantModalityModifier
     paths:
-      - core/data/src/main
       - app/src/main/java/com/letta/mobile/runtime/local
   # Duplicate-block notes are tracked via CodeScene / review, not this gate.
   - name: DuplicatedCode

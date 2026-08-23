@@ -13,10 +13,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class VibesyncAdminApi @Inject constructor(
+class VibesyncAdminApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
-    open suspend fun refreshAgentsMd(projectId: String? = null, dryRun: Boolean = true): AgentsMdRefreshSummary {
+    suspend fun refreshAgentsMd(projectId: String? = null, dryRun: Boolean = true): AgentsMdRefreshSummary {
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/admin/agents-md/refresh") {
             contentType(ContentType.Application.Json)

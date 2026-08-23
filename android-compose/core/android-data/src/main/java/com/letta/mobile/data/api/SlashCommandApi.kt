@@ -22,7 +22,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 
 @Singleton
-open class SlashCommandApi @Inject constructor(
+class SlashCommandApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : SlashCommandRemoteSource {
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }

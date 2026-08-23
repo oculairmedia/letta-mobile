@@ -11,7 +11,7 @@ import kotlinx.coroutines.SupervisorJob
 
 /** Android binding for [CachedVibesyncEventStreamRepository]. Phase 5o. */
 @Singleton
-open class VibesyncEventStreamRepository internal constructor(
+class VibesyncEventStreamRepository internal constructor(
     streamSource: VibesyncEventStreamSource,
     scope: CoroutineScope,
     logger: VibesyncEventStreamLogger,

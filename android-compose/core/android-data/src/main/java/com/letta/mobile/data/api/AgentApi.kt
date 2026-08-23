@@ -13,7 +13,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class AgentApi @Inject constructor(
+class AgentApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) : com.letta.mobile.data.repository.api.AgentRemoteSource {
     private val json = Json {
@@ -23,7 +23,7 @@ open class AgentApi @Inject constructor(
         coerceInputValues = true
     }
 
-    open override suspend fun listAgents(
+    override suspend fun listAgents(
         limit: Int?,
         offset: Int?,
         tags: List<String>?
@@ -51,7 +51,7 @@ open class AgentApi @Inject constructor(
      * The default full-agent [listAgents] path is unchanged and still used by
      * screens that need full [Agent] objects (edit-agent, chat config, …).
      */
-    open override suspend fun listAgentsSlim(
+    override suspend fun listAgentsSlim(
         limit: Int?,
         offset: Int?,
         tags: List<String>?
@@ -71,16 +71,16 @@ open class AgentApi @Inject constructor(
         )
     }
 
-    open override suspend fun getAgent(agentId: AgentId): Agent {
+    override suspend fun getAgent(agentId: AgentId): Agent {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/${agentId.value}")
         return response.requireSuccess().body()
     }
 
-    open suspend fun getAgent(agentId: String): Agent = getAgent(AgentId(agentId))
+    suspend fun getAgent(agentId: String): Agent = getAgent(AgentId(agentId))
 
-    open override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
+    override suspend fun getContextWindow(agentId: AgentId, conversationId: ConversationId?): ContextWindowOverview {
         val (client, baseUrl) = apiClient.session()
 
         return client.prepareGet("$baseUrl/v1/agents/${agentId.value}/context") {
@@ -96,17 +96,17 @@ open class AgentApi @Inject constructor(
         }
     }
 
-    open suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
+    suspend fun getContextWindow(agentId: String, conversationId: String? = null): ContextWindowOverview =
         getContextWindow(AgentId(agentId), conversationId?.let(::ConversationId))
 
-    open override suspend fun countAgents(): Int {
+    override suspend fun countAgents(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/count")
         return response.requireSuccess().body()
     }
 
-    open override suspend fun createAgent(params: AgentCreateParams): Agent {
+    override suspend fun createAgent(params: AgentCreateParams): Agent {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents") {
@@ -116,7 +116,7 @@ open class AgentApi @Inject constructor(
         return response.requireSuccess().body()
     }
 
-    open override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
+    override suspend fun updateAgent(agentId: AgentId, params: AgentUpdateParams): Agent {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}") {
@@ -126,27 +126,27 @@ open class AgentApi @Inject constructor(
         return response.requireSuccess().body()
     }
 
-    open suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
+    suspend fun updateAgent(agentId: String, params: AgentUpdateParams): Agent = updateAgent(AgentId(agentId), params)
 
-    open override suspend fun deleteAgent(agentId: AgentId) {
+    override suspend fun deleteAgent(agentId: AgentId) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/agents/${agentId.value}")
         response.requireSuccess()
     }
 
-    open suspend fun deleteAgent(agentId: String) = deleteAgent(AgentId(agentId))
+    suspend fun deleteAgent(agentId: String) = deleteAgent(AgentId(agentId))
 
-    open override suspend fun exportAgent(agentId: AgentId): String {
+    override suspend fun exportAgent(agentId: AgentId): String {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/agents/${agentId.value}/export")
         return response.requireSuccess().body()
     }
 
-    open suspend fun exportAgent(agentId: String): String = exportAgent(AgentId(agentId))
+    suspend fun exportAgent(agentId: String): String = exportAgent(AgentId(agentId))
 
-    open override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
+    override suspend fun importAgent(params: AgentImportParams): ImportedAgentsResponse {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.submitFormWithBinaryData(
@@ -165,23 +165,23 @@ open class AgentApi @Inject constructor(
         return response.requireSuccess().body()
     }
 
-    open override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
+    override suspend fun attachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/attach/$archiveId")
         response.requireSuccess()
     }
 
-    open suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
+    suspend fun attachArchive(agentId: String, archiveId: String) = attachArchive(AgentId(agentId), archiveId)
 
-    open override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
+    override suspend fun detachArchive(agentId: AgentId, archiveId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/${agentId.value}/archives/detach/$archiveId")
         response.requireSuccess()
     }
 
-    open suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
+    suspend fun detachArchive(agentId: String, archiveId: String) = detachArchive(AgentId(agentId), archiveId)
 
     private suspend fun HttpResponse.requireSuccess(): HttpResponse {
         if (status.value !in 200..299) {
