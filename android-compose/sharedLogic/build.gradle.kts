@@ -79,7 +79,7 @@ kotlin {
             dependencies {
                 api(project(":core:ids"))
                 api(project(":core:runtime"))
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
                 api("org.jetbrains.kotlinx:atomicfu:0.32.1")
@@ -93,14 +93,14 @@ kotlin {
                 // Runtime-only: @Immutable/@Stable + MutableState for projection
                 // / A2UI data models. No Compose UI toolkit — that is :sharedUI.
                 api("org.jetbrains.compose.runtime:runtime:1.10.0")
-                api("io.ktor:ktor-http:3.5.0")
-                api("io.ktor:ktor-io:3.5.0")
+                api(libs.ktor.http)
+                api(libs.ktor.io)
                 // Multiplatform HTTP client core for shared repository logic
                 // (the engine is supplied per-platform). Lets HTTP admin
                 // repositories live once in commonMain instead of being
                 // duplicated per platform (letta-mobile-mqzkc).
-                api("io.ktor:ktor-client-core:3.5.0")
-                api("io.ktor:ktor-client-websockets:3.5.0")
+                api(libs.ktor.client.core)
+                api(libs.ktor.client.websockets)
             }
         }
 
@@ -119,7 +119,7 @@ kotlin {
                 api("com.google.zxing:core:3.5.3")
                 // CIO engine for the admin-proxy PATCH path: HttpURLConnection
                 // cannot send PATCH (JDK ProtocolException).
-                implementation("io.ktor:ktor-client-cio:3.5.0")
+                implementation(libs.ktor.client.cio)
             }
         }
 
@@ -146,20 +146,20 @@ kotlin {
                 implementation("computer.iroh:iroh:1.1.0")
                 // PNG rendering (QrRenderer.kt) needs ZXing javase — jvmMain only.
                 implementation("com.google.zxing:javase:3.5.3")
-                api("io.ktor:ktor-websockets:3.5.0")
+                api(libs.ktor.websockets)
             }
         }
 
         getByName("jvmTest") {
             dependsOn(jvmAndAndroidTest)
             dependencies {
-                implementation("io.ktor:ktor-client-cio:3.5.0")
+                implementation(libs.ktor.client.cio)
                 implementation("com.google.zxing:javase:3.5.3")
-                implementation("io.ktor:ktor-server-core:3.5.0")
-                implementation("io.ktor:ktor-server-cio:3.5.0")
-                implementation("io.ktor:ktor-server-websockets:3.5.0")
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cio)
+                implementation(libs.ktor.server.websockets)
                 // TEST-ONLY OkHttp engine negative control (letta-mobile-vnp3q).
-                implementation("io.ktor:ktor-client-okhttp:3.5.0")
+                implementation(libs.ktor.client.okhttp)
             }
         }
 
@@ -167,11 +167,11 @@ kotlin {
             dependencies {
                 implementation(kotlin("test"))
                 implementation("app.cash.turbine:turbine:1.2.1")
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation(libs.kotlinx.coroutines.test)
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-                implementation("io.ktor:ktor-client-mock:3.5.0")
-                implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
+                implementation(libs.ktor.client.mock)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
             }
         }
 
@@ -179,7 +179,7 @@ kotlin {
         val wasmJsMain by getting {
             dependsOn(commonMain.get())
             dependencies {
-                implementation("io.ktor:ktor-client-js:3.5.0")
+                implementation(libs.ktor.client.js)
             }
         }
     }

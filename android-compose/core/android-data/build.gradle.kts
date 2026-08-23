@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
     id("org.jetbrains.kotlin.plugin.serialization")
     id("org.jetbrains.kotlin.plugin.allopen")
     id("com.google.dagger.hilt.android")
@@ -33,11 +33,6 @@ detekt {
 
 android {
     namespace = "com.letta.mobile.core"
-    compileSdk = libs.versions.compileSdk.get().toInt()
-
-    defaultConfig {
-        minSdk = libs.versions.minSdk.get().toInt()
-    }
 
     buildFeatures {
         buildConfig = true
@@ -85,8 +80,8 @@ kotlin {
 dependencies {
     api(project(":sharedLogic"))
 
-    implementation("com.google.dagger:hilt-android:2.59.2")
-    ksp("com.google.dagger:hilt-compiler:2.59.2")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
 
     // Compose runtime for @Stable and @Immutable annotations
     implementation("androidx.compose.runtime:runtime:1.8.3")
@@ -94,15 +89,15 @@ dependencies {
     // androidx.tracing — Perfetto tracing integration
     implementation("androidx.tracing:tracing:1.2.0")
 
-    implementation("io.ktor:ktor-client-core:3.5.0")
-    implementation("io.ktor:ktor-client-okhttp:3.5.0")
-    implementation("io.ktor:ktor-client-content-negotiation:3.5.0")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.5.0")
-    implementation("io.ktor:ktor-client-logging:3.5.0")
-    implementation("io.ktor:ktor-client-auth:3.5.0")
+    implementation(libs.ktor.client.core)
+    implementation(libs.ktor.client.okhttp)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
+    implementation(libs.ktor.client.logging)
+    implementation(libs.ktor.client.auth)
 
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation(libs.kotlinx.coroutines.android)
 
     implementation("androidx.paging:paging-runtime-ktx:3.5.0")
     implementation("androidx.datastore:datastore-preferences:1.3.0-alpha09")
@@ -117,8 +112,8 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
-    testImplementation("io.ktor:ktor-client-mock:3.5.0")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
     testImplementation("com.squareup.okhttp3:mockwebserver:5.3.2")
     testImplementation("app.cash.turbine:turbine:1.2.1")
     testImplementation("io.mockk:mockk:1.14.9")

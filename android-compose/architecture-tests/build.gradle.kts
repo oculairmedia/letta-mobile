@@ -32,7 +32,7 @@ tasks.test {
     }
 }
 
-val architectureTest by tasks.registering(Test::class) {
+val architectureTest = tasks.register<Test>("architectureTest") {
     description = "Run Kotlin source and JVM bytecode architecture checks (hard fail)."
     group = "verification"
     testClassesDirs = sourceSets.test.get().output.classesDirs

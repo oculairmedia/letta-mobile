@@ -41,7 +41,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(project(":core:ids"))
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-core:1.11.0")
                 api("org.jetbrains.kotlinx:kotlinx-collections-immutable:0.3.8")
             }

@@ -34,7 +34,7 @@ kotlin {
         commonMain {
             dependencies {
                 api(project(":avatar:core"))
-                api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+                api(libs.kotlinx.coroutines.core)
                 api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
             }
         }
@@ -42,7 +42,7 @@ kotlin {
         commonTest {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
 
@@ -51,17 +51,17 @@ kotlin {
         // the WebView JS bridge instead).
         getByName("jvmMain") {
             dependencies {
-                implementation("io.ktor:ktor-server-core:3.5.0")
-                implementation("io.ktor:ktor-server-cio:3.5.0")
-                implementation("io.ktor:ktor-server-websockets:3.5.0")
+                implementation(libs.ktor.server.core)
+                implementation(libs.ktor.server.cio)
+                implementation(libs.ktor.server.websockets)
             }
         }
 
         getByName("jvmTest") {
             dependencies {
-                implementation("io.ktor:ktor-client-core:3.5.0")
-                implementation("io.ktor:ktor-client-cio:3.5.0")
-                implementation("io.ktor:ktor-client-websockets:3.5.0")
+                implementation(libs.ktor.client.core)
+                implementation(libs.ktor.client.cio)
+                implementation(libs.ktor.client.websockets)
             }
         }
     }

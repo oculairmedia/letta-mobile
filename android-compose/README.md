@@ -51,11 +51,12 @@ Do not assume changes to one path automatically belong in the other.
   that range.
 - `local.properties` pointing at your Android SDK
 
-`compileSdk`, `targetSdk`, and `minSdk` are defined in
-`gradle/libs.versions.toml`. Module build files must consume those catalog
-entries instead of repeating raw SDK literals. `:baselineprofile` is the only
-documented exception: AGP's baseline-profile producer requires
-`minSdkBaselineProfile` (28).
+`compileSdk`, `targetSdk`, `minSdk`, kotlinx-coroutines, Ktor, Hilt, AGP, and
+Kotlin plugin versions live in `gradle/libs.versions.toml`. Android library
+modules apply `com.letta.mobile.android.library` instead of repeating SDK/Java
+17 settings. Documented exceptions: `:baselineprofile` uses
+`minSdkBaselineProfile` (28); `:feature-chat` still pins Hilt 2.60.1 and
+`ktor-client-core` 3.5.2.
 
 ## Local setup
 

@@ -10,8 +10,8 @@ kotlin {
 }
 
 dependencies {
-    implementation("com.android.tools.build:gradle:9.3.1")
-    implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.10")
+    implementation(libs.android.gradle.plugin)
+    implementation(libs.kotlin.gradle.plugin)
 
     testImplementation(gradleTestKit())
     testImplementation(kotlin("test"))

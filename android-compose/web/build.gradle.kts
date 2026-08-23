@@ -10,12 +10,11 @@ plugins {
 val composeVersion = "1.10.0"
 val composeMaterial3Version = "1.9.0"
 val composeIconsVersion = "1.7.3"
-val ktorVersion = "3.5.0"
 val irohWasmDir = rootProject.layout.projectDirectory.dir("native/iroh-wasm")
 val irohWasmArtifact = irohWasmDir.file("target/wasm32-unknown-unknown/release/letta_iroh_wasm.wasm")
 val generatedIrohResources = layout.buildDirectory.dir("generated/iroh-wasm")
 
-val buildIrohWasm by tasks.registering(Exec::class) {
+val buildIrohWasm = tasks.register<Exec>("buildIrohWasm") {
     inputs.files(
         irohWasmDir.file("Cargo.toml"),
         irohWasmDir.file("Cargo.lock"),
@@ -34,7 +33,7 @@ val buildIrohWasm by tasks.registering(Exec::class) {
     )
 }
 
-val generateIrohWasmBindings by tasks.registering(Exec::class) {
+val generateIrohWasmBindings = tasks.register<Exec>("generateIrohWasmBindings") {
     dependsOn(buildIrohWasm)
     inputs.file(irohWasmArtifact)
     outputs.dir(generatedIrohResources)
@@ -69,10 +68,10 @@ kotlin {
                 implementation("org.jetbrains.compose.material3:material3:$composeMaterial3Version")
                 implementation("org.jetbrains.compose.ui:ui:$composeVersion")
                 implementation("org.jetbrains.compose.material:material-icons-extended:$composeIconsVersion")
-                implementation("io.ktor:ktor-client-js:$ktorVersion")
-                implementation("io.ktor:ktor-client-websockets:$ktorVersion")
-                implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+                implementation(libs.ktor.client.js)
+                implementation(libs.ktor.client.websockets)
+                implementation(libs.ktor.client.content.negotiation)
+                implementation(libs.ktor.serialization.kotlinx.json)
                 implementation("io.github.vinceglb:filekit-core:0.15.0")
                 implementation("io.github.vinceglb:filekit-dialogs:0.15.0")
             }
@@ -80,7 +79,7 @@ kotlin {
         val wasmJsTest by getting {
             dependencies {
                 implementation(kotlin("test"))
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+                implementation(libs.kotlinx.coroutines.test)
             }
         }
     }

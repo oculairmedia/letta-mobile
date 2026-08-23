@@ -29,8 +29,6 @@ providers.environmentVariable("LETTA_DESKTOP_BUILD_DIR").orNull
 // Compose baselines) — do it as its own change, not as a drive-by bump.
 val composeDesktopMaterial3Version = "1.9.0"
 val composeDesktopMaterialIconsVersion = "1.7.3"
-val coroutinesVersion = "1.11.0"
-val ktorVersion = "3.5.0"
 val jewelVersion = "0.37.0-262.4852.51"
 val kuiverVersion = "0.3.0"
 val autoLinkTextVersion = "2.0.2"
@@ -138,7 +136,7 @@ val mermaidNativeLibraryName = when {
     else -> "libletta_mermaid_renderer.so"
 }
 val mermaidRendererDir = rootProject.layout.projectDirectory.dir("native/mermaid_renderer")
-val buildDesktopMermaidNative by tasks.registering(Exec::class) {
+val buildDesktopMermaidNative = tasks.register<Exec>("buildDesktopMermaidNative") {
     val manifest = mermaidRendererDir.file("Cargo.toml")
     inputs.files(
         manifest,
@@ -155,7 +153,7 @@ val buildDesktopMermaidNative by tasks.registering(Exec::class) {
         manifest.asFile.absolutePath,
     )
 }
-val stageDesktopMermaidNative by tasks.registering(Sync::class) {
+val stageDesktopMermaidNative = tasks.register<Sync>("stageDesktopMermaidNative") {
     dependsOn(buildDesktopMermaidNative)
     from(mermaidRendererDir.file("target/release/$mermaidNativeLibraryName"))
     into(mermaidNativeDir)
@@ -241,13 +239,13 @@ dependencies {
     implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation("com.arjunjadeja:texty:$textyVersion")
     implementation("com.kizitonwose.calendar:compose-multiplatform:$calendarVersion")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:$coroutinesVersion")
+    implementation(libs.kotlinx.coroutines.swing)
     implementation("me.friwi:jcefmaven:$jcefMavenVersion")
     implementation("net.java.dev.jna:jna-platform:$jnaVersion")
-    implementation("io.ktor:ktor-client-cio:$ktorVersion")
-    implementation("io.ktor:ktor-client-websockets:$ktorVersion")
-    implementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+    implementation(libs.ktor.client.cio)
+    implementation(libs.ktor.client.websockets)
+    implementation(libs.ktor.client.content.negotiation)
+    implementation(libs.ktor.serialization.kotlinx.json)
     // Kotzilla SDK — JVM Compose variant for Desktop's instrumentation.
     // The wrapper in sharedLogic/jvmMain calls initKotzillaConfig() from
     // the generated `io.kotzilla.generated` package (reflective lookup so
@@ -257,8 +255,8 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.compose.ui:ui-test:1.11.1")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:$coroutinesVersion")
-    testImplementation("io.ktor:ktor-client-mock:$ktorVersion")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.ktor.client.mock)
 }
 
 tasks.withType<Test>().configureEach {
@@ -309,69 +307,54 @@ val desktopJbrArchive = layout.buildDirectory.file("downloads/$jbrArchiveName")
 val desktopJbrRoot = layout.buildDirectory.dir("desktop-jbr-runtime")
 val desktopJbrHome: Provider<Directory> = desktopJbrRoot.map { it.dir(jbrExtractDirName) }
 
+val desktopDownloadScript = layout.projectDirectory.file("scripts/download-verified.ps1")
+val desktopExtractScript = layout.projectDirectory.file("scripts/extract-zip.ps1")
+val desktopNpmCiScript = layout.projectDirectory.file("scripts/npm-ci.ps1")
+val desktopStageRuntimeScript = layout.projectDirectory.file("scripts/stage-letta-code-runtime.ps1")
+
 val downloadDesktopJbr = tasks.register<Exec>("downloadDesktopJbr") {
-    onlyIf { isWindowsHost }
+    enabled = isWindowsHost
     inputs.property("jbrVersion", jbrVersion)
     inputs.property("jbrBuild", jbrBuild)
     inputs.property("sha512", jbrArchiveSha512)
+    inputs.file(desktopDownloadScript)
     outputs.file(desktopJbrArchive)
-    val target = desktopJbrArchive.get().asFile
-    val temporary = File(target.parentFile, "${target.name}.part")
-    val downloadScript = """
-        ${'$'}ErrorActionPreference = 'Stop'
-        function Get-Sha512([string]${'$'}Path) {
-            ${'$'}stream = [System.IO.File]::OpenRead(${'$'}Path)
-            try {
-                ${'$'}hasher = [System.Security.Cryptography.SHA512]::Create()
-                try { return ([System.BitConverter]::ToString(${'$'}hasher.ComputeHash(${'$'}stream)) -replace '-', '').ToLowerInvariant() }
-                finally { ${'$'}hasher.Dispose() }
-            } finally { ${'$'}stream.Dispose() }
-        }
-        New-Item -ItemType Directory -Force -Path '${target.parentFile.absolutePath}' | Out-Null
-        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-Sha512 '${target.absolutePath}') -eq '$jbrArchiveSha512')) { exit 0 }
-        Remove-Item -LiteralPath '${temporary.absolutePath}' -Force -ErrorAction SilentlyContinue
-        Invoke-WebRequest -UseBasicParsing 'https://cache-redirector.jetbrains.com/intellij-jbr/$jbrArchiveName' -OutFile '${temporary.absolutePath}'
-        if ((Get-Sha512 '${temporary.absolutePath}') -ne '$jbrArchiveSha512') { throw 'SHA-512 mismatch for $jbrArchiveName' }
-        Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
-    """.trimIndent()
-    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)
-    // Same constraint as the desktop packaging tasks (see comment on
-    // packageDistributionForCurrentOS in desktop.yml): the PowerShell script
-    // captures a File built from a Gradle Provider, so the task's config
-    // cannot be serialized into the configuration cache. The download itself
-    // is idempotent (sha-mismatched or missing files always re-download), so
-    // a single-use invocation per Gradle run is fine.
-    notCompatibleWithConfigurationCache(
-        "PowerShell download script captures a File resolved from a Gradle Provider, " +
-            "which the configuration cache cannot serialize.",
+    // All args are config-time strings so Exec stays configuration-cache safe.
+    commandLine(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        desktopDownloadScript.asFile.absolutePath,
+        "-Url",
+        "https://cache-redirector.jetbrains.com/intellij-jbr/$jbrArchiveName",
+        "-OutFile",
+        desktopJbrArchive.get().asFile.absolutePath,
+        "-Algorithm",
+        "SHA512",
+        "-Expected",
+        jbrArchiveSha512,
     )
 }
 
 val extractDesktopJbr = tasks.register<Exec>("extractDesktopJbr") {
-    onlyIf { isWindowsHost }
+    enabled = isWindowsHost
     dependsOn(downloadDesktopJbr)
-    val archive = desktopJbrArchive.get().asFile
-    val extractTo = desktopJbrRoot.get().asFile
-    val target = desktopJbrHome.get().asFile
-    val extractScript = """
-        ${'$'}ErrorActionPreference = 'Stop'
-        Add-Type -AssemblyName 'System.IO.Compression.FileSystem' -ErrorAction SilentlyContinue
-        if (-not (Test-Path -LiteralPath '${archive.absolutePath}')) { throw 'JBR archive missing on disk' }
-        if ((Test-Path -LiteralPath '${target.absolutePath}') -and (Get-ChildItem -LiteralPath '${target.absolutePath}' -ErrorAction SilentlyContinue | Select-Object -First 1)) { exit 0 }
-        New-Item -ItemType Directory -Force -Path '${extractTo.absolutePath}' | Out-Null
-        [System.IO.Compression.ZipFile]::ExtractToDirectory('${archive.absolutePath}', '${extractTo.absolutePath}')
-    """.trimIndent()
-    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", extractScript)
-    // Same constraint as the download task: the script captures Files
-    // resolved from Gradle Providers, so the task config cannot be
-    // serialized. The extraction is idempotent (exits 0 if the target dir
-    // already has content), so a single-use invocation per Gradle run is
-    // fine. Any task depending on this — packaging, :desktop:run — will
-    // therefore be config-cache-incompatible for that run, which is
-    // acceptable: the build is small and the JBR is already on disk.
-    notCompatibleWithConfigurationCache(
-        "PowerShell extract script captures Files resolved from Gradle Providers, " +
-            "which the configuration cache cannot serialize.",
+    inputs.file(desktopExtractScript)
+    inputs.file(desktopJbrArchive)
+    outputs.dir(desktopJbrHome)
+    commandLine(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        desktopExtractScript.asFile.absolutePath,
+        "-Archive",
+        desktopJbrArchive.get().asFile.absolutePath,
+        "-ExtractTo",
+        desktopJbrRoot.get().asFile.absolutePath,
+        "-Target",
+        desktopJbrHome.get().asFile.absolutePath,
     )
 }
 
@@ -521,53 +504,54 @@ nucleus.application {
 
 val desktopRuntimeSourceDir = layout.projectDirectory.dir("runtime")
 val desktopNodeArchive = layout.buildDirectory.file("downloads/$desktopNodeArchiveName")
-val desktopNodeExtractDir = layout.buildDirectory.dir("desktop-node-runtime")
+val desktopNodeRuntimeRoot = layout.buildDirectory.dir("desktop-node-runtime")
+val desktopNodeExtractDir = desktopNodeRuntimeRoot.map { it.dir("node-v$desktopNodeVersion-win-x64") }
 val desktopRuntimeInstallDir = layout.buildDirectory.dir("desktop-letta-code-runtime")
 val desktopAppResourcesDir = layout.buildDirectory.dir("generated/desktop-app-resources")
 val desktopBundledRuntimeDir = desktopAppResourcesDir.map { it.dir("windows/letta-code-runtime") }
 
 val downloadDesktopNodeRuntime = tasks.register<Exec>("downloadDesktopNodeRuntime") {
-    onlyIf { isWindowsHost }
+    enabled = isWindowsHost
     inputs.property("nodeVersion", desktopNodeVersion)
     inputs.property("sha256", desktopNodeArchiveSha256)
+    inputs.file(desktopDownloadScript)
     outputs.file(desktopNodeArchive)
-    val target = desktopNodeArchive.get().asFile
-    val temporary = File(target.parentFile, "${target.name}.part")
-    val downloadScript = """
-        ${'$'}ErrorActionPreference = 'Stop'
-        function Get-Sha256([string]${'$'}Path) {
-            ${'$'}stream = [System.IO.File]::OpenRead(${'$'}Path)
-            try {
-                ${'$'}hasher = [System.Security.Cryptography.SHA256]::Create()
-                try { return [System.BitConverter]::ToString(${'$'}hasher.ComputeHash(${'$'}stream)).Replace('-', '').ToLowerInvariant() }
-                finally { ${'$'}hasher.Dispose() }
-            } finally { ${'$'}stream.Dispose() }
-        }
-        New-Item -ItemType Directory -Force -Path '${target.parentFile.absolutePath}' | Out-Null
-        if ((Test-Path -LiteralPath '${target.absolutePath}') -and ((Get-Sha256 '${target.absolutePath}') -eq '$desktopNodeArchiveSha256')) { exit 0 }
-        Remove-Item -LiteralPath '${temporary.absolutePath}' -Force -ErrorAction SilentlyContinue
-        Invoke-WebRequest -UseBasicParsing 'https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName' -OutFile '${temporary.absolutePath}'
-        if ((Get-Sha256 '${temporary.absolutePath}') -ne '$desktopNodeArchiveSha256') { throw 'SHA-256 mismatch for $desktopNodeArchiveName' }
-        Move-Item -LiteralPath '${temporary.absolutePath}' -Destination '${target.absolutePath}' -Force
-    """.trimIndent()
-    commandLine("powershell.exe", "-NoProfile", "-NonInteractive", "-Command", downloadScript)
-    // PowerShell script captures a File resolved from a Gradle Provider, so
-    // the task config cannot be serialized. Idempotent SHA-256 check means
-    // re-running is cheap; this just keeps the configuration cache happy.
-    notCompatibleWithConfigurationCache(
-        "PowerShell download script captures a File resolved from a Gradle Provider, " +
-            "which the configuration cache cannot serialize.",
+    commandLine(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        desktopDownloadScript.asFile.absolutePath,
+        "-Url",
+        "https://nodejs.org/dist/v$desktopNodeVersion/$desktopNodeArchiveName",
+        "-OutFile",
+        desktopNodeArchive.get().asFile.absolutePath,
+        "-Algorithm",
+        "SHA256",
+        "-Expected",
+        desktopNodeArchiveSha256,
     )
 }
 
-val extractDesktopNodeRuntime = tasks.register<Sync>("extractDesktopNodeRuntime") {
-    onlyIf { isWindowsHost }
+val extractDesktopNodeRuntime = tasks.register<Exec>("extractDesktopNodeRuntime") {
+    enabled = isWindowsHost
     dependsOn(downloadDesktopNodeRuntime)
-    from(desktopNodeArchive.map { archive -> zipTree(archive) }) {
-        eachFile { path = path.substringAfter('/') }
-        includeEmptyDirs = false
-    }
-    into(desktopNodeExtractDir)
+    inputs.file(desktopExtractScript)
+    inputs.file(desktopNodeArchive)
+    outputs.dir(desktopNodeExtractDir)
+    commandLine(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        desktopExtractScript.asFile.absolutePath,
+        "-Archive",
+        desktopNodeArchive.get().asFile.absolutePath,
+        "-ExtractTo",
+        desktopNodeRuntimeRoot.get().asFile.absolutePath,
+        "-Target",
+        desktopNodeExtractDir.get().asFile.absolutePath,
+    )
 }
 
 val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntimeInstallDir") {
@@ -577,41 +561,49 @@ val prepareDesktopRuntimeInstallDir = tasks.register<Copy>("prepareDesktopRuntim
 }
 
 val installDesktopLettaCodeRuntime = tasks.register<Exec>("installDesktopLettaCodeRuntime") {
-    onlyIf { isWindowsHost }
+    enabled = isWindowsHost
     dependsOn(extractDesktopNodeRuntime)
     dependsOn(prepareDesktopRuntimeInstallDir)
     inputs.files(
         desktopRuntimeSourceDir.file("package.json"),
         desktopRuntimeSourceDir.file("package-lock.json"),
     )
+    inputs.file(desktopNpmCiScript)
     inputs.property("lettaCodeVersion", desktopLettaCodeVersion)
     outputs.dir(desktopRuntimeInstallDir.map { it.dir("node_modules") })
-    workingDir(desktopRuntimeInstallDir)
     commandLine(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        desktopNpmCiScript.asFile.absolutePath,
+        "-NpmCmd",
         desktopNodeExtractDir.get().file("npm.cmd").asFile.absolutePath,
-        "ci",
-        "--omit=dev",
-        "--no-audit",
-        "--no-fund",
+        "-WorkDir",
+        desktopRuntimeInstallDir.get().asFile.absolutePath,
     )
 }
 
-val prepareDesktopLettaCodeRuntime = tasks.register<Sync>("prepareDesktopLettaCodeRuntime") {
-    onlyIf { isWindowsHost }
+val prepareDesktopLettaCodeRuntime = tasks.register<Exec>("prepareDesktopLettaCodeRuntime") {
+    enabled = isWindowsHost
     dependsOn(installDesktopLettaCodeRuntime)
-    from(desktopNodeExtractDir.map { it.file("node.exe") })
-    from(desktopRuntimeInstallDir) {
-        include("package.json", "package-lock.json", "runtime-manifest.json", "node_modules/**")
-        // TypeScript declarations are never loaded at runtime. Some SDK packages
-        // nest them deeply enough to exceed WiX's effective source-path limit,
-        // leaving the MSI manifest pointing at files Windows could not stage.
-        exclude(
-            "node_modules/**/*.d.ts",
-            "node_modules/**/*.map",
-            "node_modules/**/dist-types/**",
-        )
-    }
-    into(desktopBundledRuntimeDir)
+    inputs.file(desktopStageRuntimeScript)
+    inputs.file(desktopNodeExtractDir.map { it.file("node.exe") })
+    inputs.dir(desktopRuntimeInstallDir)
+    outputs.dir(desktopBundledRuntimeDir)
+    commandLine(
+        "powershell.exe",
+        "-NoProfile",
+        "-NonInteractive",
+        "-File",
+        desktopStageRuntimeScript.asFile.absolutePath,
+        "-NodeExe",
+        desktopNodeExtractDir.get().file("node.exe").asFile.absolutePath,
+        "-InstallDir",
+        desktopRuntimeInstallDir.get().asFile.absolutePath,
+        "-DestDir",
+        desktopBundledRuntimeDir.get().asFile.absolutePath,
+    )
 }
 
 tasks.matching { it.name == "prepareAppResources" }.configureEach {

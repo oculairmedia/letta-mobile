@@ -1,19 +1,9 @@
 plugins {
-    id("com.android.library")
+    id("com.letta.mobile.android.library")
 }
 
 android {
     namespace = "com.letta.mobile.core.testutil"
-    compileSdk = libs.versions.compileSdk.get().toInt()
-
-    defaultConfig {
-        minSdk = libs.versions.minSdk.get().toInt()
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
-    }
 }
 
 kotlin {
@@ -25,7 +15,7 @@ kotlin {
 dependencies {
     api(project(":core:android-data"))
     api(project(":sharedLogic"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation(libs.kotlinx.coroutines.core)
     
     // Add mockk since fakes use it (relaxed relaxed = true mockk in FakeToolApi)
     implementation("io.mockk:mockk:1.14.9")
