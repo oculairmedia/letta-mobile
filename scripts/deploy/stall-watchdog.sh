@@ -90,7 +90,20 @@ while true; do
         node "$PROBE" 2>&1)
   rc=$?
   ts=$(date -Is)
-  echo "$ts $out" >> "$LATENCY_LOG"
+
+  # Record the App Server's RSS on every sample. Two stalls on 2026-08-23 showed
+  # the SAME probe signature (connect ok, upgrade=-1) from two DIFFERENT causes,
+  # and only RSS told them apart:
+  #   15:50 load 30.64, si=4540 swap-in, node RSS  227MB -> host memory pressure
+  #   17:45 load  3.87, si=8    no swap,  node RSS 2700MB -> V8 GC near the
+  #                                                          4.05GB heap ceiling
+  # Without this column the next stall is ambiguous again.
+  as_pid=$(appserver_pid)
+  as_rss=""
+  if [[ -n "$as_pid" && "$as_pid" != "0" && -r "/proc/$as_pid/status" ]]; then
+      as_rss=$(awk '/^VmRSS:/{printf "%d", $2/1024}' "/proc/$as_pid/status" 2>/dev/null)
+  fi
+  echo "$ts $out rss=${as_rss:-?}MB" >> "$LATENCY_LOG"
 
   if (( rc != 0 )); then
     capture "probe_failed: $out"
