@@ -1,5 +1,6 @@
 package com.letta.mobile.data.chat.projection
 
+import com.letta.mobile.data.model.SyntheticSkillEnvelopeDetector
 import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.data.timeline.TimelineInstant
 import com.letta.mobile.data.timeline.parseTimelineInstantOrNull
@@ -405,21 +406,30 @@ private fun UiMessage.isPlainAssistantTextEchoOf(lastReasoningContent: String?):
 fun filterMessagesForMode(
     messages: List<UiMessage>,
     mode: ChatDisplayMode,
-): List<UiMessage> = when (mode) {
-    // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches
-    // Aether's standard streaming view. Mid-turn tool/reasoning frames must
-    // reach RunBlock + projectRunActivity so the Working header and compact
-    // tool activity can render live; post-turn auto-collapse folds that work
-    // into the Worked/Thought disclosure while prose stays primary.
-    //
-    // Prior filter (letta-mobile-5s1n era) dropped tools/reasoning and left
-    // Simple as a dead prose-only timeline until final text arrived — that
-    // is the defect this supersedes. Errors remain visible because every
-    // mode now passes the full set; density differences live in the UI layer
-    // (RunBlock collapse, SkillEnvelopeChip, TimelineV1), not here.
-    ChatDisplayMode.Simple,
-    ChatDisplayMode.Interactive,
-    ChatDisplayMode.Debug -> messages
+): List<UiMessage> {
+    // letta-mobile-45e2k: synthetic skill-instruction envelopes are backend
+    // model context, not user-visible conversation. Filter them from every
+    // display mode so they never appear as user bubbles. The canonical skill
+    // tool call (assistant TOOL_CALL) renders through the normal tool card.
+    val afterFilter = messages.filterNot { msg ->
+        msg.role == "user" && SyntheticSkillEnvelopeDetector.isSyntheticSkillEnvelope(msg.role, msg.content)
+    }
+    return when (mode) {
+        // letta-mobile-tz1sp (2026-08-05 product decision): Simple mode matches
+        // Aether's standard streaming view. Mid-turn tool/reasoning frames must
+        // reach RunBlock + projectRunActivity so the Working header and compact
+        // tool activity can render live; post-turn auto-collapse folds that work
+        // into the Worked/Thought disclosure while prose stays primary.
+        //
+        // Prior filter (letta-mobile-5s1n era) dropped tools/reasoning and left
+        // Simple as a dead prose-only timeline until final text arrived — that
+        // is the defect this supersedes. Errors remain visible because every
+        // mode now passes the full set; density differences live in the UI layer
+        // (RunBlock collapse, TimelineV1), not here.
+        ChatDisplayMode.Simple,
+        ChatDisplayMode.Interactive,
+        ChatDisplayMode.Debug -> afterFilter
+    }
 }
 
 fun dedupeGroupedMessagesForLazyKeys(

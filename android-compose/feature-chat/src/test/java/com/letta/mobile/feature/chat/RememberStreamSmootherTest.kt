@@ -107,4 +107,65 @@ class RememberStreamSmootherTest {
         assertEquals("", text)
         assertTrue(smoother.isFullyRevealed)
     }
+
+    @Test
+    fun `multiple rapid updates converge to same revealed state as single final update`() {
+        val target = "Hello there, this is a longer streaming message to reveal smoothly"
+
+        // Single-update baseline.
+        val baseline = StreamingDisplayTextSmoother(revealCodePointsPerStep = 8)
+        baseline.updateTarget(target, isStreaming = true, nowMs = 15L)
+        val baselineFirst = baseline.step(STREAMING_TEXT_PAINT_INTERVAL_MS)
+
+        // Rapid incremental deltas ending at the same final text.
+        val incremental = StreamingDisplayTextSmoother(revealCodePointsPerStep = 8)
+        incremental.updateTarget("Hello", isStreaming = true, nowMs = 0L)
+        incremental.updateTarget("Hello there,", isStreaming = true, nowMs = 5L)
+        incremental.updateTarget("Hello there, this is", isStreaming = true, nowMs = 10L)
+        incremental.updateTarget(target, isStreaming = true, nowMs = 15L)
+        val incrementalFirst = incremental.step(STREAMING_TEXT_PAINT_INTERVAL_MS)
+
+        // Same buffer, same first paint — rapid updates did not corrupt state.
+        assertEquals(baselineFirst, incrementalFirst)
+        assertEquals(baseline.isFullyRevealed, incremental.isFullyRevealed)
+    }
+
+    @Test
+    fun `target growth after full reveal continues from current cursor`() {
+        val smoother = StreamingDisplayTextSmoother(revealCodePointsPerStep = 4)
+
+        smoother.updateTarget("Hello", isStreaming = true, nowMs = 0L)
+        // Catch up completely.
+        val caughtUp = smoother.step(STREAMING_TEXT_PAINT_INTERVAL_MS * 10)
+        assertEquals("Hello", caughtUp)
+        assertTrue(smoother.isFullyRevealed)
+
+        // More text arrives while the stream is still open.
+        smoother.updateTarget("Hello world", isStreaming = true, nowMs = STREAMING_TEXT_PAINT_INTERVAL_MS * 10)
+        assertFalse(smoother.isFullyRevealed)
+
+        // Same loop reveals the new tail from the existing cursor.
+        val afterGrowth = smoother.step(STREAMING_TEXT_PAINT_INTERVAL_MS * 11)
+        assertTrue(afterGrowth.startsWith("Hello"))
+        assertTrue("Hello world".startsWith(afterGrowth))
+    }
+
+    @Test
+    fun `terminal settle reaches exact canonical text after streaming ends`() {
+        val smoother = StreamingDisplayTextSmoother(revealCodePointsPerStep = 3)
+        val target = "Final canonical text"
+
+        smoother.updateTarget(target, isStreaming = true, nowMs = 0L)
+        // Partially reveal — not yet at the end.
+        val partial = smoother.step(STREAMING_TEXT_PAINT_INTERVAL_MS)
+        assertTrue(partial.length < target.length)
+        assertFalse(smoother.isFullyRevealed)
+
+        // Stream closes.
+        smoother.updateTarget(target, isStreaming = false, nowMs = STREAMING_TEXT_PAINT_INTERVAL_MS)
+
+        // Next step snaps to the exact canonical text, no truncation.
+        assertEquals(target, smoother.step(STREAMING_TEXT_PAINT_INTERVAL_MS * 2))
+        assertTrue(smoother.isFullyRevealed)
+    }
 }

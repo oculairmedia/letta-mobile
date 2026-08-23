@@ -395,7 +395,6 @@ private fun MessageListItem(
         when (item) {
             is ChatRenderItem.Single -> DesktopMessageBubble(item.message, streamingMessageId)
             is ChatRenderItem.RunBlock -> DesktopRunBlock(item, streamingMessageId)
-            is ChatRenderItem.SkillEnvelopeChip -> DesktopSkillEnvelopeChip(item)
         }
         // Per-message clock timestamp (Penpot "Grouping + timestamps"),
         // aligned to the sender side.
@@ -442,7 +441,6 @@ private fun List<ChatRenderItem>.tailContentLength(): Int =
         when (item) {
             is ChatRenderItem.Single -> item.message.content.length
             is ChatRenderItem.RunBlock -> item.messages.sumOf { it.first.content.length }
-            is ChatRenderItem.SkillEnvelopeChip -> item.rawContent.length
         }
     } ?: 0
 

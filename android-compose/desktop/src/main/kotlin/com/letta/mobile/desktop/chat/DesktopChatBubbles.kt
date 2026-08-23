@@ -528,7 +528,6 @@ internal fun messageClockLabel(iso: IsoTimestamp): String? {
  * last matching one. Returns null for user prompts or items with no narration.
  */
 internal fun ChatRenderItem.streamingCandidateMessageId(): String? = when (this) {
-    is ChatRenderItem.SkillEnvelopeChip -> null
     is ChatRenderItem.Single -> message
         .takeIf {
             !MessageRoleToken(it.role).isUser() &&

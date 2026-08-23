@@ -151,10 +151,12 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                                     timelineInstantDurationMillis(startedAt, completedAt).coerceAtLeast(0L)
                                 }
                         } else null
+                        val normalized = normalizeSkillToolCall(tc.name ?: "tool", tc.arguments ?: "")
                         UiToolCall(
-                            name = tc.name ?: "tool",
-                            arguments = tc.arguments ?: "",
+                            name = normalized.name,
+                            arguments = normalized.arguments,
                             result = result,
+                            displayTarget = normalized.displayTarget,
                             status = if (result == null) null else if (isError) "error" else "success",
                             generatedImageAttachments = if (tc.name == "generate_image") {
                                 ev.attachments.map {
@@ -295,10 +297,12 @@ fun timelineEventToUiMessage(ev: TimelineEvent, ownAgentId: String? = null): UiM
                         // letta-mobile-fe51r: surface the pointer-diet marker
                         // so the card can lazily fetch the full body on expand.
                         val truncation = callId?.let { ev.toolReturnTruncationByCallId[it] }
+                        val normalized = normalizeSkillToolCall(tc.name ?: "tool", tc.arguments ?: "")
                         UiToolCall(
-                            name = tc.name ?: "tool",
-                            arguments = tc.arguments ?: "",
+                            name = normalized.name,
+                            arguments = normalized.arguments,
                             result = result,
+                            displayTarget = normalized.displayTarget,
                             status = if (result == null) null else if (isError) "error" else "success",
                             generatedImageAttachments = if (tc.name == "generate_image") {
                                 ev.attachments.map {
@@ -418,6 +422,35 @@ private fun com.letta.mobile.data.model.ToolCall.toSubagentDispatch(result: Stri
     } else {
         null
     }
+
+/**
+ * letta-mobile-45e2k: normalize a skill-invocation tool call for display.
+ *
+ * When a tool call's arguments contain a `skill` field (possibly wrapped in
+ * up to two JSON-string layers), replace the tool name with "Skill" and the
+ * remaining arguments as normalized JSON. Unknown or malformed payloads fall
+ * back to the original name/arguments so the tool call stays visible.
+ */
+private data class NormalizedToolCall(
+    val name: String,
+    val arguments: String,
+    val displayTarget: String? = null,
+)
+
+private fun normalizeSkillToolCall(name: String, arguments: String): NormalizedToolCall {
+    val normalized = com.letta.mobile.data.model.SkillArgumentNormalizer.normalize(arguments)
+    return if (normalized != null) {
+        // Keep invocation details on the ordinary tool-card path rather than
+        // projecting the injected skill document as a second timeline item.
+        NormalizedToolCall(
+            name = "Skill",
+            arguments = normalized.normalizedArguments,
+            displayTarget = normalized.skillName,
+        )
+    } else {
+        NormalizedToolCall(name = name, arguments = arguments)
+    }
+}
 
 /**
  * letta-mobile-c49of: approval chip for a TOOL_CALL event. An explicit
