@@ -667,21 +667,39 @@ sealed interface AppServerInboundFrame {
     /**
      * Response to `app_server_info` capability discovery request (lgns8.24).
      *
-     * Carries server version, protocol version, backend, and capability flags.
-     * Callers should inspect [info] before using protocol features that depend
-     * on specific capabilities.
+     * Upstream carries server version, protocol version, backend, and capability
+     * flags as top-level fields. [info] reconstructs the typed descriptor callers
+     * inspect before using protocol features that depend on those capabilities.
      */
     @Serializable
     @SerialName("app_server_info_response")
     data class AppServerInfoResponse(
         @SerialName("request_id") override val requestId: String,
         val success: Boolean,
-        val info: AppServerInfoData? = null,
+        @SerialName("letta_code_version") val lettaCodeVersion: String? = null,
+        @SerialName("protocol_version") val protocolVersion: Int? = null,
+        val backend: String? = null,
+        val capabilities: JsonObject? = null,
         val error: String? = null,
     ) : AppServerInboundFrame {
         @Transient override val type: String = "app_server_info_response"
 
         @Transient override val runtime: AppServerRuntimeScope? = null
+
+        /** Canonical capability descriptor reconstructed from the wire's top-level fields. */
+        val info: AppServerInfoData?
+            get() = if (
+                lettaCodeVersion != null || protocolVersion != null || backend != null || capabilities != null
+            ) {
+                AppServerInfoData(
+                    lettaCodeVersion = lettaCodeVersion,
+                    protocolVersion = protocolVersion,
+                    backend = backend,
+                    capabilities = capabilities,
+                )
+            } else {
+                null
+            }
     }
 
     @Serializable

@@ -103,6 +103,10 @@ data class AppServerInfoData(
 
     /** Returns a specific capability flag value. */
     fun hasCapability(name: String): Boolean =
-        capabilities?.get(name)?.jsonPrimitive?.booleanOrNull ?: false
+        capability(name) == true
+
+    /** Returns an advertised capability flag, or null when absent/malformed. */
+    fun capability(name: String): Boolean? =
+        (capabilities?.get(name) as? JsonPrimitive)?.booleanOrNull
 }
 

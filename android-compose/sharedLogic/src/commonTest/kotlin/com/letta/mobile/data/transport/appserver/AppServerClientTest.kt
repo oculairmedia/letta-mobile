@@ -71,6 +71,70 @@ class AppServerClientTest {
     }
 
     @Test
+    fun parentScopedRouterIsSubscribedBeforeAnImmediateResponse() = runTest {
+        val transport = FakeAppServerTransport()
+        transport.onControlCommand = { command ->
+            if (command is AppServerCommand.RuntimeStart) {
+                transport.emitControl(runtimeStartResponse(requestId = command.requestId, runtime = runtime))
+            }
+        }
+        val client = DefaultAppServerClient(
+            transport = transport,
+            parentScope = backgroundScope,
+            requestTimeoutMs = 1_000,
+        )
+
+        val response = client.runtimeStart(
+            AppServerCommand.RuntimeStart(requestId = "start-immediate", agentId = "agent-1"),
+        )
+
+        assertEquals(runtime, response.runtime)
+    }
+
+    @Test
+    fun connectedGenerationFailsPendingRequestImmediatelyOnDisconnect() = runTest {
+        val transport = FakeAppServerTransport(initiallyConnected = true)
+        val client = DefaultAppServerClient(
+            transport = transport,
+            parentScope = backgroundScope,
+            requestTimeoutMs = 60_000,
+        )
+        val failure = backgroundScope.async {
+            runCatching {
+                client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-disconnect", agentId = "agent-1"))
+            }.exceptionOrNull()
+        }
+        runCurrent()
+        assertIs<AppServerCommand.RuntimeStart>(transport.sentControlCommands.single())
+
+        transport.connectedState.value = false
+        runCurrent()
+
+        assertIs<AppServerRequestFailedException>(failure.await())
+    }
+
+    @Test
+    fun ownerTeardownFailsPendingRequestImmediately() = runTest {
+        val transport = FakeAppServerTransport(initiallyConnected = true)
+        val client = DefaultAppServerClient(
+            transport = transport,
+            parentScope = backgroundScope,
+            requestTimeoutMs = 60_000,
+        )
+        val failure = backgroundScope.async {
+            runCatching {
+                client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-close", agentId = "agent-1"))
+            }.exceptionOrNull()
+        }
+        runCurrent()
+
+        client.failPendingRequests("test generation closed")
+        runCurrent()
+
+        assertIs<AppServerRequestFailedException>(failure.await())
+    }
+
+    @Test
     fun syncAndAbortRequireRequestIdsForCorrelation() = runTest {
         val client = DefaultAppServerClient(FakeAppServerTransport(), requestTimeoutMs = 10)
 
@@ -170,9 +234,11 @@ private class FakeAppServerTransport(initiallyConnected: Boolean = true) : AppSe
     val connectedState = kotlinx.coroutines.flow.MutableStateFlow(initiallyConnected)
     override val isConnected = connectedState
     val sentControlCommands = mutableListOf<AppServerCommand>()
+    var onControlCommand: suspend (AppServerCommand) -> Unit = {}
 
     override suspend fun sendControl(command: AppServerCommand) {
         sentControlCommands += command
+        onControlCommand(command)
     }
 
     fun emitControl(frame: AppServerInboundFrame) {
