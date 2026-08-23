@@ -29,6 +29,70 @@ message says it "mitigates but does not eliminate". That prediction held: the sa
 failure now occurs at the higher ceiling. **Raising it again is not a fix**, it
 just moves the threshold.
 
+## Scale: the assumption underneath all of this is wrong
+
+Measured from `lastTerminalSeq` at turn completion (n=21, wrapper boot 2026-08-23):
+
+| | events per turn |
+|---|---|
+| min | 180 |
+| **median** | **5,529** |
+| p90 | 19,622 |
+| max | 25,120 |
+| **turns exceeding the 1024-frame queue** | **19 of 21 (90%)** |
+
+Observed rates: 42–349 events/sec, over turns lasting 35s to **566s** (9.4 minutes).
+
+**The queue holds 18% of a median turn and 4% of the largest.** At the observed
+peak rate, 1024 slots is ~2.9 seconds of drain lag. This is no longer a
+burst-absorption buffer in any meaningful sense — it is a small fraction of one
+unit of work.
+
+This reframes the whole issue. `DELIVERY_QUEUE_CAPACITY` was chosen for runs of a
+few hundred messages. Runs now routinely carry thousands of messages and tool
+calls, so **every bound sized against the old workload is now undersized by one
+to two orders of magnitude** — and the same phenomenon shows up in at least two
+other places already documented in `letta-mobile-jsfrn`:
+
+- the 203MB / 47,949-row transcript that costs ≥2.7s of blocked event loop to
+  load (`readJsonlFile`, unbounded, retained in `localMessagesByConversationKey`
+  until `deleteAgent`), and
+- the App Server growing to 2.7GB RSS. (Per the audit note in
+  `scripts/deploy/README-stall-diagnostics.md`: RSS is *not* V8 heap occupancy,
+  so this is retention growth as an observation, not a demonstrated GC-ceiling
+  diagnosis. It still scales with run length, which is the only property this
+  section relies on.)
+
+All three are the same root phenomenon — run length scaled well past what the
+bounds assume — not three unrelated bugs.
+
+### What this changes about the proposal below
+
+The Phase 1 design assumes eviction is **exceptional**. At this scale it would be
+**routine**: a median turn overruns the queue by 5x, so evict-and-resync becomes
+the steady state rather than an edge case, and "live streaming" degrades toward
+periodic snapshot refreshes for the duration of a long turn. That may still beat
+today's behaviour (whole session torn down), but it is a materially different
+trade than the one the rest of this document was written to make.
+
+It also sharpens the real question, which is **not** what the queue capacity
+should be:
+
+- If the consumer can sustain ~350 events/sec on average, the queue only ever
+  needs to cover transient drain lag, and no capacity increase is warranted —
+  the bug is whatever causes multi-second drain stalls, and that is what should
+  be investigated.
+- If the consumer *cannot* sustain that rate, **no queue size fixes anything**;
+  it only changes how long it takes to fail. The fix would then have to be on the
+  drain side — batching or coalescing frames before Iroh fanout, so that cost
+  stops scaling linearly with event count × viewer count.
+
+**That question must be answered before implementing Phase 1.** Measuring actual
+drain throughput is a prerequisite, not a follow-up. Notably, the 28 overflows in
+this boot produced only 6 `releasedWithoutTerminal` events, so most overflows tore
+down the session *without* losing a turn — which is itself unexplained and worth
+understanding before committing to a design.
+
 ## Why the current behaviour is the way it is
 
 Two invariants are deliberately encoded in tests and must survive any change:
