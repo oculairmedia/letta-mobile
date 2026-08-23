@@ -80,13 +80,15 @@ class DesktopAppServerChatGatewayBuilder(
         try {
             if (transport is KtorAppServerWebSocketTransport) {
                 awaitDesktopAppServerReadiness(
-                    connectionState = transport.connectionState,
-                    client = client,
-                    expectation = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
-                        localDesktopAppServerExpectation
-                    } else {
-                        DesktopAppServerReadinessExpectation()
-                    },
+                    DesktopAppServerReadinessProbe(
+                        connectionState = transport.connectionState,
+                        client = client,
+                        expectation = if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {
+                            localDesktopAppServerExpectation
+                        } else {
+                            DesktopAppServerReadinessExpectation()
+                        },
+                    ),
                 )
             }
             if (lettaConfig.mode == LettaConfig.Mode.LOCAL) {

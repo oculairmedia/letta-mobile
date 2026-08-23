@@ -5,9 +5,11 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.put
@@ -93,28 +95,25 @@ class AppServerClientTest {
 
     @Test
     fun connectedGenerationFailsPendingRequestImmediatelyOnDisconnect() = runTest {
-        val transport = FakeAppServerTransport(initiallyConnected = true)
-        val client = DefaultAppServerClient(
-            transport = transport,
-            parentScope = backgroundScope,
-            requestTimeoutMs = 60_000,
-        )
-        val failure = backgroundScope.async {
-            runCatching {
-                client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-disconnect", agentId = "agent-1"))
-            }.exceptionOrNull()
-        }
-        runCurrent()
-        assertIs<AppServerCommand.RuntimeStart>(transport.sentControlCommands.single())
+        val pending = startPendingRuntimeStart("start-disconnect")
+        assertIs<AppServerCommand.RuntimeStart>(pending.transport.sentControlCommands.single())
 
-        transport.connectedState.value = false
+        pending.transport.connectedState.value = false
         runCurrent()
 
-        assertIs<AppServerRequestFailedException>(failure.await())
+        assertIs<AppServerRequestFailedException>(pending.failure.await())
     }
 
     @Test
     fun ownerTeardownFailsPendingRequestImmediately() = runTest {
+        val pending = startPendingRuntimeStart("start-close")
+        pending.client.failPendingRequests("test generation closed")
+        runCurrent()
+
+        assertIs<AppServerRequestFailedException>(pending.failure.await())
+    }
+
+    private fun TestScope.startPendingRuntimeStart(requestId: String): PendingRuntimeStart {
         val transport = FakeAppServerTransport(initiallyConnected = true)
         val client = DefaultAppServerClient(
             transport = transport,
@@ -123,15 +122,11 @@ class AppServerClientTest {
         )
         val failure = backgroundScope.async {
             runCatching {
-                client.runtimeStart(AppServerCommand.RuntimeStart(requestId = "start-close", agentId = "agent-1"))
+                client.runtimeStart(AppServerCommand.RuntimeStart(requestId = requestId, agentId = "agent-1"))
             }.exceptionOrNull()
         }
         runCurrent()
-
-        client.failPendingRequests("test generation closed")
-        runCurrent()
-
-        assertIs<AppServerRequestFailedException>(failure.await())
+        return PendingRuntimeStart(transport, client, failure)
     }
 
     @Test
@@ -261,6 +256,12 @@ private class FakeAppServerTransport(initiallyConnected: Boolean = true) : AppSe
         )
     }
 }
+
+private data class PendingRuntimeStart(
+    val transport: FakeAppServerTransport,
+    val client: DefaultAppServerClient,
+    val failure: Deferred<Throwable?>,
+)
 
 private fun runtimeStartResponse(
     requestId: String,

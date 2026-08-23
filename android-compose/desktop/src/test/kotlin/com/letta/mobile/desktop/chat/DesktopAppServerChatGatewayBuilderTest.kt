@@ -77,7 +77,7 @@ class DesktopAppServerChatGatewayBuilderTest {
                 val requestId = server.awaitAppServerInfoRequestId()
                 assertFalse(build.isCompleted, "gateway was published before app_server_info completed")
 
-                server.sendAppServerInfo(requestId = requestId, success = true, protocolVersion = 1, runtimeStart = true)
+                server.sendAppServerInfo(AppServerInfoReply(requestId = requestId))
                 val gateway = withTimeout(5.seconds) { build.await() }
                 (gateway as AutoCloseable).close()
                 server.awaitPeerClose()
@@ -104,11 +104,13 @@ class DesktopAppServerChatGatewayBuilderTest {
             try {
                 val requestId = server.awaitAppServerInfoRequestId()
                 server.sendAppServerInfo(
-                    requestId = requestId,
-                    success = false,
-                    protocolVersion = null,
-                    runtimeStart = false,
-                    error = "unsupported command",
+                    AppServerInfoReply(
+                        requestId = requestId,
+                        success = false,
+                        protocolVersion = null,
+                        runtimeStart = false,
+                        error = "unsupported command",
+                    ),
                 )
 
                 assertFailsWith<IllegalStateException> { withTimeout(5.seconds) { build.await() } }
@@ -135,7 +137,7 @@ class DesktopAppServerChatGatewayBuilderTest {
 
             try {
                 val requestId = server.awaitAppServerInfoRequestId()
-                server.sendAppServerInfo(requestId = requestId, success = true, protocolVersion = 1, runtimeStart = false)
+                server.sendAppServerInfo(AppServerInfoReply(requestId = requestId, runtimeStart = false))
 
                 assertFailsWith<IllegalStateException> { withTimeout(5.seconds) { build.await() } }
                 server.awaitPeerClose()
@@ -382,6 +384,14 @@ class DesktopAppServerChatGatewayBuilderTest {
  * transport. It intentionally exposes the info response as a test-controlled
  * barrier so returning a gateway on socket-open alone is observable.
  */
+private data class AppServerInfoReply(
+    val requestId: String,
+    val success: Boolean = true,
+    val protocolVersion: Int? = 1,
+    val runtimeStart: Boolean = true,
+    val error: String? = null,
+)
+
 private class RawAppServerWebSocket : AutoCloseable {
     private val server = ServerSocket(0, 1, InetAddress.getLoopbackAddress())
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -428,26 +438,20 @@ private class RawAppServerWebSocket : AutoCloseable {
         return payload.getValue("request_id").jsonPrimitive.content
     }
 
-    suspend fun sendAppServerInfo(
-        requestId: String,
-        success: Boolean,
-        protocolVersion: Int?,
-        runtimeStart: Boolean,
-        error: String? = null,
-    ) {
+    suspend fun sendAppServerInfo(reply: AppServerInfoReply) {
         val response = buildJsonObject {
             put("type", "app_server_info_response")
-            put("request_id", requestId)
-            put("success", success)
-            error?.let { put("error", it) }
-            if (protocolVersion != null) {
+            put("request_id", reply.requestId)
+            put("success", reply.success)
+            reply.error?.let { put("error", it) }
+            if (reply.protocolVersion != null) {
                 put("letta_code_version", "0.29.12")
-                put("protocol_version", protocolVersion)
+                put("protocol_version", reply.protocolVersion)
                 put("backend", "local")
                 put(
                     "capabilities",
                     buildJsonObject {
-                        put("runtime_start", runtimeStart)
+                        put("runtime_start", reply.runtimeStart)
                         put("split_channels", false)
                         put("agent_management", true)
                         put("conversation_management", true)

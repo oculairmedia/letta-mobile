@@ -17,18 +17,22 @@ internal data class DesktopAppServerReadinessExpectation(
     val requiredCapabilities: Set<String> = emptySet(),
 )
 
+internal data class DesktopAppServerReadinessProbe(
+    val connectionState: StateFlow<AppServerConnectionState>,
+    val client: AppServerClient,
+    val expectation: DesktopAppServerReadinessExpectation,
+    val timeoutMs: Long = DESKTOP_APP_SERVER_READINESS_TIMEOUT_MS,
+    val requestIdFactory: () -> String = { "desktop-info-${UUID.randomUUID()}" },
+)
+
 /**
  * Makes one App Server connection generation prove protocol compatibility
  * before Desktop publishes a gateway backed by it.
  */
 internal suspend fun awaitDesktopAppServerReadiness(
-    connectionState: StateFlow<AppServerConnectionState>,
-    client: AppServerClient,
-    expectation: DesktopAppServerReadinessExpectation,
-    timeoutMs: Long = DESKTOP_APP_SERVER_READINESS_TIMEOUT_MS,
-    requestIdFactory: () -> String = { "desktop-info-${UUID.randomUUID()}" },
-): AppServerInfoData = withTimeoutOrNull(timeoutMs.milliseconds) {
-    when (val settled = connectionState.first { it.isReady || it is AppServerConnectionState.Failed }) {
+    probe: DesktopAppServerReadinessProbe,
+): AppServerInfoData = withTimeoutOrNull(probe.timeoutMs.milliseconds) {
+    when (val settled = probe.connectionState.first { it.isReady || it is AppServerConnectionState.Failed }) {
         AppServerConnectionState.Ready -> Unit
         is AppServerConnectionState.Failed -> error(
             "Desktop App Server connection failed before readiness: " +
@@ -37,18 +41,18 @@ internal suspend fun awaitDesktopAppServerReadiness(
         else -> error("Desktop App Server reached an invalid readiness state: $settled")
     }
 
-    val response = client.appServerInfo(AppServerCommand.AppServerInfo(requestIdFactory()))
+    val response = probe.client.appServerInfo(AppServerCommand.AppServerInfo(probe.requestIdFactory()))
     if (!response.success) {
         error("Desktop App Server handshake failed: ${response.error ?: "unknown protocol failure"}")
     }
     val info = response.info
-        ?.requireCompatibleWith(expectation.toCompatibilityRequirement())
+        ?.requireCompatibleWith(probe.expectation.toCompatibilityRequirement())
         ?: error("Desktop App Server handshake returned no server information")
-    check(connectionState.value.isReady) {
+    check(probe.connectionState.value.isReady) {
         "Desktop App Server connection was lost during protocol handshake"
     }
     info
-} ?: error("Desktop App Server readiness timed out after ${timeoutMs}ms")
+} ?: error("Desktop App Server readiness timed out after ${probe.timeoutMs}ms")
 
 private fun DesktopAppServerReadinessExpectation.toCompatibilityRequirement() =
     AppServerCompatibilityRequirement(
