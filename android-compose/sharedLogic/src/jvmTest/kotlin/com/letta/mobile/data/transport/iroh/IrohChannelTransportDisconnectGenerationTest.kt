@@ -50,17 +50,17 @@ class IrohChannelTransportDisconnectGenerationTest {
     fun characterizeDisconnectAndReconnectGenerationIsolation(): Unit = runBlocking {
         val harness = TransportHarness()
         try {
-            harness.connect(observerIndex = 0)
+            harness.connect(Observer.OLD)
             val viewedPath = harness.seedViewedConversation()
-            harness.emitAndAwait(observerIndex = 0, sequence = 1, content = "from-session-1")
+            harness.emitAndAwait(AssistantFrame(Observer.OLD, 1, "from-session-1"))
 
             harness.disconnectAndAssertPublicState()
-            harness.emitAndAssertIgnored(observerIndex = 0, sequence = 2, content = "stale-frame")
+            harness.emitAndAssertIgnored(AssistantFrame(Observer.OLD, 2, "stale-frame"))
 
-            harness.connect(observerIndex = 1)
+            harness.connect(Observer.NEW)
             harness.assertViewedConversationResubscribed(viewedPath)
-            harness.emitAndAwait(observerIndex = 1, sequence = 3, content = "from-session-2")
-            harness.emitAndAssertIgnored(observerIndex = 0, sequence = 4, content = "stale-2")
+            harness.emitAndAwait(AssistantFrame(Observer.NEW, 3, "from-session-2"))
+            harness.emitAndAssertIgnored(AssistantFrame(Observer.OLD, 4, "stale-2"))
         } finally {
             harness.close()
         }
@@ -84,10 +84,10 @@ class IrohChannelTransportDisconnectGenerationTest {
             transport.events.collect { frames.add(it) }
         }
 
-        suspend fun connect(observerIndex: Int) {
+        suspend fun connect(observer: Observer) {
             transport.connect("iroh://ticket", "", "device", "test")
             awaitCondition { transport.state.value is ChannelTransportState.Connected }
-            awaitCondition { observerStreams[observerIndex].subscriptionCount.value == 1 }
+            awaitCondition { observerStreams[observer.index].subscriptionCount.value == 1 }
         }
 
         suspend fun seedViewedConversation(): String {
@@ -109,15 +109,15 @@ class IrohChannelTransportDisconnectGenerationTest {
             assertEquals(expectedPath, call.path)
         }
 
-        suspend fun emitAndAwait(observerIndex: Int, sequence: Long, content: String) {
-            observerStreams[observerIndex].emit(streamDelta(sequence, content))
-            awaitCondition { frames.hasAssistantContent(content) }
+        suspend fun emitAndAwait(frame: AssistantFrame) {
+            observerStreams[frame.observer.index].emit(streamDelta(frame))
+            awaitCondition { frames.hasAssistantContent(frame.content) }
         }
 
-        suspend fun emitAndAssertIgnored(observerIndex: Int, sequence: Long, content: String) {
-            observerStreams[observerIndex].emit(streamDelta(sequence, content))
+        suspend fun emitAndAssertIgnored(frame: AssistantFrame) {
+            observerStreams[frame.observer.index].emit(streamDelta(frame))
             delay(STALE_FRAME_SETTLE_TIME)
-            assertFalse(frames.hasAssistantContent(content))
+            assertFalse(frames.hasAssistantContent(frame.content))
         }
 
         suspend fun close() {
@@ -146,6 +146,14 @@ class IrohChannelTransportDisconnectGenerationTest {
         }
     }
 
+    private enum class Observer(val index: Int) { OLD(0), NEW(1) }
+
+    private data class AssistantFrame(
+        val observer: Observer,
+        val sequence: Long,
+        val content: String,
+    )
+
     private data class AdminRpcRecord(val session: String, val method: String, val path: String)
 
     private companion object {
@@ -162,15 +170,15 @@ class IrohChannelTransportDisconnectGenerationTest {
         fun List<ServerFrame>.hasAssistantContent(content: String): Boolean =
             any { it is ServerFrame.AssistantMessage && it.content == content }
 
-        fun streamDelta(sequence: Long, content: String): AppServerReceivedFrame {
+        fun streamDelta(frame: AssistantFrame): AppServerReceivedFrame {
             val body = """
                 {
                   "type": "stream_delta",
                   "runtime": {"agent_id": "$AGENT", "conversation_id": "$CONVERSATION"},
-                  "event_seq": $sequence,
+                  "event_seq": ${frame.sequence},
                   "emitted_at": "2026-08-23T00:00:00Z",
-                  "idempotency_key": "disc-$CONVERSATION-$sequence",
-                  "delta": {"message_type": "assistant_message", "id": "msg-$sequence", "content": "$content"}
+                  "idempotency_key": "disc-$CONVERSATION-${frame.sequence}",
+                  "delta": {"message_type": "assistant_message", "id": "msg-${frame.sequence}", "content": "${frame.content}"}
                 }
             """.trimIndent()
             return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
