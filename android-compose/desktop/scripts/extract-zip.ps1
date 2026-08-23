@@ -25,11 +25,13 @@ try {
     if ($stagedEntries.Count -eq 0) {
         throw "Archive extracted no entries: $Archive"
     }
+    $stagedTarget = Join-Path $stageRoot $leaf
+    $publishSource = if (Test-Path -LiteralPath $stagedTarget) { $stagedTarget } else { $stageRoot }
 
     if (Test-Path -LiteralPath $Target) {
         Move-Item -LiteralPath $Target -Destination $backup
     }
-    Move-Item -LiteralPath $stageRoot -Destination $Target
+    Move-Item -LiteralPath $publishSource -Destination $Target
     if (Test-Path -LiteralPath $backup) {
         Remove-Item -LiteralPath $backup -Recurse -Force
     }
