@@ -94,7 +94,10 @@ jobs:
         # follow-up. Output:
         #   D:\l\compose\binaries\main\exe\*.exe
         #   D:\l\compose\binaries\main\msi\*.msi
-        run: ./gradlew :desktop:packageDistributionForCurrentOS
+        # Packaging still captures Gradle script objects (Nucleus jpackage tasks
+        # plus JBR verify actions). :desktop:run is configuration-cache safe;
+        # this entry point is not, so keep the cache off here only.
+        run: ./gradlew --no-configuration-cache :desktop:packageDistributionForCurrentOS
 
       - name: Upload Windows installers
         uses: actions/upload-artifact@v4

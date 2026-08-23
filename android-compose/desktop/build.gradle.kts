@@ -610,6 +610,10 @@ tasks.matching { it.name == "prepareAppResources" }.configureEach {
     dependsOn(prepareDesktopLettaCodeRuntime)
 }
 
+tasks.matching { it.name == "checkRuntime" || it.name == "checkReleaseRuntime" }.configureEach {
+    dependsOn(extractDesktopJbr)
+}
+
 /**
  * Verify the JBR we're about to package IS actually a JetBrains Runtime.
  * Runs against the source JBR (extractDesktopJbr's output) before jpackage
