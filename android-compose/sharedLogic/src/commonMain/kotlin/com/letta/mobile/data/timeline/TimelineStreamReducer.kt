@@ -72,7 +72,12 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             )
             return output()
         }
-        val updated = match.copy(approvalDecided = true)
+        // letta-mobile-c49of: record the explicit decision so a REJECTED
+        // request projects as Rejected instead of the legacy Approved chip.
+        val updated = match.copy(
+            approvalDecided = true,
+            approvalDecision = message.approvalOutcome() ?: match.approvalDecision,
+        )
         timeline = timeline.replaceByServerId(updated)
         pendingEvents += TimelineSyncEvent.StreamEventIngested(match.serverId, message.messageType)
         return output()
@@ -237,6 +242,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
                 content = mergedText,
                 toolCalls = mergedCalls,
                 approvalDecided = existing.approvalDecided || confirmed.approvalDecided,
+                approvalDecision = existing.approvalDecision ?: confirmed.approvalDecision,
                 toolReturnContent = confirmed.toolReturnContent ?: existing.toolReturnContent,
                 toolReturnIsError = confirmed.toolReturnIsError || existing.toolReturnIsError,
                 toolReturnContentByCallId = (existing.toolReturnContentByCallId + confirmed.toolReturnContentByCallId).toTimelinePersistentMap(),
