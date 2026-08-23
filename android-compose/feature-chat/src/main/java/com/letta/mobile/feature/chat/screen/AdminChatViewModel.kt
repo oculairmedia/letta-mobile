@@ -499,10 +499,12 @@ internal class AdminChatViewModel @Inject constructor(
     fun onTruncatedToolResultExpanded(messageId: String) =
         truncatedToolReturnCoordinator.onTruncatedToolResultExpanded(messageId)
 
-    private fun collapseCompletedRunsIfStreamingFinished(
+    // letta-mobile-ah1ng: terminal-run reconciliation runs on every projection
+    // publication (see ChatTimelineObserver), not only on the streaming edge.
+    private fun reconcileCollapsedRunsOnProjection(
         previous: ChatUiState,
         next: ChatUiState,
-    ): ChatUiState = runExpansionState.collapseCompletedRunsIfStreamingFinished(previous, next)
+    ): ChatUiState = runExpansionState.reconcileCollapsedRunsOnProjection(previous, next)
 
     private val chatSearchCoordinator: ChatSearchCoordinator = ChatSearchCoordinator(
         scope = viewModelScope,
@@ -543,7 +545,7 @@ internal class AdminChatViewModel @Inject constructor(
         clearA2uiThinkingOnResponse = { adminChatA2uiCoordinator.clearA2uiThinkingOnResponse() },
         isFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight },
         clearFollowingDuplicateInitialMessageInFlight = { followingDuplicateInitialMessageInFlight = false },
-        collapseCompletedRunsIfStreamingFinished = ::collapseCompletedRunsIfStreamingFinished,
+        reconcileCollapsedRunsOnProjection = ::reconcileCollapsedRunsOnProjection,
         syncA2uiHistorySnapshot = { convId, msgs -> adminChatA2uiCoordinator.syncA2uiHistorySnapshot(convId, msgs) },
         hydrationIdentity = ::hydrationIdentity,
     )
