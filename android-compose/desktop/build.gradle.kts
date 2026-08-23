@@ -2,7 +2,6 @@ import dev.nucleusframework.desktop.application.dsl.TargetFormat
 import dev.nucleusframework.desktop.application.dsl.ReleaseChannel
 import dev.nucleusframework.desktop.application.dsl.ReleaseType
 import dev.nucleusframework.desktop.application.dsl.SigningAlgorithm
-import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // WiX 4 still resolves installer sources through Win32 paths. Keep CI's
@@ -708,17 +707,26 @@ tasks.matching { it.name.startsWith("createDistributable") || it.name.startsWith
 // working touch keyboard on Compose Multiplatform).
 afterEvaluate {
     tasks.named<JavaExec>("run") {
-        dependsOn(extractDesktopJbr)
-        val jbrLauncher = javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(minimumRuntimeJdk))
-        }
-        javaLauncher.set(jbrLauncher)
-        doFirst {
-            val resolved = desktopJbrHome.get().asFile.resolve(if (isWindowsHost) "bin/java.exe" else "bin/java")
-            val launcherExecutable = javaLauncher.get().executablePath.asFile
-            check(resolved.isFile) { "JBR java missing at $resolved — extractDesktopJbr did not produce it." }
-            check(launcherExecutable == resolved) {
-                "Desktop run launcher resolved to $launcherExecutable instead of extracted JBR $resolved."
+        if (isWindowsHost) {
+            dependsOn(extractDesktopJbr)
+            val jbrJava = desktopJbrHome.map { it.file("bin/java.exe") }
+            javaLauncher.set(provider {
+                val executable = jbrJava.get()
+                object : org.gradle.jvm.toolchain.JavaLauncher {
+                    override fun getExecutablePath() = executable
+                    override fun getMetadata() = object : org.gradle.jvm.toolchain.JavaInstallationMetadata {
+                        override fun getLanguageVersion() = org.gradle.jvm.toolchain.JavaLanguageVersion.of(minimumRuntimeJdk)
+                        override fun getJavaRuntimeVersion() = jbrVersion
+                        override fun getJvmVersion() = jbrVersion
+                        override fun getVendor() = "JetBrains"
+                        override fun getInstallationPath() = desktopJbrHome.get()
+                        override fun isCurrentJvm() = false
+                    }
+                }
+            })
+            doFirst {
+                val resolved = jbrJava.get().asFile
+                check(resolved.isFile) { "JBR java missing at $resolved — extractDesktopJbr did not produce it." }
             }
         }
     }

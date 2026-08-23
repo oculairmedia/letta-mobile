@@ -20,6 +20,9 @@ concurrency:
   group: android-perf-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   perf-gate:
     name: perf-gate
