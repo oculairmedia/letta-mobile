@@ -16,6 +16,7 @@ import com.letta.mobile.data.controller.reconnect.AppServerClientGeneration
 import com.letta.mobile.data.controller.reconnect.ReconnectCoordinator
 import com.letta.mobile.data.controller.reconnect.ReconnectingAppServerClient
 import com.letta.mobile.data.controller.reconnect.ReconnectingClientListener
+import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
 import com.letta.mobile.data.controller.registry.InMemoryRuntimeRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRouter
@@ -28,6 +29,7 @@ import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.IrohNodeEndpoint
 import com.letta.mobile.data.runtime.AppServerContextWindowPreflight
 import com.letta.mobile.data.transport.appserver.DefaultAppServerClient
+import com.letta.mobile.data.transport.appserver.DualLaneAppServerClient
 import com.letta.mobile.data.transport.appserver.KtorAppServerWebSocketTransport
 import com.letta.mobile.data.transport.appserver.applyAppServerDefaults
 import io.ktor.client.HttpClient
@@ -40,6 +42,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
@@ -591,17 +595,26 @@ class AppServerServeIrohCommand : CliktCommand(
         val runtimeRegistry = InMemoryRuntimeRegistry()
         var controllerRef: DefaultAppServerController? = null
         var coordinatorRef: ReconnectCoordinator? = null
-        val reconnectingClient = ReconnectingAppServerClient(
+        val adminClient = ReconnectingAppServerClient(
+            connect = { mintGeneration(httpClient, appServerUrl, requestTimeoutMs, scope) },
+            telemetryComponent = "AppServerAdminReconnect",
+        )
+        val runtimeClient = ReconnectingAppServerClient(
             connect = { mintGeneration(httpClient, appServerUrl, requestTimeoutMs, scope) },
             listener = recoveryListener(
                 controller = { controllerRef },
                 coordinator = { coordinatorRef },
+                adminState = adminClient.state,
             ),
         )
+        val routedClient = DualLaneAppServerClient(
+            runtime = runtimeClient,
+            admin = adminClient,
+        )
         val controller = DefaultAppServerController(
-            client = reconnectingClient,
+            client = routedClient,
             runtimeRegistry = runtimeRegistry,
-            turnContextPreflight = AppServerContextWindowPreflight(reconnectingClient),
+            turnContextPreflight = AppServerContextWindowPreflight(routedClient),
             // letta-mobile-bn008-phase2-custom-tool (1vuec): wire the Iroh
             // agent-message CLI as an external tool, gated by --meridian-binary.
             // When unset the registry advertises no extras, preserving the
@@ -614,8 +627,9 @@ class AppServerServeIrohCommand : CliktCommand(
         )
         controllerRef = controller
         coordinatorRef = ReconnectCoordinator(controller, runtimeRegistry)
-        reconnectingClient.start(scope)
-        return controller to reconnectingClient
+        adminClient.start(scope)
+        runtimeClient.start(scope)
+        return controller to routedClient
     }
 
     /**
@@ -683,6 +697,7 @@ class AppServerServeIrohCommand : CliktCommand(
     private fun recoveryListener(
         controller: () -> DefaultAppServerController?,
         coordinator: () -> ReconnectCoordinator?,
+        adminState: Flow<ReconnectingClientState>,
     ): ReconnectingClientListener = object : ReconnectingClientListener {
         override suspend fun onDisconnected(reason: String?) {
             println("[iroh-app-server] App Server connection lost: ${reason ?: "unknown"}")
@@ -690,6 +705,7 @@ class AppServerServeIrohCommand : CliktCommand(
         }
 
         override suspend fun onRecovered(client: com.letta.mobile.data.transport.appserver.AppServerClient) {
+            awaitManagementLaneReady(adminState)
             val result = coordinator()?.reconnect()
             result?.errors?.forEach {
                 System.err.println("[iroh-app-server] reattach failed: ${it.message}")
@@ -699,6 +715,10 @@ class AppServerServeIrohCommand : CliktCommand(
             // channel_start re-wires ingress to the live socket, which a reconnect
             // otherwise leaves pointed at the dead one.
             restoreChannels(client)
+            // Recovery work can take long enough for the independent management
+            // lane to roll generations. Re-check at the readiness boundary so
+            // the runtime supervisor never advertises a half-usable startup.
+            awaitManagementLaneReady(adminState)
             controller()?.markConnected()
             println(
                 "[iroh-app-server] App Server connection recovered " +
@@ -797,6 +817,24 @@ class AppServerServeIrohCommand : CliktCommand(
         )
         val client = DefaultAppServerClient(transport, requestTimeoutMs = requestTimeoutMs)
         return DefaultAppServerController(client) to null
+    }
+}
+
+/**
+ * Runtime readiness is only truthful once the read lane needed by turn
+ * preflight is usable. This wait runs inside runtime recovery, before its
+ * supervisor emits `generation.ready`; later admin disconnects do not cancel
+ * the already-ready runtime generation.
+ */
+internal suspend fun awaitManagementLaneReady(state: Flow<ReconnectingClientState>) {
+    when (val settled = state.first {
+        it is ReconnectingClientState.Ready || it is ReconnectingClientState.GaveUp
+    }) {
+        is ReconnectingClientState.Ready -> Unit
+        is ReconnectingClientState.GaveUp -> error(
+            "App Server management lane gave up before runtime readiness: ${settled.reason ?: "unknown"}",
+        )
+        else -> error("unreachable management lane state: $settled")
     }
 }
 

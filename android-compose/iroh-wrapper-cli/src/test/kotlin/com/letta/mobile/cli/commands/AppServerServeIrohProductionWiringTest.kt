@@ -4,16 +4,41 @@ import com.letta.mobile.data.controller.DefaultAppServerController
 import com.letta.mobile.data.controller.node.iroh.AdminRpcRegistry
 import com.letta.mobile.data.controller.node.iroh.SubagentRegistrySource
 import com.letta.mobile.data.controller.node.iroh.SubagentTodosSnapshot
+import com.letta.mobile.data.controller.reconnect.ReconnectingClientState
 import com.letta.mobile.data.model.SubagentEntry
 import com.letta.mobile.data.transport.appserver.AppServerClient
 import com.letta.mobile.data.transport.appserver.AppServerCommand
 import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class AppServerServeIrohProductionWiringTest {
+    @Test
+    fun `runtime readiness waits for management lane readiness`() = runTest {
+        val state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.Connecting(attempt = 0))
+
+        val waiting = async { awaitManagementLaneReady(state) }
+        testScheduler.runCurrent()
+        assertFalse(waiting.isCompleted)
+
+        state.value = ReconnectingClientState.Ready
+        waiting.await()
+    }
+
+    @Test
+    fun `runtime readiness fails when management lane gives up`() = runTest {
+        val state = MutableStateFlow<ReconnectingClientState>(ReconnectingClientState.GaveUp("auth rejected"))
+
+        val failure = runCatching { awaitManagementLaneReady(state) }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+    }
+
     @Test
     fun `production router always registers controller-native subagent routes`() {
         val controller = DefaultAppServerController(EmptyClient)
