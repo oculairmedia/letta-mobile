@@ -203,7 +203,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
         // incremental stream — the same signal that distinguishes the bn008
         // production cascade from the wucn counterexample at this exact merge
         // point.
-        val isCumulativeStream = confirmed.otid != null && confirmed.otid == existing.otid
+        val isCumulativeStream = confirmed.otid == existing.otid
         // letta-mobile-k9y5d: a frame is a forward (newer) delta only when its
         // seq id is strictly greater than the text we already hold. A frame with
         // a lower-or-equal seq id is a replayed / out-of-order re-delivery and
@@ -223,28 +223,7 @@ fun reduceStreamFrame(input: TimelineReducerInput): TimelineReducerOutput {
             // instead — mergeStreamText with incomingIsForwardDelta=false only
             // keeps-or-grows relative to the accumulator, and the id/run-id
             // promotion below is unaffected (it keys off `confirmed`).
-            val fence = evaluateTerminalSettlementFence(
-                conversationId = conversationId,
-                serverId = confirmed.serverId,
-                lastDeltaSeqId = existing.seqId,
-                terminalSeqId = confirmed.seqId,
-                accumulatedText = oldText,
-                terminalText = newText,
-            )
-            if (fence.blocked) {
-                mergeStreamText(
-                    existing = oldText,
-                    incoming = newText,
-                    canUseSnapshotMerge = true,
-                    incomingIsForwardDelta = false,
-                )
-            } else {
-                StreamTextMergeResult(
-                    text = newText.ifBlank { oldText },
-                    branch = StreamTextMergeBranch.SNAPSHOT_CONFLICT,
-                    garbleRisk = false,
-                )
-            }
+            mergeTerminalSettlementText(conversationId, existing, confirmed)
         } else {
             mergeStreamText(
                 existing = oldText,

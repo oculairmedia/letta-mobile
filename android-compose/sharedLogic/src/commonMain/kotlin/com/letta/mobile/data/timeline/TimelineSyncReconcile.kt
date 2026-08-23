@@ -197,32 +197,8 @@ fun Timeline.mergeServerMessages(
             // stale, non-superset final must not shrink it. Keep the promotion
             // (ids/run id come from `confirmed`) but fold the text so the
             // accumulator can only keep-or-grow.
-            val fence = evaluateTerminalSettlementFence(
-                conversationId = timeline.conversationId,
-                serverId = confirmed.serverId,
-                lastDeltaSeqId = existingByServerId.seqId,
-                terminalSeqId = confirmed.seqId,
-                accumulatedText = existingByServerId.content,
-                terminalText = confirmed.content,
-            )
-            if (fence.blocked) {
-                val folded = mergeStreamText(
-                    existing = existingByServerId.content,
-                    incoming = confirmed.content,
-                    canUseSnapshotMerge = true,
-                    incomingIsForwardDelta = false,
-                )
-                timeline = timeline.replaceByServerId(
-                    confirmed.copy(
-                        content = folded.text,
-                        seqId = latestSeqId(existingByServerId.seqId, confirmed.seqId),
-                    ),
-                )
-            } else {
-                timeline = timeline.replaceByServerId(
-                    confirmed.copy(seqId = latestSeqId(existingByServerId.seqId, confirmed.seqId)),
-                )
-            }
+            val settled = settleTerminalEvent(timeline.conversationId, existingByServerId, confirmed)
+            timeline = timeline.replaceByServerId(settled)
             merged++
         } else if (existingByServerId == null) {
             val prefixIndex = timeline.findRecentAssistantPrefixIndex(confirmed)

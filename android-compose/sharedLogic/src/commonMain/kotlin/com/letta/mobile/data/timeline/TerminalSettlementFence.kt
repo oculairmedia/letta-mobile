@@ -46,14 +46,11 @@ internal data class TerminalSettlementFenceDecision(
 
 internal fun evaluateTerminalSettlementFence(
     conversationId: String,
-    serverId: String,
-    lastDeltaSeqId: Int?,
-    terminalSeqId: Int?,
-    accumulatedText: String,
-    terminalText: String,
+    accumulated: TimelineEvent.Confirmed,
+    terminal: TimelineEvent.Confirmed,
 ): TerminalSettlementFenceDecision {
-    val lastSeq = lastDeltaSeqId
-    val terminalSeq = terminalSeqId
+    val lastSeq = accumulated.seqId
+    val terminalSeq = terminal.seqId
     val bothSeqsKnown = lastSeq != null && terminalSeq != null
     val terminalIsStale = bothSeqsKnown && terminalSeq < lastSeq
 
@@ -67,18 +64,18 @@ internal fun evaluateTerminalSettlementFence(
     // The terminal frame is OLDER than a delta we already folded in. It may
     // still be safe to settle with when it carries everything we hold plus
     // more (server coalesced/reordered delivery) — content decides.
-    val supersetOfAccumulated = isContentSuperset(terminalText, accumulatedText)
+    val supersetOfAccumulated = isContentSuperset(terminal.content, accumulated.content)
     if (supersetOfAccumulated) {
         Telemetry.event(
             "TimelineSync", "terminal.settlement.fence",
             "conversationId" to conversationId,
-            "serverId" to serverId,
+            "serverId" to terminal.serverId,
             "decision" to "allowed_superset",
             "fenceReason" to "stale_seq_but_superset",
             "lastDeltaSeq" to lastSeq,
             "terminalSeq" to terminalSeq,
-            "existingLen" to accumulatedText.length,
-            "incomingLen" to terminalText.length,
+            "existingLen" to accumulated.content.length,
+            "incomingLen" to terminal.content.length,
         )
         return TerminalSettlementFenceDecision(blocked = false, reason = "stale_seq_but_superset")
     }
@@ -86,17 +83,52 @@ internal fun evaluateTerminalSettlementFence(
     Telemetry.event(
         "TimelineSync", "terminal.settlement.fence",
         "conversationId" to conversationId,
-        "serverId" to serverId,
+        "serverId" to terminal.serverId,
         "decision" to "blocked",
         "fenceReason" to "stale_terminal_not_superset",
         "lastDeltaSeq" to lastSeq,
         "terminalSeq" to terminalSeq,
-        "existingLen" to accumulatedText.length,
-        "incomingLen" to terminalText.length,
+        "existingLen" to accumulated.content.length,
+        "incomingLen" to terminal.content.length,
         level = Telemetry.Level.WARN,
     )
     return TerminalSettlementFenceDecision(blocked = true, reason = "stale_terminal_not_superset")
 }
+
+/**
+ * Resolve the text of a terminal snapshot without letting it shrink a newer
+ * accumulator. Callers keep their own event-identity promotion semantics.
+ */
+internal fun mergeTerminalSettlementText(
+    conversationId: String,
+    accumulated: TimelineEvent.Confirmed,
+    terminal: TimelineEvent.Confirmed,
+): StreamTextMergeResult {
+    val fence = evaluateTerminalSettlementFence(conversationId, accumulated, terminal)
+    if (!fence.blocked) {
+        return StreamTextMergeResult(
+            text = terminal.content.ifBlank { accumulated.content },
+            branch = StreamTextMergeBranch.SNAPSHOT_CONFLICT,
+            garbleRisk = false,
+        )
+    }
+    return mergeStreamText(
+        existing = accumulated.content,
+        incoming = terminal.content,
+        canUseSnapshotMerge = true,
+        incomingIsForwardDelta = false,
+    )
+}
+
+/** Promote a reconciled terminal event while preserving the newest text/seq. */
+internal fun settleTerminalEvent(
+    conversationId: String,
+    accumulated: TimelineEvent.Confirmed,
+    terminal: TimelineEvent.Confirmed,
+): TimelineEvent.Confirmed = terminal.copy(
+    content = mergeTerminalSettlementText(conversationId, accumulated, terminal).text,
+    seqId = latestSeqId(accumulated.seqId, terminal.seqId),
+)
 
 /**
  * True when [candidate] carries at least all of [accumulated] (exact
