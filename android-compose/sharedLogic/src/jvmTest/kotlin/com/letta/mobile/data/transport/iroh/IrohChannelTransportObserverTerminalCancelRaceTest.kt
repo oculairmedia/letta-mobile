@@ -12,19 +12,21 @@ import com.letta.mobile.data.transport.appserver.AppServerRuntimeScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.AfterTest
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
@@ -44,74 +46,13 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
 
     @AfterTest
     fun tearDown() {
-        clientScope.coroutineContext[Job]?.cancel()
+        clientScope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 
-    @Test
-    fun characterizeDelayedEngineTerminalAfterObserverTerminalAndCancel() = scenarioTest {
-        val turn = startTurn()
-        assertTrue(transport.hasActiveChatTurn(CONVERSATION_ID))
-
-        emitTerminal(TerminalSource.Observer, turn.runId, seq = 5)
-        awaitInactiveTurn()
-        assertTrue(transport.cancel(CONVERSATION_ID))
-
-        emitTerminal(TerminalSource.Engine, turn.runId, seq = 6)
-        releaseInput()
-        awaitTurnDone()
-        delay(200.milliseconds)
-        assertDrained()
-
-        val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
-        val summary = turnDones.joinToString { "${it.turnId}:${it.status}" }
-        assertTrue(turnDones.isNotEmpty(), "expected terminal TurnDone frames: $summary")
-        assertNotNull(
-            turnDones.firstOrNull { it.status == "cancelled" },
-            "cancelled TurnDone must be emitted ($summary)",
-        )
-    }
-
-    @Test
-    fun characterizePermanentlyAbsentEngineTerminalRacingCancel() = scenarioTest {
-        val turn = startTurn()
-
-        emitTerminal(TerminalSource.Observer, turn.runId, seq = 5)
-        awaitInactiveTurn()
-        assertTrue(transport.cancel(CONVERSATION_ID))
-
-        delay(300.milliseconds)
-        releaseInput()
-        assertDrained()
-    }
-
-    @Test
-    fun characterizeRepeatedCancelAndRepeatedTerminalDelivery() = scenarioTest {
-        val turn = startTurn()
-
-        emitTerminal(TerminalSource.Observer, turn.runId, seq = 10)
-        awaitInactiveTurn()
-        assertTrue(transport.cancel(CONVERSATION_ID))
-        assertTrue(transport.cancel(CONVERSATION_ID))
-
-        emitTerminal(TerminalSource.Engine, turn.runId, seq = 11)
-        emitTerminal(TerminalSource.Observer, turn.runId, seq = 12)
-        releaseInput()
-        delay(300.milliseconds)
-        assertDrained()
-    }
-
-    private fun scenarioTest(block: suspend Scenario.() -> Unit): Unit = runBlocking {
-        val scenario = createScenario()
-        try {
-            scenario.block()
-        } finally {
-            scenario.close()
-        }
-    }
-
-    private suspend fun createScenario(): Scenario {
-        val client = ControllableSplitClient()
-        val observerStream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+    private suspend fun transportWith(
+        client: ControllableSplitClient,
+        observerStream: MutableSharedFlow<AppServerReceivedFrame>,
+    ): Pair<IrohChannelTransport, AppServerTurnEngine> {
         val engine = AppServerTurnEngine(
             client = client,
             requestIdFactory = { "runtime-start-1" },
@@ -131,75 +72,192 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
             },
             serverTerminalWaitMs = 150L,
         )
-        val frames = CopyOnWriteArrayList<ServerFrame>()
         transport.connect("iroh://ticket", "", "device", "test")
-        val collector = clientScope.launch { transport.events.collect(frames::add) }
         withTimeout(5.seconds) {
             while (observerStream.subscriptionCount.value < 1) delay(10.milliseconds)
         }
-        delay(150.milliseconds)
-        return Scenario(client, observerStream, transport, frames, collector)
+        return transport to engine
     }
 
-    private class Scenario(
-        private val client: ControllableSplitClient,
-        private val observerStream: MutableSharedFlow<AppServerReceivedFrame>,
-        val transport: IrohChannelTransport,
-        val frames: CopyOnWriteArrayList<ServerFrame>,
-        private val collector: Job,
-    ) {
-        suspend fun startTurn(): ServerFrame.TurnStarted {
-            assertTrue(transport.send(AGENT_ID, CONVERSATION_ID, "hello", "otid-1", null, false))
+    @Test
+    fun characterizeDelayedEngineTerminalAfterObserverTerminalAndCancel(): Unit = runBlocking {
+        val client = ControllableSplitClient()
+        val observerStream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        val (transport, _) = transportWith(client, observerStream)
+        val frames = CopyOnWriteArrayList<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+
+        try {
+            delay(150.milliseconds)
+
+            // 1. Start turn on conv-1
+            assertTrue(transport.send(AGENT, CONV_1, "hello", "otid-1", null, false))
             withTimeout(3.seconds) {
                 while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds)
             }
             withTimeout(3.seconds) { client.inputEntered.await() }
-            return frames.filterIsInstance<ServerFrame.TurnStarted>().single()
-        }
 
-        suspend fun emitTerminal(source: TerminalSource, runId: String, seq: Long) {
-            val target = when (source) {
-                TerminalSource.Observer -> observerStream
-                TerminalSource.Engine -> client.engineStream
-            }
-            target.emit(stopReasonFrame(source.idPrefix, runId, seq))
-        }
+            val turnSnapshot = transport.activeTurnSnapshot(CONV_1)
+            assertNotNull(turnSnapshot)
+            val turnId = turnSnapshot.turnId
+            val runId = turnSnapshot.runId
+            assertTrue(transport.hasActiveChatTurn(CONV_1))
 
-        suspend fun awaitInactiveTurn() {
+            // 2. Observer projects a TurnDone via stop_reason
+            emitObserverStopReason(observerStream, CONV_1, runId, seq = 5)
+
+            // Within observer cycle, active turn is retired from activeTurns map
             withTimeout(3.seconds) {
-                while (transport.hasActiveChatTurn(CONVERSATION_ID)) delay(10.milliseconds)
+                while (transport.hasActiveChatTurn(CONV_1)) delay(10.milliseconds)
             }
-        }
+            assertNull(transport.activeTurnSnapshot(CONV_1), "active turn retired by observer")
 
-        suspend fun awaitTurnDone() {
-            withTimeout(3.seconds) {
-                while (frames.none { it is ServerFrame.TurnDone }) delay(10.milliseconds)
-            }
-        }
+            // 3. Concurrent cancel arrives
+            val cancelResult = transport.cancel(CONV_1)
+            assertTrue(cancelResult)
 
-        fun releaseInput() {
+            // 4. Delayed engine terminal arrives after send job was cancelled by cancel()
+            client.emitEngineStopReason(CONV_1, runId, seq = 6)
             client.releaseInput.complete(Unit)
-        }
 
-        suspend fun assertDrained() {
             withTimeout(3.seconds) {
-                while (transport.hasActiveChatTurn(CONVERSATION_ID) || transport.hasAnyActiveChatTurn) {
-                    delay(10.milliseconds)
-                }
+                while (frames.filterIsInstance<ServerFrame.TurnDone>().isEmpty()) delay(10.milliseconds)
             }
-            assertFalse(transport.hasActiveChatTurn(CONVERSATION_ID))
-            assertFalse(transport.hasAnyActiveChatTurn)
-        }
+            delay(200.milliseconds)
 
-        suspend fun close() {
+            // Final state: clean maps
+            assertEquals(0, transport.activeTurnsCount())
+            assertEquals(0, transport.activeSendJobsCount())
+            assertFalse(transport.hasActiveChatTurn(CONV_1))
+
+            val allTurnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
+            val turnDoneSummary = allTurnDones.joinToString { "${it.turnId}:${it.status}" }
+            assertTrue(allTurnDones.isNotEmpty(), "expected terminal TurnDone frames: $turnDoneSummary")
+            val doneCancelled = allTurnDones.firstOrNull { it.status == "cancelled" }
+            assertNotNull(doneCancelled, "cancelled TurnDone must be emitted ($turnDoneSummary)")
+        } finally {
             collector.cancel()
             transport.disconnect()
         }
     }
 
-    private enum class TerminalSource(val idPrefix: String) {
-        Observer("obs"),
-        Engine("eng"),
+    @Test
+    fun characterizePermanentlyAbsentEngineTerminalRacingCancel(): Unit = runBlocking {
+        val client = ControllableSplitClient()
+        val observerStream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        val (transport, _) = transportWith(client, observerStream)
+        val frames = CopyOnWriteArrayList<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+
+        try {
+            delay(150.milliseconds)
+
+            // 1. Start turn on conv-1
+            assertTrue(transport.send(AGENT, CONV_1, "hello", "otid-1", null, false))
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds)
+            }
+            withTimeout(3.seconds) { client.inputEntered.await() }
+
+            val turnSnapshot = transport.activeTurnSnapshot(CONV_1)
+            assertNotNull(turnSnapshot)
+            val turnId = turnSnapshot.turnId
+            val runId = turnSnapshot.runId
+
+            // 2. Observer receives terminal
+            emitObserverStopReason(observerStream, CONV_1, runId, seq = 5)
+            withTimeout(3.seconds) {
+                while (transport.hasActiveChatTurn(CONV_1)) delay(10.milliseconds)
+            }
+
+            // 3. Cancel arrives while engine terminal is withheld
+            assertTrue(transport.cancel(CONV_1))
+
+            // Wait for synthetic cancel fallback
+            delay(300.milliseconds)
+            client.releaseInput.complete(Unit)
+
+            // Final state assertions
+            assertEquals(0, transport.activeTurnsCount())
+            assertEquals(0, transport.activeSendJobsCount())
+            assertFalse(transport.hasActiveChatTurn(CONV_1))
+        } finally {
+            collector.cancel()
+            transport.disconnect()
+        }
+    }
+
+    @Test
+    fun characterizeRepeatedCancelAndRepeatedTerminalDelivery(): Unit = runBlocking {
+        val client = ControllableSplitClient()
+        val observerStream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
+        val (transport, _) = transportWith(client, observerStream)
+        val frames = CopyOnWriteArrayList<ServerFrame>()
+        val collector = clientScope.async { transport.events.collect { frames.add(it) } }
+
+        try {
+            delay(150.milliseconds)
+
+            assertTrue(transport.send(AGENT, CONV_1, "hello", "otid-1", null, false))
+            withTimeout(3.seconds) {
+                while (frames.none { it is ServerFrame.TurnStarted }) delay(10.milliseconds)
+            }
+            withTimeout(3.seconds) { client.inputEntered.await() }
+
+            val turnSnapshot = transport.activeTurnSnapshot(CONV_1)
+            assertNotNull(turnSnapshot)
+            val turnId = turnSnapshot.turnId
+            val runId = turnSnapshot.runId
+
+            // Deliver observer terminal
+            emitObserverStopReason(observerStream, CONV_1, runId, seq = 10)
+            withTimeout(3.seconds) {
+                while (transport.hasActiveChatTurn(CONV_1)) delay(10.milliseconds)
+            }
+
+            // Repeated cancel invocations
+            assertTrue(transport.cancel(CONV_1))
+            assertTrue(transport.cancel(CONV_1))
+
+            // Deliver engine terminal and extra duplicate observer terminal
+            client.emitEngineStopReason(CONV_1, runId, seq = 11)
+            emitObserverStopReason(observerStream, CONV_1, runId, seq = 12)
+            client.releaseInput.complete(Unit)
+
+            delay(300.milliseconds)
+
+            // Maps cleanly drained
+            assertEquals(0, transport.activeTurnsCount())
+            assertEquals(0, transport.activeSendJobsCount())
+            assertFalse(transport.hasActiveChatTurn(CONV_1))
+        } finally {
+            collector.cancel()
+            transport.disconnect()
+        }
+    }
+
+    private companion object {
+        const val AGENT = "agent-1"
+        const val CONV_1 = "conv-1"
+
+        suspend fun emitObserverStopReason(
+            observerStream: MutableSharedFlow<AppServerReceivedFrame>,
+            conversationId: String,
+            runId: String,
+            seq: Long,
+        ) {
+            val body = """
+                {
+                  "type": "stream_delta",
+                  "runtime": {"agent_id": "$AGENT", "conversation_id": "$conversationId"},
+                  "event_seq": $seq,
+                  "emitted_at": "2026-08-23T00:00:00Z",
+                  "idempotency_key": "obs-$conversationId-$seq",
+                  "delta": {"message_type": "stop_reason", "stop_reason": "end_turn", "run_id": "$runId"}
+                }
+            """.trimIndent()
+            observerStream.emit(AppServerProtocol.decodeFrame(body, AppServerChannel.Stream))
+        }
     }
 
     private class ControllableSplitClient : AppServerClient {
@@ -207,6 +265,7 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         override val events: Flow<AppServerReceivedFrame> = engineStream
 
         val abortCommands = CopyOnWriteArrayList<AppServerCommand.AbortMessage>()
+
         val inputEntered = CompletableDeferred<Unit>()
         val releaseInput = CompletableDeferred<Unit>()
 
@@ -215,7 +274,7 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
                 requestId = command.requestId,
                 success = true,
                 runtime = AppServerRuntimeScope(
-                    agentId = command.agentId ?: AGENT_ID,
+                    agentId = command.agentId ?: AGENT,
                     conversationId = requireNotNull(command.conversationId),
                 ),
             )
@@ -231,7 +290,7 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse {
             abortCommands.add(command)
             return AppServerInboundFrame.AbortMessageResponse(
-                requestId = command.requestId.orEmpty(),
+                requestId = command.requestId ?: "",
                 runtime = command.runtime,
                 aborted = true,
                 success = true,
@@ -242,24 +301,19 @@ class IrohChannelTransportObserverTerminalCancelRaceTest {
             error("adminRpc unused")
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
-    }
 
-    private companion object {
-        const val AGENT_ID = "agent-1"
-        const val CONVERSATION_ID = "conv-1"
-
-        fun stopReasonFrame(idPrefix: String, runId: String, seq: Long): AppServerReceivedFrame {
+        suspend fun emitEngineStopReason(conversationId: String, runId: String, seq: Long) {
             val body = """
                 {
                   "type": "stream_delta",
-                  "runtime": {"agent_id": "$AGENT_ID", "conversation_id": "$CONVERSATION_ID"},
+                  "runtime": {"agent_id": "$AGENT", "conversation_id": "$conversationId"},
                   "event_seq": $seq,
                   "emitted_at": "2026-08-23T00:00:00Z",
-                  "idempotency_key": "$idPrefix-$CONVERSATION_ID-$seq",
+                  "idempotency_key": "eng-$conversationId-$seq",
                   "delta": {"message_type": "stop_reason", "stop_reason": "end_turn", "run_id": "$runId"}
                 }
             """.trimIndent()
-            return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
+            engineStream.emit(AppServerProtocol.decodeFrame(body, AppServerChannel.Stream))
         }
     }
 }
