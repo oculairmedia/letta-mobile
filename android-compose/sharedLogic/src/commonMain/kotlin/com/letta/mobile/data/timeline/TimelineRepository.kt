@@ -400,8 +400,9 @@ open class TimelineRepository(
         conversationId: String,
         reason: String,
         forceRefresh: Boolean = false,
-    ): Int {
-        return getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh)
+        connectionGeneration: Long = 0L,
+    ): RecentMessagesReconcileOutcome {
+        return getOrCreate(conversationId).reconcileRecentMessages(reason, forceRefresh, connectionGeneration)
     }
 
     override suspend fun reconcileRecentMessages(
@@ -409,8 +410,9 @@ open class TimelineRepository(
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
-    ): Int {
-        return getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh)
+        connectionGeneration: Long,
+    ): RecentMessagesReconcileOutcome {
+        return getOrCreate(agentId, conversationId).reconcileRecentMessages(reason, forceRefresh, connectionGeneration)
     }
 
     // letta-mobile-dangling-tool: forward turn-lifecycle signals to the

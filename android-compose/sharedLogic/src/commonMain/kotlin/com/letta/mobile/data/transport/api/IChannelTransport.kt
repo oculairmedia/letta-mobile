@@ -141,4 +141,5 @@ data class RedialWhileTurnActive(
     val conversationId: String,
     val turnId: String,
     val runId: String,
+    val connectionGeneration: Long = 0L,
 )

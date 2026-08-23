@@ -2,6 +2,7 @@ package com.letta.mobile.testutil
 
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 
 /** Deterministic fake for the admin-shim WebSocket timeline write surface. */
@@ -125,9 +126,17 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         conversationId: String,
         reason: String,
         forceRefresh: Boolean,
-    ): Int {
-        recentReconciles += RecentReconcile(agentId, conversationId, reason, emptySet(), forceRefresh)
-        return 0
+        connectionGeneration: Long,
+    ): RecentMessagesReconcileOutcome {
+        recentReconciles += RecentReconcile(
+            agentId = agentId,
+            conversationId = conversationId,
+            reason = reason,
+            candidateRunIds = emptySet(),
+            forceRefresh = forceRefresh,
+            connectionGeneration = connectionGeneration,
+        )
+        return RecentMessagesReconcileOutcome.Skipped("fake")
     }
 
     data class ExternalLocal(
@@ -185,6 +194,7 @@ class FakeTimelineExternalTransportWriter : TimelineExternalTransportWriter {
         val reason: String,
         val candidateRunIds: Set<String> = emptySet(),
         val forceRefresh: Boolean,
+        val connectionGeneration: Long,
     )
 
 }

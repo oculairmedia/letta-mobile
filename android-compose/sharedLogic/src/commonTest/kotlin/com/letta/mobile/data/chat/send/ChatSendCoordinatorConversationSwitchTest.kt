@@ -9,6 +9,7 @@ import com.letta.mobile.data.model.AssistantMessage
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.repository.api.IConversationRepository
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.A2uiActionDispatchResult
 import com.letta.mobile.data.transport.ChannelTransportState
@@ -242,7 +243,7 @@ class ChatSendCoordinatorConversationSwitchTest {
         override suspend fun clearExternalTransportActive(conversationId: String) = Unit
         override suspend fun clearExternalTransportActive(agentId: String?, conversationId: String) = Unit
         override suspend fun cleanupAbandonedAssistantFragments(agentId: String?, conversationId: String, runId: String?, turnId: String?, reason: String, candidateRunIds: Set<String>): Int = 0
-        override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean): Int = 0
+        override suspend fun reconcileRecentMessages(agentId: String?, conversationId: String, reason: String, forceRefresh: Boolean, connectionGeneration: Long): RecentMessagesReconcileOutcome = RecentMessagesReconcileOutcome.Applied(0)
     }
 
     private class FakeConversationRepository : IConversationRepository {

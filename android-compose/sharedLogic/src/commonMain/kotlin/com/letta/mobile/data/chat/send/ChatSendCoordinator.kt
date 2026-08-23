@@ -12,6 +12,7 @@ import com.letta.mobile.data.runtime.TurnFailureNotice
 import com.letta.mobile.data.runtime.TurnFailureNotices
 import com.letta.mobile.data.runtime.terminalReasonKind
 import com.letta.mobile.data.timeline.IROH_SYNTHETIC_RUN_ID_PREFIXES
+import com.letta.mobile.data.timeline.RecentMessagesReconcileOutcome
 import com.letta.mobile.data.timeline.api.TimelineExternalTransportWriter
 import com.letta.mobile.data.transport.WsChatBridge
 import com.letta.mobile.data.transport.BridgeTurnStatus
@@ -984,20 +985,35 @@ class ChatSendCoordinator(
         // conversation's own turn state may be finalized by it.
         val state = peekState(event.conversationId) ?: return
         if (state.otid == null && !ui.isStreaming() && !ui.isAgentTyping()) return
-        runCatching {
-            timelineRepository.reconcileRecentMessages(
+        when (
+            val outcome = timelineRepository.reconcileRecentMessages(
                 agentId = agentId,
                 conversationId = event.conversationId,
                 reason = "redial-recovery",
                 forceRefresh = true,
+                connectionGeneration = event.connectionGeneration,
             )
-        }.onFailure { error ->
-            Telemetry.error(
-                "AdminChatVM", "ws.redialRecovery.reconcileFailed", error,
-                "conversationId" to event.conversationId,
-                "turnId" to event.turnId,
-                "runId" to event.runId,
-            )
+        ) {
+            is RecentMessagesReconcileOutcome.Applied -> Unit
+            is RecentMessagesReconcileOutcome.Skipped -> {
+                Telemetry.event(
+                    "AdminChatVM", "ws.redialRecovery.reconcileSkipped",
+                    "conversationId" to event.conversationId,
+                    "turnId" to event.turnId,
+                    "runId" to event.runId,
+                    "reason" to outcome.reason,
+                )
+                return
+            }
+            is RecentMessagesReconcileOutcome.Failed -> {
+                Telemetry.error(
+                    "AdminChatVM", "ws.redialRecovery.reconcileFailed", outcome.cause,
+                    "conversationId" to event.conversationId,
+                    "turnId" to event.turnId,
+                    "runId" to event.runId,
+                )
+                return
+            }
         }
         finishActiveTurn(
             state = state,
