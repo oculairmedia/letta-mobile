@@ -71,6 +71,7 @@ import com.letta.mobile.data.transport.appserver.AppServerReceivedFrame
 import java.time.Instant
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import com.letta.mobile.data.transport.iroh.IrohTransportSupport.string
 
 import kotlin.time.Duration.Companion.milliseconds
 /**
@@ -130,27 +131,14 @@ class IrohChannelTransport(
         Telemetry.event(
             "IrohGate", "gate1.emitBoth",
             "frame" to (frame::class.simpleName ?: ""),
-            "messageId" to frameMessageId(frame),
-            "conversationId" to frameConversationId(frame),
+            "messageId" to IrohTransportSupport.frameMessageId(frame),
+            "conversationId" to IrohTransportSupport.frameConversationId(frame),
         )
-        frameFlowContent(frame)?.let { (key, type, content) ->
+        IrohTransportSupport.frameFlowContent(frame)?.let { (key, type, content) ->
             IrohFrameFlowDiagnostics.record("gate1.emit", key, type, content)
         }
         _events.emit(frame)
         _frameEvents.emit(TransportFrameEvent(frame = frame))
-    }
-
-    /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
-    private fun frameFlowContent(frame: ServerFrame): Triple<String, String, String>? = when (frame) {
-        is ServerFrame.AssistantMessage -> {
-            val f: ServerFrame.AssistantMessage = frame
-            Triple(f.otid ?: f.id, "assistant_message", f.content)
-        }
-        is ServerFrame.ReasoningMessage -> {
-            val f: ServerFrame.ReasoningMessage = frame
-            Triple(f.id, "reasoning_message", f.reasoning)
-        }
-        else -> null
     }
 
     /**
@@ -376,18 +364,9 @@ class IrohChannelTransport(
 
     private fun recordViewedConversationFrom(method: String, path: String) {
         if (method != "message.list") return
-        val conversationId = conversationIdFromMessageListPath(path) ?: return
+        val conversationId = IrohTransportSupport.conversationIdFromMessageListPath(path) ?: return
         viewedConversationId = conversationId
         viewedMessageListPath = path
-    }
-
-    private fun conversationIdFromMessageListPath(path: String): String? {
-        val marker = "/v1/conversations/"
-        val start = path.indexOf(marker)
-        if (start < 0) return null
-        val after = path.substring(start + marker.length)
-        val id = after.substringBefore('/').substringBefore('?')
-        return id.takeIf { it.isNotBlank() }
     }
 
     /**
@@ -467,7 +446,7 @@ class IrohChannelTransport(
         agentId: String,
         conversationId: String,
     ) {
-        val command = observerTurnCommand(agentId, conversationId)
+        val command = IrohTransportSupport.observerTurnCommand(agentId, conversationId)
         observerMapper.map(command, received).forEach { draft ->
             val frames = payloadToServerFrames(
                 payload = draft.payload,
@@ -508,7 +487,7 @@ class IrohChannelTransport(
         scope: ObserverProjectionScope,
         received: AppServerReceivedFrame,
     ) {
-        val command = observerTurnCommand(scope.agentId, scope.conversationId)
+        val command = IrohTransportSupport.observerTurnCommand(scope.agentId, scope.conversationId)
         val projectedFrames = observerMapper.map(command, received).flatMap { draft ->
             payloadToServerFrames(
                 payload = draft.payload,
@@ -631,10 +610,10 @@ class IrohChannelTransport(
         lastEmittedSubagentRevision = revision
         val snapshot = subagentCorrelator.snapshot()
         val changed = snapshot.firstOrNull { it.toolCallId == changedToolCallId }
-        val nowIso = nowIso()
+        val nowIso = IrohTransportSupport.nowIso()
         return listOf(
             ServerFrame.SubagentsUpdated(
-                id = frameId("subagents_updated"),
+                id = IrohTransportSupport.frameId("subagents_updated"),
                 ts = nowIso,
                 reason = reason,
                 subagent = changed,
@@ -643,21 +622,6 @@ class IrohChannelTransport(
             ),
         )
     }
-
-    private fun JsonObject.string(key: String): String? =
-        this[key]?.jsonPrimitive?.contentOrNull
-
-    private fun observerTurnCommand(agentId: String, conversationId: String): TurnCommand =
-        TurnCommand(
-            backendId = BackendId("iroh-app-server"),
-            runtimeId = RuntimeId("iroh-observer"),
-            agentId = AgentId(agentId),
-            conversationId = ConversationId(conversationId),
-            input = TurnInput.UserMessage(
-                localMessageId = "iroh-observer-$conversationId",
-                text = "",
-            ),
-        )
 
     /**
      * letta-mobile-or40x: recovery is announced PER CONVERSATION. Every
@@ -696,15 +660,10 @@ class IrohChannelTransport(
                 "from" to result.from,
                 "to" to result.to,
                 "turnId" to (localTurn?.turnId ?: ""),
-                "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
+                "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
             )
         }
     }
-
-    /** Comma-joined ids of live nonterminal turns other than [conversationId]. */
-    private fun otherActiveConversationsLabel(conversationId: String): String =
-        turnRegistry.concurrentTurns(excludingConversationId = IrohConversationId(conversationId))
-            .joinToString(",") { it.conversationId }
 
     // letta-mobile-34xoj: track consecutive admin_rpc failures and last proof-of-life
     // time to decide retry-on-same-connection vs. escalate-to-reconnect.
@@ -903,8 +862,8 @@ class IrohChannelTransport(
             scope.launch {
                 emitBoth(
                     ServerFrame.Error(
-                        id = frameId("error"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("error"),
+                        ts = IrohTransportSupport.nowIso(),
                         code = "iroh_turn_engine_busy",
                         message = "a turn is already active for this conversation",
                         conversationId = conversationId,
@@ -914,8 +873,8 @@ class IrohChannelTransport(
                 )
                 emitBoth(
                     ServerFrame.TurnDone(
-                        id = frameId("turn_done"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("turn_done"),
+                        ts = IrohTransportSupport.nowIso(),
                         turnId = turnId,
                         runId = initialRunId,
                         status = "failed",
@@ -944,8 +903,8 @@ class IrohChannelTransport(
                 emitTurnFrame(
                     turn,
                     ServerFrame.Error(
-                        id = frameId("error"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("error"),
+                        ts = IrohTransportSupport.nowIso(),
                         code = "iroh_connection_not_ready",
                         message = error.message ?: error.toString(),
                         conversationId = conversationId,
@@ -956,8 +915,8 @@ class IrohChannelTransport(
                 emitTurnFrame(
                     turn,
                     ServerFrame.TurnDone(
-                        id = frameId("turn_done"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("turn_done"),
+                        ts = IrohTransportSupport.nowIso(),
                         turnId = turnId,
                         runId = turn.runId,
                         status = "failed",
@@ -998,8 +957,8 @@ class IrohChannelTransport(
                 emitTurnFrame(
                     turn,
                     ServerFrame.Error(
-                        id = frameId("error"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("error"),
+                        ts = IrohTransportSupport.nowIso(),
                         code = "iroh_turn_engine_busy",
                         message = "Iroh App Server turn engine is already busy.",
                         conversationId = conversationId,
@@ -1010,8 +969,8 @@ class IrohChannelTransport(
                 emitTurnFrame(
                     turn,
                     ServerFrame.TurnDone(
-                        id = frameId("turn_done"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("turn_done"),
+                        ts = IrohTransportSupport.nowIso(),
                         turnId = turnId,
                         runId = turn.runId,
                         status = "failed",
@@ -1022,8 +981,8 @@ class IrohChannelTransport(
             emitTurnFrame(
                 turn,
                 ServerFrame.TurnStarted(
-                    id = frameId("turn_started"),
-                    ts = nowIso(),
+                    id = IrohTransportSupport.frameId("turn_started"),
+                    ts = IrohTransportSupport.nowIso(),
                     agentId = agentId,
                     conversationId = conversationId,
                     turnId = turnId,
@@ -1038,7 +997,7 @@ class IrohChannelTransport(
                         agentId = AgentId(agentId),
                         conversationId = ConversationId(conversationId),
                         input = TurnInput.UserMessage(
-                            localMessageId = otid ?: frameId("local"),
+                            localMessageId = otid ?: IrohTransportSupport.frameId("local"),
                             text = text,
                             contentPartsJson = contentParts?.toString(),
                         ),
@@ -1048,8 +1007,8 @@ class IrohChannelTransport(
                         if (turnRegistry.promoteRunId(IrohRunPromotion(turn.token, IrohRunId(realRunId)))) {
                             emitBoth(
                                 ServerFrame.TurnStarted(
-                                    id = frameId("turn_started"),
-                                    ts = nowIso(),
+                                    id = IrohTransportSupport.frameId("turn_started"),
+                                    ts = IrohTransportSupport.nowIso(),
                                     agentId = agentId,
                                     conversationId = conversationId,
                                     turnId = turnId,
@@ -1069,8 +1028,8 @@ class IrohChannelTransport(
                 emitTurnFrame(
                     turn,
                     ServerFrame.Error(
-                        id = frameId("error"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("error"),
+                        ts = IrohTransportSupport.nowIso(),
                         code = "iroh_app_server_error",
                         message = error.message ?: error.toString(),
                         conversationId = conversationId,
@@ -1081,8 +1040,8 @@ class IrohChannelTransport(
                 emitTurnFrame(
                     turn,
                     ServerFrame.TurnDone(
-                        id = frameId("turn_done"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("turn_done"),
+                        ts = IrohTransportSupport.nowIso(),
                         turnId = turnId,
                         runId = turn.runId,
                         status = "failed",
@@ -1101,7 +1060,7 @@ class IrohChannelTransport(
                         "conversationId" to conversationId,
                         "turnId" to turn.turnId,
                         "runId" to turn.runId,
-                        "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
+                        "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
                     )
                 }
             } else {
@@ -1177,8 +1136,8 @@ class IrohChannelTransport(
             )
             listOf(
                 ServerFrame.TurnStarted(
-                    id = frameId("turn_started"),
-                    ts = nowIso(),
+                    id = IrohTransportSupport.frameId("turn_started"),
+                    ts = IrohTransportSupport.nowIso(),
                     agentId = agentId,
                     conversationId = conversationId,
                     turnId = turnId,
@@ -1224,24 +1183,6 @@ class IrohChannelTransport(
             runId = runId,
         ),
     )
-
-    private fun frameMessageId(frame: ServerFrame): String? = when (frame) {
-        is ServerFrame.AssistantMessage -> frame.id
-        is ServerFrame.ReasoningMessage -> frame.id
-        is ServerFrame.ToolCallMessage -> frame.id
-        is ServerFrame.ToolReturnMessage -> frame.id
-        is ServerFrame.UserMessage -> frame.id
-        else -> null
-    }
-
-    private fun frameConversationId(frame: ServerFrame): String? = when (frame) {
-        is ServerFrame.AssistantMessage -> frame.conversationId
-        is ServerFrame.ReasoningMessage -> frame.conversationId
-        is ServerFrame.ToolCallMessage -> frame.conversationId
-        is ServerFrame.ToolReturnMessage -> frame.conversationId
-        is ServerFrame.UserMessage -> frame.conversationId
-        else -> null
-    }
 
     /**
      * letta-mobile-or40x: cancel HONORS ITS ARGUMENT. Only [conversationId]'s own
@@ -1307,8 +1248,8 @@ class IrohChannelTransport(
                         "runId" to turn.runId,
                     )
                     val cancelFrame = ServerFrame.TurnDone(
-                        id = frameId("cancelled"),
-                        ts = nowIso(),
+                        id = IrohTransportSupport.frameId("cancelled"),
+                        ts = IrohTransportSupport.nowIso(),
                         turnId = turn.turnId,
                         runId = turn.runId,
                         status = "cancelled",
@@ -1338,14 +1279,14 @@ class IrohChannelTransport(
         Telemetry.event(
             "IrohTransport", "cancel.no_active_turn",
             "conversationId" to conversationId,
-            "otherActiveConversations" to otherActiveConversationsLabel(conversationId),
+            "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
         )
         turnRegistry.removeSendJob(IrohConversationId(conversationId))?.cancel()
         scope.launch {
             emitBoth(
                 ServerFrame.TurnDone(
-                    id = frameId("cancelled"),
-                    ts = nowIso(),
+                    id = IrohTransportSupport.frameId("cancelled"),
+                    ts = IrohTransportSupport.nowIso(),
                     turnId = "cancelled-${UUID.randomUUID()}",
                     runId = "cancelled-${UUID.randomUUID()}",
                     status = "cancelled",
@@ -1602,7 +1543,7 @@ class IrohChannelTransport(
             },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronListRpcResult>(result)
-                ServerFrame.CronListResponse(id = frameId("cron_list"), ts = nowIso(), requestId = requestId, success = true, tasks = decoded.tasks)
+                ServerFrame.CronListResponse(id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, tasks = decoded.tasks)
             },
             onFailure = ::cronListFailure,
         )
@@ -1628,7 +1569,7 @@ class IrohChannelTransport(
             },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
-                ServerFrame.CronAddResponse(id = frameId("cron_add"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task, warning = decoded.warning)
+                ServerFrame.CronAddResponse(id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, task = decoded.task, warning = decoded.warning)
             },
             onFailure = ::cronAddFailure,
         )
@@ -1643,7 +1584,7 @@ class IrohChannelTransport(
             body = buildJsonObject { put("task_id", taskId) },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
-                ServerFrame.CronGetResponse(id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task)
+                ServerFrame.CronGetResponse(id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, task = decoded.task)
             },
             onFailure = ::cronGetFailure,
         )
@@ -1657,7 +1598,7 @@ class IrohChannelTransport(
             timeoutMs = timeoutMs,
             body = buildJsonObject { put("task_id", taskId) },
             mapSuccess = { _ ->
-                ServerFrame.CronDeleteResponse(id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = true)
+                ServerFrame.CronDeleteResponse(id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true)
             },
             onFailure = ::cronDeleteFailure,
         )
@@ -1672,7 +1613,7 @@ class IrohChannelTransport(
             body = buildJsonObject { put("agent_id", agentId) },
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<CronDeleteAllRpcResult>(result)
-                ServerFrame.CronDeleteAllResponse(id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = true, count = decoded.deleted)
+                ServerFrame.CronDeleteAllResponse(id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = true, count = decoded.deleted)
             },
             onFailure = ::cronDeleteAllFailure,
         )
@@ -1699,8 +1640,8 @@ class IrohChannelTransport(
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result)
                 ServerFrame.SubagentListResponse(
-                    id = frameId("subagent_list"),
-                    ts = nowIso(),
+                    id = IrohTransportSupport.frameId("subagent_list"),
+                    ts = IrohTransportSupport.nowIso(),
                     requestId = requestId,
                     success = true,
                     subagents = decoded.subagents,
@@ -1732,8 +1673,8 @@ class IrohChannelTransport(
             mapSuccess = { result ->
                 val decoded = subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(result)
                 ServerFrame.SubagentTodosResponse(
-                    id = frameId("subagent_todos"),
-                    ts = nowIso(),
+                    id = IrohTransportSupport.frameId("subagent_todos"),
+                    ts = IrohTransportSupport.nowIso(),
                     requestId = requestId,
                     success = true,
                     found = decoded.found,
@@ -1798,11 +1739,11 @@ class IrohChannelTransport(
     }
 
     private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(
-        id = frameId("subagent_list"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("subagent_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
 
     private fun subagentTodosFailure(requestId: String, error: String) = ServerFrame.SubagentTodosResponse(
-        id = frameId("subagent_todos"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("subagent_todos"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
 
     /** Shared scoped-RPC labels for the cron.* bridge methods (op = the admin_rpc method). */
@@ -1834,27 +1775,24 @@ class IrohChannelTransport(
     )
 
     private fun cronListFailure(requestId: String, error: String) = ServerFrame.CronListResponse(
-        id = frameId("cron_list"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("cron_list"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
 
     private fun cronAddFailure(requestId: String, error: String) = ServerFrame.CronAddResponse(
-        id = frameId("cron_add"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("cron_add"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
 
     private fun cronGetFailure(requestId: String, error: String) = ServerFrame.CronGetResponse(
-        id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("cron_get"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
 
     private fun cronDeleteFailure(requestId: String, error: String) = ServerFrame.CronDeleteResponse(
-        id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("cron_delete"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
 
     private fun cronDeleteAllFailure(requestId: String, error: String) = ServerFrame.CronDeleteAllResponse(
-        id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = false, error = error,
+        id = IrohTransportSupport.frameId("cron_delete_all"), ts = IrohTransportSupport.nowIso(), requestId = requestId, success = false, error = error,
     )
-
-    private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
-    private fun nowIso(): String = Instant.now().toString()
 
     @Serializable
     private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())
