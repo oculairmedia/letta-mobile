@@ -10,7 +10,6 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -30,6 +29,7 @@ class ConfirmedTimelineScenarioTest {
         private val throwOnList: Throwable? = null,
     ) : TimelineTransport {
         var listMessagesCallCount = 0
+        val listMessagesStarted = CompletableDeferred<Unit>()
 
         override suspend fun listConversationMessages(
             conversationId: String,
@@ -38,6 +38,7 @@ class ConfirmedTimelineScenarioTest {
             order: String?,
         ): List<LettaMessage> {
             listMessagesCallCount++
+            listMessagesStarted.complete(Unit)
             delayCompletion?.await()
             throwOnList?.let { throw it }
             val messages = messagesByConversation[conversationId] ?: emptyList()
@@ -51,6 +52,7 @@ class ConfirmedTimelineScenarioTest {
             conversationId: String?,
         ): List<LettaMessage> {
             listMessagesCallCount++
+            listMessagesStarted.complete(Unit)
             delayCompletion?.await()
             throwOnList?.let { throw it }
             return conversationId?.let { messagesByConversation[it] } ?: emptyList()
@@ -116,7 +118,7 @@ class ConfirmedTimelineScenarioTest {
 
         try {
             val creation = async { repo.getOrCreate("conv-persisted") }
-            runCurrent()
+            transport.listMessagesStarted.await()
             assertEquals(1, transport.listMessagesCallCount)
             gate.complete(Unit)
             val initialTimeline = creation.await().state.value
