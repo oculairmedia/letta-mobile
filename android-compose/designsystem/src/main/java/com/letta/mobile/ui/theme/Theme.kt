@@ -1,6 +1,6 @@
 package com.letta.mobile.ui.theme
 
-import android.annotation.TargetApi
+import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -467,7 +467,8 @@ internal fun presetThemeColors(themePreset: ThemePreset): PresetThemeColors = wh
     ThemePreset.SPRING -> SpringThemeColors
 }
 
-@TargetApi(Build.VERSION_CODES.S)
+// The only caller performs the API 31 SDK check; Qodana does not propagate that guard into this helper.
+@SuppressLint("NewApi")
 private fun dynamicColorSchemeForApi31(context: Context, useDarkTheme: Boolean): ColorScheme =
     if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
 
