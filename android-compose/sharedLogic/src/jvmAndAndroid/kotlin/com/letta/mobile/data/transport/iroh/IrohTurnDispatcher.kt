@@ -23,13 +23,89 @@ import kotlinx.coroutines.launch
  * failure branches from accumulating in the transport facade.
  */
 internal class IrohTurnDispatcher(
-    private val scope: CoroutineScope,
-    private val registry: IrohTurnRegistry,
-    private val ready: suspend () -> IrohConnectionHandle,
-    private val emitTurnFrame: suspend (IrohActiveTurn, ServerFrame) -> Unit,
-    private val emitDraft: (RuntimeEventDraft, IrohActiveTurn) -> List<ServerFrame>,
+    private val dependencies: IrohTurnDispatcherDependencies,
 ) {
+    private val scope get() = dependencies.scope
+    private val registry get() = dependencies.registry
+    private val ready get() = dependencies.ready
+    private val emitTurnFrame get() = dependencies.emitTurnFrame
+    private val emitDraft get() = dependencies.emitDraft
+    private val emitBoth get() = dependencies.emitBoth
+    private val currentGeneration get() = dependencies.currentGeneration
+
+    fun submit(submission: IrohTurnSubmission): Boolean {
+        val turn = admit(submission) ?: return true
+        reportConcurrentTurns(turn)
+        track(launch(IrohTurnDispatch(turn, submission.input)), turn)
+        return true
+    }
+
     fun launch(request: IrohTurnDispatch): Job = scope.launch { dispatch(request) }
+
+    private fun admit(submission: IrohTurnSubmission): IrohActiveTurn? {
+        val turnId = IrohTurnId("iroh-turn-${java.util.UUID.randomUUID()}")
+        val request = IrohTurnRequest(
+            token = IrohTurnToken(IrohConversationId(submission.conversationId), currentGeneration(), turnId),
+            runId = IrohRunId("iroh-run-${java.util.UUID.randomUUID()}"),
+            agentId = IrohAgentId(submission.agentId),
+        )
+        return when (val result = registry.tryStart(request)) {
+            is IrohTryStartResult.Started -> result.turn
+            is IrohTryStartResult.Busy -> {
+                reportBusyAdmission(submission.conversationId, request, result)
+                null
+            }
+        }
+    }
+
+    private fun reportBusyAdmission(
+        conversationId: String,
+        request: IrohTurnRequest,
+        result: IrohTryStartResult.Busy,
+    ) {
+        Telemetry.event(
+            "IrohTransport", "send.rejected_same_conversation_busy",
+            "conversationId" to conversationId,
+            "activeTurnId" to result.activeTurn.turnId,
+            "rejectedTurnId" to request.token.turnId.value,
+        )
+        scope.launch {
+            emitBoth(ServerFrame.Error(
+                id = IrohTransportSupport.frameId("error"), ts = IrohTransportSupport.nowIso(),
+                code = "iroh_turn_engine_busy", message = "a turn is already active for this conversation",
+                conversationId = conversationId, turnId = request.token.turnId.value, runId = request.runId.value,
+            ))
+            emitBoth(ServerFrame.TurnDone(
+                id = IrohTransportSupport.frameId("turn_done"), ts = IrohTransportSupport.nowIso(),
+                turnId = request.token.turnId.value, runId = request.runId.value, status = "failed",
+            ))
+        }
+    }
+
+    private fun reportConcurrentTurns(turn: IrohActiveTurn) {
+        val concurrent = registry.concurrentTurns(turn.token.conversationId)
+        if (concurrent.isEmpty()) return
+        Telemetry.event(
+            "IrohTransport", "turn.concurrent_start", "conversationId" to turn.conversationId,
+            "turnId" to turn.turnId,
+            "concurrentConversations" to concurrent.joinToString(",") { it.conversationId },
+            "concurrentTurnIds" to concurrent.joinToString(",") { it.turnId },
+        )
+    }
+
+    private fun track(job: Job, turn: IrohActiveTurn) {
+        turn.job = job
+        registry.registerSendJob(IrohSendJobRegistration(turn.token.conversationId, job))
+        job.invokeOnCompletion {
+            val removed = registry.finish(turn.token)
+            if (removed && !turn.hasTerminal) {
+                Telemetry.event("IrohTransport", "turn.abandoned_nonterminal", "conversationId" to turn.conversationId, "turnId" to turn.turnId, "runId" to turn.runId)
+            } else if (!removed) {
+                Telemetry.event("IrohTransport", "turn.completion_after_eviction", "conversationId" to turn.conversationId, "turnId" to turn.turnId, "hasTerminal" to turn.hasTerminal, "currentTurnId" to (registry.getActiveTurn(turn.token.conversationId)?.turnId ?: ""))
+            }
+            registry.unregisterSendJob(IrohSendJobRegistration(turn.token.conversationId, job))
+        }
+    }
 
     private suspend fun dispatch(request: IrohTurnDispatch) {
         Telemetry.event("IrohTrace", "transport.send.job_start", "turnId" to request.turn.turnId, "runId" to request.turn.runId)
@@ -87,17 +163,7 @@ internal class IrohTurnDispatcher(
     }
 
     private suspend fun emitStarted(request: IrohTurnDispatch) {
-        emitTurnFrame(
-            request.turn,
-            ServerFrame.TurnStarted(
-                id = IrohTransportSupport.frameId("turn_started"),
-                ts = IrohTransportSupport.nowIso(),
-                agentId = request.agentId,
-                conversationId = request.conversationId,
-                turnId = request.turn.turnId,
-                runId = request.turn.runId,
-            ),
-        )
+        emitTurnFrame(request.turn, turnStarted(request, request.turn.runId))
     }
 
     private suspend fun collectTurn(
@@ -115,18 +181,17 @@ internal class IrohTurnDispatcher(
 
     private suspend fun publishRunPromotion(request: IrohTurnDispatch, realRunId: String) {
         if (!registry.promoteRunId(IrohRunPromotion(request.turn.token, IrohRunId(realRunId)))) return
-        emitTurnFrame(
-            request.turn,
-            ServerFrame.TurnStarted(
-                id = IrohTransportSupport.frameId("turn_started"),
-                ts = IrohTransportSupport.nowIso(),
-                agentId = request.agentId,
-                conversationId = request.conversationId,
-                turnId = request.turn.turnId,
-                runId = realRunId,
-            ),
-        )
+        emitTurnFrame(request.turn, turnStarted(request, realRunId))
     }
+
+    private fun turnStarted(request: IrohTurnDispatch, runId: String) = ServerFrame.TurnStarted(
+        id = IrohTransportSupport.frameId("turn_started"),
+        ts = IrohTransportSupport.nowIso(),
+        agentId = request.agentId,
+        conversationId = request.conversationId,
+        turnId = request.turn.turnId,
+        runId = runId,
+    )
 
     private suspend fun reportCollectionFailure(request: IrohTurnDispatch, error: Throwable) {
         if (error is CancellationException) {
@@ -166,6 +231,22 @@ internal class IrohTurnDispatcher(
         )
     }
 }
+
+internal data class IrohTurnDispatcherDependencies(
+    val scope: CoroutineScope,
+    val registry: IrohTurnRegistry,
+    val ready: suspend () -> IrohConnectionHandle,
+    val emitTurnFrame: suspend (IrohActiveTurn, ServerFrame) -> Unit,
+    val emitDraft: (RuntimeEventDraft, IrohActiveTurn) -> List<ServerFrame>,
+    val emitBoth: suspend (ServerFrame) -> Unit,
+    val currentGeneration: () -> Long,
+)
+
+internal data class IrohTurnSubmission(
+    val agentId: String,
+    val conversationId: String,
+    val input: TurnInput.UserMessage,
+)
 
 /** Immutable input for one already-admitted Iroh engine turn. */
 internal data class IrohTurnDispatch(

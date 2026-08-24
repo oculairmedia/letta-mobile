@@ -277,11 +277,15 @@ class IrohChannelTransport(
     )
 
     private val turnDispatcher = IrohTurnDispatcher(
-        scope = scope,
-        registry = turnRegistry,
-        ready = supervisor::ready,
-        emitTurnFrame = ::emitTurnFrame,
-        emitDraft = ::emitDraft,
+        IrohTurnDispatcherDependencies(
+            scope = scope,
+            registry = turnRegistry,
+            ready = supervisor::ready,
+            emitTurnFrame = ::emitTurnFrame,
+            emitDraft = ::emitDraft,
+            emitBoth = ::emitBoth,
+            currentGeneration = connectionSession::currentGeneration,
+        ),
     )
 
     /**
@@ -753,67 +757,10 @@ class IrohChannelTransport(
             "textLength" to text.length,
             "state" to state.value::class.simpleName,
         )
-        val turnId = "iroh-turn-${UUID.randomUUID()}"
-        val initialRunId = "iroh-run-${UUID.randomUUID()}"
-        val token = IrohTurnToken(
-            conversationId = IrohConversationId(conversationId),
-            generation = connectionSession.currentGeneration(),
-            turnId = IrohTurnId(turnId),
-        )
-        val startResult = turnRegistry.tryStart(
-            IrohTurnRequest(
-                token = token,
-                runId = IrohRunId(initialRunId),
-                agentId = IrohAgentId(agentId),
-            ),
-        )
-        if (startResult is IrohTryStartResult.Busy) {
-            Telemetry.event(
-                "IrohTransport", "send.rejected_same_conversation_busy",
-                "conversationId" to conversationId,
-                "activeTurnId" to startResult.activeTurn.turnId,
-                "rejectedTurnId" to turnId,
-            )
-            scope.launch {
-                emitBoth(
-                    ServerFrame.Error(
-                        id = IrohTransportSupport.frameId("error"),
-                        ts = IrohTransportSupport.nowIso(),
-                        code = "iroh_turn_engine_busy",
-                        message = "a turn is already active for this conversation",
-                        conversationId = conversationId,
-                        turnId = turnId,
-                        runId = initialRunId,
-                    ),
-                )
-                emitBoth(
-                    ServerFrame.TurnDone(
-                        id = IrohTransportSupport.frameId("turn_done"),
-                        ts = IrohTransportSupport.nowIso(),
-                        turnId = turnId,
-                        runId = initialRunId,
-                        status = "failed",
-                    ),
-                )
-            }
-            return true
-        }
-        val turn = (startResult as IrohTryStartResult.Started).turn
-        // SENSING (a): a turn is starting for THIS conversation while another
-        // conversation still has a nonterminal turn in flight.
-        val concurrent = turnRegistry.concurrentTurns(excludingConversationId = IrohConversationId(conversationId))
-        if (concurrent.isNotEmpty()) {
-            Telemetry.event(
-                "IrohTransport", "turn.concurrent_start",
-                "conversationId" to conversationId,
-                "turnId" to turnId,
-                "concurrentConversations" to concurrent.joinToString(",") { it.conversationId },
-                "concurrentTurnIds" to concurrent.joinToString(",") { it.turnId },
-            )
-        }
-        val sendJob = turnDispatcher.launch(
-            IrohTurnDispatch(
-                turn = turn,
+        return turnDispatcher.submit(
+            IrohTurnSubmission(
+                agentId = agentId,
+                conversationId = conversationId,
                 input = TurnInput.UserMessage(
                     localMessageId = otid ?: IrohTransportSupport.frameId("local"),
                     text = text,
@@ -821,32 +768,6 @@ class IrohChannelTransport(
                 ),
             ),
         )
-        turn.job = sendJob
-        turnRegistry.registerSendJob(IrohSendJobRegistration(IrohConversationId(conversationId), sendJob))
-        sendJob.invokeOnCompletion {
-            val removed = turnRegistry.finish(turn.token)
-            if (removed) {
-                if (!turn.hasTerminal) {
-                    Telemetry.event(
-                        "IrohTransport", "turn.abandoned_nonterminal",
-                        "conversationId" to conversationId,
-                        "turnId" to turn.turnId,
-                        "runId" to turn.runId,
-                        "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
-                    )
-                }
-            } else {
-                Telemetry.event(
-                    "IrohTransport", "turn.completion_after_eviction",
-                    "conversationId" to conversationId,
-                    "turnId" to turn.turnId,
-                    "hasTerminal" to turn.hasTerminal,
-                    "currentTurnId" to (turnRegistry.getActiveTurn(IrohConversationId(conversationId))?.turnId ?: ""),
-                )
-            }
-            turnRegistry.unregisterSendJob(IrohSendJobRegistration(IrohConversationId(conversationId), sendJob))
-        }
-        return true
     }
 
     /**
