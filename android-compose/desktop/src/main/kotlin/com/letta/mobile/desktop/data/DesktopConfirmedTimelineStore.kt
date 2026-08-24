@@ -28,97 +28,28 @@ class DesktopConfirmedTimelineStore(
     override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = withContext(Dispatchers.IO) {
         val start = timelineCurrentTimeMillis()
         val file = snapshotFile(scope)
-        if (!Files.exists(file)) return@withContext null
-
-        val payload = try {
-            Files.readString(file)
-        } catch (e: IOException) {
-            Telemetry.error("DesktopTimelineStore", "readSnapshot.ioError", e, "scope" to scope.storageKey)
-            return@withContext null
-        }
-
-        val decoded = TimelineSnapshotCodec.decode(payload)
-        val durationMs = timelineCurrentTimeMillis() - start
-
-        if (decoded != null) {
-            val ageMs = (timelineCurrentTimeMillis() - decoded.writtenAtMillis).coerceAtLeast(0)
-            Telemetry.event(
-                "DesktopTimelineStore", "readSnapshot.success",
-                "backendId" to scope.backendId,
-                "conversationId" to scope.conversationId,
-                "revision" to decoded.revision,
-                "eventCount" to decoded.events.size,
-                "byteSize" to payload.length,
-                "readDurationMs" to durationMs,
-                "ageMs" to ageMs,
-            )
-        } else {
-            Telemetry.event(
-                "DesktopTimelineStore", "readSnapshot.corruptRecovered",
-                "backendId" to scope.backendId,
-                "conversationId" to scope.conversationId,
-                level = Telemetry.Level.WARN,
-            )
-        }
-
-        decoded
+        SnapshotRead.from(file).also { read ->
+            read.report(scope, start)
+        }.envelope
     }
 
     override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean = withContext(Dispatchers.IO) {
         val scope = envelope.scope
         val file = snapshotFile(scope)
-        val parent = file.parent ?: return@withContext false
-
+        val parent = requireNotNull(file.parent)
         val scopeLock = scopeWriteLocks.computeIfAbsent(scope.storageKey) { Any() }
+
         synchronized(scopeLock) {
-        try {
-            Files.createDirectories(parent)
-
-            if (Files.exists(file)) {
-                val existingPayload = runCatching { Files.readString(file) }.getOrNull()
-                val existing = existingPayload?.let { TimelineSnapshotCodec.decode(it) }
-                if (existing != null && existing.revision >= envelope.revision) {
-                    Telemetry.event(
-                        "DesktopTimelineStore", "writeSnapshot.staleRejected",
-                        "backendId" to scope.backendId,
-                        "conversationId" to scope.conversationId,
-                        "existingRevision" to existing.revision,
-                        "attemptedRevision" to envelope.revision,
-                        level = Telemetry.Level.WARN,
-                    )
-                    return@withContext false
-                }
-            }
-
-            val writtenAt = if (envelope.writtenAtMillis > 0) envelope.writtenAtMillis else timelineCurrentTimeMillis()
-            val toWrite = if (envelope.writtenAtMillis > 0) envelope else envelope.copy(writtenAtMillis = writtenAt)
-            val payload = TimelineSnapshotCodec.encode(toWrite)
-
-            val tmp = Files.createTempFile(parent, "snapshot-", ".tmp")
             try {
-                Files.writeString(tmp, payload)
-                try {
-                    Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-                } catch (_: Exception) {
-                    Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING)
-                }
-            } finally {
-                Files.deleteIfExists(tmp)
+                Files.createDirectories(parent)
+                val candidate = envelope.withWriteTimestamp()
+                ExistingSnapshot.from(file)
+                    .dispositionFor(candidate)
+                    .persist(file, scope)
+            } catch (e: Exception) {
+                Telemetry.error("DesktopTimelineStore", "writeSnapshot.failed", e, "scope" to scope.storageKey)
+                false
             }
-
-            Telemetry.event(
-                "DesktopTimelineStore", "writeSnapshot.success",
-                "backendId" to scope.backendId,
-                "conversationId" to scope.conversationId,
-                "revision" to envelope.revision,
-                "eventCount" to envelope.events.size,
-                "byteSize" to payload.length,
-            )
-            true
-        } catch (e: Exception) {
-            Telemetry.error("DesktopTimelineStore", "writeSnapshot.failed", e, "scope" to scope.storageKey)
-            false
-        }
         }
     }
 
@@ -142,10 +73,7 @@ class DesktopConfirmedTimelineStore(
             maxRetainedConversations = maxRetainedConversations,
         )
 
-    private fun backendDirectory(backendId: String): Path {
-        val safeBackend = sanitize(backendId)
-        return rootDirectory.resolve(safeBackend)
-    }
+    private fun backendDirectory(backendId: String): Path = rootDirectory.resolve(sanitize(backendId))
 
     private fun snapshotFile(scope: TimelineScope): Path {
         val backendDir = backendDirectory(scope.backendId)
@@ -156,8 +84,149 @@ class DesktopConfirmedTimelineStore(
     private fun sanitize(value: String): String =
         value.replace(Regex("[^a-zA-Z0-9._-]"), "_")
 
+    private sealed interface SnapshotRead {
+        val envelope: StoredTimelineEnvelope?
+
+        fun report(scope: TimelineScope, startedAtMillis: Long)
+
+        data object Missing : SnapshotRead {
+            override val envelope: StoredTimelineEnvelope? = null
+
+            override fun report(scope: TimelineScope, startedAtMillis: Long) = Unit
+        }
+
+        data class IoFailure(private val exception: IOException) : SnapshotRead {
+            override val envelope: StoredTimelineEnvelope? = null
+
+            override fun report(scope: TimelineScope, startedAtMillis: Long) {
+                Telemetry.error("DesktopTimelineStore", "readSnapshot.ioError", exception, "scope" to scope.storageKey)
+            }
+        }
+
+        data class Decoded(
+            override val envelope: StoredTimelineEnvelope,
+            private val payloadSize: Int,
+        ) : SnapshotRead {
+            override fun report(scope: TimelineScope, startedAtMillis: Long) {
+                val now = timelineCurrentTimeMillis()
+                Telemetry.event(
+                    "DesktopTimelineStore", "readSnapshot.success",
+                    "backendId" to scope.backendId,
+                    "conversationId" to scope.conversationId,
+                    "revision" to envelope.revision,
+                    "eventCount" to envelope.events.size,
+                    "byteSize" to payloadSize,
+                    "readDurationMs" to now - startedAtMillis,
+                    "ageMs" to (now - envelope.writtenAtMillis).coerceAtLeast(0),
+                )
+            }
+        }
+
+        data object Corrupt : SnapshotRead {
+            override val envelope: StoredTimelineEnvelope? = null
+
+            override fun report(scope: TimelineScope, startedAtMillis: Long) {
+                Telemetry.event(
+                    "DesktopTimelineStore", "readSnapshot.corruptRecovered",
+                    "backendId" to scope.backendId,
+                    "conversationId" to scope.conversationId,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        }
+
+        companion object {
+            fun from(file: Path): SnapshotRead = when {
+                !Files.exists(file) -> Missing
+                else -> runCatching { Files.readString(file) }.fold(
+                    onSuccess = { payload ->
+                        TimelineSnapshotCodec.decode(payload)?.let { Decoded(it, payload.length) } ?: Corrupt
+                    },
+                    onFailure = { exception -> IoFailure(exception as? IOException ?: IOException(exception)) },
+                )
+            }
+        }
+    }
+
+    private sealed interface ExistingSnapshot {
+        fun dispositionFor(candidate: StoredTimelineEnvelope): SnapshotWriteDisposition
+
+        data object Replaceable : ExistingSnapshot {
+            override fun dispositionFor(candidate: StoredTimelineEnvelope): SnapshotWriteDisposition =
+                SnapshotWriteDisposition.Persist(candidate)
+        }
+
+        data class Current(private val envelope: StoredTimelineEnvelope) : ExistingSnapshot {
+            override fun dispositionFor(candidate: StoredTimelineEnvelope): SnapshotWriteDisposition =
+                when {
+                    envelope.revision >= candidate.revision -> SnapshotWriteDisposition.Stale(candidate, envelope)
+                    else -> SnapshotWriteDisposition.Persist(candidate)
+                }
+        }
+
+        companion object {
+            fun from(file: Path): ExistingSnapshot = SnapshotRead.from(file).let { snapshot ->
+                (snapshot as? SnapshotRead.Decoded)?.let { Current(it.envelope) } ?: Replaceable
+            }
+        }
+    }
+
+    private sealed interface SnapshotWriteDisposition {
+        fun persist(file: Path, scope: TimelineScope): Boolean
+
+        data class Persist(private val envelope: StoredTimelineEnvelope) : SnapshotWriteDisposition {
+            override fun persist(file: Path, scope: TimelineScope): Boolean {
+                val payload = TimelineSnapshotCodec.encode(envelope)
+                val tmp = Files.createTempFile(requireNotNull(file.parent), "snapshot-", ".tmp")
+                try {
+                    Files.writeString(tmp, payload)
+                    replaceSnapshot(tmp, file)
+                } finally {
+                    Files.deleteIfExists(tmp)
+                }
+                Telemetry.event(
+                    "DesktopTimelineStore", "writeSnapshot.success",
+                    "backendId" to scope.backendId,
+                    "conversationId" to scope.conversationId,
+                    "revision" to envelope.revision,
+                    "eventCount" to envelope.events.size,
+                    "byteSize" to payload.length,
+                )
+                return true
+            }
+        }
+
+        data class Stale(
+            private val attempted: StoredTimelineEnvelope,
+            private val existing: StoredTimelineEnvelope,
+        ) : SnapshotWriteDisposition {
+            override fun persist(file: Path, scope: TimelineScope): Boolean {
+                Telemetry.event(
+                    "DesktopTimelineStore", "writeSnapshot.staleRejected",
+                    "backendId" to scope.backendId,
+                    "conversationId" to scope.conversationId,
+                    "existingRevision" to existing.revision,
+                    "attemptedRevision" to attempted.revision,
+                    level = Telemetry.Level.WARN,
+                )
+                return false
+            }
+        }
+    }
+
+    private fun StoredTimelineEnvelope.withWriteTimestamp(): StoredTimelineEnvelope =
+        takeIf { it.writtenAtMillis > 0 } ?: copy(writtenAtMillis = timelineCurrentTimeMillis())
+
     companion object {
         fun defaultRootDirectory(): Path =
             defaultDesktopStateDirectory().resolve("timeline_snapshots")
+
+        private fun replaceSnapshot(source: Path, destination: Path) {
+            runCatching {
+                Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+            }.getOrElse {
+                Files.move(source, destination, StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
     }
 }
