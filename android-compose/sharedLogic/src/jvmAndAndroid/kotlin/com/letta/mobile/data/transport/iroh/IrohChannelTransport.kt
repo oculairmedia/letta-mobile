@@ -1280,7 +1280,7 @@ class IrohChannelTransport(
             // 3. Fallback: only if the server never produced a terminal, synthesize
             //    a cancelled one — routed through the SAME guard so exactly one
             //    terminal is ever emitted for the turn.
-            if (serverTerminalStatus == null && !turn.hasTerminal) {
+            if (serverTerminalStatus == null) {
                 if (turnRegistry.publishTerminal(IrohTerminalPublication(
                         turn = turn,
                         status = IrohTerminalStatus("cancelled"),
