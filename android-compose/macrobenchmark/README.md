@@ -62,7 +62,7 @@ flags.
 For profile runs that need a live configured app, pass a base64-encoded
 automation payload through instrumentation. The benchmark build keeps the
 production-like `release` source set and is not debuggable, so this launch
-extra is the supported credential path for `com.letta.mobile.benchmark`:
+extra is the supported credential path for `ca.oculair.meridian.benchmark`:
 
 ```bash
 AUTOMATION_PAYLOAD_BASE64="$(python3 - <<'PY'

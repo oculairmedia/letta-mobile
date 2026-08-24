@@ -12,7 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.letta.mobile.NotificationNavigationTarget
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.util.Telemetry
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject

@@ -1,7 +1,7 @@
 package com.letta.mobile.runtime.local
 
 import android.content.Context
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject

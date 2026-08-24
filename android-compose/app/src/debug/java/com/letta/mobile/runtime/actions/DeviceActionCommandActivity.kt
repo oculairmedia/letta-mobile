@@ -13,9 +13,9 @@ import javax.inject.Inject
  *
  * Example:
  * adb shell am start \
- *   -n com.letta.mobile.dev/com.letta.mobile.runtime.actions.DeviceActionCommandActivity \
+ *   -n ca.oculair.meridian.dev/com.letta.mobile.runtime.actions.DeviceActionCommandActivity \
  *   --es command_json '{"command":"sensors.summary"}'
- * adb shell run-as com.letta.mobile.dev cat files/device-action-command-result.json
+ * adb shell run-as ca.oculair.meridian.dev cat files/device-action-command-result.json
  */
 @AndroidEntryPoint
 class DeviceActionCommandActivity : ComponentActivity() {

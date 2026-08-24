@@ -55,7 +55,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.platform.SystemAccessFlavor
 import com.letta.mobile.platform.systemaccess.SystemAccessApprovalPolicy
 import com.letta.mobile.platform.systemaccess.SystemAccessAuditPolicy

@@ -2,7 +2,7 @@ package com.letta.mobile.runtime.local
 
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
-import com.letta.mobile.BuildConfig
+import ca.oculair.meridian.BuildConfig
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.data.model.LettaConfig
 import com.letta.mobile.runtime.*

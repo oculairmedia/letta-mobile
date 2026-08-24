@@ -150,7 +150,7 @@ class SessionManagerTest {
 
         val firstGraph = sessionManager.current
         settingsRepository.activeConfigState.value = localConfig("backend-a").copy(
-            localModelPath = "/data/user/0/com.letta.mobile.dev/files/embedded-models/gemma.litertlm",
+            localModelPath = "/data/user/0/ca.oculair.meridian.dev/files/embedded-models/gemma.litertlm",
             localModelHandle = "google/gemma-3n-E2B-it-litert-lm",
         )
         advanceUntilIdle()

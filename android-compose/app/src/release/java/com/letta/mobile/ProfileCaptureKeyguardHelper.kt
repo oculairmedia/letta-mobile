@@ -3,6 +3,7 @@ package com.letta.mobile
 import android.app.Activity
 import android.os.Build
 import android.view.WindowManager
+import ca.oculair.meridian.BuildConfig
 
 /** Enables keyguard rendering only for the generated Baseline Profile target. */
 object ProfileCaptureKeyguardHelper {

@@ -34,7 +34,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import com.letta.mobile.R
+import ca.oculair.meridian.R
 import com.letta.mobile.data.model.Agent
 import com.letta.mobile.data.model.AgentId
 import com.letta.mobile.ui.components.EmptyState

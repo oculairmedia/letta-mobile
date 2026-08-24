@@ -11,11 +11,11 @@ scripts/perf/capture-trace.sh
 Optional arguments:
 
 ```bash
-scripts/perf/capture-trace.sh 15 com.letta.mobile
+scripts/perf/capture-trace.sh 15 ca.oculair.meridian
 ```
 
 - First arg: duration in seconds (default `10`)
-- Second arg: Android app id passed to `perfetto --app` (default `com.letta.mobile`)
+- Second arg: Android app id passed to `perfetto --app` (default `ca.oculair.meridian`)
 
 ## What the script records
 
