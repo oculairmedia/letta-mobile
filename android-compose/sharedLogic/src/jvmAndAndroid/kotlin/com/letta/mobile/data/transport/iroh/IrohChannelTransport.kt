@@ -233,7 +233,7 @@ class IrohChannelTransport(
      * Guards are atomic because the send job (Dispatchers.IO) and a cancel
      * request race for the single terminal.
      */
-    private class ActiveTurn(
+    internal class ActiveTurn(
         val turnId: String,
         initialRunId: String,
         val agentId: String,
@@ -976,19 +976,40 @@ class IrohChannelTransport(
             agentId = agentId,
             conversationId = conversationId,
         )
-        // letta-mobile-or40x: KEYED registration. Starting a turn on conversation
-        // B must never displace conversation A's turn — only a new turn on the
-        // SAME conversation supersedes the previous one, and that supersession is
-        // reported (SENSING b) instead of being silently absorbed.
-        val superseded = activeTurns.put(conversationId, turn)
-        if (superseded != null && !superseded.hasTerminal) {
+        // Atomic same-key registration: only register if no active turn is in flight for this conversation.
+        val collision = activeTurns.registerUnlessInFlight(conversationId, turn)
+        if (collision != null) {
             Telemetry.event(
-                "IrohTransport", "turn.superseded_nonterminal",
+                "IrohTransport", "turn.busy_same_conversation",
                 "conversationId" to conversationId,
-                "supersededTurnId" to superseded.turnId,
-                "supersededRunId" to superseded.runId,
-                "newTurnId" to turnId,
+                "activeTurnId" to collision.turnId,
+                "activeRunId" to collision.runId,
+                "rejectedTurnId" to turnId,
+                "rejectedRunId" to runId,
             )
+            scope.launch {
+                emitBoth(
+                    ServerFrame.Error(
+                        id = frameId("error"),
+                        ts = nowIso(),
+                        code = "iroh_turn_engine_busy",
+                        message = "Iroh App Server turn engine is already busy for conversation $conversationId.",
+                        conversationId = conversationId,
+                        turnId = turnId,
+                        runId = runId,
+                    )
+                )
+                emitBoth(
+                    ServerFrame.TurnDone(
+                        id = frameId("turn_done"),
+                        ts = nowIso(),
+                        turnId = turnId,
+                        runId = runId,
+                        status = "failed",
+                    )
+                )
+            }
+            return true
         }
         // SENSING (a): a turn is starting for THIS conversation while another
         // conversation still has a nonterminal turn in flight. Legal after or40x

@@ -14,7 +14,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -31,15 +30,15 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Characterization test for letta-mobile-53k65.1:
- * Same-conversation supersession lifecycle in [IrohChannelTransport].
+ * Acceptance test for letta-mobile-53k65.4:
+ * Atomic same-conversation supersession and rejection lifecycle in [IrohChannelTransport].
  *
  * Sequence under test:
  * 1. First turn starts and streams input on (agent-1, conv-1).
  * 2. Second send arrives for the SAME conversation while the first is in-flight.
- * 3. The turn engine rejects the second send as busy.
- * 4. Demonstrates the ownership, active job reachability, cancellation targeting,
- *    and liveness transitions across the lifecycle of both turns.
+ * 3. Atomic registration rejects the second send as busy without displacing turn #1.
+ * 4. Turn #1 ownership, active job reachability, cancellation targeting, and liveness
+ *    are preserved until turn #1 settles.
  */
 class IrohChannelTransportSameConversationSupersessionTest {
 
@@ -72,7 +71,7 @@ class IrohChannelTransportSameConversationSupersessionTest {
     }
 
     @Test
-    fun characterizeSameConversationSupersessionAndRejectionLifecycle() = runBlocking {
+    fun verifySameConversationAtomicRejectionPreservesActiveTurn(): Unit = runBlocking {
         val client = ScriptedClient()
         val transport = transportWith(client)
         val frames = CopyOnWriteArrayList<ServerFrame>()
@@ -83,8 +82,8 @@ class IrohChannelTransportSameConversationSupersessionTest {
             val firstTurn = startFirstTurn(transport, client, frames)
             val secondTurnId = rejectSecondTurn(transport, frames)
 
-            assertFirstTurnOwnershipWasLost(transport)
-            cancelConversation(transport, client)
+            assertFirstTurnOwnershipIsPreserved(transport, firstTurn.id)
+            cancelConversation(transport, client, firstTurn.id)
             completeFirstTurn(client, frames, firstTurn)
             assertFinalState(transport, frames, firstTurn.id, secondTurnId)
         } finally {
@@ -109,8 +108,9 @@ class IrohChannelTransportSameConversationSupersessionTest {
             transport.privateMap<Job>("activeSendJobs")[CONV_1],
             "job for turn #1 must be registered in activeSendJobs",
         )
-        assertTrue(
-            transport.privateMap<Any>("activeTurns").containsKey(CONV_1),
+        assertEquals(
+            started.turnId,
+            transport.activeTurnId(CONV_1),
             "active turn #1 must be registered in activeTurns",
         )
         assertTrue(job.isActive, "job for turn #1 must be active")
@@ -134,25 +134,32 @@ class IrohChannelTransportSameConversationSupersessionTest {
         return assertNotNull(busyError.turnId, "busy rejection must identify turn #2")
     }
 
-    private fun assertFirstTurnOwnershipWasLost(transport: IrohChannelTransport) {
-        assertFalse(
-            transport.privateMap<Any>("activeTurns").containsKey(CONV_1),
-            "characterization: on current-main, activeTurns[CONV_1] is evicted and cleared by send #2 completion",
-        )
-        assertFalse(
-            transport.privateMap<Job>("activeSendJobs").containsKey(CONV_1),
-            "characterization: on current-main, activeSendJobs[CONV_1] is cleared by send #2 completion",
-        )
-        assertFalse(
+    private fun assertFirstTurnOwnershipIsPreserved(transport: IrohChannelTransport, firstTurnId: String) {
+        assertEquals(firstTurnId, transport.activeTurnId(CONV_1), "activeTurns must belong to turn #1")
+        val job = transport.privateMap<Job>("activeSendJobs")[CONV_1]
+        assertNotNull(job, "activeSendJobs[CONV_1] must remain populated with turn #1's job")
+        assertTrue(job.isActive, "turn #1's job must remain active")
+        assertTrue(
             transport.hasActiveChatTurn(CONV_1),
-            "characterization: hasActiveChatTurn is prematurely false while turn #1 is still streaming",
+            "hasActiveChatTurn must remain true while turn #1 is streaming",
         )
     }
 
-    private suspend fun cancelConversation(transport: IrohChannelTransport, client: ScriptedClient) {
+    private suspend fun cancelConversation(
+        transport: IrohChannelTransport,
+        client: ScriptedClient,
+        firstTurnId: String,
+    ) {
+        assertEquals(firstTurnId, transport.activeTurnId(CONV_1), "cancel must target turn #1")
         val cancelResult = transport.cancel(CONV_1)
-        assertTrue(cancelResult, "cancel returns true by synthesizing a fallback cancelled frame")
-        assertTrue(client.abortCommands.isEmpty(), "characterization: no abort_message sent because activeTurns was empty")
+        assertTrue(cancelResult, "cancel returns true")
+        withTimeout(3.seconds) {
+            while (client.abortCommands.isEmpty()) delay(10.milliseconds)
+        }
+        assertEquals(1, client.abortCommands.size, "abort_message was correctly sent targeting turn #1")
+        val abortCmd = client.abortCommands.single()
+        assertEquals(CONV_1, abortCmd.runtime.conversationId)
+        assertEquals(AGENT, abortCmd.runtime.agentId)
     }
 
     private suspend fun completeFirstTurn(
@@ -178,32 +185,37 @@ class IrohChannelTransportSameConversationSupersessionTest {
         secondTurnId: String,
     ) {
         assertEquals(0, transport.privateMap<Any>("activeTurns").size, "activeTurns map must be empty after all turns complete")
-        assertEquals(0, transport.privateMap<Job>("activeSendJobs").size, "activeSendJobs map must be empty after all jobs complete")
-        assertFalse(transport.hasActiveChatTurn(CONV_1), "no active chat turn at the end")
+        assertEquals(0, transport.privateMap<Job>("activeSendJobs").size, "activeSendJobs map must be empty after all turns complete")
+        assertFalse(transport.hasActiveChatTurn(CONV_1), "hasActiveChatTurn must be false after completion")
 
-        val turnStarts = frames.filterIsInstance<ServerFrame.TurnStarted>()
-        assertEquals(1, turnStarts.size, "only turn #1 had TurnStarted emitted; rejected turn #2 did not")
-        assertEquals(firstTurnId, turnStarts.single().turnId)
+        val turnDoneFrames = frames.filterIsInstance<ServerFrame.TurnDone>()
+        val doneForTurn1 = turnDoneFrames.filter { it.turnId == firstTurnId }
+        val doneForTurn2 = turnDoneFrames.filter { it.turnId == secondTurnId }
 
-        val turnDones = frames.filterIsInstance<ServerFrame.TurnDone>()
-        val summary = turnDones.joinToString { "${it.turnId}:${it.status}" }
-        assertEquals(3, turnDones.size, "actual TurnDones: $summary")
-        assertNotNull(turnDones.firstOrNull { it.turnId == firstTurnId }, "turn #1 engine TurnDone must be present ($summary)")
-        assertNotNull(turnDones.firstOrNull { it.turnId == secondTurnId }, "turn #2 failed TurnDone must be present ($summary)")
-        val cancelled = turnDones.any { it.status == "cancelled" }
-        val observed = turnDones.any { it.turnId == "iroh-observer-turn-$CONV_1" }
-        assertTrue(cancelled || observed, "expected either cancelled or observer TurnDone ($summary)")
+        assertEquals(1, doneForTurn1.size, "turn #1 must receive exactly 1 terminal frame")
+        assertEquals(1, doneForTurn2.size, "turn #2 must receive exactly 1 terminal frame (its busy rejection)")
+        assertEquals("failed", doneForTurn2.single().status)
     }
 
-    private data class RunningTurn(val id: String, val runId: String, val job: Job)
+    private fun IrohChannelTransport.activeTurnId(conversationId: String): String? {
+        val turn = privateMap<Any>("activeTurns")[conversationId] ?: return null
+        val field = turn.javaClass.getDeclaredField("turnId")
+        field.isAccessible = true
+        return field.get(turn) as String
+    }
 
-    /** Keeps lifecycle inspection in the test instead of expanding the production hotspot API. */
     @Suppress("UNCHECKED_CAST")
     private fun <V> IrohChannelTransport.privateMap(fieldName: String): Map<String, V> {
         val field = IrohChannelTransport::class.java.getDeclaredField(fieldName)
         field.isAccessible = true
         return field.get(this) as Map<String, V>
     }
+
+    private data class RunningTurn(
+        val id: String,
+        val runId: String,
+        val job: Job,
+    )
 
     private companion object {
         const val AGENT = "agent-1"
@@ -214,12 +226,10 @@ class IrohChannelTransportSameConversationSupersessionTest {
         val stream = MutableSharedFlow<AppServerReceivedFrame>(extraBufferCapacity = 64)
         override val events: Flow<AppServerReceivedFrame> = stream
 
-        val abortCommands = CopyOnWriteArrayList<AppServerCommand.AbortMessage>()
-
         val firstInputEntered = CompletableDeferred<Unit>()
         val releaseFirstInput = CompletableDeferred<Unit>()
 
-        private var inputCount = 0
+        val abortCommands = CopyOnWriteArrayList<AppServerCommand.AbortMessage>()
 
         override suspend fun runtimeStart(command: AppServerCommand.RuntimeStart): AppServerInboundFrame.RuntimeStartResponse =
             AppServerInboundFrame.RuntimeStartResponse(
@@ -232,13 +242,8 @@ class IrohChannelTransportSameConversationSupersessionTest {
             )
 
         override suspend fun input(command: AppServerCommand.Input) {
-            val idx = ++inputCount
-            if (idx == 1) {
-                firstInputEntered.complete(Unit)
-                releaseFirstInput.await()
-            } else {
-                awaitCancellation()
-            }
+            firstInputEntered.complete(Unit)
+            releaseFirstInput.await()
         }
 
         override suspend fun sync(command: AppServerCommand.Sync): AppServerInboundFrame.SyncResponse =
@@ -247,7 +252,7 @@ class IrohChannelTransportSameConversationSupersessionTest {
         override suspend fun abort(command: AppServerCommand.AbortMessage): AppServerInboundFrame.AbortMessageResponse {
             abortCommands.add(command)
             return AppServerInboundFrame.AbortMessageResponse(
-                requestId = command.requestId.orEmpty(),
+                requestId = command.requestId ?: "",
                 runtime = command.runtime,
                 aborted = true,
                 success = true,
@@ -259,13 +264,7 @@ class IrohChannelTransportSameConversationSupersessionTest {
 
         override suspend fun sendExternalToolResponse(command: AppServerCommand.ExternalToolCallResponse) = Unit
 
-        fun emitStopReason(conversationId: String, runId: String, seq: Long) = emit(
-            conversationId,
-            seq,
-            """{"message_type": "stop_reason", "stop_reason": "end_turn", "run_id": "$runId"}""",
-        )
-
-        private fun emit(conversationId: String, seq: Long, delta: String) {
+        suspend fun emitStopReason(conversationId: String, runId: String, seq: Long) {
             val body = """
                 {
                   "type": "stream_delta",
@@ -273,10 +272,10 @@ class IrohChannelTransportSameConversationSupersessionTest {
                   "event_seq": $seq,
                   "emitted_at": "2026-08-23T00:00:00Z",
                   "idempotency_key": "evt-$conversationId-$seq",
-                  "delta": $delta
+                  "delta": {"message_type": "stop_reason", "stop_reason": "end_turn", "run_id": "$runId"}
                 }
             """.trimIndent()
-            check(stream.tryEmit(AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)))
+            stream.emit(AppServerProtocol.decodeFrame(body, AppServerChannel.Stream))
         }
     }
 }
