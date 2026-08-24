@@ -2,9 +2,13 @@ package com.letta.mobile.feature.chat
 
 import com.letta.mobile.feature.chat.screen.chatRenderItemSeesLiveScale
 import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchAnchorState
+import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchCompensationRequest
 import com.letta.mobile.feature.chat.screen.messagelist.ChatVisibleItemBounds
+import com.letta.mobile.feature.chat.screen.messagelist.shouldClearChatPinchAnchorAfterSettle
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,46 +25,95 @@ class PinchLiveScaleTest {
     }
 
     @Test
-    fun `anchor captures stable key and centroid offset`() {
+    fun `anchor captures stable key original height and normalized point`() {
         val state = ChatPinchAnchorState()
-        val anchor = state.begin(160f, listOf(item("a", 2, 20, 120), item("b", 3, 120, 300)))
+        val anchor = state.begin(160f, listOf(item("a", 2, 20, 120), item("b", 3, 100, 200)))
 
         assertEquals("b", anchor?.key)
-        assertEquals(40f, anchor?.centroidOffsetPx)
-        assertEquals(160f, anchor?.desiredContentPointPx)
+        assertEquals(100, anchor?.originalItemHeightPx)
+        assertEquals(0.6f, anchor?.fractionWithinItem)
+        assertEquals(160f, anchor?.desiredCentroidYPx)
     }
 
     @Test
-    fun `correction sign keeps content point beneath centroid`() {
+    fun `grow preserves normalized content point rather than fixed offset`() {
         val state = ChatPinchAnchorState()
-        state.begin(160f, listOf(item("b", 3, 120, 300)))
+        state.begin(220f, listOf(item("b", 3, 100, 300)))
 
-        assertEquals(30f, state.correction(listOf(item("b", 3, 150, 360))).deltaPx)
-        assertEquals(-25f, state.correction(listOf(item("b", 3, 95, 260))).deltaPx)
+        assertEquals(180f, state.correction(listOf(item("b", 3, 100, 600))).deltaPx)
     }
 
     @Test
-    fun `stable key survives reorder and resize`() {
+    fun `shrink preserves normalized content point`() {
         val state = ChatPinchAnchorState()
-        state.begin(160f, listOf(item("b", 3, 120, 300)))
+        state.begin(220f, listOf(item("b", 3, 100, 300)))
 
-        val correction = state.correction(listOf(item("x", 7, 40, 90), item("b", 9, 130, 420)))
+        assertEquals(-60f, state.correction(listOf(item("b", 3, 100, 200))).deltaPx)
+    }
+
+    @Test
+    fun `stable key survives reorder and resize without fallback`() {
+        val state = ChatPinchAnchorState()
+        val original = state.begin(160f, listOf(item("b", 3, 120, 320)))
+
+        val correction = state.correction(listOf(item("x", 7, 40, 90), item("b", 9, 130, 430)))
 
         assertEquals("b", correction.anchor?.key)
-        assertEquals(10f, correction.deltaPx)
+        assertSame(original, correction.anchor)
+        assertEquals(30f, correction.deltaPx)
     }
 
     @Test
-    fun `disappeared anchor falls back to nearest visible stable key`() {
+    fun `ordinary resize never falls back to another stable row`() {
         val state = ChatPinchAnchorState()
-        state.begin(160f, listOf(item("b", 5, 120, 300)))
+        state.begin(160f, listOf(item("b", 3, 120, 320)))
+
+        val correction = state.correction(listOf(item("x", 2, 40, 90), item("b", 3, 100, 500)))
+
+        assertEquals("b", correction.anchor?.key)
+        assertEquals(20f, correction.deltaPx)
+    }
+
+    @Test
+    fun `disappeared anchor falls back deterministically to nearest stable key`() {
+        val state = ChatPinchAnchorState()
+        state.begin(160f, listOf(item("b", 5, 120, 320)))
 
         val correction = state.correction(
-            listOf(item("date-x", 4, 80, 110), item("a", 2, 110, 190), item("c", 6, 190, 280)),
+            listOf(item("date-x", 4, 80, 110), item("a", 2, 110, 190), item("c", 6, 190, 290)),
         )
 
         assertEquals("c", correction.anchor?.key)
-        assertEquals(70f, correction.deltaPx)
+        assertEquals(50f, correction.deltaPx)
+    }
+
+    @Test
+    fun `rapid coalesced layouts use latest normalized bounds`() {
+        val state = ChatPinchAnchorState()
+        state.begin(220f, listOf(item("b", 3, 100, 300)))
+
+        state.correction(listOf(item("b", 3, 100, 400)))
+        state.correction(listOf(item("b", 3, 100, 500)))
+        val latest = state.correction(listOf(item("b", 3, 80, 580)))
+
+        assertEquals(160f, latest.deltaPx)
+    }
+
+    @Test
+    fun `settle residual reaches tolerance after correction`() {
+        val state = ChatPinchAnchorState()
+        state.begin(220f, listOf(item("b", 3, 100, 300)))
+
+        assertEquals(180f, state.correction(listOf(item("b", 3, 100, 600))).deltaPx)
+        assertEquals(0f, state.correction(listOf(item("b", 3, -80, 420))).deltaPx)
+        assertEquals(0f, state.correction(listOf(item("b", 3, -79, 420))).deltaPx)
+    }
+
+    @Test
+    fun `release retains anchor until committed layout settles`() {
+        assertFalse(shouldClearChatPinchAnchorAfterSettle(ChatPinchCompensationRequest.Layout, true))
+        assertFalse(shouldClearChatPinchAnchorAfterSettle(ChatPinchCompensationRequest.CommitLayout, false))
+        assertTrue(shouldClearChatPinchAnchorAfterSettle(ChatPinchCompensationRequest.CommitLayout, true))
     }
 
     @Test
@@ -78,8 +131,8 @@ class PinchLiveScaleTest {
     @Test
     fun `tiny correction is ignored`() {
         val state = ChatPinchAnchorState()
-        state.begin(160f, listOf(item("b", 5, 120, 300)))
+        state.begin(160f, listOf(item("b", 5, 120, 320)))
 
-        assertEquals(0f, state.correction(listOf(item("b", 5, 120, 301))).deltaPx)
+        assertEquals(0f, state.correction(listOf(item("b", 5, 120, 321))).deltaPx)
     }
 }

@@ -12,8 +12,9 @@ internal data class ChatVisibleItemBounds(
 internal data class ChatPinchAnchor(
     val key: Any,
     val itemIndex: Int,
-    val centroidOffsetPx: Float,
-    val desiredContentPointPx: Float,
+    val desiredCentroidYPx: Float,
+    val originalItemHeightPx: Int,
+    val fractionWithinItem: Float,
 )
 
 internal data class ChatPinchAnchorCorrection(
@@ -22,7 +23,7 @@ internal data class ChatPinchAnchorCorrection(
 )
 
 internal class ChatPinchAnchorState(
-    private val minimumCorrectionPx: Float = 0.5f,
+    private val residualTolerancePx: Float = 0.5f,
 ) {
     var anchor: ChatPinchAnchor? = null
         private set
@@ -32,11 +33,14 @@ internal class ChatPinchAnchorState(
         val item = visibleItems.firstOrNull {
             centroidYPx >= it.topPx && centroidYPx < it.bottomPx
         } ?: return null
+        val itemHeightPx = item.heightPx
+        if (itemHeightPx <= 0) return null
         return ChatPinchAnchor(
             key = item.key,
             itemIndex = item.index,
-            centroidOffsetPx = centroidYPx - item.topPx,
-            desiredContentPointPx = centroidYPx,
+            desiredCentroidYPx = centroidYPx,
+            originalItemHeightPx = itemHeightPx,
+            fractionWithinItem = ((centroidYPx - item.topPx) / itemHeightPx).coerceIn(0f, 1f),
         ).also { anchor = it }
     }
 
@@ -48,18 +52,18 @@ internal class ChatPinchAnchorState(
         }
 
         val fallback = visibleItems
-            .filter { isStableChatRenderItemKey(it.key) }
+            .filter { isStableChatRenderItemKey(it.key) && it.heightPx > 0 }
             .minWithOrNull(compareBy<ChatVisibleItemBounds> { abs(it.index - currentAnchor.itemIndex) }.thenBy { it.index })
             ?: run {
                 anchor = null
                 return ChatPinchAnchorCorrection(null, 0f)
             }
-        val fallbackOffset = currentAnchor.centroidOffsetPx.coerceIn(0f, (fallback.bottomPx - fallback.topPx).toFloat())
         val fallbackAnchor = ChatPinchAnchor(
             key = fallback.key,
             itemIndex = fallback.index,
-            centroidOffsetPx = fallbackOffset,
-            desiredContentPointPx = currentAnchor.desiredContentPointPx,
+            desiredCentroidYPx = currentAnchor.desiredCentroidYPx,
+            originalItemHeightPx = fallback.heightPx,
+            fractionWithinItem = currentAnchor.fractionWithinItem,
         )
         anchor = fallbackAnchor
         return correctionFor(fallbackAnchor, fallback)
@@ -70,9 +74,13 @@ internal class ChatPinchAnchorState(
     }
 
     private fun correctionFor(anchor: ChatPinchAnchor, item: ChatVisibleItemBounds): ChatPinchAnchorCorrection {
-        val delta = item.topPx + anchor.centroidOffsetPx - anchor.desiredContentPointPx
-        return ChatPinchAnchorCorrection(anchor, if (abs(delta) < minimumCorrectionPx) 0f else delta)
+        val contentPointPx = item.topPx + anchor.fractionWithinItem * item.heightPx
+        val delta = contentPointPx - anchor.desiredCentroidYPx
+        return ChatPinchAnchorCorrection(anchor, if (abs(delta) < residualTolerancePx) 0f else delta)
     }
+
+    private val ChatVisibleItemBounds.heightPx: Int
+        get() = bottomPx - topPx
 }
 
 internal fun isStableChatRenderItemKey(key: Any): Boolean =

@@ -114,7 +114,7 @@ internal fun ChatMessageList(
             onHighlightedMessageIdChange = { highlightedMessageId = it },
             hasScrolledToTarget = hasScrolledToTarget,
             onHasScrolledToTargetChange = { hasScrolledToTarget = it },
-            isPinching = pinchFontScaleController.isPinching,
+            isPinching = pinchFontScaleController.isPinching || suppressPinchLayoutAnimations,
         ),
     )
 
