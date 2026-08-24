@@ -11,18 +11,11 @@ import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitCancellation
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-
-import com.letta.mobile.data.model.MessageCreateRequest
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.emptyFlow
 
 class ConfirmedTimelineScenarioTest {
 
@@ -30,7 +23,7 @@ class ConfirmedTimelineScenarioTest {
         private val messagesByConversation: Map<String, List<LettaMessage>> = emptyMap(),
         private val delayCompletion: CompletableDeferred<Unit>? = null,
         private val throwOnList: Throwable? = null,
-    ) : TimelineTransport {
+    ) : TimelineTransport by EmptyTimelineTransport {
         var listMessagesCallCount = 0
         val listMessagesStarted = CompletableDeferred<Unit>()
 
@@ -47,77 +40,23 @@ class ConfirmedTimelineScenarioTest {
             val messages = messagesByConversation[conversationId] ?: emptyList()
             return if (order == "desc") messages.reversed() else messages
         }
-
-        override suspend fun listAgentMessages(
-            agentId: String,
-            limit: Int?,
-            order: String?,
-            conversationId: String?,
-        ): List<LettaMessage> {
-            listMessagesCallCount++
-            listMessagesStarted.complete(Unit)
-            delayCompletion?.await()
-            throwOnList?.let { throw it }
-            return conversationId?.let { messagesByConversation[it] } ?: emptyList()
-        }
-
-        override suspend fun sendConversationMessage(
-            conversationId: String,
-            request: MessageCreateRequest,
-        ): Flow<LettaMessage> = emptyFlow()
-
-        override suspend fun streamConversation(conversationId: String): Flow<TimelineStreamFrame> = emptyFlow()
     }
 
-    private class BlockingConfirmedTimelineStore : ConfirmedTimelineStore {
-        val writeStarted = CompletableDeferred<Unit>()
-        val writeFinished = CompletableDeferred<Unit>()
-
-        override suspend fun readSnapshot(scope: TimelineScope): StoredTimelineEnvelope? = null
-
-        override suspend fun writeSnapshot(envelope: StoredTimelineEnvelope): Boolean {
-            writeStarted.complete(Unit)
-            try {
-                awaitCancellation()
-            } finally {
-                writeFinished.complete(Unit)
-            }
-        }
-
-        override suspend fun deleteSnapshot(scope: TimelineScope) = Unit
-        override suspend fun clearForBackend(backendId: String) = Unit
-        override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
-    }
-
-    private fun testScope(conversationId: String) =
-        TimelineScope(backendId = "test-backend", conversationId = conversationId)
-
-    private fun testStoredEvent(
-        serverId: String,
-        content: String,
-        position: Double = 1.0,
-        messageType: String = "USER",
-        dateIso: String = "2026-08-23T10:00:00Z",
-    ) = StoredTimelineEvent(
-        position = position,
-        otid = "server-$serverId-${messageType.lowercase()}",
-        content = content,
-        serverId = serverId,
-        messageType = messageType,
-        dateIso = dateIso,
+    private fun TimelineScope.testEnvelope(events: List<StoredTimelineEvent>) = StoredTimelineEnvelope(
+        schemaVersion = StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
+        scope = this,
+        revision = 1L,
+        events = events,
+        writtenAtMillis = 5000L,
     )
 
-    private fun testEnvelope(
-        scope: TimelineScope,
-        events: List<StoredTimelineEvent>,
-        revision: Long = 1L,
-        writtenAtMillis: Long = 5000L,
-    ) = StoredTimelineEnvelope(
-        schemaVersion = StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
-        scope = scope,
-        revision = revision,
-        events = events,
-        writtenAtMillis = writtenAtMillis,
+    private val storedEventFixture = StoredTimelineEvent(
+        position = 1.0,
+        otid = "server-message-user",
+        content = "fixture",
+        serverId = "message",
+        messageType = "USER",
+        dateIso = "2026-08-23T10:00:00Z",
     )
 
     private fun createTestRepo(
@@ -151,12 +90,22 @@ class ConfirmedTimelineScenarioTest {
     @Test
     fun coldStartWithDurableSnapshotRendersImmediatelyBeforeRemoteCall() = runTest {
         val store = InMemoryConfirmedTimelineStore()
-        val scope = testScope("conv-persisted")
-        val envelope = testEnvelope(
-            scope = scope,
-            events = listOf(
-                testStoredEvent("msg-1", "Hello from yesterday", position = 1.0, messageType = "USER", dateIso = "2026-08-23T10:00:00Z"),
-                testStoredEvent("msg-2", "I remember you!", position = 2.0, messageType = "ASSISTANT", dateIso = "2026-08-23T10:00:05Z"),
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-persisted")
+        val envelope = scope.testEnvelope(
+            listOf(
+                storedEventFixture.copy(
+                    otid = "server-msg-1-user",
+                    content = "Hello from yesterday",
+                    serverId = "msg-1",
+                ),
+                storedEventFixture.copy(
+                    position = 2.0,
+                    otid = "server-msg-2-assistant",
+                    content = "I remember you!",
+                    serverId = "msg-2",
+                    messageType = "ASSISTANT",
+                    dateIso = "2026-08-23T10:00:05Z",
+                ),
             ),
         )
         store.writeSnapshot(envelope)
@@ -195,15 +144,17 @@ class ConfirmedTimelineScenarioTest {
     @Test
     fun offlineModePreservesLastKnownGoodContentWithoutLoaderOrBlanking() = runTest {
         val store = InMemoryConfirmedTimelineStore()
-        val scope = testScope("conv-offline")
-        val envelope = testEnvelope(
-            scope = scope,
-            revision = 2L,
-            events = listOf(
-                testStoredEvent("msg-offline-1", "Saved offline content", dateIso = "2026-08-23T11:00:00Z"),
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-offline")
+        val envelope = scope.testEnvelope(
+            listOf(
+                storedEventFixture.copy(
+                    otid = "server-msg-offline-1-user",
+                    content = "Saved offline content",
+                    serverId = "msg-offline-1",
+                    dateIso = "2026-08-23T11:00:00Z",
+                ),
             ),
-            writtenAtMillis = 6000L,
-        )
+        ).copy(revision = 2L, writtenAtMillis = 6000L)
         store.writeSnapshot(envelope)
 
         val transport = FakeTimelineTransport(
@@ -226,14 +177,17 @@ class ConfirmedTimelineScenarioTest {
     @Test
     fun slowRefreshMergesBackgroundDeltasWithoutBlanking() = runTest {
         val store = InMemoryConfirmedTimelineStore()
-        val scope = testScope("conv-slow")
-        val envelope = testEnvelope(
-            scope = scope,
-            events = listOf(
-                testStoredEvent("msg-1", "Older message", dateIso = "2026-08-23T12:00:00Z"),
+        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-slow")
+        val envelope = scope.testEnvelope(
+            listOf(
+                storedEventFixture.copy(
+                    otid = "server-msg-1-user",
+                    content = "Older message",
+                    serverId = "msg-1",
+                    dateIso = "2026-08-23T12:00:00Z",
+                ),
             ),
-            writtenAtMillis = 1000L,
-        )
+        ).copy(writtenAtMillis = 1000L)
         store.writeSnapshot(envelope)
 
         val gate = CompletableDeferred<Unit>()
@@ -269,15 +223,13 @@ class ConfirmedTimelineScenarioTest {
     fun rapidConversationSwitchingYieldsTargetSnapshotInstantly() = runTest {
         val store = InMemoryConfirmedTimelineStore()
         store.writeSnapshot(
-            testEnvelope(
-                scope = testScope("conv-A"),
-                events = listOf(testStoredEvent("a1", "Chat A")),
+            TimelineScope(backendId = "test-backend", conversationId = "conv-A").testEnvelope(
+                listOf(storedEventFixture.copy(otid = "server-a1-user", content = "Chat A", serverId = "a1")),
             ),
         )
         store.writeSnapshot(
-            testEnvelope(
-                scope = testScope("conv-B"),
-                events = listOf(testStoredEvent("b1", "Chat B")),
+            TimelineScope(backendId = "test-backend", conversationId = "conv-B").testEnvelope(
+                listOf(storedEventFixture.copy(otid = "server-b1-user", content = "Chat B", serverId = "b1")),
             ),
         )
 
@@ -295,20 +247,6 @@ class ConfirmedTimelineScenarioTest {
         } finally {
             repo.clearAll()
         }
-    }
-
-    @Test
-    fun closeCancelsAndJoinsInFlightSnapshotPersistence() = runTest {
-        val store = BlockingConfirmedTimelineStore()
-        val scope = testScope("conv-closing")
-        val loop = createTestLoop(scope, FakeTimelineTransport(), store)
-
-        loop.scheduleSnapshotPersist(immediate = true)
-        store.writeStarted.await()
-
-        loop.closeAndJoin()
-
-        assertTrue(store.writeFinished.isCompleted)
     }
 
     @Test

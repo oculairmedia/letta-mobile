@@ -5,6 +5,7 @@ import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
 import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -39,15 +40,30 @@ class DesktopConfirmedTimelineStore(
             maxRetainedConversations = maxRetainedConversations,
         )
 
-    private fun backendDirectory(backendId: String): Path = rootDirectory.resolve(sanitize(backendId))
+    private fun backendDirectory(backendId: String): Path =
+        rootDirectory.resolve(backendId.sha256PathComponent())
 
     private fun snapshotFile(scope: TimelineScope): Path =
         backendDirectory(scope.backendId)
-            .resolve(sanitize("${scope.agentId.orEmpty()}__${scope.conversationId}") + ".json")
+            .resolve(
+                "${scope.agentId.orEmpty().sha256PathComponent()}__" +
+                    "${scope.conversationId.sha256PathComponent()}.json",
+            )
 
-    private fun sanitize(value: String): String = value.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+    private fun String.sha256PathComponent(): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(encodeToByteArray())
+        return buildString(digest.size * 2) {
+            digest.forEach { byte ->
+                val value = byte.toInt() and 0xff
+                append(HEX_DIGITS[value ushr 4])
+                append(HEX_DIGITS[value and 0x0f])
+            }
+        }
+    }
 
     companion object {
+        private const val HEX_DIGITS = "0123456789abcdef"
+
         fun defaultRootDirectory(): Path = defaultDesktopStateDirectory().resolve("timeline_snapshots")
     }
 }

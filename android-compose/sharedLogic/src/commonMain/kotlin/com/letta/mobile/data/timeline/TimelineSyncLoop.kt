@@ -15,6 +15,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -27,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Single sync loop per conversation. Acts as a thin orchestrator (under 200 lines).
@@ -67,8 +69,9 @@ class TimelineSyncLoop(
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
     private var snapshotRevision: Long = initialRevision
-    private var persistJob: Job? = null
+    private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
     private val persistMutex = Mutex()
+    private val persistJob: Job
 
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
@@ -129,23 +132,23 @@ class TimelineSyncLoop(
         onHydrationCommitted = { scheduleSnapshotPersist(immediate = true) },
     )
 
-    private var persistPending = false
-
     internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
         timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
-        if (immediate) {
-            persistPending = false
-            persistJob?.cancel()
-            persistJob = loopScope.launch { flushSnapshotNow(prune = true) }
-        } else {
-            persistPending = true
-            if (persistJob?.isActive != true) {
-                persistJob = loopScope.launch {
-                    delay(100)
-                    flushSnapshotNow()
-                }
+        persistRequests.trySend(
+            if (immediate) SnapshotPersistRequest.Immediate else SnapshotPersistRequest.Debounced,
+        )
+    }
+
+    private suspend fun runSnapshotPersistence() {
+        for (request in persistRequests) {
+            if (request == SnapshotPersistRequest.Debounced) {
+                delay(SNAPSHOT_PERSIST_DEBOUNCE_MS)
             }
+            while (persistRequests.tryReceive().isSuccess) {
+                // Coalesce all timeline changes received during the debounce window.
+            }
+            flushSnapshotNow(prune = true)
         }
     }
 
@@ -153,10 +156,7 @@ class TimelineSyncLoop(
         val snapshotScope = timelineScope ?: return
         if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
         persistMutex.withLock {
-            do {
-                persistPending = false
-                persistCurrentSnapshot(snapshotScope, prune)
-            } while (persistPending)
+            persistCurrentSnapshot(snapshotScope, prune)
         }
     }
 
@@ -265,6 +265,7 @@ class TimelineSyncLoop(
     )
 
     init {
+        persistJob = loopScope.launch { runSnapshotPersistence() }
         loopScope.launch { processEventQueue() }
         if (startStreamSubscriber) {
             loopScope.launch { runStreamSubscriber() }
@@ -276,14 +277,19 @@ class TimelineSyncLoop(
     }
 
     fun close() {
+        persistRequests.close()
         eventQueue.close(CancellationException("TimelineSyncLoop closed"))
         outboundSendProcessor.sendQueue.close(CancellationException("TimelineSyncLoop closed"))
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
     }
 
     suspend fun closeAndJoin() {
+        persistRequests.close()
+        withContext(NonCancellable) {
+            persistJob.join()
+            flushSnapshotNow(prune = true)
+        }
         close()
-        persistJob?.join()
     }
 
     @Volatile
@@ -629,7 +635,13 @@ class TimelineSyncLoop(
         wsSubscription.clear()
     }
 
+    private enum class SnapshotPersistRequest {
+        Immediate,
+        Debounced,
+    }
+
     companion object {
+        private const val SNAPSHOT_PERSIST_DEBOUNCE_MS = 100L
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected

@@ -95,10 +95,32 @@ class DesktopConfirmedTimelineStoreTest {
     }
 
     @Test
+    fun normalizedPathCollisionsRemainIsolated() = runTest {
+        val slashScope = TimelineScope(
+            backendId = "https://host/a",
+            agentId = "agent/a",
+            conversationId = "conversation/a",
+        )
+        val underscoreScope = TimelineScope(
+            backendId = "https://host_a",
+            agentId = "agent_a",
+            conversationId = "conversation_a",
+        )
+
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = slashScope, revision = 1L)))
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = underscoreScope, revision = 2L)))
+
+        assertEquals(1L, store.readSnapshot(slashScope)?.revision)
+        assertEquals(2L, store.readSnapshot(underscoreScope)?.revision)
+    }
+
+    @Test
     fun corruptPayloadRecoversGracefully() = runTest {
         val scope = TimelineScope(backendId = "b1", conversationId = "c1")
-        val file = tempDir.resolve("b1").resolve("__c1.json")
-        Files.createDirectories(file.parent)
+        assertTrue(store.writeSnapshot(StoredTimelineEnvelope(scope = scope, revision = 1L)))
+        val file = Files.walk(tempDir).use { paths ->
+            paths.filter { Files.isRegularFile(it) }.findFirst().orElseThrow()
+        }
         Files.writeString(file, "corrupt json payload")
 
         val read = store.readSnapshot(scope)

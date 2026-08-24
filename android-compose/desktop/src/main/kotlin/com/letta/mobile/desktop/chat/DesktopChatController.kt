@@ -30,6 +30,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -341,6 +342,12 @@ class DesktopChatController(
     private var started = false
     private var closed = false
 
+    private fun closeActiveLoopAsync() {
+        val loop = activeLoop ?: return
+        activeLoop = null
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { loop.closeAndAwait() }
+    }
+
     fun start() {
         if (started || closed) return
         started = true
@@ -353,8 +360,7 @@ class DesktopChatController(
         selectJob?.cancel()
         sendJob?.cancel()
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         (gateway as? AutoCloseable)?.close()
         bindGateway(null)
         started = false
@@ -379,8 +385,7 @@ class DesktopChatController(
         sendJob?.cancel()
         createConversationJob?.cancel()
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         (gateway as? AutoCloseable)?.close()
         bindGateway(null)
     }
@@ -436,8 +441,7 @@ class DesktopChatController(
                         _thinkingConversationId.value = null
                     }
                     timelineJob?.cancel()
-                    activeLoop?.close()
-                    activeLoop = null
+                    closeActiveLoopAsync()
                     val runtime = _state.value.runtimeState
                     val nextSelected = runtime.selectedConversationId
                     if (nextSelected != null) {
@@ -946,8 +950,7 @@ class DesktopChatController(
         applyComposerModelLabel(conversationId, conversation.agentId)
 
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         timelineProjector.reset()
         _boundPresenceFacts.value = BoundPresenceFacts()
 

@@ -14,7 +14,6 @@ import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.runBlocking
 
 internal fun ChatComposerError.toDesktopMessage(limits: AttachmentLimits): String = when (this) {
     ChatComposerError.MaxAttachmentCountExceeded -> "Attach up to ${limits.maxAttachmentCount} images."
@@ -27,6 +26,7 @@ interface DesktopTimelineLoop {
     suspend fun hydrate(request: DesktopTimelineHydrateRequest = DesktopTimelineHydrateRequest())
     suspend fun send(request: DesktopTimelineSendRequest): String
     fun close()
+    suspend fun closeAndAwait() = close()
 }
 
 data class DesktopTimelineHydrateRequest(
@@ -97,7 +97,11 @@ internal class RealDesktopTimelineLoop private constructor(
         delegate.send(request.content.value, request.attachments)
 
     override fun close() {
-        runBlocking { delegate.closeAndJoin() }
+        delegate.close()
+    }
+
+    override suspend fun closeAndAwait() {
+        delegate.closeAndJoin()
     }
 
     companion object {
