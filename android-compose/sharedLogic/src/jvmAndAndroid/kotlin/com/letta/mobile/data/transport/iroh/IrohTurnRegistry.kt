@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap
 /** Per-turn state shared between streaming send jobs, observer ingest, and cancellation. */
 class IrohActiveTurn(request: IrohTurnRequest) {
     val token = request.token
-    private val runIdRef = atomic(request.runId)
+    private val runIdRef = atomic(request.runId.value)
     private val terminalClaimed = atomic<IrohTerminalSource?>(null)
 
     /** Completes when a single terminal is emitted or the turn is retired. */
@@ -22,7 +22,7 @@ class IrohActiveTurn(request: IrohTurnRequest) {
     val conversationId: String get() = token.conversationId.value
     val turnId: String get() = token.turnId.value
     val agentId: String get() = agent.value
-    val runId: String get() = runIdRef.value.value
+    val runId: String get() = runIdRef.value
     val hasTerminal: Boolean get() = terminalClaimed.value != null
     val terminalSource: IrohTerminalSource? get() = terminalClaimed.value
 
@@ -33,8 +33,8 @@ class IrohActiveTurn(request: IrohTurnRequest) {
         if (candidate.isIrohSyntheticRunId()) return false
         while (true) {
             val current = runIdRef.value
-            if (!current.value.isIrohSyntheticRunId() || current == promotion.runId) return false
-            if (runIdRef.compareAndSet(current, promotion.runId)) return true
+            if (!current.isIrohSyntheticRunId() || current == candidate) return false
+            if (runIdRef.compareAndSet(current, candidate)) return true
         }
     }
 
@@ -148,12 +148,31 @@ class IrohTurnRegistry {
     fun interruptedTurnsSnapshot(): List<RedialWhileTurnActive> = interruptedTurns.values.toList()
     fun activeTurnsSnapshot(): List<IrohActiveTurn> = activeTurns.values.toList()
 
+    /**
+     * Claims every currently active turn for disconnect before its job is cancelled.
+     * This prevents a cancelled job's completion handler from removing the turn before
+     * disconnect has emitted its deterministic terminal.
+     */
+    fun claimDisconnectTerminals(): List<IrohActiveTurn> =
+        activeTurns.values.filter { it.tryClaimTerminal(IrohTerminalSource.Disconnect) }
+
+    fun cancelSendJobs() {
+        activeSendJobs.values.forEach(Job::cancel)
+        activeSendJobs.clear()
+    }
+
+    /** Retires a terminal that was claimed by [claimDisconnectTerminals]. */
+    fun retireClaimed(publication: IrohTerminalPublication): Boolean {
+        if (publication.turn.terminalSource != publication.source) return false
+        retire(publication)
+        return true
+    }
+
     fun clear() {
         interruptedTurns.clear()
         recentlyRetiredRuns.clear()
         frameOwnership.clear()
-        activeSendJobs.values.forEach(Job::cancel)
-        activeSendJobs.clear()
+        cancelSendJobs()
         activeTurns.values.forEach { it.terminalReached.complete(IrohTerminalStatus("disconnected")) }
         activeTurns.clear()
     }

@@ -21,6 +21,7 @@ enum class IrohTerminalSource {
     Engine,
     Observer,
     CancelSynthetic,
+    Disconnect,
 }
 
 enum class IrohFrameOwner {

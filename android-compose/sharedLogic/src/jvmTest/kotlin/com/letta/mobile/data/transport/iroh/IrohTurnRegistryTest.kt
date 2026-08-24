@@ -89,6 +89,24 @@ class IrohTurnRegistryTest {
         assertEquals(0, registry.activeSendJobsCount())
     }
 
+    @Test
+    fun disconnectClaimsTerminalBeforeCancellingJob() {
+        val start = registry.tryStart(request())
+        assertTrue(start is IrohTryStartResult.Started)
+        val job = Job()
+        registry.registerSendJob(IrohSendJobRegistration(conversationId(), job))
+
+        val claimed = registry.claimDisconnectTerminals()
+        registry.cancelSendJobs()
+
+        assertEquals(listOf(start.turn), claimed)
+        assertEquals(IrohTerminalSource.Disconnect, start.turn.terminalSource)
+        assertTrue(job.isCancelled)
+        assertTrue(registry.retireClaimed(publication(start.turn, IrohTerminalSource.Disconnect)))
+        assertTrue(start.turn.terminalReached.isCompleted)
+        assertFalse(registry.hasAnyActiveTurn)
+    }
+
     private fun conversationId() = IrohConversationId("conv-1")
 
     private fun request(

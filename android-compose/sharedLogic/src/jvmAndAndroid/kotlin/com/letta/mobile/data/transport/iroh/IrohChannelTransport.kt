@@ -975,18 +975,7 @@ class IrohChannelTransport(
             "otherActiveConversations" to IrohTransportSupport.otherActiveConversationsLabel(turnRegistry, conversationId),
         )
         turnRegistry.removeSendJob(IrohConversationId(conversationId))?.cancel()
-        scope.launch {
-            emitBoth(
-                ServerFrame.TurnDone(
-                    id = IrohTransportSupport.frameId("cancelled"),
-                    ts = IrohTransportSupport.nowIso(),
-                    turnId = "cancelled-${UUID.randomUUID()}",
-                    runId = "cancelled-${UUID.randomUUID()}",
-                    status = "cancelled",
-                ),
-            )
-        }
-        return true
+        return false
     }
 
     override fun bye(): Boolean = true
@@ -1133,6 +1122,28 @@ class IrohChannelTransport(
 
     override suspend fun disconnect() {
         connectionSession.stopAndJoin()
+        // Claim terminal ownership before cancellation: a cancelled send job can
+        // synchronously remove its turn from the registry in its completion handler.
+        // Claiming first makes disconnect the deterministic terminal winner.
+        val disconnectOwnedTurns = turnRegistry.claimDisconnectTerminals()
+        turnRegistry.cancelSendJobs()
+        disconnectOwnedTurns.forEach { turn ->
+            val terminal = ServerFrame.TurnDone(
+                id = IrohTransportSupport.frameId("cancelled"),
+                ts = IrohTransportSupport.nowIso(),
+                turnId = turn.turnId,
+                runId = turn.runId,
+                status = "cancelled",
+            )
+            emitBoth(terminal)
+            turnRegistry.retireClaimed(
+                IrohTerminalPublication(
+                    turn = turn,
+                    status = IrohTerminalStatus(terminal.status),
+                    source = IrohTerminalSource.Disconnect,
+                ),
+            )
+        }
         turnRegistry.clear()
         subagentCorrelator.reset()
         lastEmittedSubagentRevision = 0L
