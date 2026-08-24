@@ -43,76 +43,53 @@ class IrohObserverIngestorTest {
         return AppServerProtocol.decodeFrame(body, AppServerChannel.Stream)
     }
 
-    @Test
-    fun testRecordViewedConversationAndResubscribe() = testScope.runTest {
-        val emittedFrames = CopyOnWriteArrayList<ServerFrame>()
+    private fun resubscribeFixture(currentGeneration: Long): ResubscribeFixture {
         val adminRpcCalls = CopyOnWriteArrayList<Pair<String, String>>()
-        val turnRegistry = IrohTurnRegistry()
-        val connectionGeneration = AtomicLong(1L)
-
+        val connectionGeneration = AtomicLong(currentGeneration)
         val ingestor = IrohObserverIngestor(
             scope = testScope,
-            turnRegistry = turnRegistry,
-            connectionGeneration = { connectionGeneration.get() },
-            emitBoth = { emittedFrames.add(it) },
-            adminRpc = { method, path, _ ->
-                adminRpcCalls.add(method to path)
-                AppServerInboundFrame.AdminRpcResponse(
-                    requestId = "req-1",
-                    success = true,
-                    result = buildJsonObject { },
-                    error = null,
-                )
-            },
-            recordFrameOwnership = { _, _ -> },
-        )
-
-        ingestor.recordViewedConversationFrom(
-            method = "message.list",
-            path = "/v1/conversations/conv-123/messages?limit=50",
-        )
-
-        assertEquals("conv-123", ingestor.viewedConversationId)
-        assertEquals("/v1/conversations/conv-123/messages?limit=50", ingestor.viewedMessageListPath)
-
-        ingestor.reSubscribeViewedConversation(generation = 1L)
-
-        assertEquals(1, adminRpcCalls.size)
-        assertEquals("message.list" to "/v1/conversations/conv-123/messages?limit=50", adminRpcCalls[0])
-    }
-
-    @Test
-    fun testResubscribeRejectedOnStaleGeneration() = testScope.runTest {
-        val adminRpcCalls = CopyOnWriteArrayList<Pair<String, String>>()
-        val turnRegistry = IrohTurnRegistry()
-        val connectionGeneration = AtomicLong(2L)
-
-        val ingestor = IrohObserverIngestor(
-            scope = testScope,
-            turnRegistry = turnRegistry,
+            turnRegistry = IrohTurnRegistry(),
             connectionGeneration = { connectionGeneration.get() },
             emitBoth = { },
             adminRpc = { method, path, _ ->
                 adminRpcCalls.add(method to path)
-                AppServerInboundFrame.AdminRpcResponse(
-                    requestId = "req-1",
-                    success = true,
-                    result = buildJsonObject { },
-                    error = null,
-                )
+                AppServerInboundFrame.AdminRpcResponse("req-1", true, buildJsonObject { }, null)
             },
             recordFrameOwnership = { _, _ -> },
         )
+        return ResubscribeFixture(ingestor, adminRpcCalls)
+    }
 
-        ingestor.recordViewedConversationFrom(
-            method = "message.list",
-            path = "/v1/conversations/conv-123/messages",
+    private data class ResubscribeFixture(
+        val ingestor: IrohObserverIngestor,
+        val adminRpcCalls: CopyOnWriteArrayList<Pair<String, String>>,
+    )
+
+    @Test
+    fun testRecordViewedConversationAndResubscribe() = testScope.runTest {
+        val fixture = resubscribeFixture(currentGeneration = 1L)
+        val path = "/v1/conversations/conv-123/messages?limit=50"
+
+        fixture.ingestor.recordViewedConversationFrom(ViewedConversationRequest("message.list", path))
+
+        assertEquals("conv-123", fixture.ingestor.viewedConversationId)
+        assertEquals(path, fixture.ingestor.viewedMessageListPath)
+
+        fixture.ingestor.reSubscribeViewedConversation(ObserverResubscribeRequest(1L))
+
+        assertEquals(listOf("message.list" to path), fixture.adminRpcCalls)
+    }
+
+    @Test
+    fun testResubscribeRejectedOnStaleGeneration() = testScope.runTest {
+        val fixture = resubscribeFixture(currentGeneration = 2L)
+        fixture.ingestor.recordViewedConversationFrom(
+            ViewedConversationRequest("message.list", "/v1/conversations/conv-123/messages"),
         )
 
-        // Try resubscribe with generation 1 when current generation is 2
-        ingestor.reSubscribeViewedConversation(generation = 1L)
+        fixture.ingestor.reSubscribeViewedConversation(ObserverResubscribeRequest(1L))
 
-        assertTrue(adminRpcCalls.isEmpty(), "Resubscribe on stale generation must not issue RPC")
+        assertTrue(fixture.adminRpcCalls.isEmpty(), "Resubscribe on stale generation must not issue RPC")
     }
 
     @Test
@@ -122,11 +99,11 @@ class IrohObserverIngestorTest {
         val connectionGeneration = AtomicLong(1L)
 
         val startResult = turnRegistry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-1",
-            agentId = "agent-1",
-            generation = 1L,
+            IrohTurnRegistration(
+                IrohTurnToken(IrohConversationId("conv-1"), 1L, IrohTurnId("turn-1")),
+                IrohRunId("run-1"),
+                IrohAgentId("agent-1"),
+            ),
         )
         val activeTurn = (startResult as IrohTryStartResult.Started).turn
 
@@ -146,7 +123,7 @@ class IrohObserverIngestorTest {
             seq = 1L,
             delta = """{"message_type": "assistant_message", "content": "hello from engine"}""",
         )
-        ingestor.ingestObserverFrame(streamFrame, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(streamFrame, 1L))
         assertTrue(emittedFrames.isEmpty(), "Engine-owned non-terminal delta must not be emitted by observer")
 
         // 2. Terminal TurnDone frame for engine-owned conversation -> claims terminal and publishes
@@ -156,7 +133,7 @@ class IrohObserverIngestorTest {
             seq = 2L,
             delta = """{"message_type": "stop_reason", "stop_reason": "end_turn"}""",
         )
-        ingestor.ingestObserverFrame(terminalDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(terminalDelta, 1L))
         assertEquals(1, emittedFrames.size)
         assertTrue(emittedFrames[0] is ServerFrame.TurnDone)
         assertEquals("completed", (emittedFrames[0] as ServerFrame.TurnDone).status)
@@ -184,7 +161,7 @@ class IrohObserverIngestorTest {
             seq = 1L,
             delta = """{"message_type": "assistant_message", "id": "m1", "content": "passive hello"}""",
         )
-        ingestor.ingestObserverFrame(assistantFrame, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(assistantFrame, 1L))
 
         assertFalse(emittedFrames.isEmpty(), "Passive observer frame must be projected and emitted")
     }
@@ -196,14 +173,14 @@ class IrohObserverIngestorTest {
         val connectionGeneration = AtomicLong(1L)
 
         val startResult = turnRegistry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-retired",
-            agentId = "agent-1",
-            generation = 1L,
+            IrohTurnRegistration(
+                IrohTurnToken(IrohConversationId("conv-1"), 1L, IrohTurnId("turn-1")),
+                IrohRunId("run-retired"),
+                IrohAgentId("agent-1"),
+            ),
         )
         val turn = (startResult as IrohTryStartResult.Started).turn
-        turnRegistry.publishTerminal(turn, "completed", "engine")
+        turnRegistry.publishTerminal(turn, IrohTerminal(IrohTerminalStatus("completed"), IrohTerminalSource.Engine))
 
         val ingestor = IrohObserverIngestor(
             scope = testScope,
@@ -220,7 +197,7 @@ class IrohObserverIngestorTest {
             seq = 1L,
             delta = """{"message_type": "assistant_message", "run_id": "run-retired", "content": "afterlife message"}""",
         )
-        ingestor.ingestObserverFrame(delta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(delta, 1L))
 
         assertTrue(emittedFrames.isEmpty(), "Retired run frame must be skipped")
     }
@@ -257,7 +234,7 @@ class IrohObserverIngestorTest {
                 }
             """.trimIndent(),
         )
-        ingestor.ingestObserverFrame(dispatchDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(dispatchDelta, 1L))
 
         val subagentUpdate1 = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>().firstOrNull()
         assertNotNull(subagentUpdate1, "SubagentsUpdated must be emitted on Agent dispatch")
@@ -277,7 +254,7 @@ class IrohObserverIngestorTest {
                 }
             """.trimIndent(),
         )
-        ingestor.ingestObserverFrame(returnDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(returnDelta, 1L))
 
         val subagentUpdate2 = emittedFrames.filterIsInstance<ServerFrame.SubagentsUpdated>().lastOrNull()
         assertNotNull(subagentUpdate2, "SubagentsUpdated must be emitted on Agent return")
@@ -314,7 +291,7 @@ class IrohObserverIngestorTest {
                 }
             """.trimIndent(),
         )
-        ingestor.ingestObserverFrame(dispatchDelta, expectedGeneration = 1L)
+        ingestor.ingestObserverFrame(ObserverFrameRequest(dispatchDelta, 1L))
         assertTrue(ingestor.subagentCorrelator.revision > 0L)
         assertTrue(ingestor.subagentCorrelator.snapshot().isNotEmpty())
 
