@@ -298,7 +298,28 @@ class IrohObserverIngestorTest {
             recordFrameOwnership = { _, _ -> },
         )
 
+        val dispatchDelta = streamDelta(
+            agentId = "parent-agent",
+            conversationId = "conv-parent",
+            seq = 1L,
+            delta = """
+                {
+                  "message_type": "tool_call_message",
+                  "run_id": "parent-run-1",
+                  "tool_call": {
+                    "name": "Agent",
+                    "tool_call_id": "call-sub-1",
+                    "arguments": "{\"subagent_id\":\"sub-1\"}"
+                  }
+                }
+            """.trimIndent(),
+        )
+        ingestor.ingestObserverFrame(dispatchDelta, expectedGeneration = 1L)
+        assertTrue(ingestor.subagentCorrelator.revision > 0L)
+        assertTrue(ingestor.subagentCorrelator.snapshot().isNotEmpty())
+
         ingestor.reset()
         assertEquals(0L, ingestor.subagentCorrelator.revision)
+        assertTrue(ingestor.subagentCorrelator.snapshot().isEmpty())
     }
 }
