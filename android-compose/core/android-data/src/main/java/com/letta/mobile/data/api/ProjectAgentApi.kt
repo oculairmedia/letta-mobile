@@ -8,10 +8,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ProjectAgentApi @Inject constructor(
+class ProjectAgentApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) {
-    open suspend fun lookup(repo: String): PmAgentMetadata? {
+    suspend fun lookup(repo: String): PmAgentMetadata? {
         val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/api/agents/lookup") {
             url { parameters.append("repo", repo) }

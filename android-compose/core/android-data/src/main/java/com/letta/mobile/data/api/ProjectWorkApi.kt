@@ -57,10 +57,10 @@ data class ProjectIssueReasonRequest(
 )
 
 @Singleton
-open class ProjectWorkApi @Inject constructor(
+class ProjectWorkApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : ProjectWorkRemoteSource {
-    open override suspend fun getReadyWork(
+    override suspend fun getReadyWork(
         projectId: String,
         limit: Int?,
         cursor: String?,
@@ -73,7 +73,7 @@ open class ProjectWorkApi @Inject constructor(
         return response.bodyOrThrow()
     }
 
-    open override suspend fun listIssues(
+    override suspend fun listIssues(
         projectId: String,
         params: ProjectIssueListParams,
     ): ProjectIssueListResponse {
@@ -93,7 +93,7 @@ open class ProjectWorkApi @Inject constructor(
         return response.bodyOrThrow()
     }
 
-    open override suspend fun getIssueAnalytics(
+    override suspend fun getIssueAnalytics(
         projectId: String,
         params: ProjectIssueAnalyticsParams,
     ): IssueAnalyticsResponse {
@@ -135,13 +135,13 @@ open class ProjectWorkApi @Inject constructor(
         }
     }
 
-    open override suspend fun getIssue(issueId: String): ProjectIssueDetailResponse {
+    override suspend fun getIssue(issueId: String): ProjectIssueDetailResponse {
         val (client, baseUrl) = session()
         val response = client.get("$baseUrl/api/issues/$issueId")
         return response.bodyOrThrow()
     }
 
-    open override suspend fun claimIssue(
+    override suspend fun claimIssue(
         issueId: String,
         assignee: String,
         ifMatch: String,
@@ -152,7 +152,7 @@ open class ProjectWorkApi @Inject constructor(
         headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
-    open suspend fun claimIssue(
+    suspend fun claimIssue(
         issueId: String,
         request: ProjectIssueClaimRequest,
         headers: ProjectIssueMutationHeaders,
@@ -162,7 +162,7 @@ open class ProjectWorkApi @Inject constructor(
         body = request,
     )
 
-    open override suspend fun unclaimIssue(
+    override suspend fun unclaimIssue(
         issueId: String,
         ifMatch: String,
         idempotencyKey: String,
@@ -171,7 +171,7 @@ open class ProjectWorkApi @Inject constructor(
         headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
-    open suspend fun unclaimIssue(
+    suspend fun unclaimIssue(
         issueId: String,
         headers: ProjectIssueMutationHeaders,
     ): ProjectIssueMutationResponse = mutateIssue(
@@ -180,7 +180,7 @@ open class ProjectWorkApi @Inject constructor(
         body = EmptyMutationRequest,
     )
 
-    open override suspend fun updateIssueStatus(
+    override suspend fun updateIssueStatus(
         issueId: String,
         status: String,
         ifMatch: String,
@@ -191,7 +191,7 @@ open class ProjectWorkApi @Inject constructor(
         headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
-    open suspend fun updateIssueStatus(
+    suspend fun updateIssueStatus(
         issueId: String,
         request: ProjectIssueStatusRequest,
         headers: ProjectIssueMutationHeaders,
@@ -205,7 +205,7 @@ open class ProjectWorkApi @Inject constructor(
         return response.bodyOrThrow()
     }
 
-    open override suspend fun addIssueNote(
+    override suspend fun addIssueNote(
         issueId: String,
         note: String,
         ifMatch: String,
@@ -216,7 +216,7 @@ open class ProjectWorkApi @Inject constructor(
         headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
-    open suspend fun addIssueNote(
+    suspend fun addIssueNote(
         issueId: String,
         request: ProjectIssueNoteRequest,
         headers: ProjectIssueMutationHeaders,
@@ -226,7 +226,7 @@ open class ProjectWorkApi @Inject constructor(
         body = request,
     )
 
-    open override suspend fun closeIssue(
+    override suspend fun closeIssue(
         issueId: String,
         reason: String,
         ifMatch: String,
@@ -237,7 +237,7 @@ open class ProjectWorkApi @Inject constructor(
         headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
-    open suspend fun closeIssue(
+    suspend fun closeIssue(
         issueId: String,
         request: ProjectIssueReasonRequest,
         headers: ProjectIssueMutationHeaders,
@@ -247,7 +247,7 @@ open class ProjectWorkApi @Inject constructor(
         body = request,
     )
 
-    open override suspend fun reopenIssue(
+    override suspend fun reopenIssue(
         issueId: String,
         reason: String,
         ifMatch: String,
@@ -258,7 +258,7 @@ open class ProjectWorkApi @Inject constructor(
         headers = ProjectIssueMutationHeaders(ifMatch, idempotencyKey),
     )
 
-    open suspend fun reopenIssue(
+    suspend fun reopenIssue(
         issueId: String,
         request: ProjectIssueReasonRequest,
         headers: ProjectIssueMutationHeaders,

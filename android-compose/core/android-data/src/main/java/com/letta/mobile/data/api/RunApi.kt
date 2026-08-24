@@ -20,10 +20,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class RunApi @Inject constructor(
+class RunApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.RunRemoteSource {
-    open override suspend fun listRuns(params: RunListParams): List<Run> {
+    override suspend fun listRuns(params: RunListParams): List<Run> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/") {
@@ -47,7 +47,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveRun(runId: String): Run {
+    override suspend fun retrieveRun(runId: String): Run {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId")
@@ -57,7 +57,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listRunMessages(
+    override suspend fun listRunMessages(
         runId: String,
         before: String?,
         after: String?,
@@ -78,7 +78,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveRunUsage(runId: String): UsageStatistics {
+    override suspend fun retrieveRunUsage(runId: String): UsageStatistics {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId/usage")
@@ -88,7 +88,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveRunMetrics(runId: String): RunMetrics {
+    override suspend fun retrieveRunMetrics(runId: String): RunMetrics {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/runs/$runId/metrics")
@@ -98,7 +98,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listRunSteps(
+    override suspend fun listRunSteps(
         runId: String,
         before: String?,
         after: String?,
@@ -119,7 +119,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun cancelRun(agentId: String, runId: String): Map<String, String> {
+    override suspend fun cancelRun(agentId: String, runId: String): Map<String, String> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/agents/$agentId/messages/cancel") {
@@ -132,7 +132,7 @@ open class RunApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun deleteRun(runId: String) {
+    override suspend fun deleteRun(runId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/runs/$runId")

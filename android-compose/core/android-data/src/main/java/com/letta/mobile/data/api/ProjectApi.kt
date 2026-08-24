@@ -43,7 +43,7 @@ private data class ProjectMutationResponse(
 )
 
 @Singleton
-open class ProjectApi @Inject constructor(
+class ProjectApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : ProjectRemoteSource {
     /**
@@ -62,7 +62,7 @@ open class ProjectApi @Inject constructor(
      *     active-config change, so a recovered server flips the flag
      *     back to true on the next switch.
      */
-    open suspend fun probeAvailability(): Boolean {
+    suspend fun probeAvailability(): Boolean {
         val (client, baseUrl) = apiClient.session()
         return try {
             val response = client.get("$baseUrl/api/projects?limit=1")
@@ -76,7 +76,7 @@ open class ProjectApi @Inject constructor(
         }
     }
 
-    open override suspend fun listProjects(): ProjectCatalog {
+    override suspend fun listProjects(): ProjectCatalog {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/api/projects")
@@ -86,7 +86,7 @@ open class ProjectApi @Inject constructor(
         return response.body<ProjectCatalog>()
     }
 
-    open override suspend fun getProject(identifier: String): ProjectSummary {
+    override suspend fun getProject(identifier: String): ProjectSummary {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/api/projects/$identifier")
@@ -96,7 +96,7 @@ open class ProjectApi @Inject constructor(
         return response.body<ProjectDetailResponse>().project
     }
 
-    open override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
+    override suspend fun getBeadsRemoteStatus(identifier: String): BeadsRemoteStatus {
         val (client, baseUrl) = apiClient.session()
         val response = client.get("$baseUrl/api/projects/$identifier/beads-remote")
         if (response.status.value !in 200..299) {
@@ -105,7 +105,7 @@ open class ProjectApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse {
+    override suspend fun provisionBeadsRemote(identifier: String, push: Boolean): BeadsRemoteProvisionResponse {
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/projects/$identifier/beads-remote/provision") {
             contentType(ContentType.Application.Json)
@@ -117,7 +117,7 @@ open class ProjectApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
+    override suspend fun triggerSync(identifier: String): ProjectSyncTriggerResponse {
         val (client, baseUrl) = apiClient.session()
         val response = client.post("$baseUrl/api/sync/trigger") {
             contentType(ContentType.Application.Json)
@@ -129,7 +129,7 @@ open class ProjectApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun createProject(
+    override suspend fun createProject(
         name: String?,
         filesystemPath: String,
         gitUrl: String?,
@@ -141,7 +141,7 @@ open class ProjectApi @Inject constructor(
         ),
     )
 
-    open suspend fun createProject(request: ProjectCreateRequest): ProjectSummary {
+    suspend fun createProject(request: ProjectCreateRequest): ProjectSummary {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/api/registry/projects") {
@@ -154,7 +154,7 @@ open class ProjectApi @Inject constructor(
         return response.body<ProjectMutationResponse>().project
     }
 
-    open override suspend fun updateProject(
+    override suspend fun updateProject(
         identifier: String,
         filesystemPath: String?,
         gitUrl: String?,
@@ -166,7 +166,7 @@ open class ProjectApi @Inject constructor(
         ),
     )
 
-    open suspend fun updateProject(identifier: String, request: ProjectUpdateRequest): ProjectSummary {
+    suspend fun updateProject(identifier: String, request: ProjectUpdateRequest): ProjectSummary {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/api/registry/projects/$identifier") {
@@ -179,14 +179,14 @@ open class ProjectApi @Inject constructor(
         return response.body<ProjectMutationResponse>().project
     }
 
-    open override suspend fun archiveProject(identifier: String): ProjectSummary {
+    override suspend fun archiveProject(identifier: String): ProjectSummary {
         return updateProject(
             identifier = identifier,
             request = ProjectUpdateRequest(status = "archived"),
         )
     }
 
-    open override suspend fun deleteProject(identifier: String) {
+    override suspend fun deleteProject(identifier: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/api/registry/projects/$identifier")

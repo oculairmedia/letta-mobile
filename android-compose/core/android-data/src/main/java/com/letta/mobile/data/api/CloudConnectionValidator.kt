@@ -18,7 +18,7 @@ sealed interface CloudConnectionValidationResult {
 }
 
 @Singleton
-open class CloudConnectionValidator @Inject constructor() {
+class CloudConnectionValidator @Inject constructor() {
     private val client: HttpClient by lazy {
         HttpClient(OkHttp) {
             install(HttpTimeout) {
@@ -30,7 +30,7 @@ open class CloudConnectionValidator @Inject constructor() {
         }
     }
 
-    open suspend fun validate(
+    suspend fun validate(
         baseUrl: String,
         apiToken: String,
     ): CloudConnectionValidationResult = withContext(Dispatchers.IO) {

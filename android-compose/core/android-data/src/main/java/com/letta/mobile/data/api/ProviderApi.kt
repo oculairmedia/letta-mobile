@@ -18,10 +18,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ProviderApi @Inject constructor(
+class ProviderApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.ProviderRemoteSource {
-    open override suspend fun listProviders(
+    override suspend fun listProviders(
         before: String?,
         after: String?,
         limit: Int?,
@@ -45,7 +45,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveProvider(providerId: String): Provider {
+    override suspend fun retrieveProvider(providerId: String): Provider {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/providers/$providerId")
@@ -55,7 +55,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun createProvider(params: ProviderCreateParams): Provider {
+    override suspend fun createProvider(params: ProviderCreateParams): Provider {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/") {
@@ -68,7 +68,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
+    override suspend fun updateProvider(providerId: String, params: ProviderUpdateParams): Provider {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/providers/$providerId") {
@@ -81,7 +81,7 @@ open class ProviderApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun checkProvider(params: ProviderCheckParams) {
+    override suspend fun checkProvider(params: ProviderCheckParams) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/check") {
@@ -93,7 +93,7 @@ open class ProviderApi @Inject constructor(
         }
     }
 
-    open override suspend fun checkExistingProvider(providerId: String) {
+    override suspend fun checkExistingProvider(providerId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/providers/$providerId/check")
@@ -102,7 +102,7 @@ open class ProviderApi @Inject constructor(
         }
     }
 
-    open override suspend fun deleteProvider(providerId: String) {
+    override suspend fun deleteProvider(providerId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/providers/$providerId")

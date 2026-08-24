@@ -20,10 +20,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ArchiveApi @Inject constructor(
+class ArchiveApi @Inject constructor(
     private val apiClient: LettaApiClient,
 ) : com.letta.mobile.data.repository.api.ArchiveRemoteSource {
-    open override suspend fun listArchives(params: ArchiveListParams): List<Archive> {
+    override suspend fun listArchives(params: ArchiveListParams): List<Archive> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/archives/") {
@@ -40,7 +40,7 @@ open class ArchiveApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun retrieveArchive(archiveId: String): Archive {
+    override suspend fun retrieveArchive(archiveId: String): Archive {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/archives/$archiveId")
@@ -50,7 +50,7 @@ open class ArchiveApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun createArchive(params: ArchiveCreateParams): Archive {
+    override suspend fun createArchive(params: ArchiveCreateParams): Archive {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/archives/") {
@@ -63,7 +63,7 @@ open class ArchiveApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun updateArchive(archiveId: String, params: ArchiveUpdateParams): Archive {
+    override suspend fun updateArchive(archiveId: String, params: ArchiveUpdateParams): Archive {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/archives/$archiveId") {
@@ -76,7 +76,7 @@ open class ArchiveApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun deleteArchive(archiveId: String): Archive {
+    override suspend fun deleteArchive(archiveId: String): Archive {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/archives/$archiveId")
@@ -86,7 +86,7 @@ open class ArchiveApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun listAgentsForArchive(params: ArchiveAgentsListParams): List<Agent> {
+    override suspend fun listAgentsForArchive(params: ArchiveAgentsListParams): List<Agent> {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/archives/${params.archiveId}/agents") {
@@ -101,7 +101,7 @@ open class ArchiveApi @Inject constructor(
         return response.body()
     }
 
-    open override suspend fun deletePassageFromArchive(archiveId: String, passageId: String) {
+    override suspend fun deletePassageFromArchive(archiveId: String, passageId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/archives/$archiveId/passages/$passageId")

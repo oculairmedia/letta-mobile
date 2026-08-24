@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * sharedLogic; this class wires Android storage only.
  */
 @Singleton
-open class SettingsRepository @Inject constructor(
+class SettingsRepository @Inject constructor(
     dataStore: DataStore<Preferences>,
     secureSettingsStore: SecureSettingsStore,
     backendSwitchInvalidator: Provider<BackendSwitchInvalidator>,

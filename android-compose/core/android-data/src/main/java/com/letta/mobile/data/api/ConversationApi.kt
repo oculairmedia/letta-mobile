@@ -10,10 +10,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ConversationApi @Inject constructor(
+class ConversationApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) : ConversationRemoteSource {
-    open override suspend fun listConversations(
+    override suspend fun listConversations(
         agentId: AgentId?,
         limit: Int?,
         after: String?,
@@ -39,7 +39,7 @@ open class ConversationApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun listConversations(
+    suspend fun listConversations(
         agentId: String? = null,
         limit: Int? = null,
         after: String? = null,
@@ -49,7 +49,7 @@ open class ConversationApi @Inject constructor(
         orderBy: String? = null,
     ): List<Conversation> = listConversations(agentId?.let(::AgentId), limit, after, archiveStatus, summarySearch, order, orderBy)
 
-    open suspend fun getConversation(conversationId: ConversationId): Conversation {
+    suspend fun getConversation(conversationId: ConversationId): Conversation {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/conversations/${conversationId.value}")
@@ -59,9 +59,9 @@ open class ConversationApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun getConversation(conversationId: String): Conversation = getConversation(ConversationId(conversationId))
+    suspend fun getConversation(conversationId: String): Conversation = getConversation(ConversationId(conversationId))
 
-    open suspend fun createConversation(params: ConversationCreateParams): Conversation {
+    suspend fun createConversation(params: ConversationCreateParams): Conversation {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations") {
@@ -75,7 +75,7 @@ open class ConversationApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateConversation(conversationId: ConversationId, params: ConversationUpdateParams): Conversation {
+    suspend fun updateConversation(conversationId: ConversationId, params: ConversationUpdateParams): Conversation {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/conversations/${conversationId.value}") {
@@ -88,10 +88,10 @@ open class ConversationApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateConversation(conversationId: String, params: ConversationUpdateParams): Conversation =
+    suspend fun updateConversation(conversationId: String, params: ConversationUpdateParams): Conversation =
         updateConversation(ConversationId(conversationId), params)
 
-    open suspend fun deleteConversation(conversationId: ConversationId) {
+    suspend fun deleteConversation(conversationId: ConversationId) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/conversations/${conversationId.value}")
@@ -100,9 +100,9 @@ open class ConversationApi @Inject constructor(
         }
     }
 
-    open suspend fun deleteConversation(conversationId: String) = deleteConversation(ConversationId(conversationId))
+    suspend fun deleteConversation(conversationId: String) = deleteConversation(ConversationId(conversationId))
 
-    open suspend fun forkConversation(conversationId: ConversationId, agentId: AgentId? = null): Conversation {
+    suspend fun forkConversation(conversationId: ConversationId, agentId: AgentId? = null): Conversation {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/${conversationId.value}/fork") {
@@ -115,10 +115,10 @@ open class ConversationApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun forkConversation(conversationId: String, agentId: String? = null): Conversation =
+    suspend fun forkConversation(conversationId: String, agentId: String? = null): Conversation =
         forkConversation(ConversationId(conversationId), agentId?.let(::AgentId))
 
-    open suspend fun cancelConversation(conversationId: ConversationId, agentId: AgentId? = null) {
+    suspend fun cancelConversation(conversationId: ConversationId, agentId: AgentId? = null) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/conversations/${conversationId.value}/cancel") {
@@ -130,10 +130,10 @@ open class ConversationApi @Inject constructor(
         }
     }
 
-    open suspend fun cancelConversation(conversationId: String, agentId: String? = null) =
+    suspend fun cancelConversation(conversationId: String, agentId: String? = null) =
         cancelConversation(ConversationId(conversationId), agentId?.let(::AgentId))
 
-    open suspend fun recompileConversation(
+    suspend fun recompileConversation(
         conversationId: ConversationId,
         dryRun: Boolean = false,
         agentId: AgentId? = null,
@@ -155,6 +155,6 @@ open class ConversationApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun recompileConversation(conversationId: String, dryRun: Boolean = false, agentId: String? = null): String =
+    suspend fun recompileConversation(conversationId: String, dryRun: Boolean = false, agentId: String? = null): String =
         recompileConversation(ConversationId(conversationId), dryRun, agentId?.let(::AgentId))
 }

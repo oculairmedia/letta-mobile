@@ -9,10 +9,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-open class ToolApi @Inject constructor(
+class ToolApi @Inject constructor(
     private val apiClient: LettaApiClient
 ) {
-    open suspend fun listTools(
+    suspend fun listTools(
         tags: List<String>? = null,
         limit: Int? = null,
         offset: Int? = null
@@ -30,7 +30,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun getTool(toolId: String): Tool {
+    suspend fun getTool(toolId: String): Tool {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/tools/$toolId")
@@ -40,7 +40,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun countTools(): Int {
+    suspend fun countTools(): Int {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.get("$baseUrl/v1/tools/count")
@@ -50,7 +50,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun createTool(params: ToolCreateParams): Tool {
+    suspend fun createTool(params: ToolCreateParams): Tool {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/tools") {
@@ -63,7 +63,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun upsertTool(params: ToolCreateParams): Tool {
+    suspend fun upsertTool(params: ToolCreateParams): Tool {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.put("$baseUrl/v1/tools") {
@@ -76,7 +76,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
+    suspend fun updateTool(toolId: String, params: ToolUpdateParams): Tool {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/tools/$toolId") {
@@ -89,7 +89,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun generateJsonSchema(params: ToolSchemaGenerateParams): kotlinx.serialization.json.JsonObject {
+    suspend fun generateJsonSchema(params: ToolSchemaGenerateParams): kotlinx.serialization.json.JsonObject {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.post("$baseUrl/v1/tools/generate-schema") {
@@ -102,7 +102,7 @@ open class ToolApi @Inject constructor(
         return response.body()
     }
 
-    open suspend fun deleteTool(toolId: String) {
+    suspend fun deleteTool(toolId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.delete("$baseUrl/v1/tools/$toolId")
@@ -111,7 +111,7 @@ open class ToolApi @Inject constructor(
         }
     }
 
-    open suspend fun attachTool(agentId: String, toolId: String) {
+    suspend fun attachTool(agentId: String, toolId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/tools/attach/$toolId") {
@@ -122,7 +122,7 @@ open class ToolApi @Inject constructor(
         }
     }
 
-    open suspend fun detachTool(agentId: String, toolId: String) {
+    suspend fun detachTool(agentId: String, toolId: String) {
         val (client, baseUrl) = apiClient.session()
 
         val response = client.patch("$baseUrl/v1/agents/$agentId/tools/detach/$toolId") {
