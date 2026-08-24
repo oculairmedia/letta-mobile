@@ -209,56 +209,96 @@ class IrohChannelTransport(
     internal val isObserverIngesting: Boolean get() = observerIngestor.isIngesting
 
     private var explicitConfig: IrohConnectConfig? = null
+
+    private val irohDialer = IrohDialer(
+        scope = scope,
+        secretKeyStore = secretKeyStore,
+        onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
+        onCloseResources = ::handleCloseResources,
+    )
+
     // Explicit type: this field and `livenessProbe` reference each other through
     // their lambdas, which defeats type inference.
     private val supervisor: IrohConnectionSupervisor = IrohConnectionSupervisor(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
-        dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
-        onStateChanged = { supervisorState ->
-            _state.value = supervisorState.toChannelTransportState()
-            if (supervisorState is IrohConnectionState.Ready) {
-                val generation = connectionGeneration.incrementAndGet()
-                notifyRedialIfTurnActive()
-                // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
-                // bound to THIS connection generation. Any prior collector (tied to
-                // an older, now-dead flow) is cancelled first so a stale collector
-                // never ingests from a torn-down transport.
-                observerIngestor.start(supervisorState.handle, generation)
-                // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
-                // redial after a QUIC timeout — re-register this connection as a
-                // viewer of the currently-viewed conversation.
-                observerIngestor.reSubscribeViewedConversation(generation)
-                // letta-mobile-wxy4s: arm the application-level liveness probe for
-                // THIS connection generation.
-                livenessProbe.start(supervisorState.handle)
-            } else {
-                connectionGeneration.incrementAndGet()
-                // Snapshot turn identity before a degraded handle is closed and
-                // its send jobs drop their entries from activeTurns. Intentional
-                // disconnects and config replacement must not synthesize redial
-                // recovery.
-                if (supervisorState is IrohConnectionState.Degraded && supervisorState.reason != "config_changed") {
-                    turnRegistry.rememberInterruptedTurns()
-                } else if (supervisorState is IrohConnectionState.Degraded) {
-                    turnRegistry.clearInterruptedTurns()
-                }
-                // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
-                // stops observer ingestion. On redial a fresh Ready fires and the
-                // collector restarts against the new handle above.
-                observerIngestor.stop("state:${supervisorState::class.simpleName}")
-                // letta-mobile-wxy4s: the probe is pinned to a Ready handle; any
-                // non-Ready transition disarms it. A fresh Ready re-arms it above.
-                livenessProbe.stop("state:${supervisorState::class.simpleName}")
-            }
-        },
+        dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
+        onStateChanged = ::handleSupervisorStateChanged,
     )
+
+    private fun handleCloseResources(reason: String) {
+        turnRegistry.allSendJobEntries().forEach { (conversationId, _) ->
+            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
+            val turn = turnRegistry.getActiveTurn(conversationId)
+            if (turn != null && !turn.hasTerminal) {
+                Telemetry.event(
+                    "IrohTransport", "turn.torn_down_nonterminal",
+                    "reason" to reason,
+                    "conversationId" to conversationId,
+                    "turnId" to turn.turnId,
+                    "runId" to turn.runId,
+                )
+            }
+            runCatching { job.cancel() }
+        }
+    }
+
+    private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
+        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
+        return irohDialer.dial(
+            config = config,
+            effectiveUrlOverride = forcedUrl,
+            onConnecting = {
+                _state.value = ChannelTransportState.Connecting()
+                onConnect()
+            },
+        )
+    }
+
+    private fun handleSupervisorStateChanged(supervisorState: IrohConnectionState) {
+        _state.value = supervisorState.toChannelTransportState()
+        if (supervisorState is IrohConnectionState.Ready) {
+            handleReadyState(supervisorState)
+        } else {
+            handleNonReadyState(supervisorState)
+        }
+    }
+
+    private fun handleReadyState(supervisorState: IrohConnectionState.Ready) {
+        val generation = connectionGeneration.incrementAndGet()
+        notifyRedialIfTurnActive()
+        observerIngestor.start(supervisorState.handle, generation)
+        observerIngestor.reSubscribeViewedConversation(generation)
+        livenessProbe.start(supervisorState.handle)
+    }
+
+    private fun handleNonReadyState(supervisorState: IrohConnectionState) {
+        connectionGeneration.incrementAndGet()
+        if (supervisorState is IrohConnectionState.Degraded && supervisorState.reason != "config_changed") {
+            turnRegistry.rememberInterruptedTurns()
+        } else if (supervisorState is IrohConnectionState.Degraded) {
+            turnRegistry.clearInterruptedTurns()
+        }
+        val reason = "state:${supervisorState::class.simpleName}"
+        observerIngestor.stop(reason)
+        livenessProbe.stop(reason)
+    }
 
     // letta-mobile-53k65.10: Generation-scoped Admin RPC executor and retry state.
     private val adminRpcExecutor = IrohAdminRpcExecutor(
         supervisor = supervisor,
         connectionGeneration = { connectionGeneration.value },
         recordViewedConversation = { method, path -> observerIngestor.recordViewedConversationFrom(method, path) },
+    )
+
+    private val cronRpcClient = IrohCronRpcClient(
+        adminRpc = { method, path, body -> adminRpc(method, path, body) },
+    )
+
+    private val subagentRpcClient = IrohSubagentRpcClient(
+        readyHandle = { supervisor.ready() },
+        currentScope = { observerIngestor.currentSubagentScope() },
+        adminRpc = { method, path, body -> adminRpc(method, path, body) },
     )
 
     /**
@@ -359,90 +399,6 @@ class IrohChannelTransport(
         supervisor.refreshConfig()
         val handle = supervisor.ready()
         Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
-    }
-
-    private suspend fun dial(config: IrohConnectConfig): IrohConnectionHandle {
-        val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
-            ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
-            ?: config.baseShimUrl
-        if (!isIrohUrl(effectiveUrl)) {
-            error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
-        }
-        val ticket = normalizeIrohAddress(effectiveUrl).takeIf { it.isNotBlank() }
-            ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
-        _state.value = ChannelTransportState.Connecting()
-        onConnect()
-        val secretKey = secretKeyStore.loadOrCreate()
-        val localEndpoint = runCatching {
-            Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey)
-            )
-        }.onFailure { t ->
-            Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
-        }.getOrThrow()
-        var transport: IrohAppServerTransport? = null
-        // letta-mobile-r3i1z: attribute this connection's loss reports to the
-        // handle produced by THIS dial. A dead transport reports loss up to
-        // twice (close watcher + reader exit) and the second report can land
-        // after the supervisor has already redialed; attribution lets the
-        // supervisor drop such stale reports instead of tearing down the
-        // healthy redialed connection (and its observer-ingestion collector).
-        val dialedHandle = java.util.concurrent.atomic.AtomicReference<IrohConnectionHandle?>(null)
-        return runCatching {
-            transport = IrohAppServerTransportAdapter(
-                endpoint = localEndpoint,
-                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason, dialedHandle.get()) },
-            ).createTransport(
-                endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
-                scope = scope,
-            ) as IrohAppServerTransport
-            val appServerClient = DefaultAppServerClient(transport!!)
-            // The auth exchange doubles as the Iroh transport handshake: it
-            // advertises client capabilities (frame_part chunked-frame
-            // reassembly) so the server may split >1MiB frames instead of
-            // failing them. Send it even with a blank token — servers without
-            // a required token still ack and record capabilities.
-            val auth = appServerClient.auth(
-                AppServerCommand.Auth(
-                    requestId = "auth-${UUID.randomUUID()}",
-                    token = config.token,
-                    capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
-                ),
-            )
-            if (!auth.success && config.token.isNotBlank()) {
-                throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
-            }
-            Telemetry.event(
-                "IrohTransport", "auth.negotiated",
-                "success" to auth.success,
-                "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
-            )
-            // Preflight stays on the Iroh *node* / wrapper turn engine (WS to
-            // App Server). Client-side preflight would send agent_retrieve /
-            // conversation_messages_list as typed control frames; the node only
-            // accepts auth/runtime_start/input/admin_rpc/sync/abort.
-            transport!!.awaitConnectionReady()
-            val (engine, eventRouter) = buildIrohTurnEngine(
-                client = appServerClient,
-                clientVersion = config.clientVersion,
-                routerScope = scope,
-            )
-            IrohConnectionHandle(
-                config = config,
-                ticket = ticket,
-                sessionId = ticket.hashCode().toString(),
-                transport = transport,
-                turnEngine = engine,
-                serverCapabilities = auth.capabilities?.toSet(),
-                close = { reason ->
-                    eventRouter.detach()
-                    closeIrohResources(reason, transport, localEndpoint)
-                },
-            ).also { handle -> dialedHandle.set(handle) }
-        }.getOrElse { error ->
-            closeIrohResources("dial_failed", transport, localEndpoint)
-            throw error
-        }
     }
 
     override fun send(
@@ -939,61 +895,6 @@ class IrohChannelTransport(
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
 
-    private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
-        Telemetry.event(
-            "IrohTrace", "transport.closeCurrent",
-            "reason" to reason,
-            "hasTransport" to (transport != null),
-            "hasEndpoint" to (endpoint != null),
-        )
-        // letta-mobile-or40x: a full teardown legitimately cancels EVERY
-        // conversation's turn — the connection those turns stream over is gone.
-        // Do it explicitly over all keyed entries (not via one global slot), and
-        // report each nonterminal casualty (SENSING b) so a teardown that eats an
-        // in-flight turn is never silent again.
-        turnRegistry.allSendJobEntries().forEach { (conversationId, _) ->
-            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
-            val turn = turnRegistry.getActiveTurn(conversationId)
-            if (turn != null && !turn.hasTerminal) {
-                Telemetry.event(
-                    "IrohTransport", "turn.torn_down_nonterminal",
-                    "reason" to reason,
-                    "conversationId" to conversationId,
-                    "turnId" to turn.turnId,
-                    "runId" to turn.runId,
-                )
-            }
-            runCatching { job.cancel() }
-        }
-        runCatching { transport?.close() }
-        runCatching { endpoint?.shutdown() }
-        runCatching { endpoint?.close() }
-    }
-
-    /**
-     * lgns8.22.3: one inbound collector per dial generation; turns subscribe via
-     * fanout instead of collecting [AppServerClient.events] directly.
-     */
-    private fun buildIrohTurnEngine(
-        client: DefaultAppServerClient,
-        clientVersion: String,
-        routerScope: CoroutineScope,
-    ): Pair<AppServerTurnEngine, AppServerRuntimeEventRouter> {
-        val eventRouter = AppServerRuntimeEventRouter()
-        eventRouter.attach(routerScope, client.events)
-        val engine = AppServerTurnEngine(
-            client = client,
-            clientInfo = AppServerRuntimeStartClientInfo(
-                name = "letta-mobile-android-iroh",
-                version = clientVersion,
-            ),
-            permissionMode = AppServerPermissionMode.Unrestricted,
-            turnContextPreflight = TurnContextPreflight.None,
-            eventRouter = eventRouter,
-        )
-        return engine to eventRouter
-    }
-
     private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
         IrohConnectionState.Disconnected -> ChannelTransportState.Idle
         IrohConnectionState.Dialing,
@@ -1011,300 +912,29 @@ class IrohChannelTransport(
         IrohConnectionState.Closed -> ChannelTransportState.Disconnected(1000, "closed")
     }
 
-    // lgns8: cron scheduling over admin_rpc. The native CronAdminHandlers already
-    // serve cron.list/add/get/delete/delete_all against the live App Server; the
-    // Iroh transport just bridges the IChannelTransport surface onto those methods
-    // (dispatch is by method name — CRON_ADMIN_PATH is a stable cosmetic hint,
-    // cron is native-only with no proxy fallback). Field mapping mirrors the native
-    // AppServerCommand.CronAdd contract: a one-off `at` maps to `scheduled_for`;
-    // there is no native interval (`every`) field, so an every-only add reaches the
-    // handler without a `cron` and is rejected there with a clear error rather than
-    // silently dropped.
-    override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse {
-        val requestId = "iroh-cron-list-${UUID.randomUUID()}"
-        return cronInvoke(
-            op = "cron.list",
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            body = buildJsonObject {
-                agentId?.let { put("agent_id", it) }
-                conversationId?.let { put("conversation_id", it) }
-            },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<CronListRpcResult>(result)
-                ServerFrame.CronListResponse(id = frameId("cron_list"), ts = nowIso(), requestId = requestId, success = true, tasks = decoded.tasks)
-            },
-            onFailure = ::cronListFailure,
-        )
-    }
+    override suspend fun sendCronList(agentId: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronListResponse =
+        cronRpcClient.sendCronList(agentId, conversationId, timeoutMs)
 
-    override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronAddResponse {
-        val requestId = "iroh-cron-add-${UUID.randomUUID()}"
-        return cronInvoke(
-            op = "cron.add",
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            body = buildJsonObject {
-                put("agent_id", agentId)
-                put("name", name)
-                put("description", description)
-                put("prompt", prompt)
-                put("recurring", recurring)
-                cron?.let { put("cron", it) }
-                timezone?.let { put("timezone", it) }
-                conversationId?.let { put("conversation_id", it) }
-                // Native contract has no `every`; a one-off time is `scheduled_for`.
-                at?.let { put("scheduled_for", it) }
-            },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
-                ServerFrame.CronAddResponse(id = frameId("cron_add"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task, warning = decoded.warning)
-            },
-            onFailure = ::cronAddFailure,
-        )
-    }
+    override suspend fun sendCronAdd(agentId: String, name: String, description: String, prompt: String, recurring: Boolean, cron: String?, every: String?, at: String?, timezone: String?, conversationId: String?, timeoutMs: Long): ServerFrame.CronAddResponse =
+        cronRpcClient.sendCronAdd(agentId, name, description, prompt, recurring, cron, every, at, timezone, conversationId, timeoutMs)
 
-    override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse {
-        val requestId = "iroh-cron-get-${UUID.randomUUID()}"
-        return cronInvoke(
-            op = "cron.get",
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            body = buildJsonObject { put("task_id", taskId) },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<CronMutationRpcResult>(result)
-                ServerFrame.CronGetResponse(id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = true, task = decoded.task)
-            },
-            onFailure = ::cronGetFailure,
-        )
-    }
+    override suspend fun sendCronGet(taskId: String, timeoutMs: Long): ServerFrame.CronGetResponse =
+        cronRpcClient.sendCronGet(taskId, timeoutMs)
 
-    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse {
-        val requestId = "iroh-cron-delete-${UUID.randomUUID()}"
-        return cronInvoke(
-            op = "cron.delete",
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            body = buildJsonObject { put("task_id", taskId) },
-            mapSuccess = { _ ->
-                ServerFrame.CronDeleteResponse(id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = true)
-            },
-            onFailure = ::cronDeleteFailure,
-        )
-    }
+    override suspend fun sendCronDelete(taskId: String, timeoutMs: Long): ServerFrame.CronDeleteResponse =
+        cronRpcClient.sendCronDelete(taskId, timeoutMs)
 
-    override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse {
-        val requestId = "iroh-cron-delete-all-${UUID.randomUUID()}"
-        return cronInvoke(
-            op = "cron.delete_all",
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            body = buildJsonObject { put("agent_id", agentId) },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<CronDeleteAllRpcResult>(result)
-                ServerFrame.CronDeleteAllResponse(id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = true, count = decoded.deleted)
-            },
-            onFailure = ::cronDeleteAllFailure,
-        )
-    }
-    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse {
-        val requestId = "iroh-subagent-list-${UUID.randomUUID()}"
-        val scope = currentSubagentScope()
-            ?: return subagentListFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
-        return invokeScopedRpc(
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            labels = ScopedRpcLabels(
-                unsupported = SUBAGENT_RPC_UNSUPPORTED,
-                timedOut = "subagent.list timed out",
-                failed = "subagent.list failed",
-            ),
-            call = {
-                callScopedSubagentRpc(
-                    method = "subagent.list",
-                    scope = scope,
-                    body = buildJsonObject { put("all", all) }.toString(),
-                )
-            },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<SubagentListRpcResult>(result)
-                ServerFrame.SubagentListResponse(
-                    id = frameId("subagent_list"),
-                    ts = nowIso(),
-                    requestId = requestId,
-                    success = true,
-                    subagents = decoded.subagents,
-                )
-            },
-            onFailure = ::subagentListFailure,
-        )
-    }
+    override suspend fun sendCronDeleteAll(agentId: String, timeoutMs: Long): ServerFrame.CronDeleteAllResponse =
+        cronRpcClient.sendCronDeleteAll(agentId, timeoutMs)
 
-    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse {
-        val requestId = "iroh-subagent-todos-${UUID.randomUUID()}"
-        val scope = currentSubagentScope()
-            ?: return subagentTodosFailure(requestId, "subagent scope unavailable; hydrate a conversation first")
-        return invokeScopedRpc(
-            requestId = requestId,
-            timeoutMs = timeoutMs,
-            labels = ScopedRpcLabels(
-                unsupported = SUBAGENT_RPC_UNSUPPORTED,
-                timedOut = "subagent.todos timed out",
-                failed = "subagent.todos failed",
-            ),
-            call = {
-                callScopedSubagentRpc(
-                    method = "subagent.todos",
-                    scope = scope,
-                    body = buildJsonObject { put("tool_call_id", toolCallId) }.toString(),
-                )
-            },
-            mapSuccess = { result ->
-                val decoded = subagentJson.decodeFromJsonElement<SubagentTodosRpcResult>(result)
-                ServerFrame.SubagentTodosResponse(
-                    id = frameId("subagent_todos"),
-                    ts = nowIso(),
-                    requestId = requestId,
-                    success = true,
-                    found = decoded.found,
-                    subagent = decoded.subagent,
-                    todos = decoded.todos,
-                    todosFound = decoded.todosFound,
-                )
-            },
-            onFailure = ::subagentTodosFailure,
-        )
-    }
+    override suspend fun sendSubagentList(all: Boolean, timeoutMs: Long): ServerFrame.SubagentListResponse =
+        subagentRpcClient.sendSubagentList(all, timeoutMs)
 
-    private data class ScopedRpcLabels(
-        val unsupported: String,
-        val timedOut: String,
-        val failed: String,
-    )
-
-    private suspend fun <T> invokeScopedRpc(
-        requestId: String,
-        timeoutMs: Long,
-        labels: ScopedRpcLabels,
-        call: suspend () -> AppServerInboundFrame.AdminRpcResponse?,
-        mapSuccess: (JsonElement) -> T,
-        onFailure: (String, String) -> T,
-    ): T = try {
-        withTimeoutOrNull(timeoutMs.milliseconds) {
-            val response = call() ?: return@withTimeoutOrNull onFailure(requestId, labels.unsupported)
-            if (!response.success) return@withTimeoutOrNull onFailure(requestId, response.error ?: labels.failed)
-            val result = response.result ?: return@withTimeoutOrNull onFailure(requestId, "${labels.failed}: no result")
-            mapSuccess(result)
-        } ?: onFailure(requestId, labels.timedOut)
-    } catch (cancelled: CancellationException) {
-        throw cancelled
-    } catch (error: Exception) {
-        onFailure(requestId, error.message ?: labels.failed)
-    }
-
-    private suspend fun callScopedSubagentRpc(
-        method: String,
-        scope: SubagentRpcScope,
-        body: String,
-    ): AppServerInboundFrame.AdminRpcResponse? {
-        val handle = supervisor.ready()
-        val advertised = handle.serverCapabilities
-        if (advertised != null && SUBAGENT_RPC_CAPABILITY !in advertised) return null
-        val scopedBody = buildJsonObject {
-            put("conversation_id", scope.conversationId)
-            scope.agentId?.let { put("agent_id", it) }
-            subagentJson.parseToJsonElement(body).jsonObject.forEach { (key, value) -> put(key, value) }
-        }.toString()
-        val response = adminRpc(method, "/v1/conversations/${scope.conversationId}/subagents", scopedBody)
-        return response.takeUnless {
-            !it.success && AdminRpcErrors.isUnknownMethod(it.error)
-        }
-    }
-
-    private fun currentSubagentScope(): SubagentRpcScope? = observerIngestor.currentSubagentScope()
-
-    private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(
-        id = frameId("subagent_list"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
-
-    private fun subagentTodosFailure(requestId: String, error: String) = ServerFrame.SubagentTodosResponse(
-        id = frameId("subagent_todos"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
-
-    /** Shared scoped-RPC labels for the cron.* bridge methods (op = the admin_rpc method). */
-    private fun cronLabels(op: String) = ScopedRpcLabels(
-        unsupported = CRON_RPC_UNSUPPORTED,
-        timedOut = "$op timed out",
-        failed = "$op failed",
-    )
-
-    /**
-     * Shared cron.* bridge invocation: run [op] over admin_rpc with [body] and map
-     * the result / typed failure. Collapses the per-method invokeScopedRpc + labels
-     * + adminRpc boilerplate so each sendCron* is just its body + result mapping.
-     */
-    private suspend fun <T> cronInvoke(
-        op: String,
-        requestId: String,
-        timeoutMs: Long,
-        body: JsonObject,
-        mapSuccess: (JsonElement) -> T,
-        onFailure: (String, String) -> T,
-    ): T = invokeScopedRpc(
-        requestId = requestId,
-        timeoutMs = timeoutMs,
-        labels = cronLabels(op),
-        call = { adminRpc(method = op, path = CRON_ADMIN_PATH, body = body.toString()) },
-        mapSuccess = mapSuccess,
-        onFailure = onFailure,
-    )
-
-    private fun cronListFailure(requestId: String, error: String) = ServerFrame.CronListResponse(
-        id = frameId("cron_list"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
-
-    private fun cronAddFailure(requestId: String, error: String) = ServerFrame.CronAddResponse(
-        id = frameId("cron_add"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
-
-    private fun cronGetFailure(requestId: String, error: String) = ServerFrame.CronGetResponse(
-        id = frameId("cron_get"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
-
-    private fun cronDeleteFailure(requestId: String, error: String) = ServerFrame.CronDeleteResponse(
-        id = frameId("cron_delete"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
-
-    private fun cronDeleteAllFailure(requestId: String, error: String) = ServerFrame.CronDeleteAllResponse(
-        id = frameId("cron_delete_all"), ts = nowIso(), requestId = requestId, success = false, error = error,
-    )
+    override suspend fun sendSubagentTodos(toolCallId: String, timeoutMs: Long): ServerFrame.SubagentTodosResponse =
+        subagentRpcClient.sendSubagentTodos(toolCallId, timeoutMs)
 
     private fun frameId(prefix: String): String = "$prefix-${UUID.randomUUID()}"
-    private fun nowIso(): String = Instant.now().toString()
-
-    @Serializable
-    private data class SubagentListRpcResult(val subagents: List<SubagentEntry> = emptyList())
-
-    @Serializable
-    private data class SubagentTodosRpcResult(
-        val found: Boolean = false,
-        val subagent: SubagentEntry? = null,
-        val todos: List<SubagentTodo> = emptyList(),
-        @SerialName("todos_found") val todosFound: Boolean = false,
-    )
-
-    @Serializable
-    private data class CronListRpcResult(val tasks: List<CronTask> = emptyList())
-
-    @Serializable
-    private data class CronMutationRpcResult(
-        val found: Boolean = false,
-        val task: CronTask? = null,
-        val warning: String? = null,
-    )
-
-    @Serializable
-    private data class CronDeleteAllRpcResult(val deleted: Long = 0L)
+    private fun nowIso(): String = java.time.Instant.now().toString()
 
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
@@ -1322,15 +952,6 @@ class IrohChannelTransport(
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
-        private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
-        private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
-        // Cron dispatch is by admin_rpc method name; this path is a stable cosmetic
-        // hint (cron is native-only, no proxy fallback consumes it).
-        private const val CRON_ADMIN_PATH = "/v1/cron"
-        private val subagentJson = Json { ignoreUnknownKeys = true }
-        // letta-mobile-34xoj: admin_rpc retry thresholds
-        private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
-        private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
         // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
