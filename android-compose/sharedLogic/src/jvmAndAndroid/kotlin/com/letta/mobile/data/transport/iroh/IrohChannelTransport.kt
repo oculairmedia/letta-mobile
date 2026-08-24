@@ -122,7 +122,7 @@ class IrohChannelTransport(
      *  WsChatBridge (via frameEvents) see each frame exactly once without split histories. */
     private suspend fun emitBoth(frame: ServerFrame) {
         // letta-mobile-34xoj: record stream activity to prevent premature reconnect
-        adminRpcRetryState.recordStreamActivity()
+        adminRpcExecutor.recordStreamActivity()
         Telemetry.event(
             "IrohGate", "gate1.emitBoth",
             "frame" to (frame::class.simpleName ?: ""),
@@ -196,14 +196,52 @@ class IrohChannelTransport(
     private var lastEmittedSubagentRevision: Long = 0L
 
     private var explicitConfig: IrohConnectConfig? = null
+
+    private val irohDialer = IrohDialer(
+        scope = scope,
+        secretKeyStore = secretKeyStore,
+        onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
+        onCloseResources = ::handleCloseResources,
+    )
+
     // Explicit type: this field and `livenessProbe` reference each other through
     // their lambdas, which defeats type inference.
     private val supervisor: IrohConnectionSupervisor = IrohConnectionSupervisor(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
-        dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
+        dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
         onStateChanged = ::handleSupervisorStateChange,
     )
+
+    private fun handleCloseResources(reason: String) {
+        turnRegistry.allSendJobEntries().forEach { registration ->
+            val conversationId = registration.conversationId
+            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
+            val turn = turnRegistry.getActiveTurn(conversationId)
+            if (turn != null && !turn.hasTerminal) {
+                Telemetry.event(
+                    "IrohTransport", "turn.torn_down_nonterminal",
+                    "reason" to reason,
+                    "conversationId" to conversationId.value,
+                    "turnId" to turn.turnId,
+                    "runId" to turn.runId,
+                )
+            }
+            runCatching { job.cancel() }
+        }
+    }
+
+    private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
+        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
+        return irohDialer.dial(
+            config = config,
+            effectiveUrlOverride = forcedUrl,
+            onConnecting = {
+                _state.value = ChannelTransportState.Connecting()
+                onConnect()
+            },
+        )
+    }
 
     private fun handleSupervisorStateChange(state: IrohConnectionState) {
         _state.value = state.toChannelTransportState()
@@ -228,6 +266,30 @@ class IrohChannelTransport(
         }
     }
 
+    // letta-mobile-53k65.10: Generation-scoped Admin RPC executor and retry state.
+    private val adminRpcExecutor = IrohAdminRpcExecutor(
+        IrohAdminRpcExecutor.Dependencies(
+            supervisor = supervisor,
+            connectionGeneration = ::currentConnectionGeneration,
+            onRequestObserved = { request ->
+                if (request.method == "message.list") {
+                    IrohViewedConversation.fromMessageListPath(request.path)
+                        ?.let(connectionSession::recordViewedConversation)
+                }
+            },
+        ),
+    )
+
+    private val cronRpcClient = IrohCronRpcClient(
+        adminRpc = { method, path, body -> adminRpc(method, path, body) },
+    )
+
+    private val subagentRpcClient = IrohSubagentRpcClient(
+        readyHandle = { supervisor.ready() },
+        currentScope = { observerIngestor.currentSubagentScope() },
+        adminRpc = { method, path, body -> adminRpc(method, path, body) },
+    )
+
     /**
      * letta-mobile-wxy4s: application-level connection liveness. QUIC state alone
      * cannot detect a black-holed peer — the transport's unacked keepalive datagram
@@ -239,9 +301,9 @@ class IrohChannelTransport(
         timeoutMs = livenessProbeTimeoutMs,
         failuresToDeclareDead = livenessProbeFailuresToDeclareDead,
         maxDetectionMs = livenessMaxDetectionMs,
-        millisSinceLastProofOfLife = { adminRpcRetryState.millisSinceLastStream() },
+        millisSinceLastProofOfLife = { adminRpcExecutor.millisSinceLastProofOfLife() },
         youngInFlightAdminRpcCount = {
-            adminRpcRetryState.youngInFlightAdminRpcCount(graceMs = livenessCongestionGraceMs)
+            adminRpcExecutor.youngInFlightAdminRpcCount(graceMs = livenessCongestionGraceMs)
         },
         // Attribution is MANDATORY (r3i1z): an unattributed loss report landing
         // after a redial destroys the healthy NEW handle.
@@ -593,61 +655,9 @@ class IrohChannelTransport(
         }
     }
 
-    // letta-mobile-34xoj: track consecutive admin_rpc failures and last proof-of-life
-    // time to decide retry-on-same-connection vs. escalate-to-reconnect.
-    // letta-mobile-parg0: proof-of-life includes successful admin_rpc (not only
-    // stream frames), and in-flight admin_rpc ages feed the liveness congestion gate.
-    private val adminRpcRetryState = AdminRpcRetryState()
-    private class AdminRpcRetryState {
-        private val mutex = Mutex()
-        @Volatile var consecutiveFailures = 0
-        @Volatile private var lastProofOfLifeMs = System.currentTimeMillis()
-        /** Opaque tokens → start epoch ms for in-flight ChannelTransport.adminRpc. */
-        private val inFlightStartByToken = ConcurrentHashMap<Long, Long>()
-        private val nextInFlightToken = java.util.concurrent.atomic.AtomicLong(0L)
-
-        suspend fun recordFailure(): Int = mutex.withLock {
-            consecutiveFailures += 1
-            consecutiveFailures
-        }
-
-        suspend fun reset() = mutex.withLock {
-            consecutiveFailures = 0
-        }
-
-        fun recordProofOfLife() {
-            lastProofOfLifeMs = System.currentTimeMillis()
-        }
-
-        /** Alias kept for stream-frame call sites (emitBoth). */
-        fun recordStreamActivity() = recordProofOfLife()
-
-        fun millisSinceLastStream(): Long = System.currentTimeMillis() - lastProofOfLifeMs
-
-        fun beginAdminRpc(): Long {
-            val token = nextInFlightToken.incrementAndGet()
-            inFlightStartByToken[token] = System.currentTimeMillis()
-            return token
-        }
-
-        fun endAdminRpc(token: Long) {
-            inFlightStartByToken.remove(token)
-        }
-
-        /**
-         * Count of in-flight admin_rpc calls younger than [graceMs]. Stale hung
-         * calls (older than grace) do not protect the liveness probe forever.
-         */
-        fun youngInFlightAdminRpcCount(graceMs: Long = IrohLivenessProbe.CONGESTION_GRACE_MS): Int {
-            val now = System.currentTimeMillis()
-            var count = 0
-            for (startMs in inFlightStartByToken.values) {
-                val age = now - startMs
-                if (age in 0 until graceMs) count += 1
-            }
-            return count
-        }
-    }
+    /** Test/wiring visibility: current generation admin RPC retry state. */
+    internal val adminRpcRetryState get() = adminRpcExecutor.currentRetryState()
+    internal fun adminRpcRetryStateFor(generation: Long) = adminRpcExecutor.retryStateFor(generation)
 
     override suspend fun connect(baseShimUrl: String, token: String, deviceId: String, clientVersion: String) {
         explicitConfig = IrohConnectConfig(
@@ -665,90 +675,6 @@ class IrohChannelTransport(
         supervisor.refreshConfig()
         val handle = supervisor.ready()
         Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
-    }
-
-    private suspend fun dial(config: IrohConnectConfig): IrohConnectionHandle {
-        val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
-            ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
-            ?: config.baseShimUrl
-        if (!isIrohUrl(effectiveUrl)) {
-            error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
-        }
-        val ticket = normalizeIrohAddress(effectiveUrl).takeIf { it.isNotBlank() }
-            ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
-        _state.value = ChannelTransportState.Connecting()
-        onConnect()
-        val secretKey = secretKeyStore.loadOrCreate()
-        val localEndpoint = runCatching {
-            Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey)
-            )
-        }.onFailure { t ->
-            Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
-        }.getOrThrow()
-        var transport: IrohAppServerTransport? = null
-        // letta-mobile-r3i1z: attribute this connection's loss reports to the
-        // handle produced by THIS dial. A dead transport reports loss up to
-        // twice (close watcher + reader exit) and the second report can land
-        // after the supervisor has already redialed; attribution lets the
-        // supervisor drop such stale reports instead of tearing down the
-        // healthy redialed connection (and its observer-ingestion collector).
-        val dialedHandle = java.util.concurrent.atomic.AtomicReference<IrohConnectionHandle?>(null)
-        return runCatching {
-            transport = IrohAppServerTransportAdapter(
-                endpoint = localEndpoint,
-                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason, dialedHandle.get()) },
-            ).createTransport(
-                endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
-                scope = scope,
-            ) as IrohAppServerTransport
-            val appServerClient = DefaultAppServerClient(transport!!)
-            // The auth exchange doubles as the Iroh transport handshake: it
-            // advertises client capabilities (frame_part chunked-frame
-            // reassembly) so the server may split >1MiB frames instead of
-            // failing them. Send it even with a blank token — servers without
-            // a required token still ack and record capabilities.
-            val auth = appServerClient.auth(
-                AppServerCommand.Auth(
-                    requestId = "auth-${UUID.randomUUID()}",
-                    token = config.token,
-                    capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
-                ),
-            )
-            if (!auth.success && config.token.isNotBlank()) {
-                throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
-            }
-            Telemetry.event(
-                "IrohTransport", "auth.negotiated",
-                "success" to auth.success,
-                "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
-            )
-            // Preflight stays on the Iroh *node* / wrapper turn engine (WS to
-            // App Server). Client-side preflight would send agent_retrieve /
-            // conversation_messages_list as typed control frames; the node only
-            // accepts auth/runtime_start/input/admin_rpc/sync/abort.
-            transport!!.awaitConnectionReady()
-            val (engine, eventRouter) = buildIrohTurnEngine(
-                client = appServerClient,
-                clientVersion = config.clientVersion,
-                routerScope = scope,
-            )
-            IrohConnectionHandle(
-                config = config,
-                ticket = ticket,
-                sessionId = ticket.hashCode().toString(),
-                transport = transport,
-                turnEngine = engine,
-                serverCapabilities = auth.capabilities?.toSet(),
-                close = { reason ->
-                    eventRouter.detach()
-                    closeIrohResources(reason, transport, localEndpoint)
-                },
-            ).also { handle -> dialedHandle.set(handle) }
-        }.getOrElse { error ->
-            closeIrohResources("dial_failed", transport, localEndpoint)
-            throw error
-        }
     }
 
     override fun send(
@@ -1008,143 +934,8 @@ class IrohChannelTransport(
     override fun sendA2uiAction(action: A2uiAction): A2uiActionDispatchResult = A2uiActionDispatchResult.Failed
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
-    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse {
-        // letta-mobile-r3i1z (A): learn the currently-viewed conversation from
-        // the hydrate so a later reconnect can re-register this connection as a
-        // server-side viewer with no user action. Recorded before the call so a
-        // hydrate that only succeeds on retry/redial is still captured.
-        if (method == "message.list") {
-            IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
-        }
-        // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
-        // openBi is progressing — the liveness probe must not declare-dead over it.
-        val inFlightToken = adminRpcRetryState.beginAdminRpc()
-        try {
-            return adminRpcTracked(method = method, path = path, body = body)
-        } finally {
-            adminRpcRetryState.endAdminRpc(inFlightToken)
-        }
-    }
-
-    private suspend fun adminRpcTracked(
-        method: String,
-        path: String,
-        body: String?,
-    ): AppServerInboundFrame.AdminRpcResponse {
-        // letta-mobile-34xoj: first attempt
-        val first = supervisor.ready()
-        val firstAttempt = runCatching {
-            first.adminRpc(method = method, path = path, body = body)
-        }
-        if (firstAttempt.isSuccess) {
-            adminRpcRetryState.reset()
-            // letta-mobile-parg0: successful admin_rpc is proof of life (not only
-            // stream frames) — suppresses the next liveness probe window.
-            adminRpcRetryState.recordProofOfLife()
-            return firstAttempt.getOrThrow()
-        }
-
-        val firstError = firstAttempt.exceptionOrNull()!!
-        if (firstError is CancellationException) throw firstError
-        // k7yyc: a decode / frame-size (payload) error is isolated to THIS
-        // request. It is NOT a transport fault, so never reconnect or close
-        // the shared connection for it — a single oversized or garbled
-        // list response must fail only its own request with the typed
-        // error, never tear down streaming for every other request.
-        if (firstError.isAdminRpcPayloadError()) throw firstError
-        if (!firstError.isConnectionLostClass()) throw firstError
-        if (!method.isReadOnlyAdminRpcMethod()) throw firstError
-
-        // Request isolation: if the shared connection is STILL ALIVE, this read's
-        // failure is isolated to THIS request (e.g. a method the node doesn't
-        // implement, or this request's own 15s timeout), NOT a transport fault.
-        // `isConnectionLostClass()` only inspects the error text — which for
-        // per-request errors ("admin_rpc stream closed before response", "admin_rpc
-        // timed out") matches "closed"/"stream"/"timeout" and looks connection-ish
-        // even though the QUIC connection is fine. Escalating here would call
-        // supervisor.onConnectionLost → close the shared connection → cancel every
-        // OTHER in-flight admin_rpc read on it (e.g. a large concurrent agent.list),
-        // which is exactly the desktop connect-burst teardown loop. A genuine drop
-        // instead flips `connected` false (reader-exit/close, which reconnect
-        // independently), so only fall through to retry/escalate when the
-        // connection is actually dead.
-        if (first.isConnectionAlive) {
-            com.letta.mobile.util.Telemetry.event(
-                "IrohTransport", "admin_rpc.request_isolated",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-            )
-            throw firstError
-        }
-
-        // letta-mobile-34xoj: an admin_rpc read timed out or failed with a
-        // connection-like error. NEVER invalidate the live connection while
-        // a turn is actively streaming — retry on the SAME connection.
-        val failures = adminRpcRetryState.recordFailure()
-        val idleMs = adminRpcRetryState.millisSinceLastStream()
-        val shouldEscalate = failures >= ADMIN_RPC_FAILURE_THRESHOLD && idleMs > STREAM_IDLE_THRESHOLD_MS
-
-        if (!shouldEscalate) {
-            // Retry on the SAME connection (no supervisor invalidation)
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.retry.same_connection",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-                "consecutiveFailures" to failures.toString(),
-                "idleMs" to idleMs.toString(),
-            )
-            return runCatching {
-                // Re-use the SAME handle (no redial)
-                first.adminRpc(method = method, path = path, body = body)
-            }.getOrElse { retryError ->
-                if (retryError is CancellationException) throw retryError
-                // Second failure on same connection — now escalate
-                Telemetry.event(
-                    "IrohTransport", "admin_rpc.escalate.reconnect",
-                    "method" to method,
-                    "path" to path,
-                    "error" to (retryError.message ?: retryError.toString()),
-                    "class" to retryError::class.simpleName,
-                    "consecutiveFailures" to (failures + 1).toString(),
-                )
-                supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${retryError.message ?: retryError.toString()}", first)
-                val newHandle = supervisor.ready()
-                newHandle.adminRpc(method = method, path = path, body = body).also {
-                    // Successful redial response clears the failure streak — otherwise
-                    // two fail-then-succeed cycles leave consecutiveFailures at threshold
-                    // and the next first-attempt failure forces an unnecessary reconnect.
-                    adminRpcRetryState.reset()
-                    adminRpcRetryState.recordProofOfLife()
-                }
-            }.also {
-                adminRpcRetryState.reset()
-                adminRpcRetryState.recordProofOfLife()
-            }
-        } else {
-            // Escalate: connection is idle and multiple failures accumulated
-            Telemetry.event(
-                "IrohTransport", "admin_rpc.escalate.reconnect",
-                "method" to method,
-                "path" to path,
-                "error" to (firstError.message ?: firstError.toString()),
-                "class" to firstError::class.simpleName,
-                "consecutiveFailures" to failures.toString(),
-                "idleMs" to idleMs.toString(),
-            )
-            supervisor.onConnectionLost("admin_rpc_failed: ${firstError.message ?: firstError.toString()}", first)
-            val retry = supervisor.ready()
-            return retry.adminRpc(method = method, path = path, body = body).also {
-                adminRpcRetryState.reset()
-                adminRpcRetryState.recordProofOfLife()
-            }
-        }
-    }
-
-    private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
+    override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
+        adminRpcExecutor.execute(AdminRpcRequest(method, path, body))
 
     override suspend fun disconnect() {
         connectionSession.stopAndJoin()
@@ -1171,6 +962,7 @@ class IrohChannelTransport(
             )
         }
         turnRegistry.clear()
+        adminRpcExecutor.clear()
         subagentCorrelator.reset()
         lastEmittedSubagentRevision = 0L
         livenessProbe.stop("disconnect")
@@ -1178,61 +970,6 @@ class IrohChannelTransport(
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
 
-    private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
-        Telemetry.event(
-            "IrohTrace", "transport.closeCurrent",
-            "reason" to reason,
-            "hasTransport" to (transport != null),
-            "hasEndpoint" to (endpoint != null),
-        )
-        // letta-mobile-or40x: a full teardown legitimately cancels EVERY
-        // conversation's turn — the connection those turns stream over is gone.
-        // Do it explicitly over all keyed entries (not via one global slot), and
-        // report each nonterminal casualty (SENSING b) so a teardown that eats an
-        // in-flight turn is never silent again.
-        turnRegistry.allSendJobEntries().forEach { registration ->
-            val conversationId = registration.conversationId
-            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
-            val turn = turnRegistry.getActiveTurn(conversationId)
-            if (turn != null && !turn.hasTerminal) {
-                Telemetry.event(
-                    "IrohTransport", "turn.torn_down_nonterminal",
-                    "reason" to reason,
-                    "conversationId" to conversationId.value,
-                    "turnId" to turn.turnId,
-                    "runId" to turn.runId,
-                )
-            }
-            runCatching { job.cancel() }
-        }
-        runCatching { transport?.close() }
-        runCatching { endpoint?.shutdown() }
-        runCatching { endpoint?.close() }
-    }
-
-    /**
-     * lgns8.22.3: one inbound collector per dial generation; turns subscribe via
-     * fanout instead of collecting [AppServerClient.events] directly.
-     */
-    private fun buildIrohTurnEngine(
-        client: DefaultAppServerClient,
-        clientVersion: String,
-        routerScope: CoroutineScope,
-    ): Pair<AppServerTurnEngine, AppServerRuntimeEventRouter> {
-        val eventRouter = AppServerRuntimeEventRouter()
-        eventRouter.attach(routerScope, client.events)
-        val engine = AppServerTurnEngine(
-            client = client,
-            clientInfo = AppServerRuntimeStartClientInfo(
-                name = "letta-mobile-android-iroh",
-                version = clientVersion,
-            ),
-            permissionMode = AppServerPermissionMode.Unrestricted,
-            turnContextPreflight = TurnContextPreflight.None,
-            eventRouter = eventRouter,
-        )
-        return engine to eventRouter
-    }
 
     private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
         IrohConnectionState.Disconnected -> ChannelTransportState.Idle
@@ -1549,6 +1286,7 @@ class IrohChannelTransport(
     @Serializable
     private data class CronDeleteAllRpcResult(val deleted: Long = 0L)
 
+
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
         // letta-mobile-m6oa1.3: informational `reason` vocabulary on the
@@ -1567,13 +1305,8 @@ class IrohChannelTransport(
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
         private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
         private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
-        // Cron dispatch is by admin_rpc method name; this path is a stable cosmetic
-        // hint (cron is native-only, no proxy fallback consumes it).
         private const val CRON_ADMIN_PATH = "/v1/cron"
         private val subagentJson = Json { ignoreUnknownKeys = true }
-        // letta-mobile-34xoj: admin_rpc retry thresholds
-        private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
-        private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
         // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
