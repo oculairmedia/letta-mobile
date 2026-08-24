@@ -155,37 +155,41 @@ class TimelineSyncLoop(
         persistMutex.withLock {
             do {
                 persistPending = false
-                val currentTimeline = writeMutex.withLock { state.value }
-                val revision = ++snapshotRevision
-                val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
-                    timeline = currentTimeline,
-                    scope = snapshotScope,
-                    revision = revision,
-                    writtenAtMillis = timelineCurrentTimeMillis(),
-                )
-                try {
-                    val written = confirmedTimelineStore.writeSnapshot(envelope)
-                    if (prune) {
-                        confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
-                    }
-                    if (!written) {
-                        Telemetry.event(
-                            "TimelineSync", "snapshotPersist.staleRejected",
-                            "conversationId" to conversationId,
-                            "revision" to revision,
-                            level = Telemetry.Level.WARN,
-                        )
-                    }
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Throwable) {
-                    Telemetry.error(
-                        "TimelineSync", "snapshotPersist.failed", error,
-                        "conversationId" to conversationId,
-                        "revision" to revision,
-                    )
-                }
+                persistCurrentSnapshot(snapshotScope, prune)
             } while (persistPending)
+        }
+    }
+
+    private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
+        val currentTimeline = writeMutex.withLock { state.value }
+        val revision = ++snapshotRevision
+        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+            timeline = currentTimeline,
+            scope = snapshotScope,
+            revision = revision,
+            writtenAtMillis = timelineCurrentTimeMillis(),
+        )
+        try {
+            val written = confirmedTimelineStore.writeSnapshot(envelope)
+            if (prune) {
+                confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+            }
+            if (!written) {
+                Telemetry.event(
+                    "TimelineSync", "snapshotPersist.staleRejected",
+                    "conversationId" to conversationId,
+                    "revision" to revision,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error(
+                "TimelineSync", "snapshotPersist.failed", error,
+                "conversationId" to conversationId,
+                "revision" to revision,
+            )
         }
     }
 

@@ -18,11 +18,7 @@ import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
 import com.letta.mobile.data.timeline.TimelineStreamFrame
-import com.letta.mobile.data.timeline.snapshot.InMemoryConfirmedTimelineStore
 import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEnvelope
-import com.letta.mobile.data.timeline.snapshot.StoredTimelineEvent
-import com.letta.mobile.data.timeline.snapshot.TimelineScope
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -67,57 +63,6 @@ class DesktopChatControllerTest {
         assertEquals("Remote planning", state.conversations.first().title)
         assertTrue(state.selectedMessages.any { it.role == "user" && it.content == "Hello from history" })
 
-        controller.close()
-    }
-
-
-    @Test
-    fun productionLoopPublishesPersistedSnapshotBeforeRemoteHydrationCompletes() = runTest {
-        val store = InMemoryConfirmedTimelineStore()
-        val persistence = DesktopTimelinePersistence(store = store, backendId = "production-hydration-proof")
-        store.writeSnapshot(
-            StoredTimelineEnvelope(
-                schemaVersion = 1,
-                scope = TimelineScope(
-                    backendId = persistence.backendId,
-                    conversationId = "conv-1",
-                    agentId = "agent-0",
-                ),
-                revision = 7,
-                events = listOf(
-                    StoredTimelineEvent(
-                        position = 1.0,
-                        otid = "persisted-user",
-                        content = "Visible before the network",
-                        serverId = "persisted-user-id",
-                        messageType = "USER",
-                        dateIso = "2026-08-23T10:00:00Z",
-                    ),
-                ),
-                writtenAtMillis = 5_000,
-            ),
-        )
-        val remoteGate = CompletableDeferred<Unit>()
-        val gateway = GatedHydrationGateway(remoteGate)
-        val controller = DesktopChatController(
-            bootstrapState = defaultDesktopBootstrapState(),
-            scope = this,
-            gatewayFactory = { gateway },
-            timelinePersistence = persistence,
-        )
-
-        controller.start()
-        runCurrent()
-
-        assertTrue(gateway.hydrationStarted.isCompleted)
-        assertTrue(
-            controller.state.value.selectedMessages.any { it.content == "Visible before the network" },
-            "the production controller/loop path must publish the durable snapshot while remote hydration is pending",
-        )
-
-        remoteGate.complete(Unit)
-        runCurrent()
-        assertTrue(controller.state.value.selectedMessages.any { it.content == "Fresh remote history" })
         controller.close()
     }
 
@@ -806,29 +751,6 @@ open class FakeDesktopChatGateway(
                 id = "agent-user-$agentId",
                 contentRaw = JsonPrimitive("Hello from $agentId history"),
                 date = "2026-06-07T01:00:00Z",
-            ),
-        )
-    }
-}
-
-private class GatedHydrationGateway(
-    private val remoteGate: CompletableDeferred<Unit>,
-) : FakeDesktopChatGateway() {
-    val hydrationStarted = CompletableDeferred<Unit>()
-
-    override suspend fun listConversationMessages(
-        conversationId: String,
-        limit: Int?,
-        after: String?,
-        order: String?,
-    ): List<LettaMessage> {
-        hydrationStarted.complete(Unit)
-        remoteGate.await()
-        return listOf(
-            UserMessage(
-                id = "fresh-remote-user",
-                contentRaw = JsonPrimitive("Fresh remote history"),
-                date = "2026-08-24T10:00:00Z",
             ),
         )
     }

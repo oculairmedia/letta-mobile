@@ -120,6 +120,34 @@ class ConfirmedTimelineScenarioTest {
         writtenAtMillis = writtenAtMillis,
     )
 
+    private fun createTestRepo(
+        transport: TimelineTransport,
+        store: ConfirmedTimelineStore = InMemoryConfirmedTimelineStore(),
+    ) = TimelineRepository(
+        timelineTransport = transport,
+        pendingLocalStore = NoOpPendingLocalStore,
+        conversationCursorStore = NoOpConversationCursorStore,
+        confirmedTimelineStore = store,
+        backendIdProvider = { "test-backend" },
+        startLoopStreamSubscribers = false,
+    )
+
+    private fun kotlinx.coroutines.CoroutineScope.createTestLoop(
+        scope: TimelineScope,
+        transport: TimelineTransport,
+        store: ConfirmedTimelineStore = InMemoryConfirmedTimelineStore(),
+        snapshot: StoredTimelineEnvelope? = null,
+    ) = TimelineSyncLoop(
+        messageApi = transport,
+        conversationId = scope.conversationId,
+        scope = this,
+        startStreamSubscriber = false,
+        confirmedTimelineStore = store,
+        timelineScope = scope,
+        initialTimeline = snapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline),
+        initialRevision = snapshot?.revision ?: 0L,
+    )
+
     @Test
     fun coldStartWithDurableSnapshotRendersImmediatelyBeforeRemoteCall() = runTest {
         val store = InMemoryConfirmedTimelineStore()
@@ -147,16 +175,7 @@ class ConfirmedTimelineScenarioTest {
         )
         val snapshot = store.readSnapshot(scope)
         assertNotNull(snapshot)
-        val loop = TimelineSyncLoop(
-            messageApi = transport,
-            conversationId = scope.conversationId,
-            scope = this,
-            startStreamSubscriber = false,
-            confirmedTimelineStore = store,
-            timelineScope = scope,
-            initialTimeline = TimelineSnapshotCodec.storedEnvelopeToTimeline(snapshot),
-            initialRevision = snapshot.revision,
-        )
+        val loop = createTestLoop(scope, transport, store, snapshot)
 
         try {
             val hydration = async { loop.hydrate() }
@@ -190,15 +209,7 @@ class ConfirmedTimelineScenarioTest {
         val transport = FakeTimelineTransport(
             throwOnList = IllegalStateException("Network unreachable (offline)"),
         )
-
-        val repo = TimelineRepository(
-            timelineTransport = transport,
-            pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
-            confirmedTimelineStore = store,
-            backendIdProvider = { "test-backend" },
-            startLoopStreamSubscribers = false,
-        )
+        val repo = createTestRepo(transport, store)
 
         try {
             val loop = repo.getOrCreate("conv-offline")
@@ -237,16 +248,7 @@ class ConfirmedTimelineScenarioTest {
         )
         val snapshot = store.readSnapshot(scope)
         assertNotNull(snapshot)
-        val loop = TimelineSyncLoop(
-            messageApi = transport,
-            conversationId = scope.conversationId,
-            scope = this,
-            startStreamSubscriber = false,
-            confirmedTimelineStore = store,
-            timelineScope = scope,
-            initialTimeline = TimelineSnapshotCodec.storedEnvelopeToTimeline(snapshot),
-            initialRevision = snapshot.revision,
-        )
+        val loop = createTestLoop(scope, transport, store, snapshot)
 
         try {
             val hydration = async { loop.hydrate() }
@@ -280,14 +282,7 @@ class ConfirmedTimelineScenarioTest {
         )
 
         val transport = FakeTimelineTransport()
-        val repo = TimelineRepository(
-            timelineTransport = transport,
-            pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
-            confirmedTimelineStore = store,
-            backendIdProvider = { "test-backend" },
-            startLoopStreamSubscribers = false,
-        )
+        val repo = createTestRepo(transport, store)
 
         try {
             val loopA = repo.getOrCreate("conv-A")
@@ -306,14 +301,7 @@ class ConfirmedTimelineScenarioTest {
     fun closeCancelsAndJoinsInFlightSnapshotPersistence() = runTest {
         val store = BlockingConfirmedTimelineStore()
         val scope = testScope("conv-closing")
-        val loop = TimelineSyncLoop(
-            messageApi = FakeTimelineTransport(),
-            conversationId = scope.conversationId,
-            scope = this,
-            startStreamSubscriber = false,
-            confirmedTimelineStore = store,
-            timelineScope = scope,
-        )
+        val loop = createTestLoop(scope, FakeTimelineTransport(), store)
 
         loop.scheduleSnapshotPersist(immediate = true)
         store.writeStarted.await()
@@ -327,14 +315,7 @@ class ConfirmedTimelineScenarioTest {
     fun neverSeenConversationOpensEmptyShellWithoutLoader() = runTest {
         val store = InMemoryConfirmedTimelineStore()
         val transport = FakeTimelineTransport()
-        val repo = TimelineRepository(
-            timelineTransport = transport,
-            pendingLocalStore = NoOpPendingLocalStore,
-            conversationCursorStore = NoOpConversationCursorStore,
-            confirmedTimelineStore = store,
-            backendIdProvider = { "test-backend" },
-            startLoopStreamSubscribers = false,
-        )
+        val repo = createTestRepo(transport, store)
 
         try {
             val loop = repo.getOrCreate("conv-brand-new")
