@@ -7,6 +7,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Owns work that is scoped to one logical Iroh connection session.
@@ -23,6 +24,7 @@ internal class IrohConnectionSession(
     private val generation = atomic(0L)
     @Volatile
     private var observerJob: Job? = null
+    private val stoppedObserverJobs = ConcurrentHashMap.newKeySet<Job>()
     @Volatile
     private var resubscribeJob: Job? = null
     @Volatile
@@ -37,10 +39,23 @@ internal class IrohConnectionSession(
     }
 
     fun onNotReady(reason: String) {
+        stopSessionWork(reason)
+    }
+
+    /** Stops the observer before callers reset state it exclusively owns. */
+    suspend fun stopAndJoin(reason: String) {
+        stopSessionWork(reason)
+        stoppedObserverJobs.toList().forEach { job ->
+            job.join()
+            stoppedObserverJobs.remove(job)
+        }
+    }
+
+    private fun stopSessionWork(reason: String): Job? {
         generation.incrementAndGet()
         resubscribeJob?.cancel()
         resubscribeJob = null
-        stopObserverIngest(reason)
+        return stopObserverIngest(reason)
     }
 
     fun recordViewedConversation(method: String, path: String) {
@@ -59,7 +74,10 @@ internal class IrohConnectionSession(
             Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
             return
         }
-        observerJob?.cancel()
+        observerJob?.let { priorObserver ->
+            priorObserver.cancel()
+            stoppedObserverJobs.add(priorObserver)
+        }
         Telemetry.event(
             "IrohObserver", "ingest.start",
             "sessionId" to handle.sessionId,
@@ -82,11 +100,13 @@ internal class IrohConnectionSession(
         }
     }
 
-    private fun stopObserverIngest(reason: String) {
-        val job = observerJob ?: return
+    private fun stopObserverIngest(reason: String): Job? {
+        val job = observerJob ?: return null
         observerJob = null
+        stoppedObserverJobs.add(job)
         job.cancel()
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
+        return job
     }
 
     private data class ReSubscription(

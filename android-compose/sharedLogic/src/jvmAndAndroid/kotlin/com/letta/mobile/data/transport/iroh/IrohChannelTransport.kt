@@ -138,19 +138,6 @@ class IrohChannelTransport(
         _frameEvents.emit(TransportFrameEvent(frame = frame))
     }
 
-    /** (key, messageType, content) for content-bearing frames, for FrameFlowDiag. */
-    private fun frameFlowContent(frame: ServerFrame): Triple<String, String, String>? = when (frame) {
-        is ServerFrame.AssistantMessage -> {
-            val f: ServerFrame.AssistantMessage = frame
-            Triple(f.otid ?: f.id, "assistant_message", f.content)
-        }
-        is ServerFrame.ReasoningMessage -> {
-            val f: ServerFrame.ReasoningMessage = frame
-            Triple(f.id, "reasoning_message", f.reasoning)
-        }
-        else -> null
-    }
-
     /**
      * letta-mobile-or40x: send jobs KEYED BY conversationId.
      *
@@ -1275,6 +1262,20 @@ class IrohChannelTransport(
         retireActiveTurn(turn, "cancelled", source = "cancel_synthetic")
     }
 
+    private suspend fun emitDisconnectTerminal(turn: IrohActiveTurn) {
+        if (!turn.tryClaimTerminal("disconnect")) return
+        emitBoth(
+            ServerFrame.TurnDone(
+                id = frameId("cancelled"),
+                ts = nowIso(),
+                turnId = turn.turnId,
+                runId = turn.runId,
+                status = "cancelled",
+            ),
+        )
+        retireActiveTurn(turn, "cancelled", source = "disconnect")
+    }
+
     private fun teardownCancelledTurn(conversationId: String, turn: IrohActiveTurn) {
         turn.job?.cancel()
         turn.job?.let { activeSendJobs.remove(conversationId, it) }
@@ -1430,16 +1431,18 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
-        connectionSession.onNotReady("disconnect")
+        connectionSession.stopAndJoin("disconnect")
         interruptedTurns.clear()
         retiredRuns.clear()
         frameOwnershipPath.clear()
         activeSendJobs.values.forEach { it.cancel() }
         activeSendJobs.clear()
-        activeTurns.values.forEach { turn ->
-            turn.terminalReached.complete("disconnected")
+        for (turn in activeTurns.values.toList()) {
+            emitDisconnectTerminal(turn)
         }
         activeTurns.clear()
+        // The observer collector has fully stopped above, so these retain their
+        // single-threaded ownership without racing a final ingested frame.
         subagentCorrelator.reset()
         lastEmittedSubagentRevision = 0L
         livenessProbe.stop("disconnect")
