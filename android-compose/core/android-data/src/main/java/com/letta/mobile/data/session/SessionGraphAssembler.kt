@@ -210,8 +210,8 @@ class SessionGraphAssembler @Inject constructor(
     }
 
     private fun createAdminRepositories(request: SessionGraphAssembleRequest): AdminRepositories {
-        val catalog = createCatalogAdminRepositories(request)
         val ops = createOpsAdminRepositories(request)
+        val catalog = createCatalogAdminRepositories(request, ops.provider)
         return AdminRepositories(
             archive = catalog.archive,
             folder = catalog.folder,
@@ -228,7 +228,10 @@ class SessionGraphAssembler @Inject constructor(
         )
     }
 
-    private fun createCatalogAdminRepositories(request: SessionGraphAssembleRequest): CatalogAdminRepositories {
+    private fun createCatalogAdminRepositories(
+        request: SessionGraphAssembleRequest,
+        providerRepository: ProviderRepository,
+    ): CatalogAdminRepositories {
         val transport = request.channelTransport
         val settings = request.settingsRepository
         return CatalogAdminRepositories(
@@ -268,6 +271,15 @@ class SessionGraphAssembler @Inject constructor(
                 settingsRepository = settings,
                 irohModelSource = settings?.let {
                     IrohAdminRpcModelSource(channelTransport = transport, settingsRepository = it)
+                },
+                credentialedProviderTypes = {
+                    if (providerRepository.providers.value.isEmpty()) {
+                        providerRepository.refreshProviders()
+                    }
+                    providerRepository.providers.value
+                        .map { it.providerType }
+                        .filter { it.isNotBlank() }
+                        .toSet()
                 },
             ),
             project = ProjectRepository(

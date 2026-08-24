@@ -153,6 +153,12 @@ kotlin {
         getByName("jvmTest") {
             dependsOn(jvmAndAndroidTest)
             dependencies {
+                // Architecture characterization for the Meridian federation
+                // decision. Automerge Java 0.0.9 includes the Samod repository
+                // runtime and a generic Transport bridge, letting it run over
+                // the Iroh endpoint we already own instead of adding a second
+                // native mesh endpoint.
+                implementation("org.automerge:automerge:0.0.9")
                 implementation(libs.ktor.client.cio)
                 implementation("com.google.zxing:javase:3.5.3")
                 implementation(libs.ktor.server.core)
