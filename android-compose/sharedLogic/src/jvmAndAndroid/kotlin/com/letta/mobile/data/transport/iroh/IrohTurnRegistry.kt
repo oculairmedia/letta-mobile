@@ -79,16 +79,13 @@ class IrohTurnRegistry {
     private val interruptedTurns = ConcurrentHashMap<String, RedialWhileTurnActive>()
 
     fun tryStart(
-        conversationId: String,
-        turnId: String,
+        token: IrohTurnToken,
         initialRunId: String,
         agentId: String,
-        generation: Long,
     ): IrohTryStartResult {
-        val token = IrohTurnToken(conversationId, generation, turnId)
         val newTurn = IrohActiveTurn(token, initialRunId, agentId)
         var busy: IrohActiveTurn? = null
-        activeTurns.compute(conversationId) { _, existing ->
+        activeTurns.compute(token.conversationId) { _, existing ->
             if (existing != null && !existing.terminalReached.isCompleted) {
                 busy = existing
                 existing
@@ -96,8 +93,16 @@ class IrohTurnRegistry {
                 newTurn
             }
         }
-        return busy?.let { IrohTryStartResult.Busy(it, turnId) } ?: IrohTryStartResult.Started(newTurn)
+        return busy?.let { IrohTryStartResult.Busy(it, token.turnId) } ?: IrohTryStartResult.Started(newTurn)
     }
+
+    fun tryStart(
+        conversationId: String,
+        turnId: String,
+        initialRunId: String,
+        agentId: String,
+        generation: Long,
+    ): IrohTryStartResult = tryStart(IrohTurnToken(conversationId, generation, turnId), initialRunId, agentId)
 
     fun registerSendJob(conversationId: String, job: Job) {
         activeSendJobs[conversationId] = job
