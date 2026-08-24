@@ -1,5 +1,6 @@
 package com.letta.mobile.data.timeline
 
+import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +19,7 @@ internal class TimelineHydrator(
     private val state: MutableStateFlow<Timeline>,
     private val events: MutableSharedFlow<TimelineSyncEvent>,
     private val holderHydrationSeed: MutableStateFlow<Timeline>,
+    private val onHydrationCommitted: (() -> Unit)? = null,
 ) {
     suspend fun hydrate(
         limit: Int = 50,
@@ -45,36 +47,10 @@ internal class TimelineHydrator(
         }
         val timelineBeforeFetch = writeMutex.withLock { state.value }
         try {
-            val rawFetchLimit = hydrateRawFetchLimit(limit)
-            val response = normalizeHydratedMessageOrder(
-                messageApi.listConversationMessages(
-                    conversationId = conversationId,
-                    limit = rawFetchLimit,
-                    order = "desc",
-                ).reversed()
-            )
-            val diskRecords = runCatching { pendingLocalStore.load(conversationId) }
-                .getOrDefault(emptyList())
-            val hydrateEndSeq = if (recordConversationCursor) {
-                response.mapNotNull { it.seqId?.toLong() }
-                    .plus(listOfNotNull(fallbackCursorSeq))
-                    .maxOrNull()
-            } else {
-                null
-            }
-
-            val hydrated = writeMutex.withLock {
-                TimelineHydrationReducer.reduce(
-                    conversationId = conversationId,
-                    serverMessagesChronological = response,
-                    timelineBeforeFetch = timelineBeforeFetch,
-                    currentTimeline = state.value,
-                    diskRecords = diskRecords,
-                ).also { result ->
-                    state.value = result.timeline
-                    holderHydrationSeed.value = result.timeline
-                }
-            }
+            val response = fetchChronologicalMessages(limit)
+            val hydrateEndSeq = response.cursorSequence(recordConversationCursor, fallbackCursorSeq)
+            val hydrated = commitHydration(response, timelineBeforeFetch)
+            notifyHydrationCommitted()
             if (recordConversationCursor && hydrateEndSeq != null) {
                 conversationCursorStore.recordFrame(conversationId, hydrateEndSeq)
                 Telemetry.event(
@@ -95,6 +71,43 @@ internal class TimelineHydrator(
             timer.stopError(t, "conversationId" to conversationId)
             throw t
         }
+    }
+
+    private suspend fun fetchChronologicalMessages(limit: Int) = normalizeHydratedMessageOrder(
+        messageApi.listConversationMessages(
+            conversationId = conversationId,
+            limit = hydrateRawFetchLimit(limit),
+            order = "desc",
+        ).reversed()
+    )
+
+    private fun List<LettaMessage>.cursorSequence(
+        shouldRecord: Boolean,
+        fallbackCursorSeq: Long?,
+    ): Long? =
+        if (shouldRecord) mapNotNull { it.seqId?.toLong() }.plus(listOfNotNull(fallbackCursorSeq)).maxOrNull() else null
+
+    private suspend fun commitHydration(
+        response: List<LettaMessage>,
+        timelineBeforeFetch: Timeline,
+    ): HydratedTimelineResult {
+        val diskRecords = runCatching { pendingLocalStore.load(conversationId) }.getOrDefault(emptyList())
+        return writeMutex.withLock {
+            TimelineHydrationReducer.reduce(
+                conversationId = conversationId,
+                serverMessagesChronological = response,
+                timelineBeforeFetch = timelineBeforeFetch,
+                currentTimeline = state.value,
+                diskRecords = diskRecords,
+            ).also { result ->
+                state.value = result.timeline
+                holderHydrationSeed.value = result.timeline
+            }
+        }
+    }
+
+    private fun notifyHydrationCommitted() {
+        onHydrationCommitted?.invoke()
     }
 
     private companion object {

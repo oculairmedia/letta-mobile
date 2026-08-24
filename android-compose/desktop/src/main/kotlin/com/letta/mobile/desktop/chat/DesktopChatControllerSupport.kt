@@ -8,6 +8,10 @@ import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineSyncLoop
 import com.letta.mobile.data.timeline.TimelineTransport
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
+import com.letta.mobile.desktop.data.DesktopConfirmedTimelineStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.StateFlow
 
@@ -22,6 +26,7 @@ interface DesktopTimelineLoop {
     suspend fun hydrate(request: DesktopTimelineHydrateRequest = DesktopTimelineHydrateRequest())
     suspend fun send(request: DesktopTimelineSendRequest): String
     fun close()
+    suspend fun closeAndAwait() = close()
 }
 
 data class DesktopTimelineHydrateRequest(
@@ -43,18 +48,40 @@ value class MessageListOrder(val value: String)
 @JvmInline
 value class TimelinePageLimit(val value: Int)
 
-internal class RealDesktopTimelineLoop(
+private val sharedDesktopConfirmedTimelineStore: ConfirmedTimelineStore by lazy {
+    DesktopConfirmedTimelineStore()
+}
+
+data class DesktopTimelinePersistence(
+    val store: ConfirmedTimelineStore = sharedDesktopConfirmedTimelineStore,
+    val backendId: String = "desktop-local",
+)
+
+internal class RealDesktopTimelineLoop private constructor(
     gateway: DesktopChatGateway,
     conversation: DesktopConversationSummary,
     scope: CoroutineScope,
+    confirmedTimelineStore: ConfirmedTimelineStore,
+    backendId: String,
+    initialTimeline: Timeline?,
+    initialRevision: Long,
 ) : DesktopTimelineLoop {
     private val routing = resolveDesktopTimelineRouting(gateway, conversation)
-
+    private val timelineScope = TimelineScope(
+        backendId = backendId,
+        conversationId = routing.loopConversationId.value,
+        agentId = conversation.agentId,
+    )
     private val delegate = TimelineSyncLoop(
         messageApi = routing.transport,
         conversationId = routing.loopConversationId.value,
+        agentId = conversation.agentId,
         scope = scope,
         logTag = DESKTOP_CHAT_LOG_TAG.value,
+        confirmedTimelineStore = confirmedTimelineStore,
+        timelineScope = timelineScope,
+        initialTimeline = initialTimeline,
+        initialRevision = initialRevision,
     )
 
     override val state: StateFlow<Timeline> = delegate.state
@@ -71,6 +98,27 @@ internal class RealDesktopTimelineLoop(
 
     override fun close() {
         delegate.close()
+    }
+
+    override suspend fun closeAndAwait() {
+        delegate.closeAndJoin()
+    }
+
+    companion object {
+        suspend fun create(
+            gateway: DesktopChatGateway,
+            conversation: DesktopConversationSummary,
+            scope: CoroutineScope,
+            persistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
+        ): RealDesktopTimelineLoop {
+            val routing = resolveDesktopTimelineRouting(gateway, conversation)
+            val timelineScope = TimelineScope(persistence.backendId, routing.loopConversationId.value, conversation.agentId)
+            val snapshot = runCatching { persistence.store.readSnapshot(timelineScope) }.getOrNull()
+            return RealDesktopTimelineLoop(
+                gateway, conversation, scope, persistence.store, persistence.backendId,
+                snapshot?.let(TimelineSnapshotCodec::storedEnvelopeToTimeline), snapshot?.revision ?: 0L,
+            )
+        }
     }
 }
 

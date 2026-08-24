@@ -18,6 +18,7 @@ import com.letta.mobile.data.model.UserMessage
 import com.letta.mobile.data.timeline.Timeline
 import com.letta.mobile.data.timeline.TimelineNoActiveRunException
 import com.letta.mobile.data.timeline.TimelineStreamFrame
+import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
 import com.letta.mobile.desktop.defaultDesktopBootstrapState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -40,6 +41,11 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+internal val noOpDesktopTimelinePersistence = DesktopTimelinePersistence(
+    store = NoOpConfirmedTimelineStore,
+    backendId = "desktop-controller-test",
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class DesktopChatControllerTest {
     @Test
@@ -59,7 +65,6 @@ class DesktopChatControllerTest {
 
         controller.close()
     }
-
 
     @Test
     fun startResolvesAgentNamesForConversationNavigation() = runTest {
@@ -394,6 +399,7 @@ class DesktopChatControllerTest {
                 gatewayConstructed = true
                 FakeDesktopChatGateway()
             },
+            timelinePersistence = noOpDesktopTimelinePersistence,
         )
         controller.start()
         runCurrent()
@@ -510,7 +516,7 @@ class DesktopChatControllerTest {
 
         assertEquals(1, loop.closeCount)
         assertTrue(controller.state.value.isLoading)
-        assertEquals(DesktopChatConnectionState.Loading, controller.state.value.connectionState)
+        assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
     }
 
     @Test
@@ -577,7 +583,7 @@ class DesktopChatControllerTest {
 
         assertEquals("conv-2", controller.state.value.selectedConversationId)
         assertTrue(controller.state.value.isLoading)
-        assertEquals(DesktopChatConnectionState.Loading, controller.state.value.connectionState)
+        assertEquals(DesktopChatConnectionState.Live, controller.state.value.connectionState)
         assertEquals(1, loops.first().closeCount)
 
         controller.close()
@@ -638,6 +644,7 @@ class DesktopChatControllerTest {
             scope = this,
             gatewayFactory = { gateway },
             agentNamesByIdProvider = agentNamesByIdProvider,
+            timelinePersistence = noOpDesktopTimelinePersistence,
             loopFactory = loopFactory,
         )
 
@@ -650,6 +657,7 @@ class DesktopChatControllerTest {
             scope = this,
             gatewayFactory = { gateway },
             agentNamesByIdProvider = agentNamesByIdProvider,
+            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 
     private fun TestScope.testController(
@@ -661,6 +669,7 @@ class DesktopChatControllerTest {
             scope = this,
             gatewayFactory = gatewayFactory,
             agentNamesByIdProvider = agentNamesByIdProvider,
+            timelinePersistence = noOpDesktopTimelinePersistence,
         )
 }
 
@@ -746,7 +755,6 @@ open class FakeDesktopChatGateway(
         )
     }
 }
-
 
 private class CloseTrackingGateway(
     private val listConversationsBlock: suspend () -> List<Conversation>,

@@ -191,10 +191,9 @@ private fun ChatScreenMainContent(
 }
 
 private fun chatScreenContentPhase(state: ChatUiState): String = when {
-    state.conversationState is ConversationState.Loading -> "loading"
-    state.conversationState is ConversationState.Error -> "error"
+    state.conversationState is ConversationState.Loading && state.messages.isEmpty() -> "loading"
+    state.conversationState is ConversationState.Error && state.messages.isEmpty() -> "error"
     state.conversationState == ConversationState.NoConversation -> "no-conv"
-    state.isLoadingMessages && state.messages.isEmpty() -> "loading"
     state.error != null && state.messages.isEmpty() -> "error"
     else -> "ready"
 }

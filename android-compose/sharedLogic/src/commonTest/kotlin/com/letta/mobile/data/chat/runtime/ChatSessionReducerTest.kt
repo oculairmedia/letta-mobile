@@ -192,7 +192,9 @@ class ChatSessionReducerTest {
         assertEquals(0, selected.conversations.first { it.id == "b" }.unreadCount)
         assertEquals(ChatComposerState(), selected.composer)
         assertTrue(selected.isLoading)
-        assertEquals(ChatConnectionState.Loading, selected.connectionState)
+        assertEquals(ChatConnectionState.Live, selected.connectionState)
+        assertEquals(SnapshotAvailability.None, selected.snapshotAvailability)
+        assertEquals(RemoteSyncState.Refreshing, selected.remoteSyncState)
         assertEquals(10, selected.selectionGeneration)
     }
 
@@ -299,7 +301,7 @@ class ChatSessionReducerTest {
             isRemoteBacked = true,
             connectionState = ChatConnectionState.Live,
         )
-        val loading = live.copy(isLoading = true)
+        val loadingWithoutSelection = live.copy(selectedConversationId = null, connectionState = ChatConnectionState.Loading)
         val offline = live.copy(
             selectedConversationId = null,
             connectionState = ChatConnectionState.Offline,
@@ -312,7 +314,7 @@ class ChatSessionReducerTest {
         )
 
         assertTrue(ChatSessionReducer.canSend(live))
-        assertFalse(ChatSessionReducer.canSend(loading))
+        assertFalse(ChatSessionReducer.canSend(loadingWithoutSelection))
         assertTrue(ChatSessionReducer.shouldShowStatePanel(offline))
         assertTrue(ChatSessionReducer.canSend(newChat))
         assertTrue(ChatSessionReducer.canSend(noConversations))

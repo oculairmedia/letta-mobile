@@ -4,6 +4,10 @@ import com.letta.mobile.util.Telemetry
 import com.letta.mobile.data.model.LettaMessage
 import com.letta.mobile.data.model.MessageContentPart
 import com.letta.mobile.data.model.ToolReturnMessage
+import com.letta.mobile.data.timeline.snapshot.ConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.NoOpConfirmedTimelineStore
+import com.letta.mobile.data.timeline.snapshot.TimelineScope
+import com.letta.mobile.data.timeline.snapshot.TimelineSnapshotCodec
 import kotlin.concurrent.Volatile
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
@@ -11,8 +15,10 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -22,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Single sync loop per conversation. Acts as a thin orchestrator (under 200 lines).
@@ -42,11 +49,15 @@ class TimelineSyncLoop(
     // scoping. Null when unknown/legacy. LAST param so positional callers are
     // unaffected.
     private val agentId: String? = null,
+    private val confirmedTimelineStore: ConfirmedTimelineStore = NoOpConfirmedTimelineStore,
+    private val timelineScope: TimelineScope? = null,
+    initialTimeline: Timeline? = null,
+    initialRevision: Long = 0L,
 ) {
     private val loopJob = SupervisorJob(scope.coroutineContext[Job])
     private val loopScope = CoroutineScope(scope.coroutineContext + loopJob)
 
-    private val _state = MutableStateFlow(Timeline(conversationId))
+    private val _state = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
     val state: StateFlow<Timeline> = _state.asStateFlow()
 
     private val _streamSubscriberActive = MutableStateFlow(false)
@@ -57,12 +68,17 @@ class TimelineSyncLoop(
     private val _events = MutableSharedFlow<TimelineSyncEvent>(replay = 1, extraBufferCapacity = 64)
     val events: SharedFlow<TimelineSyncEvent> = _events.asSharedFlow()
 
+    private var snapshotRevision: Long = initialRevision
+    private val persistRequests = Channel<SnapshotPersistRequest>(Channel.CONFLATED)
+    private val persistMutex = Mutex()
+    private val persistJob: Job
+
     private val pendingToolReturnsByCallId = LinkedHashMap<String, ToolReturnMessage>()
     private val seenStreamMessageLock = SynchronizedObject()
     private val seenStreamMessageKeys = ArrayDeque<String>()
     private val seenStreamMessageKeySet = mutableSetOf<String>()
     private val holderFramesIn = MutableSharedFlow<LettaMessage>(extraBufferCapacity = 64)
-    private val holderHydrationSeed = MutableStateFlow(Timeline(conversationId))
+    private val holderHydrationSeed = MutableStateFlow(initialTimeline ?: Timeline(conversationId))
     
     private val holder = com.letta.mobile.data.timeline.experimental.ConversationStateHolder(
         conversationId = conversationId,
@@ -90,7 +106,8 @@ class TimelineSyncLoop(
         loopScope = loopScope,
         ingestNotificationDispatcher = ingestNotificationDispatcher,
         holderFramesIn = holderFramesIn,
-        getHolderEventCount = { holder.state.value.events.size }
+        getHolderEventCount = { holder.state.value.events.size },
+        onStreamFrameIngested = { scheduleSnapshotPersist(immediate = false) },
     )
 
     private val recentMessagesReconciler = TimelineRecentMessagesReconciler(
@@ -111,8 +128,70 @@ class TimelineSyncLoop(
         writeMutex = writeMutex,
         state = _state,
         events = _events,
-        holderHydrationSeed = holderHydrationSeed
+        holderHydrationSeed = holderHydrationSeed,
+        onHydrationCommitted = { scheduleSnapshotPersist(immediate = true) },
     )
+
+    internal fun scheduleSnapshotPersist(immediate: Boolean = false) {
+        timelineScope ?: return
+        if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        persistRequests.trySend(
+            if (immediate) SnapshotPersistRequest.Immediate else SnapshotPersistRequest.Debounced,
+        )
+    }
+
+    private suspend fun runSnapshotPersistence() {
+        for (request in persistRequests) {
+            if (request == SnapshotPersistRequest.Debounced) {
+                delay(SNAPSHOT_PERSIST_DEBOUNCE_MS)
+            }
+            while (persistRequests.tryReceive().isSuccess) {
+                // Coalesce all timeline changes received during the debounce window.
+            }
+            flushSnapshotNow(prune = true)
+        }
+    }
+
+    suspend fun flushSnapshotNow(prune: Boolean = false) {
+        val snapshotScope = timelineScope ?: return
+        if (confirmedTimelineStore === NoOpConfirmedTimelineStore) return
+        persistMutex.withLock {
+            persistCurrentSnapshot(snapshotScope, prune)
+        }
+    }
+
+    private suspend fun persistCurrentSnapshot(snapshotScope: TimelineScope, prune: Boolean) {
+        val currentTimeline = writeMutex.withLock { state.value }
+        val revision = ++snapshotRevision
+        val envelope = TimelineSnapshotCodec.timelineToStoredEnvelope(
+            timeline = currentTimeline,
+            scope = snapshotScope,
+            revision = revision,
+            writtenAtMillis = timelineCurrentTimeMillis(),
+        )
+        try {
+            val written = confirmedTimelineStore.writeSnapshot(envelope)
+            if (prune) {
+                confirmedTimelineStore.prune(snapshotScope.backendId, MAX_RETAINED_SNAPSHOTS)
+            }
+            if (!written) {
+                Telemetry.event(
+                    "TimelineSync", "snapshotPersist.staleRejected",
+                    "conversationId" to conversationId,
+                    "revision" to revision,
+                    level = Telemetry.Level.WARN,
+                )
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Throwable) {
+            Telemetry.error(
+                "TimelineSync", "snapshotPersist.failed", error,
+                "conversationId" to conversationId,
+                "revision" to revision,
+            )
+        }
+    }
 
     // letta-mobile-dangling-tool: canonical-record-driven post-turn sweep +
     // hydration guard for tool-call cards left unresolved after PR #900
@@ -186,6 +265,7 @@ class TimelineSyncLoop(
     )
 
     init {
+        persistJob = loopScope.launch { runSnapshotPersistence() }
         loopScope.launch { processEventQueue() }
         if (startStreamSubscriber) {
             loopScope.launch { runStreamSubscriber() }
@@ -197,9 +277,19 @@ class TimelineSyncLoop(
     }
 
     fun close() {
+        persistRequests.close()
         eventQueue.close(CancellationException("TimelineSyncLoop closed"))
         outboundSendProcessor.sendQueue.close(CancellationException("TimelineSyncLoop closed"))
         loopJob.cancel(CancellationException("TimelineSyncLoop closed"))
+    }
+
+    suspend fun closeAndJoin() {
+        persistRequests.close()
+        withContext(NonCancellable) {
+            persistJob.join()
+            flushSnapshotNow(prune = true)
+        }
+        close()
     }
 
     @Volatile
@@ -545,7 +635,13 @@ class TimelineSyncLoop(
         wsSubscription.clear()
     }
 
+    private enum class SnapshotPersistRequest {
+        Immediate,
+        Debounced,
+    }
+
     companion object {
+        private const val SNAPSHOT_PERSIST_DEBOUNCE_MS = 100L
         private const val STREAM_HEARTBEAT_EXPECTED_MS = 30_000L
         // letta-mobile-5pi: 6x multiplier = 3 minute silence timeout.
         // Previously 12x (6 minutes) — a dead stream could go undetected
@@ -553,6 +649,7 @@ class TimelineSyncLoop(
         // margin for network jitter) while detecting stuck streams faster.
         private const val STREAM_SILENCE_TIMEOUT_MS = STREAM_HEARTBEAT_EXPECTED_MS * 6
         private const val MAX_SEEN_STREAM_MESSAGES = 512
+        private const val MAX_RETAINED_SNAPSHOTS = 50
         private val activeStreamCount = TimelineAtomicCounter(0)
         internal val DEFAULT_INCLUDE_TYPES = listOf("assistant_message", "reasoning_message", "tool_call_message", "tool_return_message")
     }

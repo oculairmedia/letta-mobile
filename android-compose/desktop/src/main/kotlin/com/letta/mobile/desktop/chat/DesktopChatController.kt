@@ -30,6 +30,7 @@ import com.letta.mobile.util.Telemetry
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -55,16 +56,13 @@ class DesktopChatController(
     // PATCHes the server so this lights up automatically once the backend lands.
     loadArchivedConversationIds: () -> Set<String> = { emptySet() },
     private val persistArchivedConversationIds: (Set<String>) -> Unit = {},
-    private val loopFactory: (
+    private val timelinePersistence: DesktopTimelinePersistence = DesktopTimelinePersistence(),
+    private val loopFactory: suspend (
         gateway: DesktopChatGateway,
         conversation: DesktopConversationSummary,
         scope: CoroutineScope,
     ) -> DesktopTimelineLoop = { gateway, conversation, loopScope ->
-        RealDesktopTimelineLoop(
-            gateway = gateway,
-            conversation = conversation,
-            scope = loopScope,
-        )
+        RealDesktopTimelineLoop.create(gateway, conversation, loopScope, timelinePersistence)
     },
 ) {
     private val initialState = initialLiveDesktopChatSurfaceState(bootstrapState)
@@ -344,6 +342,12 @@ class DesktopChatController(
     private var started = false
     private var closed = false
 
+    private fun closeActiveLoopAsync() {
+        val loop = activeLoop ?: return
+        activeLoop = null
+        scope.launch(start = CoroutineStart.UNDISPATCHED) { loop.closeAndAwait() }
+    }
+
     fun start() {
         if (started || closed) return
         started = true
@@ -356,8 +360,7 @@ class DesktopChatController(
         selectJob?.cancel()
         sendJob?.cancel()
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         (gateway as? AutoCloseable)?.close()
         bindGateway(null)
         started = false
@@ -382,8 +385,7 @@ class DesktopChatController(
         sendJob?.cancel()
         createConversationJob?.cancel()
         timelineJob?.cancel()
-        activeLoop?.close()
-        activeLoop = null
+        closeActiveLoopAsync()
         (gateway as? AutoCloseable)?.close()
         bindGateway(null)
     }
@@ -439,8 +441,7 @@ class DesktopChatController(
                         _thinkingConversationId.value = null
                     }
                     timelineJob?.cancel()
-                    activeLoop?.close()
-                    activeLoop = null
+                    closeActiveLoopAsync()
                     val runtime = _state.value.runtimeState
                     val nextSelected = runtime.selectedConversationId
                     if (nextSelected != null) {
@@ -949,7 +950,7 @@ class DesktopChatController(
         applyComposerModelLabel(conversationId, conversation.agentId)
 
         timelineJob?.cancel()
-        activeLoop?.close()
+        closeActiveLoopAsync()
         timelineProjector.reset()
         _boundPresenceFacts.value = BoundPresenceFacts()
 
@@ -957,20 +958,38 @@ class DesktopChatController(
             it.withRuntimeState(ChatSessionReducer.beginSelectedConversationHydrate(it.runtimeState, generation))
         }
 
+        val selectionStart = System.currentTimeMillis()
         val loop = loopFactory(nextGateway, conversation, scope)
         activeLoop = loop
+        val snapshotEventCount = loop.state.value.events.size
+        val selectionToSnapshotMs = System.currentTimeMillis() - selectionStart
+        Telemetry.event(
+            "ChatPerformance", "selection_to_snapshot",
+            "conversationId" to conversationId,
+            "durationMs" to selectionToSnapshotMs,
+            "eventCount" to snapshotEventCount,
+            "hasSnapshot" to (snapshotEventCount > 0),
+        )
+
         timelineJob = scope.launch {
             loop.state.collect { timeline ->
                 updateTimelineMessages(conversationId, generation, timeline)
             }
         }
 
+        val refreshStart = System.currentTimeMillis()
         try {
             loop.hydrate(
                 DesktopTimelineHydrateRequest(
                     limit = TimelinePageLimit(50),
                     recordConversationCursor = true,
                 ),
+            )
+            val refreshDurationMs = System.currentTimeMillis() - refreshStart
+            Telemetry.event(
+                "ChatPerformance", "remote_refresh",
+                "conversationId" to conversationId,
+                "durationMs" to refreshDurationMs,
             )
             if (!isActiveSelection(generation)) return
             _state.update {
@@ -982,7 +1001,7 @@ class DesktopChatController(
             if (!isActiveSelection(generation)) return
             _state.update {
                 it.withRuntimeState(
-                    ChatSessionReducer.streamDisconnected(
+                    ChatSessionReducer.hydrateFailed(
                         state = it.runtimeState,
                         generation = generation,
                         errorMessage = t.message ?: t::class.simpleName ?: "Message load failed",

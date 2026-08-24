@@ -25,8 +25,9 @@ import com.letta.mobile.data.model.DomainIdConverters
         RuntimeEventEntity::class,
         MemFsFileEntity::class,
         MemFsCommitEntity::class,
+        ConfirmedTimelineSnapshotEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 @androidx.room.TypeConverters(DomainIdConverters::class)
@@ -38,6 +39,7 @@ abstract class LettaDatabase : RoomDatabase() {
     abstract fun conversationCursorDao(): ConversationCursorDao
     abstract fun runtimeEventDao(): RuntimeEventDao
     abstract fun memFsDao(): MemFsDao
+    abstract fun confirmedTimelineSnapshotDao(): ConfirmedTimelineSnapshotDao
 
     companion object {
         @Volatile

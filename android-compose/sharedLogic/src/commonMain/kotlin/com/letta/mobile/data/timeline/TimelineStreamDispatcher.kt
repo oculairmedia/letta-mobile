@@ -25,6 +25,7 @@ internal class TimelineStreamDispatcher(
     private val ingestNotificationDispatcher: TimelineIngestNotificationDispatcher,
     private val holderFramesIn: MutableSharedFlow<LettaMessage>,
     private val getHolderEventCount: () -> Int,
+    private val onStreamFrameIngested: (() -> Unit)? = null,
 ) {
     // letta-mobile-yflpp: throttle the shadow-holder parity telemetry. This is
     // a Phase-2 parity probe for the experimental ConversationStateHolder, NOT
@@ -51,6 +52,7 @@ internal class TimelineStreamDispatcher(
         if (notification != null) {
             loopScope.launch { ingestNotificationDispatcher.dispatch(notification) }
         }
+        onStreamFrameIngested?.invoke()
         val emitted = holderFramesIn.tryEmit(message)
         dispatchCount++
         val holderEventCount = getHolderEventCount()

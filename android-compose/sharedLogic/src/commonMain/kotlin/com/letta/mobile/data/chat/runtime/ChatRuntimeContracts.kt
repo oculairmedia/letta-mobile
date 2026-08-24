@@ -163,12 +163,31 @@ enum class ChatComposerError {
 }
 
 @Immutable
+enum class SnapshotAvailability {
+    None,
+    Persisted,
+    Live,
+}
+
+@Immutable
+enum class RemoteSyncState {
+    Idle,
+    Refreshing,
+    Live,
+    Offline,
+    Failed,
+    StreamDisconnected,
+}
+
+@Immutable
 data class ChatSessionState(
     val conversations: List<ChatConversationSummary> = emptyList(),
     val selectedConversationId: String? = null,
     val messagesByConversationId: Map<String, List<UiMessage>> = emptyMap(),
     val composer: ChatComposerState = ChatComposerState(),
     val connectionState: ChatConnectionState = ChatConnectionState.Loading,
+    val snapshotAvailability: SnapshotAvailability = SnapshotAvailability.None,
+    val remoteSyncState: RemoteSyncState = RemoteSyncState.Idle,
     val isRemoteBacked: Boolean = true,
     val isLoading: Boolean = false,
     val isSending: Boolean = false,
