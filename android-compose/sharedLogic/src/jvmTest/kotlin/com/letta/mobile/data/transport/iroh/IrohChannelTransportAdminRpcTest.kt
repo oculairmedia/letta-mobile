@@ -674,7 +674,7 @@ class IrohChannelTransportAdminRpcTest {
     }
 
     @Test
-    fun concurrentSuccessDoesNotResetFailingRpcGenerationRetryState() = runTest {
+    fun concurrentSuccessResetsSharedGenerationRetryState() = runTest {
         val aEntered = CompletableDeferred<Unit>()
         val aRelease = CompletableDeferred<Unit>()
         var dials = 0
@@ -690,11 +690,11 @@ class IrohChannelTransportAdminRpcTest {
                 if (path == "/a") {
                     aAttempts += 1
                     if (aAttempts == 1) {
-                        aEntered.complete(Unit)
-                        aRelease.await()
                         throw IllegalStateException("connection lost attempt 1")
                     }
                     if (aAttempts == 2) {
+                        aEntered.complete(Unit)
+                        aRelease.await()
                         throw IllegalStateException("connection lost attempt 2")
                     }
                     response("ok-a", success = true, result = JsonPrimitive("ok-a"))
@@ -704,18 +704,21 @@ class IrohChannelTransportAdminRpcTest {
             }
         }
 
-        // 1. Call A begins first attempt and gates
+        // 1. Call A records its first failure, then gates during its retry.
         val pendingA = async {
             transport.adminRpc("message.list", "/a", null)
         }
         runCurrent()
         aEntered.await()
+        assertEquals(1, transport.adminRpcRetryState.consecutiveFailures)
 
-        // 2. Concurrent Call B executes successfully
+        // 2. Retry state is deliberately shared per generation, so a concurrent success
+        // proves that the connection is healthy and clears Call A's prior failure.
         val resultB = transport.adminRpc("message.list", "/b", null)
         assertTrue(resultB.success)
+        assertEquals(0, transport.adminRpcRetryState.consecutiveFailures)
 
-        // 3. Release Call A's first attempt (which fails, retries, fails again -> escalates)
+        // 3. Release Call A's retry (which fails and escalates).
         aRelease.complete(Unit)
         runCurrent()
         advanceUntilIdle()
