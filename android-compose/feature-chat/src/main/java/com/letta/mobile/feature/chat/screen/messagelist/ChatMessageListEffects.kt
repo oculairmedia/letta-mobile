@@ -54,10 +54,12 @@ internal fun ChatMessageListEffects(params: ChatMessageListEffectsParams) {
             listState = params.listState,
         ),
     )
-    ChatMessageListAutoScrollEffect(params)
-    ChatMessageListLoadOlderEffect(params)
-    ChatMessageListReleaseOlderEffect(params)
-    ChatMessageListScrollToMessageEffect(params)
+    if (!params.isPinching) {
+        ChatMessageListAutoScrollEffect(params)
+        ChatMessageListLoadOlderEffect(params)
+        ChatMessageListReleaseOlderEffect(params)
+        ChatMessageListScrollToMessageEffect(params)
+    }
 }
 
 @Composable

@@ -55,6 +55,12 @@ internal object ChatMessageRoles {
 
 internal const val StreamingAutoScrollSnapThrottleMs = 96L
 
+internal fun chatRenderItemSeesLiveScale(
+    isPinching: Boolean,
+    scaleWindowIndexRange: IntRange,
+    itemIndex: Int,
+): Boolean = !isPinching || scaleWindowIndexRange.isEmpty() || itemIndex in scaleWindowIndexRange
+
 internal fun autoScrollAction(input: AutoScrollActionInput): ChatAutoScrollAction {
     if (!input.isStreaming || input.signature.role != ChatMessageRoles.Assistant) {
         return ChatAutoScrollAction.Animate

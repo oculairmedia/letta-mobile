@@ -5,9 +5,13 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculateCentroid
 import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -17,6 +21,9 @@ import com.letta.mobile.data.model.UiMessage
 import com.letta.mobile.ui.zoom.PinchScalePreviewController
 import com.letta.mobile.util.Telemetry
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 
 internal data class ChatPinchVisibleContentSummary(
     val userMessages: Int,
@@ -44,7 +51,8 @@ internal data class ChatPinchGestureRuntime(
     val currentLoadPressureSummary: ChatLoadPressureSummary,
     val callbacks: ChatMessageListCallbacks,
     val pinchFontScaleController: PinchScalePreviewController,
-    val pinchState: ChatItemPinchState,
+    val pinchAnchorState: ChatPinchAnchorState,
+    val compensationRequests: Channel<Unit>,
     val pinchFrameBudgetSampler: ChatPinchFrameBudgetSampler,
     val onPinchTick: (Long) -> Unit,
     val onPinchAnimationSuppressionTick: (Long) -> Unit,
@@ -87,7 +95,7 @@ internal data class ChatPinchGestureBoxParams(
     val currentLoadPressureSummary: ChatLoadPressureSummary,
     val callbacks: ChatMessageListCallbacks,
     val pinchFontScaleController: PinchScalePreviewController,
-    val pinchState: ChatItemPinchState,
+    val pinchAnchorState: ChatPinchAnchorState,
     val pinchFrameBudgetSampler: ChatPinchFrameBudgetSampler,
     val onPinchTick: (Long) -> Unit,
     val onPinchAnimationSuppressionTick: (Long) -> Unit,
@@ -101,6 +109,9 @@ internal fun ChatMessageListPinchGestureBox(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
+    val compensationRequests = remember {
+        Channel<Unit>(capacity = Channel.CONFLATED)
+    }
     val runtime = ChatPinchGestureRuntime(
         listState = params.listState,
         activeFontScale = params.activeFontScale,
@@ -108,18 +119,36 @@ internal fun ChatMessageListPinchGestureBox(
         currentLoadPressureSummary = params.currentLoadPressureSummary,
         callbacks = params.callbacks,
         pinchFontScaleController = params.pinchFontScaleController,
-        pinchState = params.pinchState,
+        pinchAnchorState = params.pinchAnchorState,
+        compensationRequests = compensationRequests,
         pinchFrameBudgetSampler = params.pinchFrameBudgetSampler,
         onPinchTick = params.onPinchTick,
         onPinchAnimationSuppressionTick = params.onPinchAnimationSuppressionTick,
         onSuppressPinchLayoutAnimations = params.onSuppressPinchLayoutAnimations,
     )
+    ChatPinchAnchorCompensationEffect(runtime)
     BoxWithConstraints(
         modifier = modifier
             .fillMaxSize()
             .chatMessageListPinchGesture(runtime),
     ) {
         content()
+    }
+}
+
+@Composable
+private fun ChatPinchAnchorCompensationEffect(runtime: ChatPinchGestureRuntime) {
+    LaunchedEffect(runtime.listState, runtime.compensationRequests) {
+        runtime.compensationRequests.receiveAsFlow().collectLatest {
+            withFrameNanos { }
+            val visibleItems = runtime.listState.layoutInfo.visibleItemsInfo.map {
+                ChatVisibleItemBounds(it.key, it.index, it.offset, it.offset + it.size)
+            }
+            val correction = runtime.pinchAnchorState.correction(visibleItems)
+            if (correction.anchor != null && correction.deltaPx != 0f) {
+                runtime.listState.scrollBy(correction.deltaPx)
+            }
+        }
     }
 }
 
@@ -132,40 +161,37 @@ private fun Modifier.chatMessageListPinchGesture(runtime: ChatPinchGestureRuntim
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 if (event.changes.count { it.pressed } >= 2) {
                     if (!gesturePinching) {
-                        gesturePinching = true
-                        startChatPinchGesture(runtime, event.calculateCentroid().y)
+                        gesturePinching = startChatPinchGesture(runtime, event.calculateCentroid().y)
                     }
-                    if (runtime.pinchState.reconcile(runtime.currentRenderItems.map { it.key })) {
-                        applyChatPinchZoom(
-                            ChatPinchZoomContext(
-                                event = event,
-                                pinchFontScaleController = runtime.pinchFontScaleController,
-                            ),
-                        )
-                    } else {
-                        cancelChatPinchGesture(runtime)
-                        gesturePinching = false
-                    }
+                    if (!gesturePinching) continue
+                    applyChatPinchZoom(
+                        ChatPinchZoomContext(
+                            event = event,
+                            pinchFontScaleController = runtime.pinchFontScaleController,
+                        ),
+                    )
+                    runtime.compensationRequests.trySend(Unit)
                 }
             } while (event.changes.any { it.pressed })
             finishChatPinchGesture(runtime, gesturePinching)
         }
     }
 
-private fun startChatPinchGesture(runtime: ChatPinchGestureRuntime, centroidYPx: Float) {
-    val owner = runtime.pinchState.begin(
+private fun startChatPinchGesture(runtime: ChatPinchGestureRuntime, centroidYPx: Float): Boolean {
+    val anchor = runtime.pinchAnchorState.begin(
         centroidYPx = centroidYPx,
         visibleItems = runtime.listState.layoutInfo.visibleItemsInfo.map {
             ChatVisibleItemBounds(
                 key = it.key,
+                index = it.index,
                 topPx = it.offset,
                 bottomPx = it.offset + it.size,
             )
         },
-    ) ?: return
-    if (owner.key !in runtime.currentRenderItems.map { it.key }) {
-        runtime.pinchState.finish()
-        return
+    ) ?: return false
+    if (anchor.key !in runtime.currentRenderItems.map { it.key }) {
+        runtime.pinchAnchorState.finish()
+        return false
     }
     runtime.onSuppressPinchLayoutAnimations(true)
     runtime.onPinchAnimationSuppressionTick(0L)
@@ -184,6 +210,7 @@ private fun startChatPinchGesture(runtime: ChatPinchGestureRuntime, centroidYPx:
         ),
     )
     runtime.onPinchTick(System.nanoTime())
+    return true
 }
 
 private fun visiblePinchContent(runtime: ChatPinchGestureRuntime): ChatPinchVisibleContentSummary {
@@ -211,31 +238,25 @@ private fun finishChatPinchGesture(runtime: ChatPinchGestureRuntime, gesturePinc
 }
 
 private fun finishActiveChatPinchGesture(runtime: ChatPinchGestureRuntime) {
-    val previewScale = runtime.pinchFontScaleController.effectiveScale
+    val snapped = runtime.pinchFontScaleController.finishPreview()
+    runtime.callbacks.onActiveFontScaleChange(snapped)
+    runtime.callbacks.onFontScaleChange(snapped)
+    runtime.pinchAnchorState.finish()
     runtime.pinchFrameBudgetSampler.stop(
         ChatPinchFrameBudgetStopContext(
             committedScale = runtime.activeFontScale,
-            targetScale = previewScale,
+            targetScale = snapped,
         ),
     )
-    finishLocalPinch(
-        state = runtime.pinchState,
-        cancelPreview = runtime.pinchFontScaleController::cancel,
-        releaseAnimationSuppression = {
-            runtime.onSuppressPinchLayoutAnimations(false)
-            runtime.onPinchTick(System.nanoTime())
-            runtime.onPinchAnimationSuppressionTick(System.nanoTime())
-        },
-    )
+    runtime.onPinchTick(System.nanoTime())
+    runtime.onPinchAnimationSuppressionTick(System.nanoTime())
 }
 
 private fun cancelChatPinchGesture(runtime: ChatPinchGestureRuntime) {
+    runtime.pinchFontScaleController.cancel()
+    runtime.pinchAnchorState.finish()
     runtime.pinchFrameBudgetSampler.cancel()
-    finishLocalPinch(
-        state = runtime.pinchState,
-        cancelPreview = runtime.pinchFontScaleController::cancel,
-        releaseAnimationSuppression = { runtime.onSuppressPinchLayoutAnimations(false) },
-    )
+    runtime.onSuppressPinchLayoutAnimations(false)
 }
 
 internal fun Collection<ChatRenderItem>.pinchVisibleContentSummary(): ChatPinchVisibleContentSummary {

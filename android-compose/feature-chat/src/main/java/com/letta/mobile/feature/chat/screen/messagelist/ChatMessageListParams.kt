@@ -58,6 +58,7 @@ internal data class ChatMessageListEffectsParams(
     val onHighlightedMessageIdChange: (String?) -> Unit,
     val hasScrolledToTarget: Boolean,
     val onHasScrolledToTargetChange: (Boolean) -> Unit,
+    val isPinching: Boolean,
 )
 
 internal data class ChatMessageListLazyColumnParams(
@@ -82,7 +83,7 @@ internal data class ChatMessageListBodyParams(
     val isUserScrolling: Boolean,
     val liveFontScale: Float,
     val pinchFontScaleController: com.letta.mobile.ui.zoom.PinchScalePreviewController,
-    val pinchState: ChatItemPinchState,
+    val scaleWindowIndexRange: IntRange,
     val itemGeometryState: com.letta.mobile.ui.chat.render.ChatMessageGeometryState,
     val highlightedMessageId: String?,
     val showScrollFab: Boolean,
