@@ -152,9 +152,6 @@ class IrohChannelTransport(
      * coroutines on Dispatchers.IO.
      */
     private val turnRegistry = IrohTurnRegistry()
-    private val connectionGeneration = atomic(0L)
-    @Volatile
-    private var resubscribeJob: Job? = null
 
     override fun hasActiveChatTurn(conversationId: String): Boolean =
         turnRegistry.hasActiveTurn(IrohConversationId(conversationId))
@@ -216,55 +213,15 @@ class IrohChannelTransport(
 
     private fun handleSupervisorStateChange(state: IrohConnectionState) {
         _state.value = state.toChannelTransportState()
-        when (state) {
-            is IrohConnectionState.Ready -> handleReadyState(state)
-            else -> handleInactiveState(state)
+        if (state is IrohConnectionState.Ready) {
+            notifyRedialIfTurnActive()
+            connectionSession.onReady(state.handle)
+            livenessProbe.start(state.handle)
+        } else {
+            connectionSession.onNotReady()
+            updateInterruptedTurns(state)
+            livenessProbe.stop("state:${state::class.simpleName}")
         }
-    }
-
-    private fun handleReadyState(state: IrohConnectionState.Ready) {
-        val generation = connectionGeneration.incrementAndGet()
-        notifyRedialIfTurnActive()
-        startObserverIngest(state.handle, generation)
-        resubscribeViewedConversation(generation)
-        livenessProbe.start(state.handle)
-    }
-
-    private fun resubscribeViewedConversation(generation: Long) {
-        val path = viewedMessageListPath ?: return
-        val conversationId = viewedConversationId.orEmpty()
-        resubscribeJob?.cancel()
-        resubscribeJob = scope.launch {
-            if (connectionGeneration.value != generation) return@launch
-            Telemetry.event(
-                "IrohObserver", "resubscribe.begin",
-                "conversationId" to conversationId,
-                "generation" to generation.toString(),
-            )
-            runCatching {
-                if (connectionGeneration.value == generation) {
-                    adminRpc(method = "message.list", path = path, body = null)
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                Telemetry.event(
-                    "IrohObserver", "resubscribe.failed",
-                    "conversationId" to conversationId,
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
-                )
-            }
-        }
-    }
-
-    private fun handleInactiveState(state: IrohConnectionState) {
-        connectionGeneration.incrementAndGet()
-        resubscribeJob?.cancel()
-        resubscribeJob = null
-        updateInterruptedTurns(state)
-        val reason = "state:${state::class.simpleName}"
-        stopObserverIngest(reason)
-        livenessProbe.stop(reason)
     }
 
     private fun updateInterruptedTurns(state: IrohConnectionState) {
@@ -314,60 +271,15 @@ class IrohChannelTransport(
     // stream_delta frames into the SAME _events/_frameEvents seam the initiator
     // uses, so observer frames reduce identically.
     private val observerMapper = AppServerRuntimeEventMapper()
-    private val observerGeneration = atomic(0)
-    @Volatile
-    private var observerJob: Job? = null
-
-    private fun startObserverIngest(handle: IrohConnectionHandle, generation: Long) {
-        val streamFrames = handle.effectiveObserverStreamFrames
-        if (streamFrames == null) {
-            stopObserverIngest("no_observer_stream")
-            Telemetry.event("IrohObserver", "ingest.unavailable", "sessionId" to handle.sessionId)
-            return
-        }
-        observerJob?.cancel()
-        Telemetry.event(
-            "IrohObserver", "ingest.start",
-            "sessionId" to handle.sessionId,
-            "generation" to generation.toString(),
-        )
-        observerJob = scope.launch {
-            runCatching {
-                streamFrames.collect { received ->
-                    if (connectionGeneration.value != generation) return@collect
-                    ingestObserverFrame(received)
-                }
-            }.onFailure { error ->
-                if (error is CancellationException) throw error
-                Telemetry.event(
-                    "IrohObserver", "ingest.failed",
-                    "error" to (error.message ?: error.toString()),
-                    "class" to error::class.simpleName,
-                )
-            }
-        }
-    }
-
-    private fun stopObserverIngest(reason: String) {
-        val job = observerJob ?: return
-        observerJob = null
-        observerGeneration.incrementAndGet()
-        job.cancel()
-        Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
-    }
-
-    // letta-mobile-r3i1z (A): RE-SUBSCRIBE ON RECONNECT.
-    @Volatile
-    private var viewedConversationId: String? = null
-    @Volatile
-    private var viewedMessageListPath: String? = null
-
-    private fun recordViewedConversationFrom(method: String, path: String) {
-        if (method != "message.list") return
-        val conversationId = IrohTransportSupport.conversationIdFromMessageListPath(path) ?: return
-        viewedConversationId = conversationId
-        viewedMessageListPath = path
-    }
+    // Own generation-bound observer and viewer re-subscription work in a typed
+    // session so stale handles cannot mutate a successor connection.
+    private val connectionSession = IrohConnectionSession(
+        scope = scope,
+        ingestObserverFrame = ::ingestObserverFrame,
+        resubscribe = { conversation ->
+            adminRpc(method = "message.list", path = conversation.messageListPath, body = null)
+        },
+    )
 
     /**
      * Ingest ONE fanned-out stream frame the observer path owns.
@@ -842,7 +754,7 @@ class IrohChannelTransport(
         val initialRunId = "iroh-run-${UUID.randomUUID()}"
         val token = IrohTurnToken(
             conversationId = IrohConversationId(conversationId),
-            generation = connectionGeneration.value,
+            generation = connectionSession.currentGeneration(),
             turnId = IrohTurnId(turnId),
         )
         val startResult = turnRegistry.tryStart(
@@ -1305,7 +1217,9 @@ class IrohChannelTransport(
         // the hydrate so a later reconnect can re-register this connection as a
         // server-side viewer with no user action. Recorded before the call so a
         // hydrate that only succeeds on retry/redial is still captured.
-        recordViewedConversationFrom(method, path)
+        if (method == "message.list") {
+            IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
+        }
         // letta-mobile-parg0: in-flight admin_rpc (even before completion) proves
         // openBi is progressing — the liveness probe must not declare-dead over it.
         val inFlightToken = adminRpcRetryState.beginAdminRpc()
@@ -1437,13 +1351,10 @@ class IrohChannelTransport(
     private fun String.isReadOnlyAdminRpcMethod(): Boolean = this in READ_ONLY_ADMIN_RPC_METHODS
 
     override suspend fun disconnect() {
-        connectionGeneration.incrementAndGet()
-        resubscribeJob?.cancel()
-        resubscribeJob = null
+        connectionSession.stopAndJoin()
         turnRegistry.clear()
         subagentCorrelator.reset()
         lastEmittedSubagentRevision = 0L
-        stopObserverIngest("disconnect")
         livenessProbe.stop("disconnect")
         supervisor.disconnect("disconnect")
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
@@ -1733,9 +1644,9 @@ class IrohChannelTransport(
     }
 
     private fun currentSubagentScope(): SubagentRpcScope? {
-        val conversationId = viewedConversationId ?: return null
-        val agentId = turnRegistry.getActiveTurn(IrohConversationId(conversationId))?.agentId
-        return SubagentRpcScope(conversationId, agentId)
+        val conversationId = connectionSession.currentViewedConversationId() ?: return null
+        val agentId = turnRegistry.getActiveTurn(IrohConversationId(conversationId.value))?.agentId
+        return SubagentRpcScope(conversationId.value, agentId)
     }
 
     private fun subagentListFailure(requestId: String, error: String) = ServerFrame.SubagentListResponse(

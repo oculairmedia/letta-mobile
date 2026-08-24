@@ -65,6 +65,8 @@ internal class IrohConnectionSession(
 
     fun currentViewedConversationId(): ConversationId? = viewedConversation?.id
 
+    fun currentGeneration(): Long = generation.value
+
     private fun startObserverIngest(handle: IrohConnectionHandle, readyGeneration: IrohSessionGeneration) {
         val streamFrames = handle.effectiveObserverStreamFrames
         if (streamFrames == null) {
