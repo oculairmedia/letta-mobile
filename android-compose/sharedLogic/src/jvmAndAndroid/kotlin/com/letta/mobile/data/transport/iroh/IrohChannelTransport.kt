@@ -207,29 +207,6 @@ class IrohChannelTransport(
     override val hasAnyActiveChatTurn: Boolean
         get() = activeTurns.values.any { !it.terminalReached.isCompleted }
 
-    internal data class ActiveTurnSnapshot(
-        val turnId: String,
-        val runId: String,
-        val hasTerminal: Boolean,
-        val isTerminalCompleted: Boolean,
-    )
-
-    internal fun activeTurnSnapshot(conversationId: String): ActiveTurnSnapshot? {
-        val turn = activeTurns[conversationId] ?: return null
-        return ActiveTurnSnapshot(
-            turnId = turn.turnId,
-            runId = turn.runId,
-            hasTerminal = turn.hasTerminal,
-            isTerminalCompleted = turn.terminalReached.isCompleted,
-        )
-    }
-
-    internal fun activeSendJob(conversationId: String): Job? = activeSendJobs[conversationId]
-
-    internal fun activeTurnsCount(): Int = activeTurns.size
-
-    internal fun activeSendJobsCount(): Int = activeSendJobs.size
-
     /**
      * letta-mobile-m6oa1.1: the Kotlin App Server's own Agent-tool_call
      * correlation reducer — the Kotlin analogue of the shim's
