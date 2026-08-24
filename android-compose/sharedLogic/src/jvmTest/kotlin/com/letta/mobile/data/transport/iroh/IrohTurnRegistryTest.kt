@@ -4,126 +4,81 @@ import kotlinx.coroutines.Job
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class IrohTurnRegistryTest {
-
     private val registry = IrohTurnRegistry()
 
     @Test
     fun tryStartRegistersNewTurnWhenIdle() {
-        val result = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-1",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val result = registry.tryStart(request())
         assertTrue(result is IrohTryStartResult.Started)
         assertEquals("conv-1", result.turn.conversationId)
         assertEquals("turn-1", result.turn.turnId)
         assertEquals("run-1", result.turn.runId)
-        assertTrue(registry.hasActiveTurn("conv-1"))
+        assertTrue(registry.hasActiveTurn(conversationId()))
         assertTrue(registry.hasAnyActiveTurn)
     }
 
     @Test
     fun tryStartRejectsWhenTurnAlreadyActive() {
-        val first = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-1",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val first = registry.tryStart(request())
         assertTrue(first is IrohTryStartResult.Started)
 
-        val second = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-2",
-            initialRunId = "run-2",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val second = registry.tryStart(request(turnId = "turn-2", runId = "run-2"))
         assertTrue(second is IrohTryStartResult.Busy)
         assertEquals("turn-1", second.activeTurn.turnId)
-        assertEquals("turn-2", second.rejectedTurnId)
+        assertEquals("turn-2", second.rejectedToken.turnId.value)
     }
 
     @Test
     fun promoteRunIdUpdatesSyntheticToRealRunId() {
-        val start = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "iroh-run-synth-1",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val start = registry.tryStart(request(runId = "iroh-run-synth-1"))
         assertTrue(start is IrohTryStartResult.Started)
 
-        val promoted = registry.promoteRunId("conv-1", "turn-1", "real-run-123")
+        val promoted = registry.promoteRunId(IrohRunPromotion(start.turn.token, IrohRunId("real-run-123")))
         assertTrue(promoted)
-        assertEquals("real-run-123", registry.getActiveTurn("conv-1")?.runId)
+        assertEquals("real-run-123", registry.getActiveTurn(conversationId())?.runId)
 
-        val secondPromotion = registry.promoteRunId("conv-1", "turn-1", "real-run-456")
+        val secondPromotion = registry.promoteRunId(IrohRunPromotion(start.turn.token, IrohRunId("real-run-456")))
         assertFalse(secondPromotion)
     }
 
     @Test
     fun publishTerminalClaimsExactlyOnceAndRetires() {
-        val start = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "real-run-1",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val start = registry.tryStart(request())
         assertTrue(start is IrohTryStartResult.Started)
         val turn = start.turn
 
-        val published = registry.publishTerminal(turn, status = "completed", source = "engine")
+        val published = registry.publishTerminal(publication(turn, IrohTerminalSource.Engine))
         assertTrue(published)
         assertTrue(turn.hasTerminal)
-        assertEquals("engine", turn.terminalSource)
+        assertEquals(IrohTerminalSource.Engine, turn.terminalSource)
         assertTrue(turn.terminalReached.isCompleted)
-        assertNull(registry.getActiveTurn("conv-1"))
-        assertFalse(registry.hasActiveTurn("conv-1"))
-        assertTrue(registry.isRetiredRun("real-run-1"))
+        assertNull(registry.getActiveTurn(conversationId()))
+        assertFalse(registry.hasActiveTurn(conversationId()))
+        assertTrue(registry.isRetiredRun(IrohRunId("run-1")))
 
-        val secondPublish = registry.publishTerminal(turn, status = "completed", source = "observer")
+        val secondPublish = registry.publishTerminal(publication(turn, IrohTerminalSource.Observer))
         assertFalse(secondPublish)
     }
 
     @Test
     fun finishWithMatchingTokenRemovesTurn() {
-        val start = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-1",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val start = registry.tryStart(request())
         assertTrue(start is IrohTryStartResult.Started)
 
-        val finished = registry.finish(start.turn.token)
-        assertTrue(finished)
-        assertNull(registry.getActiveTurn("conv-1"))
+        assertTrue(registry.finish(start.turn.token))
+        assertNull(registry.getActiveTurn(conversationId()))
     }
 
     @Test
     fun clearCancelsJobsAndCompletesActiveTurns() {
-        val start = registry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-1",
-            agentId = "agent-1",
-            generation = 1L,
-        )
+        val start = registry.tryStart(request())
         assertTrue(start is IrohTryStartResult.Started)
         val job = Job()
-        registry.registerSendJob("conv-1", job)
+        registry.registerSendJob(IrohSendJobRegistration(conversationId(), job))
 
         registry.clear()
 
@@ -133,4 +88,21 @@ class IrohTurnRegistryTest {
         assertEquals(0, registry.activeTurnsCount())
         assertEquals(0, registry.activeSendJobsCount())
     }
+
+    private fun conversationId() = IrohConversationId("conv-1")
+
+    private fun request(
+        turnId: String = "turn-1",
+        runId: String = "run-1",
+    ) = IrohTurnRequest(
+        token = IrohTurnToken(conversationId(), generation = 1L, turnId = IrohTurnId(turnId)),
+        runId = IrohRunId(runId),
+        agentId = IrohAgentId("agent-1"),
+    )
+
+    private fun publication(turn: IrohActiveTurn, source: IrohTerminalSource) = IrohTerminalPublication(
+        turn = turn,
+        status = IrohTerminalStatus("completed"),
+        source = source,
+    )
 }
