@@ -89,35 +89,43 @@ internal class IrohConnectionSession(
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
     }
 
+    private data class ReSubscription(
+        val path: String,
+        val conversationId: String?,
+        val generation: Long,
+    )
+
     private fun reSubscribeViewedConversation(readyGeneration: Long) {
         val path = viewedMessageListPath ?: return
-        val conversationId = viewedConversationId
+        val request = ReSubscription(path, viewedConversationId, readyGeneration)
         resubscribeJob?.cancel()
-        resubscribeJob = scope.launch {
-            runReSubscription(path, conversationId, readyGeneration)
-        }
+        resubscribeJob = scope.launch { runReSubscription(request) }
     }
 
-    private suspend fun runReSubscription(path: String, conversationId: String?, readyGeneration: Long) {
-        if (generation.value != readyGeneration) return
+    private suspend fun runReSubscription(request: ReSubscription) {
+        if (generation.value != request.generation) return
         Telemetry.event(
             "IrohObserver", "resubscribe.begin",
-            "conversationId" to (conversationId ?: ""),
-            "generation" to readyGeneration.toString(),
+            "conversationId" to (request.conversationId ?: ""),
+            "generation" to request.generation.toString(),
         )
-        try {
-            if (generation.value != readyGeneration) return
-            resubscribe(path)
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            Telemetry.event(
-                "IrohObserver", "resubscribe.failed",
-                "conversationId" to (conversationId ?: ""),
-                "error" to (error.message ?: error.toString()),
-                "class" to error::class.simpleName,
-            )
-        }
+        resubscribeIfCurrent(request)
+    }
+
+    private suspend fun resubscribeIfCurrent(request: ReSubscription) {
+        if (generation.value != request.generation) return
+        runCatching { resubscribe(request.path) }
+            .onFailure { error -> reportResubscribeFailure(request, error) }
+    }
+
+    private fun reportResubscribeFailure(request: ReSubscription, error: Throwable) {
+        if (error is CancellationException) throw error
+        Telemetry.event(
+            "IrohObserver", "resubscribe.failed",
+            "conversationId" to (request.conversationId ?: ""),
+            "error" to (error.message ?: error.toString()),
+            "class" to error::class.simpleName,
+        )
     }
 
     private fun conversationIdFromMessageListPath(path: String): String? {
