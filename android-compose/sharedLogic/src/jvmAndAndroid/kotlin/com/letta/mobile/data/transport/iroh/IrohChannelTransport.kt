@@ -196,14 +196,52 @@ class IrohChannelTransport(
     private var lastEmittedSubagentRevision: Long = 0L
 
     private var explicitConfig: IrohConnectConfig? = null
+
+    private val irohDialer = IrohDialer(
+        scope = scope,
+        secretKeyStore = secretKeyStore,
+        onConnectionLost = { reason, handle -> supervisor.onConnectionLostAsync(reason, handle) },
+        onCloseResources = ::handleCloseResources,
+    )
+
     // Explicit type: this field and `livenessProbe` reference each other through
     // their lambdas, which defeats type inference.
     private val supervisor: IrohConnectionSupervisor = IrohConnectionSupervisor(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
-        dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
+        dialer = { config -> testDialer?.invoke(config) ?: dialConnection(config) },
         onStateChanged = ::handleSupervisorStateChange,
     )
+
+    private fun handleCloseResources(reason: String) {
+        turnRegistry.allSendJobEntries().forEach { registration ->
+            val conversationId = registration.conversationId
+            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
+            val turn = turnRegistry.getActiveTurn(conversationId)
+            if (turn != null && !turn.hasTerminal) {
+                Telemetry.event(
+                    "IrohTransport", "turn.torn_down_nonterminal",
+                    "reason" to reason,
+                    "conversationId" to conversationId.value,
+                    "turnId" to turn.turnId,
+                    "runId" to turn.runId,
+                )
+            }
+            runCatching { job.cancel() }
+        }
+    }
+
+    private suspend fun dialConnection(config: IrohConnectConfig): IrohConnectionHandle {
+        val forcedUrl = forcedIrohUrl.takeIf { it.isNotBlank() } ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
+        return irohDialer.dial(
+            config = config,
+            effectiveUrlOverride = forcedUrl,
+            onConnecting = {
+                _state.value = ChannelTransportState.Connecting()
+                onConnect()
+            },
+        )
+    }
 
     private fun handleSupervisorStateChange(state: IrohConnectionState) {
         _state.value = state.toChannelTransportState()
@@ -237,6 +275,16 @@ class IrohChannelTransport(
                 IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
             }
         },
+    )
+
+    private val cronRpcClient = IrohCronRpcClient(
+        adminRpc = { method, path, body -> adminRpc(method, path, body) },
+    )
+
+    private val subagentRpcClient = IrohSubagentRpcClient(
+        readyHandle = { supervisor.ready() },
+        currentScope = { observerIngestor.currentSubagentScope() },
+        adminRpc = { method, path, body -> adminRpc(method, path, body) },
     )
 
     /**
@@ -626,90 +674,6 @@ class IrohChannelTransport(
         Telemetry.event("IrohTrace", "transport.connect.done", "state" to "connected", "sessionId" to handle.sessionId)
     }
 
-    private suspend fun dial(config: IrohConnectConfig): IrohConnectionHandle {
-        val effectiveUrl = forcedIrohUrl.takeIf { it.isNotBlank() }
-            ?: DEBUG_FORCE_IROH_URL.takeIf { it.isNotBlank() }
-            ?: config.baseShimUrl
-        if (!isIrohUrl(effectiveUrl)) {
-            error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
-        }
-        val ticket = normalizeIrohAddress(effectiveUrl).takeIf { it.isNotBlank() }
-            ?: error("IrohChannelTransport requires backend URL iroh://<EndpointTicket>.")
-        _state.value = ChannelTransportState.Connecting()
-        onConnect()
-        val secretKey = secretKeyStore.loadOrCreate()
-        val localEndpoint = runCatching {
-            Endpoint.bind(
-                EndpointOptions(relayMode = RelayMode.defaultMode(), secretKey = secretKey)
-            )
-        }.onFailure { t ->
-            Telemetry.event("IrohTransport", "bind.failed", "error" to (t.message ?: t.toString()), "class" to t::class.simpleName)
-        }.getOrThrow()
-        var transport: IrohAppServerTransport? = null
-        // letta-mobile-r3i1z: attribute this connection's loss reports to the
-        // handle produced by THIS dial. A dead transport reports loss up to
-        // twice (close watcher + reader exit) and the second report can land
-        // after the supervisor has already redialed; attribution lets the
-        // supervisor drop such stale reports instead of tearing down the
-        // healthy redialed connection (and its observer-ingestion collector).
-        val dialedHandle = java.util.concurrent.atomic.AtomicReference<IrohConnectionHandle?>(null)
-        return runCatching {
-            transport = IrohAppServerTransportAdapter(
-                endpoint = localEndpoint,
-                onConnectionLost = { reason -> supervisor.onConnectionLostAsync(reason, dialedHandle.get()) },
-            ).createTransport(
-                endpoint = AppServerEndpoint(scheme = "iroh", address = ticket),
-                scope = scope,
-            ) as IrohAppServerTransport
-            val appServerClient = DefaultAppServerClient(transport!!)
-            // The auth exchange doubles as the Iroh transport handshake: it
-            // advertises client capabilities (frame_part chunked-frame
-            // reassembly) so the server may split >1MiB frames instead of
-            // failing them. Send it even with a blank token — servers without
-            // a required token still ack and record capabilities.
-            val auth = appServerClient.auth(
-                AppServerCommand.Auth(
-                    requestId = "auth-${UUID.randomUUID()}",
-                    token = config.token,
-                    capabilities = listOf(IrohFrameCodec.FRAME_PART_CAPABILITY),
-                ),
-            )
-            if (!auth.success && config.token.isNotBlank()) {
-                throw IrohAuthFailure(auth.error ?: "Iroh auth failed")
-            }
-            Telemetry.event(
-                "IrohTransport", "auth.negotiated",
-                "success" to auth.success,
-                "serverCapabilities" to (auth.capabilities ?: emptyList()).sorted().joinToString(","),
-            )
-            // Preflight stays on the Iroh *node* / wrapper turn engine (WS to
-            // App Server). Client-side preflight would send agent_retrieve /
-            // conversation_messages_list as typed control frames; the node only
-            // accepts auth/runtime_start/input/admin_rpc/sync/abort.
-            transport!!.awaitConnectionReady()
-            val (engine, eventRouter) = buildIrohTurnEngine(
-                client = appServerClient,
-                clientVersion = config.clientVersion,
-                routerScope = scope,
-            )
-            IrohConnectionHandle(
-                config = config,
-                ticket = ticket,
-                sessionId = ticket.hashCode().toString(),
-                transport = transport,
-                turnEngine = engine,
-                serverCapabilities = auth.capabilities?.toSet(),
-                close = { reason ->
-                    eventRouter.detach()
-                    closeIrohResources(reason, transport, localEndpoint)
-                },
-            ).also { handle -> dialedHandle.set(handle) }
-        }.getOrElse { error ->
-            closeIrohResources("dial_failed", transport, localEndpoint)
-            throw error
-        }
-    }
-
     override fun send(
         agentId: String,
         conversationId: String,
@@ -1003,61 +967,6 @@ class IrohChannelTransport(
         _state.value = ChannelTransportState.Disconnected(1000, "disconnected")
     }
 
-    private suspend fun closeIrohResources(reason: String, transport: IrohAppServerTransport?, endpoint: Endpoint?) {
-        Telemetry.event(
-            "IrohTrace", "transport.closeCurrent",
-            "reason" to reason,
-            "hasTransport" to (transport != null),
-            "hasEndpoint" to (endpoint != null),
-        )
-        // letta-mobile-or40x: a full teardown legitimately cancels EVERY
-        // conversation's turn — the connection those turns stream over is gone.
-        // Do it explicitly over all keyed entries (not via one global slot), and
-        // report each nonterminal casualty (SENSING b) so a teardown that eats an
-        // in-flight turn is never silent again.
-        turnRegistry.allSendJobEntries().forEach { registration ->
-            val conversationId = registration.conversationId
-            val job = turnRegistry.removeSendJob(conversationId) ?: return@forEach
-            val turn = turnRegistry.getActiveTurn(conversationId)
-            if (turn != null && !turn.hasTerminal) {
-                Telemetry.event(
-                    "IrohTransport", "turn.torn_down_nonterminal",
-                    "reason" to reason,
-                    "conversationId" to conversationId.value,
-                    "turnId" to turn.turnId,
-                    "runId" to turn.runId,
-                )
-            }
-            runCatching { job.cancel() }
-        }
-        runCatching { transport?.close() }
-        runCatching { endpoint?.shutdown() }
-        runCatching { endpoint?.close() }
-    }
-
-    /**
-     * lgns8.22.3: one inbound collector per dial generation; turns subscribe via
-     * fanout instead of collecting [AppServerClient.events] directly.
-     */
-    private fun buildIrohTurnEngine(
-        client: DefaultAppServerClient,
-        clientVersion: String,
-        routerScope: CoroutineScope,
-    ): Pair<AppServerTurnEngine, AppServerRuntimeEventRouter> {
-        val eventRouter = AppServerRuntimeEventRouter()
-        eventRouter.attach(routerScope, client.events)
-        val engine = AppServerTurnEngine(
-            client = client,
-            clientInfo = AppServerRuntimeStartClientInfo(
-                name = "letta-mobile-android-iroh",
-                version = clientVersion,
-            ),
-            permissionMode = AppServerPermissionMode.Unrestricted,
-            turnContextPreflight = TurnContextPreflight.None,
-            eventRouter = eventRouter,
-        )
-        return engine to eventRouter
-    }
 
     private fun IrohConnectionState.toChannelTransportState(): ChannelTransportState = when (this) {
         IrohConnectionState.Disconnected -> ChannelTransportState.Idle
@@ -1374,6 +1283,7 @@ class IrohChannelTransport(
     @Serializable
     private data class CronDeleteAllRpcResult(val deleted: Long = 0L)
 
+
     companion object {
         const val IROH_URL_PREFIX = "iroh://"
         // letta-mobile-m6oa1.3: informational `reason` vocabulary on the
@@ -1390,15 +1300,6 @@ class IrohChannelTransport(
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
-        private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
-        private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
-        // Cron dispatch is by admin_rpc method name; this path is a stable cosmetic
-        // hint (cron is native-only, no proxy fallback consumes it).
-        private const val CRON_ADMIN_PATH = "/v1/cron"
-        private val subagentJson = Json { ignoreUnknownKeys = true }
-        // letta-mobile-34xoj: admin_rpc retry thresholds
-        private const val ADMIN_RPC_FAILURE_THRESHOLD = 3
-        private const val STREAM_IDLE_THRESHOLD_MS = 30_000L
         // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
