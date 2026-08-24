@@ -268,13 +268,16 @@ class IrohChannelTransport(
 
     // letta-mobile-53k65.10: Generation-scoped Admin RPC executor and retry state.
     private val adminRpcExecutor = IrohAdminRpcExecutor(
-        supervisor = supervisor,
-        connectionGeneration = ::currentConnectionGeneration,
-        recordViewedConversation = { method, path ->
-            if (method == "message.list") {
-                IrohViewedConversation.fromMessageListPath(path)?.let(connectionSession::recordViewedConversation)
-            }
-        },
+        IrohAdminRpcExecutor.Dependencies(
+            supervisor = supervisor,
+            connectionGeneration = ::currentConnectionGeneration,
+            onRequestObserved = { request ->
+                if (request.method == "message.list") {
+                    IrohViewedConversation.fromMessageListPath(request.path)
+                        ?.let(connectionSession::recordViewedConversation)
+                }
+            },
+        ),
     )
 
     private val cronRpcClient = IrohCronRpcClient(
@@ -932,7 +935,7 @@ class IrohChannelTransport(
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
-        adminRpcExecutor.execute(method, path, body)
+        adminRpcExecutor.execute(AdminRpcRequest(method, path, body))
 
     override suspend fun disconnect() {
         connectionSession.stopAndJoin()
@@ -1300,6 +1303,10 @@ class IrohChannelTransport(
         // before falling back to a synthetic cancelled TurnDone.
         internal const val SERVER_TERMINAL_WAIT_MS = 3_000L
         internal const val SUBAGENT_RPC_CAPABILITY = "subagent_registry_v1"
+        private const val SUBAGENT_RPC_UNSUPPORTED = "subagent registry is unavailable on this Iroh node"
+        private const val CRON_RPC_UNSUPPORTED = "cron scheduling is unavailable on this Iroh node"
+        private const val CRON_ADMIN_PATH = "/v1/cron"
+        private val subagentJson = Json { ignoreUnknownKeys = true }
         // letta-mobile-wxy4s: liveness probe cadence lives on IrohLivenessProbe.
         internal const val LIVENESS_PROBE_INTERVAL_MS = IrohLivenessProbe.INTERVAL_MS
         internal const val LIVENESS_PROBE_TIMEOUT_MS = IrohLivenessProbe.TIMEOUT_MS
