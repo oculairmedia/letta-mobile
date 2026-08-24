@@ -15,6 +15,12 @@ data class IrohTurnToken(
     val turnId: String,
 )
 
+data class IrohTurnRegistration(
+    val token: IrohTurnToken,
+    val initialRunId: String,
+    val agentId: String,
+)
+
 /**
  * Per-turn client state shared between streaming send jobs, observer ingest, and cancel.
  */
@@ -78,12 +84,9 @@ class IrohTurnRegistry {
     private val recentlyRetiredRuns = ConcurrentHashMap<String, Long>()
     private val interruptedTurns = ConcurrentHashMap<String, RedialWhileTurnActive>()
 
-    fun tryStart(
-        token: IrohTurnToken,
-        initialRunId: String,
-        agentId: String,
-    ): IrohTryStartResult {
-        val newTurn = IrohActiveTurn(token, initialRunId, agentId)
+    fun tryStart(registration: IrohTurnRegistration): IrohTryStartResult {
+        val token = registration.token
+        val newTurn = IrohActiveTurn(token, registration.initialRunId, registration.agentId)
         var busy: IrohActiveTurn? = null
         activeTurns.compute(token.conversationId) { _, existing ->
             if (existing != null && !existing.terminalReached.isCompleted) {
@@ -96,13 +99,6 @@ class IrohTurnRegistry {
         return busy?.let { IrohTryStartResult.Busy(it, token.turnId) } ?: IrohTryStartResult.Started(newTurn)
     }
 
-    fun tryStart(
-        conversationId: String,
-        turnId: String,
-        initialRunId: String,
-        agentId: String,
-        generation: Long,
-    ): IrohTryStartResult = tryStart(IrohTurnToken(conversationId, generation, turnId), initialRunId, agentId)
 
     fun registerSendJob(conversationId: String, job: Job) {
         activeSendJobs[conversationId] = job

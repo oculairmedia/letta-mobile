@@ -122,11 +122,7 @@ class IrohObserverIngestorTest {
         val connectionGeneration = AtomicLong(1L)
 
         val startResult = turnRegistry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-1",
-            agentId = "agent-1",
-            generation = 1L,
+            IrohTurnRegistration(IrohTurnToken("conv-1", 1L, "turn-1"), "run-1", "agent-1"),
         )
         val activeTurn = (startResult as IrohTryStartResult.Started).turn
 
@@ -196,11 +192,7 @@ class IrohObserverIngestorTest {
         val connectionGeneration = AtomicLong(1L)
 
         val startResult = turnRegistry.tryStart(
-            conversationId = "conv-1",
-            turnId = "turn-1",
-            initialRunId = "run-retired",
-            agentId = "agent-1",
-            generation = 1L,
+            IrohTurnRegistration(IrohTurnToken("conv-1", 1L, "turn-1"), "run-retired", "agent-1"),
         )
         val turn = (startResult as IrohTryStartResult.Started).turn
         turnRegistry.publishTerminal(turn, "completed", "engine")

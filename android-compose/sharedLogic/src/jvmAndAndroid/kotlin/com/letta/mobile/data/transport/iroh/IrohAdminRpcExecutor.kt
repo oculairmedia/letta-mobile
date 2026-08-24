@@ -182,7 +182,7 @@ internal class IrohAdminRpcExecutor(
             "consecutiveFailures" to failures.toString(),
             "idleMs" to idleMs.toString(),
         )
-        supervisor.onConnectionLost("admin_rpc_failed: ${error.message ?: error.toString()}", first)
+        supervisor.onConnectionLost("admin_rpc_failed_after_retry: ${error.message ?: error.toString()}", first)
         val newHandle = supervisor.ready()
         val nextGeneration = connectionGeneration()
         val nextRetryState = retryStateFor(nextGeneration)
