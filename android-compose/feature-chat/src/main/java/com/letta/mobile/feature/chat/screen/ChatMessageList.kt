@@ -15,7 +15,6 @@ import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchGestureBoxParam
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchGestureBox
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffectParams
 import com.letta.mobile.feature.chat.screen.messagelist.ChatMessageListPinchIndicatorEffects
-import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchAnchorState
 import com.letta.mobile.feature.chat.screen.messagelist.ChatPinchFrameBudgetSampler
 import com.letta.mobile.ui.chat.render.ChatMessageGeometryState
 import com.letta.mobile.ui.chat.render.ChatUiState
@@ -96,7 +95,6 @@ internal fun ChatMessageList(
         PinchScalePreviewController(minScale = 0.7f, maxScale = 1.6f, step = 0.02f)
     }
     val pinchFrameBudgetSampler = remember { ChatPinchFrameBudgetSampler() }
-    val pinchAnchorState = remember { ChatPinchAnchorState() }
 
     DisposableEffect(Unit) {
         onDispose { pinchFrameBudgetSampler.cancel() }
@@ -114,7 +112,6 @@ internal fun ChatMessageList(
             onHighlightedMessageIdChange = { highlightedMessageId = it },
             hasScrolledToTarget = hasScrolledToTarget,
             onHasScrolledToTargetChange = { hasScrolledToTarget = it },
-            isPinching = pinchFontScaleController.isPinching || suppressPinchLayoutAnimations,
         ),
     )
 
@@ -187,7 +184,6 @@ internal fun ChatMessageList(
             currentLoadPressureSummary = currentLoadPressureSummary,
             callbacks = callbacks,
             pinchFontScaleController = pinchFontScaleController,
-            pinchAnchorState = pinchAnchorState,
             pinchFrameBudgetSampler = pinchFrameBudgetSampler,
             onPinchTick = { pinchTick = it },
             onPinchAnimationSuppressionTick = { pinchAnimationSuppressionTick = it },

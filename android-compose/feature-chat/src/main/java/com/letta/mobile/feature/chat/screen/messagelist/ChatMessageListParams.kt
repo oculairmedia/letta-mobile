@@ -58,7 +58,6 @@ internal data class ChatMessageListEffectsParams(
     val onHighlightedMessageIdChange: (String?) -> Unit,
     val hasScrolledToTarget: Boolean,
     val onHasScrolledToTargetChange: (Boolean) -> Unit,
-    val isPinching: Boolean,
 )
 
 internal data class ChatMessageListLazyColumnParams(
