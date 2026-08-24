@@ -1,0 +1,18 @@
+# Repository-owned systemd template — letta-mobile-jsfrn.
+# THIS FILE IS NOT THE LIVE UNIT. See scripts/deploy/README-stall-diagnostics.md
+# for the install commands, the incident it exists for, and how to read its output.
+
+[Unit]
+Description=Periodically re-home agent-spawned build daemons (letta-mobile-jsfrn)
+
+[Timer]
+# Gradle/Kotlin daemons are long-lived, so catching them within a minute is
+# ample -- the goal is to stop them ACCUMULATING in the production cgroup, not
+# to intercept them at exec time.
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=15s
+Unit=meridian-build-adopter.service
+
+[Install]
+WantedBy=timers.target
