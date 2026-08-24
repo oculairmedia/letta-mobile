@@ -6,11 +6,11 @@ import java.util.concurrent.ConcurrentHashMap
  * Atomically retains an in-flight turn for [conversationId] or installs [newTurn]
  * after a prior terminal has completed.
  */
-internal fun ConcurrentHashMap<String, IrohChannelTransport.ActiveTurn>.registerUnlessInFlight(
+internal fun ConcurrentHashMap<String, IrohActiveTurn>.registerUnlessInFlight(
     conversationId: String,
-    newTurn: IrohChannelTransport.ActiveTurn,
-): IrohChannelTransport.ActiveTurn? {
-    var collision: IrohChannelTransport.ActiveTurn? = null
+    newTurn: IrohActiveTurn,
+): IrohActiveTurn? {
+    var collision: IrohActiveTurn? = null
     compute(conversationId) { _, existing ->
         if (existing != null && !existing.terminalReached.isCompleted) {
             collision = existing
