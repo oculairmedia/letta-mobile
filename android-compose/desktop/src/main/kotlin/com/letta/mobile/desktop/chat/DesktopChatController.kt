@@ -947,6 +947,7 @@ class DesktopChatController(
 
         timelineJob?.cancel()
         activeLoop?.close()
+        activeLoop = null
         timelineProjector.reset()
         _boundPresenceFacts.value = BoundPresenceFacts()
 

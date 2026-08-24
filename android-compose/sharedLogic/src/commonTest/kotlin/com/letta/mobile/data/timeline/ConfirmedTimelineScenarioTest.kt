@@ -89,33 +89,47 @@ class ConfirmedTimelineScenarioTest {
         override suspend fun prune(backendId: String, maxRetainedConversations: Int) = Unit
     }
 
+    private fun testScope(conversationId: String) =
+        TimelineScope(backendId = "test-backend", conversationId = conversationId)
+
+    private fun testStoredEvent(
+        serverId: String,
+        content: String,
+        position: Double = 1.0,
+        messageType: String = "USER",
+        dateIso: String = "2026-08-23T10:00:00Z",
+    ) = StoredTimelineEvent(
+        position = position,
+        otid = "server-$serverId-${messageType.lowercase()}",
+        content = content,
+        serverId = serverId,
+        messageType = messageType,
+        dateIso = dateIso,
+    )
+
+    private fun testEnvelope(
+        scope: TimelineScope,
+        events: List<StoredTimelineEvent>,
+        revision: Long = 1L,
+        writtenAtMillis: Long = 5000L,
+    ) = StoredTimelineEnvelope(
+        schemaVersion = StoredTimelineEnvelope.CURRENT_SCHEMA_VERSION,
+        scope = scope,
+        revision = revision,
+        events = events,
+        writtenAtMillis = writtenAtMillis,
+    )
+
     @Test
     fun coldStartWithDurableSnapshotRendersImmediatelyBeforeRemoteCall() = runTest {
         val store = InMemoryConfirmedTimelineStore()
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-persisted")
-        val envelope = StoredTimelineEnvelope(
-            schemaVersion = 1,
+        val scope = testScope("conv-persisted")
+        val envelope = testEnvelope(
             scope = scope,
-            revision = 1L,
             events = listOf(
-                StoredTimelineEvent(
-                    position = 1.0,
-                    otid = "server-msg-1-user",
-                    content = "Hello from yesterday",
-                    serverId = "msg-1",
-                    messageType = "USER",
-                    dateIso = "2026-08-23T10:00:00Z",
-                ),
-                StoredTimelineEvent(
-                    position = 2.0,
-                    otid = "server-msg-2-assistant",
-                    content = "I remember you!",
-                    serverId = "msg-2",
-                    messageType = "ASSISTANT",
-                    dateIso = "2026-08-23T10:00:05Z",
-                ),
+                testStoredEvent("msg-1", "Hello from yesterday", position = 1.0, messageType = "USER", dateIso = "2026-08-23T10:00:00Z"),
+                testStoredEvent("msg-2", "I remember you!", position = 2.0, messageType = "ASSISTANT", dateIso = "2026-08-23T10:00:05Z"),
             ),
-            writtenAtMillis = 5000L,
         )
         store.writeSnapshot(envelope)
 
@@ -162,20 +176,12 @@ class ConfirmedTimelineScenarioTest {
     @Test
     fun offlineModePreservesLastKnownGoodContentWithoutLoaderOrBlanking() = runTest {
         val store = InMemoryConfirmedTimelineStore()
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-offline")
-        val envelope = StoredTimelineEnvelope(
-            schemaVersion = 1,
+        val scope = testScope("conv-offline")
+        val envelope = testEnvelope(
             scope = scope,
             revision = 2L,
             events = listOf(
-                StoredTimelineEvent(
-                    position = 1.0,
-                    otid = "otid-off",
-                    content = "Saved offline content",
-                    serverId = "msg-offline-1",
-                    messageType = "user_message",
-                    dateIso = "2026-08-23T11:00:00Z",
-                ),
+                testStoredEvent("msg-offline-1", "Saved offline content", dateIso = "2026-08-23T11:00:00Z"),
             ),
             writtenAtMillis = 6000L,
         )
@@ -209,20 +215,11 @@ class ConfirmedTimelineScenarioTest {
     @Test
     fun slowRefreshMergesBackgroundDeltasWithoutBlanking() = runTest {
         val store = InMemoryConfirmedTimelineStore()
-        val scope = TimelineScope(backendId = "test-backend", conversationId = "conv-slow")
-        val envelope = StoredTimelineEnvelope(
-            schemaVersion = 1,
+        val scope = testScope("conv-slow")
+        val envelope = testEnvelope(
             scope = scope,
-            revision = 1L,
             events = listOf(
-                StoredTimelineEvent(
-                    position = 1.0,
-                    otid = "server-msg-1-user",
-                    content = "Older message",
-                    serverId = "msg-1",
-                    messageType = "USER",
-                    dateIso = "2026-08-23T12:00:00Z",
-                ),
+                testStoredEvent("msg-1", "Older message", dateIso = "2026-08-23T12:00:00Z"),
             ),
             writtenAtMillis = 1000L,
         )
@@ -270,35 +267,15 @@ class ConfirmedTimelineScenarioTest {
     fun rapidConversationSwitchingYieldsTargetSnapshotInstantly() = runTest {
         val store = InMemoryConfirmedTimelineStore()
         store.writeSnapshot(
-            StoredTimelineEnvelope(
-                scope = TimelineScope("test-backend", "conv-A"),
-                revision = 1L,
-                events = listOf(
-                    StoredTimelineEvent(
-                        position = 1.0,
-                        otid = "otid-a",
-                        content = "Chat A",
-                        serverId = "a1",
-                        messageType = "user_message",
-                        dateIso = "2026-08-23T13:00:00Z",
-                    ),
-                ),
+            testEnvelope(
+                scope = testScope("conv-A"),
+                events = listOf(testStoredEvent("a1", "Chat A")),
             ),
         )
         store.writeSnapshot(
-            StoredTimelineEnvelope(
-                scope = TimelineScope("test-backend", "conv-B"),
-                revision = 1L,
-                events = listOf(
-                    StoredTimelineEvent(
-                        position = 1.0,
-                        otid = "otid-b",
-                        content = "Chat B",
-                        serverId = "b1",
-                        messageType = "user_message",
-                        dateIso = "2026-08-23T13:00:00Z",
-                    ),
-                ),
+            testEnvelope(
+                scope = testScope("conv-B"),
+                events = listOf(testStoredEvent("b1", "Chat B")),
             ),
         )
 
@@ -328,7 +305,7 @@ class ConfirmedTimelineScenarioTest {
     @Test
     fun closeCancelsAndJoinsInFlightSnapshotPersistence() = runTest {
         val store = BlockingConfirmedTimelineStore()
-        val scope = TimelineScope("test-backend", "conv-closing")
+        val scope = testScope("conv-closing")
         val loop = TimelineSyncLoop(
             messageApi = FakeTimelineTransport(),
             conversationId = scope.conversationId,
@@ -367,5 +344,49 @@ class ConfirmedTimelineScenarioTest {
         } finally {
             repo.clearAll()
         }
+    }
+
+    @Test
+    fun hydrationPreservesNewerStreamedEventsWithoutPrepending() {
+        val oldEvent = TimelineEvent.Confirmed(
+            position = 1.0,
+            otid = "server-srv-1-user",
+            content = "Oldest message",
+            serverId = "srv-1",
+            messageType = TimelineMessageType.USER,
+            date = parseTimelineInstant("2026-08-23T08:00:00Z"),
+            runId = null,
+            stepId = null,
+        )
+        val newerStreamedEvent = TimelineEvent.Confirmed(
+            position = 3.0,
+            otid = "server-srv-3-assistant",
+            content = "Newer streamed message",
+            serverId = "srv-3",
+            messageType = TimelineMessageType.ASSISTANT,
+            date = parseTimelineInstant("2026-08-23T12:00:00Z"),
+            runId = null,
+            stepId = null,
+        )
+        val timelineBefore = Timeline(
+            conversationId = "conv-order",
+            events = kotlinx.collections.immutable.persistentListOf(oldEvent, newerStreamedEvent),
+        )
+        val serverMiddleMessage = UserMessage(
+            id = "srv-2",
+            date = "2026-08-23T10:00:00Z",
+            contentRaw = kotlinx.serialization.json.JsonPrimitive("Middle message"),
+        )
+
+        val result = TimelineHydrationReducer.reduce(
+            conversationId = "conv-order",
+            serverMessagesChronological = listOf(serverMiddleMessage),
+            timelineBeforeFetch = timelineBefore,
+            currentTimeline = timelineBefore,
+            diskRecords = emptyList(),
+        )
+
+        val contents = result.timeline.events.map { it.content }
+        assertEquals(listOf("Oldest message", "Middle message", "Newer streamed message"), contents)
     }
 }

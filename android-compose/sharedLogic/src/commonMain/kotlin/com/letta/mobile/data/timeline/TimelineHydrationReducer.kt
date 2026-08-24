@@ -70,17 +70,25 @@ object TimelineHydrationReducer {
     ): PreservedEvents {
         val convertedKeys = converted.flatMap { it.identityKeys() }.toHashSet()
         val initialKeys = timelineBeforeFetch.events.flatMap { it.identityKeys() }.toHashSet()
-        val olderConfirmed = timelineBeforeFetch.events.filterIsInstance<TimelineEvent.Confirmed>()
-            .filter { it.identityKeys().none(convertedKeys::contains) }
+        val oldestServerDate = converted.firstOrNull()?.date
+        val (olderConfirmed, newerConfirmed) = if (oldestServerDate != null) {
+            timelineBeforeFetch.events.filterIsInstance<TimelineEvent.Confirmed>()
+                .filter { it.identityKeys().none(convertedKeys::contains) }
+                .partition { compareTimelineInstants(it.date, oldestServerDate) < 0 }
+        } else {
+            val unmatched = timelineBeforeFetch.events.filterIsInstance<TimelineEvent.Confirmed>()
+                .filter { it.identityKeys().none(convertedKeys::contains) }
+            Pair(unmatched, emptyList<TimelineEvent.Confirmed>())
+        }
         val pendingLocals = currentTimeline.events.filterIsInstance<TimelineEvent.Local>()
             .filter { it.deliveryState.isPendingOrRestorable() }
             .filter { local -> converted.none { it.otid == local.otid } }
         val concurrentConfirmed = currentTimeline.events.filterIsInstance<TimelineEvent.Confirmed>()
             .filter { it.identityKeys().none(initialKeys::contains) }
             .filter { it.identityKeys().none(convertedKeys::contains) }
-        val knownOtids = (converted + pendingLocals + olderConfirmed).mapTo(HashSet()) { it.otid }
+        val knownOtids = (converted + pendingLocals + olderConfirmed + newerConfirmed).mapTo(HashSet()) { it.otid }
         val diskLocals = diskRecords.filter { it.otid !in knownOtids }.map { it.toSentEvent() }
-        return PreservedEvents(olderConfirmed, (pendingLocals + concurrentConfirmed).sortedBy { it.position } + diskLocals)
+        return PreservedEvents(olderConfirmed, newerConfirmed + (pendingLocals + concurrentConfirmed).sortedBy { it.position } + diskLocals)
     }
 
     private fun List<TimelineEvent.Confirmed>.mergeWith(

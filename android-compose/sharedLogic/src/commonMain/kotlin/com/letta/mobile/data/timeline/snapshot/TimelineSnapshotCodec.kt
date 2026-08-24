@@ -116,11 +116,28 @@ fun TimelineEvent.Confirmed.toStoredTimelineEvent(): StoredTimelineEvent =
         toolReturnTruncationByCallId = toolReturnTruncationByCallId.mapValues { (_, v) ->
             StoredToolReturnTruncation(messageId = v.messageId, byteLen = v.byteLen)
         },
-        attachments = attachments.map {
-            StoredImageAttachmentPointer(
-                mediaType = it.mediaType,
-                byteSize = it.base64.length.toLong(),
-            )
+        attachments = attachments.mapNotNull {
+            val rawBase64 = it.base64
+            val estimatedBytes = if (rawBase64.isNotEmpty()) {
+                val padding = rawBase64.takeLast(2).count { ch -> ch == '=' }
+                ((rawBase64.length * 3L) / 4L) - padding
+            } else {
+                -1L
+            }
+            val thumbnail = if (rawBase64.isNotEmpty() && rawBase64.length <= 16384) {
+                rawBase64
+            } else {
+                null
+            }
+            if (rawBase64.isEmpty() && thumbnail == null) {
+                null
+            } else {
+                StoredImageAttachmentPointer(
+                    mediaType = it.mediaType,
+                    byteSize = estimatedBytes,
+                    thumbnailBase64 = thumbnail,
+                )
+            }
         },
     )
 
@@ -164,11 +181,13 @@ fun StoredTimelineEvent.toConfirmedTimelineEvent(): TimelineEvent.Confirmed {
         toolReturnTruncationByCallId = toolReturnTruncationByCallId.mapValues { (_, v) ->
             ToolReturnTruncation(messageId = v.messageId, byteLen = v.byteLen)
         }.toPersistentMap(),
-        attachments = attachments.map {
-            MessageContentPart.Image(
-                base64 = it.thumbnailBase64.orEmpty(),
-                mediaType = it.mediaType,
-            )
+        attachments = attachments.mapNotNull { pointer ->
+            pointer.thumbnailBase64?.let { thumb ->
+                MessageContentPart.Image(
+                    base64 = thumb,
+                    mediaType = pointer.mediaType,
+                )
+            }
         }.toPersistentList(),
         source = MessageSource.LETTA_SERVER,
     )

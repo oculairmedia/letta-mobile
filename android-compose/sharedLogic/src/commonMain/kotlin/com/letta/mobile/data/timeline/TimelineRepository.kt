@@ -288,9 +288,15 @@ open class TimelineRepository(
      */
     suspend fun warmConversations(conversationIds: List<Pair<String?, String>>) {
         withContext(timelineIoDispatcher) {
-            conversationIds.take(maxCachedLoops).forEach { (agentId, conversationId) ->
+            val maxWarm = (maxCachedLoops - 2).coerceAtLeast(1)
+            conversationIds.forEach { (agentId, conversationId) ->
                 val key = TimelineCacheKey(agentId = agentId, conversationId = conversationId)
-                getOrCreateLoopWithoutHydrate(key)
+                val shouldWarm = loopsMutex.withLock {
+                    key !in loops && loops.size < maxWarm
+                }
+                if (shouldWarm) {
+                    getOrCreateLoopWithoutHydrate(key)
+                }
             }
         }
     }
