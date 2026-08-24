@@ -223,70 +223,71 @@ class IrohChannelTransport(
         scope = scope,
         configProvider = { explicitConfig ?: activeConfigProvider() },
         dialer = { config -> testDialer?.invoke(config) ?: dial(config) },
-        onStateChanged = { supervisorState ->
-            _state.value = supervisorState.toChannelTransportState()
-            if (supervisorState is IrohConnectionState.Ready) {
-                val generation = connectionGeneration.incrementAndGet()
-                notifyRedialIfTurnActive()
-                // letta-mobile-r3i1z: (re)start the passive observer ingestion loop
-                // bound to THIS connection generation. Any prior collector (tied to
-                // an older, now-dead flow) is cancelled first so a stale collector
-                // never ingests from a torn-down transport.
-                startObserverIngest(supervisorState.handle, generation)
-                // letta-mobile-r3i1z (A): on EVERY fresh Ready — including a silent
-                // redial after a QUIC timeout — re-register this connection as a
-                // viewer of the currently-viewed conversation.
-                viewedMessageListPath?.let { path ->
-                    val conversationId = viewedConversationId.orEmpty()
-                    resubscribeJob?.cancel()
-                    resubscribeJob = scope.launch {
-                        if (connectionGeneration.value != generation) return@launch
-                        Telemetry.event(
-                            "IrohObserver", "resubscribe.begin",
-                            "conversationId" to conversationId,
-                            "generation" to generation.toString(),
-                        )
-                        runCatching {
-                            if (connectionGeneration.value == generation) {
-                                adminRpc(method = "message.list", path = path, body = null)
-                            }
-                        }.onFailure { error ->
-                            if (error is CancellationException) throw error
-                            Telemetry.event(
-                                "IrohObserver", "resubscribe.failed",
-                                "conversationId" to conversationId,
-                                "error" to (error.message ?: error.toString()),
-                                "class" to error::class.simpleName,
-                            )
-                        }
-                    }
-                }
-                // letta-mobile-wxy4s: arm the application-level liveness probe for
-                // THIS connection generation.
-                livenessProbe.start(supervisorState.handle)
-            } else {
-                connectionGeneration.incrementAndGet()
-                resubscribeJob?.cancel()
-                resubscribeJob = null
-                // Snapshot turn identity before a degraded handle is closed and
-                // its send jobs drop their entries from activeTurns. Intentional
-                // disconnects and config replacement must not synthesize redial
-                // recovery.
-                if (supervisorState is IrohConnectionState.Degraded && supervisorState.reason != "config_changed") {
-                    turnRegistry.rememberInterruptedTurns()
-                } else if (supervisorState is IrohConnectionState.Degraded) {
-                    turnRegistry.clearInterruptedTurns()
-                }
-                // Any non-Ready transition (Degraded/Disconnected/Closed/dialing)
-                // stops observer ingestion. On redial a fresh Ready fires and the
-                // collector restarts against the new handle above.
-                stopObserverIngest("state:${supervisorState::class.simpleName}")
-                // letta-mobile-wxy4s: the probe is pinned to a Ready handle; any
-                // non-Ready transition disarms it. A fresh Ready re-arms it above.
-                livenessProbe.stop("state:${supervisorState::class.simpleName}")
-            }
-        },
+        onStateChanged = ::handleSupervisorStateChange,
     )
+
+    private fun handleSupervisorStateChange(state: IrohConnectionState) {
+        _state.value = state.toChannelTransportState()
+        when (state) {
+            is IrohConnectionState.Ready -> handleReadyState(state)
+            else -> handleInactiveState(state)
+        }
+    }
+
+    private fun handleReadyState(state: IrohConnectionState.Ready) {
+        val generation = connectionGeneration.incrementAndGet()
+        notifyRedialIfTurnActive()
+        startObserverIngest(state.handle, generation)
+        resubscribeViewedConversation(generation)
+        livenessProbe.start(state.handle)
+    }
+
+    private fun resubscribeViewedConversation(generation: Long) {
+        val path = viewedMessageListPath ?: return
+        val conversationId = viewedConversationId.orEmpty()
+        resubscribeJob?.cancel()
+        resubscribeJob = scope.launch {
+            if (connectionGeneration.value != generation) return@launch
+            Telemetry.event(
+                "IrohObserver", "resubscribe.begin",
+                "conversationId" to conversationId,
+                "generation" to generation.toString(),
+            )
+            runCatching {
+                if (connectionGeneration.value == generation) {
+                    adminRpc(method = "message.list", path = path, body = null)
+                }
+            }.onFailure { error ->
+                if (error is CancellationException) throw error
+                Telemetry.event(
+                    "IrohObserver", "resubscribe.failed",
+                    "conversationId" to conversationId,
+                    "error" to (error.message ?: error.toString()),
+                    "class" to error::class.simpleName,
+                )
+            }
+        }
+    }
+
+    private fun handleInactiveState(state: IrohConnectionState) {
+        connectionGeneration.incrementAndGet()
+        resubscribeJob?.cancel()
+        resubscribeJob = null
+        updateInterruptedTurns(state)
+        val reason = "state:${state::class.simpleName}"
+        stopObserverIngest(reason)
+        livenessProbe.stop(reason)
+    }
+
+    private fun updateInterruptedTurns(state: IrohConnectionState) {
+        when (state) {
+            is IrohConnectionState.Degraded -> {
+                if (state.reason == "config_changed") turnRegistry.clearInterruptedTurns()
+                else turnRegistry.rememberInterruptedTurns()
+            }
+            else -> Unit
+        }
+    }
 
     /**
      * letta-mobile-wxy4s: application-level connection liveness. QUIC state alone
@@ -414,44 +415,58 @@ class IrohChannelTransport(
      */
     private suspend fun ingestObserverFrame(received: AppServerReceivedFrame) {
         val streamDelta = received.frame as? AppServerInboundFrame.StreamDelta ?: return
-        engineOwnedProjectionScope(streamDelta)?.let { scope ->
-            Telemetry.event(
-                "IrohObserver", "ingest.skip_engine_owned",
-                "conversationId" to scope.conversationId,
-                "turnId" to scope.localTurn.turnId,
-            )
-            projectEngineOwnedObserverDelta(scope, received)
+        val engineScope = engineOwnedProjectionScope(streamDelta)
+        if (engineScope != null) {
+            recordEngineOwnedObserverFrame(engineScope, received)
             return
         }
+        ingestPassiveObserverFrame(streamDelta, received)
+    }
+
+    private suspend fun recordEngineOwnedObserverFrame(
+        scope: ObserverProjectionScope,
+        received: AppServerReceivedFrame,
+    ) {
+        Telemetry.event(
+            "IrohObserver", "ingest.skip_engine_owned",
+            "conversationId" to scope.conversationId,
+            "turnId" to scope.localTurn.turnId,
+        )
+        projectEngineOwnedObserverDelta(scope, received)
+    }
+
+    private suspend fun ingestPassiveObserverFrame(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        received: AppServerReceivedFrame,
+    ) {
         val conversationId = streamDelta.runtime.conversationId
         val agentId = streamDelta.runtime.agentId
-
-        val deltaObj = streamDelta.delta as? JsonObject
-        val frameRunId = deltaObj?.string("run_id") ?: deltaObj?.string("runId")
-        if (frameRunId != null && turnRegistry.isRetiredRun(IrohRunId(frameRunId))) {
-            Telemetry.event(
-                "IrohObserver", "ingest.skip_already_retired",
-                "conversationId" to conversationId,
-                "runId" to frameRunId,
-            )
-            return
-        }
-
-        // letta-mobile-m6oa1.1 / m6oa1.3: ADDITIVE tap — correlate parent
-        // `Agent` tool_call dispatch/return frames into the subagent correlator
-        // and, when the correlator's observable state advances, publish the
-        // resulting SubagentsUpdated frame(s) through the SAME emitBoth seam the
-        // repository's push-fold already consumes (observePushEvents). This does
-        // NOT consume or alter the projection below; it only observes and then
-        // publishes an additive push frame. The pure reducer decides WHAT to
-        // emit (correlateAgentFrame stays side-effect-light); this suspend
-        // caller does the actual emitBoth.
+        if (isRetiredObserverFrame(streamDelta, conversationId)) return
         correlateAgentFrame(streamDelta).forEach { emitBoth(it) }
+        emitObserverProjection(streamDelta, received, agentId, conversationId)
+    }
 
-        // Project via the EXACT initiator chain: raw StreamDelta -> RuntimeEventDraft
-        // (AppServerRuntimeEventMapper, the same mapper engine.collect uses) ->
-        // ServerFrame(s) (payloadToServerFrames, shared with emitDraft). The
-        // observer supplies only fallback context; wire envelope ids win.
+    private fun isRetiredObserverFrame(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        conversationId: String,
+    ): Boolean {
+        val delta = streamDelta.delta as? JsonObject
+        val runId = delta?.string("run_id") ?: delta?.string("runId")
+        if (runId == null || !turnRegistry.isRetiredRun(IrohRunId(runId))) return false
+        Telemetry.event(
+            "IrohObserver", "ingest.skip_already_retired",
+            "conversationId" to conversationId,
+            "runId" to runId,
+        )
+        return true
+    }
+
+    private suspend fun emitObserverProjection(
+        streamDelta: AppServerInboundFrame.StreamDelta,
+        received: AppServerReceivedFrame,
+        agentId: String,
+        conversationId: String,
+    ) {
         val command = observerTurnCommand(agentId, conversationId)
         observerMapper.map(command, received).forEach { draft ->
             val frames = payloadToServerFrames(
