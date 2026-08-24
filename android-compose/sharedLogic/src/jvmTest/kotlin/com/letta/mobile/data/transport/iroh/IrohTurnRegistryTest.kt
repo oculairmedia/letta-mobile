@@ -35,9 +35,9 @@ class IrohTurnRegistryTest {
     fun promoteRunIdUpdatesSyntheticToRealRunId() {
         val start = startTurn(initialRunId = "iroh-run-synth-1")
         assertTrue(start is IrohTryStartResult.Started)
-        assertTrue(registry.promoteRunId("conv-1", "turn-1", "real-run-123"))
+        assertTrue(registry.promoteRunId(IrohRunPromotion(IrohTurnToken("conv-1", 1L, "turn-1"), "real-run-123")))
         assertEquals("real-run-123", registry.getActiveTurn("conv-1")?.runId)
-        assertFalse(registry.promoteRunId("conv-1", "turn-1", "real-run-456"))
+        assertFalse(registry.promoteRunId(IrohRunPromotion(IrohTurnToken("conv-1", 1L, "turn-1"), "real-run-456")))
     }
 
     @Test
@@ -45,14 +45,14 @@ class IrohTurnRegistryTest {
         val start = startTurn(initialRunId = "real-run-1")
         assertTrue(start is IrohTryStartResult.Started)
         val turn = start.turn
-        assertTrue(registry.publishTerminal(turn, status = "completed", source = "engine"))
+        assertTrue(registry.publishTerminal(IrohTerminalPublication(turn, "completed", "engine")))
         assertTrue(turn.hasTerminal)
         assertEquals("engine", turn.terminalSource)
         assertTrue(turn.terminalReached.isCompleted)
         assertNull(registry.getActiveTurn("conv-1"))
         assertFalse(registry.hasActiveTurn("conv-1"))
         assertTrue(registry.isRetiredRun("real-run-1"))
-        assertFalse(registry.publishTerminal(turn, status = "completed", source = "observer"))
+        assertFalse(registry.publishTerminal(IrohTerminalPublication(turn, "completed", "observer")))
     }
 
     @Test
@@ -68,7 +68,7 @@ class IrohTurnRegistryTest {
         val start = startTurn()
         assertTrue(start is IrohTryStartResult.Started)
         val job = Job()
-        registry.registerSendJob("conv-1", job)
+        registry.registerSendJob(IrohSendJobRegistration("conv-1", job))
         registry.clear()
         assertTrue(job.isCancelled)
         assertTrue(start.turn.terminalReached.isCompleted)
@@ -81,8 +81,6 @@ class IrohTurnRegistryTest {
         turnId: String = "turn-1",
         initialRunId: String = "run-1",
     ): IrohTryStartResult = registry.tryStart(
-        token = IrohTurnToken("conv-1", 1L, turnId),
-        initialRunId = initialRunId,
-        agentId = "agent-1",
+        IrohTurnStartRequest(IrohTurnToken("conv-1", 1L, turnId), initialRunId, "agent-1"),
     )
 }

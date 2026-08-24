@@ -18,6 +18,24 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
+private fun IrohObserverIngestor(
+    scope: TestScope,
+    turnRegistry: IrohTurnRegistry,
+    connectionGeneration: () -> Long,
+    emitBoth: suspend (ServerFrame) -> Unit,
+    adminRpc: suspend (String, String, String?) -> AppServerInboundFrame.AdminRpcResponse,
+    recordFrameOwnership: (String, IrohActiveTurn?) -> Unit,
+): IrohObserverIngestor = IrohObserverIngestor(
+    IrohObserverIngestor.Dependencies(
+        scope = scope,
+        turnRegistry = turnRegistry,
+        connectionGeneration = connectionGeneration,
+        emit = emitBoth,
+        adminRpc = { request -> adminRpc(request.method, request.path, request.body) },
+        recordFrameOwnership = { observation -> recordFrameOwnership(observation.conversationId, observation.localTurn) },
+    ),
+)
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class IrohObserverIngestorTest {
 
@@ -49,7 +67,7 @@ class IrohObserverIngestorTest {
         val generation = AtomicLong(1L)
         val ingestor = observerIngestor(generation, calls)
         val path = "/v1/conversations/conv-123/messages?limit=50"
-        ingestor.recordViewedConversationFrom("message.list", path)
+        ingestor.observeAdminRequest(AdminRpcRequest("message.list", path, null))
         assertEquals("conv-123", ingestor.viewedConversationId)
         assertEquals(path, ingestor.viewedMessageListPath)
 
@@ -83,9 +101,7 @@ class IrohObserverIngestorTest {
         val connectionGeneration = AtomicLong(1L)
 
         val startResult = turnRegistry.tryStart(
-            token = IrohTurnToken("conv-1", 1L, "turn-1"),
-            initialRunId = "run-1",
-            agentId = "agent-1",
+            IrohTurnStartRequest(IrohTurnToken("conv-1", 1L, "turn-1"), "run-1", "agent-1"),
         )
         val activeTurn = (startResult as IrohTryStartResult.Started).turn
 
@@ -155,12 +171,10 @@ class IrohObserverIngestorTest {
         val connectionGeneration = AtomicLong(1L)
 
         val startResult = turnRegistry.tryStart(
-            token = IrohTurnToken("conv-1", 1L, "turn-1"),
-            initialRunId = "run-retired",
-            agentId = "agent-1",
+            IrohTurnStartRequest(IrohTurnToken("conv-1", 1L, "turn-1"), "run-retired", "agent-1"),
         )
         val turn = (startResult as IrohTryStartResult.Started).turn
-        turnRegistry.publishTerminal(turn, "completed", "engine")
+        turnRegistry.publishTerminal(IrohTerminalPublication(turn, "completed", "engine"))
 
         val ingestor = IrohObserverIngestor(
             scope = testScope,

@@ -194,12 +194,14 @@ class IrohChannelTransport(
 
     // letta-mobile-53k65.8: Generation-bound observer ingestion collaborator.
     private val observerIngestor = IrohObserverIngestor(
-        scope = scope,
-        turnRegistry = turnRegistry,
-        connectionGeneration = { connectionGeneration.value },
-        emitBoth = { emitBoth(it) },
-        adminRpc = { method, path, body -> adminRpc(method, path, body) },
-        recordFrameOwnership = { conversationId, localTurn -> recordFrameOwnership(conversationId, localTurn) },
+        IrohObserverIngestor.Dependencies(
+            scope = scope,
+            turnRegistry = turnRegistry,
+            connectionGeneration = { connectionGeneration.value },
+            emit = { emitBoth(it) },
+            adminRpc = { request -> adminRpc(request.method, request.path, request.body) },
+            recordFrameOwnership = ::recordFrameOwnership,
+        ),
     )
 
     /** Test/wiring visibility: subagent correlator and observer state. */
@@ -286,9 +288,11 @@ class IrohChannelTransport(
 
     // letta-mobile-53k65.10: Generation-scoped Admin RPC executor and retry state.
     private val adminRpcExecutor = IrohAdminRpcExecutor(
-        supervisor = supervisor,
-        connectionGeneration = { connectionGeneration.value },
-        recordViewedConversation = { method, path -> observerIngestor.recordViewedConversationFrom(method, path) },
+        IrohAdminRpcExecutor.Dependencies(
+            supervisor = supervisor,
+            connectionGeneration = { connectionGeneration.value },
+            onRequestObserved = observerIngestor::observeAdminRequest,
+        ),
     )
 
     private val cronRpcClient = IrohCronRpcClient(
@@ -360,8 +364,10 @@ class IrohChannelTransport(
         turnRegistry.removeInterruptedTurn(conversationId)
     }
 
-    private fun recordFrameOwnership(conversationId: String, localTurn: IrohActiveTurn?) {
-        val result = turnRegistry.recordFrameOwnership(conversationId, localTurn)
+    private fun recordFrameOwnership(observation: IrohObserverIngestor.FrameObservation) {
+        val conversationId = observation.conversationId
+        val localTurn = observation.localTurn
+        val result = turnRegistry.recordFrameOwnership(IrohFrameOwnershipObservation(conversationId, localTurn))
         if (result is IrohTurnRegistry.FrameOwnershipResult.Switched) {
             Telemetry.event(
                 "IrohObserver", "ingest.ownership_switched",
@@ -420,9 +426,7 @@ class IrohChannelTransport(
         val initialRunId = "iroh-run-${UUID.randomUUID()}"
         val token = IrohTurnToken(conversationId, connectionGeneration.value, turnId)
         val startResult = turnRegistry.tryStart(
-            token = token,
-            initialRunId = initialRunId,
-            agentId = agentId,
+            IrohTurnStartRequest(token, initialRunId, agentId),
         )
         if (startResult is IrohTryStartResult.Busy) {
             Telemetry.event(
@@ -622,7 +626,7 @@ class IrohChannelTransport(
             }
         }
         turn.job = sendJob
-        turnRegistry.registerSendJob(conversationId, sendJob)
+        turnRegistry.registerSendJob(IrohSendJobRegistration(conversationId, sendJob))
         sendJob.invokeOnCompletion {
             val removed = turnRegistry.finish(turn.token)
             if (removed) {
@@ -644,7 +648,7 @@ class IrohChannelTransport(
                     "currentTurnId" to (turnRegistry.getActiveTurn(conversationId)?.turnId ?: ""),
                 )
             }
-            turnRegistry.unregisterSendJob(conversationId, sendJob)
+            turnRegistry.unregisterSendJob(IrohSendJobRegistration(conversationId, sendJob))
         }
         return true
     }
@@ -657,7 +661,7 @@ class IrohChannelTransport(
      */
     private suspend fun emitTurnFrame(turn: IrohActiveTurn, frame: ServerFrame) {
         if (frame is ServerFrame.TurnDone) {
-            if (!turnRegistry.publishTerminal(turn, frame.status, source = "engine")) {
+            if (!turnRegistry.publishTerminal(IrohTerminalPublication(turn, frame.status, "engine"))) {
                 Telemetry.event(
                     "IrohTrace", "transport.turn_done.duplicate_skipped",
                     "turnId" to turn.turnId,
@@ -845,7 +849,7 @@ class IrohChannelTransport(
             //    a cancelled one — routed through the SAME guard so exactly one
             //    terminal is ever emitted for the turn.
             if (serverTerminalStatus == null && !turn.hasTerminal) {
-                if (turnRegistry.publishTerminal(turn, "cancelled", source = "cancel_synthetic")) {
+                if (turnRegistry.publishTerminal(IrohTerminalPublication(turn, "cancelled", "cancel_synthetic"))) {
                     Telemetry.event(
                         "IrohTransport", "cancel.synthetic_terminal",
                         "turnId" to turn.turnId,
@@ -865,7 +869,7 @@ class IrohChannelTransport(
             //    only. Keyed removal: another conversation's in-flight job is
             //    structurally unreachable from here.
             turn.job?.cancel()
-            turn.job?.let { turnRegistry.unregisterSendJob(conversationId, it) }
+            turn.job?.let { turnRegistry.unregisterSendJob(IrohSendJobRegistration(conversationId, it)) }
             if (!turnRegistry.finish(turn.token)) {
                 Telemetry.event(
                     "IrohTransport", "cancel.turn_already_replaced",
@@ -882,7 +886,7 @@ class IrohChannelTransport(
     override fun subscribe(runId: String, cursor: Long): Boolean = false
 
     override suspend fun adminRpc(method: String, path: String, body: String?): AppServerInboundFrame.AdminRpcResponse =
-        adminRpcExecutor.execute(method, path, body)
+        adminRpcExecutor.execute(AdminRpcRequest(method, path, body))
 
     override suspend fun disconnect() {
         connectionGeneration.incrementAndGet()

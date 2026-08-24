@@ -38,15 +38,27 @@ import java.util.UUID
  * - Tracked message list view path and re-subscription on reconnect
  */
 internal class IrohObserverIngestor(
-    private val scope: CoroutineScope,
-    private val turnRegistry: IrohTurnRegistry,
-    private val connectionGeneration: () -> Long,
-    private val emitBoth: suspend (ServerFrame) -> Unit,
-    private val adminRpc: suspend (method: String, path: String, body: String?) -> AppServerInboundFrame.AdminRpcResponse,
-    private val recordFrameOwnership: (conversationId: String, localTurn: IrohActiveTurn?) -> Unit,
-    private val observerMapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper(),
-    internal val subagentCorrelator: SubagentCorrelator = SubagentCorrelator(),
+    private val dependencies: Dependencies,
 ) {
+    internal data class Dependencies(
+        val scope: CoroutineScope,
+        val turnRegistry: IrohTurnRegistry,
+        val connectionGeneration: () -> Long,
+        val emit: suspend (ServerFrame) -> Unit,
+        val adminRpc: suspend (AdminRpcRequest) -> AppServerInboundFrame.AdminRpcResponse,
+        val recordFrameOwnership: (FrameObservation) -> Unit,
+        val observerMapper: AppServerRuntimeEventMapper = AppServerRuntimeEventMapper(),
+        val subagentCorrelator: SubagentCorrelator = SubagentCorrelator(),
+    )
+
+    private val scope get() = dependencies.scope
+    private val turnRegistry get() = dependencies.turnRegistry
+    private val connectionGeneration get() = dependencies.connectionGeneration
+    private val emitBoth get() = dependencies.emit
+    private val adminRpc get() = dependencies.adminRpc
+    private val recordFrameOwnership get() = dependencies.recordFrameOwnership
+    private val observerMapper get() = dependencies.observerMapper
+    internal val subagentCorrelator get() = dependencies.subagentCorrelator
     private val observerGeneration = atomic(0)
 
     @Volatile
@@ -107,28 +119,28 @@ internal class IrohObserverIngestor(
         Telemetry.event("IrohObserver", "ingest.stop", "reason" to reason)
     }
 
-    fun recordViewedConversationFrom(method: String, path: String) {
-        if (method != "message.list") return
-        val conversationId = conversationIdFromMessageListPath(path) ?: return
+    fun observeAdminRequest(request: AdminRpcRequest) {
+        if (request.method != "message.list") return
+        val conversationId = conversationIdFromMessageListPath(request.path) ?: return
         viewedConversationId = conversationId
-        viewedMessageListPath = path
+        viewedMessageListPath = request.path
     }
 
     fun reSubscribeViewedConversation(generation: Long) {
-        val path = viewedMessageListPath ?: return
+        val subscription = viewedMessageListPath?.let { ViewedConversation(it, viewedConversationId, generation) } ?: return
         resubscribeJob?.cancel()
-        resubscribeJob = scope.launch { resubscribe(ViewedConversation(path, viewedConversationId), generation) }
+        resubscribeJob = scope.launch { resubscribe(subscription) }
     }
 
-    private suspend fun resubscribe(view: ViewedConversation, generation: Long) {
-        if (connectionGeneration() != generation) return
+    private suspend fun resubscribe(subscription: ViewedConversation) {
+        if (connectionGeneration() != subscription.generation) return
         Telemetry.event(
             "IrohObserver", "resubscribe.begin",
-            "conversationId" to view.conversationId.orEmpty(),
-            "generation" to generation.toString(),
+            "conversationId" to subscription.conversationId.orEmpty(),
+            "generation" to subscription.generation.toString(),
         )
-        runCatching { adminRpc("message.list", view.path, null) }
-            .onFailure { reportResubscribeFailure(it, view) }
+        runCatching { adminRpc(subscription.request) }
+            .onFailure { reportResubscribeFailure(it, subscription) }
     }
 
     private fun reportResubscribeFailure(error: Throwable, view: ViewedConversation) {
@@ -149,7 +161,7 @@ internal class IrohObserverIngestor(
 
     private suspend fun ingestStreamDelta(context: ObserverFrameContext) {
         val localTurn = turnRegistry.getActiveTurn(context.conversationId)
-        recordFrameOwnership(context.conversationId, localTurn)
+        recordFrameOwnership(FrameObservation(context.conversationId, localTurn))
         if (localTurn == null) {
             ingestPassiveObserverDelta(context)
         } else {
@@ -220,7 +232,7 @@ internal class IrohObserverIngestor(
         }
         val terminal = projectedFrames.firstOrNull { it is ServerFrame.TurnDone }
         if (terminal is ServerFrame.TurnDone) {
-            if (turnRegistry.publishTerminal(scope.localTurn, terminal.status, source = "observer")) {
+            if (turnRegistry.publishTerminal(IrohTerminalPublication(scope.localTurn, terminal.status, "observer"))) {
                 emitBoth(terminal)
             }
         }
@@ -311,7 +323,18 @@ internal class IrohObserverIngestor(
         return id.takeIf { it.isNotBlank() }
     }
 
-    private data class ViewedConversation(val path: String, val conversationId: String?)
+    private data class ViewedConversation(
+        val path: String,
+        val conversationId: String?,
+        val generation: Long,
+    ) {
+        val request: AdminRpcRequest get() = AdminRpcRequest("message.list", path, null)
+    }
+
+    internal data class FrameObservation(
+        val conversationId: String,
+        val localTurn: IrohActiveTurn?,
+    )
 
     private data class ObserverFrameContext(
         val received: AppServerReceivedFrame,

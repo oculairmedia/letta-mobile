@@ -67,6 +67,13 @@ sealed interface IrohTryStartResult {
     data class Busy(val activeTurn: IrohActiveTurn, val rejectedTurnId: String) : IrohTryStartResult
 }
 
+/** Cohesive registry commands prevent conversation, turn, run, and lifecycle values drifting apart. */
+data class IrohTurnStartRequest(val token: IrohTurnToken, val initialRunId: String, val agentId: String)
+data class IrohRunPromotion(val token: IrohTurnToken, val realRunId: String)
+data class IrohTerminalPublication(val turn: IrohActiveTurn, val status: String, val source: String)
+data class IrohFrameOwnershipObservation(val conversationId: String, val localTurn: IrohActiveTurn?)
+data class IrohSendJobRegistration(val conversationId: String, val job: Job)
+
 /**
  * Atomic registry of active turns, send jobs, interrupted turns, and frame ownership
  * for [IrohChannelTransport].
@@ -78,14 +85,10 @@ class IrohTurnRegistry {
     private val recentlyRetiredRuns = ConcurrentHashMap<String, Long>()
     private val interruptedTurns = ConcurrentHashMap<String, RedialWhileTurnActive>()
 
-    fun tryStart(
-        token: IrohTurnToken,
-        initialRunId: String,
-        agentId: String,
-    ): IrohTryStartResult {
-        val newTurn = IrohActiveTurn(token, initialRunId, agentId)
+    fun tryStart(request: IrohTurnStartRequest): IrohTryStartResult {
+        val newTurn = IrohActiveTurn(request.token, request.initialRunId, request.agentId)
         var busy: IrohActiveTurn? = null
-        activeTurns.compute(token.conversationId) { _, existing ->
+        activeTurns.compute(request.token.conversationId) { _, existing ->
             if (existing != null && !existing.terminalReached.isCompleted) {
                 busy = existing
                 existing
@@ -93,17 +96,16 @@ class IrohTurnRegistry {
                 newTurn
             }
         }
-        return busy?.let { IrohTryStartResult.Busy(it, token.turnId) } ?: IrohTryStartResult.Started(newTurn)
+        return busy?.let { IrohTryStartResult.Busy(it, request.token.turnId) } ?: IrohTryStartResult.Started(newTurn)
     }
 
 
-    fun registerSendJob(conversationId: String, job: Job) {
-        activeSendJobs[conversationId] = job
+    fun registerSendJob(registration: IrohSendJobRegistration) {
+        activeSendJobs[registration.conversationId] = registration.job
     }
 
-    fun unregisterSendJob(conversationId: String, job: Job): Boolean {
-        return activeSendJobs.remove(conversationId, job)
-    }
+    fun unregisterSendJob(registration: IrohSendJobRegistration): Boolean =
+        activeSendJobs.remove(registration.conversationId, registration.job)
 
     fun removeSendJob(conversationId: String): Job? = activeSendJobs.remove(conversationId)
     fun getSendJob(conversationId: String): Job? = activeSendJobs[conversationId]
@@ -119,10 +121,10 @@ class IrohTurnRegistry {
     fun concurrentTurns(excludingConversationId: String): List<IrohActiveTurn> =
         activeTurns.values.filter { it.conversationId != excludingConversationId && !it.hasTerminal }
 
-    fun promoteRunId(conversationId: String, turnId: String, realRunId: String): Boolean {
-        val turn = activeTurns[conversationId] ?: return false
-        if (turn.turnId != turnId) return false
-        return turn.promoteRunId(realRunId)
+    fun promoteRunId(promotion: IrohRunPromotion): Boolean {
+        val turn = activeTurns[promotion.token.conversationId] ?: return false
+        if (turn.token != promotion.token) return false
+        return turn.promoteRunId(promotion.realRunId)
     }
 
     fun observeTerminal(conversationId: String, source: String): Boolean {
@@ -130,9 +132,9 @@ class IrohTurnRegistry {
         return turn.tryClaimTerminal(source)
     }
 
-    fun publishTerminal(turn: IrohActiveTurn, status: String, source: String): Boolean {
-        if (!turn.tryClaimTerminal(source)) return false
-        retire(turn, status, source)
+    fun publishTerminal(publication: IrohTerminalPublication): Boolean {
+        if (!publication.turn.tryClaimTerminal(publication.source)) return false
+        retire(publication.turn, publication.status, publication.source)
         return true
     }
 
@@ -169,17 +171,14 @@ class IrohTurnRegistry {
         return valid
     }
 
-    fun recordFrameOwnership(conversationId: String, turn: IrohActiveTurn?): FrameOwnershipResult {
-        val previous = frameOwnershipPath[conversationId]
-        val current = if (turn != null) "engine" else "observer"
-        val switched = previous != null && previous != current
-        if (switched) {
-            frameOwnershipPath[conversationId] = current
+    fun recordFrameOwnership(observation: IrohFrameOwnershipObservation): FrameOwnershipResult {
+        val previous = frameOwnershipPath[observation.conversationId]
+        val current = if (observation.localTurn != null) "engine" else "observer"
+        if (previous != null && previous != current) {
+            frameOwnershipPath[observation.conversationId] = current
             return FrameOwnershipResult.Switched(from = previous, to = current)
         }
-        if (previous == null) {
-            frameOwnershipPath[conversationId] = current
-        }
+        if (previous == null) frameOwnershipPath[observation.conversationId] = current
         return FrameOwnershipResult.Unchanged(current)
     }
 
