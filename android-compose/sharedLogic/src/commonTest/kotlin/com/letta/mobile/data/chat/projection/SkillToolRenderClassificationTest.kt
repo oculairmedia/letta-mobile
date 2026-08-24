@@ -9,6 +9,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+private const val TEST_TIMESTAMP = "2026-04-19T12:00:00Z"
+
 /**
  * Skill tool-call rendering tests for letta-mobile-45e2k.
  *
@@ -224,12 +226,11 @@ class SkillToolRenderClassificationTest {
         content: String = "a-$id",
         runId: String? = null,
         toolCalls: List<UiToolCall>? = null,
-        ts: String = "2026-04-19T12:00:00Z",
     ) = UiMessage(
         id = id,
         role = "assistant",
         content = content,
-        timestamp = ts,
+        timestamp = TEST_TIMESTAMP,
         runId = runId,
         toolCalls = toolCalls,
     )
