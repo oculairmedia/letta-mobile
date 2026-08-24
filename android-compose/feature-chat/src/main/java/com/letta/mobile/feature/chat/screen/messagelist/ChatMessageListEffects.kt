@@ -44,17 +44,18 @@ internal data class ChatMessageListPerformAutoScrollParams(
     val lastStreamingSnapMs: Long,
 )
 
+enum class ChatRestorationState {
+    AwaitingSnapshot,
+    AwaitingFirstLayout,
+    Restored,
+    UserControlled,
+    FollowTail,
+}
+
 @Composable
 internal fun ChatMessageListEffects(params: ChatMessageListEffectsParams) {
     ChatMessageListFocusClearEffect(params.listState)
-    ChatMessageListConversationResetEffect(
-        ChatMessageListConversationResetParams(
-            conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId,
-            renderItems = params.renderItems,
-            listState = params.listState,
-        ),
-    )
-    ChatMessageListAutoScrollEffect(params)
+    ChatMessageListViewportRestorationEffect(params)
     ChatMessageListLoadOlderEffect(params)
     ChatMessageListReleaseOlderEffect(params)
     ChatMessageListScrollToMessageEffect(params)
@@ -73,74 +74,94 @@ private fun ChatMessageListFocusClearEffect(listState: LazyListState) {
 }
 
 @Composable
-private fun ChatMessageListConversationResetEffect(params: ChatMessageListConversationResetParams) {
-    LaunchedEffect(params.conversationId) {
-        if (params.renderItems.isNotEmpty()) {
-            params.listState.scrollToItem(0)
-        }
-        ChatHydrationTrace.current(params.conversationId)?.let { generation ->
-            ChatHydrationTrace.scrollInitialized(generation, correction = "conversation_reset")
-        }
-    }
-}
-
-@Composable
-private fun ChatMessageListAutoScrollEffect(params: ChatMessageListEffectsParams) {
+private fun ChatMessageListViewportRestorationEffect(params: ChatMessageListEffectsParams) {
     val density = LocalDensity.current
     val autoScrollSignature = newestMessageAutoScrollSignature(params.state.messages)
     val isStreamingForAutoScroll by rememberUpdatedState(params.state.isStreaming)
     val conversationId = (params.state.conversationState as? ConversationState.Ready)?.conversationId
 
     var lastStreamingSnapMs by remember { mutableStateOf(0L) }
+    var restorationState by remember(conversationId) {
+        mutableStateOf(
+            if (params.renderItems.isNotEmpty()) ChatRestorationState.AwaitingFirstLayout
+            else ChatRestorationState.AwaitingSnapshot,
+        )
+    }
     var followLatest by remember(conversationId) { mutableStateOf(true) }
-    val lastAutoScrollSignature = remember { mutableStateOf<ChatAutoScrollSignature?>(null) }
+    val lastAutoScrollSignature = remember(conversationId) { mutableStateOf<ChatAutoScrollSignature?>(null) }
 
-    LaunchedEffect(conversationId) {
-        followLatest = true
-        if (params.renderItems.isNotEmpty()) {
-            params.listState.scrollToItem(0)
-        }
-        ChatHydrationTrace.current(conversationId)?.let { generation ->
-            ChatHydrationTrace.scrollInitialized(generation, correction = "follow_latest_reset")
+    // 1. Monotonic restoration state machine: AwaitingSnapshot -> AwaitingFirstLayout -> Restored
+    LaunchedEffect(params.renderItems.size, conversationId) {
+        if (params.renderItems.isNotEmpty() && restorationState == ChatRestorationState.AwaitingSnapshot) {
+            restorationState = ChatRestorationState.AwaitingFirstLayout
         }
     }
 
+    // First layout anchoring: perform exactly ONE synchronous/non-animated restore
+    LaunchedEffect(params.listState, params.renderItems.size, conversationId) {
+        snapshotFlow { params.listState.layoutInfo.totalItemsCount }
+            .distinctUntilChanged()
+            .collect { totalCount ->
+                if (totalCount > 0 && restorationState == ChatRestorationState.AwaitingFirstLayout) {
+                    if (params.listState.firstVisibleItemIndex != 0 || params.listState.firstVisibleItemScrollOffset != 0) {
+                        params.listState.scrollToItem(0)
+                    }
+                    restorationState = ChatRestorationState.Restored
+                    followLatest = true
+                    ChatHydrationTrace.current(conversationId)?.let { generation ->
+                        ChatHydrationTrace.scrollInitialized(generation, correction = "initial_restore")
+                    }
+                }
+            }
+    }
+
+    // 2. Track user-controlled scrolling vs followTail
     LaunchedEffect(params.listState, params.isUserScrolling, params.renderItems.size) {
         snapshotFlow { params.listState.toChatViewportSnapshot(params.isUserScrolling, params.renderItems.size) }
             .distinctUntilChanged()
             .collect { snapshot ->
-                followLatest = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
+                val nextFollowMode = ChatViewportFollowPolicy.nextFollowModeAfterScroll(
                     currentFollowMode = followLatest,
                     snapshot = snapshot,
                 )
+                followLatest = nextFollowMode
+                if (!nextFollowMode && restorationState != ChatRestorationState.AwaitingSnapshot && restorationState != ChatRestorationState.AwaitingFirstLayout) {
+                    restorationState = ChatRestorationState.UserControlled
+                } else if (nextFollowMode && restorationState == ChatRestorationState.UserControlled) {
+                    restorationState = ChatRestorationState.FollowTail
+                }
             }
     }
 
+    // 3. Handle live stream tail updates, incoming user messages, and remote reconciles
     LaunchedEffect(autoScrollSignature, isStreamingForAutoScroll, params.renderItems.size) {
         val signature = autoScrollSignature ?: return@LaunchedEffect
         val previousSignature = lastAutoScrollSignature.value
 
         if (shouldForceScrollOnUserSend(signature, previousSignature?.messageId)) {
             followLatest = true
+            restorationState = ChatRestorationState.FollowTail
             val sendScrollOffset = with(density) { -ChatFadeEdgeLength.roundToPx() }
             params.listState.animateScrollToItem(0, sendScrollOffset)
-        } else if (
-            shouldAutoScrollToLatest(
-                ChatMessageListAutoScrollGate(
-                    signature = signature,
-                    previousSignature = previousSignature,
-                    followLatest = followLatest,
-                    renderItemCount = params.renderItems.size,
-                ),
-            )
-        ) {
-            lastStreamingSnapMs = performAutoScrollToLatest(
-                ChatMessageListPerformAutoScrollParams(
-                    listState = params.listState,
-                    isStreaming = isStreamingForAutoScroll,
-                    lastStreamingSnapMs = lastStreamingSnapMs,
-                ),
-            )
+        } else if (restorationState == ChatRestorationState.Restored || restorationState == ChatRestorationState.FollowTail) {
+            if (
+                shouldAutoScrollToLatest(
+                    ChatMessageListAutoScrollGate(
+                        signature = signature,
+                        previousSignature = previousSignature,
+                        followLatest = followLatest,
+                        renderItemCount = params.renderItems.size,
+                    ),
+                )
+            ) {
+                lastStreamingSnapMs = performAutoScrollToLatest(
+                    ChatMessageListPerformAutoScrollParams(
+                        listState = params.listState,
+                        isStreaming = isStreamingForAutoScroll,
+                        lastStreamingSnapMs = lastStreamingSnapMs,
+                    ),
+                )
+            }
         }
 
         lastAutoScrollSignature.value = signature

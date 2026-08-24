@@ -168,7 +168,8 @@ internal object ChatHydrationTrace {
         it in setOf(
             "timeline", "a2ui", "none", "open", "conversation_open", "initial_frame_settled",
             "stale_generation", "presence_only", "projection_presence", "conversation_reset",
-            "follow_latest_reset", "Full", "AppendTail", "ReplaceTail", "redacted",
+            "follow_latest_reset", "initial_restore", "coalesced_follow", "user_controlled",
+            "stable_viewport_settled", "Full", "AppendTail", "ReplaceTail", "redacted",
         )
     } ?: "redacted"
 }
