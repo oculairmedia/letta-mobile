@@ -107,8 +107,16 @@ class PairCommandTest {
             // not just emitting random pixels.
             val image = ImageIO.read(tmp) ?: error("ImageIO.read returned null")
             val source = BufferedImageLuminanceSource(image)
-            val bitmap = BinaryBitmap(HybridBinarizer(source))
-            val result = MultiFormatReader().decode(bitmap)
+            val hints = mapOf(
+                com.google.zxing.DecodeHintType.POSSIBLE_FORMATS to listOf(com.google.zxing.BarcodeFormat.QR_CODE),
+                com.google.zxing.DecodeHintType.TRY_HARDER to true,
+            )
+            val reader = MultiFormatReader()
+            val result = try {
+                reader.decode(BinaryBitmap(HybridBinarizer(source)), hints)
+            } catch (_: Exception) {
+                reader.decode(BinaryBitmap(com.google.zxing.common.GlobalHistogramBinarizer(source)), hints)
+            }
             assertEquals(qr, result.text, "rendered PNG must decode back to the original qr_invite value")
         } finally {
             tmp.delete()
